@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-09-25: package_installed, a package somebody asked for and the owner approved, filed under
+ *     made: one sentence for an install and one for an update, each naming who asked.
  *   2026-09-24: memory_accessed_by_operator, one sentence per action (opened, searched, deleted,
  *     restored), filed under access: the operator reaching into your entries is news you read here.
  *   2026-09-23: Composed from components/Timeline.js (Timeline, TimelineRow), which emits the
@@ -140,6 +142,11 @@ export function line(item) {
         : tr('home.feed.skillInstalled', 'You installed the skill {name}.').replace('{name}', d.name || '');
     case 'extension_installed':
       return tr('home.feed.extensionInstalled', 'You installed the extension {name}.').replace('{name}', d.name || '');
+    case 'package_installed':
+      return (d.act === 'install'
+        ? tr('home.feed.packageInstalled', 'The package {name} is installed. {who} asked for it.')
+        : tr('home.feed.packageUpdated', 'The package {name} is updated. {who} asked for it.'))
+        .replace('{name}', d.name || '').replace('{who}', d.who || '');
     case 'payment_received':
       return tr('home.feed.paymentReceived', 'You were paid {amount}.').replace('{amount}', d.amount || '');
     case 'payment_sent':
@@ -218,7 +225,7 @@ export function kindCategory(kind) {
   if (k.startsWith('app:')) return 'agent';
   if (['welcome_mat', 'app_published', 'app_updated', 'workspace_record_published',
     'workflow_created', 'workflow_updated', 'workflow_deleted', 'skill_installed',
-    'extension_installed'].includes(k)) return 'made';
+    'extension_installed', 'package_installed'].includes(k)) return 'made';
   if (['agent_connected', 'agent_knocking', 'agent_task_done', 'workflow_run_started',
     'workflow_run_finished', 'app_tool_first_use'].includes(k)) return 'agent';
   // The operator reset sits with 'trouble' rather than with the other two: a second factor that

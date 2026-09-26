@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   v1.4.0 — 2026-09-25 — aimeat_package_install_requests holds a request id constant, so `decision`
+ *     is measured on the decision door instead of being filed as unmeasurable.
  *   v1.3.0 — 2026-09-24 — The connector's aimeat_memory_restore sends owner_scope on the route, as the
  *     CLI does. Failed on the old code first: the connector sent the restore without it.
  *   v1.2.0 — 2026-09-13 — The routes, not only the values: update and activate on the extension
@@ -112,6 +114,9 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // The cortex door has no upload branch over HTTP: every call carries a manifest, and `update`
     // turns the POST into a PUT on the name the manifest declares.
     aimeat_cortex_install: { always: { manifest: 'metadata:\n  name: zqxprobezqx\n' } },
+    // A decision is made ON a request, so `decision` alone is refused before the wire. With a
+    // request named it goes to the decision door, which is the branch that carries it.
+    aimeat_package_install_requests: { always: { request_id: 'zqxrequest_idzqx' } },
 };
 
 /**

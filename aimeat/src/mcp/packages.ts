@@ -21,6 +21,8 @@
  *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.3.0 — 2026-09-25 — install and update go through installOrRequest / updateOrRequest: without
+ *     the words a memory part needs, the answer is a request for the owner, as on the HTTP door.
  *   v1.2.0 — 2026-09-24 — install and update hand the session's scopes to the service, which asks
  *     them for a memory component that writes into the owner's memory, as the HTTP door does.
  *   v1.1.1 — 2026-09-12 — resolveGhii takes the node here too. These tools passed the AGENT's GAII
@@ -38,11 +40,10 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { installPackage } from '../services/package-install.js';
+import { installOrRequest, updateOrRequest, requestedBody } from '../services/package-install-requests.js';
 import { listPackagesFor, getPackageFor } from '../services/package-read.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
 import { composePackageFromApps } from '../services/package-compose.js';
-import { updateInstanceToLatest } from '../services/package-migrate.js';
 import { pullPackage } from '../services/package-pull.js';
 import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
@@ -195,7 +196,7 @@ export function registerPackageTools(
     }, annotationsFor('aimeat_package_update'), async ({ instance_id, dry_run: dryRun }) => {
         const owner = ownerOf();
         const gaii = getAgentGaii();
-        const out = await updateInstanceToLatest({ storage, config },
+        const out = await updateOrRequest({ storage, config },
             { owner, ownerGhii: await resolveGhii(storage, owner, config), sub: gaii, ...grant },
             { instanceId: instance_id, dryRun: dryRun === true });
         if (!out.ok) {
@@ -204,6 +205,8 @@ export function registerPackageTools(
                 isError: true,
             };
         }
+        // Not a failure: the update waits for the owner, and the answer says how it goes on.
+        if ('kind' in out) return { content: [{ type: 'text' as const, text: JSON.stringify(requestedBody(out), null, 2) }] };
         return { content: [{ type: 'text' as const, text: JSON.stringify(out.answer, null, 2) }] };
     });
 
@@ -234,7 +237,7 @@ export function registerPackageTools(
         const owner = parseGaiiLoose(gaii).owner || gaii;
         const ownerGhii = await resolveGhii(storage, owner, config);
 
-        const out = await installPackage(
+        const out = await installOrRequest(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },
             { owner, sub: gaii, ownerGhii, ...grant },
             { groupId: group_id, label, version, dryRun: dryRun === true },
@@ -249,6 +252,11 @@ export function registerPackageTools(
 
         if (out.kind === 'dry-run') {
             return { content: [{ type: 'text' as const, text: JSON.stringify(out.preview, null, 2) }] };
+        }
+
+        // Not a failure: the install waits for the owner, the same 202 the HTTP door answers.
+        if (out.kind === 'requested') {
+            return { content: [{ type: 'text' as const, text: JSON.stringify(requestedBody(out), null, 2) }] };
         }
 
         // The registered names are the addresses that matter afterwards: an app component installs

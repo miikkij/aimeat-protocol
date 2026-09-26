@@ -17,6 +17,8 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-25 -- aimeat_package_install_requests: list, read, approve or decline the
+ *     owner's package install requests.
  *   v1.2.0 -- 2026-09-05 -- aimeat_package_status_set, the act that makes a package installable at
  *     all; and aimeat_package_list sending the parameter names the route reads (it sent ?q= against
  *     a route that reads ?search=, so every filtered list came back unfiltered and said nothing).
@@ -203,7 +205,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
         // through this table, so without an entry here the tool exists on the other two doors and
         // not on the one an agent actually calls.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit. A package that writes into your owner\'s memory, when you lack memory:write and memory:write-as-owner, becomes a request your owner approves.',
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier, from aimeat_package_list.' },
             label: { type: 'string', description: 'What to call this copy, e.g. the company it is for.' },
@@ -219,6 +221,26 @@ export const packageTools: ConnectCliToolDefinition[] = [
             const dryRun = optionalBoolean(input, 'dry_run');
             if (dryRun !== undefined) body.dry_run = dryRun;
             return client.post(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/install`, body);
+        },
+    },
+    {
+        // An install that needed words its caller lacked became a request. A fleet daemon's agent
+        // reads and answers one here, on the node's own rule: never its own, and only with the words.
+        name: 'aimeat_package_install_requests',
+        description: 'List your owner\'s package install requests, read one, or approve or decline one you did not file yourself.',
+        input: {
+            request_id: { type: 'string', description: 'One request. Omit to list them all.' },
+            decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
+        },
+        handler: ({ client }, input) => {
+            const decision = optionalString(input, 'decision');
+            const requestId = optionalString(input, 'request_id');
+            if (decision !== undefined) {
+                // The node checks the word; the one thing checked here is that there is a request to send it to.
+                return client.post(`/v1/package-install-requests/${encodeURIComponent(requiredString(input, 'request_id'))}/decision`, { decision });
+            }
+            if (requestId !== undefined) return client.get(`/v1/package-install-requests/${encodeURIComponent(requestId)}`);
+            return client.get('/v1/package-install-requests');
         },
     },
 ];

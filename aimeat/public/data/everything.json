@@ -1284,10 +1284,10 @@
      "slug": "g-8-packages",
      "cells": [
       "<strong>Packages</strong>",
-      "Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update.",
-      "<code>/v1/packages</code>, <code>/v1/instances</code>, <code>aimeat_package_*</code>"
+      "Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update. When an agent or an app installs a package that writes entries into your memory and it lacks the permission to, the install waits for you instead of failing: one notification with Approve and Decline, which installs it as yours. An agent of yours that holds the permission can approve it from a chat, never its own request. A request you leave undecided expires after seven days.",
+      "<code>/v1/packages</code>, <code>/v1/instances</code>, <code>/v1/package-install-requests</code>, <code>aimeat_package_*</code>"
      ],
-     "plain": "Packages Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update. /v1/packages, /v1/instances, aimeat_package_*"
+     "plain": "Packages Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update. When an agent or an app installs a package that writes entries into your memory and it lacks the permission to, the install waits for you instead of failing: one notification with Approve and Decline, which installs it as yours. An agent of yours that holds the permission can approve it from a chat, never its own request. A request you leave undecided expires after seven days. /v1/packages, /v1/instances, /v1/package-install-requests, aimeat_package_*"
     },
     {
      "slug": "g-8-tracked-responses",

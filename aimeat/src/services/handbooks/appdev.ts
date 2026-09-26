@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-25 — The package line says what an install without the memory words answers, and names
+ *     aimeat_package_install_requests.
  *   2026-09-19 — The build flow names the track first: a new app goes on Atelier, from a genre, and
  *     the flow sent every builder straight to the Classic specification.
  *   2026-09-19 — Decisions in an app: aimeat-decide.js, the data map row, English, the app's
@@ -37,7 +39,10 @@ FILENAME, on every surface — MCP, the connector, and \`/local/call\`.
 \`aimeat_package_get\` · \`aimeat_package_compose\` · \`aimeat_package_status_set\` ·
 \`aimeat_package_install\`, addressed by \`group_id\` (authoring a package by hand and pruning its
 history are done from the connector at a keyboard, not here). If you want the thing a person opens in a
-browser, you want the app tools above.
+browser, you want the app tools above. A package that writes entries into the owner's memory needs
+memory:write and memory:write-as-owner; without them the install answers \`status: awaiting_owner\` and
+a \`request_id\`, and it happens once the owner approves. \`aimeat_package_install_requests\` lists
+those requests, and lets you approve one you did not file when you hold the words.
 
 **Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
 \`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with

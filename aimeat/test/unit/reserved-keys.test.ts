@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-25 — `packages.install-requests.` is the fifteenth: an install request the
+ *     decision door performs as the owner.
  *   v1.x — 2026-09-25 — `notif.`, the first PREFIX only the node writes: a notification's buttons run
  *     with the owner's session, so no principal writes one, and its neighbours are untouched.
  *   v1.x — 2026-09-24 — `__redirect__`, the first key only the node writes: exact, and reserved.
@@ -50,7 +52,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all fourteen, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all fifteen, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -72,9 +74,21 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // point every agent this owner has at an endpoint of its choosing. `crews.llm.catalog` lives in
         // the agent's own namespace since 2026-09-16; the prefix still keeps a forged one out of the
         // owner's.
+        // `packages.install-requests.` (2026-09-25): an install an agent or an app could not do alone,
+        // waiting for the owner. The decision door installs what the record names, as the owner.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.'],
         );
+    });
+
+    it('refuses a granted app and a delegated agent the install requests, and leaves the rest of `packages.` alone', () => {
+        const key = 'packages.install-requests.6c1f2a90-0000-4000-8000-000000000001';
+        expect(isReservedServerKey(key)).toBe(true);
+        expect(appMayWriteKey(['app'], key)).toBe(false);
+        expect(appMayWriteKey(['agent'], key, true)).toBe(false);
+        expect(appMayWriteKey(['owner'], key)).toBe(true);
+        expect(isReservedServerKey('packages.favourites')).toBe(false);
+        expect(isReservedServerKey('packages.install-requestsx.1')).toBe(false);
     });
 
     it('refuses a granted app the decision key and the scrubber policy, and lets the owner write them', () => {

@@ -12,6 +12,9 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-25 -- aimeat_package_install_requests: list, read, approve or decline the
+ *     owner's package install requests; install and update say that lacking the memory words makes
+ *     a request instead of a refusal.
  *   v1.3.1 -- 2026-09-24 -- aimeat_package_install names the two memory words a package that seeds
  *     memory records costs an agent.
  *   v1.3.0 -- 2026-09-05 -- aimeat_package_status_set, because publishing was reachable on no
@@ -138,7 +141,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // exists and is what a component the owner EDITED goes through; this one moves everything
         // that can move safely and names the rest.
         name: 'aimeat_package_update',
-        description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten.',
+        description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten. A new version that writes into your owner\'s memory, when you lack memory:write and memory:write-as-owner, becomes a request your owner approves (status awaiting_owner).',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -151,7 +154,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -159,6 +162,19 @@ export const packagesTools: AimeatToolDefinition[] = [
             label: { type: 'string', description: 'What to call this copy, e.g. the company it is for.' },
             version: { type: 'string', description: 'A specific version. Defaults to the latest published one.' },
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
+        },
+    },
+    {
+        // An install, update or migration that needed words its caller lacked became a request; this
+        // is how one is read and answered from a chat. The owner in person answers on the
+        // notification; an agent of theirs answers here, and only for a request it did not file.
+        name: 'aimeat_package_install_requests',
+        description: 'List your owner\'s package install requests, read one, or approve or decline one. You may approve a request only when you did not file it yourself and you hold packages:write, memory:write and memory:write-as-owner; otherwise your owner approves it on their Notifications page. You may decline any request you did not file.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            request_id: { type: 'string', description: 'One request. Omit to list them all.' },
+            decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
         },
     },
 ];

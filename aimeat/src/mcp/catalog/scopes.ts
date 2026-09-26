@@ -21,6 +21,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.28.0 -- 2026-09-25 -- aimeat_package_install_requests -> packages:write, the word the three
+ *     /v1/package-install-requests doors ask.
  *   v1.27.0 -- 2026-09-24 -- SECURITY (audit A5-1): aimeat_mail_search, aimeat_mail_read and
  *     aimeat_mail_aliases ride connections:read-through instead of connections:use.
  *   v1.26.0 -- 2026-09-24 -- SECURITY (audit A8-1): the node administration block leaves
@@ -259,6 +261,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     // declares, all under the owner's identity — a write with a long tail, and its own word on the
     // consent screen. Same scope POST /v1/packages/:groupId/install requires.
     aimeat_package_install:                   'packages:write',
+    // Reading and deciding the install requests. The same word /v1/package-install-requests asks on
+    // all three doors: approving an install is taking part in installing. The words the install itself
+    // needs are asked of the approving agent inside the service, not here.
+    aimeat_package_install_requests:          'packages:write',
 
     // A capability is how this account offers work to others, so writing one speaks in the
     // owner's name.

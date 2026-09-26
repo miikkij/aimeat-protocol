@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-25 — aimeat_package_install_requests on `appdev` and `agent`, beside the install it answers.
  *   2026-09-24 — aimeat_theme_policy_set beside the other theme tools.
  *   2026-09-24 — aimeat_theme_style_save and aimeat_theme_component_css_set beside the other theme tools.
  *   2026-09-24 — aimeat_theme_list, aimeat_theme_get and aimeat_theme_save on the agent and admin surfaces.
@@ -139,7 +140,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
         'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
-        'aimeat_package_pull',
+        'aimeat_package_pull', 'aimeat_package_install_requests',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
         'aimeat_app_seo_set', 'aimeat_app_marks_set', 'aimeat_app_legal_set', 'aimeat_app_audit', 'aimeat_seo_status',
@@ -209,6 +210,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_pull',
+        // An install that lacked the words becomes a request; the person's own agent answers it here.
+        'aimeat_package_install_requests',
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',
