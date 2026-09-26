@@ -33,6 +33,8 @@
  *     again"; the owner's own save is unaffected.
  *   v1.11.0 — 2026-09-25 — An agent step costs work:request for a workflow saved from 2026-09-25 on,
  *     at save, at a run and at the trigger; one saved before keeps running without it.
+ *   v1.12.0 — 2026-09-26 — The refusal's two buttons carry their own locale keys, so the bell and the
+ *     Notifications page say them in the reader's language.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -1414,6 +1416,10 @@ async function run() {
       `"Run as me" calls the owner's door for this refusal: ${JSON.stringify(runAsMe)}`);
     assert(approve?.kind === 'navigate' && /tab=agents/.test(approve.link) && /agent=wf-trig-saver/.test(approve.link),
       `"Approve again" opens that agent's permissions: ${JSON.stringify(approve)}`);
+    // Each button carries its own words, a key under `notiftext.`, so the bell and the Notifications
+    // page say it in the reader's language; `label` stays the English fallback a push shows.
+    assert(runAsMe?.i18n?.key === 'workflow_run_refused.run_as_me' && approve?.i18n?.key === 'workflow_run_refused.approve_again',
+      `the buttons say their words in the reader's language: ${JSON.stringify(note.actions)}`);
 
     // In chat: the owner's AI reads the same refusal with aimeat_workflow_get.
     const reader = await mintAgent('wf-trig-reader', ['workflow:read']);

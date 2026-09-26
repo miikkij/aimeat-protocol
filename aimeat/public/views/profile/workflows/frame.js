@@ -10,6 +10,9 @@
  * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · verdictOf · workflowRows · crumb · renderPage
  * @usage import { renderPage, verdictOf, signalWords } from './frame.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-26 -- Words for a run the node stopped at its spending limit and one its trigger
+ *            did not start, and the verdict says why in the reader's language: the cap, the spend
+ *            and the step, or who saved the workflow and what they lack.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Työnkulkujen sivu", direction A).
@@ -18,7 +21,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { date as fmtDate } from '/js/format.js';
+import { date as fmtDate, money } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { cronWords } from '../scheduler/cron-words.js';
 
@@ -48,11 +51,11 @@ export function durationWords(ms) {
 export const minutesWords = (min) => durationWords(min * 60000);
 
 /* ── the words ─────────────────────────────────────────────────────────────────────────────── */
-export const RUN_WORDS = { done: 'run.done', partial: 'run.partial', 'waiting-step': 'run.waiting', running: 'run.running', cancelled: 'run.cancelled', red: 'run.red' };
+export const RUN_WORDS = { done: 'run.done', partial: 'run.partial', 'waiting-step': 'run.waiting', running: 'run.running', cancelled: 'run.cancelled', red: 'run.red', stopped: 'run.stopped', refused: 'run.refused' };
 export const STEP_WORDS = { green: 'step.green', 'output-red': 'step.outputRed', 'input-red': 'step.inputRed', 'timed-out': 'step.timedOut', 'agent-offline': 'step.offline', skipped: 'step.skipped', 'waiting-human': 'step.waitingHuman', dispatched: 'step.dispatched', pending: 'step.pending' };
 export const runWord = (s) => (s ? c(RUN_WORDS[s] || 'run.unknown') : '·');
 export const stepWord = (s) => (s ? c(STEP_WORDS[s] || 'step.pending') : '·');
-export const runTone = (s) => (s === 'done' ? 'ok' : s === 'partial' || s === 'red' ? 'bad' : s === 'waiting-step' || s === 'running' ? 'wait' : '');
+export const runTone = (s) => (s === 'done' ? 'ok' : s === 'partial' || s === 'red' || s === 'stopped' || s === 'refused' ? 'bad' : s === 'waiting-step' || s === 'running' ? 'wait' : '');
 export const stepTone = (s) => (s === 'green' ? 'ok' : s === 'output-red' || s === 'input-red' || s === 'timed-out' || s === 'agent-offline' ? 'bad' : s === 'waiting-human' || s === 'dispatched' ? 'wait' : '');
 export const isRed = (s) => s === 'output-red' || s === 'input-red' || s === 'timed-out' || s === 'agent-offline';
 
@@ -126,6 +129,18 @@ export function verdictOf(run) {
   if (run.status === 'running' || run.status === 'waiting-step') {
     const busy = steps.filter(s => st(s.id) === 'dispatched').map(s => name(s.id));
     return { tone: 'wait', head: busy.length ? c('verdict.running', { steps: busy.join(', ') }) : c('verdict.starting'), sub: c('verdict.runningSub', { n: green, total: steps.length, when }) };
+  }
+  // The node ended the run at its spending limit, or its trigger did not start it: said from the
+  // numbers and names the run keeps, in the reader's language (the run's own `reason` is English).
+  if (run.status === 'stopped') {
+    const cap = run.costCap;
+    const head = cap ? c('verdict.stopped', { step: name(cap.stoppedBefore), spent: money(cap.spentUsd), cap: money(cap.capUsd) }) : c('verdict.stoppedPlain');
+    return { tone: 'bad', head, sub: c('verdict.doneSub', { n: green, total: steps.length, when, took }) };
+  }
+  if (run.status === 'refused') {
+    const r = run.refusal || {};
+    const head = r.gone ? c('verdict.refusedGone', { saver: r.saverName || '' }) : c('verdict.refused', { saver: r.saverName || '', words: (r.missing || []).join(', ') });
+    return { tone: 'bad', head, sub: c('verdict.refusedSub', { last: rel(r.lastAttemptAt || run.startedAt), when }) };
   }
   if (run.status === 'cancelled') return { tone: '', head: c('verdict.cancelled'), sub: c('verdict.doneSub', { n: green, total: steps.length, when, took }) };
   if (run.status === 'done') return { tone: 'ok', head: c('verdict.done', { total: steps.length }), sub: c('verdict.doneSub', { n: green, total: steps.length, when, took }) };

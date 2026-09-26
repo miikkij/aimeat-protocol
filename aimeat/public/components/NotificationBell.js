@@ -13,6 +13,8 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.8.0 — 2026-09-26 — A link that names an agent (?tab=agents&agent=<name>) opens that agent's
+ *     row.
  *   v1.7.0 — 2026-09-26 — A button that carries its own words (`i18n`) is said in the reader's
  *     language (actionTextOf), such as "Allow reading" with the app's name.
  *   v1.6.0 — 2026-09-25 — An api button runs only when it calls a door of this node's own API
@@ -103,6 +105,10 @@ export function openNotificationLink(link, onNavigate) {
       try {
         sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
         if (tabId === 'messages' && rest) sessionStorage.setItem('aimeat.inbox.open', rest);
+        // `?tab=agents&agent=<name>` names one agent: the navigation below drops the query, so the
+        // name goes where the Agents tab looks for it on mount, as it does for the home card.
+        const agent = url.searchParams.get('agent');
+        if (tabId === 'agents' && agent) sessionStorage.setItem('aimeat.agents.open', agent);
       // eslint-disable-next-line aimeat/no-silent-catch -- noop
       } catch { /* noop */ }
       if (onNavigate) onNavigate('/v1/profile');
