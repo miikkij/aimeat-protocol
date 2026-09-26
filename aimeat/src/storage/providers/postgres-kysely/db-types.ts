@@ -915,6 +915,7 @@ export interface AppGrant {
   id: Generated<string>;
   lastUsedAt: Timestamp | null;
   owner: string;
+  ownerAddedScopes: string[] | null;
   refreshTokenHash: string | null;
   revoked: Generated<boolean>;
   scopes: string[] | null;

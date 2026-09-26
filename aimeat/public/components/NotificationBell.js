@@ -13,6 +13,8 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.7.0 — 2026-09-26 — A button that carries its own words (`i18n`) is said in the reader's
+ *     language (actionTextOf), such as "Allow reading" with the app's name.
  *   v1.6.0 — 2026-09-25 — An api button runs only when it calls a door of this node's own API
  *     (isRunnableActionEndpoint); any other says why it was not used, and nothing is sent.
  *   v1.1.0 — 2026-09-24 — A notification's actions are the shared menu row, in a column; the action's
@@ -38,7 +40,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
-import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint } from '/js/services/notifications.js';
+import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf } from '/js/services/notifications.js';
 import { ago } from '/js/format.js';
 const html = htm.bind(h);
 
@@ -179,7 +181,7 @@ export function NotificationBell({ t, onNavigate }) {
     openNotificationLink(n.link, onNavigate);
   };
 
-  const actionLabel = (a) => tr(ACTION_I18N[a.id], a.label || a.id);
+  const actionLabel = (a) => actionTextOf(a) || tr(ACTION_I18N[a.id], a.label || a.id);
 
   // 'api' action (approve/deny/accept/decline/reject): call the endpoint with the owner's session.
   // Every button that is not a reply or a link lands here, so the endpoint is judged here: only a door

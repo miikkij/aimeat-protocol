@@ -10,6 +10,8 @@
  *   the page may run with the owner's session (isRunnableActionEndpoint).
  * @usage import * as notif from '/js/services/notifications.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — actionTextOf: a button that carries a locale key and variables is said in
+ *     the reader's language, the way a title is.
  *   v1.1.0 — 2026-09-25 — isRunnableActionEndpoint: the bell, the Notifications page and a push
  *     click run an `api` button only when it calls a door of this node's own API.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
@@ -112,6 +114,8 @@ const said = (key, vars) => { const s = t(key, vars); return s && s !== key ? s 
 /** The title in the reader's language when the record says how; else what the sender wrote. */
 export function titleOf(n) { return (n?.i18n?.key && said(`notiftext.${n.i18n.key}.title`, n.i18n.vars || {})) || n?.title || ''; }
 export function bodyOf(n) { return (n?.i18n?.key && said(`notiftext.${n.i18n.key}.body`, n.i18n.vars || {})) || n?.body || ''; }
+/** A button's words in the reader's language when the button says how (a key under `notiftext.`); else null. */
+export function actionTextOf(a) { return (a?.i18n?.key && said(`notiftext.${a.i18n.key}`, a.i18n.vars || {})) || null; }
 /** The sender as a person reads it: the node's own name, or the app's, extension's, agent's name. */
 export function sourceName(n) { const s = n?.source; if (!s || s.kind === 'aimeat') return 'AIMEAT'; if (s.kind === 'owner') return t('notifpage.kind.owner'); return s.name || s.id || ''; }
 export function kindWord(kind) { return t('notifpage.kind.' + (kind || 'aimeat')); }

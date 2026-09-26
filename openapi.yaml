@@ -7402,7 +7402,11 @@ paths:
     get:
       operationId: listAppGrants
       summary: List the apps the owner has granted access to
-      description: Returns active (non-revoked) app grants with their scopes, origin, and last-used time.
+      description: >-
+        Returns active (non-revoked) app grants with their scopes, origin, and last-used time.
+        `owner_added_scopes` names the words the owner added to a grant by hand
+        (POST /v1/app-grants/{grantId}/read-through); a refresh or a sign-in that follows the app's
+        own declaration keeps them until the owner takes them away.
       tags: [Auth]
       security:
         - BearerAuth: []
@@ -7421,7 +7425,8 @@ paths:
         stamped `scopes_fixed_at`, which the boot-time vocabulary migration honours, so a right the
         person took away does not come back at the next restart. The access token the app already
         holds keeps its claims until it expires; the response says how long that can take
-        (`applies_within_seconds`), and the app's next refresh mints from the narrowed grant. Owner-only.
+        (`applies_within_seconds`), and the app's next refresh mints from the narrowed grant. A word
+        the owner added by hand and now leaves out goes from `owner_added_scopes` too. Owner-only.
       tags: [Auth]
       security:
         - BearerAuth: []
@@ -7455,6 +7460,51 @@ paths:
         - { in: path, name: grantId, required: true, schema: { type: string } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/app-grants/{grantId}/read-through:
+    post:
+      operationId: appGrantAllowReadThrough
+      summary: Let an app that publishes through your accounts read them too
+      description: >-
+        Adds `connections:read-through` to this one grant and nothing else: the app may then read what
+        is in the accounts you have connected (your mail, its attachments, the addresses you send
+        from). Until 2026-09-24 `connections:use` carried reading as well, so this is only for a grant
+        that holds `connections:use`; any other answers 409 NOT_ELIGIBLE, and such an app asks on its
+        own consent screen. The word is recorded in `owner_added_scopes`, so a refresh or a sign-in
+        that follows the app's declaration keeps it until you take it away (here with DELETE, or on
+        the grants page with PATCH /v1/app-grants/{grantId}). Idempotent: a grant that can already
+        read answers `added: false`. The owner in person only: an app, an agent (unless the owner
+        gave it `account:security`) and a session from another node are refused with 403.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: grantId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+    delete:
+      operationId: appGrantRemoveReadThrough
+      summary: Stop an app reading what is in your accounts
+      description: >-
+        Takes `connections:read-through` off this grant, however it got there, and out of
+        `owner_added_scopes`; everything else stays, and the grant is stamped `scopes_fixed_at` as a
+        narrowing by hand. Idempotent: a grant without the word answers `removed: false`. The owner in
+        person only, as for POST.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: grantId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/auth/token/exchange:
@@ -50675,6 +50725,10 @@ paths:
         Needs `connections:read-through`. Reading the LIST of connections is knowing what you
         attached (`connections:read`), publishing and sending through one is `connections:use`, and
         reading what is IN one is its own permission, with its own sentence on the consent screen.
+        An app without it is refused with 403 SCOPE_DENIED, and the message says how an app gets it:
+        it adds `connections:read-through` to its `<meta name="aimeat-scopes">`, and the owner approves
+        it in the consent window. The owner can also allow it for an app that holds
+        `connections:use` (POST /v1/app-grants/{grantId}/read-through).
 
 
         The token never reaches the caller. It is spent here and the answer comes back.

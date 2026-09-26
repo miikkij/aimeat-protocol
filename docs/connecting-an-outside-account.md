@@ -218,7 +218,21 @@ Seven tools, on all three MCP surfaces:
 `aimeat_mail_search`, `aimeat_mail_read` and `aimeat_mail_aliases` read what is in the mailbox, and
 need `connections:read-through`, as does `POST /v1/connections/{id}/read/{resource}` behind them.
 `connections:use` publishes and sends; it does not read. An app granted before 2026-09-24 that
-reads mail needs the owner to grant the new word.
+reads mail needs the owner to grant the new word, and there are two ways:
+
+- **The owner's one tap.** Once per node, every owner who has a mailbox this node can read and apps
+  holding `connections:use` gets one notification that names those apps, with a button per app
+  (three at most; the rest are named, and can ask themselves).
+  The button is `POST /v1/app-grants/{grantId}/read-through`, the owner in person only: it adds that
+  one word to that one grant, only to a grant that holds `connections:use`. `DELETE` on the same
+  address takes it away, as does narrowing the grant on the Access page.
+- **The app asks.** An app refused the read door is told the word and the way: it adds
+  `connections:read-through` to its `<meta name="aimeat-scopes">`, and the owner approves it in the
+  consent window.
+
+A word the owner added by hand is recorded on the grant (`owner_added_scopes` in
+`GET /v1/app-grants`). A refresh and a silent sign-in bring a grant down to what the app declares,
+and they keep that word until the owner takes it away.
 
 ## Configuration
 
