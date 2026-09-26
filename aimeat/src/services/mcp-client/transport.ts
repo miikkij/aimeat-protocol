@@ -27,10 +27,14 @@
  *
  *   A LOCAL PROCESS IS THE ONE THING HERE THAT IS NOT A NETWORK CALL, and its three conditions live
  *   in stdio-policy.ts with the argument for each. This file only asks, at the line that spawns.
- * @structure guardedFetch · guardedFetchNaming · resolveWireAddress · buildTransport · MCP_CONNECT_TIMEOUT_MS
+ * @structure guardedFetch · guardedFetchNaming · resolveWireAddress · buildTransport · MCP_CONNECT_TIMEOUT_MS ·
+ *   MCP_RESPONSE_MAX_BYTES
  * @usage const wire = await resolveWireAddress(storage, server);
  *   if (wire.ok) await client.connect(buildTransport(wire.server, credential));
  * @version-history
+ *   v1.5.0 — 2026-09-26 — Every answer a remote server sends is read with a ceiling that holds while
+ *     it arrives, MCP_RESPONSE_MAX_BYTES, per answer or per event on a stream (secaudit 2026-09, A2-2).
+ *     The SDK held a JSON answer whole before anything measured it.
  *   v1.4.0 — 2026-09-17 — Every request to a remote MCP server carries X-AIMEAT-MCP-Via, set at the
  *     moment of sending from the chain the current request is serving under (hops.ts), so a call
  *     that would come back to a node it already passed through is refused there.
@@ -46,6 +50,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { Transport, FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import { capResponseBody } from '../../utils/read-capped.js';
 import { checkStdioPolicy } from './stdio-policy.js';
 import { MCP_VIA_HEADER, outgoingVia } from './hops.js';
 import type { AimeatConfig } from '../../config.js';
@@ -72,16 +77,34 @@ export const MCP_CONNECT_TIMEOUT_MS = 20_000;
 export const guardedFetch: FetchLike = guardedFetchNaming([]);
 
 /**
+ * The most this node reads of one answer from a remote MCP server, or of one event on its stream.
+ *
+ * The SDK reads a JSON answer with response.json(), which holds the whole body before anything can
+ * measure it, so every ceiling after the read (the tool list's in invoke.ts) was asked only once a
+ * server had sent as much as it liked. 16 MB is past the largest answer this node's own /v1/mcp
+ * gives, a 10 MB file handed back inline in base64, and within the 15 MB it accepts in one request.
+ */
+export const MCP_RESPONSE_MAX_BYTES = 16 * 1024 * 1024;
+
+/**
  * guardedFetch that also drops the named headers on a cross-origin redirect. A static credential may
  * travel in a header of its own name (X-API-Key), which safeFetch cannot know is a secret unless it
  * is told; it followed the redirect with that header and handed the key to the next host.
+ *
+ * Every answer it hands the SDK stops at MCP_RESPONSE_MAX_BYTES while it arrives (utils/read-capped.ts
+ * capResponseBody): a JSON answer as a whole, an event stream event by event. Past it, the read
+ * fails with ResponseTooLargeError and the rest is never read. On a JSON answer the SDK hands that
+ * error to the request; on an event stream it reports the stream as dropped, and the request ends at
+ * its own timeout.
  */
 export function guardedFetchNaming(extraSensitive: string[]): FetchLike {
-  return (url, init) =>
-    safeFetch(typeof url === 'string' ? url : url.toString(), {
+  return async (url, init) => capResponseBody(
+    await safeFetch(typeof url === 'string' ? url : url.toString(), {
       ...init,
       sensitiveHeaders: ['authorization', ...extraSensitive],
-    });
+    }),
+    MCP_RESPONSE_MAX_BYTES,
+  );
 }
 
 /**

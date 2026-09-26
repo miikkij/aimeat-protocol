@@ -19,6 +19,11 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   v1.7.0 — 2026-09-26 — A tool list refused as too large drops the list stored before, so no door
+ *     answers from an older copy of it; MAX_TOOL_LIST_BYTES is 2 MB, since this node's own list
+ *     measured 436,530 bytes; a list cut at the read ceiling (transport.ts MCP_RESPONSE_MAX_BYTES) is
+ *     TOOL_LIST_TOO_LARGE, and a call answer cut there is RESPONSE_TOO_LARGE, 502, the server not
+ *     parked (secaudit 2026-09, A2-2).
  *   v1.6.0 — 2026-09-24 — `ownerInPerson`: the door says whether the caller is the account holder in
  *     person, and only then does the server's owner pass without a scope. An app grant resolves to
  *     its owner's account and passed as them.
@@ -42,7 +47,8 @@ import type {
 } from '../../models/mcp-server-schemas.js';
 import { mcpClientPool } from './pool.js';
 import { openMcpCredential } from './credential.js';
-import { resolveWireAddress } from './transport.js';
+import { resolveWireAddress, MCP_RESPONSE_MAX_BYTES } from './transport.js';
+import { ResponseTooLargeError } from '../../utils/read-capped.js';
 import { refreshMcpOAuth } from './oauth.js';
 import { resolveMcpAccess, applyLockedInput } from './grants.js';
 import { recordUsageCall } from '../usage/usage-buffer.js';
@@ -61,12 +67,18 @@ const CALL_TIMEOUT_MS = 60_000;
 /**
  * The most this node keeps of one server's tool list, measured as it would be stored.
  *
- * A hundred tools with their full schemas come to 100 to 200 KB, so half a megabyte leaves room for
- * the largest real servers. Without a ceiling one attachment decided how much this node stored and
- * then served to every caller the server admits: a single 8 MB description was cached and answered
- * in full. listRemoteTools is the one place a list is stored, so the ceiling holds for every door.
+ * A hundred tools with their full schemas come to 100 to 200 KB, and a peer AIMEAT node is a server
+ * too: this node's own list for an agent holding every word measured 436,530 bytes on 2026-09-26,
+ * 83% of the 512 KB this ceiling was first set to, so about sixty more tools would have made a peer
+ * impossible to attach. 2 MB holds that list four times over. Without a ceiling one attachment
+ * decided how much this node stored and then served to every caller the server admits: a single
+ * 8 MB description was cached and answered in full. listRemoteTools is the one place a list is
+ * stored, so the ceiling holds for every door.
+ *
+ * It is asked of what the SDK has already read. The read itself stops at MCP_RESPONSE_MAX_BYTES
+ * (transport.ts), and a list cut there is refused by the same name.
  */
-const MAX_TOOL_LIST_BYTES = 512 * 1024;
+const MAX_TOOL_LIST_BYTES = 2 * 1024 * 1024;
 
 /** A proxied result. `ok: false` always carries `message`, and `message` is for a person. */
 export type RemoteCallResult =
@@ -96,6 +108,8 @@ export type RemoteCallRefusal =
   | 'LOOP_DETECTED'
   /** The far side's tool list is larger than this node keeps (MAX_TOOL_LIST_BYTES). */
   | 'TOOL_LIST_TOO_LARGE'
+  /** One answer passed what this node reads of one (MCP_RESPONSE_MAX_BYTES), so it was cut off. */
+  | 'RESPONSE_TOO_LARGE'
   | 'TOOL_FAILED';
 
 /**
@@ -135,6 +149,7 @@ export function statusForRemoteRefusal(code: RemoteCallRefusal): number {
     case 'UNREACHABLE':
     case 'UPSTREAM_UNAUTHORIZED':
     case 'TOOL_LIST_TOO_LARGE':
+    case 'RESPONSE_TOO_LARGE':
     case 'TOOL_FAILED':
       return 502;
   }
@@ -296,10 +311,8 @@ export async function listRemoteTools(
     // look parks it. The client is kept: the server answers, only its list is more than we keep.
     const bytes = Buffer.byteLength(JSON.stringify(tools), 'utf8');
     if (bytes > MAX_TOOL_LIST_BYTES) {
-      const message = `"${server.slug}" lists ${Math.ceil(bytes / 1024)} KB of tools, and this node `
-        + `keeps at most ${MAX_TOOL_LIST_BYTES / 1024} KB of one server's list, so nothing was stored.`;
-      await storage.setMcpServerStatus(server.id, 'unreachable', message);
-      return { ok: false, code: 'TOOL_LIST_TOO_LARGE', message };
+      return refuseToolList(storage, server, `"${server.slug}" lists ${Math.ceil(bytes / 1024)} KB of tools, and this node `
+        + `keeps at most ${MAX_TOOL_LIST_BYTES / 1024} KB of one server's list, so nothing was stored.`);
     }
     const hash = toolCacheHash(tools);
     const changed = hash !== server.toolCacheHash;
@@ -307,8 +320,32 @@ export async function listRemoteTools(
     await storage.touchMcpServerOk(server.id);
     return { ok: true, tools, changed };
   } catch (err) {
+    // The read stopped at its own ceiling: the list is larger than this node reads at all.
+    if (isResponseTooLarge(err)) {
+      return refuseToolList(storage, server, `"${server.slug}" answered its tool list with more than `
+        + `${MCP_RESPONSE_MAX_BYTES / 1024 / 1024} MB at once, which is more than this node reads of one answer, so nothing was stored.`);
+    }
     return { ok: false, ...(await parkAndDescribe(storage, server, err)) };
   }
+}
+
+/**
+ * A tool list refused as too large: the server is parked with the reason, and the list stored
+ * before goes too. A server whose list grew past the ceiling was otherwise served from its older
+ * copy by every door that answers from the cache (the REST tools door, the gateway, the flattened
+ * tools) until somebody detached it.
+ */
+async function refuseToolList(
+  storage: Storage, server: McpServerRecord, message: string,
+): Promise<{ ok: false; code: 'TOOL_LIST_TOO_LARGE'; message: string }> {
+  await storage.setMcpServerToolCache(server.id, [], '');
+  await storage.setMcpServerStatus(server.id, 'unreachable', message);
+  return { ok: false, code: 'TOOL_LIST_TOO_LARGE', message };
+}
+
+/** The guarded fetch's ceiling was hit (transport.ts, utils/read-capped.ts), not the network. */
+function isResponseTooLarge(err: unknown): boolean {
+  return err instanceof ResponseTooLargeError || (err as { code?: unknown } | null)?.code === 'RESPONSE_TOO_LARGE';
 }
 
 /**
@@ -341,6 +378,14 @@ async function parkAndDescribe(
       code: 'LOOP_DETECTED',
       // One sentence for both refusals the far side sends with 508: a circle, and a chain too long.
       message: `Calling "${server.slug}" would send this call round in a circle, or through more servers than one call should need, so it was stopped.`,
+    };
+  }
+  // The answer passed what this node reads of one (transport.ts). The server did answer, so it is
+  // not parked and its client is kept: only this one answer was more than this node takes.
+  if (isResponseTooLarge(err)) {
+    return {
+      code: 'RESPONSE_TOO_LARGE',
+      message: `"${server.slug}" answered with more than ${MCP_RESPONSE_MAX_BYTES / 1024 / 1024} MB at once, which is more than this node reads of one answer.`,
     };
   }
   if (isUnauthorized(err)) {
