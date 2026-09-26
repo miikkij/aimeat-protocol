@@ -10,10 +10,20 @@
  *   --radius; it has no literal corner, frame, shadow or case.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 -- 2026-09-26 -- The TagInput component (components/TagInput.js): .tag-input and .tag-input-field,
+ *     the tags then the underlined Text field, the look most tag fields draw (component plan C5).
  *   v1.1.0 -- 2026-09-26 -- The x is the Tag's remove mark (.poster-chip-x); .pj-tag-x goes (a unification: Jouni's decision "Remove mark").
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
  */
 
+/* The TagInput (components/TagInput.js): the tags and the Text field after them in one row that
+   wraps, the look most tag fields draw (Contacts, the memory file form, an agent's card: Tags beside
+   an underlined field). The field takes what room is left in the row. */
+.tag-input { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; min-width: 0; }
+.tag-input > .tag-input-field { flex: 1 1 8rem; width: auto; min-width: 8rem; }
+
+/* The organisms' framed tag box, drawn by views/profile/shared.js TagInput until its page takes the
+   component; then these three rules go. */
 .pj-taginput { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; border: 1.5px solid var(--control-border); border-radius: var(--radius); background: var(--control-bg); padding: 0.3rem 0.45rem; }
 .pj-tag { display: inline-flex; align-items: center; gap: 0.25rem; }
 .pj-taginput-field { flex: 1; min-width: 90px; border: none; background: transparent; color: var(--text); font-size: 0.82rem; outline: none; padding: 0.15rem 0; }

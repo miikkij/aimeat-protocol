@@ -10,6 +10,8 @@
  *   router, the builder, billing, rating, and a delivery's content.
  * @structure default OffersTab({ session, showToast }) — state, loads, handlers, the ctx bag, render
  * @version-history
+ *   v2.3.0 -- 2026-09-26 -- The line while the feed loads is the Note's loading kind; the tab writes no
+ *     class (page group G6).
  *   v2.2.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v2.1.0 -- 2026-09-06 -- Deep link: ?offer=<agent>/<id> opens that offer's page on a cold navigation,
@@ -32,6 +34,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
+import { Note } from '/components/Note.js';
 import * as offersService from '/js/services/offers.js';
 import { swallowed } from '/js/swallowed.js';
 import { buildModel } from './offers/model.js';
@@ -175,7 +178,7 @@ export default function OffersTab({ session, showToast }) {
     } catch (e) { showToast((e && e.message) || t('profile.offers.rateFailed')); }
   };
 
-  if (feed === null) return html`<div class="og og-op"><p class="poster-quiet loading-mark">…</p></div>`;
+  if (feed === null) return html`<${Note} kind="loading">…<//>`;
 
   const ctx = {
     showToast, model, builder, busy, loadingDeliveries: deliverables === null,

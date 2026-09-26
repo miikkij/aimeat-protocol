@@ -15,6 +15,10 @@
  *     change waits for the creator or an admin, or why it was refused, and reload to what is stored
  *     (the section refusal was swallowed). Sections come from the workspace read. Settings sets the
  *     workspace's rule for members' changes.
+ *   v2.3.0 — 2026-09-26 — The page writes no class: the crumb is the library's Crumb (its steps from
+ *     buildBreadcrumb), the loading line the Note, and an empty workspace's head the PageSection with
+ *     its description (HeadDesc) and the loud action. The document tree owns the drag, so the
+ *     draggedDoc ref goes (page migration G2b).
  *   v2.2.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v2.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
  *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
@@ -67,8 +71,13 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { LoadingLine } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { Crumb } from '/components/Crumb.js';
+import { Note } from '/components/Note.js';
+import { Loud } from '/components/Action.js';
+import { PageSection } from '/components/PageSection.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { Row as Line } from '/components/Layout.js';
 import * as orgService from '/js/services/organisms.js';
 import { getGhii } from '/js/services/auth.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -145,7 +154,6 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId],color?}] }
   const [colorsByType, setColorsByType] = useState({});      // { typeName: { instanceId: colorKey } } — optional per-item color tags
   const [editingSec, setEditingSec] = useState(null);        // section id currently being renamed inline
-  const draggedDoc = useRef(null);                            // { type, id } of the doc being dragged
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [showArchived, setShowArchived] = useState(false);   // false = active records, true = archived-only view
   const [delConfirm, setDelConfirm] = useState('');   // typed-name confirmation for delete
@@ -692,18 +700,19 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
 
   const back = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws });
 
-  if (ws === undefined) return html`<div>${back}<${LoadingLine} text=${t('organisms.loading') || 'Loading...'} /></div>`;
+  if (ws === undefined) return html`<div><${Crumb} steps=${back} /><${Note} kind="loading">${t('organisms.loading') || 'Loading...'}<//></div>`;
 
   if (ws === null) {
     return html`
-      <div class="pj-ws">
-        ${back}
-        <div class="poster-section-title">${(org.name || 'Organism')}</div>
-        <div class="section-desc">${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}</div>
-        <button class="poster-slab poster-slab--control" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
-        <${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}
-          onApplied=${load} onOpenSettings=${() => setShowSettings(true)} showRegenerate=${false}
-          manifest=${null} genBusy=${genBusy} setGenBusy=${setGenBusy} />
+      <div>
+        <${Crumb} steps=${back} />
+        <${PageSection} first title=${(org.name || 'Organism')}>
+          <${HeadDesc}>${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}<//>
+          <${Line} above="small"><${Loud} control onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}<//><//>
+          <${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}
+            onApplied=${load} onOpenSettings=${() => setShowSettings(true)} showRegenerate=${false}
+            manifest=${null} genBusy=${genBusy} setGenBusy=${setGenBusy} />
+        <//>
       </div>
     `;
   }
@@ -728,7 +737,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const rctx = {
     orgId, wsId, org, ws, wsName, busy, showArchived, setShowArchived, allTypes, wsCanEdit, showToast, load,
     onBack, onBackToList, activeDoc, setActiveDoc, expandedSeries, setExpandedSeries, editingSec, setEditingSec,
-    expandedRec, setExpandedRec, adding, addingId, addingSchema, addingInitial, draggedDoc,
+    expandedRec, setExpandedRec, adding, addingId, addingSchema, addingInitial,
     sectionsByType, wsEvents, wsObjectives, wsGraph, wsTocSeed, saveWsReadme, onWsMapNav,
     openReadme, setOpenReadme, openMap, setOpenMap, openAi, setOpenAi, showSearch, setShowSearch, railTree, setRailTree,
     share, shareBusy, sharePw, setSharePw, gateOn, showFlow, setShowFlow, showRegenerate, setShowRegenerate,
@@ -744,7 +753,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   };
 
   return html`
-    <div class="pj-ws">
+    <div>
       <${ConfirmUI} />
       ${renderWorkspaceView(rctx)}
     </div>

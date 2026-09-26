@@ -10,6 +10,10 @@
  *   Drawn as markup: <select class="select-field">…</select>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — .select-field--attention (Select attention), main's .inbox-bc-audience--on;
+ *     fix pass.
+ *   v1.1.0 — 2026-09-26 — Drawn by components/Select.js (options as data); the fit and refused cuts
+ *     (component plan C5).
  *   v1.0.0 — 2026-09-25 — Initial, with the values the selects of those tabs draw.
  */
 
@@ -23,3 +27,10 @@
 }
 .select-field:focus { border-color: var(--accent); }
 .select-field:disabled { cursor: not-allowed; }
+/* Fit: as wide as its words, beside a label or in a line (formerly .mem-vis-select, .pf-or-select--sm).
+   Refused: the frame in the danger colour. Both drawn by components/Select.js. */
+.select-field--fit { width: auto; min-width: 9rem; }
+.select-field--invalid { border-color: var(--danger-fg); }
+/* Attention: a choice that widens what an act reaches, while it is set: the coral frame on the pale
+   coral ground (Select attention; main's .inbox-bc-audience--on, the operator's broadcast audience). */
+.select-field--attention { border-color: var(--accent); background: var(--accent-subtle); }

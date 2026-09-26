@@ -12,6 +12,8 @@
  * @structure VoiceRecorder (control) · useRecorder (state machine)
  * @usage <${VoiceRecorder} maxSeconds=${300} onRecorded=${(file, seconds) => …} />
  * @version-history
+ *   v1.2.0 — 2026-09-26 — `small`: the idle button in the small action link's look, so a Settings page
+ *     names a meaning instead of passing .poster-action classes (additive, page group G4).
  *   v1.1.0 — 2026-09-24 — `plain`: the host draws the idle button (the composer's icon button).
  *   v1.0.0 — 2026-08-01 — Initial version (voice messages + STT settings test).
  */
@@ -31,8 +33,10 @@ import { startRecording, isRecordingSupported, fmtDuration } from '/js/services/
  * @param {string} [props.className]    extra class on the idle button (host styling)
  * @param {boolean} [props.plain]       the host draws the idle button itself: `className` only,
  *   without .vr-btn, whose sheet loads after poster.css and would win over a library shape
+ * @param {boolean} [props.small]       the idle button is the small action link (a Settings page's
+ *   look, so the page passes a meaning and no class)
  */
-export function VoiceRecorder({ onRecorded, maxSeconds = 300, disabled = false, label, className = '', plain = false }) {
+export function VoiceRecorder({ onRecorded, maxSeconds = 300, disabled = false, label, className = '', plain = false, small = false }) {
   const [state, setState] = useState('idle');   // idle | starting | recording | finishing
   const [seconds, setSeconds] = useState(0);
   const [level, setLevel] = useState(0);
@@ -112,7 +116,7 @@ export function VoiceRecorder({ onRecorded, maxSeconds = 300, disabled = false, 
 
   return html`
     <span class="vr-wrap">
-      <button type="button" class=${plain ? className : `vr-btn ${className}`} disabled=${disabled || state === 'starting'}
+      <button type="button" class=${plain ? className : `vr-btn${small ? ' poster-action poster-action--small' : ''}${className ? ` ${className}` : ''}`} disabled=${disabled || state === 'starting'}
               onClick=${begin} title=${t('voice.record')} aria-label=${t('voice.record')}>
         <span class="vr-ico" aria-hidden="true">🎤</span>${label ? html`<span class="vr-label">${label}</span>` : null}
       </button>

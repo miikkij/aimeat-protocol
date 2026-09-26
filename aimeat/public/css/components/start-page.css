@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — .start-page--footer: the preference at the foot of the Settings overview
+ *     (formerly profile.css .pf .pf-start-page, values unchanged; page group G8).
  *   v1.1.0 — 2026-09-24 — The choices are tabs; the row keeps the chooser's tab spacing.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1275-1285), so theme.css
  *     holds tokens only (UI consolidation, a move).
@@ -22,4 +24,12 @@
 .start-page-words { display: flex; flex-direction: column; gap: 0.15rem; }
 .start-page-title { font-weight: var(--weight-semibold); color: var(--text); }
 .start-page-seg { align-self: flex-start; display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+
+/* footer: at the foot of a page, separated by the heavy rule so it reads as a footer preference
+   rather than another card; words and tabs on one line (the Settings overview). */
+.start-page.start-page--footer {
+  margin: 4rem 0 1rem; padding-top: 1.2rem; font-family: var(--font-showroom-body);
+  flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+}
+.start-page--footer .start-page-title { font-weight: 800; font-size: 1rem; }
 

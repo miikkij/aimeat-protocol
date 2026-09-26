@@ -5,10 +5,32 @@
  * @description The box a person types into: Enter sends, Shift+Enter opens a line, the field grows
  *   with what is in it, attachments wait above it until sent, and a recorder and a file button sit
  *   beside it. Its look is css/components/composer.css; the catalogue entry is `composer`.
- * @structure Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, attachments,
- *   onDropAttachment, busy, disabled, note, listening, voiceMaxSeconds })
+ *
+ *   Two tones of one component (component plan C2):
+ *   - the chat's (the default): one row, the field, the tools and Send; the page keeps the words
+ *     (`value`, `onInput`) and the files.
+ *   - `tone="message"` (Messages): the field over the whole width with its tools under it, the loud
+ *     action at the end of that line, the bigger editor behind ⤢; it keeps its own draft per
+ *     conversation and its own files (components/MessageComposer.js has the whole API).
+ * @structure Composer({ tone, …}) · ChatComposer({ value, onInput, onSend, onStop, onSpeak, onAttach,
+ *   attachments, onDropAttachment, busy, disabled, note, listening, voiceMaxSeconds, placeholder,
+ *   sendLabel, sending, inputRef, suggest, suggestLabel }) ·
+ *   MessageComposer (components/MessageComposer.js)
+ *   The chat's row, named options for a page that talks to one agent (an agent's Messages tab):
+ *   `placeholder` and `sendLabel` (its own words), `sending` (Send is held and Enter does not send
+ *   twice while a message goes), `inputRef` (the page puts the cursor in the field), `suggest` =
+ *   [{ key, name, desc, onPick }] (what the typed words can become, an agent's slash commands, in a
+ *   list over the field; a press takes one and gives the field the cursor back; `suggestLabel` names
+ *   the list).
  * @usage html`<${Composer} value=${draft} onInput=${setDraft} onSend=${send} onStop=${stop} busy=${busy} />`
+ *        html`<${Composer} tone="message" recipient=${peer} sendLabel=${t('inbox.reply')} sending=${sending}
+ *          onSend=${(recipient, markdown, files, reset) => …} draftKey=${key} focusNonce=${n} />`
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The chat's row takes `placeholder`, `sendLabel`, `sending`, `inputRef` and
+ *     `suggest` (the slash commands over the field, from an agent's Messages tab, where main drew them
+ *     as .pf-agd-autocomplete); additive, the chat's row is unchanged without them.
+ *   v1.2.0 — 2026-09-26 — `tone="message"`: Messages' composer (components/MessageComposer.js) is a
+ *     tone of this component; the chat's row is unchanged.
  *   v1.1.0 — 2026-09-24 — Attach and the microphone are the large icon button (Jouni's decision
  *     "Icon button").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
@@ -19,21 +41,32 @@ import { useRef, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
+import { MessageComposer } from '/components/MessageComposer.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
+/** The Composer: the chat's row, or with `tone="message"` Messages' composer. */
+export function Composer({ tone, ...props }) {
+  return tone === 'message'
+    ? html`<${MessageComposer} ...${props} />`
+    : html`<${ChatComposer} ...${props} />`;
+}
+
 /**
- * The box.
+ * The chat's box.
  *
  * Enter sends and Shift+Enter opens a line, which is what every chat does and therefore what a
  * person's hands already expect. The field grows with what is in it up to a ceiling, so a long ask
  * is readable while being written without the composer eating the conversation.
  */
-export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, attachments = [], onDropAttachment,
-    busy, disabled, note, listening, voiceMaxSeconds = 300 }) {
+export function ChatComposer({ value, onInput, onSend, onStop, onSpeak, onAttach, attachments = [], onDropAttachment,
+    busy, disabled, note, listening, voiceMaxSeconds = 300,
+    placeholder, sendLabel, sending, inputRef, suggest, suggestLabel }) {
     const ref = useRef(null);
     const fileRef = useRef(null);
+    // A page that must put the cursor in the field (an agent's "Other") holds the element too.
+    useEffect(() => { if (inputRef) inputRef.current = ref.current; });
 
     // Re-measured on a resize as well as on every keystroke. Height depends on WIDTH: a line that
     // fits on a desktop wraps on a phone, and a height measured before the turn left the field
@@ -53,12 +86,25 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
     const keydown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            if (!busy && !disabled && value.trim()) onSend();
+            if (!busy && !disabled && !sending && value.trim()) onSend();
         }
     };
 
     return html`
-        <div class="poster-composer poster-row--thing">
+        <div class=${'poster-composer poster-row--thing' + (suggest ? ' poster-composer--suggest' : '')}>
+            ${/* What the typed words can become (an agent's slash commands), over the field; a press
+                  takes one and puts the cursor back in the field. */''}
+            ${suggest && suggest.length > 0 ? html`
+                <ul class="composer-suggest" aria-label=${suggestLabel}>
+                    ${suggest.map((s) => html`
+                        <li key=${s.key ?? s.name}>
+                            <button type="button" class="composer-suggest-item"
+                                onClick=${() => { s.onPick?.(); ref.current?.focus(); }}>
+                                <span class="composer-suggest-name">${s.name}</span>
+                                <span class="composer-suggest-desc">${s.desc || ''}</span>
+                            </button>
+                        </li>`)}
+                </ul>` : ''}
             ${note ? html`<p class="poster-composer-note">${note}</p>` : ''}
             ${listening ? html`<p class="poster-composer-note">${tr('chat.hearing', 'Working out what you said…')}</p>` : ''}
             ${/* Attached and not yet sent. Each one is removable: a picture picked by mistake should
@@ -80,9 +126,9 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
                 <textarea ref=${ref} class="poster-composer-input" rows="1"
                     value=${value}
                     disabled=${disabled}
-                    placeholder=${disabled
+                    placeholder=${placeholder || (disabled
                         ? tr('chat.disabledPlaceholder', 'There is no chat agent here yet.')
-                        : tr('chat.placeholder', 'Ask for something, or describe what you want built.')}
+                        : tr('chat.placeholder', 'Ask for something, or describe what you want built.'))}
                     onInput=${(e) => onInput(e.target.value)}
                     onKeyDown=${keydown}></textarea>
                 ${onAttach && !busy ? html`
@@ -97,8 +143,8 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
                 ${busy
                     ? html`<button type="button" class="btn-outline poster-slab poster-slab--control poster-composer-send" onClick=${onStop}>${tr('chat.stop', 'Stop')}</button>`
                     : html`<button type="button" class="poster-slab poster-slab--control poster-composer-send"
-                        disabled=${disabled || !value.trim()}
-                        onClick=${onSend}>${tr('chat.send', 'Send')}</button>`}
+                        disabled=${disabled || sending || !value.trim()}
+                        onClick=${onSend}>${sendLabel || tr('chat.send', 'Send')}</button>`}
             </div>
         </div>
     `;

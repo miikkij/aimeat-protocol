@@ -5,13 +5,15 @@
  * @description An agent's GAII as a control: the full identifier in small grey typewriter letters with
  *   a copy mark after it, no chrome until the pointer is on it (then the sun under ink words), green
  *   for a moment once it has been copied; it ellipsizes rather than wraps. Drawn by
- *   views/profile/agents/gaii-chip.js (GaiiChip).
+ *   components/GaiiChip.js.
  *   Moved unchanged out of views/agents-detail.css and, for its square corner and its sun under the
  *   pointer, out of views/profile-poster.css (the agent page is the only place that draws it), in
  *   the order the two sheets applied. Both corners read --shape-corner-control, a control's corner
  *   (the part is a button); the skin's rule reads --shape-corner (built-in 0).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The component's own names (gaii-chip, was pf-agd-gaii) without the .pf scope, now that
+ *     the control is components/GaiiChip.js; the values are unchanged (page group G1a).
  *   v1.1.0 — 2026-09-26 — The 4px corner reads --shape-corner-control, a button's corner; the skin's square corner overrides it on every page, so nothing on screen changes (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
  *   v1.0.0 — 2026-09-25 — Moved out of views/agents-detail.css and views/profile-poster.css (UI consolidation phase 5, a move).
  */
@@ -21,7 +23,7 @@
    one unbreakable token, so it ellipsizes when the card is narrow and the whole string still goes
    to the clipboard. The button carries no chrome until it is hovered — it stands in a line of
    plain meta text, and a framed control there would read as the loudest thing on the row. */
-.pf .pf-agd-gaii {
+.gaii-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -38,14 +40,14 @@
   line-height: inherit;
   text-align: left;
 }
-.pf .pf-agd-gaii:hover,
-.pf .pf-agd-gaii:focus-visible {
+.gaii-chip:hover,
+.gaii-chip:focus-visible {
   color: var(--accent, #E8564A);
   background: var(--bg-dim, #F9FAFB);
 }
-.pf .pf-agd-gaii--copied,
-.pf .pf-agd-gaii--copied:hover { color: var(--success, #10b981); }
-.pf .pf-agd-gaii-value {
+.gaii-chip--copied,
+.gaii-chip--copied:hover { color: var(--success, #10b981); }
+.gaii-chip-value {
   min-width: 0;
   font-family: var(--font-mono);
   font-size: 0.72rem;
@@ -53,13 +55,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pf .pf-agd-gaii-mark {
+.gaii-chip-mark {
   flex: none;
   display: inline-flex;
   align-items: center;
   opacity: 0.55;
 }
-.pf .pf-agd-gaii:hover .pf-agd-gaii-mark { opacity: 1; }
+.gaii-chip:hover .gaii-chip-mark { opacity: 1; }
 /* The GAII on a row: square, and the sun under the pointer, the same answer the board tiles give. */
-.pf .pf-agd-gaii { border-radius: var(--shape-corner); }
-.pf .pf-agd-gaii:hover, .pf .pf-agd-gaii:focus-visible { background: var(--sun); color: var(--on-sun); }
+.gaii-chip { border-radius: var(--shape-corner); }
+.gaii-chip:hover, .gaii-chip:focus-visible { background: var(--sun); color: var(--on-sun); }

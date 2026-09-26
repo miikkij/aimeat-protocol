@@ -14,6 +14,13 @@
  *     bundle, and its verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the fields are
+ *     TextField, TextArea and Select with their own label and hint (this file's Field goes), the grids
+ *     are Fields in two or three columns, a member or a task is the Box (its place as the code in its
+ *     head, Remove at its end, the attention frame when the validator points at it), the tools are the
+ *     List's pick rows under Group headings (a decision tool with no key cannot be ticked: pickOff),
+ *     the checks are Check, the validator's lines are the error Note, the parts are Split, and the
+ *     task-order picture is the TaskGraph component.
  *   v1.16.0 -- 2026-09-26 -- The crew form's check lines are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -48,7 +55,18 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { CORE_TOOLS, EXCHANGE_BUNDLE, EXCHANGE_VERBS, toolLabelKey } from './crew-tools.js';
 import { emptyMember, emptyTask } from './crew-templates.js';
-import { TaskDag } from './crew-dag.js';
+import { TaskGraph } from '/components/TaskGraph.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { Box } from '/components/Box.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { List, Row, Name, Desc, Group } from '/components/List.js';
+import { Split, Stack } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const K = 'profile.agents.detail.crew';
@@ -84,9 +102,10 @@ export function anchorErrors(lines) {
   return out;
 }
 
+/** The validator's lines, verbatim, each a refusal said where it points. */
 export function ErrorLines({ lines }) {
   if (!lines || lines.length === 0) return null;
-  return html`<ul class="pf-agd-crew-errors">${lines.map((l, i) => html`<li key=${i}>${l}</li>`)}</ul>`;
+  return html`<${Stack} gap="tight">${lines.map((l, i) => html`<${Note} key=${i} kind="message" error role="status">${l}<//>`)}<//>`;
 }
 
 const isStringList = (v) => Array.isArray(v) && v.every(x => typeof x === 'string');
@@ -98,20 +117,20 @@ const isStringList = (v) => Array.isArray(v) && v.every(x => typeof x === 'strin
  * object survives an edit), and a list this input has no mapper for and cannot show as strings is
  * handed to the JSON editor instead of being flattened to "[object Object]" and written back.
  */
-function ListInput({ value, onChange, placeholder, id, toText, fromText }) {
+function ListInput({ value, onChange, placeholder, id, toText, fromText, label, hint }) {
   const list = Array.isArray(value) ? value : [];
   const canShow = toText ? true : isStringList(list);
   const joined = canShow ? (toText ? toText(list) : list).join(', ') : '';
   const [text, setText] = useState(joined);
   useEffect(() => { setText(joined); }, [joined]);
-  if (!canShow) return html`<${JsonInput} id=${id} value=${list} onChange=${onChange} rows="3" />`;
+  if (!canShow) return html`<${JsonInput} id=${id} label=${label} hint=${hint} value=${list} onChange=${onChange} rows="3" />`;
   const commit = () => {
     if (text === joined) return;
     const names = text.split(',').map(s => s.trim()).filter(Boolean);
     onChange(fromText ? fromText(names, list) : names);
   };
-  return html`<input id=${id} type="text" class="og-input" value=${text} placeholder=${placeholder || ''}
-    onInput=${e => setText(e.target.value)} onBlur=${commit} />`;
+  return html`<${TextField} id=${id} label=${label} hint=${hint} type="text" value=${text} placeholder=${placeholder || ''}
+    onInput=${setText} onBlur=${commit} />`;
 }
 
 /** capabilities.technical is a list of {name, type} objects (the node indexes it for search). Shown
@@ -124,7 +143,7 @@ function technicalFromText(names, prev) {
 }
 
 /** A JSON blob (offers, signals) with local text; parsed on blur, parse errors shown in place. */
-function JsonInput({ value, onChange, id, rows }) {
+function JsonInput({ value, onChange, id, rows, label, hint }) {
   const pretty = value === undefined || value === null ? '' : JSON.stringify(value, null, 2);
   const [text, setText] = useState(pretty);
   const [err, setErr] = useState(null);
@@ -134,20 +153,11 @@ function JsonInput({ value, onChange, id, rows }) {
     try { onChange(JSON.parse(text)); setErr(null); }
     catch (e) { setErr(e.message); }
   };
+  // The refusal is said under the text area (the field's message), with or without a label.
+  const message = err ? { text: t(`${K}.messages.jsonInvalid`, { err }), error: true } : null;
   return html`
-    <textarea id=${id} class="og-textarea" rows=${rows || 4} value=${text}
-      onInput=${e => setText(e.target.value)} onBlur=${commit}></textarea>
-    ${err && html`<div class="form-message form-message--error">${t(`${K}.messages.jsonInvalid`, { err })}</div>`}
-  `;
-}
-
-function Field({ label, hint, children, htmlFor }) {
-  return html`
-    <div class="pf-agd-form-field pf-agd-crew-field">
-      <label class="poster-label" for=${htmlFor}>${label}</label>
-      ${children}
-      ${hint && html`<div class="poster-hint pf-agd-help-text">${hint}</div>`}
-    </div>
+    <${TextArea} id=${id} label=${label} hint=${hint} rows=${Number(rows) || 4} value=${text}
+      message=${message} onInput=${setText} onBlur=${commit} />
   `;
 }
 
@@ -159,7 +169,7 @@ function Field({ label, hint, children, htmlFor }) {
  * fallback for an agent that is offline or older — and it is a copy, which is exactly why it drifted
  * two tools behind before anybody asked the runtime.
  */
-export function ToolMenu({ selected, onChange, idPrefix, runtimeTools, decideTools }) {
+export function ToolMenu({ selected, onChange, runtimeTools, decideTools }) {
   const set = new Set(Array.isArray(selected) ? selected : []);
   // The decision rows: `decide`, one `decide:<rule>` per rule the owner made for agents, and any
   // `decide:` id the definition already names whose rule is gone, so it stays visible and removable.
@@ -186,59 +196,57 @@ export function ToolMenu({ selected, onChange, idPrefix, runtimeTools, decideToo
   // A decision row is ticked only when a key exists somewhere in the order. A ticked one stays
   // untickable, so a definition can always be cleaned up.
   const decideOff = !decideTools?.available;
+  // One tool: its box first, the whole row its label; the id in the typewriter face, what it does after.
+  const toolRow = (id, desc, off = false) => html`
+    <${Row} key=${id} picked=${set.has(id)} pickOff=${off} pickLabel=${id} onPick=${() => toggle(id)}>
+      <${Name} code>${id}<//>
+      <${Desc}>${desc}<//>
+    <//>`;
   const decideRow = (id) => {
     const rule = ruleOf.get(id);
     const desc = id === 'decide' ? t(`${K}.tools.decide`)
       : rule ? t(`${K}.tools.decideRule`, { title: rule.title, decides: rule.decides })
         : t(`${K}.tools.decideRuleGone`);
-    return html`
-      <label key=${id} class=${`pf-agd-crew-tool ${decideOff && !set.has(id) ? 'pf-agd-crew-tool--off' : ''}`}>
-        <input type="checkbox" id=${`${idPrefix}-${id}`} checked=${set.has(id)} disabled=${decideOff && !set.has(id)}
-               onChange=${() => toggle(id)} />
-        <code class="code-inline pf-agd-crew-tool-id">${id}</code>
-        <span class="pf-agd-crew-tool-desc">${desc}</span>
-      </label>`;
+    return toolRow(id, desc, decideOff && !set.has(id));
   };
-  const row = (id) => html`
-    <label key=${id} class="pf-agd-crew-tool">
-      <input type="checkbox" id=${`${idPrefix}-${id}`} checked=${set.has(id)} onChange=${() => toggle(id)} />
-      <code class="code-inline pf-agd-crew-tool-id">${id}</code>
-      <span class="pf-agd-crew-tool-desc">${livePurpose.get(id) || t(toolLabelKey(id))}</span>
-    </label>
-  `;
+  const row = (id) => toolRow(id, livePurpose.get(id) || t(toolLabelKey(id)));
+  const settingsLink = html`<${Action} small href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →<//>`;
   return html`
-    <div class="pf-agd-crew-tools">
-      <div class="pf-agd-crew-tools-group poster-row--thing">
-        <div class="pf-agd-crew-tools-title poster-day-title">${t(`${K}.tools.core`)}</div>
-        ${core.map(row)}
-      </div>
-      <div class="pf-agd-crew-tools-group poster-row--thing">
-        <div class="pf-agd-crew-tools-title poster-day-title">${t(`${K}.tools.exchange`)}</div>
-        ${row(EXCHANGE_BUNDLE)}
-        <button type="button" class="poster-action poster-action--small pf-agd-crew-tools-refine" onClick=${() => setRefine(r => !r)}>
-          ${refine ? '▾' : '▸'} ${t(`${K}.tools.exchangeRefine`)}
-        </button>
-        ${refine && html`<div class="pf-agd-crew-tools-verbs">${verbs.map(row)}</div>`}
-      </div>
-      <div class="pf-agd-crew-tools-group poster-row--thing">
-        <div class="pf-agd-crew-tools-title poster-day-title">${t(`${K}.tools.decisions`)}</div>
+    <${Stack} gap="small">
+      <${Group} title=${t(`${K}.tools.core`)}>
+        <${List} cols="check-name-desc" keepCols dense>${core.map(row)}<//>
+      <//>
+      <${Group} title=${t(`${K}.tools.exchange`)}>
+        <${List} cols="check-name-desc" keepCols dense>${row(EXCHANGE_BUNDLE)}<//>
+        <div>
+          <${Action} small expanded=${refine} onClick=${() => setRefine(r => !r)}>
+            ${refine ? '▾' : '▸'} ${t(`${K}.tools.exchangeRefine`)}
+          <//>
+        </div>
+        ${refine && html`<${List} cols="check-name-desc" keepCols dense under>${verbs.map(row)}<//>`}
+      <//>
+      <${Group} title=${t(`${K}.tools.decisions`)}>
         ${decideOff && html`
-          <p class="poster-hint pf-agd-help-text" role="note">
+          <${Note} role="note">
             ${decideTools && !decideTools.enabled ? t(`${K}.tools.decideOffOperator`) : t(`${K}.tools.decideNoKey`)}
-            ${' '}<a class="poster-action poster-action--small" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a>
-          </p>`}
-        ${decideIds.map(decideRow)}
+            ${' '}${settingsLink}
+          <//>`}
+        <${List} cols="check-name-desc" keepCols dense>${decideIds.map(decideRow)}<//>
         ${!decideOff && ruleIds.length === 0 && html`
-          <p class="poster-hint pf-agd-help-text">${t(`${K}.tools.decideNoRules`)} <a class="poster-action poster-action--small" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a></p>`}
-      </div>
-    </div>
+          <${Note}>${t(`${K}.tools.decideNoRules`)} ${settingsLink}<//>`}
+      <//>
+    <//>
   `;
 }
 
-function SectionHead({ title, lines }) {
+/** A part of the crew form: its heading, the validator's lines for it, and its fields. */
+function Part({ title, lines, children }) {
   return html`
-    <div class="pf-agd-section-title sub-heading">${title}</div>
-    <${ErrorLines} lines=${lines} />
+    <${Split} gap="small">
+      <${SubHeading}>${title}<//>
+      <${ErrorLines} lines=${lines} />
+      ${children}
+    <//>
   `;
 }
 
@@ -247,34 +255,24 @@ export function IdentitySection({ doc, onChange, errors }) {
   const caps = (doc.capabilities && typeof doc.capabilities === 'object') ? doc.capabilities : {};
   const setCap = (k, v) => set({ capabilities: { ...caps, [k]: v } });
   return html`
-    <section class="og-split pf-agd-crew-section">
-      <${SectionHead} title=${t(`${K}.sections.identity`)} lines=${errors.identity} />
-      <${Field} label=${t(`${K}.fields.agentName`)} hint=${t(`${K}.fields.agentNameHint`)} htmlFor="crew-agent-name">
-        <input id="crew-agent-name" type="text" class="og-input" value=${doc.agent_name || ''} readonly />
-      <//>
-      <${Field} label=${t(`${K}.fields.tags`)} hint=${t(`${K}.fields.tagsHint`)} htmlFor="crew-tags">
-        <${ListInput} id="crew-tags" value=${doc.tags} onChange=${v => set({ tags: v })} placeholder="research, news" />
-      <//>
-      <div class="pf-agd-crew-grid3">
-        <${Field} label=${t(`${K}.fields.capTechnical`)} htmlFor="crew-cap-tech">
-          <${ListInput} id="crew-cap-tech" value=${caps.technical} onChange=${v => setCap('technical', v)}
+    <${Part} title=${t(`${K}.sections.identity`)} lines=${errors.identity}>
+      <${Fields}>
+        <${TextField} id="crew-agent-name" label=${t(`${K}.fields.agentName`)} hint=${t(`${K}.fields.agentNameHint`)}
+          type="text" value=${doc.agent_name || ''} readOnly />
+        <${ListInput} id="crew-tags" label=${t(`${K}.fields.tags`)} hint=${t(`${K}.fields.tagsHint`)}
+          value=${doc.tags} onChange=${v => set({ tags: v })} placeholder="research, news" />
+        <${Fields} cols=${3}>
+          <${ListInput} id="crew-cap-tech" label=${t(`${K}.fields.capTechnical`)} value=${caps.technical} onChange=${v => setCap('technical', v)}
             toText=${technicalToText} fromText=${technicalFromText} />
+          <${ListInput} id="crew-cap-domain" label=${t(`${K}.fields.capDomain`)} value=${caps.domain} onChange=${v => setCap('domain', v)} />
+          <${ListInput} id="crew-cap-lang" label=${t(`${K}.fields.capLanguages`)} value=${caps.languages} onChange=${v => setCap('languages', v)} placeholder="fi, en" />
         <//>
-        <${Field} label=${t(`${K}.fields.capDomain`)} htmlFor="crew-cap-domain">
-          <${ListInput} id="crew-cap-domain" value=${caps.domain} onChange=${v => setCap('domain', v)} />
-        <//>
-        <${Field} label=${t(`${K}.fields.capLanguages`)} htmlFor="crew-cap-lang">
-          <${ListInput} id="crew-cap-lang" value=${caps.languages} onChange=${v => setCap('languages', v)} placeholder="fi, en" />
-        <//>
-      </div>
-      <${Field} label=${t(`${K}.fields.skills`)} hint=${t(`${K}.fields.skillsHint`)} htmlFor="crew-skills">
-        <${ListInput} id="crew-skills" value=${doc.skills} onChange=${v => set({ skills: v.length ? v : undefined })} />
+        <${ListInput} id="crew-skills" label=${t(`${K}.fields.skills`)} hint=${t(`${K}.fields.skillsHint`)}
+          value=${doc.skills} onChange=${v => set({ skills: v.length ? v : undefined })} />
+        <${TextArea} id="crew-readme" label=${t(`${K}.fields.readme`)} rows=${3} value=${doc.readme_md || ''}
+          onInput=${v => set({ readme_md: v || undefined })} />
       <//>
-      <${Field} label=${t(`${K}.fields.readme`)} htmlFor="crew-readme">
-        <textarea id="crew-readme" class="og-textarea" rows="3" value=${doc.readme_md || ''}
-          onInput=${e => set({ readme_md: e.target.value || undefined })}></textarea>
-      <//>
-    </section>
+    <//>
   `;
 }
 
@@ -289,99 +287,79 @@ export function CrewSection({ doc, onChange, errors, runtimeTools, decideTools }
   const patchTask = (i, patch) => setTasks(tasks.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const memberKeys = agents.map(memberKey).filter(Boolean);
   return html`
-    <section class="og-split pf-agd-crew-section">
-      <${SectionHead} title=${t(`${K}.sections.crew`)} lines=${[]} />
-      <div class="pf-agd-crew-sub">${t(`${K}.fields.members`)}</div>
+    <${Part} title=${t(`${K}.sections.crew`)} lines=${[]}>
+      <${SubHeading}>${t(`${K}.fields.members`)}<//>
       ${agents.map((a, i) => html`
-        <div key=${`m${i}`} class="pf-agd-crew-card ${errors.agents.has(i) ? 'pf-agd-crew-card--problem' : ''}">
-          <div class="pf-agd-crew-card-head">
-            <code class="code-inline pf-agd-crew-card-index">agents[${i}]</code>
-            <button type="button" class="poster-action poster-action--small" onClick=${() => setAgents(agents.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}</button>
-          </div>
-          <${ErrorLines} lines=${errors.agents.get(i)} />
-          <div class="pf-agd-crew-grid2">
-            <${Field} label=${t(`${K}.fields.memberName`)} htmlFor=${`crew-m${i}-name`}>
-              <input id=${`crew-m${i}-name`} type="text" class="og-input" value=${a.name || ''} onInput=${e => patchAgent(i, { name: e.target.value })} />
+        <${Box} key=${`m${i}`} tone=${errors.agents.has(i) ? 'attention' : undefined}
+          marks=${html`<${Code}>agents[${i}]<//>`}
+          end=${html`<${Action} small onClick=${() => setAgents(agents.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}<//>`}>
+          <${Fields}>
+            <${ErrorLines} lines=${errors.agents.get(i)} />
+            <${Fields} cols=${2}>
+              <${TextField} id=${`crew-m${i}-name`} label=${t(`${K}.fields.memberName`)} type="text" value=${a.name || ''} onInput=${v => patchAgent(i, { name: v })} />
+              <${TextField} id=${`crew-m${i}-role`} label=${t(`${K}.fields.memberRole`)} type="text" value=${a.role || ''} onInput=${v => patchAgent(i, { role: v })} />
             <//>
-            <${Field} label=${t(`${K}.fields.memberRole`)} htmlFor=${`crew-m${i}-role`}>
-              <input id=${`crew-m${i}-role`} type="text" class="og-input" value=${a.role || ''} onInput=${e => patchAgent(i, { role: e.target.value })} />
+            <${TextArea} id=${`crew-m${i}-goal`} label=${t(`${K}.fields.memberGoal`)} rows=${2} value=${a.goal || ''} onInput=${v => patchAgent(i, { goal: v })} />
+            <${TextArea} id=${`crew-m${i}-backstory`} label=${t(`${K}.fields.memberBackstory`)} rows=${2} value=${a.backstory || ''} onInput=${v => patchAgent(i, { backstory: v })} />
+            <${Field} label=${t(`${K}.fields.memberTools`)} group>
+              <${ToolMenu} selected=${a.tools} runtimeTools=${runtimeTools} decideTools=${decideTools} onChange=${v => patchAgent(i, { tools: v })} />
             <//>
-          </div>
-          <${Field} label=${t(`${K}.fields.memberGoal`)} htmlFor=${`crew-m${i}-goal`}>
-            <textarea id=${`crew-m${i}-goal`} class="og-textarea" rows="2" value=${a.goal || ''} onInput=${e => patchAgent(i, { goal: e.target.value })}></textarea>
+            <${Check} checked=${!!a.allow_delegation} onChange=${on => patchAgent(i, { allow_delegation: on })}>
+              ${t(`${K}.fields.allowDelegation`)}
+            <//>
           <//>
-          <${Field} label=${t(`${K}.fields.memberBackstory`)} htmlFor=${`crew-m${i}-backstory`}>
-            <textarea id=${`crew-m${i}-backstory`} class="og-textarea" rows="2" value=${a.backstory || ''} onInput=${e => patchAgent(i, { backstory: e.target.value })}></textarea>
-          <//>
-          <${Field} label=${t(`${K}.fields.memberTools`)}>
-            <${ToolMenu} idPrefix=${`crew-m${i}-tool`} selected=${a.tools} runtimeTools=${runtimeTools} decideTools=${decideTools} onChange=${v => patchAgent(i, { tools: v })} />
-          <//>
-          <label class="pf-agd-crew-check check-line">
-            <input type="checkbox" checked=${!!a.allow_delegation} onChange=${e => patchAgent(i, { allow_delegation: e.target.checked })} />
-            ${t(`${K}.fields.allowDelegation`)}
-          </label>
-        </div>
+        <//>
       `)}
-      <div class="pf-agd-form-actions">
-        <button type="button" class="poster-action poster-action--small" onClick=${() => setAgents([...agents, emptyMember()])}>${t(`${K}.actions.addMember`)}</button>
-      </div>
+      <${FormActions}>
+        <${Action} small onClick=${() => setAgents([...agents, emptyMember()])}>${t(`${K}.actions.addMember`)}<//>
+      <//>
 
-      <div class="pf-agd-crew-sub">${t(`${K}.fields.tasks`)}</div>
+      <${SubHeading}>${t(`${K}.fields.tasks`)}<//>
       ${tasks.map((task, i) => html`
-        <div key=${`t${i}`} class="pf-agd-crew-card ${errors.tasks.has(i) ? 'pf-agd-crew-card--problem' : ''}">
-          <div class="pf-agd-crew-card-head">
-            <code class="code-inline pf-agd-crew-card-index">tasks[${i}]</code>
-            <button type="button" class="poster-action poster-action--small" onClick=${() => setTasks(tasks.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}</button>
-          </div>
-          <${ErrorLines} lines=${errors.tasks.get(i)} />
-          <div class="pf-agd-crew-grid2">
-            <${Field} label=${t(`${K}.fields.taskId`)} htmlFor=${`crew-t${i}-id`}>
-              <input id=${`crew-t${i}-id`} type="text" class="og-input" value=${task.id || ''} onInput=${e => patchTask(i, { id: e.target.value })} />
+        <${Box} key=${`t${i}`} tone=${errors.tasks.has(i) ? 'attention' : undefined}
+          marks=${html`<${Code}>tasks[${i}]<//>`}
+          end=${html`<${Action} small onClick=${() => setTasks(tasks.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}<//>`}>
+          <${Fields}>
+            <${ErrorLines} lines=${errors.tasks.get(i)} />
+            <${Fields} cols=${2}>
+              <${TextField} id=${`crew-t${i}-id`} label=${t(`${K}.fields.taskId`)} type="text" value=${task.id || ''} onInput=${v => patchTask(i, { id: v })} />
+              <${Select} id=${`crew-t${i}-agent`} label=${t(`${K}.fields.taskAgent`)} value=${task.agent || ''} onChange=${v => patchTask(i, { agent: v })}
+                placeholder="—" options=${memberKeys} />
             <//>
-            <${Field} label=${t(`${K}.fields.taskAgent`)} htmlFor=${`crew-t${i}-agent`}>
-              <select id=${`crew-t${i}-agent`} class="select-field" value=${task.agent || ''} onChange=${e => patchTask(i, { agent: e.target.value })}>
-                <option value="">—</option>
-                ${memberKeys.map(k => html`<option key=${k} value=${k}>${k}</option>`)}
-              </select>
-            <//>
-          </div>
-          <${Field} label=${t(`${K}.fields.taskDescription`)} hint=${t(`${K}.fields.taskDescriptionHint`)} htmlFor=${`crew-t${i}-desc`}>
-            <textarea id=${`crew-t${i}-desc`} class="og-textarea" rows="3" value=${task.description || ''} onInput=${e => patchTask(i, { description: e.target.value })}></textarea>
-          <//>
-          <${Field} label=${t(`${K}.fields.taskExpected`)} htmlFor=${`crew-t${i}-expected`}>
-            <textarea id=${`crew-t${i}-expected`} class="og-textarea" rows="2" value=${task.expected_output || ''} onInput=${e => patchTask(i, { expected_output: e.target.value })}></textarea>
-          <//>
-          ${i > 0 && html`
-            <${Field} label=${t(`${K}.fields.taskContext`)}>
-              <div class="pf-agd-crew-context">
-                ${tasks.slice(0, i).map((prev, j) => {
-                  const pid = prev.id || `#${j + 1}`;
-                  const on = Array.isArray(task.context) && task.context.includes(prev.id);
-                  return html`<label key=${j} class="pf-agd-crew-check pf-agd-crew-check--inline check-line">
-                    <input type="checkbox" checked=${on} disabled=${!prev.id} onChange=${e => {
+            <${TextArea} id=${`crew-t${i}-desc`} label=${t(`${K}.fields.taskDescription`)} hint=${t(`${K}.fields.taskDescriptionHint`)}
+              rows=${3} value=${task.description || ''} onInput=${v => patchTask(i, { description: v })} />
+            <${TextArea} id=${`crew-t${i}-expected`} label=${t(`${K}.fields.taskExpected`)}
+              rows=${2} value=${task.expected_output || ''} onInput=${v => patchTask(i, { expected_output: v })} />
+            ${i > 0 && html`
+              <${Field} label=${t(`${K}.fields.taskContext`)} group>
+                <div>
+                  ${tasks.slice(0, i).map((prev, j) => {
+                    const pid = prev.id || `#${j + 1}`;
+                    const on = Array.isArray(task.context) && task.context.includes(prev.id);
+                    return html`<${Check} key=${j} inline checked=${on} disabled=${!prev.id} onChange=${checked => {
                       const cur = Array.isArray(task.context) ? task.context : [];
-                      patchTask(i, { context: e.target.checked ? [...cur, prev.id] : cur.filter(x => x !== prev.id) });
-                    }} />${pid}</label>`;
-                })}
-              </div>
+                      patchTask(i, { context: checked ? [...cur, prev.id] : cur.filter(x => x !== prev.id) });
+                    }}>${pid}<//>`;
+                  })}
+                </div>
+              <//>
+            `}
+            <${Check} checked=${!!task.async} onChange=${on => patchTask(i, { async: on })}>
+              ${t(`${K}.fields.taskAsync`)}
             <//>
-          `}
-          <label class="pf-agd-crew-check check-line">
-            <input type="checkbox" checked=${!!task.async} onChange=${e => patchTask(i, { async: e.target.checked })} />
-            ${t(`${K}.fields.taskAsync`)}
-          </label>
-        </div>
+          <//>
+        <//>
       `)}
-      <div class="pf-agd-form-actions">
-        <button type="button" class="poster-action poster-action--small" onClick=${() => setTasks([...tasks, emptyTask()])}>${t(`${K}.actions.addTask`)}</button>
-      </div>
+      <${FormActions}>
+        <${Action} small onClick=${() => setTasks([...tasks, emptyTask()])}>${t(`${K}.actions.addTask`)}<//>
+      <//>
 
       ${tasks.length > 0 && html`
-        <div class="pf-agd-crew-sub">${t(`${K}.dag.title`)}</div>
-        <div class="poster-hint pf-agd-help-text">${t(`${K}.dag.hint`)}</div>
-        <${TaskDag} tasks=${tasks} problemIds=${errors.problemTaskIndexes} />
+        <${SubHeading}>${t(`${K}.dag.title`)}<//>
+        <${Note}>${t(`${K}.dag.hint`)}<//>
+        <${TaskGraph} tasks=${tasks} problemIds=${errors.problemTaskIndexes} />
       `}
-    </section>
+    <//>
   `;
 }
 
@@ -398,50 +376,38 @@ export function RunSection({ doc, onChange, errors }) {
     set({ listen_for: list.length ? list : undefined });
   };
   return html`
-    <section class="og-split pf-agd-crew-section">
-      <${SectionHead} title=${t(`${K}.sections.run`)} lines=${errors.run} />
-      <div class="pf-agd-crew-grid3">
-        <${Field} label=${t(`${K}.fields.llmProfile`)} hint=${t(`${K}.fields.llmProfileHint`)} htmlFor="crew-llm">
-          <input id="crew-llm" type="text" class="og-input" value=${doc.llm_profile || ''} onInput=${e => set({ llm_profile: e.target.value || undefined })} />
+    <${Part} title=${t(`${K}.sections.run`)} lines=${errors.run}>
+      <${Fields}>
+        <${Fields} cols=${3}>
+          <${TextField} id="crew-llm" label=${t(`${K}.fields.llmProfile`)} hint=${t(`${K}.fields.llmProfileHint`)}
+            type="text" value=${doc.llm_profile || ''} onInput=${v => set({ llm_profile: v || undefined })} />
+          <${TextField} id="crew-temp" label=${t(`${K}.fields.temperature`)} type="number" min="0" max="2" step="0.1"
+            value=${doc.temperature ?? ''} onInput=${v => set({ temperature: v === '' ? undefined : Number(v) })} />
+          <${Select} id="crew-process" label=${t(`${K}.fields.process`)} value=${doc.process || 'sequential'} onChange=${v => set({ process: v })}
+            options=${[['sequential', t(`${K}.fields.processSequential`)], ['hierarchical', t(`${K}.fields.processHierarchical`)]]} />
         <//>
-        <${Field} label=${t(`${K}.fields.temperature`)} htmlFor="crew-temp">
-          <input id="crew-temp" type="number" min="0" max="2" step="0.1" class="og-input" value=${doc.temperature ?? ''}
-            onInput=${e => set({ temperature: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <${Field} label=${t(`${K}.fields.listenFor`)} group>
+          <div>
+            ${LISTEN.map(k => html`<${Check} key=${k} inline checked=${listen.has(k)} onChange=${() => toggleListen(k)}>${t(`${K}.fields.${LISTEN_KEY[k]}`)}<//>`)}
+          </div>
         <//>
-        <${Field} label=${t(`${K}.fields.process`)} htmlFor="crew-process">
-          <select id="crew-process" class="select-field" value=${doc.process || 'sequential'} onChange=${e => set({ process: e.target.value })}>
-            <option value="sequential">${t(`${K}.fields.processSequential`)}</option>
-            <option value="hierarchical">${t(`${K}.fields.processHierarchical`)}</option>
-          </select>
-        <//>
-      </div>
-      <${Field} label=${t(`${K}.fields.listenFor`)}>
-        <div class="pf-agd-crew-context">
-          ${LISTEN.map(k => html`<label key=${k} class="pf-agd-crew-check pf-agd-crew-check--inline check-line">
-            <input type="checkbox" checked=${listen.has(k)} onChange=${() => toggleListen(k)} />${t(`${K}.fields.${LISTEN_KEY[k]}`)}</label>`)}
-        </div>
+        <${Check} checked=${!!doc.memory} onChange=${on => set({ memory: on })}>${t(`${K}.fields.memory`)}<//>
+        <${Check} checked=${!!doc.discover} onChange=${on => set({ discover: on })}>${t(`${K}.fields.discover`)}<//>
       <//>
-      <label class="pf-agd-crew-check check-line">
-        <input type="checkbox" checked=${!!doc.memory} onChange=${e => set({ memory: e.target.checked })} />${t(`${K}.fields.memory`)}
-      </label>
-      <label class="pf-agd-crew-check check-line">
-        <input type="checkbox" checked=${!!doc.discover} onChange=${e => set({ discover: e.target.checked })} />${t(`${K}.fields.discover`)}
-      </label>
-    </section>
+    <//>
   `;
 }
 
 export function ContractSection({ doc, onChange, errors }) {
   const set = (patch) => onChange({ ...doc, ...patch });
   return html`
-    <section class="og-split pf-agd-crew-section">
-      <${SectionHead} title=${t(`${K}.sections.contract`)} lines=${errors.contract} />
-      <${Field} label=${t(`${K}.fields.offers`)} hint=${t(`${K}.fields.offersHint`)} htmlFor="crew-offers">
-        <${JsonInput} id="crew-offers" value=${doc.offers} onChange=${v => set({ offers: v })} rows="4" />
+    <${Part} title=${t(`${K}.sections.contract`)} lines=${errors.contract}>
+      <${Fields}>
+        <${JsonInput} id="crew-offers" label=${t(`${K}.fields.offers`)} hint=${t(`${K}.fields.offersHint`)}
+          value=${doc.offers} onChange=${v => set({ offers: v })} rows="4" />
+        <${JsonInput} id="crew-signals" label=${t(`${K}.fields.signals`)} hint=${t(`${K}.fields.signalsHint`)}
+          value=${doc.signals} onChange=${v => set({ signals: v })} rows="4" />
       <//>
-      <${Field} label=${t(`${K}.fields.signals`)} hint=${t(`${K}.fields.signalsHint`)} htmlFor="crew-signals">
-        <${JsonInput} id="crew-signals" value=${doc.signals} onChange=${v => set({ signals: v })} rows="4" />
-      <//>
-    </section>
+    <//>
   `;
 }

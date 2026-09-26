@@ -5,115 +5,130 @@
  * @description The schedule calendar: a month, week or day of the jobs that will run, each run a chip
  *   striped in its kind's colour (a custom property --k per kind, shared with the legend), today
  *   framed in coral, the jobs that run too often for the grid in a "continuously running" strip
- *   above it. Drawn by the scheduler's Calendar page in Settings & Controls (scheduler-calendar.js).
- *   Moved unchanged out of views/scheduler.css; the class names stay. The 3px stripes read
+ *   above it. Drawn by components/ScheduleCalendar.js (the scheduler's Calendar page in Settings &
+ *   Controls), with its own class names (.schedule-calendar, .schedule-calendar-*). The 3px stripes read
  *   --shape-frame-heavy (3px built in, so nothing changes). The corners read the shape corners by
  *   what the thing is: a day, a week column, the strip and a kind's key square --shape-corner, a run
  *   (a button) --shape-corner-control, a job in the strip --shape-corner-pill; a job's dot stays a
  *   circle. Today is framed by its coral border.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.1 -- 2026-09-27 -- The poster skin reads the shape values (--shape-corner, --shape-frame, --shape-rule-colour: 0, 2px and ink in AIMEAT, so nothing changes there; a theme such as Pebble reaches the calendar).
+ *   v1.3.0 -- 2026-09-27 -- The component's own class names: .sch-cal → .schedule-calendar, every .sch-cal-* → .schedule-calendar-*, .sch-muted → .schedule-calendar-muted. The calendar's poster rules in views/profile-poster.css (.pf .sch-cal-freq in the sections group; .pf .sch-cal-cell, -weekcol, their --today, -weekcol-head and -head) move in under the same .pf scope and in the same order, so they still win over the rules here. Every declaration kept (Jouni: components draw only their own class names, a move).
+ *   v1.2.0 -- 2026-09-26 -- Drawn by components/ScheduleCalendar.js, which takes data; .sch-muted moves in from views/scheduler.css, its only user is the calendar (page group G5).
  *   v1.1.0 -- 2026-09-26 -- The corners read the shape corners (3px, 6px and 8px --shape-corner; a run's 4px and 3px --shape-corner-control; the strip's 999px --shape-corner-pill); today's 1px inset coral ring goes, its coral border stays (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/scheduler.css (UI consolidation phase 5, a move).
  */
 
 /* ══ Calendar (day / week / month cadence view) ══ */
-.sch-cal { display: flex; flex-direction: column; gap: 0.5rem; }
+.schedule-calendar { display: flex; flex-direction: column; gap: 0.5rem; }
 
-.sch-cal-head { display: flex; flex-direction: column; gap: 0.35rem; }
-.sch-cal-nav { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
-.sch-cal-modes { display: inline-flex; gap: .4rem .9rem; align-items: center; }
-.sch-cal-move { display: inline-flex; gap: 0.25rem; }
-.sch-cal-range { color: var(--text-dim); font-size: 0.85rem; }
-.sch-cal-trunc { color: var(--warn-fg); font-size: 0.78rem; }
+.schedule-calendar-head { display: flex; flex-direction: column; gap: 0.35rem; }
+.schedule-calendar-nav { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.schedule-calendar-modes { display: inline-flex; gap: .4rem .9rem; align-items: center; }
+.schedule-calendar-move { display: inline-flex; gap: 0.25rem; }
+.schedule-calendar-range { color: var(--text-dim); font-size: 0.85rem; }
+/* "· loading" after the range (moved from views/scheduler.css: the calendar is its only user). */
+.schedule-calendar-muted { color: var(--text-dim); font-size: 0.82rem; }
+.schedule-calendar-trunc { color: var(--warn-fg); font-size: 0.78rem; }
 
-.sch-cal-legend { display: inline-flex; flex-wrap: wrap; gap: 0.15rem 0.75rem; margin-left: auto; }
-.sch-cal-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; color: var(--text-dim); }
-.sch-cal-swatch { width: 0.7rem; height: 0.7rem; border-radius: var(--shape-corner); display: inline-block; background: var(--k, var(--border)); }
+.schedule-calendar-legend { display: inline-flex; flex-wrap: wrap; gap: 0.15rem 0.75rem; margin-left: auto; }
+.schedule-calendar-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; color: var(--text-dim); }
+.schedule-calendar-swatch { width: 0.7rem; height: 0.7rem; border-radius: var(--shape-corner); display: inline-block; background: var(--k, var(--border)); }
 
 /* kind → colour (one custom property drives both the chip stripe and the legend swatch) */
-.sch-cal-ev--ai    { --k: var(--info-fg); }
-.sch-cal-ev--agent { --k: var(--warn-fg); }
-.sch-cal-ev--ext   { --k: var(--success-fg); }
-.sch-cal-ev--eco   { --k: var(--accent); }
-.sch-cal-ev--sec   { --k: var(--accent); }
-.sch-cal-ev--core  { --k: var(--text-dim); }
+.schedule-calendar-ev--ai    { --k: var(--info-fg); }
+.schedule-calendar-ev--agent { --k: var(--warn-fg); }
+.schedule-calendar-ev--ext   { --k: var(--success-fg); }
+.schedule-calendar-ev--eco   { --k: var(--accent); }
+.schedule-calendar-ev--sec   { --k: var(--accent); }
+.schedule-calendar-ev--core  { --k: var(--text-dim); }
 
 /* event chip (a reset button so it's clickable + keyboard-focusable) */
-.sch-cal-ev {
+.schedule-calendar-ev {
   display: block; width: 100%; box-sizing: border-box; text-align: left; font: inherit;
   font-size: 0.72rem; padding: 0.12rem 0.4rem; border-radius: var(--shape-corner-control);
   border: 0; border-left: var(--shape-frame-heavy) solid var(--k, var(--border));
   background: var(--card); color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.sch-cal-ev--past { opacity: 0.55; }
-.sch-cal-ev--click { cursor: pointer; }
-.sch-cal-ev--click:hover { filter: brightness(1.15); border-color: var(--accent); }
-.sch-cal-ev--dot { padding: 0.05rem 0.35rem; border-radius: var(--shape-corner-control); border-left-width: var(--shape-frame-heavy); }
-.sch-cal-evtime:where(:not(.poster-time)) { color: var(--text-dim); }
-.sch-cal-more { font-size: 0.66rem; color: var(--text-dim); padding-left: 0.15rem; }
-.sch-cal-empty { text-align: center; padding: 0.75rem; }
-.sch-cal-dotempty { color: var(--text-dim); text-align: center; font-size: 0.8rem; }
+.schedule-calendar-ev--past { opacity: 0.55; }
+.schedule-calendar-ev--click { cursor: pointer; }
+.schedule-calendar-ev--click:hover { filter: brightness(1.15); border-color: var(--accent); }
+.schedule-calendar-ev--dot { padding: 0.05rem 0.35rem; border-radius: var(--shape-corner-control); border-left-width: var(--shape-frame-heavy); }
+.schedule-calendar-evtime:where(:not(.poster-time)) { color: var(--text-dim); }
+.schedule-calendar-more { font-size: 0.66rem; color: var(--text-dim); padding-left: 0.15rem; }
+.schedule-calendar-empty { text-align: center; padding: 0.75rem; }
+.schedule-calendar-dotempty { color: var(--text-dim); text-align: center; font-size: 0.8rem; }
 
 /* month grid */
-.sch-cal-weekrow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.sch-cal-wd { font-size: 0.72rem; color: var(--text-dim); text-align: center; padding: 0.2rem 0; }
-.sch-cal-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.sch-cal-cell {
+.schedule-calendar-weekrow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.schedule-calendar-wd { font-size: 0.72rem; color: var(--text-dim); text-align: center; padding: 0.2rem 0; }
+.schedule-calendar-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.schedule-calendar-cell {
   min-height: 66px; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; padding: 0.25rem;
   background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--shape-corner);
 }
-.sch-cal-cell--dim { opacity: 0.45; }
-.sch-cal-cell--today { border-color: var(--accent); }
-.sch-cal-daynum { font-size: 0.78rem; color: var(--text); font-weight: 600; }
-.sch-cal-cell-evs { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }
+.schedule-calendar-cell--dim { opacity: 0.45; }
+.schedule-calendar-cell--today { border-color: var(--accent); }
+.schedule-calendar-daynum { font-size: 0.78rem; color: var(--text); font-weight: 600; }
+.schedule-calendar-cell-evs { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }
 
 /* week grid */
-.sch-cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.sch-cal-weekcol { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--shape-corner); min-height: 120px; min-width: 0; display: flex; flex-direction: column; }
-.sch-cal-weekcol--today { border-color: var(--accent); }
-.sch-cal-weekcol-head { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.3rem; border-bottom: 1px solid var(--border); }
-.sch-cal-weekcol-evs { display: flex; flex-direction: column; gap: 2px; padding: 0.25rem; min-width: 0; }
+.schedule-calendar-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.schedule-calendar-weekcol { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--shape-corner); min-height: 120px; min-width: 0; display: flex; flex-direction: column; }
+.schedule-calendar-weekcol--today { border-color: var(--accent); }
+.schedule-calendar-weekcol-head { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.3rem; border-bottom: 1px solid var(--border); }
+.schedule-calendar-weekcol-evs { display: flex; flex-direction: column; gap: 2px; padding: 0.25rem; min-width: 0; }
 
 /* day rail */
-.sch-cal-day { display: flex; flex-direction: column; gap: 1px; }
-.sch-cal-hourrow, .sch-cal-bucket { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 0.5rem; align-items: start; }
-.sch-cal-hourrow { min-height: 1.9rem; border-top: 1px solid var(--border); padding-top: 0.2rem; }
-.sch-cal-bucket { margin: 0.3rem 0; }
-.sch-cal-hour { font-size: 0.72rem; color: var(--text-dim); padding-top: 0.15rem; }
-.sch-cal-hour-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.schedule-calendar-day { display: flex; flex-direction: column; gap: 1px; }
+.schedule-calendar-hourrow, .schedule-calendar-bucket { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 0.5rem; align-items: start; }
+.schedule-calendar-hourrow { min-height: 1.9rem; border-top: 1px solid var(--border); padding-top: 0.2rem; }
+.schedule-calendar-bucket { margin: 0.3rem 0; }
+.schedule-calendar-hour { font-size: 0.72rem; color: var(--text-dim); padding-top: 0.15rem; }
+.schedule-calendar-hour-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
 /* ── "Continuously running" strip — high-frequency schedules kept out of the grid ── */
-.sch-cal-freq {
+.schedule-calendar-freq {
 border-radius: var(--shape-corner);
   background: var(--bg-dim); padding: 0.5rem 0.65rem;
   display: flex; flex-direction: column; gap: 0.45rem;
 }
-.sch-cal-freq-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-.sch-cal-freq-title { font-size: 0.8rem; font-weight: 700; color: var(--text-dim); display: inline-flex; align-items: center; gap: 0.4rem; }
-.sch-cal-freq-pills { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.sch-cal-freqpill {
+.schedule-calendar-freq-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.schedule-calendar-freq-title { font-size: 0.8rem; font-weight: 700; color: var(--text-dim); display: inline-flex; align-items: center; gap: 0.4rem; }
+.schedule-calendar-freq-pills { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.schedule-calendar-freqpill {
   display: inline-flex; align-items: center; gap: 0.4rem; max-width: 100%;
   font: inherit; font-size: 0.74rem; text-align: left; cursor: pointer;
   padding: 0.2rem 0.55rem; border-radius: var(--shape-corner-pill);
   border: 1px solid var(--border); border-left: var(--shape-frame-heavy) solid var(--k, var(--border));
   background: var(--card); color: var(--text);
 }
-.sch-cal-freqpill:hover { filter: brightness(1.12); border-color: var(--accent); }
-.sch-cal-freqdot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--k, var(--border)); flex: none; }
-.sch-cal-freqname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sch-cal-freqcad { color: var(--text-dim); white-space: nowrap; }
-.sch-cal-freqmore {
+.schedule-calendar-freqpill:hover { filter: brightness(1.12); border-color: var(--accent); }
+.schedule-calendar-freqdot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--k, var(--border)); flex: none; }
+.schedule-calendar-freqname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.schedule-calendar-freqcad { color: var(--text-dim); white-space: nowrap; }
+.schedule-calendar-freqmore {
   font: inherit; font-size: 0.74rem; cursor: pointer; color: var(--accent);
   background: transparent; border: 0; padding: 0.2rem 0.4rem;
 }
 /* aggregated ⟳ ×N chip when continuous schedules are folded into the grid */
-.sch-cal-freqchip { border-left-style: dashed; }
-.sch-cal-freqmark { color: var(--text-dim); }
-.sch-cal-freqcount { display: inline-flex; align-items: center; gap: 0.2rem; opacity: 0.85; }
+.schedule-calendar-freqchip { border-left-style: dashed; }
+.schedule-calendar-freqmark { color: var(--text-dim); }
+.schedule-calendar-freqcount { display: inline-flex; align-items: center; gap: 0.2rem; opacity: 0.85; }
+
+/* ── The poster skin of the machine room (moved from views/profile-poster.css with the same .pf
+   scope, so these still win over the rules above): the strip is a section under the rule, the days
+   and the week columns square with a 2px frame, today framed in ink, the heads over a 2px ink line. ── */
+.pf .schedule-calendar-freq {
+  background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: var(--shape-corner); box-shadow: none; padding: 1rem 0 1.25rem;
+}
+.pf .schedule-calendar-cell, .pf .schedule-calendar-weekcol { border-radius: var(--shape-corner); border: var(--shape-frame) solid var(--border); background: none; }
+.pf .schedule-calendar-cell--today, .pf .schedule-calendar-weekcol--today { border-color: var(--shape-rule-colour); }
+.pf .schedule-calendar-weekcol-head, .pf .schedule-calendar-head { background: none; border-bottom: var(--shape-frame) solid var(--shape-rule-colour); font-weight: var(--font-poster-strong-weight); }
 
 @media (max-width: 640px) {
-  .sch-cal-legend { margin-left: 0; width: 100%; }
-  .sch-cal-cell { min-height: 52px; }
+  .schedule-calendar-legend { margin-left: 0; width: 100%; }
+  .schedule-calendar-cell { min-height: 52px; }
 }

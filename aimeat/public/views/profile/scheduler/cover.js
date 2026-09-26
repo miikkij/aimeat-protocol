@@ -8,10 +8,12 @@
  *   dated list, then every schedule as a register with one door per row, and the agents' own
  *   schedules as a fold. Each schedule opens as a PAGE under the same crumb (detail.js); the new
  *   schedule form, the paused and failed lists and the old calendar are pages reached from the rail.
- *   Pure render functions over the ctx bag scheduler-tab.js assembles.
+ *   Pure render functions over the ctx bag scheduler-tab.js assembles; every part is a component
+ *   that takes data (the page writes no class).
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the page frame is the SettingsPage, the strip the FigureStrip, the lists the List (the time a Figure, the countdown the Num's sign, the long words clipped), the week's rhythm the WeekRhythm, the continuous jobs the JobChips, the search the SearchLine, "show more" the More, the doors the Tab's fold tone. Main's grey tags come back: the paused count, and the failed count while it is 0, are the dim Mark (main's og-chip--dim).
  *   v1.19.0 -- 2026-09-26 -- What fires next, the rarer ones, the register and the agents' own jobs are the Listing (listing, listing-row and its head row, name, who, words, figure and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.18.0 -- 2026-09-26 -- The line under a schedule's or a job's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.17.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -49,19 +51,30 @@ import { date as fmtDate, num as fmtNum, time as fmtTime, calendar } from '/js/f
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure } from '/components/Figure.js';
+import { List, Row, Name, Desc, Who, Num, When, Cell, Doors, Group, SearchLine, More } from '/components/List.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Tab } from '/components/Tabs.js';
+import { WeekRhythm } from '/components/WeekRhythm.js';
+import { JobChips } from '/components/JobChips.js';
 import SchedulerCalendar from '../scheduler-calendar.js';
 import { formatUntil } from '../schedule-item.js';
 import { cronWords, cronWordsFor } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { CreateForm } from './create-form.js';
 import { renderDetail } from './detail.js';
-import { c, hhmm, whoRuns, resultWord, lastRun, crumb, pageLinks, renderPage } from './frame.js';
+import { c, hhmm, whoRuns, resultWord, resultStripTone, lastRun, crumb, pageLinks, renderPage } from './frame.js';
 import { Hint } from '/components/Hint.js';
 
 const AGENDA_ROWS = 6;
 const TABLE_ROWS = 12;
-const openBtn = (ctx, s, label) => html`<button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'detail', id: s.id })}>${label || nameOf(s)}</button>`;
+const open = (ctx, s) => () => ctx.pickView({ kind: 'detail', id: s.id });
+/** A line that says a part is empty, or loading while it loads. */
+const emptyOr = (loading, words) => (loading ? html`<${Note} kind="loading">${t('profile.scheduler.cal.loading')}<//>` : html`<${Note} kind="quiet">${words}<//>`);
 
 /* ── The cover ─────────────────────────────────────────────────────────────────────────────── */
 export function renderSchedulerView(ctx) {
@@ -81,80 +94,68 @@ export function renderSchedulerView(ctx) {
 
 function renderCover(ctx) {
   const m = ctx.model;
-  const chip = (n, key, cls = '') => html`<span class=${`poster-chip ${cls}`}>${c(key, { n })}</span>`;
-  const strip = html`
-    <div class="og-strip">
-      <div>${m.next
-        ? html`<b>${hhmm(m.next.at)}</b><span>${c('stripNext')}</span><small>${nameOf(m.next.s)} · ${dayLabel(m.next.at)} · ${formatUntil(m.next.at.toISOString())}</small>`
-        : html`<b>·</b><span>${c('stripNext')}</span><small>${c('stripNextNone')}</small>`}</div>
-      <div><b>${m.todayLeft}</b><span>${c('stripToday')}</span><small>${c('stripTodaySub')}</small></div>
-      <div>${m.latest
-        ? html`<b class=${`og-strip-coral sc-res--${m.latest.lastRunResult || 'success'}`}>${resultWord(m.latest.lastRunResult || 'success')}</b><span>${c('stripLatest')}</span><small>${nameOf(m.latest)} · ${formatRelativeTime(m.latest.lastRunAt)}</small>`
-        : html`<b>·</b><span>${c('stripLatest')}</span><small>${t('profile.scheduler.never')}</small>`}</div>
-      <div><b>${m.failed.length}</b><span>${c('stripFailed')}</span><small>${c('stripFailedSub')}</small></div>
-    </div>`;
+  const tag = (n, key, tone) => ({ label: c(key, { n }), tone });
+  const latest = m.latest ? (m.latest.lastRunResult || 'success') : null;
+  const strip = html`<${FigureStrip} items=${[
+    m.next
+      ? { key: 'next', n: hhmm(m.next.at), label: c('stripNext'), sub: `${nameOf(m.next.s)} · ${dayLabel(m.next.at)} · ${formatUntil(m.next.at.toISOString())}` }
+      : { key: 'next', n: '·', label: c('stripNext'), sub: c('stripNextNone') },
+    { key: 'today', n: m.todayLeft, label: c('stripToday'), sub: c('stripTodaySub') },
+    m.latest
+      ? { key: 'latest', n: resultWord(latest), tone: resultStripTone(latest), label: c('stripLatest'), sub: `${nameOf(m.latest)} · ${formatRelativeTime(m.latest.lastRunAt)}` }
+      : { key: 'latest', n: '·', label: c('stripLatest'), sub: t('profile.scheduler.never') },
+    { key: 'failed', n: m.failed.length, label: c('stripFailed'), sub: c('stripFailedSub') },
+  ]} />`;
 
-  return html`
-    <div class="og og-sc">
-      ${crumb(ctx, [])}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('profile.scheduler.title')}</h1>
-          <div class="poster-chips">
-            ${chip(m.all.length, 'chipAll')}${chip(m.rhythm.length, 'chipWeekly')}${chip(m.continuous.length, 'chipCont')}${chip(m.rare.length, 'chipRare')}
-            ${chip(m.paused.length, 'chipPaused')}${chip(m.failed.length, 'chipFailed', m.failed.length ? 'poster-chip--coral' : '')}
-            ${m.agentMade ? chip(m.agentMade, 'chipAgent', 'poster-chip--coral') : null}
-          </div>
-          <p class="og-desc">${c('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <button type="button" class="poster-slab" onClick=${() => ctx.pickView({ kind: 'page', id: 'create' })}>${t('profile.scheduler.newSchedule')}</button>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.pickView({ kind: 'page', id: 'calendar' })}>${c('calendar')}</button></div>
-        </div>
-      </div>
-      ${ctx.error ? html`<div class="form-message form-message--error">${ctx.error}</div>` : null}
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secNext(ctx)}
-          ${secRhythm(ctx)}
-          ${secContinuous(ctx)}
-          ${secRare(ctx)}
-          ${secAll(ctx)}
-          ${secAgents(ctx)}
-        </div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${c('railTitle')}</span>
-          ${[['01', 'sc-next', c('secNext'), m.agenda.length], ['02', 'sc-rhythm', c('secRhythm'), m.rhythm.length], ['03', 'sc-cont', c('secCont'), m.continuous.length],
-            ['04', 'sc-rare', c('secRare'), m.rare.length], ['05', 'sc-all', c('secAll'), m.all.length], ['06', 'sc-agents', c('secAgents'), ctx.internal.length]]
-            .map(([num, id, label, n]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${num}</i>${label}<em>${n}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks(ctx, null)}
-        </nav>
-      </div>
-    </div>`;
+  return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')}
+    marks=${[
+      tag(m.all.length, 'chipAll'), tag(m.rhythm.length, 'chipWeekly'), tag(m.continuous.length, 'chipCont'), tag(m.rare.length, 'chipRare'),
+      tag(m.paused.length, 'chipPaused', 'dim'), tag(m.failed.length, 'chipFailed', m.failed.length ? 'coral' : 'dim'),
+      m.agentMade ? tag(m.agentMade, 'chipAgent', 'coral') : null,
+    ]}
+    desc=${c('desc')}
+    actions=${html`
+      <${Loud} onClick=${() => ctx.pickView({ kind: 'page', id: 'create' })}>${t('profile.scheduler.newSchedule')}<//>
+      <${Actions}><${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'calendar' })}>${c('calendar')}<//><//>`}
+    strip=${html`${ctx.error ? html`<${Note} kind="message" error>${ctx.error}<//>` : null}${strip}`}
+    railTitle=${c('railTitle')}
+    sections=${[
+      { id: 'sc-next', num: '01', label: c('secNext'), count: m.agenda.length },
+      { id: 'sc-rhythm', num: '02', label: c('secRhythm'), count: m.rhythm.length },
+      { id: 'sc-cont', num: '03', label: c('secCont'), count: m.continuous.length },
+      { id: 'sc-rare', num: '04', label: c('secRare'), count: m.rare.length },
+      { id: 'sc-all', num: '05', label: c('secAll'), count: m.all.length },
+      { id: 'sc-agents', num: '06', label: c('secAgents'), count: ctx.internal.length },
+    ]}
+    pagesLabel=${c('pages')} pages=${pageLinks(ctx, null)}>
+      ${secNext(ctx)}
+      ${secRhythm(ctx)}
+      ${secContinuous(ctx)}
+      ${secRare(ctx)}
+      ${secAll(ctx)}
+      ${secAgents(ctx)}
+  <//>`;
 }
 
 /* ── 01 What fires next ────────────────────────────────────────────────────────────────────── */
 function agendaRows(ctx, list) {
   const nowMs = Date.now();
-  return html`<div class="listing listing--cols listing--when-name-who-in sc-list">
+  return html`<${List} cols="when-name-who-in" keepCols>
     ${list.map((o, i) => html`
-      <div class="listing-row" key=${i}>
-        <div class="sc-at poster-stat-number poster-stat-number--small">${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div>
-        <div class="listing-name">${openBtn(ctx, o.s)}<small class="listing-meta">${cronWordsFor(o.s)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}</small></div>
-        <div class="listing-who">${whoRuns(o.s)}</div>
-        <div class="listing-n sc-in">${o.at.getTime() > nowMs ? formatUntil(o.at.toISOString()) : ''}</div>
-      </div>`)}
-  </div>`;
+      <${Row} key=${i}>
+        <${Cell}><${Figure} small n=${hhmm(o.at)} sub=${dayLabel(o.at)} /><//>
+        <${Name} onOpen=${open(ctx, o.s)} clip meta=${`${cronWordsFor(o.s)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}`}>${nameOf(o.s)}<//>
+        <${Who} clip>${whoRuns(o.s)}<//>
+        <${Num} sign>${o.at.getTime() > nowMs ? formatUntil(o.at.toISOString()) : ''}<//>
+      <//>`)}
+  <//>`;
 }
 function secNext(ctx) {
   const list = ctx.nextOpen ? ctx.model.agenda : ctx.model.agenda.slice(0, AGENDA_ROWS);
   const doors = ctx.model.agenda.length > AGENDA_ROWS
-    ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setNextOpen(v => !v)}>${ctx.nextOpen ? c('showFewer') : c('showAllComing', { n: ctx.model.agenda.length })}</button>` : null;
+    ? html`<${Action} tone="more" onClick=${() => ctx.setNextOpen(v => !v)}>${ctx.nextOpen ? c('showFewer') : c('showAllComing', { n: ctx.model.agenda.length })}<//>` : null;
   return html`<${PageSection} id="sc-next" num="01" title=${c('secNext')} count=${ctx.model.next ? dayLabel(ctx.model.next.at) : null} doors=${doors} first=${true}>
-    ${list.length ? agendaRows(ctx, list) : html`<p class=${`poster-quiet${ctx.occLoading ? ' loading-mark' : ''}`}>${ctx.occLoading ? t('profile.scheduler.cal.loading') : c('noneNext')}</p>`}
+    ${list.length ? agendaRows(ctx, list) : emptyOr(ctx.occLoading, c('noneNext'))}
   <//>`;
 }
 
@@ -163,8 +164,8 @@ function secRhythm(ctx) {
   const m = ctx.model;
   const rows = ctx.rhythmSort === 'name' ? [...m.rhythm].sort((a, b) => nameOf(a.s).localeCompare(nameOf(b.s))) : m.rhythm;
   const doors = html`
-    <button type="button" class=${`poster-tab poster-tab--fold ${ctx.rhythmSort === 'time' ? 'is-on' : ''}`} onClick=${() => ctx.setRhythmSort('time')}>${c('byTime')}</button>
-    <button type="button" class=${`poster-tab poster-tab--fold ${ctx.rhythmSort === 'name' ? 'is-on' : ''}`} onClick=${() => ctx.setRhythmSort('name')}>${c('byName')}</button>`;
+    <${Tab} tone="fold" on=${ctx.rhythmSort === 'time'} onClick=${() => ctx.setRhythmSort('time')}>${c('byTime')}<//>
+    <${Tab} tone="fold" on=${ctx.rhythmSort === 'name'} onClick=${() => ctx.setRhythmSort('name')}>${c('byName')}<//>`;
   // `times` are MINUTES past midnight in the reader's own zone — a number, because that is what
   // sorts. They are a WALL CLOCK rather than an instant, so they are written out as one: anchored
   // in UTC and formatted in UTC, which leaves the digits alone and still gives the reader their own
@@ -175,19 +176,13 @@ function secRhythm(ctx) {
   const timeLabel = (r) => (r.times.length === 1 ? clockOf(r.times[0]) : r.times.length <= 3 ? r.times.map(hourOf).join(' · ') : c('timesN', { n: r.times.length }));
   return html`<${PageSection} id="sc-rhythm" num="02" title=${c('secRhythm')} count=${c('secRhythmSub', { n: m.rhythm.length })} doors=${doors}>
     ${rows.length ? html`
-      <div class="sc-rhythm">
-        <div class="sc-hd poster-label">${c('colTime')}</div><div class="sc-hd poster-label">${c('colSchedule')}</div>
-        ${/* A column IS a calendar day, so it is written as one: calendar() cannot be slid into the
-              day before by a reader whose clock sits west of the browser's. */''}
-        ${m.days.map((d, i) => html`<div class=${`sc-hd sc-hd--day poster-label ${i === 0 ? 'sc-today' : ''}`} key=${'h' + i}>${calendar(d, { weekday: 'short' })}<small>${d.getDate()}</small></div>`)}
-        <div class="sc-hd poster-label">${c('colLast')}</div>
-        ${rows.map(r => html`
-          <div class="sc-t" key=${'t' + r.s.id}>${timeLabel(r)}</div>
-          <div class="sc-nm" key=${'n' + r.s.id}>${openBtn(ctx, r.s)}<i>${cronWordsFor(r.s)}</i></div>
-          ${r.days.map((on, i) => html`<div class=${`sc-d ${on ? '' : 'sc-d--no'} ${i === 0 ? 'sc-today' : ''} ${kindOf(r.s) === 'agent' ? 'sc-d--agent' : ''}`} key=${'d' + r.s.id + i}>${on ? '●' : '·'}</div>`)}
-          <div class="sc-last poster-time" key=${'l' + r.s.id}>${lastRun(r.s)}</div>`)}
-      </div>
-      <${Hint}>${c('rhythmHint')}<//>` : html`<p class=${`poster-quiet${ctx.occLoading ? ' loading-mark' : ''}`}>${ctx.occLoading ? t('profile.scheduler.cal.loading') : c('noneRhythm')}</p>`}
+      <${WeekRhythm} heads=${{ time: c('colTime'), name: c('colSchedule'), last: c('colLast') }}
+        days=${m.days.map((d, i) => ({ key: i, label: calendar(d, { weekday: 'short' }), sub: d.getDate(), today: i === 0 }))}
+        rows=${rows.map(r => ({ key: r.s.id, time: timeLabel(r), name: nameOf(r.s), onOpen: open(ctx, r.s), note: cronWordsFor(r.s),
+          days: r.days, agent: kindOf(r.s) === 'agent', last: lastRun(r.s) }))} />
+      ${/* A column IS a calendar day, so it is written as one: calendar() cannot be slid into the
+            day before by a reader whose clock sits west of the browser's. */''}
+      <${Hint}>${c('rhythmHint')}<//>` : emptyOr(ctx.occLoading, c('noneRhythm'))}
   <//>`;
 }
 
@@ -202,11 +197,10 @@ function cadence(f) {
 function secContinuous(ctx) {
   const list = ctx.model.continuous;
   return html`<${PageSection} id="sc-cont" num="03" title=${c('secCont')} count=${c('secContSub', { n: list.length })}>
-    ${list.length ? html`<div class="sc-cont">
-      ${list.map(f => html`<button type="button" key=${f.scheduleId} class=${`sc-job ${f.s.lastRunResult === 'error' ? 'sc-job--warn' : ''}`} onClick=${() => ctx.pickView({ kind: 'detail', id: f.s.id })}>
-        ${nameOf(f.s)}<i>${cadence(f)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}${f.s.runCount ? ` · ${c('runsN', { n: fmtNum(Number(f.s.runCount)) })}` : ''}</i>
-      </button>`)}
-    </div>` : html`<p class="poster-quiet">${c('noneCont')}</p>`}
+    ${list.length ? html`<${JobChips} items=${list.map(f => ({
+      key: f.scheduleId, name: nameOf(f.s), warn: f.s.lastRunResult === 'error', onOpen: open(ctx, f.s),
+      note: `${cadence(f)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}${f.s.runCount ? ` · ${c('runsN', { n: fmtNum(Number(f.s.runCount)) })}` : ''}`,
+    }))} />` : html`<${Note} kind="quiet">${c('noneCont')}<//>`}
   <//>`;
 }
 
@@ -214,36 +208,36 @@ function secContinuous(ctx) {
 function secRare(ctx) {
   const list = ctx.model.rare;
   return html`<${PageSection} id="sc-rare" num="04" title=${c('secRare')} count=${c('secRareSub')}>
-    ${list.length ? html`<div class="listing listing--cols listing--when-name-who-in sc-list">
+    <${List} cols="when-name-who-in" keepCols empty=${c('noneRare')}>
       ${list.map(s => { const d = new Date(s.nextRunAt); return html`
-        <div class="listing-row" key=${s.id}>
-          <div class="sc-at poster-stat-number poster-stat-number--small">${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}<small>${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}</small></div>
-          <div class="listing-name">${openBtn(ctx, s)}<small class="listing-meta">${cronWordsFor(s)}</small></div>
-          <div class="listing-who">${whoRuns(s)}</div>
-          <div class="listing-n sc-in">${formatUntil(s.nextRunAt)}</div>
-        </div>`; })}
-    </div>` : html`<p class="poster-quiet">${c('noneRare')}</p>`}
+        <${Row} key=${s.id}>
+          <${Cell}><${Figure} small n=${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })} sub=${`${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}`} /><//>
+          <${Name} onOpen=${open(ctx, s)} clip meta=${cronWordsFor(s)}>${nameOf(s)}<//>
+          <${Who} clip>${whoRuns(s)}<//>
+          <${Num} sign>${formatUntil(s.nextRunAt)}<//>
+        <//>`; })}
+    <//>
   <//>`;
 }
 
 /* ── 05 The register ───────────────────────────────────────────────────────────────────────── */
 export function registerTable(ctx, list, { id = 'reg', head = true } = {}) {
-  const open = ctx.moreOpen.has(id);
-  const shown = open ? list : list.slice(0, TABLE_ROWS);
+  const isOpen = ctx.moreOpen.has(id);
+  const shown = isOpen ? list : list.slice(0, TABLE_ROWS);
   return html`
-    <div class="listing listing--cols listing--name-when-who-last-n-doors sc-reg">
-      ${head ? html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colSchedule')}</div><div class="poster-label">${c('colWhen')}</div><div class="poster-label">${c('colWho')}</div><div class="poster-label">${c('colLast')}</div><div class="poster-label">${t('profile.scheduler.col.runs')}</div><div class="poster-label"></div></div>` : null}
+    <${List} cols="name-when-who-last-n-doors" keepCols
+      head=${head ? [c('colSchedule'), c('colWhen'), c('colWho'), c('colLast'), t('profile.scheduler.col.runs'), ''] : null}>
       ${shown.map(s => html`
-        <div class="listing-row" key=${s.id}>
-          <div class="listing-name">${openBtn(ctx, s)}${s.enabled === false ? html`<span class="poster-status poster-status--attention">${t('profile.scheduler.paused')}</span>` : null}</div>
-          <div class="listing-desc">${cronWordsFor(s)}</div>
-          <div class="listing-who">${whoRuns(s)}</div>
-          <div class="poster-time">${lastRun(s)}</div>
-          <div class="listing-n sc-n poster-stat-number poster-stat-number--small">${s.runCount ?? 0}</div>
-          <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'detail', id: s.id })}>${c('open')}</button></div>
-        </div>`)}
-    </div>
-    ${list.length > TABLE_ROWS ? html`<p class="sc-more"><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.toggleMore(id)}>${open ? c('showFewer') : c('showRest', { n: list.length - TABLE_ROWS })}</button></p>` : null}`;
+        <${Row} key=${s.id}>
+          <${Name} onOpen=${open(ctx, s)} after=${s.enabled === false ? html`<${Mark} kind="status" tone="attention">${t('profile.scheduler.paused')}<//>` : null}>${nameOf(s)}<//>
+          <${Desc} clip>${cronWordsFor(s)}<//>
+          <${Who} clip>${whoRuns(s)}<//>
+          <${When} clip>${lastRun(s)}<//>
+          <${Num}><${Figure} small n=${s.runCount ?? 0} /><//>
+          <${Doors}><${Action} small row onClick=${open(ctx, s)}>${c('open')}<//><//>
+        <//>`)}
+    <//>
+    ${list.length > TABLE_ROWS ? html`<${More} label=${isOpen ? c('showFewer') : c('showRest', { n: list.length - TABLE_ROWS })} onMore=${() => ctx.toggleMore(id)} />` : null}`;
 }
 function secAll(ctx) {
   const m = ctx.model;
@@ -252,11 +246,11 @@ function secAll(ctx) {
   if (ctx.regFilter === 'agents') list = list.filter(s => s.createdByAgent || kindOf(s) === 'agent');
   if (q) list = list.filter(s => nameOf(s).toLowerCase().includes(q) || (s.agentName || '').toLowerCase().includes(q));
   const doors = html`
-    <button type="button" class=${`poster-tab poster-tab--fold ${ctx.showSearch ? 'is-on' : ''}`} aria-pressed=${ctx.showSearch ? 'true' : 'false'} onClick=${() => ctx.setShowSearch(v => !v)}>${c('searchName')}</button>
-    <button type="button" class=${`poster-tab poster-tab--fold ${ctx.regFilter === 'agents' ? 'is-on' : ''}`} onClick=${() => ctx.setRegFilter(f => (f === 'agents' ? 'all' : 'agents'))}>${c('agentsOnly')}</button>`;
+    <${Tab} tone="fold" on=${ctx.showSearch} pressed=${ctx.showSearch} onClick=${() => ctx.setShowSearch(v => !v)}>${c('searchName')}<//>
+    <${Tab} tone="fold" on=${ctx.regFilter === 'agents'} onClick=${() => ctx.setRegFilter(f => (f === 'agents' ? 'all' : 'agents'))}>${c('agentsOnly')}<//>`;
   return html`<${PageSection} id="sc-all" num="05" title=${c('secAll')} count=${list.length} doors=${doors}>
-    ${ctx.showSearch ? html`<div class="search-line"><input class="og-input" type="search" value=${ctx.regQuery} onInput=${e => ctx.setRegQuery(e.target.value)} placeholder=${c('searchName')} /></div>` : null}
-    ${list.length ? registerTable(ctx, list) : html`<p class="poster-quiet">${t('profile.scheduler.noManaged')}</p>`}
+    ${ctx.showSearch ? html`<${SearchLine} value=${ctx.regQuery} onInput=${e => ctx.setRegQuery(e.target.value)} placeholder=${c('searchName')} />` : null}
+    ${list.length ? registerTable(ctx, list) : html`<${Note} kind="quiet">${t('profile.scheduler.noManaged')}<//>`}
   <//>`;
 }
 
@@ -265,26 +259,24 @@ function secAgents(ctx) {
   const groups = ctx.internal;
   return html`<${FoldSection} id="sc-agents" num="06" title=${c('secAgents')} sub=${c('secAgentsSub', { n: groups.length })} open=${ctx.agentsOpen} onToggle=${() => ctx.setAgentsOpen(v => !v)}>
     <${Hint}>${t('profile.scheduler.internalNote')}<//>
-    ${groups.length ? groups.map(grp => html`<div class="sc-internal" key=${grp.gaii}>
-      <div class="poster-day-title sc-internal-agent">${grp.agentName}</div>
-      <div class="listing listing--cols listing--name-when-state sc-reg">
+    ${groups.length ? groups.map(grp => html`<${Group} key=${grp.gaii} title=${grp.agentName}>
+      <${List} cols="name-when-state" keepCols>
         ${grp.entries.map((e, i) => html`
-          <div class="listing-row" key=${i}>
-            <div class="listing-name">${e.name}${e.purpose ? html`<small class="listing-meta">${e.purpose}</small>` : null}</div>
-            <div class="listing-desc">${cronWords(e.cron || e.schedule || '')}${e.timezone ? ` · ${e.timezone}` : ''}</div>
-            <div class="listing-desc">${e.status || 'active'}</div>
-          </div>`)}
-      </div>
-    </div>`) : html`<p class="poster-quiet">${t('profile.scheduler.noInternal')}</p>`}
+          <${Row} key=${i}>
+            <${Name} clip meta=${e.purpose || null}>${e.name}<//>
+            <${Desc} clip>${cronWords(e.cron || e.schedule || '')}${e.timezone ? ` · ${e.timezone}` : ''}<//>
+            <${Desc} clip>${e.status || 'active'}<//>
+          <//>`)}
+      <//>
+    <//>`) : html`<${Note} kind="quiet">${t('profile.scheduler.noInternal')}<//>`}
   <//>`;
 }
 
 /* ── Pages ─────────────────────────────────────────────────────────────────────────────────── */
 function renderCreate(ctx) {
   return renderPage(ctx, {
-    id: 'create', crumbs: [t('profile.scheduler.newSchedule')], title: t('profile.scheduler.newSchedule'),
+    id: 'create', crumbs: [t('profile.scheduler.newSchedule')], title: t('profile.scheduler.newSchedule'), desc: c('createDesc'),
     children: html`
-      <p class="og-desc og-desc--page">${c('createDesc')}</p>
       <${CreateForm} agents=${ctx.agents} showToast=${ctx.showToast} onCancel=${() => ctx.pickView({ kind: 'cover' })}
         onCreated=${() => { ctx.pickView({ kind: 'cover' }); ctx.loadData(); }} />`,
   });
@@ -292,8 +284,8 @@ function renderCreate(ctx) {
 function renderList(ctx, id, title, list, empty) {
   return renderPage(ctx, {
     id, crumbs: [title], title,
-    chips: html`<span class="poster-chip">${c('chipAll', { n: list.length })}</span>`,
-    children: list.length ? registerTable(ctx, list, { id }) : html`<p class="poster-quiet">${empty}</p>`,
+    marks: [{ label: c('chipAll', { n: list.length }) }],
+    children: list.length ? registerTable(ctx, list, { id }) : html`<${Note} kind="quiet">${empty}<//>`,
   });
 }
 function renderCalendar(ctx) {

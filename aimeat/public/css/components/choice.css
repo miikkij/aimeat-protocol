@@ -1,0 +1,31 @@
+/**
+ * @file choice.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Choice's own layout (components/Choice.js): the grid of the boxed answers. The
+ *   boxed answer wears the library's shape in poster.css (.poster-choice, .on); a row of tabs is the
+ *   Tabs' (css/components/tab-row.css). Reads only the theme's tokens.
+ *   Drawn by components/Choice.js; a page never writes these.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial. The boxed grid has the values of .agp-choices, .sc-choices and
+ *     .cal-opts (.7rem apart; two columns under 1100px, one under 700px); a boxed answer with its
+ *     radio dot the layout of .cal-opt (component plan C5).
+ */
+
+.choice--boxed { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .7rem; align-items: stretch; }
+.choice--cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.choice--cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.choice--cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* A boxed answer with its radio dot: the dot level with the name, the line under the name. */
+.choice-dot { display: flex; gap: .6rem; align-items: flex-start; }
+.choice-dot input { margin: .2rem 0 0; }
+.choice-dot small { display: block; }
+
+@media (max-width: 1100px) {
+  .choice--cols-3, .choice--cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .choice--boxed { grid-template-columns: minmax(0, 1fr); }
+}

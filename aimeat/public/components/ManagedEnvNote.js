@@ -18,7 +18,12 @@
  *   import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
  *   html`<${ManagedEnvNote} />`            // full, beside a primary prompt
  *   html`<${ManagedEnvNote} compact=${true} />`  // title + reason only, for secondary prompts
+ *   html`<${ManagedEnvNote} compact poster />`   // in a Settings page's poster face (the MCP page)
+ *   `poster`: the note in the poster face of a Settings page: a plain 2px frame in the border colour,
+ *   smaller grey words, the link in ink with its underline (formerly the MCP page's own dress).
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The `poster` option, the MCP page's dress of the note moved in from
+ *     css/views/mcp-poster.css (page group G6, additive).
  *   v1.0.0 — 2026-07-31 — Initial. Born from a security team that met the notice with no
  *     warning and did not continue; mirrors the block published in the Experience Center.
  */
@@ -27,11 +32,11 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 const html = htm.bind(h);
 
-export function ManagedEnvNote({ compact = false }) {
+export function ManagedEnvNote({ compact = false, poster = false }) {
   // t() echoes the key when a translation is missing — fall back to readable English.
   const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
   return html`
-    <aside class="mgd-note">
+    <aside class=${poster ? 'mgd-note mgd-note--poster' : 'mgd-note'}>
       <h4 class="mgd-note-title">${tr('managedEnv.title', 'On a company-managed account: what those notices mean')}</h4>
       <p class="mgd-note-body">${tr('managedEnv.why', 'Company-managed AI tools (Claude Enterprise, Team and similar) may show a notice about prompt injection or an untrusted source when you use a prompt from this page. The notice appears before anything has run. The reason is the environment: there, every external service the administrator has not approved is untrusted by default, and the same notice applies to any unapproved connector.')}</p>
       <p class="mgd-note-body">${tr('managedEnv.read', 'Do not click past it out of habit. If you do not know where a prompt came from, do not run it. The prompt above is shown in full before you copy it.')}</p>

@@ -2,107 +2,29 @@
  * @file offers-poster.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Offers page in the poster face (op- prefix; design canvas "AIMEAT Tarjoaman sivu",
- *   direction A). The shared parts (crumb, masthead, strip, sections, folds, rail) come from
- *   organism.css's og- rules; this file carries what offers add: the deliveries table, the
- *   production lines as step chains, the catalogue with its search row, the AI hits, the request
- *   field and the framed sample on an offer's page, the selling editor, the rating row and the map.
- *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
+ * @description What is left of the Offers page's own sheet (op- prefix). Every part of the page is a
+ *   component now (page group G6: SettingsPage, List, FigureStrip, Facts, StepStrip, OfferMap, …),
+ *   so this file keeps only the page's sub-page title size, which page parts leave to each page sheet
+ *   keyed by its name and `page` (kit/page.md §3), and the rules the design lab's catalogue and
+ *   decision samples still write by hand (views/design-lab/demos-settings.js 'offer-map',
+ *   decision-samples-final.js 'row-stars'): those go with the lab's pass.
+ *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- Every rule the page used went with its part into a component (page group
+ *     G6): the deliveries, the catalogue and its group headings, the search row, the offer's request,
+ *     prerequisites, sample and provenance, the selling editor (Fields of four), the folds' narrow
+ *     screen (FoldSection wrap) and the side column. Kept: the sub-page title size, and the agent tag
+ *     and one-line cells for the design lab's samples.
  *   v1.28.0 -- 2026-09-26 -- The deliveries, the catalogue and the selling register are the Listing (css/components/listing.css), a unification: the look most tabs use. The grids, cells, heading rows and narrow-screen columns of op-back and op-cat go (the columns move to the cuts, listing--cols); the agent is the who cell, the other words the words cell; one line each and a group's heading across the row stay.
  *   v1.27.0 -- 2026-09-26 -- The line under an offer's name is the Listing's (.listing-meta): its body face, size and colour go; one line stays (a unification: Jouni's decision "Meta line").
  *   v1.26.0 -- 2026-09-26 -- A brief, a sample and a delivery are the Object box at the page's own size: the box's own words size goes (a unification).
- *   v1.25.0 -- 2026-09-26 -- An offer's agent is the Tag (.poster-chip; the sun tone on its own page), a unification: Jouni's decision Tag.
- *   v1.24.0 -- 2026-09-26 -- Whether an offer's agent is online is the status dot (components/StatusDot.js: online, idle), a unification: the look most tabs use; the square op-dot goes.
- *   v1.23.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
- *   v1.22.0 -- 2026-09-25 -- A prerequisite's state and a muted sender are the Status (a unification: Jouni's decision "Status").
- *   v1.21.0 -- 2026-09-25 -- "Show more" under a list is the action link's more tone (.poster-action--more), a unification: the look most tabs use.
- *   v1.20.0 -- 2026-09-25 -- What the AI found for a need is the library's Offer hits (css/components/offer-hits.css), moved unchanged with its class names (UI consolidation phase 5, a move).
- *   v1.19.0 -- 2026-09-25 -- Rating a delivery is the library's Rating stars (css/components/rating-stars.css), moved unchanged with its class names (UI consolidation phase 5, a move).
- *   v1.18.0 -- 2026-09-25 -- The request on an offer's page is the library's Offer request (css/components/offer-request.css), moved unchanged with its class names (UI consolidation phase 5, a move).
- *   v1.17.0 -- 2026-09-25 -- The map of offers is the library's Offer map (css/components/offer-map.css), moved unchanged with its class names (UI consolidation phase 5, a move).
- *   v1.16.0 -- 2026-09-25 -- The production lines are the library's Offer lines (css/components/offer-lines.css), moved unchanged with their class names (UI consolidation phase 5, a move).
- *   v1.15.0 -- 2026-09-25 -- The named values on an offer's page are the Facts (css/components/facts.css, the wide cut), a unification: the look most tabs use. The rules of op-kv and its keys go, with their phone rule; op-prereqs stays on its value.
- *   v1.14.0 -- 2026-09-25 -- A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
- *   v1.14.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
- *   v1.14.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
- *   v1.14.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
- *   v1.13.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
- *   v1.13.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
- *   v1.13.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
- *   v1.12.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
- *   v1.12.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
- *   v1.11.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
- *   v1.10.0 -- 2026-09-25 -- A framed box's own frame and ground go: it is the Object box (.poster-box, css/poster.css); its place (margin, padding) stays here (Jouni's decision "Object box", a unification).
- *   v1.9.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
- *   v1.8.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
- *   v1.7.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
- *   v1.6.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title; their rules here keep only their place (Jouni's decision "Group heading", a unification).
- *   v1.5.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
- *   v1.4.0 -- 2026-09-25 -- The quiet ways on are the library's action link (Jouni's decision "Action
- *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
- *     place's layout value moves to the new class.
- *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
- *   2026-09-25 -- The axis, inbox and map switches lose their rule: the tab (.poster-tab) now draws them (a unification: Jouni's decision "Tabs and filters").
- *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
- *   v1.3.0 -- 2026-09-25 -- Dead rules removed: selectors whose classes no file writes (UI consolidation phase 5, a move; the browser's reading proves only those went).
- *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
- *   v1.1.0 — 2026-09-06 — The map's three flat views (columns, grid, tiles): the tile that is a link, the
- *     need head, the matrix with a modifier per column count, the blocks that grow with what they hold.
- *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-op .poster-quiet { margin: 0; }
-/* "Show the rest" is the action link's more tone (.poster-action--more); its line keeps its place. */
-.og-op .op-more { margin: .8rem 0 0; }
+/* A page inside the Offers page (an offer, a delivery, the inbox, the map, the register): its title size. */
 .og-op.og-page { --poster-page-size: 2.1rem; }
-.op-side { display: flex; flex-direction: column; gap: 1rem; }
-.op-st--err { color: var(--accent); }
-.og-op .og-strip b.op-st-ok { color: var(--success, #10B981); } .og-op .og-strip b.op-st-err { color: var(--accent); }
-/* An offer's agent is the Tag (.poster-chip), its presence dot inside; the coral "away" says a state. */
+
+/* For the design lab only (its samples write this markup; the page's agent tag is Mark presence and
+   its one-line cells the List's clip). */
 .op-agent { display: inline-flex; align-items: center; gap: .3rem; }
 .op-agent em { font-style: normal; color: var(--accent); }
-
-/* ── What came back: when, what, who, how it went ───────────────────────────────────────────── */
-/* The deliveries and the catalogue are the Listing (css/components/listing.css). */
-.op-at { margin-right: 0; }
-.op-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
-.og-op .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-/* The line under a name is the Listing's (.listing-meta); here it keeps to one line, and so do the
-   agent, the state and the catalogue's words. */
 :is(.op-back, .op-cat) .listing-name small, .op-who, .op-st, .op-cat .listing-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* ── The production lines ───────────────────────────────────────────────────────────────────── */
-
-/* ── The catalogue ──────────────────────────────────────────────────────────────────────────── */
-.op-search .poster-action { flex: none; }
-.op-search .poster-hint { margin: 0; white-space: nowrap; }
-/* A group's heading spans the catalogue's row. */
-.op-lbl { grid-column: 1 / -1; display: flex; align-items: baseline; padding: .9rem 0 .25rem; }
-.op-lbl em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
-
-/* ── An offer's page ────────────────────────────────────────────────────────────────────────── */
-.op-prereqs { display: flex; flex-wrap: wrap; gap: .4rem; }
-/* A brief, a sample and a delivery are the Object box (.poster-box) at the page's own size; their place only. */
-.op-frame { margin: 0; padding: .9rem 1.1rem; line-height: 1.6; }
-.op-frame .poster-label { display: block; margin-bottom: .5rem; }
-.op-sample { max-height: 24rem; overflow: auto; }
-/* Where a delivery came from is the Hint (css/components/hint.css); its place only. */
-.op-prov { margin: .8rem 0 0; }
-.op-sell { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem 1.2rem; align-items: end; }
-.op-field { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
-.op-sell-actions { grid-column: 1 / -1; }
-.op-sell-hint { grid-column: 1 / -1; margin: 0; }
-
-/* ── The map: four views of the same offers, and the search that narrows them ──────────────── */
-.search-line.op-map-search { margin-bottom: 0; }
-/* As many columns as fit at 10rem each; the rest wrap under, in the same order. A narrow main gets three per row. */
-/* The matrix keeps a width its cells can be read at and scrolls inside .op-map when the main is narrower. */
-
-@media (max-width: 1100px) {
-  .op-sell { grid-template-columns: 1fr 1fr; }
-  .og-op .og-fold { flex-wrap: wrap; row-gap: .35rem; }
-  .og-op .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
-  .og-op .og-strip { flex-wrap: wrap; }
-  .og-op .og-strip > div { flex: 1 1 45%; }
-}

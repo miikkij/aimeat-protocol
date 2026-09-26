@@ -15,6 +15,14 @@
  * @structure ConnectionsSection — GET /v1/connections + /providers + /clients, connect via a
  *   pop-up, revoke · OwnApp — one service's own-app credentials.
  * @version-history
+ *   v1.7.1 — 2026-09-26 — An account's name turns coral under the pointer again, as main's
+ *     .mem-item:hover drew it (Row hover; fix pass).
+ *   v1.7.0 — 2026-09-26 — Every part is a component that takes data, and the file writes no class
+ *     (component plan, page group G3): the accounts are a List (its empty line the List's), a
+ *     service's fields TextFields beside its Connect action, each service after the first under a
+ *     hairline (Split), "use your own app" indented behind its line (Split side), the help lines
+ *     Notes. `inRow` leaves out the heading and intro where the page's section says them (Access
+ *     03; the .ac-kept rule hid them until now).
  *   v1.6.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.5.0 — 2026-09-25 — The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
  *   v1.4.0 — 2026-09-25 — The connected accounts are the Listing (css/components/listing.css), a unification: the look most tabs use. The empty line stands on its own after the heading.
@@ -37,7 +45,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { QuietNote } from '/components/QuietNote.js';
+import { List, Row, Name, Doors } from '/components/List.js';
+import { Action, Actions } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { TextField } from '/components/TextField.js';
+import { Row as Line, Stack, Split } from '/components/Layout.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -50,7 +63,11 @@ const NOTES = {
   x: ['cxNoteXBefore'],
 };
 
-export function ConnectionsSection({ showToast }) {
+/**
+ * @param {{ showToast: Function, inRow?: boolean }} props `inRow`: the section stands inside a page
+ *   section that already says its heading and intro (Access, 03), so it leaves out its own.
+ */
+export function ConnectionsSection({ showToast, inRow }) {
   const [connections, setConnections] = useState([]);
   const [providers, setProviders] = useState([]);
   const [instances, setInstances] = useState({});
@@ -282,90 +299,79 @@ export function ConnectionsSection({ showToast }) {
 
   if (unavailable) return null;
 
+  /* One service per block, and the eye has to tell where one ends: from the second block on, a
+     hairline and air above (Split). MEASURED before the line existed: the "use your own app" control
+     sat 52-83px below the Connect button it belongs to and 16px above the NEXT service's, so
+     proximity said it belonged to the wrong one in every single case. */
+  const serviceBlock = (p, i, body) => (i
+    ? html`<${Split} key=${p.id} above="large" pad="large" gap="small">${body}<//>`
+    : html`<${Stack} key=${p.id} gap="small">${body}<//>`);
+
   return html`
-    <div class="access-section">
-      <${ConfirmUI} />
-      <h3 class="access-h3">${t('profile.access.cxTitle') || 'Connected accounts'}</h3>
-      <p class="poster-hint">${t('profile.access.cxIntro')
-        || 'Accounts you have connected at other services. The credential stays on this node — an app is only ever told which account it may use, never the account itself.'}</p>
+    <${ConfirmUI} />
+    ${inRow ? null : html`<${SubHeading} level=${3}>${t('profile.access.cxTitle') || 'Connected accounts'}<//>
+      <${Note}>${t('profile.access.cxIntro')
+        || 'Accounts you have connected at other services. The credential stays on this node — an app is only ever told which account it may use, never the account itself.'}<//>`}
 
-      ${connections.length === 0 && html`
-        <${QuietNote}>${t('profile.access.cxEmpty') || 'No connected accounts yet.'}<//>
-      `}
-
-      ${connections.length > 0 && html`
-        <div class="listing listing--cols listing--name-state">
-          ${connections.map(c => html`
-            <div class="listing-row" key=${c.id}>
-              <div class="listing-name">${escHtml(c.accountLabel)}<small>
-                ${escHtml(c.provider)}${c.status === 'needs_reauth'
-                  ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting')
-                  : ''}
-              </small></div>
-              <div class="listing-doors">
-                ${c.status === 'needs_reauth' && html`
-                  <button class="poster-action poster-action--small poster-action--row" onClick=${() => connect({ id: c.provider })}>
-                    ${t('profile.access.cxReconnect') || 'Reconnect'}
-                  </button>
-                `}
-                <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => revoke(c)}>
-                  ${t('profile.access.cxDisconnect') || 'Disconnect'}
-                </button>
-              </div>
-            </div>
-          `)}
-        </div>
-      `}
-
-      ${providers.map(p => html`
-        <div class="access-cx-add" key=${p.id}>
-          <div class="mem-item access-fed-add">
-            ${p.instanceScoped && html`
-              <input type="text" class="og-input"
-                placeholder=${t('profile.access.cxInstance') || 'instance address, e.g. mastodon.social'}
-                value=${instances[p.id] || ''}
-                onInput=${e => setInstances({ ...instances, [p.id]: e.target.value })} />
+    <${List} cols="name-state" keepCols empty=${t('profile.access.cxEmpty') || 'No connected accounts yet.'}>
+      ${connections.map(c => html`
+        <${Row} key=${c.id} hover>
+          <${Name} meta=${`${escHtml(c.provider)}${c.status === 'needs_reauth' ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting') : ''}`}>${escHtml(c.accountLabel)}<//>
+          <${Doors}>
+            ${c.status === 'needs_reauth' && html`
+              <${Action} small row onClick=${() => connect({ id: c.provider })}>${t('profile.access.cxReconnect') || 'Reconnect'}<//>
             `}
-            ${(p.attachFields || []).map(f => html`
-              <input key=${f.name}
-                type=${f.secret ? 'password' : 'text'}
-                class="og-input"
-                autocomplete=${f.secret ? 'new-password' : 'off'}
-                placeholder=${f.placeholder || f.label}
-                aria-label=${f.label}
-                value=${(fields[p.id] || {})[f.name] || ''}
-                onInput=${e => setFields(prev => ({
-                  ...prev, [p.id]: { ...(prev[p.id] || {}), [f.name]: e.target.value },
-                }))} />
-            `)}
-            <button class="poster-action poster-action--small" disabled=${busy === p.id}
-              onClick=${() => (p.attachFields ? attach(p) : connect(p))}>
-              ${busy === p.id
-                ? (t('profile.access.cxConnecting') || 'Connecting…')
-                : `${t('profile.access.cxConnect') || 'Connect'} ${escHtml(p.label)}`}
-            </button>
-          </div>
-          ${!p.attachFields && html`
-            <${OwnApp}
-              provider=${p}
-              client=${ownClients.find(c => c.provider === p.id)}
-              open=${ownOpen === p.id}
-              busy=${busy === p.id}
-              draft=${ownDraft[p.id] || {}}
-              onToggle=${() => setOwnOpen(ownOpen === p.id ? '' : p.id)}
-              onDraft=${(field, value) => setOwnDraft(prev => ({
-                ...prev, [p.id]: { ...(prev[p.id] || {}), [field]: value },
-              }))}
-              onSave=${() => saveOwnClient(p.id)}
-              onRemove=${(count) => removeOwnClient(p.id, count)} />
-          `}
-          ${(NOTES[p.id] || []).map(key => html`
-            <p class="poster-hint" key=${key}>${t('profile.access.' + key)}</p>
-          `)}
-
-        </div>
+            <${Action} small row tone="danger" onClick=${() => revoke(c)}>${t('profile.access.cxDisconnect') || 'Disconnect'}<//>
+          <//>
+        <//>
       `)}
-    </div>
+    <//>
+
+    ${providers.map((p, i) => serviceBlock(p, i, html`
+      <${Line} gap="small" above="small">
+        ${p.instanceScoped && html`
+          <${TextField}
+            placeholder=${t('profile.access.cxInstance') || 'instance address, e.g. mastodon.social'}
+            ariaLabel=${t('profile.access.cxInstance') || 'instance address, e.g. mastodon.social'}
+            value=${instances[p.id] || ''}
+            onInput=${v => setInstances({ ...instances, [p.id]: v })} />
+        `}
+        ${(p.attachFields || []).map(f => html`
+          <${TextField} key=${f.name}
+            type=${f.secret ? 'password' : 'text'}
+            autoComplete=${f.secret ? 'new-password' : 'off'}
+            placeholder=${f.placeholder || f.label}
+            ariaLabel=${f.label}
+            value=${(fields[p.id] || {})[f.name] || ''}
+            onInput=${v => setFields(prev => ({
+              ...prev, [p.id]: { ...(prev[p.id] || {}), [f.name]: v },
+            }))} />
+        `)}
+        <${Action} small disabled=${busy === p.id}
+          onClick=${() => (p.attachFields ? attach(p) : connect(p))}>
+          ${busy === p.id
+            ? (t('profile.access.cxConnecting') || 'Connecting…')
+            : `${t('profile.access.cxConnect') || 'Connect'} ${escHtml(p.label)}`}
+        <//>
+      <//>
+      ${!p.attachFields && html`
+        <${OwnApp}
+          provider=${p}
+          client=${ownClients.find(c => c.provider === p.id)}
+          open=${ownOpen === p.id}
+          busy=${busy === p.id}
+          draft=${ownDraft[p.id] || {}}
+          onToggle=${() => setOwnOpen(ownOpen === p.id ? '' : p.id)}
+          onDraft=${(field, value) => setOwnDraft(prev => ({
+            ...prev, [p.id]: { ...(prev[p.id] || {}), [field]: value },
+          }))}
+          onSave=${() => saveOwnClient(p.id)}
+          onRemove=${(count) => removeOwnClient(p.id, count)} />
+      `}
+      ${(NOTES[p.id] || []).map(key => html`
+        <${Note} key=${key}>${t('profile.access.' + key)}<//>
+      `)}
+    `))}
   `;
 }
 
@@ -386,53 +392,61 @@ function OwnApp({ provider, client, open, busy, draft, onToggle, onDraft, onSave
   // that mysteriously refuses and one whose refusal has an obvious fix.
   const nodeless = provider.nodeConfigured === false;
 
+  // Indented behind a line at its start (Split side), quiet on purpose: it is the advanced door, and
+  // it must not compete with the Connect button that almost everyone wants instead.
   if (client) {
     return html`
-      <div class="access-cx-own">
-        <p class="poster-hint">
-          ${t('profile.access.cxOwnActive') || 'Using your own app'} · ${escHtml(client.clientId)}
-          ${client.connectionCount > 0 ? ' · ' + (t('profile.access.cxOwnCount')
-            || '{n} account(s) connected with it').replace('{n}', String(client.connectionCount)) : ''}
-        </p>
-        <button class="poster-action poster-action--small" onClick=${() => onRemove(client.connectionCount)}>
-          ${t('profile.access.cxOwnRemove') || 'Remove app'}
-        </button>
-      </div>
+      <${Split} side above="small" pad="none" below="medium">
+        <${Line} gap="small" wrap>
+          <${Note} inline>
+            ${t('profile.access.cxOwnActive') || 'Using your own app'} · ${escHtml(client.clientId)}
+            ${client.connectionCount > 0 ? ' · ' + (t('profile.access.cxOwnCount')
+              || '{n} account(s) connected with it').replace('{n}', String(client.connectionCount)) : ''}
+          <//>
+          <${Action} small onClick=${() => onRemove(client.connectionCount)}>
+            ${t('profile.access.cxOwnRemove') || 'Remove app'}
+          <//>
+        <//>
+      <//>
     `;
   }
 
   return html`
-    <div class="access-cx-own">
-      ${nodeless && html`
-        <p class="poster-hint">${t('profile.access.cxOwnRequired')
-          || 'This node has no app registered at this service. Bring your own and it works anyway.'}</p>
-      `}
-      <button class="poster-action poster-action--small" onClick=${onToggle} aria-expanded=${open}>
-        ${open
-          ? (t('profile.access.cxOwnHide') || 'Cancel')
-          : (t('profile.access.cxOwnUse') || 'Use your own app')}
-      </button>
+    <${Split} side above="small" pad="none" below="medium" gap="small">
+      <${Line} gap="small" wrap>
+        ${nodeless && html`
+          <${Note} inline>${t('profile.access.cxOwnRequired')
+            || 'This node has no app registered at this service. Bring your own and it works anyway.'}<//>
+        `}
+        <${Action} small onClick=${onToggle} expanded=${open}>
+          ${open
+            ? (t('profile.access.cxOwnHide') || 'Cancel')
+            : (t('profile.access.cxOwnUse') || 'Use your own app')}
+        <//>
+      <//>
       ${open && html`
-        <div class="access-cx-own-form">
-          <p class="poster-hint">${t('profile.access.cxOwnWhy')
-            || 'Register an app at the service and paste its credentials here. Yours then carries its own rate limit, its own reputation and, where posting costs money, its own bill.'}</p>
-          <input type="text" class="og-input" autocomplete="off"
+        <${Stack} gap="small">
+          <${Note}>${t('profile.access.cxOwnWhy')
+            || 'Register an app at the service and paste its credentials here. Yours then carries its own rate limit, its own reputation and, where posting costs money, its own bill.'}<//>
+          <${TextField} autoComplete="off"
             placeholder=${t('profile.access.cxOwnClientId') || 'Client ID'}
-            aria-label=${t('profile.access.cxOwnClientId') || 'Client ID'}
+            ariaLabel=${t('profile.access.cxOwnClientId') || 'Client ID'}
             value=${draft.clientId || ''}
-            onInput=${e => onDraft('clientId', e.target.value)} />
-          <input type="password" class="og-input" autocomplete="new-password"
+            onInput=${v => onDraft('clientId', v)} />
+          <${TextField} type="password" autoComplete="new-password"
             placeholder=${t('profile.access.cxOwnClientSecret') || 'Client secret'}
-            aria-label=${t('profile.access.cxOwnClientSecret') || 'Client secret'}
+            ariaLabel=${t('profile.access.cxOwnClientSecret') || 'Client secret'}
             value=${draft.clientSecret || ''}
-            onInput=${e => onDraft('clientSecret', e.target.value)} />
-          <button class="poster-action poster-action--small" disabled=${busy} onClick=${onSave}>
-            ${busy ? (t('profile.access.cxOwnSaving') || 'Saving…') : (t('profile.access.cxOwnSave') || 'Save app')}
-          </button>
-          <p class="poster-hint">${t('profile.access.cxOwnKeepsExisting')
-            || 'Accounts you already connected keep the app that connected them: a token can only be renewed by the app that issued it. Reconnect one to move it.'}</p>
-        </div>
+            onInput=${v => onDraft('clientSecret', v)} />
+          <${Actions}>
+            <${Action} small disabled=${busy} onClick=${onSave}>
+              ${busy ? (t('profile.access.cxOwnSaving') || 'Saving…') : (t('profile.access.cxOwnSave') || 'Save app')}
+            <//>
+          <//>
+          <${Note}>${t('profile.access.cxOwnKeepsExisting')
+            || 'Accounts you already connected keep the app that connected them: a token can only be renewed by the app that issued it. Reconnect one to move it.'}<//>
+        <//>
       `}
-    </div>
+    <//>
   `;
 }

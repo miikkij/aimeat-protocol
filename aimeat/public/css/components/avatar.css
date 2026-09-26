@@ -1,0 +1,22 @@
+/**
+ * @file avatar.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Avatar component's sizes (components/Avatar.js). The frame, the letters and the
+ *   agent tone are the Object box's avatar cut in poster.css (.poster-box--avatar); this sheet holds
+ *   the square's named sizes, which the pages used to set one by one:
+ *   - the row size, 2.2rem: Apps .ap-av, Companies .co-av, Contacts .ct-av, Notifications and Email
+ *     .nt-av, MCP .mc-av (six pages); Organisms' .pj-org-avatar and Messages' 36px avatar (36px,
+ *     under a pixel more) take it.
+ *   - small, 24px: Messages' avatar beside a group's heading (.inbox-avatar--24).
+ *   - large, 2.4rem: Memory's file picture (.mp-file-kind).
+ *   A picture or an identicon fills the square.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial (component plan C3).
+ */
+
+.avatar { width: 2.2rem; height: 2.2rem; flex: none; overflow: hidden; user-select: none; }
+.avatar--small { width: 24px; height: 24px; }
+.avatar--large { width: 2.4rem; height: 2.4rem; }
+.avatar svg, .avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }

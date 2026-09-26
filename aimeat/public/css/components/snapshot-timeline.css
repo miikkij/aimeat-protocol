@@ -1,0 +1,25 @@
+/**
+ * @file snapshot-timeline.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The SnapshotTimeline component's own rules (components/SnapshotTimeline.js): the diagram
+ *   over a hairline, the list of points with the chosen one on a coral rule, and the picture beside it,
+ *   stacked on a phone. The values are org-timeline.css's (the .pj-timeline-* rules of the organism's
+ *   development timeline) under the component's own class names; the counts line keeps the grey of the
+ *   section description it wore. Colours and frames read the theme tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Initial: org-timeline.css values under the component's class names (page group G2a).
+ */
+
+.snapshot-timeline-diagram { overflow: auto; max-height: 22rem; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+.snapshot-timeline-grid { display: grid; grid-template-columns: minmax(14rem, 22rem) 1fr; gap: 1rem; align-items: start; }
+.snapshot-timeline-list { list-style: none; margin: 0; padding: 0; max-height: 30rem; overflow: auto; }
+.snapshot-timeline-point { margin: 0; }
+.snapshot-timeline-entry { display: flex; flex-direction: column; gap: 0.1rem; width: 100%; text-align: left; background: none; border: none; border-left: var(--shape-frame) solid var(--border); padding: 0.4rem 0.6rem; cursor: pointer; color: var(--text); }
+.snapshot-timeline-entry:hover { background: var(--bg-dim); }
+.snapshot-timeline-point.is-on .snapshot-timeline-entry { border-left-color: var(--accent); background: var(--bg-dim); }
+.snapshot-timeline-event { font-size: 0.84rem; }
+.snapshot-timeline-counts { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); }
+.snapshot-timeline-picture { overflow: auto; max-height: 30rem; }
+@media (max-width: 720px) { .snapshot-timeline-grid { grid-template-columns: 1fr; } }

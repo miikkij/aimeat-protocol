@@ -8,6 +8,10 @@
  *   details" disclosure: principal, grants, subscriptions, binding). Extracted from ecosystem-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.18.1 -- 2026-09-26 -- The sample prompt's copy button stands beside the prompt again (Beside;
+ *     main's .pf-eco-mcp-sample-row), and the technical details are on the grey ground again (Box
+ *     tone="dim"; main's .pf-eco-tech). Fix pass.
+ *   v1.18.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): a data entry is the FoldRow (its key as a key, the visibility tag and the time), a part of the card the heavy-ruled Split under its Sub-heading, the MCP promo the Box with its sample prompt as the Code block and the copy as the Loud action, the technical details the Box with the Tab's fold tone and its parts under the hairline Split, the binding the Facts, the event picker the Select (it keeps the chosen event). It writes no class.
  *   v1.17.0 -- 2026-09-26 -- An app's setup guide is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   v1.16.0 -- 2026-09-26 -- A sample prompt is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.15.0 -- 2026-09-26 -- A sample prompt is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
@@ -46,8 +50,18 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { JsonValue } from '/components/JsonView.js';
+import { FoldRow } from '/components/Folds.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark, Marks, Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Select } from '/components/Select.js';
+import { Tab } from '/components/Tabs.js';
+import { Row, Stack, Split, Beside } from '/components/Layout.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { EcoSection } from './ecosystem-tab.automation.js';
 import { Markdown } from '/components/Markdown.js';
 import { getAutomationRecipe } from '/js/services/ecosystem.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
@@ -63,19 +77,12 @@ import { Hint } from '/components/Hint.js';
 export function EcoDataEntry({ entry }) {
   const [open, setOpen] = useState(false);
   return html`
-    <div class="pf-eco-data-entry">
-      <button class="og-fold og-fold--event pf-eco-data-row" onClick=${() => setOpen(o => !o)}
-        aria-expanded=${open} title=${open ? t('profile.ecosystem.dataCollapse') : t('profile.ecosystem.dataExpand')}>
-        <b class="pf-eco-data-key">${entry.key}</b>
-        <span class=${`poster-chip ${entry.visibility === 'public' ? 'poster-chip--sun' : ''}`}>${entry.visibility}</span>
-        <span class="pf-eco-data-time poster-time">${entry.updated_at ? timeAgo(entry.updated_at) : ''}</span>
-        <span class="og-fold-arrow">${open ? '↓' : '→'}</span>
-      </button>
-      ${open && html`
-        <div class="pf-eco-data-body">
-          <${JsonValue} value=${entry.value} />
-        </div>`}
-    </div>`;
+    <${FoldRow} name=${entry.key} isKey open=${open} onToggle=${(next) => setOpen(next)}
+      title=${open ? t('profile.ecosystem.dataCollapse') : t('profile.ecosystem.dataExpand')}
+      right=${entry.updated_at ? html`<${Mark} kind="time">${timeAgo(entry.updated_at)}<//>` : ''}
+      body=${html`<${JsonValue} value=${entry.value} />`}>
+      <${Mark} tone=${entry.visibility === 'public' ? 'sun' : undefined}>${entry.visibility}<//>
+    <//>`;
 }
 
 /**
@@ -95,12 +102,11 @@ export function EcoSetupGuide({ app }) {
   const guide = setup && (setup[locale] || setup.en || setup.fi);
 
   return html`
-    <div class="pf-eco-section poster-row--thing pf-eco-setup-guide">
-      <div class="pf-eco-section-title">${t('profile.ecosystem.setupGuideTitle')}</div>
+    <${EcoSection} title=${t('profile.ecosystem.setupGuideTitle')}>
       ${guide
-        ? html`<div class="pf-eco-setup-guide-md"><${Markdown} text=${guide} small /></div>`
-        : html`<p class="poster-hint">${t('profile.ecosystem.setupGuideMissing')}</p>`}
-    </div>`;
+        ? html`<${Markdown} text=${guide} small />`
+        : html`<${Note}>${t('profile.ecosystem.setupGuideMissing')}<//>`}
+    <//>`;
 }
 
 /**
@@ -142,28 +148,22 @@ export function EcoAskInClaude({ app }) {
     : '';
 
   return html`
-    <div class="pf-eco-section poster-row--thing pf-eco-ask">
-      <div class="pf-eco-section-title">${t('profile.ecosystem.askClaudeTitle')}</div>
-      <div class="pf-eco-mcp poster-row--thing">
-        <div class="pf-eco-mcp-head">
-          <span class="pf-eco-mcp-icon">💬</span>
-          <strong class="pf-eco-mcp-title">${t('profile.ecosystem.mcpTitle')}</strong>
-        </div>
-        <p class="poster-hint">${t('profile.ecosystem.mcpSub')}</p>
-        <p class="poster-hint">${t('profile.ecosystem.mcpConnect')}</p>
-        <div class="pf-eco-mcp-sample">
+    <${EcoSection} title=${t('profile.ecosystem.askClaudeTitle')}>
+      <${Box} packed name=${`💬 ${t('profile.ecosystem.mcpTitle')}`}>
+        <${Stack}>
+          <${Note}>${t('profile.ecosystem.mcpSub')}<//>
+          <${Note}>${t('profile.ecosystem.mcpConnect')}<//>
           ${organismName
             ? html`
-              <div class="poster-label">${t('profile.ecosystem.mcpSampleLabel')}</div>
-              <div class="pf-eco-mcp-sample-row">
-                <code class="code-block pf-eco-mcp-sample-prompt">${samplePrompt}</code>
-                <${CopyButton} className="poster-slab" text=${samplePrompt} />
-              </div>
+              <${Label} block>${t('profile.ecosystem.mcpSampleLabel')}<//>
+              <${Beside} side=${html`<${Loud} copy=${samplePrompt}>${t('common.copy')}<//>`}>
+                <${Code} block>${samplePrompt}<//>
+              <//>
               <${Hint}>${t('profile.ecosystem.mcpAccessNote')}<//>`
-            : html`<p class="poster-hint">${t('profile.ecosystem.mcpNoOrganism')}</p>`}
-        </div>
-      </div>
-    </div>`;
+            : html`<${Note}>${t('profile.ecosystem.mcpNoOrganism')}<//>`}
+        <//>
+      <//>
+    <//>`;
 }
 
 /**
@@ -180,63 +180,54 @@ export function EcoAskInClaude({ app }) {
  * All the existing functionality (subscribe / unsubscribe) is preserved here verbatim — only
  * relocated. The toggle is independent per card and resets when the card is collapsed/re-expanded.
  */
-export function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, setSubForm }) {
+export function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, subForm, setSubForm }) {
   const [open, setOpen] = useState(false);
+  const part = (title, body) => html`<${Split} above="small" pad="small" gap="small"><${SubHeading}>${title}<//>${body}<//>`;
   return html`
-    <div class="pf-eco-tech poster-box">
-      <button type="button" class=${`poster-tab poster-tab--fold pf-eco-tech-toggle ${open ? 'is-on' : ''}`} aria-expanded=${open} onClick=${() => setOpen(o => !o)}>
+    <${Box} tone="dim" packed>
+      <div><${Tab} tone="fold" on=${open} expanded=${open} onClick=${() => setOpen(o => !o)}>
         🔧 ${t('profile.ecosystem.techDetailsTitle')}
-      </button>
+      <//></div>
       ${open && html`
-        <div class="pf-eco-tech-body">
+        <${Stack} above="small">
           <${Hint}>${t('profile.ecosystem.techDetailsHint')}<//>
 
-          <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.principalTitle')}</div>
-            <code class="code-inline">${app.geai}</code>
-          </div>
+          ${part(t('profile.ecosystem.principalTitle'), html`<span><${Code}>${app.geai}<//></span>`)}
 
-          <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.grants')}</div>
-            <p class="poster-hint pf-eco-tech-access">${t('profile.ecosystem.accessPlain')}</p>
-            <div class="poster-chips">
-              ${(app.scopes || []).map(s => html`<span class="poster-chip" key=${s}>${s}</span>`)}
-            </div>
+          ${part(t('profile.ecosystem.grants'), html`
+            <${Note}>${t('profile.ecosystem.accessPlain')}<//>
+            <${Marks}>
+              ${(app.scopes || []).map(s => html`<${Mark} key=${s}>${s}<//>`)}
+            <//>
             ${/* The areas this app may write used to be listed HERE, three disclosures deep. A
                   statement of what an outside app puts into your store is the opposite of a
                   technical detail, so it is now its own section on the card, above the list of what
-                  it actually wrote — claim first, then evidence. See ecosystem-tab.js. */ ''}
-          </div>
+                  it actually wrote — claim first, then evidence. See ecosystem-tab.js. */ ''}`)}
 
-          <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.subscriptions')}</div>
-            <p class="poster-hint pf-eco-sub-direction">${t('profile.ecosystem.subscriptionsDirection')}</p>
+          ${part(t('profile.ecosystem.subscriptions'), html`
+            <${Note}>${t('profile.ecosystem.subscriptionsDirection')}<//>
             ${appSubs.length === 0
-              ? html`<div class="poster-quiet">${t('profile.ecosystem.noSubs')}</div>`
+              ? html`<${Note} kind="quiet">${t('profile.ecosystem.noSubs')}<//>`
               : appSubs.map(s => html`
-                <div class="pf-eco-sub-row" key=${s.event + (s.createdAt || '')}>
-                  <span class="code-inline">${s.event}</span>
-                  ${s.match && html`<span class="pf-eco-dim">${JSON.stringify(s.match)}</span>`}
-                  <button class="poster-action poster-action--small" onClick=${() => onUnsubscribe(app.app, s.event)}>${t('profile.ecosystem.removeSub')}</button>
-                </div>`)}
+                <${Row} key=${s.event + (s.createdAt || '')}>
+                  <${Code}>${s.event}<//>
+                  ${s.match && html`<${Note} kind="meta" inline>${JSON.stringify(s.match)}<//>`}
+                  <${Action} small onClick=${() => onUnsubscribe(app.app, s.event)}>${t('profile.ecosystem.removeSub')}<//>
+                <//>`)}
             ${app.status !== 'revoked' && html`
-              <div class="pf-eco-sub-add">
-                <select class="select-field" onChange=${e => setSubForm(f => ({ ...f, [app.app]: { event: e.target.value } }))}>
-                  ${OUTBOUND_EVENTS.map(ev => html`<option value=${ev} key=${ev}>${ev}</option>`)}
-                </select>
-                <button class="poster-action poster-action--small" onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}</button>
-              </div>`}
-          </div>
+              <${Row}>
+                <${Select} fit ariaLabel=${t('profile.ecosystem.subscriptions')} value=${subForm?.[app.app]?.event || OUTBOUND_EVENTS[0]}
+                  onChange=${v => setSubForm(f => ({ ...f, [app.app]: { event: v } }))} options=${OUTBOUND_EVENTS} />
+                <${Action} small onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}<//>
+              <//>`}`)}
 
-          <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.binding')}</div>
-            <div class="facts">
-              <div class="facts-k poster-label">${t('profile.ecosystem.aimeatSide')}</div><div class="facts-v"><span class="code-inline">${app.owner}</span></div>
-              <div class="facts-k poster-label">${t('profile.ecosystem.appOrigin')}</div><div class="facts-v"><span class="code-inline">${app.app}</span></div>
-              <div class="facts-k poster-label">${t('profile.ecosystem.keyFp')}</div><div class="facts-v"><span class="code-inline">${keyFp(app.public_key)}</span></div>
-            </div>
-            <p class="poster-hint">${t('profile.ecosystem.bindingNote')}</p>
-          </div>
-        </div>`}
-    </div>`;
+          ${part(t('profile.ecosystem.binding'), html`
+            <${Facts} rows=${[
+              { k: t('profile.ecosystem.aimeatSide'), v: app.owner, mono: true },
+              { k: t('profile.ecosystem.appOrigin'), v: app.app, mono: true },
+              { k: t('profile.ecosystem.keyFp'), v: keyFp(app.public_key), mono: true },
+            ]} />
+            <${Note}>${t('profile.ecosystem.bindingNote')}<//>`)}
+        <//>`}
+    <//>`;
 }

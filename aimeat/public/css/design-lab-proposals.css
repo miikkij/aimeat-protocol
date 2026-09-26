@@ -13,6 +13,8 @@
  *   that may never ship, and a part's sheet is catalogued and drawn by pages.
  * @usage Loaded by the lab's preview page only (views/design-lab/frame.js); no other page carries it.
  * @version-history
+ *   v1.10.0 — 2026-09-27 — The lab's own copies of the page rules its pictures still draw, now that
+ *     the components draw only their own class names (.sub-tabs and others, at the end).
  *   v1.9.0 — 2026-09-26 — The last round of Settings: the suggested reply on the yellow, a delivery
  *     row's small stars, and what Pebble's own entries would do (figure strip, top bar corners, band).
  *   v1.8.0 — 2026-09-26 — Wave 4: a board member's ✗ grey at rest (decision "Remove mark").
@@ -59,7 +61,7 @@
 .poster-specimen-anchor > .poster-count { position: absolute; top: -1px; right: -1px; }
 
 /* Decisions 14-21 are built (2026-09-24): the icon button (.poster-icon), the tab's reco colour
-   (hello-mcp.css) and the dimmed action link (.poster-action:disabled) live in the library. */
+   (setup-guide.css, formerly hello-mcp.css) and the dimmed action link (.poster-action:disabled) live in the library. */
 
 /* Solo: only the element a decision is about. The rest of the drawn part keeps its place, so the
    element keeps the look its surroundings give it, but is not painted (frame.js soloLayout). */
@@ -165,8 +167,8 @@ dialog.dlg.dl-was .dlg-foot .btn-danger-solid:hover:not(:disabled) { background:
 
 /* Rating stars: the library's stars (rating-stars.css) in the proposal's tone, the given ones dark
    instead of yellow; `shown` is the small size of a rating you read (from .agt-stars, 1rem). */
-.dl-stars .op-star.on { color: var(--text); }
-.dl-stars--shown .op-star { font-size: 1rem; padding: 0 .05rem; cursor: default; }
+.dl-stars .stars-star.on { color: var(--text); }
+.dl-stars--shown .stars-star { font-size: 1rem; padding: 0 .05rem; cursor: default; }
 
 /* Small reader: one small cut of the Markdown reader, from the agent README's values (headings
    1.4 / 1.2 / 1.05rem, paragraphs .5rem apart). The words keep the reader's own size (.md-body sets
@@ -208,8 +210,8 @@ dialog.dlg.dl-was .dlg-foot .btn-danger-solid:hover:not(:disabled) { background:
 .og-ib .inbox-bubble--draft.dl-draft-readable, .og-ib .inbox-bubble--draft.dl-draft-readable .md-body, .og-ib .inbox-bubble--draft.dl-draft-readable .md-body p { color: var(--text); }
 /* A delivery's status cell at its column's width, and the library's stars cut small for it. */
 .dl-cell-7 { width: 7rem; }
-.op-stars--shown.dl-stars--row { margin-left: .3rem; vertical-align: baseline; }
-.op-stars--shown.dl-stars--row .op-star { font-size: .7rem; padding: 0; }
+.stars--shown.dl-stars--row { margin-left: .3rem; vertical-align: baseline; }
+.stars--shown.dl-stars--row .stars-star { font-size: .7rem; padding: 0; }
 /* Figure strip words: Pebble's own entry at its headline weight; the option, the strong weight everywhere. */
 [data-aimeat-theme="pebble"] .dl-pebble-strip .og-strip span { font-weight: 600; }
 .dl-strip-strong .og-strip span { font-weight: var(--font-poster-strong-weight); }
@@ -224,5 +226,16 @@ dialog.dlg.dl-was .dlg-foot .btn-danger-solid:hover:not(:disabled) { background:
 [data-aimeat-theme="pebble"] .dl-pebble-entry :is(.topnav-center, .topnav-burger) { border-radius: var(--shape-corner-control); }
 .dl-corner-control :is(.topnav-center, .topnav-burger) { border-radius: var(--shape-corner-control); }
 .poster-specimen-stage .topnav-burger { display: inline-flex; }
-/* Pebble's band: its "stat" entry without the line that colours the band's figures. */
-[data-aimeat-theme="pebble"] .dl-pebble-fix .poster-stat-number--band { color: var(--bg); }
+/* Pebble's band as it was: its "stat" entry coloured the band's figures in the accent, on the accent
+   band. NumberBand's own figures now keep the band's ink, so the lab draws the old look itself. */
+[data-aimeat-theme="pebble"] .dl-pebble-was .number-band .number-band-value { color: var(--accent); }
+
+/* ── Old page class names the lab's pictures still draw (2026-09-27). The components draw only
+   their own names now; the pictures of the looks as they were keep a copy of the page rule here,
+   scoped under the lab's stage. ── */
+/* The Nodes page's tab row as it was (views/profile.css + profile-poster.css .pf .sub-tabs). */
+.poster-specimen-stage .pf .sub-tabs { display: flex; gap: .4rem .9rem; align-items: center; border-bottom: 0; padding: 0; margin-bottom: 1.2rem; }
+/* The Settings utility .mb-half (views/profile.css .pf .mb-half), for the "Ink bold" picture. The
+   "Coral headline" picture's .p-1 needs no copy: on a .card, profile-poster.css .pf .card decided
+   the padding. */
+.poster-specimen-stage .pf .mb-half { margin-bottom: .5rem; }

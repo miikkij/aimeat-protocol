@@ -3,16 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Rating stars: five stars, the given ones dark (--text), the others grey (--text-dim).
- *   Two tones. To give (.op-stars with buttons .op-star, .on up to the rating): 1.4rem, and while the
- *   pointer is on the row the stars up to the one under it turn dark. Shown (.op-stars--shown with
- *   spans): a rating you read in a line, 1rem, not pressable. The row cut (.op-stars--shown
- *   .op-stars--row): the shown tone at .7rem, for a narrow column beside a status. The rating row around the stars to
- *   give: its label, a note field that takes the rest of the row, the send door.
- *   Drawn as markup by views/profile/offers/inbox.js (RatingRow), views/profile/agents/tab-quality.js,
- *   views/profile/agents/rate-modal.js, views/profile/agents/task-item.js, views/profile/work-tab.js, views/profile/offers/frame.js
- *   (deliveryRows, the row cut).
+ *   Two tones. To give (.stars with buttons .stars-star, .on up to the rating): 1.4rem, and while the
+ *   pointer is on the row the stars up to the one under it turn dark. Shown (.stars--shown with
+ *   spans): a rating you read in a line, 1rem, not pressable. The row cut (.stars--shown
+ *   .stars--row): the shown tone at .7rem, for a narrow column beside a status.
+ *   Drawn by components/Stars.js (give: onPick; show: value, `row`); its own class names only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — The component's own class names (.op-stars → .stars, .op-star → .stars-star,
+ *     .op-stars--shown → .stars--shown, .op-stars--row → .stars--row); every declaration and selector
+ *     shape is kept (Jouni: components draw only their own class names, a move). The rating row's
+ *     .op-rate and .op-rate-note go: nothing under public/ writes them.
+ *   v1.4.0 — 2026-09-26 — Drawn by components/Stars.js (page group G4); the rules are unchanged.
  *   v1.3.0 — 2026-09-26 — The row cut (.op-stars--row): five shown stars at .7rem, 47px, beside a status in a
  *     7rem column (Jouni's decision "offer-row-stars").
  *   v1.2.0 — 2026-09-26 — A star not given is its outline only, so 4 of 5 reads at a glance (Jouni).
@@ -21,18 +23,16 @@
  *   v1.0.0 — 2026-09-25 — Moved out of offers-poster.css (UI consolidation phase 5, a move).
  */
 
-.op-rate { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
-.op-stars { display: inline-flex; }
-.op-star { background: none; border: 0; padding: 0 .1rem; cursor: pointer; font-size: 1.4rem; line-height: 1; color: var(--text-dim); }
-.op-star.on { color: var(--text); }
+.stars { display: inline-flex; }
+.stars-star { background: none; border: 0; padding: 0 .1rem; cursor: pointer; font-size: 1.4rem; line-height: 1; color: var(--text-dim); }
+.stars-star.on { color: var(--text); }
 /* A star not given is its outline only, so 4 of 5 reads at a glance (Jouni, 2026-09-26). */
-.op-star:not(.on) { color: transparent; -webkit-text-stroke: 1px var(--text-dim); }
+.stars-star:not(.on) { color: transparent; -webkit-text-stroke: 1px var(--text-dim); }
 /* To give: the pointer on a star shows the rating it would give, dark up to that star. */
-.op-stars:not(.op-stars--shown):hover .op-star:not(:disabled) { color: var(--text); }
-.op-stars:not(.op-stars--shown) .op-star:not(:disabled):hover ~ .op-star { color: var(--text-dim); }
+.stars:not(.stars--shown):hover .stars-star:not(:disabled) { color: var(--text); }
+.stars:not(.stars--shown) .stars-star:not(:disabled):hover ~ .stars-star { color: var(--text-dim); }
 /* Shown: a rating read in a line. */
-.op-stars--shown .op-star { font-size: 1rem; padding: 0 .05rem; cursor: default; }
+.stars--shown .stars-star { font-size: 1rem; padding: 0 .05rem; cursor: default; }
 /* The row cut: the shown stars small enough that five fit beside a status in a 7rem column. */
-.op-stars--row { margin-left: .3rem; vertical-align: baseline; }
-.op-stars--row .op-star { font-size: .7rem; padding: 0; }
-.op-rate-note { flex: 1 1 14rem; min-width: 10rem; }
+.stars--row { margin-left: .3rem; vertical-align: baseline; }
+.stars--row .stars-star { font-size: .7rem; padding: 0; }

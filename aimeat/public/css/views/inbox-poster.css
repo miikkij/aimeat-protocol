@@ -9,6 +9,15 @@
  *   an ink rule, and the pages (broadcast, tracked, results) with the head the mast already carries
  *   removed. Tokens only. NOTE: this file must be linked in spa.html after inbox.css.
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- The page is SettingsPage (name "ib") and the panes ConversationPane: what stays
+ *     is the page's own place for the head, the rail pages' column, and on a phone a rail page over the
+ *     whole screen (the open panes cover it by themselves). The broadcast choices are the Choice now:
+ *     their rules go.
+ *   v1.16.0 -- 2026-09-26 -- The list, the messages, the thread and the composer are components now
+ *     (ConversationList, Message, Thread, Composer's message tone; conversation-list.css, message.css,
+ *     composer.css): their rules here go. The rule between the list and the conversation is the
+ *     page's .inbox-side (inbox.css). What stays is the page's own: the head, the two panes' place, the
+ *     thread head, the pages under the same crumb.
  *   v1.15.0 -- 2026-09-26 -- The rule between the list and the conversation reads --shape-frame-heavy and --shape-rule-colour (a move: the AIMEAT values equal the old ones).
  *   v1.14.0 -- 2026-09-26 -- The typing box is the chat's one row (.poster-composer and its stacked cut): the field with the thick line under it, the tools as framed squares, the dark block that sends with the page's word; Messages (and its Broadcast form) and an agent's Chat tab take it; the framed field, the round-cornered tools and the box's frame go (a unification: Jouni's decision "Typing box").
  *   v1.13.0 -- 2026-09-26 -- A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
@@ -38,93 +47,15 @@
 .og-ib { gap: 0; }
 .og-ib .og-mast--page { margin-top: .6rem; }
 .og-ib .og-title small { align-items: center; }
-.og-ib-actions { flex-wrap: nowrap; }
+.og-ib .og-mast-actions .og-doors { flex-wrap: nowrap; }
 
-/* ── The two panes ─────────────────────────────────────────────────────────────────────────── */
-.og-ib .inbox-body { margin-top: 1.1rem; border-radius: 0; background: transparent; }
-.og-ib .inbox-list { border-right: var(--shape-frame-heavy) solid var(--shape-rule-colour); padding: 0; gap: 0; }
-.og-ib .inbox-list-section { padding: .7rem .75rem .3rem; }
-/* The rows are the chat's rows (.poster-thread) and a person's heading its person tone (Jouni's
-   decision "Conversation list"); their room at the list's edges only. */
-.og-ib .inbox-list .poster-thread-open { padding: .6rem .75rem; }
-.og-ib .inbox-list .poster-thread { padding-right: .5rem; }
-.og-ib .inbox-request { border-radius: 0; border: 0; border-left: 3px solid var(--accent); border-bottom: 1px solid var(--border); padding: .7rem .75rem; }
-.og-ib .inbox-empty-sm { padding: .7rem .75rem; }
-/* The section headings are the day heading (.poster-day-title); the count beside them is the tally Count. */
-.og-ib .inbox-sec { gap: 0; }
-.og-ib .inbox-sec-head { gap: .45rem; }
-.og-ib .inbox-sec + .inbox-sec > .inbox-sec-head { border-top: 1px solid var(--border); }
-.og-ib .inbox-conv-group-bar { padding: 0 .5rem 0 .75rem; }
-.og-ib .inbox-conv-check { border-radius: 0; border-color: var(--text); color: var(--text); }
-.og-ib .inbox-list-tools { padding: .45rem .75rem; border-bottom: 1px solid var(--border); }
-/* A row picked for archiving keeps its mark while picking: the card ground and a coral edge. */
-.og-ib .inbox-conv--selected { background: var(--card-bg); box-shadow: inset 3px 0 0 var(--accent); }
-
-/* ── The thread ────────────────────────────────────────────────────────────────────────────── */
-.og-ib .inbox-thread-head { padding: .6rem 1rem; border-bottom: 3px solid var(--text); }
-.og-ib .inbox-thread-subject { font-family: var(--font-mono); }
-.og-ib .inbox-msgs { background: transparent; padding: 1rem; }
-.og-ib .inbox-day span { border-radius: 0; background: transparent; font-family: var(--font-mono); }
-.og-ib .inbox-bubble { border-radius: 0; border: 2px solid var(--text); background: var(--card-bg); }
-.og-ib .inbox-bubble--mine { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
-/* A message is the chat's turn (turn.css carries the ink on the sun for your words; Jouni's decision
-   "Message"). The box rules here draw the one thing it does not: a suggested reply waiting for your
-   approval (panels.js, .inbox-bubble--draft), which keeps its dashed box. */
-
-/* Ink on the sun, all the way down. The bubble sets the ink on itself, but a message body is
-   rendered markdown and .md-body sets `color: var(--text)` of its own, which the dark theme makes
-   near-white: the text one wrote oneself measured 1.52:1 on the sun. Inheritance cannot fix it,
-   so every element that carries a colour is named. The code plate inverts rather than takes the
-   ink, because its own dark background stays dark in both themes. */
-.og-ib .inbox-bubble--mine .md-body,
-.og-ib .inbox-bubble--mine .md-body p,
-.og-ib .inbox-bubble--mine .md-body li,
-.og-ib .inbox-bubble--mine .md-body h1,
-.og-ib .inbox-bubble--mine .md-body h2,
-.og-ib .inbox-bubble--mine .md-body h3,
-.og-ib .inbox-bubble--mine .md-body h4,
-.og-ib .inbox-bubble--mine .md-body h5,
-.og-ib .inbox-bubble--mine .md-body h6,
-.og-ib .inbox-bubble--mine .md-body strong,
-.og-ib .inbox-bubble--mine .md-body em,
-.og-ib .inbox-bubble--mine .md-body a,
-.og-ib .inbox-bubble--mine .md-body .md-wikilink,
-.og-ib .inbox-bubble--mine .inbox-attach-name,
-.og-ib .inbox-bubble--mine .inbox-attach-pending { color: var(--on-sun); }
-.og-ib .inbox-bubble--mine .md-body h1,
-.og-ib .inbox-bubble--mine .md-body h2,
-.og-ib .inbox-bubble--mine .md-body hr,
-.og-ib .inbox-bubble--mine .md-body th,
-.og-ib .inbox-bubble--mine .md-body td { border-color: var(--on-sun); }
-.og-ib .inbox-bubble--mine .md-body .md-code { background: var(--on-sun); border-color: var(--on-sun); color: var(--sun); }
-.og-ib .inbox-bubble--mine .md-body .md-pre { background: var(--on-sun); border-color: var(--on-sun); }
-.og-ib .inbox-bubble--mine .md-body .md-pre .md-code { color: var(--sun); }
-.og-ib .inbox-bubble--mine .md-body blockquote { background: transparent; color: var(--on-sun); border-left-color: var(--on-sun); }
-.og-ib .inbox-bubble--mine .md-body th,
-.og-ib .inbox-bubble--mine .md-body tbody tr:nth-child(even) { background: transparent; }
-/* An attachment in your message sits on the sun: the chip's own plate is a theme surface, so there it
-   reads as a hole. It takes the sun's own ground, the ink border and the ink words. */
-.og-ib .poster-turn--user .inbox-attach-chip { background: transparent; border-color: var(--on-sun); }
-.og-ib .poster-turn--user .inbox-attach-chip--pending { opacity: 1; border-style: dashed; }
-.og-ib .poster-turn--user .inbox-attach-name, .og-ib .poster-turn--user .inbox-attach-pending { color: var(--on-sun); }
-
-/* The Tags take the ink when they sit on the sun: in the dark theme the Tag's own ink is
-   near-white, which does not read on the sun (the same trap as the body text above). */
-.og-ib .poster-thread--active .poster-chip { border-color: var(--on-sun); color: var(--on-sun); }
-.og-ib .inbox-bubble-quote { border-radius: 0; }
-.og-ib .inbox-panel--empty { border-left: 0; }
-.og-ib .inbox-empty { font-weight: 600; }
-
-/* ── The pages: broadcast, tracked responses, results ──────────────────────────────────────── */
-.og-ib-page { margin-top: 1.1rem; }
-.og-ib-page .og-main { padding-top: .9rem; }
-.og-ib-page .inbox-panel { height: auto; }
-.og-ib-page .inbox-panel > .inbox-thread-head { display: none; }
-.og-ib-page .inbox-compose-fields { padding: 0 0 .8rem; }
-.og-ib-page .inbox-bc-modeopt { border-radius: 0; }
-.og-ib-page .inbox-bc-modeopt--on { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
+/* ── The pages under the same crumb: broadcast, tracked responses, results, list rules ── */
+.og-ib .og-grid { margin-top: 1.1rem; }
 
 @media (max-width: 760px) {
-  .inbox--panel .og-crumb, .inbox--panel .og-mast { display: none; }
-  .og-ib .inbox-body { margin-top: .6rem; }
+  /* A page over the whole screen, as an open conversation is; its rail is the way back. */
+  .og-ib:has(> .og-grid) { position: fixed; inset: 0; z-index: 1000; gap: 0; margin: 0; overflow-y: auto; background: var(--bg, var(--card-bg)); }
+  body:has(.og-ib > .og-grid) { overflow: clip; }
+  body:has(.og-ib > .og-grid) .topnav { display: none; }
+  .og-ib:has(> .og-grid) > .og-crumb, .og-ib:has(> .og-grid) > .og-mast { display: none; }
 }

@@ -12,6 +12,8 @@
  * @structure RunModeSwitch({ agent, showToast })
  * @usage import { RunModeSwitch } from './agent-card-run-mode.js';
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The three choices are the Choice (components/Choice.js: the tabs, the chosen
+ *     one on the sun, the arrow keys, its hint under it); the page writes no class (page group G1a).
  *   v1.4.0 — 2026-09-26 — renderRunModeBadge goes: nothing called it (Jouni: "saat poistaa jos ne on oikeasti käyttämättömiä").
  *   v1.3.0 — 2026-09-25 — Every row label is the Row label (.poster-label), a unification: Jouni's decision Row label.
  *   v1.2.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
@@ -27,7 +29,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { Hint } from '/components/Hint.js';
+import { Choice } from '/components/Choice.js';
 
 /**
  * The run mode, as a control rather than a label.
@@ -70,27 +72,19 @@ export function RunModeSwitch({ agent, showToast }) {
     }
   }
 
+  // The row label is the card's line this switch opens under (agent-card.js CardLine), so the switch
+  // names itself only to a screen reader; on main the page hid its own label for the same reason.
+  //
+  // THREE CHOICES, NOT TWO, AND EVERY ONE OF THEM REACHABLE FROM EVERY OTHER. `unset` is on
+  // screen because it is a real state and the one an agent starts in: nobody has said, so a
+  // spawner leaves it alone. With two buttons a person could enter a decision and never
+  // leave it — a mistaken `spawn` put an agent on the roster for good, and the only way back
+  // was an API call nobody would find. crewaimeat-dev hit exactly that on 2026-09-03 and
+  // could not undo a test agent. `null` on the wire; the button is the third choice here.
   return html`
-    <div class="pf-agd-runmode">
-      <span class="poster-label pf-agd-runmode-label">${t('profile.agents.runMode.label')}</span>
-      ${/* THREE CHOICES, NOT TWO, AND EVERY ONE OF THEM REACHABLE FROM EVERY OTHER. `unset` is on
-            screen because it is a real state and the one an agent starts in: nobody has said, so a
-            spawner leaves it alone. With two buttons a person could enter a decision and never
-            leave it — a mistaken `spawn` put an agent on the roster for good, and the only way back
-            was an API call nobody would find. crewaimeat-dev hit exactly that on 2026-09-03 and
-            could not undo a test agent. `null` on the wire; the button is the third choice here. */''}
-      <div class="pf-agd-runmode-choice pf-tabs" role="group" aria-label=${t('profile.agents.runMode.label')}>
-        ${[['spawn', 'spawn'], ['resident', 'resident'], [null, 'unset']].map(([value, key]) => html`
-          <button type="button"
-            class="poster-tab ${runMode === value ? 'is-on' : ''}"
-            aria-pressed=${runMode === value ? 'true' : 'false'}
-            disabled=${saving}
-            onClick=${() => choose(value)}>
-            ${t(`profile.agents.runMode.${key}`)}
-          </button>
-        `)}
-      </div>
-      <${Hint}>${t('profile.agents.runMode.tooltip')}<//>
-    </div>
+    <${Choice} ariaLabel=${t('profile.agents.runMode.label')} value=${runMode} disabled=${saving}
+      options=${[['spawn', 'spawn'], ['resident', 'resident'], [null, 'unset']].map(([value, key]) => ({ value, label: t(`profile.agents.runMode.${key}`) }))}
+      onChange=${choose}
+      hint=${t('profile.agents.runMode.tooltip')} />
   `;
 }

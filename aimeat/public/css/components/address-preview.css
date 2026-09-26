@@ -6,13 +6,15 @@
  *   address the name will get as it is typed, the address in coral, and whether it is free; a taken
  *   address in the danger colour. Moved unchanged out of css/views/companies-poster.css (Companies,
  *   "Register a company"), where it is the only place it is drawn (UI consolidation phase 5, a move).
- *   Drawn as markup: <p class="co-preview">Address: <b>acme</b> · free</p>, a taken one
- *   <span class="taken">…</span>.
+ *   Drawn by components/AddressPreview.js: <p class="address-preview">Address: <b>acme</b> · free</p>,
+ *   a taken one <span class="taken">…</span>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
  *   v1.0.0 — 2026-09-25 — Initial: the rules of .co-preview, moved unchanged from companies-poster.css.
+ *   v1.1.0 — 2026-09-27 — The component's own name: .co-preview is .address-preview (a move: the
+ *     same declarations, the same selector shapes).
  */
 
-.co-preview { margin: .5rem 0 0; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
-.co-preview b { color: var(--accent); font-weight: 500; }
-.co-preview .taken { color: var(--danger-fg); font-weight: 700; }
+.address-preview { margin: .5rem 0 0; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
+.address-preview b { color: var(--accent); font-weight: 500; }
+.address-preview .taken { color: var(--danger-fg); font-weight: 700; }

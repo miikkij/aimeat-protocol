@@ -12,12 +12,12 @@
  *   groupWords · consentEvents · dateWord · timeWord · spanWord · crumb · pageLinks · openTab
  * @usage import { x, targetRows, groupWords } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — On the component kit (page group G7): the crumb and the rail's page links are
+ *     data for SettingsPage (components/Crumb.js, Rail.js), and openTab is Rail.js's.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Tietolompakko-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate, time as fmtTime, num as fmtNum } from '/js/format.js';
 
 export const x = (key, vars) => t('dwpage.' + key, vars);
@@ -233,15 +233,14 @@ export function consentEvents(consents, days, names) {
 
 /* ── The crumb and the rail ───────────────────────────────────────────────────────────────────── */
 
-export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAccount')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.dataWallet')}</span></div>`;
-}
+/** The crumb's steps (components/Crumb.js): Settings / Account / Data wallet, the last one here. */
+export const crumb = () => [t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.dataWallet')];
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
-export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('memory')}><i>→</i>${t('profile.tabs.memory')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('contacts')}><i>→</i>${t('contacts.tabLabel')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>`;
-}
+export { openTab };
+/** The sibling pages in the rail (components/Rail.js): each opens a Settings tab, → … →. */
+export const pageLinks = () => [
+  { tab: 'organisms', label: t('profile.tabs.organisms') },
+  { tab: 'memory', label: t('profile.tabs.memory') },
+  { tab: 'contacts', label: t('contacts.tabLabel') },
+  { tab: 'agents', label: t('profile.tabs.agents') },
+];

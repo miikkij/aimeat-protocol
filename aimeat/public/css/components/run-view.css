@@ -1,0 +1,70 @@
+/**
+ * @file run-view.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What opens under a run of several models (components/RunView.js): the steps as folds
+ *   with a rule between them, a step's body and its doors under a dashed line, the copy line, each
+ *   model's block (a heavy ink edge on the grey ground, the name, the score and a typewriter line),
+ *   the checkpoint table (pass mark, checkpoint, expected, got, weight; on a phone the mark and the
+ *   checkpoint only), the two proposal lists side by side, the numbered proposals with the chosen
+ *   ones on coral, a folded output, the line under the options and the paste box. Reads only the
+ *   theme's tokens (the edge and the number's frame read the shape tokens).
+ *   Drawn by components/RunView.js; a page never writes these classes.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial, with the values of css/components/calibration-run.css v1.2.0 and the
+ *     folded output of css/views/calibrator-poster.css (.cal-pre), under the component's own class
+ *     names (component plan, special view).
+ */
+
+/* ── The steps as folds ────────────────────────────────────────────────────────────────────── */
+.run-steps { display: flex; flex-direction: column; }
+.run-step { border-top: 1px solid var(--border); }
+.run-step:first-child { border-top: 0; }
+.run-step-body { display: flex; flex-direction: column; gap: .8rem; padding: 0 0 1rem 2.5rem; }
+.run-step-doors { display: flex; flex-direction: column; gap: .5rem; padding-top: .3rem; border-top: 1px dashed var(--border); }
+.run-copies { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.2rem; }
+.run-copies > small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+
+/* ── A model's block ───────────────────────────────────────────────────────────────────────── */
+.run-model { display: flex; flex-direction: column; gap: .5rem; padding: .6rem .8rem; border-left: var(--shape-frame-heavy) solid var(--shape-frame-colour); background: var(--bg-dim); }
+.run-model-head { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; }
+.run-model-head > b { font-weight: 800; }
+.run-model-head > small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── The checkpoints ───────────────────────────────────────────────────────────────────────── */
+.run-checks { display: grid; grid-template-columns: 1.4rem minmax(9rem, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 5.5rem; gap: 0 .8rem; font-size: .82rem; line-height: 1.45; }
+.run-checks > div { padding: .35rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.run-checks > .run-checks-head { padding: 0 0 .25rem; border-bottom: 0; }
+.run-checks b { font-weight: 800; }
+.run-checks small { display: block; font-size: .74rem; color: var(--text-dim); }
+.run-check-pass { color: var(--success-fg); }
+.run-check-fail { color: var(--accent); }
+
+/* ── The proposals ─────────────────────────────────────────────────────────────────────────── */
+.run-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.run-col { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.run-props { display: flex; flex-direction: column; }
+.run-prop { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: .8rem; align-items: start; padding: .5rem 0; border-bottom: 1px solid var(--border); font-size: .88rem; line-height: 1.5; }
+.run-prop-n { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border: var(--shape-frame) solid var(--shape-frame-colour); font-family: var(--font-mono); font-size: .74rem; font-weight: 800; }
+.run-prop-n.is-on { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+.run-prop-t small { display: block; margin-top: .15rem; font-size: .78rem; color: var(--text-dim); }
+.run-prop-tags { display: flex; flex-direction: column; gap: .2rem; align-items: flex-end; }
+.run-prop-tags > * { white-space: nowrap; }
+
+/* ── A folded output ───────────────────────────────────────────────────────────────────────── */
+.run-output { border: 1px solid var(--border); background: var(--card-bg); }
+.run-output summary { cursor: pointer; padding: .35rem .6rem; font-size: .78rem; font-weight: 800; color: var(--text); }
+.run-output .code-block { margin: 0; max-height: 22rem; overflow: auto; }
+
+/* ── The line under the options, the paste box ─────────────────────────────────────────────── */
+.run-apply { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin-top: .4rem; }
+.run-apply > small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); flex-basis: 100%; }
+.run-paste { display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px dashed var(--shape-field-colour); background: var(--card-bg); }
+
+@media (max-width: 860px) {
+  .run-step-body { padding-left: 0; }
+  .run-cols { grid-template-columns: minmax(0, 1fr); }
+  .run-checks { grid-template-columns: 1.4rem minmax(0, 1fr); }
+  .run-checks > div:nth-child(5n+3), .run-checks > div:nth-child(5n+4), .run-checks > div:nth-child(5n+5) { display: none; }
+}

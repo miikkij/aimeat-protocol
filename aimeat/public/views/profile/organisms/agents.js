@@ -9,8 +9,11 @@
  * @structure OrgAgentsPanel
  * @usage import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
  * @version-history
+ *   v1.10.1 — 2026-09-26 — An agent's contract tag is green again, as main drew it (.badge-success:
+ *     Mark tone="fine"; fix pass).
  *   v1.10.0 — 2026-09-26 — The line under an agent's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.9.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.9.0 — 2026-09-26 — Every part is a kit component (page group G2a): the head is a Row of the description and the Loud action, the attach picker the Box with the Select, the Action and the TextField (Enter attaches), the attached agents the List (the 🤖 mark, the node and contract tags, the typewriter line with where it acted, Detach at the end). The contract tag is the ink tone, where main drew it green. The dashed line on top is the Split's hairline. The page writes no class.
  *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.7.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.6.0 — 2026-09-25 — "Advanced: attach by ID" is the action link (.poster-action) (a unification: Jouni's decision "Action link").
@@ -36,8 +39,15 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { LoadingLine } from '/views/profile/shared.js';
-import { QuietNote } from '/components/QuietNote.js';
+import { List, Row as ListRow, Lead, Name, Doors } from '/components/List.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Select } from '/components/Select.js';
+import { TextField } from '/components/TextField.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { Row, Stack, Split } from '/components/Layout.js';
 import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf } from '/js/services/agents.js';
 import { relTime } from '/views/profile/organisms/helpers.js';
@@ -102,56 +112,57 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
   const ownByGaii = new Map((mine || []).map(a => [a.gaii, a]));
 
   return html`
-    <div class="card-detail">
-      <div class="pj-tabhead">
-        <div class="section-desc pj-tabhead-desc">${t('organisms.agentsDesc') || 'An attached agent works in this organism with its owner’s member rights — it shows up in workspace participants and activity.'}</div>
-        <button class="poster-slab poster-slab--control" onClick=${() => setShowAttach(s => !s)}>${'+ '}${t('organisms.attachAgent') || 'Attach agent'}</button>
-      </div>
+    <${Split}>
+      <${Row} align="start" justify="between" gap="medium">
+        <${HeadDesc}>${t('organisms.agentsDesc') || 'An attached agent works in this organism with its owner’s member rights — it shows up in workspace participants and activity.'}<//>
+        <${Loud} control expanded=${showAttach} onClick=${() => setShowAttach(s => !s)}>${'+ '}${t('organisms.attachAgent') || 'Attach agent'}<//>
+      <//>
 
       ${showAttach ? html`
-        <div class="pj-attach poster-box">
-          ${mine === null ? html`<${LoadingLine} />` : (pickable.length > 0 ? html`
-            <div class="flex-row-wrap">
-              <select class="select-field" value=${pick} onChange=${e => setPick(e.target.value)}>
-                <option value="">${t('organisms.pickAgent') || 'Choose one of your agents…'}</option>
-                ${pickable.map(a => html`<option value=${a.gaii} key=${a.gaii}>${(a.display_name || a.name) + (offersWorkspaceContract(a) ? ` · 📜 ${t('organisms.contractTag') || 'contract'}` : '')}</option>`)}
-              </select>
-              <button class="poster-action poster-action--small" disabled=${busy || !pick} onClick=${() => attach(pick)}>${t('organisms.attach') || 'Attach'}</button>
-            </div>` : html`
-            <div class="section-desc">${t('organisms.noOwnAgentsLeft') || 'All your agents are already attached (or you have none yet).'}</div>`)}
-          <button type="button" class="poster-action poster-action--small" aria-expanded=${showAdvanced ? 'true' : 'false'} onClick=${() => setShowAdvanced(s => !s)}>${t('organisms.advancedAttach') || 'Advanced: attach by ID'}</button>
-          ${showAdvanced ? html`
-            <div class="flex-row-wrap">
-              <input class="og-input" placeholder=${t('organisms.agentGaiiPlaceholder') || 'agent#owner@node'} value=${agentId}
-                onInput=${(e) => setAgentId(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') attach(agentId); }} />
-              <button class="poster-action poster-action--small" disabled=${busy || !agentId.trim()} onClick=${() => attach(agentId)}>${t('organisms.attach') || 'Attach'}</button>
-            </div>` : null}
-        </div>` : null}
+        <${Box}>
+          <${Stack}>
+            ${mine === null ? html`<${Note} kind="loading" />` : (pickable.length > 0 ? html`
+              <${Row} wrap>
+                <${Select} fit value=${pick} onChange=${setPick} ariaLabel=${t('organisms.pickAgent') || 'Choose one of your agents…'}
+                  placeholder=${t('organisms.pickAgent') || 'Choose one of your agents…'}
+                  options=${pickable.map(a => [a.gaii, (a.display_name || a.name) + (offersWorkspaceContract(a) ? ` · 📜 ${t('organisms.contractTag') || 'contract'}` : '')])} />
+                <${Action} small disabled=${busy || !pick} onClick=${() => attach(pick)}>${t('organisms.attach') || 'Attach'}<//>
+              <//>` : html`
+              <${HeadDesc}>${t('organisms.noOwnAgentsLeft') || 'All your agents are already attached (or you have none yet).'}<//>`)}
+            <${Actions}>
+              <${Action} small expanded=${showAdvanced} onClick=${() => setShowAdvanced(s => !s)}>${t('organisms.advancedAttach') || 'Advanced: attach by ID'}<//>
+            <//>
+            ${showAdvanced ? html`
+              <${TextField} placeholder=${t('organisms.agentGaiiPlaceholder') || 'agent#owner@node'} ariaLabel=${t('organisms.agentGaiiPlaceholder') || 'agent#owner@node'}
+                value=${agentId} onInput=${setAgentId} onEnter=${() => attach(agentId)}
+                actions=${html`<${Action} small disabled=${busy || !agentId.trim()} onClick=${() => attach(agentId)}>${t('organisms.attach') || 'Attach'}<//>`} />` : null}
+          <//>
+        <//>` : null}
 
-      ${attached.length === 0 ? html`<${QuietNote}>${t('organisms.noAgents') || 'No agents attached.'}<//>` : null}
-      ${attached.map(g => {
-        const p = parseGaii(g);
-        const own = ownByGaii.get(g);
-        const act = acted[p.name];
-        return html`
-          <div class="pj-org-row" key=${'ag-' + g}>
-            <div class="pj-org-avatar poster-box poster-box--avatar poster-box--small" aria-hidden="true">${'🤖'}</div>
-            <div class="pj-org-main pj-org-main-static">
-              <div class="pj-org-titlerow">
-                <span class="pj-org-name">${(own?.display_name || p.name)}</span>
-                ${p.node ? html`<span class="poster-chip">${(p.node)}</span>` : null}
-                ${own && offersWorkspaceContract(own) ? html`<span class="poster-chip" title=${(t('organisms.contractAgentHint') || 'Advertises a workspace contract') + (contractNamesOf(own).length ? `: ${contractNamesOf(own).join(', ')}` : '')}>${'📜 '}${t('organisms.contractTag') || 'contract'}</span>` : null}
-              </div>
-              <div class="pj-org-desc listing-meta" title=${g}>
-                <span class="mono">${(p.owner ? `${p.name}#${p.owner}` : g)}</span>
-                ${act ? html` · ${t('organisms.agentActedIn') || 'active in'} ${([...act.ws].join(', '))} (${act.count}) · ${relTime(act.lastAt)}`
-                  : (own?.last_seen ? html` · ${t('organisms.lastActive') || 'last active'} ${relTime(own.last_seen)}` : null)}
-              </div>
-            </div>
-            ${(canManage || g.includes('#' + ghii + '@'))
-              ? html`<button class="poster-action poster-action--small" disabled=${busy} onClick=${() => detach(g)}>${t('organisms.detach') || 'Detach'}</button>`
-              : null}
-          </div>`;
-      })}
-    </div>`;
+      <${List} cols="mark-name-doors" keepCols empty=${t('organisms.noAgents') || 'No agents attached.'}>
+        ${attached.map(g => {
+          const p = parseGaii(g);
+          const own = ownByGaii.get(g);
+          const act = acted[p.name];
+          return html`
+            <${ListRow} key=${'ag-' + g}>
+              <${Lead} text=${'🤖'} />
+              <${Name} title=${g}
+                tag=${[
+                  p.node ? html`<${Mark} key="node">${(p.node)}<//>` : null,
+                  own && offersWorkspaceContract(own) ? html`<${Mark} key="contract" tone="fine" title=${(t('organisms.contractAgentHint') || 'Advertises a workspace contract') + (contractNamesOf(own).length ? `: ${contractNamesOf(own).join(', ')}` : '')}>${'📜 '}${t('organisms.contractTag') || 'contract'}<//>` : null,
+                ]}
+                meta=${html`${(p.owner ? `${p.name}#${p.owner}` : g)}${act ? html` · ${t('organisms.agentActedIn') || 'active in'} ${([...act.ws].join(', '))} (${act.count}) · ${relTime(act.lastAt)}`
+                  : (own?.last_seen ? html` · ${t('organisms.lastActive') || 'last active'} ${relTime(own.last_seen)}` : null)}`}>
+                ${(own?.display_name || p.name)}
+              <//>
+              <${Doors}>
+                ${(canManage || g.includes('#' + ghii + '@'))
+                  ? html`<${Action} small disabled=${busy} onClick=${() => detach(g)}>${t('organisms.detach') || 'Detach'}<//>`
+                  : null}
+              <//>
+            <//>`;
+        })}
+      <//>
+    <//>`;
 }

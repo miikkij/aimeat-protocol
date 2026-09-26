@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-26 — Every part is a kit component (the dialogs' fields TextField, TextArea, Select, Check, Choice and Field in a Stack; the picture's preview MastheadPreview; the password's eye TextField secret with its Show and Hide words, kept as main had it; the requirements the List's small cut with Tick; the presence button PresenceButton; Note, Action, Loud): this file writes no class (page group G8).
  *   v1.8.0 — 2026-09-26 — The overview's head is the home's head, the Masthead (components/Masthead.js); the head's own rules go, the address line and the marks keep theirs. The account dialog's preview of your picture is framed as the head frames it (.poster-frame); its size stays (a unification: Jouni's decision "Person head").
  *   v1.7.0 — 2026-09-26 — The account dialog's e-mail, which is changed in the Email tab, is the Text field, disabled; .pf-edit-readonly goes (a unification: the look most tabs use).
  *   v1.6.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -31,12 +32,23 @@ import { getProfile, updateProfile, changePassword, updateSessionMeta } from "/j
 import { getMyPresence, setMyPresence } from "/js/services/presence.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { LoadingLine } from "./shared.js";
-import { PresenceDot } from "/components/PresenceDot.js";
+import { PresenceDot, PresenceButton } from "/components/PresenceDot.js";
 import { useToast } from "/components/Toast.js";
 import { DisplayPrefsFields } from "/components/DisplayPrefsFields.js";
 import { setDisplayPrefs } from "/js/display-prefs.js";
 import { swallowed } from '/js/swallowed.js';
 import { Modal } from '/components/Modal.js';
+import { MastheadPreview } from '/components/Masthead.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Choice } from '/components/Choice.js';
+import { Field } from '/components/Field.js';
+import { List, Row, Tick, Cell } from '/components/List.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud } from '/components/Action.js';
+import { Row as Line, Stack, Space } from '/components/Layout.js';
 
 /* ───── Edit Profile Modal ───── */
 
@@ -102,71 +114,43 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   const requestClose = () => { if (!saving) onClose(); };
 
   const footer = loading ? null : html`
-    <button class="poster-action" onClick=${requestClose} disabled=${saving}>
-      ${t('profile.landing.editCancel')}
-    </button>
-    <button class="poster-slab poster-slab--control" onClick=${save} disabled=${saving}>
+    <${Action} onClick=${requestClose} disabled=${saving}>${t('profile.landing.editCancel')}<//>
+    <${Loud} control onClick=${save} disabled=${saving}>
       ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}
-    </button>`;
+    <//>`;
   const footerStart = loading ? null : html`
-    <a href="#" class="poster-action" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
-      ${t('profile.landing.changePassword')}…</a>`;
+    <${Action} href="#" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>${t('profile.landing.changePassword')}…<//>`;
 
   return html`
     <${Modal} open=${true} onClose=${requestClose} title=${t('profile.landing.editModalTitle')}
-      className="pf-account-modal" footer=${footer} footerStart=${footerStart}>
-        ${loading ? html`<div class="pf-edit-loading"><${LoadingLine} /></div>` : html`
-            <label class="pf-edit-label">
-              <span class="poster-label">${t('profile.landing.editDisplayName')}</span>
-              <input type="text" class="og-input pf-edit-input" value=${fields.display_name}
-                placeholder=${t('profile.landing.editDisplayNamePlaceholder')}
-                maxlength="100"
-                onInput=${(e) => set('display_name', e.target.value)} />
-            </label>
-            <label class="pf-edit-label">
-              <span class="poster-label">${t('profile.landing.editBio')}</span>
-              <textarea class="og-textarea pf-edit-textarea" value=${fields.bio}
-                placeholder=${t('profile.landing.editBioPlaceholder')}
-                maxlength="500" rows="3"
-                onInput=${(e) => set('bio', e.target.value)}></textarea>
-            </label>
-            <label class="pf-edit-label">
-              <span class="poster-label">${t('profile.landing.editAvatar')}</span>
-              <div class="pf-avatar-row">
-                <input type="text" class="og-input pf-edit-input" value=${fields.avatar}
-                  placeholder=${t('profile.landing.editAvatarPlaceholder')}
-                  maxlength="50"
-                  onInput=${(e) => set('avatar', e.target.value)} />
-                <span class="pf-avatar-preview poster-frame" aria-hidden="true">${fields.avatar || '🙂'}</span>
-              </div>
-            </label>
-            <label class="pf-edit-label">
-              <span class="poster-label">${t('profile.landing.editLocale')}</span>
-              <select class="select-field pf-edit-select" value=${fields.locale}
-                onChange=${(e) => set('locale', e.target.value)}>
-                <option value="en">English</option>
-                <option value="fi">Suomi</option>
-                <option value="es">Español</option>
-              </select>
-              <div class="poster-hint">${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'}</div>
-            </label>
+      footer=${footer} footerStart=${footerStart}>
+        ${loading ? html`<${Space} above="section" below="section"><${LoadingLine} /><//>` : html`
+          <${Stack} gap="medium">
+            <${TextField} label=${t('profile.landing.editDisplayName')} value=${fields.display_name}
+              placeholder=${t('profile.landing.editDisplayNamePlaceholder')} maxLength=${100}
+              onInput=${(v) => set('display_name', v)} />
+            <${TextArea} label=${t('profile.landing.editBio')} value=${fields.bio}
+              placeholder=${t('profile.landing.editBioPlaceholder')} maxLength=${500} rows=${3}
+              onInput=${(v) => set('bio', v)} />
+            <${TextField} label=${t('profile.landing.editAvatar')} value=${fields.avatar}
+              placeholder=${t('profile.landing.editAvatarPlaceholder')} maxLength=${50}
+              onInput=${(v) => set('avatar', v)}
+              actions=${html`<${MastheadPreview}>${fields.avatar || '🙂'}<//>`} />
+            <${Select} label=${t('profile.landing.editLocale')} value=${fields.locale} onChange=${(v) => set('locale', v)}
+              options=${[['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']]}
+              hint=${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'} />
             ${/* Beside the language, because they are the two settings it is NOT. */''}
             <${DisplayPrefsFields} region=${fields.region} timezone=${fields.timezone}
               onChange=${(k, v) => set(k, v)} />
-            <div class="pf-edit-label">
-              <span class="poster-label">${t('profile.landing.editEmail')}</span>
-              <input class="og-input" type="text" value=${currentEmail || t('profile.landing.editEmailNone')} disabled aria-label=${t('profile.landing.editEmail')} />
-              <a href="/v1/profile?tab=email" class="poster-action poster-action--quiet pf-edit-link">
-                ${t('profile.landing.editEmailLink') || 'Change in the Email tab →'}</a>
-            </div>
-            <label class="pf-edit-check">
-              <input type="checkbox" checked=${fields.directory_listed}
-                onChange=${(e) => set('directory_listed', e.target.checked)} />
-              <span>
-                <span class="pf-edit-check-title">${t('profile.landing.editDirectoryListed') || 'List me in the member directory'}</span>
-                <span class="poster-hint">${t('profile.landing.editDirectoryHint') || 'Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.'}</span>
-              </span>
-            </label>
+            <${Field} label=${t('profile.landing.editEmail')}>
+              <${TextField} value=${currentEmail || t('profile.landing.editEmailNone')} disabled ariaLabel=${t('profile.landing.editEmail')} />
+              <${Action} tone="quiet" href="/v1/profile?tab=email">${t('profile.landing.editEmailLink') || 'Change in the Email tab →'}<//>
+            <//>
+            <${Check} checked=${fields.directory_listed} onChange=${(on) => set('directory_listed', on)}
+              hint=${t('profile.landing.editDirectoryHint') || 'Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.'}>
+              ${t('profile.landing.editDirectoryListed') || 'List me in the member directory'}
+            <//>
+          <//>
         `}
         <${ToastContainer} />
     <//>
@@ -175,16 +159,12 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
 
 /* ───── Change Password Modal ───── */
 
-/* Password input with a neutral show/hide toggle (text-presentation eye, gray — red would read
- * as an error). */
-export function PwInput({ value, onInput }) {
-  const [show, setShow] = useState(false);
-  return html`
-    <div class="pf-pw-wrap">
-      <input type=${show ? 'text' : 'password'} class="og-input pf-edit-input" value=${value} onInput=${onInput} />
-      <button type="button" class="poster-action poster-action--quiet pf-pw-eye"
-        onClick=${() => setShow(s => !s)}>${show ? (t('profile.landing.hidePassword') || 'Hide') : (t('profile.landing.showPassword') || 'Show')}</button>
-    </div>`;
+/* Password input with the show/hide eye, named in words (the Text field's secret cut; the lead's
+ * ruling: the account password dialog keeps its eye). `onInput` gets the event, as it always did. */
+export function PwInput({ value, onInput, label, autoComplete }) {
+  return html`<${TextField} secret label=${label} value=${value} autoComplete=${autoComplete || 'current-password'}
+    showLabel=${t('profile.landing.showPassword') || 'Show'} hideLabel=${t('profile.landing.hidePassword') || 'Hide'}
+    onInput=${(v, e) => onInput?.(e)} />`;
 }
 
 export function ChangePasswordModal({ onClose, onChanged }) {
@@ -248,40 +228,31 @@ export function ChangePasswordModal({ onClose, onChanged }) {
   const setupMode = hasPassword === false;
 
   const footer = html`
-    <button class="poster-action" onClick=${requestClose} disabled=${saving}>
-      ${t('profile.landing.editCancel')}
-    </button>
-    <button class="poster-slab poster-slab--control" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
+    <${Action} onClick=${requestClose} disabled=${saving}>${t('profile.landing.editCancel')}<//>
+    <${Loud} control onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
       ${saving
         ? (setupMode ? (t('profile.landing.passwordSaving') || t('profile.landing.passwordChanging')) : t('profile.landing.passwordChanging'))
         : (setupMode ? (t('profile.landing.setPasswordBtn') || 'Set password') : (t('profile.landing.changePasswordBtn') || 'Change password'))}
-    </button>`;
+    <//>`;
 
   return html`
-    <${Modal} open=${true} onClose=${requestClose} className="pf-account-modal" size="sm" footer=${footer}
+    <${Modal} open=${true} onClose=${requestClose} size="sm" footer=${footer}
       title=${setupMode ? (t('profile.landing.setPasswordTitle') || 'Set a password') : t('profile.landing.changePasswordTitle')}>
+      <${Stack} gap="medium">
           ${setupMode ? html`
-            <div class="poster-hint">${t('profile.landing.setPasswordHint')
-              || 'Your account has no password yet (you signed in with Google). Choose a password to also sign in with your username.'}</div>
+            <${Note}>${t('profile.landing.setPasswordHint')
+              || 'Your account has no password yet (you signed in with Google). Choose a password to also sign in with your username.'}<//>
           ` : html`
-            <label class="pf-edit-label">
-              <span class="poster-label">${t('profile.landing.currentPassword')}</span>
-              <${PwInput} value=${current} onInput=${(e) => setCurrent(e.target.value)} />
-            </label>
+            <${PwInput} label=${t('profile.landing.currentPassword')} value=${current} onInput=${(e) => setCurrent(e.target.value)} />
           `}
-          <label class="pf-edit-label">
-            <span class="poster-label">${t('profile.landing.newPassword')}</span>
-            <${PwInput} value=${newPw} onInput=${(e) => setNewPw(e.target.value)} />
-          </label>
-          <ul class="pf-pw-rules">
-            ${rules.map(r => html`<li class=${r.ok ? 'ok' : ''} key=${r.label}>${r.ok ? '✓' : '○'} ${r.label}</li>`)}
-          </ul>
-          <label class="pf-edit-label">
-            <span class="poster-label">${t('profile.landing.confirmPassword')}</span>
-            <${PwInput} value=${confirm} onInput=${(e) => setConfirm(e.target.value)} />
-          </label>
-          ${mismatch ? html`<div class="form-message form-message--error">${t('profile.landing.passwordMismatch')}</div>` : null}
-          ${err && html`<div class="form-message form-message--error">${err}</div>`}
+          <${PwInput} label=${t('profile.landing.newPassword')} autoComplete="new-password" value=${newPw} onInput=${(e) => setNewPw(e.target.value)} />
+          <${List} cols="mark-name" keepCols small>
+            ${rules.map(r => html`<${Row} key=${r.label} fine=${r.ok}><${Tick} bare state=${r.ok ? 'done' : 'off'} glyph=${r.ok ? '✓' : '○'} /><${Cell}>${r.label}<//><//>`)}
+          <//>
+          <${PwInput} label=${t('profile.landing.confirmPassword')} autoComplete="new-password" value=${confirm} onInput=${(e) => setConfirm(e.target.value)} />
+          ${mismatch ? html`<${Note} kind="message" error>${t('profile.landing.passwordMismatch')}<//>` : null}
+          ${err && html`<${Note} kind="message" error>${err}<//>`}
+      <//>
     <//>
   `;
 }
@@ -294,51 +265,33 @@ export function PresenceDialog({ cfg, status, saving, onSave, onClose }) {
   // Every choice here saves the moment it is made, so there is no half-written form to guard.
   return html`
     <${Modal} open=${true} onClose=${onClose} title=${t('presence.control.title')} size="sm" guard=${false}
-      className="pf-presence-modal"
-      footer=${html`<button class="poster-slab poster-slab--control" onClick=${onClose}>${t('profile.close')}</button>`}>
-          <div class="pf-presence-head">
-            <div class="section-desc">${t('presence.control.desc')}</div>
+      footer=${html`<${Loud} control onClick=${onClose}>${t('profile.close')}<//>`}>
+      <${Stack} gap="medium">
+          <${Line} justify="between" align="start" gap="large">
+            <${HeadDesc}>${t('presence.control.desc')}<//>
             <${PresenceDot} status=${status} size="md" label=${true} />
-          </div>
+          <//>
 
-          <div class="pf-presence-row">
-            <label class="poster-label pf-presence-label">${t('presence.control.modeLabel')}</label>
-            <div class="pf-presence-modes">
-              <button class=${'poster-tab' + (cfg.mode === 'auto' ? ' is-on' : '')}
-                disabled=${saving} onClick=${() => onSave({ mode: 'auto' })}>${t('presence.control.modeAuto')}</button>
-              <button class=${'poster-tab' + (cfg.mode === 'manual' ? ' is-on' : '')}
-                disabled=${saving} onClick=${() => onSave({ mode: 'manual' })}>${t('presence.control.modeManual')}</button>
-            </div>
-          </div>
+          <${Choice} label=${t('presence.control.modeLabel')} value=${cfg.mode} disabled=${saving}
+            options=${[['auto', t('presence.control.modeAuto')], ['manual', t('presence.control.modeManual')]]}
+            onChange=${(mode) => onSave({ mode })} />
 
           ${cfg.mode === 'auto' ? html`
-            <div class="poster-hint">${t('presence.control.modeAutoHint')}</div>
+            <${Note}>${t('presence.control.modeAutoHint')}<//>
           ` : html`
-            <div class="pf-presence-row">
-              <label class="poster-label pf-presence-label" for="pf-presence-status">${t('presence.control.statusLabel')}</label>
-              <select id="pf-presence-status" class="select-field pf-edit-select" value=${cfg.status} disabled=${saving}
-                onChange=${(e) => onSave({ status: e.target.value })}>
-                <option value="available">${t('presence.status.available')}</option>
-                <option value="busy">${t('presence.status.busy')}</option>
-                <option value="away">${t('presence.status.away')}</option>
-                <option value="invisible">${t('presence.status.invisible')}</option>
-              </select>
-            </div>
+            <${Select} fit id="pf-presence-status" label=${t('presence.control.statusLabel')} value=${cfg.status} disabled=${saving}
+              onChange=${(v) => onSave({ status: v })}
+              options=${[['available', t('presence.status.available')], ['busy', t('presence.status.busy')], ['away', t('presence.status.away')], ['invisible', t('presence.status.invisible')]]} />
           `}
 
-          <div class="pf-presence-row">
-            <label class="poster-label pf-presence-label" for="pf-presence-vis">${t('presence.control.visibilityLabel')}</label>
-            <select id="pf-presence-vis" class="select-field pf-edit-select" value=${cfg.visibility} disabled=${saving}
-              onChange=${(e) => onSave({ visibility: e.target.value })}>
-              <option value="everyone">${t('presence.control.visEveryone')}</option>
-              <option value="contacts">${t('presence.control.visContacts')}</option>
-              <option value="nobody">${t('presence.control.visNobody')}</option>
-            </select>
-          </div>
-          <div class="poster-hint">
+          <${Select} fit id="pf-presence-vis" label=${t('presence.control.visibilityLabel')} value=${cfg.visibility} disabled=${saving}
+            onChange=${(v) => onSave({ visibility: v })}
+            options=${[['everyone', t('presence.control.visEveryone')], ['contacts', t('presence.control.visContacts')], ['nobody', t('presence.control.visNobody')]]} />
+          <${Note}>
             ${cfg.visibility === 'everyone' ? t('presence.control.visEveryoneHint')
               : cfg.visibility === 'contacts' ? t('presence.control.visContactsHint') : ''}
-          </div>
+          <//>
+      <//>
     <//>
   `;
 }
@@ -373,10 +326,7 @@ export function PresencePill() {
 
   if (!cfg) return null;
   return html`
-    <button class="pf-presence-pill-btn" onClick=${() => setOpen(true)} title=${t('presence.control.title')}>
-      <${PresenceDot} status=${status} size="sm" label=${true} />
-      <span class="pf-presence-pill-caret" aria-hidden="true">⌄</span>
-    </button>
+    <${PresenceButton} status=${status} title=${t('presence.control.title')} onClick=${() => setOpen(true)} />
     ${open ? html`<${PresenceDialog} cfg=${cfg} status=${status} saving=${saving}
       onSave=${save} onClose=${() => setOpen(false)} />` : null}
   `;

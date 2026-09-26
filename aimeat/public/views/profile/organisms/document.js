@@ -9,6 +9,13 @@
  * @structure loadToastUI (internal), DocumentView, DocumentEditor
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
+ *   v1.11.0 — 2026-09-26 — Every part is a library component that takes data: the view is DocView
+ *     (components/DocView.js: its bar, the Tabs of the two versions, Edit, Publish and the window icon,
+ *     the three dates as Facts, the text framed only in the document's own window: `inPage` leaves it
+ *     on the workspace page, as main's page rule did); the editor is a Layout stack of the Text
+ *     field, FileDrop's button, the Object box with the List of files and their visibility tags, the
+ *     editor's mount, DocSplit with the Text area and its scrolling preview, and FormActions. The
+ *     page writes no class (page migration G2b).
  *   v1.10.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.9.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -45,8 +52,20 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { VisibilityPill } from '/views/profile/shared.js';
-import { KeyValueRow } from '/components/KeyValueRow.js';
 import { Markdown } from '/components/Markdown.js';
+import { DocView, DocSplit } from '/components/DocView.js';
+import { Facts } from '/components/Facts.js';
+import { Tabs } from '/components/Tabs.js';
+import { Action, Loud, Icon } from '/components/Action.js';
+import { Box } from '/components/Box.js';
+import { Note } from '/components/Note.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { FileDrop } from '/components/FileDrop.js';
+import { FormActions } from '/components/Field.js';
+import { Spinner } from '/components/Spinner.js';
+import { Row as Line, Stack } from '/components/Layout.js';
+import { List, Row, Name, Doors } from '/components/List.js';
 import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
@@ -75,7 +94,7 @@ function loadToastUI() {
  * draft and a published version — offers a Draft/Published toggle so the two can be compared. The
  * parent passes the merged `page` (the draft, carrying the published copy on `page._pub`). Remounted
  * per document via `key`, so the toggle resets to "Draft" each time a document is opened. */
-export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopOut }) {
+export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopOut, inPage }) {
   const hasBoth = page._draft && page._pub;
   const [tab, setTab] = useState('draft');
   const shown = (hasBoth && tab === 'published') ? page._pub : page;
@@ -128,25 +147,25 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
   const savedAt = page._draft ? page._updatedAt : null;          // draft = working copy → "last saved"
   const publishedAt = page._pub?._updatedAt || (!page._draft && page._published ? page._updatedAt : null);
 
+  const tools = html`
+    ${hasBoth ? html`
+      <${Tabs} kind="view" value=${tab} onSelect=${setTab} items=${[
+        { value: 'draft', label: t('organisms.draftVersion') || 'Draft' },
+        { value: 'published', label: t('organisms.publishedVersion') || 'Published' },
+      ]} />` : null}
+    <${Action} small onClick=${onEdit}>${t('organisms.edit') || 'Edit'}<//>
+    ${page._draft ? html`<${Loud} control onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}<//>` : null}
+    ${onPopOut ? html`<${Icon} small label=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}<//>` : null}`;
+  const facts = (created || savedAt || publishedAt) ? html`<${Facts} rows=${[
+    created && { k: t('organisms.createdAt') || 'Created', v: dt(created) },
+    savedAt && { k: t('organisms.lastSaved') || 'Last saved', v: dt(savedAt) },
+    publishedAt && { k: t('organisms.publishedAt') || 'Published', v: dt(publishedAt) },
+  ]} />` : null;
+
   return html`
-    <div class="pj-doc-toolbar">
-      <span class="pj-doc-vtitle">${shown.title || shown.id || page.id}</span>
-      ${hasBoth ? html`
-        <div class="pf-tabs" role="tablist">
-          <button class="poster-tab ${tab === 'draft' ? 'is-on' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>
-          <button class="poster-tab ${tab === 'published' ? 'is-on' : ''}" onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}</button>
-        </div>` : null}
-      <button class="poster-action poster-action--small" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}</button>
-      ${page._draft ? html`<button class="poster-slab poster-slab--control" onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
-      ${onPopOut ? html`<button class="poster-icon poster-icon--small pj-doc-popout" title=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}</button>` : null}
-    </div>
-    ${(created || savedAt || publishedAt) ? html`
-      <div class="pj-doc-meta">
-        ${created ? html`<${KeyValueRow} label=${t('organisms.createdAt') || 'Created'} value=${dt(created)} />` : null}
-        ${savedAt ? html`<${KeyValueRow} label=${t('organisms.lastSaved') || 'Last saved'} value=${dt(savedAt)} />` : null}
-        ${publishedAt ? html`<${KeyValueRow} label=${t('organisms.publishedAt') || 'Published'} value=${dt(publishedAt)} />` : null}
-      </div>` : null}
-    <div class="pj-doc-view poster-box poster-box--raised" onClick=${onDocClick}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
+    <${DocView} title=${shown.title || shown.id || page.id} tools=${tools} facts=${facts} framed=${!inPage} onClick=${onDocClick}>
+      <${Markdown} text=${rendered} onWikiLink=${onWikiLink} />
+    <//>`;
 }
 
 /* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
@@ -291,45 +310,42 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     } finally { setSaving(false); }
   };
 
+  const titleWords = t('organisms.pageTitle') || 'Document title';
   return html`
-    <div class="pj-doc-editor">
-      <input type="text" class="og-input" placeholder=${t('organisms.pageTitle') || 'Document title'}
-        value=${title} onInput=${e => setTitle(e.target.value)} />
-      <div class="pj-doc-imgbar">
-        <label class="poster-action poster-action--small pj-file-btn">
-          <span class="pj-file-btn-icon">📷</span> ${t('organisms.insertImage') || 'Upload image from file'}
-          <input type="file" accept="image/*" hidden onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
-        </label>
-        <span class="poster-hint">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}</span>
-      </div>
+    <${Stack} above="small" below="small">
+      <${TextField} placeholder=${titleWords} ariaLabel=${titleWords} value=${title} onInput=${setTitle} />
+      <${Line} wrap gap="small">
+        <${FileDrop} button=${'📷 ' + (t('organisms.insertImage') || 'Upload image from file')} accept="image/*" onFiles=${([f]) => insertFromFile(f)} />
+        <${Note} inline>${t('organisms.orPaste') || '…or paste / drag an image into the editor'}<//>
+      <//>
       ${images.length ? html`
-        <div class="pj-img-vis poster-box">
-          <div class="pj-img-vis-head">
-            <span class="pj-img-vis-title sub-heading">${t('organisms.fileVisibility') || 'File visibility'}</span>
-            <span class="poster-hint">${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}</span>
-            ${images.some(i => i.visibility !== 'public') ? html`<button class="poster-action poster-action--small" disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}</button>` : null}
-          </div>
-          <div class="listing listing--name-doors listing--cols">
-          ${images.map(i => html`
-            <div class="listing-row" key=${i.key}>
-              <div class="listing-name" title=${i.key}>${(i.alt)}</div>
-              <div class="listing-doors"><${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} /></div>
-            </div>`)}
-          </div>
-        </div>` : null}
+        <${Box}>
+          <${Line} wrap gap="small" below="small">
+            <${SubHeading} inline>${t('organisms.fileVisibility') || 'File visibility'}<//>
+            <${Note} inline>${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}<//>
+            ${images.some(i => i.visibility !== 'public') ? html`<${Action} small disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}<//>` : null}
+          <//>
+          <${List} cols="name-doors" keepCols>
+            ${images.map(i => html`
+              <${Row} key=${i.key}>
+                <${Name} title=${i.key}>${(i.alt)}<//>
+                <${Doors}><${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} /><//>
+              <//>`)}
+          <//>
+        <//>` : null}
       ${mode === 'rich'
-        ? html`<div ref=${containerRef} class="pj-tui"></div>`
-        : html`<div class="pj-doc-grid">
-            <textarea class="og-textarea" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
-              value=${md} onInput=${e => setMd(e.target.value)}></textarea>
-            <div class="pj-doc-preview poster-box"><${Markdown} text=${md} /></div>
-          </div>`}
-      <div class="form-actions">
-        <button class="poster-slab poster-slab--control" onClick=${save} disabled=${busy || saving || !title.trim()}>
-          ${saving ? html`<span class="spinner"></span> ${t('organisms.saving') || 'Saving…'}` : (t('organisms.saveDraft') || 'Save draft')}
-        </button>
-        <button class="poster-action poster-action--small" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
-      </div>
-    </div>
+        ? html`<div ref=${containerRef}></div>`
+        : html`<${DocSplit}>
+            <${TextArea} rows=${14} placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'} ariaLabel=${t('organisms.writeMarkdown') || 'Write markdown…'}
+              value=${md} onInput=${setMd} />
+            <${Box} scroll packed><${Markdown} text=${md} /><//>
+          <//>`}
+      <${FormActions}>
+        <${Loud} control onClick=${save} disabled=${busy || saving || !title.trim()}>
+          ${saving ? html`<${Spinner} /> ${t('organisms.saving') || 'Saving…'}` : (t('organisms.saveDraft') || 'Save draft')}
+        <//>
+        <${Action} small onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}<//>
+      <//>
+    <//>
   `;
 }

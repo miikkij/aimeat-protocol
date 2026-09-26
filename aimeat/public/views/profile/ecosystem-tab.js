@@ -10,6 +10,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.22.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage (the count the tally Mark), the waiting requests the small attention note with a List (the grant level a Select that keeps its choice), the apps the List whose row opens its panel (a revoked app faded, main's .pf-eco-card-revoked), each part of the panel the heavy-ruled Split under its Sub-heading, the written data the Folds, the revoke dialog the Action, Loud and TextField. The empty part the panel drew between "ask in Claude" and the data (a bare heavy rule) goes. It writes no class.
  *   v3.21.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v3.20.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v3.19.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -152,15 +153,25 @@ import { Modal } from '/components/Modal.js';
 import { LoadingLine } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
 import { ECO_PRESETS } from './ecosystem-tab.helpers.js';
-import { EcoAutomationSection } from './ecosystem-tab.automation.js';
+import { EcoAutomationSection, EcoSection } from './ecosystem-tab.automation.js';
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
 import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { Folds } from '/components/Folds.js';
+import { Action, Loud, Icon, Actions } from '/components/Action.js';
+import { Mark, Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Select } from '/components/Select.js';
+import { TextField } from '/components/TextField.js';
+import { Row as LRow, Stack, Space } from '/components/Layout.js';
+import { SubHeading } from '/components/SubHeading.js';
 
-/** An app's state as a Status: approved is fine, waiting needs a look, revoked is danger. */
-const appStatusClass = (s) => `poster-status poster-status--${['active', 'approved'].includes(s) ? 'fine' : ['pending', 'validating'].includes(s) ? 'attention' : s === 'revoked' ? 'danger' : 'off'}`;
-/** A validation's result as a Status: passed is fine, failed is danger, the rest is off. */
-const validationClass = (v) => `poster-status poster-status--${v === 'validated' ? 'fine' : v === 'failed' ? 'danger' : 'off'}`;
+/** An app's state as a Status tone: approved is fine, waiting needs a look, revoked is danger. */
+const appStatusTone = (s) => (['active', 'approved'].includes(s) ? 'fine' : ['pending', 'validating'].includes(s) ? 'attention' : s === 'revoked' ? 'danger' : 'off');
+/** A validation's result as a Status tone: passed is fine, failed is danger, the rest is off. */
+const validationTone = (v) => (v === 'validated' ? 'fine' : v === 'failed' ? 'danger' : 'off');
 
 export default function EcosystemTab({ onStats, showToast }) {
   const [apps, setApps] = useState([]);
@@ -259,72 +270,70 @@ export default function EcosystemTab({ onStats, showToast }) {
     catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.subError'), 'error'); }
   }
 
-  if (loading) return html`<div class="pf-eco"><${LoadingLine} /></div>`;
+  if (loading) return html`<${LoadingLine} />`;
 
-  return html`
-    <div class="pf-eco">
-      <div class="og mb-1">
-        <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAutomation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.ecosystem')}</span></div>
-        <div class="og-mast"><div class="og-mast-words">
-          <h3 class="og-title poster-page-title">
-            ${t('profile.ecosystem.title')}<small><span class="poster-count poster-count--tally">${apps.length}</span></small>
-          </h3>
-          <p class="og-desc">${t('profile.ecosystem.desc')}</p>
-        </div></div>
-      </div>
+  return html`<${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.ecosystem')]}
+    title=${t('profile.ecosystem.title')} sub=${html`<${Mark} kind="count" tone="tally">${apps.length}<//>`}
+    desc=${t('profile.ecosystem.desc')}
+    after=${html`
+      <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
+        footer=${html`
+          <${Action} onClick=${() => setRevokeApp(null)}>${t('common.cancel')}<//>
+          <${Loud} control danger disabled=${revokeInput !== revokeApp} onClick=${onRevokeConfirm}>
+            ${t('profile.ecosystem.revoke')}
+          <//>`}>
+        <${Stack} gap="medium">
+          <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
+          <${TextField} value=${revokeInput} ariaLabel=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
+            placeholder=${revokeApp || ''} onInput=${v => setRevokeInput(v)} />
+        <//>
+      <//>`}>
 
       ${pending.length > 0 && html`
-        <div class="pf-eco-pending poster-aside poster-aside--small">
-          <div class="pf-eco-pending-title sub-heading">${t('profile.ecosystem.pendingTitle')}</div>
-          <${Hint}>${t('profile.ecosystem.pendingHint')}<//>
-          <div class="listing listing--name-desc-doors">${pending.map(r => html`
-            <div class="listing-row" key=${r.user_code}>
-              <div class="listing-name">${r.display_name || r.app}</div>
-              <div class="listing-desc">
-                ${r.user_code && html`<span>${t('profile.ecosystem.pendingCode')} <strong class="code-inline">${r.user_code}</strong></span>`}
-                <span class="code-inline">eco:${r.app}</span>
-                <span class="poster-status poster-status--attention">${t('profile.ecosystem.waiting')}</span>
-                ${r.validation && r.validation !== 'none' && html`
-                  <span class=${`${validationClass(r.validation)} pf-eco-valid`}
-                    title=${(r.validation_checks || []).filter(c => !c.ok).map(c => `${c.name}: ${c.detail || ''}`).join('; ')}>
-                    ${t(`profile.ecosystem.validation.${r.validation}`)}
-                  </span>`}
-                <span class="pf-eco-dim">${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}</span>
-              </div>
-              <div class="listing-doors">
-                <label class="poster-label">${t('profile.ecosystem.grantLevel')}</label>
-                <select class="select-field" onChange=${e => setPresetByCode(p => ({ ...p, [r.user_code]: e.target.value }))}>
-                  <option value="standard" selected>${t('profile.ecosystem.presetStandard')}</option>
-                  <option value="readonly">${t('profile.ecosystem.presetReadonly')}</option>
-                  <option value="full">${t('profile.ecosystem.presetFull')}</option>
-                </select>
-                <button class="poster-action poster-action--small poster-action--row" disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}</button>
-                <button class="poster-action poster-action--small poster-action--row" onClick=${() => onDeny(r.user_code)}>${t('profile.ecosystem.deny')}</button>
-              </div>
-            </div>`)}</div>
-        </div>`}
+        <${Space} below="large">
+          <${Note} kind="aside" size="small">
+            <${SubHeading}>${t('profile.ecosystem.pendingTitle')}<//>
+            <${Hint}>${t('profile.ecosystem.pendingHint')}<//>
+            <${List} cols="name-desc-doors">${pending.map(r => html`
+              <${Row} key=${r.user_code}>
+                <${Name}>${r.display_name || r.app}<//>
+                <${Desc}>
+                  <${LRow} wrap gap="small">
+                    ${r.user_code && html`<span>${t('profile.ecosystem.pendingCode')} <${Code}>${r.user_code}<//></span>`}
+                    <${Code}>eco:${r.app}<//>
+                    <${Mark} kind="status" tone="attention">${t('profile.ecosystem.waiting')}<//>
+                    ${r.validation && r.validation !== 'none' && html`
+                      <${Mark} kind="status" explains tone=${validationTone(r.validation)}
+                        title=${(r.validation_checks || []).filter(c => !c.ok).map(c => `${c.name}: ${c.detail || ''}`).join('; ')}>
+                        ${t(`profile.ecosystem.validation.${r.validation}`)}
+                      <//>`}
+                    <${Note} kind="meta" inline>${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}<//>
+                  <//>
+                <//>
+                <${Doors}>
+                  <${Label}>${t('profile.ecosystem.grantLevel')}<//>
+                  <${Select} fit ariaLabel=${t('profile.ecosystem.grantLevel')} value=${presetByCode[r.user_code] || 'standard'}
+                    onChange=${v => setPresetByCode(p => ({ ...p, [r.user_code]: v }))}
+                    options=${[['standard', t('profile.ecosystem.presetStandard')], ['readonly', t('profile.ecosystem.presetReadonly')], ['full', t('profile.ecosystem.presetFull')]]} />
+                  <${Action} small row disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}<//>
+                  <${Action} small row onClick=${() => onDeny(r.user_code)}>${t('profile.ecosystem.deny')}<//>
+                <//>
+              <//>`)}<//>
+          <//>
+        <//>`}
 
       ${apps.length === 0
-        ? html`<div class="pf-eco-empty">
-            <p class="poster-quiet">${t('profile.ecosystem.empty')}</p>
-            <p class="poster-hint">${t('profile.ecosystem.connectNote')}</p>
-          </div>`
-        : html`<div class="listing listing--name-desc-doors">${apps.map(app => {
+        ? html`<${Stack}>
+            <${Note} kind="quiet">${t('profile.ecosystem.empty')}<//>
+            <${Note}>${t('profile.ecosystem.connectNote')}<//>
+          <//>`
+        : html`<${List} cols="name-desc-doors">${apps.map(app => {
           const isOpen = expanded === app.geai;
           const appSubs = subs.filter(s => s.geai === app.geai);
           return html`
-            <div class=${`listing-row pf-eco-row ${isOpen ? 'is-open' : ''} ${app.status === 'revoked' ? 'pf-eco-card-revoked' : ''}`} key=${app.geai}
-              onClick=${(e) => { if (!e.target.closest?.('.listing-open')) toggleCard(app); }}>
-              <div class="listing-name"><span class="pf-eco-icon">🔌</span> ${app.display_name || app.app}</div>
-              <div class="listing-desc">${app.owner ? t('profile.ecosystem.connectedAsYou', { owner: app.owner }) : ''}</div>
-              <div class="listing-doors">
-                <span class=${appStatusClass(app.status)}>${t(`profile.ecosystem.status.${app.status}`)}</span>
-                <span class="poster-time">${app.last_seen ? timeAgo(app.last_seen) : ''}</span>
-                <button type="button" class="poster-icon poster-icon--small">${isOpen ? '▼' : '▶'}</button>
-              </div>
-              ${isOpen && html`
-                <div class="listing-open poster-box poster-box--raised">
-                  <p class="og-lead">${t('profile.ecosystem.appValueLine')}</p>
+            <${Row} key=${app.geai} open=${isOpen} onToggle=${() => toggleCard(app)} faded=${app.status === 'revoked'}
+              panel=${html`
+                  <${Note} kind="lead">${t('profile.ecosystem.appValueLine')}<//>
 
                   ${app.status !== 'revoked' && html`<${EcoSetupGuide} app=${app} />`}
 
@@ -332,47 +341,39 @@ export default function EcosystemTab({ onStats, showToast }) {
 
                   ${app.status !== 'revoked' && html`<${EcoAskInClaude} app=${app} />`}
 
-                  <div class="pf-eco-section poster-row--thing">
-                  </div>
-
-                  <div class="pf-eco-section poster-row--thing">
-                    <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>
+                  <${EcoSection} title=${t('profile.ecosystem.dataTitle')}>
                     ${appData[app.geai] === undefined
                       ? html`<${LoadingLine} text=${t('profile.ecosystem.dataLoading')} />`
                       : appData[app.geai].length === 0
-                        ? html`<div class="poster-quiet">${t('profile.ecosystem.dataEmpty')}</div>`
+                        ? html`<${Note} kind="quiet">${t('profile.ecosystem.dataEmpty')}<//>`
                         : html`
-                          <div class="pf-eco-data">
+                          <${Folds}>
                             ${appData[app.geai].map(entry => html`
                               <${EcoDataEntry} entry=${entry} key=${entry.key} />`)}
-                          </div>`}
-                  </div>
+                          <//>`}
+                  <//>
 
                   ${app.status !== 'revoked' && html`
-                    <div class="pf-eco-section poster-row--thing pf-eco-disconnect">
-                      <div class="pf-eco-section-title">${t('profile.ecosystem.disconnectTitle')}</div>
+                    <${EcoSection} title=${t('profile.ecosystem.disconnectTitle')}>
                       <${Hint}>${t('profile.ecosystem.disconnectHint')}<//>
-                      <button class="poster-action poster-action--small poster-action--danger" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>
-                        ${t('profile.ecosystem.disconnect')}
-                      </button>
-                    </div>`}
+                      <${Actions}>
+                        <${Action} small tone="danger" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>
+                          ${t('profile.ecosystem.disconnect')}
+                        <//>
+                      <//>
+                    <//>`}
 
                   <${EcoTechDetails} app=${app} appSubs=${appSubs}
                     onUnsubscribe=${onUnsubscribe} onSubscribe=${onSubscribe}
-                    subForm=${subForm} setSubForm=${setSubForm} />
-                </div>`}
-            </div>`;
-        })}</div>`}
-
-      <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
-        footer=${html`
-          <button class="poster-action" onClick=${() => setRevokeApp(null)}>${t('common.cancel')}</button>
-          <button class="poster-slab poster-slab--control poster-slab--danger" disabled=${revokeInput !== revokeApp} onClick=${onRevokeConfirm}>
-            ${t('profile.ecosystem.revoke')}
-          </button>`}>
-        <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
-        <input class="og-input pf-eco-revoke-input" type="text" value=${revokeInput}
-          placeholder=${revokeApp || ''} onInput=${e => setRevokeInput(e.target.value)} />
-      <//>
-    </div>`;
+                    subForm=${subForm} setSubForm=${setSubForm} />`}>
+              <${Name} before=${'🔌'}>${app.display_name || app.app}<//>
+              <${Desc}>${app.owner ? t('profile.ecosystem.connectedAsYou', { owner: app.owner }) : ''}<//>
+              <${Doors}>
+                <${Mark} kind="status" tone=${appStatusTone(app.status)}>${t(`profile.ecosystem.status.${app.status}`)}<//>
+                <${Mark} kind="time">${app.last_seen ? timeAgo(app.last_seen) : ''}<//>
+                <${Icon} small>${isOpen ? '▼' : '▶'}<//>
+              <//>
+            <//>`;
+        })}<//>`}
+  <//>`;
 }

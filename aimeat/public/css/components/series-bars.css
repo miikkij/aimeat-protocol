@@ -1,0 +1,17 @@
+/**
+ * @file series-bars.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The strip of bars (components/SeriesBars.js): a short series of numbers drawn inline
+ *   as SVG, one bar per point in the accent colour, with the space a section part keeps around it.
+ *   The heavy rule on top is poster.css .poster-row--thing, which the component's markup wears.
+ *   Reads only the theme's tokens. Drawn by the component; a page never writes these.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Moved out of css/views/living.css (.pf-ld-chart, .pf-ld-chart rect) and the
+ *     section parts' padding in profile-poster.css (.pf .pf-ld-chart) with the values unchanged
+ *     (page group G4; a move).
+ */
+
+.series-bars { display: block; background: none; padding: 1rem 0 1.25rem; }
+.series-bars rect { fill: var(--accent, var(--text)); }

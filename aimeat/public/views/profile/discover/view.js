@@ -12,6 +12,7 @@
  * @structure renderDiscoverView · renderCover · secKinds · secRecent · secPlaces · secBookkeeping · renderResults · renderKind · renderPlace
  * @usage import { renderDiscoverView } from './discover/view.js';
  * @version-history
+ *   v1.13.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its tags, doors, desk and rail as data; List with its Row, Num, Name, Desc and Doors; Group; More; Tabs; Filter; CardGrid of framed Cards with their lines for the places; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.12.0 -- 2026-09-26 -- The map of kinds, the rows of entries and the hits are the Listing (listing, listing-row and its head row, figure, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.11.0 -- 2026-09-26 -- The line under a kind's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -40,11 +41,18 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { c, num, kindName, kindSub, HUMAN_TYPES, desk, entryRows, entryCells, crumb, renderPage, rel } from './frame.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { List, Row, Num, Name, Desc, Doors, Group, More, Filter } from '/components/List.js';
+import { Figure } from '/components/Figure.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Tabs } from '/components/Tabs.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
+import { c, num, kindName, kindSub, HUMAN_TYPES, desk, entryRows, crumb, renderPage, rel } from './frame.js';
 import { Hint } from '/components/Hint.js';
 
 const RECENT_ROWS = 8;
+const SCOPE_IDS = ['own', 'public', 'shared'];
 
 export function renderDiscoverView(ctx) {
   const v = ctx.view;
@@ -53,6 +61,11 @@ export function renderDiscoverView(ctx) {
   if (v.kind === 'place') return renderPlace(ctx, v.organismId, v.organism);
   return renderCover(ctx);
 }
+
+/** The scopes as rail items: the one in use marked, each with its count. */
+const scopeItems = (ctx, countOf) => SCOPE_IDS.map(s => ({
+  key: s, mark: '→', label: t('discover.scope.' + s), count: countOf(s), on: ctx.scope === s, onClick: () => ctx.setScope(s),
+}));
 
 /* ── The cover ─────────────────────────────────────────────────────────────────────────────── */
 function kindsOf(f) {
@@ -68,42 +81,36 @@ function renderCover(ctx) {
   const places = f?.places || [];
   const orgs = new Set(places.map(p => p.organismId));
   return html`
-    <div class="og og-dv">
-      ${crumb(ctx, [])}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('discover.title')}</h1>
-          <div class="poster-chips">
-            <span class="poster-chip">${c('chipItems', { n: num(total) })}</span><span class="poster-chip">${c('chipKinds', { n: kinds.length })}</span>
-            ${orgs.size ? html`<span class="poster-chip">${c('chipOrgs', { n: orgs.size })}</span>` : null}
-            ${book ? html`<span class="poster-chip">${c('chipBook', { n: num(book) })}</span>` : null}
-            ${ctx.facets.shared?.total ? html`<span class="poster-chip poster-chip--coral">${c('chipShared', { n: num(ctx.facets.shared.total) })}</span>` : null}
-          </div>
-          <p class="og-desc">${c('desc')}</p>
-        </div>
-        <div class="og-mast-actions"><div class="og-doors">
-          <button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openTab('memory')}>${t('profile.memory.title')}</button>
-          <button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openTab('knowledge')}>${t('knowledge.tabLabel')}</button>
-        </div></div>
-      </div>
-      ${desk(ctx)}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secKinds(ctx, kinds)}
-          ${secRecent(ctx)}
-          ${secPlaces(ctx, places)}
-          ${secBookkeeping(ctx, book)}
-        </div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${c('railTitle')}</span>
-          ${[['01', 'dv-kinds', c('secKinds'), kinds.length], ['02', 'dv-recent', c('secRecent'), ''], ['03', 'dv-places', c('secPlaces'), orgs.size], ['04', 'dv-book', c('secBook'), num(book)]]
-            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${c('scopes')}</span>
-          ${['own', 'public', 'shared'].map(s => html`<button type="button" class=${`og-rail-link ${ctx.scope === s ? 'on' : ''}`} key=${s} onClick=${() => ctx.setScope(s)}><i>→</i>${t('discover.scope.' + s)}<em>${ctx.facets[s] ? num(ctx.facets[s].total) : '→'}</em></button>`)}
-        </nav>
-      </div>
-    </div>`;
+    <${SettingsPage} name="dv"
+      crumb=${crumb(ctx, [])}
+      title=${t('discover.title')}
+      marks=${[
+        { label: c('chipItems', { n: num(total) }) },
+        { label: c('chipKinds', { n: kinds.length }) },
+        orgs.size ? { label: c('chipOrgs', { n: orgs.size }) } : null,
+        book ? { label: c('chipBook', { n: num(book) }) } : null,
+        ctx.facets.shared?.total ? { label: c('chipShared', { n: num(ctx.facets.shared.total) }), tone: 'coral' } : null,
+      ]}
+      desc=${c('desc')}
+      actions=${html`<${Actions}>
+        <${Action} small onClick=${() => ctx.openTab('memory')}>${t('profile.memory.title')}<//>
+        <${Action} small onClick=${() => ctx.openTab('knowledge')}>${t('knowledge.tabLabel')}<//>
+      <//>`}
+      strip=${desk(ctx)}
+      railTitle=${c('railTitle')}
+      sections=${[
+        { id: 'dv-kinds', num: '01', label: c('secKinds'), count: kinds.length },
+        { id: 'dv-recent', num: '02', label: c('secRecent'), count: '' },
+        { id: 'dv-places', num: '03', label: c('secPlaces'), count: orgs.size },
+        { id: 'dv-book', num: '04', label: c('secBook'), count: num(book) },
+      ]}
+      pagesLabel=${c('scopes')}
+      pages=${scopeItems(ctx, (s) => (ctx.facets[s] ? num(ctx.facets[s].total) : '→'))}>
+      ${secKinds(ctx, kinds)}
+      ${secRecent(ctx)}
+      ${secPlaces(ctx, places)}
+      ${secBookkeeping(ctx, book)}
+    <//>`;
 }
 
 /* ── 01 What is here ───────────────────────────────────────────────────────────────────────── */
@@ -114,18 +121,19 @@ function whereOf(f, type) {
 function secKinds(ctx, kinds) {
   const f = ctx.facets[ctx.scope];
   const capped = ctx.scope === 'public';
+  const browse = (k) => () => ctx.pickView({ kind: 'kind', type: k.value });
   return html`<${PageSection} id="dv-kinds" num="01" title=${c('secKinds')} count=${c('secKindsSub', { n: kinds.length })} first=${true}>
-    ${!f ? html`<p class="poster-quiet loading-mark">${c('loading')}</p>` : !kinds.length ? html`<p class="poster-quiet">${t('discover.empty')}</p>` : html`
-      <div class="listing listing--cols listing--n-name-where-doors">
-        <div class="listing-row listing-row--head"><div class="poster-label"></div><div class="poster-label">${c('colKind')}</div><div class="poster-label">${c('colWhere')}</div><div class="poster-label"></div></div>
+    ${!f ? html`<${Note} kind="loading">${c('loading')}<//>` : html`
+      <${List} cols="n-name-where-doors" keepCols empty=${t('discover.empty')}
+        head=${kinds.length ? ['', c('colKind'), c('colWhere'), ''] : null}>
         ${kinds.map(k => html`
-          <div class="listing-row" key=${k.value}>
-            <div class="listing-n dv-n poster-stat-number poster-stat-number--small">${num(k.count)}${capped && k.count >= 50 ? '+' : ''}</div>
-            <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'kind', type: k.value })}>${kindName(k.value)}</button><small class="listing-meta">${kindSub(k.value)}</small></div>
-            <div class="listing-desc">${whereOf(f, k.value)}</div>
-            <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'kind', type: k.value })}>${c('browse')}</button></div>
-          </div>`)}
-      </div>`}
+          <${Row} key=${k.value}>
+            <${Num}><${Figure} small n=${`${num(k.count)}${capped && k.count >= 50 ? '+' : ''}`} /><//>
+            <${Name} onOpen=${browse(k)} meta=${kindSub(k.value)}>${kindName(k.value)}<//>
+            <${Desc}>${whereOf(f, k.value)}<//>
+            <${Doors}><${Action} small row onClick=${browse(k)}>${c('browse')}<//><//>
+          <//>`)}
+      <//>`}
   <//>`;
 }
 
@@ -136,11 +144,11 @@ function secRecent(ctx) {
   const list = all ? (filt ? all.filter(e => e.type === filt) : all) : [];
   const shown = ctx.recentOpen ? list : list.slice(0, RECENT_ROWS);
   const present = all ? [...new Set(all.map(e => e.type))] : [];
-  const doorFor = (type, label) => html`<button type="button" key=${type || 'all'} class=${`poster-tab poster-tab--fold ${filt === type ? 'is-on' : ''}`} onClick=${() => ctx.setRecentType(type)}>${label}</button>`;
-  const doors = html`${doorFor('', c('allKinds'))}${['document', 'knowledge', 'skill', 'decision'].filter(x => present.includes(x)).map(x => doorFor(x, kindName(x)))}`;
+  const kinds = [{ value: '', key: 'all', label: c('allKinds') }, ...['document', 'knowledge', 'skill', 'decision'].filter(x => present.includes(x)).map(x => ({ value: x, key: x, label: kindName(x) }))];
+  const doors = html`<${Tabs} tone="fold" value=${filt || ''} onSelect=${(v) => ctx.setRecentType(v)} items=${kinds} />`;
   return html`<${PageSection} id="dv-recent" num="02" title=${c('secRecent')} count=${c('secRecentSub')} doors=${doors}>
-    ${!all ? html`<p class="poster-quiet loading-mark">${c('loadingRecent')}</p>` : !list.length ? html`<p class="poster-quiet">${c('noneRecent')}</p>` : entryRows(ctx, shown, { head: true })}
-    ${list.length > RECENT_ROWS ? html`<p class="dv-more"><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setRecentOpen(v => !v)}>${ctx.recentOpen ? c('showFewer') : c('showMore', { n: list.length - RECENT_ROWS })}</button></p>` : null}
+    ${!all ? html`<${Note} kind="loading">${c('loadingRecent')}<//>` : !list.length ? html`<${Note} kind="quiet">${c('noneRecent')}<//>` : entryRows(ctx, shown, { head: true })}
+    ${list.length > RECENT_ROWS ? html`<${More} onMore=${() => ctx.setRecentOpen(v => !v)} label=${ctx.recentOpen ? c('showFewer') : c('showMore', { n: list.length - RECENT_ROWS })} />` : null}
     <${Hint}>${c('recentHint')}<//>
   <//>`;
 }
@@ -154,14 +162,16 @@ function secPlaces(ctx, places) {
     o.count += p.count; o.ws.push(p);
   }
   const orgs = [...byOrg.values()].sort((a, b) => b.count - a.count);
-  return html`<${PageSection} id="dv-places" num="03" title=${c('secPlaces')} count=${c('secPlacesSub', { o: orgs.length, w: places.length })} doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openTab('organisms')}>${t('profile.tabs.organisms')}</button>`}>
-    ${!orgs.length ? html`<p class="poster-quiet">${c('nonePlaces')}</p>` : html`<div class="dv-places">
-      ${orgs.map(o => html`<button type="button" class="dv-place" key=${o.id} onClick=${() => ctx.pickView({ kind: 'place', organismId: o.id, organism: o.name })}>
-        <b>${o.name}</b><small>${c('placeSub', { w: o.ws.length, n: num(o.count) })}</small>
-        ${o.ws.slice(0, 3).map(w => html`<span class="dv-ws" key=${w.workspaceId}>${w.workspace}<i>${num(w.count)}</i></span>`)}
-        ${o.ws.length > 3 ? html`<span class="dv-ws dv-ws--more">${c('moreN', { n: o.ws.length - 3 })}</span>` : null}
-      </button>`)}
-    </div>`}
+  const lines = (o) => [
+    ...o.ws.slice(0, 3).map(w => ({ key: w.workspaceId, label: w.workspace, count: num(w.count) })),
+    ...(o.ws.length > 3 ? [{ key: 'more', label: c('moreN', { n: o.ws.length - 3 }), dim: true }] : []),
+  ];
+  return html`<${PageSection} id="dv-places" num="03" title=${c('secPlaces')} count=${c('secPlacesSub', { o: orgs.length, w: places.length })}
+    doors=${html`<${Action} small soft onClick=${() => ctx.openTab('organisms')}>${t('profile.tabs.organisms')}<//>`}>
+    ${!orgs.length ? html`<${Note} kind="quiet">${c('nonePlaces')}<//>` : html`<${CardGrid}>
+      ${orgs.map(o => html`<${Card} tone="framed" key=${o.id} name=${o.name} meta=${c('placeSub', { w: o.ws.length, n: num(o.count) })}
+        lines=${lines(o)} onOpen=${() => ctx.pickView({ kind: 'place', organismId: o.id, organism: o.name })} />`)}
+    <//>`}
     <${Hint}>${c('placesHint')}<//>
   <//>`;
 }
@@ -170,7 +180,10 @@ function secPlaces(ctx, places) {
 function secBookkeeping(ctx, book) {
   return html`<${FoldSection} id="dv-book" num="04" title=${c('secBook')} sub=${c('secBookSub', { n: num(book) })} open=${ctx.bookOpen} onToggle=${() => ctx.setBookOpen(v => !v)}>
     <${Hint}>${c('bookHint')}<//>
-    <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openTab('memory')}>${t('profile.memory.title')}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.pickView({ kind: 'kind', type: 'memory', bookkeeping: true })}>${c('browseBook')}</button></div>
+    <${Actions}>
+      <${Action} small onClick=${() => ctx.openTab('memory')}>${t('profile.memory.title')}<//>
+      <${Action} small soft onClick=${() => ctx.pickView({ kind: 'kind', type: 'memory', bookkeeping: true })}>${c('browseBook')}<//>
+    <//>
   <//>`;
 }
 
@@ -184,24 +197,27 @@ function renderResults(ctx) {
   const groups = new Map();
   for (const e of human) { if (!groups.has(e.type)) groups.set(e.type, []); groups.get(e.type).push(e); }
   const order = [...groups.keys()].sort((a, b) => HUMAN_TYPES.indexOf(a) - HUMAN_TYPES.indexOf(b));
-  const chips = html`
-    <span class="poster-chip poster-chip--sun">${r ? c('hitsN', { n: num(human.length) }) : '…'}</span>
-    ${order.map(k => html`<span class="poster-chip" key=${k}>${kindName(k)} ${groups.get(k).length}</span>`)}
-    ${book ? html`<span class="poster-chip">${c('bookHidden', { n: book })}</span>` : null}`;
-  const otherScopes = ['own', 'public', 'shared'].filter(s => s !== ctx.scope);
+  const marks = [
+    { label: r ? c('hitsN', { n: num(human.length) }) : '…', tone: 'sun' },
+    ...order.map(k => ({ label: `${kindName(k)} ${groups.get(k).length}` })),
+    book ? { label: c('bookHidden', { n: book }) } : null,
+  ];
+  const otherScopes = SCOPE_IDS.filter(s => s !== ctx.scope);
+  const kindGroup = (k) => {
+    const list = groups.get(k);
+    const open = ctx.moreOpen.has(k);
+    const shown = open ? list : list.slice(0, 5);
+    return html`<${Group} key=${'g' + k} title=${kindName(k)} count=${list.length}>
+      ${entryRows(ctx, shown, { words, time: false })}
+      ${list.length > 5 ? html`<${More} onMore=${() => ctx.toggleMore(k)} label=${open ? c('showFewer') : c('showRestOf', { n: list.length - 5, k: kindName(k).toLowerCase() })} />` : null}
+    <//>`;
+  };
   return renderPage(ctx, {
-    crumbs: [ctx.query], title: t('discover.title'), chips,
-    doors: html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${ctx.clear}>${c('clear')}</button>`,
-    rail: html`<hr /><span class="og-rail-label">${c('scopes')}</span>
-      ${['own', 'public', 'shared'].map(s => html`<button type="button" class=${`og-rail-link ${ctx.scope === s ? 'on' : ''}`} key=${s} onClick=${() => ctx.setScope(s)}><i>→</i>${t('discover.scope.' + s)}<em>${ctx.scope === s ? num(human.length) : (ctx.otherCounts[s] ?? '…')}</em></button>`)}`,
+    crumbs: [ctx.query], title: t('discover.title'), marks,
+    doors: html`<${Action} small soft onClick=${ctx.clear}>${c('clear')}<//>`,
+    railGroup: { label: c('scopes'), items: scopeItems(ctx, (s) => (ctx.scope === s ? num(human.length) : (ctx.otherCounts[s] ?? '…'))) },
     children: html`
-      ${!r ? html`<p class="poster-quiet loading-mark">${c('searching')}</p>` : !human.length ? html`<p class="poster-quiet">${t('discover.empty')}</p>` : html`
-        <div class="listing listing--cols listing--name-where-doors dv-rows dv-rows--hits">
-          ${order.map(k => { const list = groups.get(k); const open = ctx.moreOpen.has(k); const shown = open ? list : list.slice(0, 5); return html`
-            <div class="dv-lbl poster-day-title" key=${'l' + k}>${kindName(k)}<em>${list.length}</em></div>
-            ${entryCells(ctx, shown, { words, time: false })}
-            ${list.length > 5 ? html`<div class="dv-morerow" key=${'m' + k}><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.toggleMore(k)}>${open ? c('showFewer') : c('showRestOf', { n: list.length - 5, k: kindName(k).toLowerCase() })}</button></div>` : null}`; })}
-        </div>`}
+      ${!r ? html`<${Note} kind="loading">${c('searching')}<//>` : !human.length ? html`<${Note} kind="quiet">${t('discover.empty')}<//>` : order.map(kindGroup)}
       ${book ? html`<${FoldSection} id="dv-bookhits" num="·" title=${c('secBook')} sub=${c('bookHitsSub', { n: book })} open=${ctx.bookOpen} onToggle=${() => ctx.setBookOpen(v => !v)}>
         ${entryRows(ctx, entries.filter(e => e.type === 'memory' && e.segment === 'bookkeeping'), { words, time: false })}
       <//>` : null}
@@ -213,8 +229,8 @@ function renderResults(ctx) {
 function browseBody(ctx) {
   const b = ctx.browse;
   return html`
-    ${!b || (b.loading && !b.entries.length) ? html`<p class="poster-quiet loading-mark">${c('loadingRows')}</p>` : !b.entries.length ? html`<p class="poster-quiet">${t('discover.empty')}</p>` : entryRows(ctx, b.entries, { head: true })}
-    ${b && b.entries.length < b.total ? html`<p class="dv-more"><button type="button" class="poster-action poster-action--more" disabled=${b.loading} onClick=${ctx.browseMore}>${c('showMore', { n: num(b.total - b.entries.length) })}</button></p>` : null}`;
+    ${!b || (b.loading && !b.entries.length) ? html`<${Note} kind="loading">${c('loadingRows')}<//>` : !b.entries.length ? html`<${Note} kind="quiet">${t('discover.empty')}<//>` : entryRows(ctx, b.entries, { head: true })}
+    ${b && b.entries.length < b.total ? html`<${More} disabled=${b.loading} onMore=${ctx.browseMore} label=${c('showMore', { n: num(b.total - b.entries.length) })} />` : null}`;
 }
 function renderKind(ctx, type) {
   const f = ctx.facets[ctx.scope];
@@ -222,10 +238,13 @@ function renderKind(ctx, type) {
   const segs = f ? f.segments.filter(s => s.type === type && s.segment !== 'bookkeeping') : [];
   return renderPage(ctx, {
     crumbs: [kindName(type)], title: kindName(type),
-    chips: html`<span class="poster-chip">${c('chipItems', { n: num(n) })}</span>${segs.slice(0, 6).map(s => html`<span class=${`poster-tab poster-tab--filter ${ctx.segment === s.segment ? 'is-on' : ''}`} key=${s.segment} onClick=${() => ctx.setSegment(ctx.segment === s.segment ? '' : s.segment)}>${s.segment} ${num(s.count)}</span>`)}`,
-    rail: html`<hr /><span class="og-rail-label">${c('secKinds')}</span>
-      ${kindsOf(f).map(k => html`<button type="button" class=${`og-rail-link ${k.value === type ? 'on' : ''}`} key=${k.value} onClick=${() => ctx.pickView({ kind: 'kind', type: k.value })}><i>→</i>${kindName(k.value)}<em>${num(k.count)}</em></button>`)}`,
-    children: html`<p class="og-desc og-desc--page">${kindSub(type)}</p>${browseBody(ctx)}`,
+    // The segments of a kind filter its rows: a press on the chosen one shows every row again.
+    marks: [
+      { label: c('chipItems', { n: num(n) }) },
+      ...segs.slice(0, 6).map(s => html`<${Filter} key=${s.segment} on=${ctx.segment === s.segment} count=${num(s.count)} onClick=${() => ctx.setSegment(ctx.segment === s.segment ? '' : s.segment)}>${s.segment}<//>`),
+    ],
+    railGroup: { label: c('secKinds'), items: kindsOf(f).map(k => ({ key: k.value, mark: '→', label: kindName(k.value), count: num(k.count), on: k.value === type, onClick: () => ctx.pickView({ kind: 'kind', type: k.value }) })) },
+    children: html`<${Note} kind="lead">${kindSub(type)}<//>${browseBody(ctx)}`,
   });
 }
 function renderPlace(ctx, organismId, organism) {
@@ -233,10 +252,9 @@ function renderPlace(ctx, organismId, organism) {
   const ws = (f?.places || []).filter(p => p.organismId === organismId);
   return renderPage(ctx, {
     crumbs: [organism], title: organism,
-    chips: html`<span class="poster-chip">${c('placeSub', { w: ws.length, n: num(ws.reduce((s, w) => s + w.count, 0)) })}</span>`,
-    doors: html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openTab('organisms')}>${c('openOrganism')}</button>`,
-    rail: html`<hr /><span class="og-rail-label">${c('workspaces')}</span>
-      ${ws.map(w => html`<span class="og-rail-link on" key=${w.workspaceId}><i>·</i>${w.workspace}<em>${num(w.count)}</em></span>`)}`,
-    children: html`<p class="og-desc og-desc--page">${c('placeDesc', { t: rel(ctx.browse?.entries?.[0]?.updatedAt) || '' })}</p>${browseBody(ctx)}`,
+    marks: [{ label: c('placeSub', { w: ws.length, n: num(ws.reduce((s, w) => s + w.count, 0)) }) }],
+    doors: html`<${Action} small onClick=${() => ctx.openTab('organisms')}>${c('openOrganism')}<//>`,
+    railGroup: { label: c('workspaces'), items: ws.map(w => ({ key: w.workspaceId, still: true, mark: '·', label: w.workspace, count: num(w.count) })) },
+    children: html`<${Note} kind="lead">${c('placeDesc', { t: rel(ctx.browse?.entries?.[0]?.updatedAt) || '' })}<//>${browseBody(ctx)}`,
   });
 }

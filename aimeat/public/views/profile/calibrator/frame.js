@@ -7,15 +7,14 @@
  *   run, the checkpoints that did not pass in words, the judge a calibration actually uses (its own
  *   or the AI page's choice), the crumb and the cross-page rail links.
  * @structure x · STEPS · dateWord · timeWord · durationWords · isEmptyRun · runAverage · runsInOrder ·
- *   labelWords · failedWords · stepsDone · judgeOf · candidatesOf · crumb · pageLinks · openTab
+ *   labelWords · failedWords · stepsDone · judgeOf · candidatesOf · crumb · pageLinks
  * @usage import { x, STEPS, judgeOf } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (Crumb.js,
+ *     Rail.js); openTab is Rail.js's (component plan C9, page parts).
  *   v1.0.1 — 2026-09-04 — labelWords: a stored label without the maker prefix and the appended price.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 
@@ -120,15 +119,15 @@ export function judgeOf(project, settings) {
 /** The candidate models that can actually be called: a stored row without a model id is skipped. */
 export const candidatesOf = (project) => (project?.candidateModels || []).filter((m) => m && m.modelId);
 
+/** The crumb's steps (components/Crumb.js): the last one is the page you are on. */
 export function crumb(here) {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span>${here
-    ? html`<span>${t('profile.calibrator.tabLabel')}</span><span>/</span><span class="og-crumb-here">${here}</span>`
-    : html`<span class="og-crumb-here">${t('profile.calibrator.tabLabel')}</span>`}</div>`;
+  return [t('nav.profile'), t('profile.landing.menuBuildShare'), ...(here ? [t('profile.calibrator.tabLabel'), here] : [t('profile.calibrator.tabLabel')])];
 }
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The sibling pages in the rail (components/Rail.js): each opens its Settings tab, → on both sides. */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('ai')}><i>→</i>${t('profile.generator.openrouter.title')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('usage')}><i>→</i>${t('profile.tabs.usage')}<em>→</em></button>`;
+  return [
+    { tab: 'ai', label: t('profile.generator.openrouter.title') },
+    { tab: 'usage', label: t('profile.tabs.usage') },
+  ];
 }

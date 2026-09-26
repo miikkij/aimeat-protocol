@@ -21,6 +21,13 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
+ *   v1.10.1 — 2026-09-26 — A server's name turns coral under the pointer again, as main's
+ *     .mem-item:hover drew it (Row hover; fix pass).
+ *   v1.10.0 — 2026-09-26 — Every part is a component that takes data, and the file writes no class
+ *     (component plan, page group G3): the servers are a List (the name a key, its slug, tools and
+ *     state the meta line, the tool list under the row while it is open), the attach form the Field
+ *     family, the toggles say whether they are open (aria-expanded). `inRow` leaves out the heading
+ *     and intro where the page's section says them (Access 04; the .ac-kept rule hid them).
  *   v1.9.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.8.0 — 2026-09-26 — A server's name wears the Key's face (.key-name, css/components/key-name.css); .mem-key keeps only its place (a unification: the look most tabs use).
  *   v1.7.0 — 2026-09-25 — The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
@@ -48,13 +55,23 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { QuietNote } from '/components/QuietNote.js';
+import { List, Row, Name, Doors } from '/components/List.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
 import { api, apiGet, apiPatch, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
 const EMPTY_DRAFT = { name: '', url: '', title: '', token: '', header: '', auth: 'token' };
 
-export function McpServersSection({ showToast }) {
+/**
+ * @param {{ showToast: Function, inRow?: boolean }} props `inRow`: the section stands inside a page
+ *   section that already says its heading and intro (Access, 04), so it leaves out its own.
+ */
+export function McpServersSection({ showToast, inRow }) {
   const [servers, setServers] = useState([]);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   /** Closed by default: attaching is the rare act, and an open form in front of everybody is noise. */
@@ -235,84 +252,81 @@ export function McpServersSection({ showToast }) {
   };
 
   return html`
-    <div class="access-section">
-      <${ConfirmUI} />
-      <h3 class="access-h3">${t('profile.access.mcpTitle') || 'MCP servers'}</h3>
-      <p class="poster-hint">${t('profile.access.mcpIntro')
-        || 'Other MCP servers you have attached. Your AI, your agents and your apps can use them, and the credential stays here in your own AIMEAT — nothing acting for you ever sees it.'}</p>
+    <${ConfirmUI} />
+    ${inRow ? null : html`<${SubHeading} level=${3}>${t('profile.access.mcpTitle') || 'MCP servers'}<//>
+      <${Note}>${t('profile.access.mcpIntro')
+        || 'Other MCP servers you have attached. Your AI, your agents and your apps can use them, and the credential stays here in your own AIMEAT — nothing acting for you ever sees it.'}<//>`}
 
-      ${servers.length === 0 && html`
-        <div class="mem-item"><${QuietNote}>${t('profile.access.mcpEmpty') || 'No MCP servers attached yet.'}<//></div>
-      `}
-
+    <${List} cols="name-doors" empty=${t('profile.access.mcpEmpty') || 'No MCP servers attached yet.'}>
       ${servers.map(s => html`
-        <div class="mem-item" key=${s.id}>
-          <span class="mem-key key-name">${escHtml(s.title || s.slug)}</span>
-          <span class="text-meta-sm">
-            ${escHtml(s.slug)} · ${(t('profile.access.mcpToolCount') || '{n} tools')
-              .replace('{n}', String(s.toolCount))}${statusNote(s) ? ' · ' + statusNote(s) : ''}
-          </span>
-          ${s.status === 'needs_reauth' && html`
-            <button class="poster-action poster-action--small" disabled=${busy === s.id} onClick=${() => authorize(s)}>
-              ${t('profile.access.mcpSignIn') || 'Sign in'}
-            </button>
-          `}
-          <button class="poster-action poster-action--small" disabled=${busy === s.id} onClick=${() => showTools(s)}>
-            ${toolsFor === s.id
-              ? (t('profile.access.mcpHideTools') || 'Hide tools')
-              : (t('profile.access.mcpShowTools') || 'Show tools')}
-          </button>
-          <button class="poster-action poster-action--small" disabled=${busy === s.id} onClick=${() => toggle(s)}>
-            ${s.enabled ? (t('profile.access.mcpSwitchOff') || 'Switch off') : (t('profile.access.mcpSwitchOn') || 'Switch on')}
-          </button>
-          <button class="poster-action poster-action--small poster-action--danger" onClick=${() => remove(s)}>
-            ${t('profile.access.mcpRemove') || 'Remove server'}
-          </button>
-        </div>
-        ${toolsFor === s.id && html`
-          <div class="mem-item">
-            <span class="text-meta-sm">
-              ${tools.length
-                ? tools.map(x => x.name).join(', ')
-                : (t('profile.access.mcpNoTools') || 'This server offers no tools right now.')}
-            </span>
-          </div>
-        `}
+        <${Row} key=${s.id} hover below=${toolsFor === s.id ? html`
+          <${Note} kind="meta">
+            ${tools.length
+              ? tools.map(x => x.name).join(', ')
+              : (t('profile.access.mcpNoTools') || 'This server offers no tools right now.')}
+          <//>` : null}>
+          <${Name} asKey meta=${`${escHtml(s.slug)} · ${(t('profile.access.mcpToolCount') || '{n} tools')
+            .replace('{n}', String(s.toolCount))}${statusNote(s) ? ' · ' + statusNote(s) : ''}`}>${escHtml(s.title || s.slug)}<//>
+          <${Doors}>
+            ${s.status === 'needs_reauth' && html`
+              <${Action} small row disabled=${busy === s.id} onClick=${() => authorize(s)}>
+                ${t('profile.access.mcpSignIn') || 'Sign in'}
+              <//>
+            `}
+            <${Action} small row expanded=${toolsFor === s.id} disabled=${busy === s.id} onClick=${() => showTools(s)}>
+              ${toolsFor === s.id
+                ? (t('profile.access.mcpHideTools') || 'Hide tools')
+                : (t('profile.access.mcpShowTools') || 'Show tools')}
+            <//>
+            <${Action} small row disabled=${busy === s.id} onClick=${() => toggle(s)}>
+              ${s.enabled ? (t('profile.access.mcpSwitchOff') || 'Switch off') : (t('profile.access.mcpSwitchOn') || 'Switch on')}
+            <//>
+            <${Action} small row tone="danger" onClick=${() => remove(s)}>
+              ${t('profile.access.mcpRemove') || 'Remove server'}
+            <//>
+          <//>
+        <//>
       `)}
+    <//>
 
-      <button class="poster-action poster-action--small" onClick=${() => setAddOpen(!addOpen)}>
+    <${Actions}>
+      <${Action} small expanded=${addOpen} onClick=${() => setAddOpen(!addOpen)}>
         ${addOpen ? (t('profile.access.mcpCancel') || 'Cancel') : (t('profile.access.mcpAdd') || 'Attach a server')}
-      </button>
+      <//>
+    <//>
 
-      ${addOpen && html`
-        <div class="mem-item">
-          <input class="og-input" placeholder=${t('profile.access.mcpName') || 'Short name, e.g. jira'}
-            value=${draft.name} onInput=${e => setDraft({ ...draft, name: e.target.value })} />
-          <input class="og-input" placeholder=${t('profile.access.mcpUrl') || 'Address (https)'}
-            value=${draft.url} onInput=${e => setDraft({ ...draft, url: e.target.value })} />
-          <input class="og-input" placeholder=${t('profile.access.mcpTitleField') || 'What to call it (optional)'}
-            value=${draft.title} onInput=${e => setDraft({ ...draft, title: e.target.value })} />
-          <select class="select-field" value=${draft.auth}
-            onChange=${e => setDraft({ ...draft, auth: e.target.value })}>
-            <option value="token">${t('profile.access.mcpAuthToken') || 'It gave me a token'}</option>
-            <option value="oauth">${t('profile.access.mcpAuthOauth') || 'I sign in to it'}</option>
-          </select>
-          ${draft.auth === 'token' && html`
-            <input class="og-input" type="password" autocomplete="off"
-              placeholder=${t('profile.access.mcpToken') || 'Token, if it needs one'}
-              value=${draft.token} onInput=${e => setDraft({ ...draft, token: e.target.value })} />
-            <input class="og-input" placeholder=${t('profile.access.mcpHeader') || 'Header for the token (optional)'}
-              value=${draft.header} onInput=${e => setDraft({ ...draft, header: e.target.value })} />
-          `}
-          <p class="poster-hint">${t('profile.access.mcpAddNote')
-            || 'The address is checked before anything is saved, so a wrong address or token is reported now. The token is encrypted here and never shown again.'}</p>
-          <button class="poster-slab poster-slab--control" disabled=${busy === 'attach'} onClick=${attach}>
+    ${addOpen && html`
+      <${Fields}>
+        <${TextField} placeholder=${t('profile.access.mcpName') || 'Short name, e.g. jira'}
+          ariaLabel=${t('profile.access.mcpName') || 'Short name, e.g. jira'}
+          value=${draft.name} onInput=${v => setDraft({ ...draft, name: v })} />
+        <${TextField} placeholder=${t('profile.access.mcpUrl') || 'Address (https)'}
+          ariaLabel=${t('profile.access.mcpUrl') || 'Address (https)'}
+          value=${draft.url} onInput=${v => setDraft({ ...draft, url: v })} />
+        <${TextField} placeholder=${t('profile.access.mcpTitleField') || 'What to call it (optional)'}
+          ariaLabel=${t('profile.access.mcpTitleField') || 'What to call it (optional)'}
+          value=${draft.title} onInput=${v => setDraft({ ...draft, title: v })} />
+        <${Select} fit value=${draft.auth} onChange=${v => setDraft({ ...draft, auth: v })}
+          options=${[['token', t('profile.access.mcpAuthToken') || 'It gave me a token'], ['oauth', t('profile.access.mcpAuthOauth') || 'I sign in to it']]} />
+        ${draft.auth === 'token' && html`
+          <${TextField} type="password" autoComplete="off"
+            placeholder=${t('profile.access.mcpToken') || 'Token, if it needs one'}
+            ariaLabel=${t('profile.access.mcpToken') || 'Token, if it needs one'}
+            value=${draft.token} onInput=${v => setDraft({ ...draft, token: v })} />
+          <${TextField} placeholder=${t('profile.access.mcpHeader') || 'Header for the token (optional)'}
+            ariaLabel=${t('profile.access.mcpHeader') || 'Header for the token (optional)'}
+            value=${draft.header} onInput=${v => setDraft({ ...draft, header: v })} />
+        `}
+        <${Note}>${t('profile.access.mcpAddNote')
+          || 'The address is checked before anything is saved, so a wrong address or token is reported now. The token is encrypted here and never shown again.'}<//>
+        <${FormActions}>
+          <${Loud} control disabled=${busy === 'attach'} onClick=${attach}>
             ${busy === 'attach'
               ? (t('profile.access.mcpChecking') || 'Checking the server…')
               : (t('profile.access.mcpAttach') || 'Attach')}
-          </button>
-        </div>
-      `}
-    </div>
+          <//>
+        <//>
+      <//>
+    `}
   `;
 }

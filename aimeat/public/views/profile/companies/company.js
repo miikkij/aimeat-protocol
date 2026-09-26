@@ -11,6 +11,7 @@
  * @structure renderCompany · secFacts · secFront · secActors · secEvents · smtpFold · chatFold
  * @usage import { renderCompany } from './companies/company.js';
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and three-group rail as data; FigureStrip; Facts with the missing details grey; Fields, TextField, TextArea, Select, Check, Choice, FileDrop; Roads; Note; Action; Layout): the page passes data and writes no class. Put back from main: who sends and who acts are dim tags (page group G8).
  *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.13.0 -- 2026-09-25 -- "No organisms yet" is the quiet sentence (.poster-quiet), a unification: Jouni's decision "Empty line"; the file picker's label loses the hint class it only used for its place.
  *   v1.12.0 -- 2026-09-25 -- What the front page shows (none, an app, the portfolio, a redirect) is a choice: the Tab (.poster-tab, the chosen one .is-on), a unification: Jouni's decision "Choice".
@@ -39,7 +40,20 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { railSection } from '/components/Rail.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts } from '/components/Facts.js';
+import { Roads, Road } from '/components/Roads.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Choice } from '/components/Choice.js';
+import { FileDrop } from '/components/FileDrop.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Row as Line } from '/components/Layout.js';
 import { c, crumb, pageLinks, goTab, FIELDS, fieldLabel, factsOf, missingWord, kindWord } from './frame.js';
 import { Hint } from '/components/Hint.js';
 
@@ -47,63 +61,56 @@ export function renderCompany(ctx) {
   const co = ctx.company;
   const facts = factsOf(co);
   const x = ctx.extras[co.id] || {};
-  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
   const host = co.address ? co.address.replace(/^https?:\/\//, '') : co.slug;
+  const sections = [
+    { id: 'co-facts', num: '01', label: c('secFacts'), count: `${facts.done}/${facts.total}` },
+    { id: 'co-front', num: '02', label: c('secFront'), count: '' },
+    { id: 'co-actors', num: '03', label: c('secActorsShort'), count: co.organismId ? c('actorsMany') : 1 },
+    { id: 'co-events', num: '04', label: c('secEventsShort'), count: (x.inv ?? 0) + (x.sent ?? 0) },
+    { id: 'co-smtp', num: '05', label: t('profile.companies.smtpTitle'), count: '' },
+    { id: 'co-chat', num: '06', label: c('chatTitle'), count: '' },
+  ];
 
-  const strip = html`
-    <div class="og-strip">
-      <div><b class=${facts.done < facts.total ? 'og-coral' : ''}>${facts.done}/${facts.total}</b><span>${c('stripFacts')}</span><small>${facts.missing.length ? c('stripFactsMissing', { list: facts.missing.slice(0, 2).map(([w]) => fieldLabel(w)).join(', ') }) : c('stripFactsDone')}</small></div>
-      <div><b>${x.inv ?? 0}</b><span>${c('stripInvoices')}</span><small>${c('stripInvoicesSub')}</small></div>
-      <div><b>${x.sent ?? 0}</b><span>${c('stripSentOne')}</span><small>${co.organismId ? c('stripSentOneSub') : c('stripSentNoBook')}</small></div>
-      <div><b>${co.organismId ? c('actorsMany') : 1}</b><span>${c('stripActors')}</span><small>${co.organismId ? c('actorsOrganism', { name: ctx.organismName(co.organismId) }) : c('actorsYou')}</small></div>
-    </div>`;
+  const strip = html`<${FigureStrip} items=${[
+    { key: 'facts', n: `${facts.done}/${facts.total}`, tone: facts.done < facts.total ? 'notice' : undefined, label: c('stripFacts'),
+      sub: facts.missing.length ? c('stripFactsMissing', { list: facts.missing.slice(0, 2).map(([w]) => fieldLabel(w)).join(', ') }) : c('stripFactsDone') },
+    { key: 'inv', n: x.inv ?? 0, label: c('stripInvoices'), sub: c('stripInvoicesSub') },
+    { key: 'sent', n: x.sent ?? 0, label: c('stripSentOne'), sub: co.organismId ? c('stripSentOneSub') : c('stripSentNoBook') },
+    { key: 'actors', n: co.organismId ? c('actorsMany') : 1, label: c('stripActors'), sub: co.organismId ? c('actorsOrganism', { name: ctx.organismName(co.organismId) }) : c('actorsYou') },
+  ]} />`;
 
   return html`
-    <div class="og og-co">
-      ${crumb(co)}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <span class="poster-label">${c('companyWord')} · ${host}</span>
-          <h1 class="og-title poster-page-title">${co.name}</h1>
-          <div class="poster-chips">
-            ${facts.done < facts.total ? chip(c('factsShort', { n: `${facts.done}/${facts.total}` }), 'poster-chip--coral') : chip(c('factsDone'))}
-            ${chip(c('chipFront', { kind: kindWord(co.frontPage?.kind) }))}
-            ${chip(ctx.smtp ? c('senderOwn') : c('senderShared'))}
-            ${chip(co.organismId ? c('withOrganism') : c('noOrganism'))}
-          </div>
-        </div>
-        <div class="og-mast-actions">
-          ${co.address ? html`<a class="poster-slab" href=${co.address} target="_blank" rel="noopener">${c('openAddress')}</a>` : null}
-          <div class="og-doors">
-            <button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copyPrompt('settings')}>${c('promptToChat')}</button>
-            <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.removeCompany()}>${c('deleteCompany')}</button>
-          </div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secFacts(ctx, co)}
-          ${secFront(ctx, co)}
-          ${secActors(ctx, co)}
-          ${secEvents(ctx, co, x)}
-          <${FoldSection} id="co-smtp" num="05" title=${t('profile.companies.smtpTitle')} sub=${ctx.smtp ? c('smtpOwnSub', { host: ctx.smtp.host }) : c('smtpSharedSub')} open=${ctx.folds.smtp} onToggle=${() => ctx.setFold('smtp', !ctx.folds.smtp)}>${smtpFold(ctx)}<//>
-          <${FoldSection} id="co-chat" num="06" title=${c('chatTitle')} sub=${c('chatSub')} open=${ctx.folds.chat} onToggle=${() => ctx.setFold('chat', !ctx.folds.chat)}>${chatFold(ctx)}<//>
-        </div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${c('railTitle')}</span>
-          ${[['01', 'co-facts', c('secFacts'), `${facts.done}/${facts.total}`], ['02', 'co-front', c('secFront'), ''], ['03', 'co-actors', c('secActorsShort'), co.organismId ? c('actorsMany') : 1], ['04', 'co-events', c('secEventsShort'), (x.inv ?? 0) + (x.sent ?? 0)], ['05', 'co-smtp', t('profile.companies.smtpTitle'), ''], ['06', 'co-chat', c('chatTitle'), '']]
-            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${c('title')}</span>
-          <button type="button" class="og-rail-link" onClick=${() => ctx.back()}><i>←</i>${c('backToList')}<em></em></button>
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="co"
+      crumb=${crumb(co)}
+      label=${`${c('companyWord')} · ${host}`}
+      title=${co.name}
+      marks=${[
+        facts.done < facts.total ? { label: c('factsShort', { n: `${facts.done}/${facts.total}` }), tone: 'coral' } : { label: c('factsDone') },
+        { label: c('chipFront', { kind: kindWord(co.frontPage?.kind) }) },
+        // Who sends and who acts count nothing yet: main's dim tags.
+        { label: ctx.smtp ? c('senderOwn') : c('senderShared'), tone: 'dim' },
+        { label: co.organismId ? c('withOrganism') : c('noOrganism'), tone: 'dim' },
+      ]}
+      actions=${html`
+        ${co.address ? html`<${Loud} href=${co.address} newTab>${c('openAddress')}<//>` : null}
+        <${Actions}>
+          <${Action} small onClick=${() => ctx.copyPrompt('settings')}>${c('promptToChat')}<//>
+          <${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.removeCompany()}>${c('deleteCompany')}<//>
+        <//>`}
+      strip=${strip}
+      rail=${{ title: c('railTitle'), groups: [
+        { label: c('railTitle'), items: sections.map(railSection) },
+        { label: c('title'), items: [{ back: true, key: 'back', label: c('backToList'), onClick: () => ctx.back() }] },
+        { label: c('pages'), items: pageLinks() },
+      ] }}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${secFacts(ctx, co)}
+      ${secFront(ctx, co)}
+      ${secActors(ctx, co)}
+      ${secEvents(ctx, co, x)}
+      <${FoldSection} id="co-smtp" num="05" title=${t('profile.companies.smtpTitle')} sub=${ctx.smtp ? c('smtpOwnSub', { host: ctx.smtp.host }) : c('smtpSharedSub')} open=${ctx.folds.smtp} onToggle=${() => ctx.setFold('smtp', !ctx.folds.smtp)}>${smtpFold(ctx)}<//>
+      <${FoldSection} id="co-chat" num="06" title=${c('chatTitle')} sub=${c('chatSub')} open=${ctx.folds.chat} onToggle=${() => ctx.setFold('chat', !ctx.folds.chat)}>${chatFold(ctx)}<//>
+    <//>`;
 }
 
 /* ── 01 · the registered details ──────────────────────────────────────────── */
@@ -111,27 +118,21 @@ export function renderCompany(ctx) {
 function secFacts(ctx, co) {
   const doors = ctx.editingFacts
     ? null
-    : html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.startFacts()}>${c('fill')}</button>
-           <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.copyPrompt('settings')}>${c('aiFill')}</button>`;
+    : html`<${Action} small onClick=${() => ctx.startFacts()}>${c('fill')}<//>
+           <${Action} small soft onClick=${() => ctx.copyPrompt('settings')}>${c('aiFill')}<//>`;
   return html`
     <${PageSection} id="co-facts" num="01" title=${c('secFacts')} count=${c('secFactsSub')} doors=${doors} first>
       ${ctx.editingFacts ? html`
-        <div class="co-edit">
+        <${Fields} cols=${2}>
           ${FIELDS.map(([wire]) => html`
-            <label key=${wire}><span class="poster-label">${fieldLabel(wire)}</span>
-              <input class="og-input" value=${ctx.factValues[wire] ?? ''} onInput=${(e) => ctx.setFact(wire, e.target.value)} /></label>`)}
-        </div>
-        <div class="og-doors co-form-doors">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy} onClick=${() => ctx.saveFacts()}>${t('profile.companies.save')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.cancelFacts()}>${t('common.cancel')}</button>
-        </div>`
+            <${TextField} key=${wire} label=${fieldLabel(wire)} value=${ctx.factValues[wire] ?? ''} onInput=${(v) => ctx.setFact(wire, v)} />`)}
+        <//>
+        <${FormActions}>
+          <${Loud} control disabled=${ctx.busy} onClick=${() => ctx.saveFacts()}>${t('profile.companies.save')}<//>
+          <${Action} small soft onClick=${() => ctx.cancelFacts()}>${t('common.cancel')}<//>
+        <//>`
       : html`
-        <div class="facts">
-          ${FIELDS.map(([wire, rec, tag]) => html`
-            <span class="facts-k poster-label">${fieldLabel(wire)}</span>${co[rec]
-              ? html`<span class="facts-v" key=${wire}>${co[rec]}</span>`
-              : html`<span class="facts-v miss" key=${wire}>${missingWord(tag)}</span>`}`)}
-        </div>`}
+        <${Facts} rows=${FIELDS.map(([wire, rec, tag]) => ({ key: wire, k: fieldLabel(wire), v: co[rec] || missingWord(tag), missing: !co[rec] }))} />`}
       <${Hint}>${c('factsHint')}<//>
     <//>`;
 }
@@ -145,24 +146,22 @@ function secFront(ctx, co) {
   const dirty = f.kind !== saved.kind || (f.kind !== 'portfolio' && (f.target || '') !== (saved.target || ''));
   return html`
     <${PageSection} id="co-front" num="02" title=${c('secFront')} count=${c('secFrontSub', { address: (co.address || '').replace(/^https?:\/\//, '') })}>
-      <div class="co-choice" role="group" aria-label=${c('secFront')}>
-        ${KINDS.map((k) => html`<button type="button" key=${k} class=${`poster-tab ${f.kind === k ? 'is-on' : ''}`} onClick=${() => ctx.setFrontState({ kind: k, target: k === saved.kind ? (saved.target || '') : '' })}>${kindWord(k)}</button>`)}
-      </div>
-      <div class="co-front-ctl">
+      <${Choice} ariaLabel=${c('secFront')} value=${f.kind}
+        options=${KINDS.map((k) => [k, kindWord(k)])}
+        onChange=${(k) => ctx.setFrontState({ kind: k, target: k === saved.kind ? (saved.target || '') : '' })} />
+      <${Line} gap="medium" wrap above="medium">
         ${f.kind === 'app' ? html`
-          <select class="select-field" value=${f.target} onChange=${(e) => ctx.setFrontState({ ...f, target: e.target.value })}>
-            <option value="">${t('profile.companies.pickApp')}</option>
-            ${ctx.apps.map((a) => html`<option key=${a.filename} value=${`${a.owner}/${a.filename}`}>${a.name || a.filename}</option>`)}
-          </select>` : null}
+          <${Select} value=${f.target} placeholder=${t('profile.companies.pickApp')} onChange=${(v) => ctx.setFrontState({ ...f, target: v })}
+            options=${ctx.apps.map((a) => ({ value: `${a.owner}/${a.filename}`, label: a.name || a.filename }))} />` : null}
         ${f.kind === 'redirect' ? html`
-          <input class="og-input" value=${f.target} placeholder="https://…" onInput=${(e) => ctx.setFrontState({ ...f, target: e.target.value })} />` : null}
+          <${TextField} value=${f.target} placeholder="https://…" onInput=${(v) => ctx.setFrontState({ ...f, target: v })} />` : null}
         ${f.kind !== 'portfolio' && dirty ? html`
-          <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy || (f.kind !== 'none' && !f.target)} onClick=${() => ctx.saveFront()}>${t('profile.companies.setFront')}</button>` : null}
-        ${f.kind === 'portfolio' ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.copyPrompt('portfolio')}>${c('buildPage')}</button>` : null}
-        ${f.kind === 'app' ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.copyPrompt('app')}>${c('buildApp')}</button>` : null}
-      </div>
+          <${Action} small disabled=${ctx.busy || (f.kind !== 'none' && !f.target)} onClick=${() => ctx.saveFront()}>${t('profile.companies.setFront')}<//>` : null}
+        ${f.kind === 'portfolio' ? html`<${Action} small soft onClick=${() => ctx.copyPrompt('portfolio')}>${c('buildPage')}<//>` : null}
+        ${f.kind === 'app' ? html`<${Action} small soft onClick=${() => ctx.copyPrompt('app')}>${c('buildApp')}<//>` : null}
+      <//>
       ${saved.kind === 'redirect' && saved.target ? html`
-        <div class="facts"><div class="facts-k poster-label">${c('redirectsTo')}</div><div class="facts-v">${saved.target}<small>${ctx.addr[co.id] === true ? c('addressOk') : ctx.addr[co.id] === false ? c('addressDown') : c('addressChecking')}</small></div></div>` : null}
+        <${Facts} rows=${[{ k: c('redirectsTo'), v: saved.target, sub: ctx.addr[co.id] === true ? c('addressOk') : ctx.addr[co.id] === false ? c('addressDown') : c('addressChecking') }]} />` : null}
       ${f.kind === 'portfolio' ? portfolioEditor(ctx) : null}
       <${Hint}>${c('frontHint')}<//>
     <//>`;
@@ -171,24 +170,20 @@ function secFront(ctx, co) {
 function portfolioEditor(ctx) {
   const st = ctx.portfolio;
   return html`
-    <div class="facts">
-      <div class="facts-k poster-label">${c('pageWord')}</div>
-      <div class="facts-v">${st?.published ? c('pageLive', { kb: Math.max(1, Math.round((st.sizeBytes || 0) / 1024)) }) : c('pageNone')}</div>
-    </div>
-    <label class="co-file"><span class="poster-action poster-action--small">${t('profile.companies.portfolioPickFile')}</span>
-      <input type="file" accept="text/html,.html,.htm" onChange=${(e) => ctx.pickPortfolioFile(e)} /></label>
-    <textarea class="og-textarea" rows="6" spellcheck="false" value=${ctx.front.html} placeholder=${'<!doctype html>…'} onInput=${(e) => ctx.setFrontState({ ...ctx.front, html: e.target.value })}></textarea>
-    <div class="og-doors co-form-doors">
-      <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy || !ctx.front.html.trim()} onClick=${() => ctx.publishPortfolio()}>${t('profile.companies.portfolioPublish')}</button>
-      ${st?.published ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.removePortfolio()}>${t('profile.companies.portfolioRemove')}</button>` : null}
-    </div>`;
+    <${Facts} rows=${[{ k: c('pageWord'), v: st?.published ? c('pageLive', { kb: Math.max(1, Math.round((st.sizeBytes || 0) / 1024)) }) : c('pageNone') }]} />
+    <${FileDrop} button=${t('profile.companies.portfolioPickFile')} accept="text/html,.html,.htm" onChange=${(e) => ctx.pickPortfolioFile(e)} />
+    <${TextArea} rows=${6} spellCheck=${false} value=${ctx.front.html} placeholder=${'<!doctype html>…'} onInput=${(v) => ctx.setFrontState({ ...ctx.front, html: v })} />
+    <${FormActions}>
+      <${Loud} control disabled=${ctx.busy || !ctx.front.html.trim()} onClick=${() => ctx.publishPortfolio()}>${t('profile.companies.portfolioPublish')}<//>
+      ${st?.published ? html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.removePortfolio()}>${t('profile.companies.portfolioRemove')}<//>` : null}
+    <//>`;
 }
 
 /* ── 03 · who acts in its name ────────────────────────────────────────────── */
 
 function secActors(ctx, co) {
   const doors = co.organismId
-    ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.unlinkOrganism()}>${c('unlink')}</button>`
+    ? html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.unlinkOrganism()}>${c('unlink')}<//>`
     : null;
   return html`
     <${PageSection} id="co-actors" num="03" title=${c('secActors')} count=${c('secActorsSub')} doors=${doors}>
@@ -197,13 +192,11 @@ function secActors(ctx, co) {
       : html`
         <p>${c('actorsNowYou')}</p>
         ${ctx.organisms.length ? html`
-          <div class="co-front-ctl">
-            <select class="select-field" value=${ctx.orgPick} onChange=${(e) => ctx.setOrgPick(e.target.value)}>
-              <option value="">${c('pickOrganism')}</option>
-              ${ctx.organisms.map((o) => html`<option key=${o.id} value=${o.id}>${o.name}</option>`)}
-            </select>
-            <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy || !ctx.orgPick} onClick=${() => ctx.linkOrganism()}>${c('link')}</button>
-          </div>` : html`<p class="poster-quiet">${c('noOrganisms')}</p>`}`}
+          <${Line} gap="medium" wrap above="medium">
+            <${Select} value=${ctx.orgPick} placeholder=${c('pickOrganism')} onChange=${(v) => ctx.setOrgPick(v)}
+              options=${ctx.organisms.map((o) => ({ value: o.id, label: o.name }))} />
+            <${Action} small disabled=${ctx.busy || !ctx.orgPick} onClick=${() => ctx.linkOrganism()}>${c('link')}<//>
+          <//>` : html`<${Note} kind="quiet">${c('noOrganisms')}<//>`}`}
       <${Hint}>${c('actorsHint')}<//>
     <//>`;
 }
@@ -211,15 +204,13 @@ function secActors(ctx, co) {
 /* ── 04 · what has happened in its name ───────────────────────────────────── */
 
 function secEvents(ctx, co, x) {
-  const doors = html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => goTab('pnl')}>${c('toPnl')}</button>`;
+  const doors = html`<${Action} small soft onClick=${() => goTab('pnl')}>${c('toPnl')}<//>`;
   return html`
     <${PageSection} id="co-events" num="04" title=${c('secEvents')} count=${c('secEventsSub')} doors=${doors}>
-      <div class="facts">
-        <div class="facts-k poster-label">${c('invoicesK')}</div>
-        <div class="facts-v">${c('invoicesV', { n: x.inv ?? 0 })}<small>${c('invoicesSub')}</small></div>
-        <div class="facts-k poster-label">${c('mailK')}</div>
-        <div class="facts-v">${c('mailV', { n: x.sent ?? 0 })}<small>${co.organismId ? c('mailSub') : c('mailSubNoBook')}</small></div>
-      </div>
+      <${Facts} rows=${[
+        { k: c('invoicesK'), v: c('invoicesV', { n: x.inv ?? 0 }), sub: c('invoicesSub') },
+        { k: c('mailK'), v: c('mailV', { n: x.sent ?? 0 }), sub: co.organismId ? c('mailSub') : c('mailSubNoBook') },
+      ]} />
     <//>`;
 }
 
@@ -228,38 +219,36 @@ function secEvents(ctx, co, x) {
 function smtpFold(ctx) {
   const f = ctx.smtpForm;
   const field = (key, label, extra = {}) => html`
-    <label key=${key}><span class="poster-label">${label}</span>
-      <input class="og-input" value=${f[key]} ...${extra} onInput=${(e) => ctx.setSmtpField(key, e.target.value)} /></label>`;
+    <${TextField} key=${key} label=${label} value=${f[key]} ...${extra} onInput=${(v) => ctx.setSmtpField(key, v)} />`;
   return html`
     <${Hint}>${ctx.smtp ? c('smtpOwnHint', { host: ctx.smtp.host }) : c('smtpSharedHint')}<//>
-    <div class="co-smtp">
+    <${Fields} cols=${2}>
       ${field('host', t('profile.companies.smtp.host'), { placeholder: 'smtp.example.com' })}
-      ${field('port', t('profile.companies.smtp.port'), { inputmode: 'numeric' })}
-      ${field('username', t('profile.companies.smtp.username'), { autocomplete: 'off' })}
-      ${field('password', t('profile.companies.smtp.password'), { type: 'password', autocomplete: 'new-password', placeholder: ctx.smtp?.passwordSet ? t('profile.companies.smtp.passwordKept') : '' })}
+      ${field('port', t('profile.companies.smtp.port'), { inputMode: 'numeric' })}
+      ${field('username', t('profile.companies.smtp.username'), { autoComplete: 'off' })}
+      ${field('password', t('profile.companies.smtp.password'), { type: 'password', autoComplete: 'new-password', placeholder: ctx.smtp?.passwordSet ? t('profile.companies.smtp.passwordKept') : '' })}
       ${field('from_address', t('profile.companies.smtp.fromAddress'), { placeholder: 'laskutus@yritys.fi' })}
       ${field('from_name', t('profile.companies.smtp.fromName'))}
       ${field('reply_to', t('profile.companies.smtp.replyTo'))}
-      <label class="co-check"><span class="poster-label">${t('profile.companies.smtp.secure')}</span>
-        <input type="checkbox" checked=${f.secure} onChange=${(e) => ctx.setSmtpField('secure', e.target.checked)} /></label>
-    </div>
-    <div class="og-doors co-form-doors">
-      <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy || !f.host.trim() || !f.from_address.trim()} onClick=${() => ctx.saveSmtp()}>${t('profile.companies.smtpSave')}</button>
-      ${ctx.smtp ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.removeSmtp()}>${t('profile.companies.smtpRemove')}</button>` : null}
-    </div>`;
+      <${Check} checked=${f.secure} onChange=${(on) => ctx.setSmtpField('secure', on)}>${t('profile.companies.smtp.secure')}<//>
+    <//>
+    <${FormActions}>
+      <${Loud} control disabled=${ctx.busy || !f.host.trim() || !f.from_address.trim()} onClick=${() => ctx.saveSmtp()}>${t('profile.companies.smtpSave')}<//>
+      ${ctx.smtp ? html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.removeSmtp()}>${t('profile.companies.smtpRemove')}<//>` : null}
+    <//>`;
 }
 
 /* ── 06 · the company in a chat ───────────────────────────────────────────── */
 
 function chatFold(ctx) {
   const road = (k, promptKind) => html`
-    <div class="nt-road poster-box" key=${k}><span class="nt-road-k">${c('road.' + k + 'K')}</span><b>${c('road.' + k + 'T')}</b><p>${c('road.' + k + 'D')}</p>
-      <button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copyPrompt(promptKind)}>${c('copyPrompt')}</button></div>`;
+    <${Road} key=${k} kicker=${c('road.' + k + 'K')} name=${c('road.' + k + 'T')} text=${c('road.' + k + 'D')}
+      doors=${html`<${Action} small onClick=${() => ctx.copyPrompt(promptKind)}>${c('copyPrompt')}<//>`} />`;
   return html`
-    <div class="nt-roads">
+    <${Roads} cols="three">
       ${road('fill', 'settings')}
       ${road('page', 'portfolio')}
       ${road('app', 'app')}
-    </div>
+    <//>
     <${Hint}>${c('chatHint')}<//>`;
 }

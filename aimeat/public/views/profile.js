@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-09-26 — The root and the toast pill are components (SettingsRoot in components/SettingsFrame.js,
+ *     ToastBox in components/Toast.js): this file writes no class (page group G8).
  *   2026-09-13 — The toast pill shows above an open dialog (raiseAboveDialogs in /js/dialog.js)
  *     instead of under its dimmed backdrop.
  *   2026-09-06 — The signed-out wall is the door (profile/door.js): it names where the address leads
@@ -43,8 +45,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
-import { normalizeToastType } from '/components/Toast.js';
-import { raiseAboveDialogs } from '/js/dialog.js';
+import { normalizeToastType, ToastBox } from '/components/Toast.js';
+import { SettingsRoot } from '/components/SettingsFrame.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { apiGet } from '/js/api.js';
@@ -333,7 +335,7 @@ export default function Profile({ navigate, locale }) {
   }
 
   return html`
-    <div class="pf">
+    <${SettingsRoot}>
       <${LandingPage}
         tier=${tier}
         stats=${stats}
@@ -346,8 +348,8 @@ export default function Profile({ navigate, locale }) {
         renderTab=${renderTab}
         getTabLabel=${getTabLabel}
       />
-    </div>
+    <//>
 
     <!-- Toast -->
-    ${toast && html`<div class="toast toast-${toast.type}" ref=${raiseAboveDialogs}>${toast.msg}</div>`}`;
+    <${ToastBox} toast=${toast} />`;
 }

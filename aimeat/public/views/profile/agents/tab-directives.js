@@ -6,6 +6,10 @@
  *   View mode shows formatted text; edit mode uses a single textarea.
  *   Memory areas, knowledge packages, and config files live in their own tabs.
  * @version-history
+ *   v2.13.0 -- 2026-09-26 -- Onto the components: the card is a section Card with the edit action at its
+ *     title's right, the purpose and the directives the Facts (the directives keep their lines, and
+ *     stand under their own label, as in the edit form), the form TextAreas in Fields with FormActions,
+ *     the lines the Note. The file writes no class any more.
  *   v2.12.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v2.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v2.10.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -38,6 +42,12 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { getDirectives, upsertDirectives } from '/js/services/agent-directives.js';
+import { Card } from '/components/Card.js';
+import { Facts } from '/components/Facts.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextArea } from '/components/TextField.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
 
 const html = htm.bind(h);
 
@@ -125,85 +135,46 @@ export default function TabDirectives({ agentName, showToast }) {
   }
 
   if (loading) {
-    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
+    return html`<${Note} kind="loading" />`;
   }
 
   if (error) {
-    return html`<div class="poster-quiet pf-agd-empty">${error}</div>`;
+    return html`<${Note} kind="quiet">${error}<//>`;
   }
 
   const hasContent = purpose || content;
+  const footer = html`<${Note}>${t('profile.agents.detail.directives.footer')}<//>`;
+
+  if (!editing) {
+    return html`
+      <${Card} tone="section" title=${t('profile.agents.directives.title')}
+        aside=${html`<${Action} small onClick=${(e) => { e.stopPropagation(); startEditing(); }}>${t('profile.agents.directives.edit')}<//>`}>
+        ${hasContent ? html`<${Facts} rows=${[
+          purpose && { k: t('profile.agents.directives.purpose'), v: purpose },
+          content && { k: t('profile.agents.detail.directives.contentLabel'), v: content, pre: true },
+        ]} />` : html`<${Note} kind="quiet">${t('profile.agents.directives.empty')}<//>`}
+        ${footer}
+      <//>
+    `;
+  }
 
   return html`
-    <div class="pf-agd-card poster-row--thing">
-      ${!editing ? html`
-        <!-- View mode -->
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title sub-heading">${t('profile.agents.directives.title')}</span>
-          <div>
-            <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); startEditing(); }}>
-              ${t('profile.agents.directives.edit')}
-            </button>
-          </div>
-        </div>
-
-        ${purpose && html`
-          <div class="pf-agd-directive-section">
-            <h4 class="poster-label">${t('profile.agents.directives.purpose')}</h4>
-            <div class="facts-v pf-agd-purpose-text">${purpose}</div>
-          </div>
-        `}
-
-        ${content ? html`
-          <div class="pf-agd-directive-section">
-            <div class="pf-agd-directives-content poster-row--thing">${content}</div>
-          </div>
-        ` : ''}
-
-        ${!hasContent && html`
-          <div class="poster-quiet pf-agd-empty">
-            ${t('profile.agents.directives.empty')}
-          </div>
-        `}
-
-        <div class="poster-hint pf-agd-directive-footer">
-          ${t('profile.agents.detail.directives.footer')}
-        </div>
-      ` : html`
-        <!-- Edit mode -->
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title sub-heading">${t('profile.agents.directives.editing')}</span>
-        </div>
-
-        <div class="pf-agd-directive-section">
-          <h4 class="poster-label">${t('profile.agents.directives.purpose')}</h4>
-          <div class="pf-agd-form-field">
-            <textarea class="og-textarea" value=${editPurpose} onInput=${(e) => setEditPurpose(e.target.value)}
-                      placeholder=${t('profile.agents.directives.purposePlaceholder')}></textarea>
-          </div>
-        </div>
-
-        <div class="pf-agd-directive-section">
-          <h4 class="poster-label">${t('profile.agents.detail.directives.contentLabel')}</h4>
-          <textarea class="og-textarea pf-agd-directives-textarea"
-                    value=${editContent}
-                    onInput=${(e) => setEditContent(e.target.value)}
-                    placeholder=${t('profile.agents.detail.directives.contentPlaceholder')}></textarea>
-        </div>
-
-        <div class="pf-agd-form-actions">
-          <button class="poster-slab poster-slab--control" onClick=${(e) => { e.stopPropagation(); handleSave(); }} disabled=${saving}>
-            ${saving ? t('profile.agents.directives.saving') : t('profile.agents.directives.save')}
-          </button>
-          <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); cancelEditing(); }}>
-            ${t('profile.agents.scopeUi.cancel')}
-          </button>
-        </div>
-
-        <div class="poster-hint pf-agd-directive-footer">
-          ${t('profile.agents.detail.directives.footer')}
-        </div>
-      `}
-    </div>
+    <${Card} tone="section" title=${t('profile.agents.directives.editing')}>
+      <${Fields}>
+        <${TextArea} rows=${3} label=${t('profile.agents.directives.purpose')} value=${editPurpose} onInput=${setEditPurpose}
+          placeholder=${t('profile.agents.directives.purposePlaceholder')} />
+        <${TextArea} rows=${8} label=${t('profile.agents.detail.directives.contentLabel')} value=${editContent} onInput=${setEditContent}
+          placeholder=${t('profile.agents.detail.directives.contentPlaceholder')} />
+      <//>
+      <${FormActions}>
+        <${Loud} control onClick=${(e) => { e.stopPropagation(); handleSave(); }} disabled=${saving}>
+          ${saving ? t('profile.agents.directives.saving') : t('profile.agents.directives.save')}
+        <//>
+        <${Action} small onClick=${(e) => { e.stopPropagation(); cancelEditing(); }}>
+          ${t('profile.agents.scopeUi.cancel')}
+        <//>
+      <//>
+      ${footer}
+    <//>
   `;
 }

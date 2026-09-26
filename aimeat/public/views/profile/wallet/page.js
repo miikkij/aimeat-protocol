@@ -9,10 +9,17 @@
  *   to you and the purchases and sales; 04 the three payout rails as rows; 05 how your AI uses the
  *   wallet. A wallet that lives on another node shows one box. Pure render over the ctx bag; the
  *   rows are rows.js.
- * @structure renderPage · federated · mast · strip · secSources · secLedger · secMoney · secRails ·
+ * @structure renderPage · federated · head · strip · secSources · secLedger · secMoney · secRails ·
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.21.0 — 2026-09-26 — On the component kit (page group G7): the frame, crumb, head, rail and
+ *     strip are SettingsPage and FigureStrip; the sections are Section; where the morsels came from and
+ *     went to and the pace are the new MorselFlow and MorselPace (components/MorselFlow.js, the bar the
+ *     one Meter); what morsels buy is CardGrid; the ledger filters are Tabs in the filter tone; the
+ *     lists are List with its More line; the share figures a FigureStrip; the doors Action, Loud and
+ *     Actions; the two roads Roads; the federated box SettingBox. The testnet tag keeps main's dim
+ *     tone (Mark tone="dim", og-chip--dim on main). The page writes no class.
  *   v1.20.0 -- 2026-09-26 -- The ready-made request is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.19.0 -- 2026-09-26 -- The figure on the pace meter wears the Meter's figure class (.poster-meter-figure); nothing on screen changes.
  *   v1.18.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -47,15 +54,25 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Section } from '/components/Section.js';
+import { scrollToSection } from '/components/Rail.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, More } from '/components/List.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tinted } from '/components/Figure.js';
+import { MorselFlow, MorselPace } from '/components/MorselFlow.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Roads, Road } from '/components/Roads.js';
+import { Space } from '/components/Layout.js';
 import { x, money, morsels, signed, dateWord, sourcesOf, crumb, pageLinks, openTab, GRANTED } from './frame.js';
 import { txRow, railRow, shareRow, moneyRow } from './rows.js';
-import { Hint } from '/components/Hint.js';
 
-const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
-const msg = (m) => (m ? html`<small class=${`form-message ${m.error ? 'form-message--error' : ''}`}>${m.text}</small>` : null);
+const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 const isMoney = (item) => item.currency && item.currency !== 'morsel';
 
 export function renderPage(ctx) {
@@ -64,95 +81,76 @@ export function renderPage(ctx) {
   const l = w?.lifetime || {};
   const sh = ctx.shares;
   const railsOn = ctx.railsOn;
-  const rail = [
-    ['01', 'wal-sources', x('secSources'), w ? `${signed(l.earned)} / ${signed(-l.spent)}` : ''],
-    ['02', 'wal-ledger', x('secLedger'), w ? String(ctx.rowsTotal) : ''],
-    ['03', 'wal-money', x('secMoney'), sh ? money(sh.total, sh.currency) : ''],
-    ['04', 'wal-rails', x('secRails'), ctx.payout ? `${railsOn} / 3` : ''],
-    ['05', 'wal-roads', x('secRoads'), ''],
+  const sections = [
+    { id: 'wal-sources', num: '01', label: x('secSources'), count: w ? `${signed(l.earned)} / ${signed(-l.spent)}` : '' },
+    { id: 'wal-ledger', num: '02', label: x('secLedger'), count: w ? String(ctx.rowsTotal) : '' },
+    { id: 'wal-money', num: '03', label: x('secMoney'), count: sh ? money(sh.total, sh.currency) : '' },
+    { id: 'wal-rails', num: '04', label: x('secRails'), count: ctx.payout ? `${railsOn} / 3` : '' },
+    { id: 'wal-roads', num: '05', label: x('secRoads'), count: '' },
   ];
   return html`
-    <div class="og og-wal">
-      ${crumb()}
-      ${mast(ctx)}
-      ${strip(ctx)}
-      <div class="og-grid">
-        <div class="og-main">
-          ${!w ? html`<p class="poster-quiet wal-empty loading-mark">${x('loading')}</p>` : html`
-            ${secSources(ctx)}
-            ${secLedger(ctx)}
-            ${secMoney(ctx)}
-            ${secRails(ctx)}
-            ${secRoads(ctx)}`}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${rail.map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="wal" crumb=${crumb()} ...${head(ctx)} strip=${strip(ctx)}
+      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${!w ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
+        ${secSources(ctx)}
+        ${secLedger(ctx)}
+        ${secMoney(ctx)}
+        ${secRails(ctx)}
+        ${secRoads(ctx)}`}
+    <//>`;
 }
 
 function federated(ctx) {
   return html`
-    <div class="og og-wal">
-      ${crumb()}
-      <div class="og-mast"><div class="og-mast-words"><h1 class="og-title poster-page-title">${t('profile.tabs.wallet')}<small>${x('titleSub')}</small></h1><p class="og-desc">${x('desc')}</p></div></div>
-      <div class="og-box og-box--solid wal-box poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
-    </div>`;
+    <${SettingsPage} name="wal" crumb=${crumb()} title=${t('profile.tabs.wallet')} sub=${x('titleSub')} desc=${x('desc')}>
+      <${SettingBox} label=${x('federatedLabel')} irreversible>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}<//>
+    <//>`;
 }
 
-function mast(ctx) {
+/** The mast as SettingsPage's head props: title, the tags, the words (and the request's message), the request slab and its doors. */
+function head(ctx) {
   const w = ctx.wallet;
   const p = ctx.payout;
   const cap = Number(w?.daily_allowance?.accumulation_cap) || 0;
   const pace = Number(w?.daily_allowance?.amount) || 0;
   const room = w ? Math.max(0, cap - (Number(w.balance) || 0)) : 0;
-  const chips = !w ? [] : [
-    chip(morsels(w.balance), 'poster-chip--sun'),
-    chip(x('chipPace', { n: pace, cap })),
-    p ? chip([x('rail.stripe'), p.x402?.enabled ? x('rail.x402') : '', x('rail.invoice')].filter(Boolean).join(' · ').toLowerCase()) : null,
-    p?.x402?.enabled && p.x402.testnet ? chip(x('chipTestnet')) : null,
+  const marks = !w ? [] : [
+    { label: morsels(w.balance), tone: 'sun' },
+    { label: x('chipPace', { n: pace, cap }) },
+    p ? { label: [x('rail.stripe'), p.x402?.enabled ? x('rail.x402') : '', x('rail.invoice')].filter(Boolean).join(' · ').toLowerCase() } : null,
+    p?.x402?.enabled && p.x402.testnet ? { label: x('chipTestnet'), tone: 'dim' } : null,
   ];
   const copy = w ? x('copyBalanceText', { balance: morsels(w.balance), available: w.available, escrow: w.in_escrow }) : '';
-  return html`
-    <div class="og-mast">
-      <div class="og-mast-words">
-        <h1 class="og-title poster-page-title">${t('profile.tabs.wallet')}<small>${x('titleSub')}</small></h1>
-        <div class="poster-chips">${chips}</div>
-        <p class="og-desc">${x('desc')}</p>
-        ${msg(ctx.requestMsg)}
-      </div>
-      <div class="og-mast-actions">
-        ${w && room > 0
-          ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'request'} onClick=${() => ctx.requestToday()}>${ctx.busy === 'request' ? x('requesting') : x('requestToday')}</button><small class="poster-hint poster-hint--slab">${x('requestHint', { n: morsels(Math.min(pace, room)), cap })}</small>`
-          : w ? html`<small class="poster-hint poster-hint--slab">${x('atCap', { cap })}</small>` : null}
-        <div class="og-doors">
-          ${w ? html`<${CopyButton} className="poster-action poster-action--small" text=${copy} label=${x('copyBalance')} />` : null}
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => scrollTo('wal-roads')}>${x('toAi')}</button>
-        </div>
-      </div>
-    </div>`;
+  const actions = html`
+    ${w && room > 0
+      ? html`<${Loud} control disabled=${ctx.busy === 'request'} onClick=${() => ctx.requestToday()}>${ctx.busy === 'request' ? x('requesting') : x('requestToday')}<//><${Note} kind="hint" slab inline>${x('requestHint', { n: morsels(Math.min(pace, room)), cap })}<//>`
+      : w ? html`<${Note} kind="hint" slab inline>${x('atCap', { cap })}<//>` : null}
+    <${Actions}>
+      ${w ? html`<${Action} small copy=${copy}>${x('copyBalance')}<//>` : null}
+      <${Action} small soft onClick=${() => scrollToSection('wal-roads')}>${x('toAi')}<//>
+    <//>`;
+  return { title: t('profile.tabs.wallet'), sub: x('titleSub'), marks, desc: html`${x('desc')}${msg(ctx.requestMsg)}`, actions };
 }
 
 function strip(ctx) {
   const w = ctx.wallet;
-  if (!w) return html`<div class="og-strip"><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div></div>`;
+  if (!w) return html`<${FigureStrip} loading=${4} />`;
   const l = w.lifetime || {};
   const cap = Number(w.daily_allowance?.accumulation_cap) || 0;
   const sh = ctx.shares;
   const p = ctx.payout;
-  return html`
-    <div class="og-strip">
-      <div><b>${w.balance}</b><span>${x('stripBalance')}</span><small>${x('stripBalanceSub', { available: w.available, escrow: w.in_escrow })}${Number(w.balance) >= cap ? ` · ${x('stripAtCap')}` : ''}</small></div>
-      <div><b><span class="is-good">${signed(l.earned)}</span> / <span class="is-low">${signed(-l.spent)}</span></b><span>${x('stripFlow')}</span><small>${x('stripFlowSub', { n: l.total_rows ?? ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}${l.unrecorded > 0 ? ` · ${x('stripUnrecorded', { n: l.unrecorded })}` : ''}</small></div>
-      <div>${sh ? html`<b>${money(sh.total, sh.currency)}</b><span>${x('stripShares')}</span><small>${x('stripSharesSub', { accrued: money(sh.accrued, sh.currency), released: money(sh.released, sh.currency) })}</small>` : html`<b class="is-dim">·</b><span>${x('stripShares')}</span><small>${x('stripNoShares')}</small>`}</div>
-      <div>${p ? html`<b>${ctx.railsOn} / 3</b><span>${x('stripRails')}</span><small>${[p.stripe?.configured ? x('rail.stripe') + ' ✓' : x('rail.stripe') + ' ✗', p.x402?.enabled ? (p.x402.configured ? x('rail.x402') + ' ✓' : x('rail.x402') + ' ✗') + (p.x402.testnet ? ` (${x('testnetShort')})` : '') : '', x('stripInvoiceAlways')].filter(Boolean).join(' · ')}</small>` : html`<b class="is-dim">·</b><span>${x('stripRails')}</span><small>${x('stripRailsOff')}</small>`}</div>
-    </div>`;
+  return html`<${FigureStrip} items=${[
+    { n: w.balance, label: x('stripBalance'), sub: `${x('stripBalanceSub', { available: w.available, escrow: w.in_escrow })}${Number(w.balance) >= cap ? ` · ${x('stripAtCap')}` : ''}` },
+    { n: html`<${Tinted} tone="fine">${signed(l.earned)}<//> / <${Tinted} tone="notice">${signed(-l.spent)}<//>`, label: x('stripFlow'),
+      sub: `${x('stripFlowSub', { n: l.total_rows ?? ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}${l.unrecorded > 0 ? ` · ${x('stripUnrecorded', { n: l.unrecorded })}` : ''}` },
+    sh
+      ? { n: money(sh.total, sh.currency), label: x('stripShares'), sub: x('stripSharesSub', { accrued: money(sh.accrued, sh.currency), released: money(sh.released, sh.currency) }) }
+      : { n: '·', tone: 'dim', label: x('stripShares'), sub: x('stripNoShares') },
+    p
+      ? { n: `${ctx.railsOn} / 3`, label: x('stripRails'), sub: [p.stripe?.configured ? x('rail.stripe') + ' ✓' : x('rail.stripe') + ' ✗', p.x402?.enabled ? (p.x402.configured ? x('rail.x402') + ' ✓' : x('rail.x402') + ' ✗') + (p.x402.testnet ? ` (${x('testnetShort')})` : '') : '', x('stripInvoiceAlways')].filter(Boolean).join(' · ') }
+      : { n: '·', tone: 'dim', label: x('stripRails'), sub: x('stripRailsOff') },
+  ]} />`;
 }
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -167,26 +165,23 @@ function secSources(ctx) {
   const real = ctx.rows.filter((tx) => !GRANTED.has(tx.type));
   const inRows = real.filter((tx) => Number(tx.amount) > 0), outRows = real.filter((tx) => Number(tx.amount) < 0);
   const span = (list) => (list.length ? `${dateWord(list[list.length - 1].timestamp)}–${dateWord(list[0].timestamp)}` : '');
-  const col = (title, total, list, rows, cls) => html`
-    <div class="wal-col poster-box">
-      <div class="wal-col-h"><b class=${cls}>${signed(total)}</b> ${title}<small>${x('rowsN', { n: rows.length })}${rows.length ? ` · ${span(rows)}` : ''}</small></div>
-      ${list.length ? list.map((src) => html`<div class="wal-src" key=${src.title}><span>${src.title}<small>${x('timesN', { n: src.count })}</small></span><b>${src.sum}</b></div>`) : html`<div class="wal-src is-dim">${x('nothingYet')}</div>`}
-    </div>`;
+  const col = (key, title, total, list, rows, tone) => ({
+    key, title, total: signed(total), tone,
+    count: `${x('rowsN', { n: rows.length })}${rows.length ? ` · ${span(rows)}` : ''}`,
+    rows: list.map((src) => ({ key: src.title, title: src.title, sub: x('timesN', { n: src.count }), sum: src.sum })),
+    empty: x('nothingYet'),
+  });
+  const capWords = Number(w.balance) >= cap ? x('paceAtCap', { balance: w.balance, cap }) : x('paceBelowCap', { balance: w.balance, days: pace ? Math.ceil((cap - Number(w.balance)) / pace) : 0 });
+  const rowWords = l.total_rows ? (l.unrecorded > 0 ? x('paceRows', { sum: signed(l.ledger_sum), unrecorded: morsels(l.unrecorded) }) : l.unrecorded < 0 ? x('paceRowsOver', { sum: signed(l.ledger_sum), n: morsels(-l.unrecorded) }) : x('paceRowsExact', { sum: signed(l.ledger_sum) })) : '';
   return html`
-    <${PageSection} id="wal-sources" num="01" title=${x('secSources')} count=${x('secSourcesSub', { in: signed(l.earned), out: signed(-l.spent), unrecorded: l.unrecorded > 0 ? l.unrecorded : 0 })} first=${true}>
-      <div class="wal-flow">
-        ${col(x('came'), l.earned, s.in, inRows, 'is-good')}
-        ${col(x('went'), -l.spent, s.out, outRows, 'is-low')}
-      </div>
-      <div class="wal-pace poster-box">
-        <div><b>${x('paceTitle')}</b> ${x('paceBody', { pace, cap })} ${Number(w.balance) >= cap ? x('paceAtCap', { balance: w.balance, cap }) : x('paceBelowCap', { balance: w.balance, days: pace ? Math.ceil((cap - Number(w.balance)) / pace) : 0 })} ${l.total_rows ? (l.unrecorded > 0 ? x('paceRows', { sum: signed(l.ledger_sum), unrecorded: morsels(l.unrecorded) }) : l.unrecorded < 0 ? x('paceRowsOver', { sum: signed(l.ledger_sum), n: morsels(-l.unrecorded) }) : x('paceRowsExact', { sum: signed(l.ledger_sum) })) : ''}</div>
-        <div class="wal-bar poster-box poster-box--meter"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width=${pct} height="100" /></svg><span class="poster-meter-figure">${w.balance} / ${cap}</span></div>
-      </div>
-      <span class="poster-label wal-label">${x('usesTitle')}</span>
-      <div class="item-grid">
-        ${['work', 'tool', 'data', 'store', 'porting', 'overage'].map((k) => html`<div key=${k}><b>${x('use.' + k)}</b>${x('useBody.' + k)}<small>${x('useSub.' + k)}</small></div>`)}
-      </div>
-      <${Hint}>${x('hintSources')}<//>
+    <${Section} id="wal-sources" num="01" title=${x('secSources')} count=${x('secSourcesSub', { in: signed(l.earned), out: signed(-l.spent), unrecorded: l.unrecorded > 0 ? l.unrecorded : 0 })} first=${true}>
+      <${MorselFlow} columns=${[col('in', x('came'), l.earned, s.in, inRows, 'fine'), col('out', x('went'), -l.spent, s.out, outRows, 'notice')]} />
+      <${MorselPace} title=${x('paceTitle')} words=${`${x('paceBody', { pace, cap })} ${capWords} ${rowWords}`} pct=${pct} figure=${`${w.balance} / ${cap}`} />
+      <${Space} above="large" below="tight"><${Label} block>${x('usesTitle')}<//><//>
+      <${CardGrid}>
+        ${['work', 'tool', 'data', 'store', 'porting', 'overage'].map((k) => html`<${Card} key=${k} name=${x('use.' + k)} text=${x('useBody.' + k)} meta=${x('useSub.' + k)} />`)}
+      <//>
+      <${Note} kind="hint">${x('hintSources')}<//>
     <//>`;
 }
 
@@ -198,20 +193,20 @@ function secLedger(ctx) {
   const counts = ctx.counts;
   const filters = [['all', counts.all], ['in', counts.in], ['out', counts.out], ['agent', counts.agent]];
   const copyAll = ctx.rows.map((tx) => `${tx.timestamp || ''}\t${signed(tx.amount)}\t${tx.type}\t${tx.tracking_code || ''}\t${tx.counterparty_gaii || ''}\t${tx.initiator_gaii || ''}`).join('\n');
+  const showMore = rows.length > shown.length ? () => ctx.showMore() : null;
   return html`
-    <${PageSection} id="wal-ledger" num="02" title=${x('secLedger')} count=${x('secLedgerSub', { n: ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}>
+    <${Section} id="wal-ledger" num="02" title=${x('secLedger')} count=${x('secLedgerSub', { n: ctx.rowsTotal, first: dateWord(ctx.first), last: dateWord(ctx.last) })}>
       ${ctx.rowsTotal ? html`
-        <div class="wal-filters">${filters.map(([id, n]) => html`<button type="button" key=${id} class=${`poster-tab poster-tab--filter ${ctx.filter === id ? 'is-on' : ''}`} onClick=${() => ctx.setFilter(id)}>${x('filter.' + id)} ${n}</button>`)}</div>
-        <div class="listing listing--cols listing--name-when-amount-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('colWhat')}</div><div class="poster-label">${x('colWhen')}</div><div class="wal-amt poster-label">${x('colAmount')}</div><div class="poster-label"></div></div>
+        <${Tabs} tone="filter" value=${ctx.filter} onSelect=${(v) => ctx.setFilter(v)}
+          items=${filters.map(([id, n]) => ({ value: id, label: x('filter.' + id), count: n }))} />
+        <${List} cols="name-when-amount-doors" keepCols head=${[x('colWhat'), x('colWhen'), { label: x('colAmount'), num: true }, '']}>
           ${shown.map((tx) => txRow(ctx, tx))}
-        </div>
-        <div class="more-line">
-          ${rows.length > shown.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.showMore()}>${x('showMore', { shown: shown.length, total: rows.length })}</button>` : null}
-          <${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${copyAll} label=${x('copyAll')} />
-          ${ctx.rowsPartial ? html`<small>${x('rowsPartial', { n: ctx.rows.length, total: ctx.rowsTotal })}</small>` : null}
-        </div>` : html`<p class="poster-quiet wal-empty"><b>${x('noRowsLead')}</b> ${x('noRowsBody')}</p>`}
-      <${Hint}>${x('hintLedger', { n: counts.agent })}<//>
+        <//>
+        <${More} label=${x('showMore', { shown: shown.length, total: rows.length })} onMore=${showMore}
+          note=${ctx.rowsPartial ? x('rowsPartial', { n: ctx.rows.length, total: ctx.rowsTotal }) : undefined}>
+          <${Action} small soft copy=${copyAll}>${x('copyAll')}<//>
+        <//>` : html`<${Note} kind="quiet"><b>${x('noRowsLead')}</b> ${x('noRowsBody')}<//>`}
+      <${Note} kind="hint">${x('hintLedger', { n: counts.agent })}<//>
     <//>`;
 }
 
@@ -223,31 +218,33 @@ function secMoney(ctx) {
   const sales = (ctx.orders || []).filter(isMoney);
   const doneSales = sales.filter((o) => o.status === 'completed');
   const verified = ctx.earnings?.verification;
+  const entries = ctx.earnings?.entries || [];
   return html`
-    <${PageSection} id="wal-money" num="03" title=${x('secMoney')} count=${sh ? x('secMoneySub', { shares: money(sh.total, sh.currency), sales: doneSales.length }) : x('secMoneySubNone')}>
-      <p class="og-lead">${x('moneyIntro')}</p>
+    <${Section} id="wal-money" num="03" title=${x('secMoney')} count=${sh ? x('secMoneySub', { shares: money(sh.total, sh.currency), sales: doneSales.length }) : x('secMoneySubNone')}>
+      <${Note} kind="lead">${x('moneyIntro')}<//>
       ${sh ? html`
-        <div class="og-strip wal-share">
-          <div><b>${money(sh.accrued, sh.currency)}</b><span>${x('share.accruedTitle')}</span><small>${x('share.entriesN', { n: sh.accruedCount })}</small></div>
-          <div><b>${money(sh.released, sh.currency)}</b><span>${x('share.releasedTitle')}</span><small>${x('share.entriesN', { n: sh.releasedCount })}</small></div>
-          <div><b>${money(sh.paid, sh.currency)}</b><span>${x('share.paidTitle')}</span><small>${x('share.paidSub')}</small></div>
-          <div>${verified?.state === 'verified' ? html`<b class="og-strip-word og-strip-fine">${x('share.verified')}</b><span>${verified.subjectLabel || ctx.approval?.subject || ''}</span><small>${verified.payable ? x('share.payable') : verified.message || ''}</small>` : html`<b class="og-strip-word">${x('share.unverified')}</b><span>${x('share.unverifiedSub')}</span><small>${verified?.message || ''}</small>`}</div>
-        </div>
-        ${ctx.openShares ? html`<div class="listing listing--cols listing--name-when-amount-doors wal-rows--money">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('share.colEntry')}</div><div class="poster-label">${x('share.colBuyer')}</div><div class="wal-amt poster-label">${x('share.colShare')}</div><div class="poster-label"></div></div>
-          ${(ctx.earnings?.entries || []).map((e, i) => shareRow(e, i))}
-        </div>` : null}` : html`<p class="poster-quiet wal-empty">${x('share.none')}</p>`}
+        <${FigureStrip} lead wrap items=${[
+          { n: money(sh.accrued, sh.currency), label: x('share.accruedTitle'), sub: x('share.entriesN', { n: sh.accruedCount }) },
+          { n: money(sh.released, sh.currency), label: x('share.releasedTitle'), sub: x('share.entriesN', { n: sh.releasedCount }) },
+          { n: money(sh.paid, sh.currency), label: x('share.paidTitle'), sub: x('share.paidSub') },
+          verified?.state === 'verified'
+            ? { n: x('share.verified'), tone: 'word fine', label: verified.subjectLabel || ctx.approval?.subject || '', sub: verified.payable ? x('share.payable') : verified.message || '' }
+            : { n: x('share.unverified'), tone: 'word', label: x('share.unverifiedSub'), sub: verified?.message || '' },
+        ]} />
+        ${ctx.openShares ? html`
+          <${List} cols="name-when-amount-doors" keepCols apart head=${[x('share.colEntry'), x('share.colBuyer'), { label: x('share.colShare'), num: true }, '']}>
+            ${entries.map((e, i) => shareRow(e, i))}
+          <//>` : null}` : html`<${Note} kind="quiet">${x('share.none')}<//>`}
       ${purchases.length || sales.length ? html`
-        <div class="listing listing--cols listing--name-when-amount-doors wal-rows--money">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('money.colTrade')}</div><div class="poster-label">${x('colWhen')}</div><div class="wal-amt poster-label">${x('money.colSum')}</div><div class="poster-label"></div></div>
+        <${List} cols="name-when-amount-doors" keepCols apart head=${[x('money.colTrade'), x('colWhen'), { label: x('money.colSum'), num: true }, '']}>
           ${sales.map((o) => moneyRow(o, true))}
           ${purchases.map((s) => moneyRow(s, false))}
-        </div>` : html`<p class="poster-quiet wal-empty">${x('money.none')}</p>`}
-      <div class="og-doors wal-more">
-        <button type="button" class="poster-action poster-action--small" onClick=${() => openTab('pnl')}>${x('toPnl')}</button>
-        ${sh && (ctx.earnings?.entries || []).length ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleShares()}>${ctx.openShares ? x('close') : x('share.showEntries', { n: ctx.earnings.entries.length })}</button>` : null}
-      </div>
-      <${Hint}>${x('hintMoney')}<//>
+        <//>` : html`<${Note} kind="quiet">${x('money.none')}<//>`}
+      <${Actions}>
+        <${Action} small onClick=${() => openTab('pnl')}>${x('toPnl')}<//>
+        ${sh && entries.length ? html`<${Action} small soft expanded=${!!ctx.openShares} onClick=${() => ctx.toggleShares()}>${ctx.openShares ? x('close') : x('share.showEntries', { n: entries.length })}<//>` : null}
+      <//>
+      <${Note} kind="hint">${x('hintMoney')}<//>
     <//>`;
 }
 
@@ -257,14 +254,13 @@ function secRails(ctx) {
   const p = ctx.payout;
   const rails = [{ id: 'stripe' }, ...(p?.x402?.enabled ? [{ id: 'x402' }] : []), { id: 'invoice' }];
   return html`
-    <${PageSection} id="wal-rails" num="04" title=${x('secRails')} count=${p ? x('secRailsSub', { n: ctx.railsOn }) : null}>
-      <p class="og-lead">${x('railsIntro')}</p>
-      ${p === false ? html`<p class="poster-quiet wal-empty">${x('railsOff')}</p>` : !p ? html`<p class="poster-quiet wal-empty loading-mark">${x('loading')}</p>` : html`
-        <div class="listing listing--cols listing--name-state-cur-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('rail.colRail')}</div><div class="poster-label">${x('rail.colState')}</div><div class="poster-label">${x('rail.colCurrencies')}</div><div class="poster-label"></div></div>
+    <${Section} id="wal-rails" num="04" title=${x('secRails')} count=${p ? x('secRailsSub', { n: ctx.railsOn }) : null}>
+      <${Note} kind="lead">${x('railsIntro')}<//>
+      ${p === false ? html`<${Note} kind="quiet">${x('railsOff')}<//>` : !p ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
+        <${List} cols="name-state-cur-doors" keepCols head=${[x('rail.colRail'), x('rail.colState'), x('rail.colCurrencies'), '']}>
           ${rails.map((r) => railRow(ctx, r))}
-        </div>`}
-      <${Hint}>${x('hintRails')}<//>
+        <//>`}
+      <${Note} kind="hint">${x('hintRails')}<//>
     <//>`;
 }
 
@@ -273,20 +269,12 @@ function secRails(ctx) {
 function secRoads(ctx) {
   const request = x('leadRequest');
   return html`
-    <${PageSection} id="wal-roads" num="05" title=${x('secRoads')} count=${null}>
-      <p class="og-lead">${x('roadsIntro')}</p>
-      <div class="wal-roads">
-        <div class="wal-road poster-box poster-box--raised">
-          <span class="poster-label">${x('roadAsk')}</span>
-          <p>${x('roadAskBody')}</p>
-          <pre class="code-block">${request}</pre>
-          <div class="og-doors"><${CopyButton} className="poster-action poster-action--small" text=${request} label=${x('copyRequest')} /></div>
-        </div>
-        <div class="wal-road poster-box">
-          <span class="poster-label">${x('roadAgent')}</span>
-          <p>${x('roadAgentBody')}</p>
-          <small>${x('roadAgentSub', { n: ctx.counts.agent, total: ctx.rowsTotal })}</small>
-        </div>
-      </div>
+    <${Section} id="wal-roads" num="05" title=${x('secRoads')}>
+      <${Note} kind="lead">${x('roadsIntro')}<//>
+      <${Roads} wide>
+        <${Road} lead name=${x('roadAsk')} text=${x('roadAskBody')} code=${request}
+          doors=${html`<${Action} small copy=${request}>${x('copyRequest')}<//>`} />
+        <${Road} name=${x('roadAgent')} text=${x('roadAgentBody')} meta=${x('roadAgentSub', { n: ctx.counts.agent, total: ctx.rowsTotal })} />
+      <//>
     <//>`;
 }

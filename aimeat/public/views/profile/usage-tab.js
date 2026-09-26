@@ -14,18 +14,21 @@
  *   MONEY AND ACTIVITY ARE NEVER SUMMED. The stat row changes with the report: a spend report leads
  *   with cost, an activity report leads with calls and shows how many were refused. A single grand
  *   total across both would be a number with no meaning.
- *   IT BORROWS NOTHING AND INVENTS NOTHING. Stats are the figure strip (`.og-strip`), the
- *   time window is the canonical `.seg`/`.seg-btn`, and only the wrapping report bar has classes of
- *   its own — eight long labels do not fit a joined segmented control on a phone. Its own classes
- *   are `pf-ureport-*` rather than `pf-usage-*`, which already belongs to the Home quota card: the
- *   first version reused that name, inherited its `background: var(--bg-surface)` over the selected
- *   button's white text, and rendered the chosen report invisible.
+ *   IT BORROWS NOTHING AND INVENTS NOTHING. Stats are the figure strip (FigureStrip), the report
+ *   bar and the time window are tab rows (Tabs), the table is the List; the page writes no class.
+ *   The report bar wraps — eight long labels do not fit a joined segmented control on a phone.
+ *   (History: its own classes were once `pf-ureport-*`, because a first version reused the Home
+ *   quota card's `pf-usage-*`, inherited its background over the selected button's white text,
+ *   and rendered the chosen report invisible.)
  * @structure
  *   - REPORTS         — button definitions: id, label key, and which stats it leads with
  *   - getRange(period) — preset key → { from, to }
  *   - UsageTab (default) — fetch + render
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.8.0 -- 2026-09-26 -- Every part is a component that takes data (SettingsPage, Tabs for the
+ *     report bar and the time window, FigureStrip, List with its empty line, Note, Layout); the page
+ *     writes no class and its pf-ureport-* rules go.
  *   v1.7.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.6.0 -- 2026-09-25 -- A line that says a load or a save failed is the Form message in its error tone (.form-message--error); the error lines' own rules go (a unification: the look most tabs use).
  *   v1.5.0 -- 2026-09-25 -- A table of rows is the Listing (css/components/listing.css): the P&L lines, the accountants, the usage report, the AI spend per app, the security overrides and an agent's internal jobs; figures stand at the right of their column (a unification: the look most tabs use).
@@ -45,8 +48,13 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { LoadingLine } from './shared.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Tabs } from '/components/Tabs.js';
+import { Note } from '/components/Note.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name, Num } from '/components/List.js';
+import { Row as Line, Space } from '/components/Layout.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -130,8 +138,10 @@ export default function UsageTab() {
   const groups = data?.groups ?? [];
   const series = data?.series ?? [];
 
+  // The chart keeps its own fixed height (UsageChart's height), so switching report does not make
+  // the table below it jump.
   const chart = series.length > 1 ? html`
-    <div class="pf-ureport-chart">
+    <${Space} below="large">
       <${UsageChart}
         type="bar"
         labels=${series.map(s => s.bucket)}
@@ -145,7 +155,7 @@ export default function UsageTab() {
         height=${200}
         legend=${false}
       />
-    </div>` : null;
+    <//>` : null;
 
   const statCards = current.kind === 'spend'
     ? [
@@ -169,55 +179,42 @@ export default function UsageTab() {
     ? [g.key, usd(g.cost_usd), compact(g.total_tokens), compact(g.calls)]
     : [g.key, compact(g.calls), compact(g.refusals), compact(g.errors), ms(g.duration_ms_avg)]));
 
+  // An empty report is a fact about this account, not a broken page — so it says which
+  // question was asked and over what window, rather than showing a bare dash.
+  const emptyWords = t('profile.usage.emptyFor')
+    .replace('{report}', t(current.label))
+    .replace('{days}', t(`profile.usage.period${period}`));
+
+  // The report bar and the time window: each chooses one, the chosen one on the sun. The report
+  // bar wraps (eight long labels do not fit one line on a phone); the two stand apart in one row.
+  const controls = html`
+    <${Line} wrap align="start" justify="between" gap="medium" below="large">
+      <${Tabs} label=${t('profile.usage.reportGroupLabel')} value=${report} onSelect=${setReport}
+        items=${REPORTS.map(r => ({ value: r.id, label: t(r.label) }))} />
+      <${Tabs} label=${t('profile.usage.periodGroupLabel')} value=${period} onSelect=${setPeriod}
+        items=${PERIODS.map(p => ({ value: p, label: t(`profile.usage.period${p}`) }))} />
+    <//>`;
+
   return html`
-    <div class="pf-ureport">
-      <div class="og mb-1">
-        <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBusiness')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.usage')}</span></div>
-        <div class="og-mast"><div class="og-mast-words">
-          <h2 class="og-title poster-page-title">${t('profile.usage.title')}</h2>
-          <p class="og-desc">${t('profile.usage.intro')}</p>
-        </div></div>
-      </div>
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.usage')]}
+      title=${t('profile.usage.title')}
+      desc=${t('profile.usage.intro')}>
+      ${controls}
 
-      <div class="pf-ureport-controls">
-        <div class="pf-ureport-bar" role="group" aria-label=${t('profile.usage.reportGroupLabel')}>
-          ${REPORTS.map(r => html`
-            <button type="button"
-              class=${`poster-tab${r.id === report ? ' is-on' : ''}`}
-              aria-pressed=${r.id === report}
-              onClick=${() => setReport(r.id)}>${t(r.label)}</button>`)}
-        </div>
-        <div class="pf-tabs" role="group" aria-label=${t('profile.usage.periodGroupLabel')}>
-          ${PERIODS.map(p => html`
-            <button type="button"
-              class=${`poster-tab${p === period ? ' is-on' : ''}`}
-              aria-pressed=${p === period}
-              onClick=${() => setPeriod(p)}>${t(`profile.usage.period${p}`)}</button>`)}
-        </div>
-      </div>
-
-      ${error ? html`<p class="form-message form-message--error">${error}</p>` : null}
-      ${loading && !data ? html`<${LoadingLine} text=${t('profile.usage.loading')} />` : null}
+      ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
+      ${loading && !data ? html`<${Note} kind="loading">${t('profile.usage.loading')}<//>` : null}
 
       ${data ? html`
-        <div class="og-strip pf-figures">
-          ${statCards.map(c => html`
-            <div>
-              <b>${c.value}</b>
-              <span>${c.label}</span>
-            </div>`)}
-        </div>
+        <${FigureStrip} lead items=${statCards.map(c => ({ key: c.label, n: c.value, label: c.label }))} />
         ${chart}
-        ${rows.length
-          ? html`<div class=${`listing listing--cols ${headers.length > 4 ? 'listing--name-n-n-n-n' : 'listing--name-n-n-n'}`}>
-              <div class="listing-row listing-row--head">${headers.map((hd, i) => html`<div class=${`poster-label ${i ? 'listing-n' : ''}`}>${hd}</div>`)}</div>
-              ${rows.map((row, ri) => html`<div class="listing-row" key=${ri}>${row.map((cell, i) => html`<div class=${i ? 'listing-n' : 'listing-name'}>${cell}</div>`)}</div>`)}
-            </div>`
-          // An empty report is a fact about this account, not a broken page — so it says which
-          // question was asked and over what window, rather than showing a bare dash.
-          : html`<p class="poster-quiet pf-ureport-empty">${t('profile.usage.emptyFor')
-              .replace('{report}', t(current.label))
-              .replace('{days}', t(`profile.usage.period${period}`))}</p>`}
+        <${List} keepCols cols=${headers.length > 4 ? 'name-n-n-n-n' : 'name-n-n-n'}
+          head=${headers.map((hd, i) => (i ? { label: hd, num: true } : hd))}
+          empty=${emptyWords}
+          rows=${rows}
+          render=${(row, ri) => html`<${Row} key=${ri}>${row.map((cell, i) => (i
+            ? html`<${Num} key=${i}>${cell}<//>`
+            : html`<${Name} key=${i}>${cell}<//>`))}<//>`} />
       ` : null}
-    </div>`;
+    <//>`;
 }

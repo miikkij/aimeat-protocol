@@ -10,14 +10,19 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.5.1 — 2026-09-27 — AgentConsent and DisplayPrefsFields draw their own names from sheets of their
+ *     own (agent-consent.css, display-prefs-fields.css; a move); the page-sheet debt note had no
+ *     entry left and goes.
+ *   v1.5.0 — 2026-09-27 — Card: the tile and its grid (ruled, framed, section, panel, figure; CardGrid), the classic card one variant.
+ *   v1.5.0 — 2026-09-27 — LinkPreview, Mermaid, ContactCard and the offer card parts draw their own
+ *     names, from sheets of their own (link-preview.css, mermaid.css, contact-card.css, offer-card-view.css; a move).
+ *   v1.4.0 — 2026-09-27 — KeyValueRow is unused: its one caller draws the Facts now.
  *   v1.3.0 — 2026-09-26 — JsonView is every stored value opened under its row in Settings & Controls (a unification).
  *   v1.2.0 — 2026-09-25 — JsonView's look is its own sheet, css/components/json-view.css (UI consolidation phase 5, a move).
  *   v1.1.0 — 2026-09-24 — FormField is active: Themes & Styles draws it.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation: theme.css to tokens only; every module catalogued).
  */
 import type { UiEntryWritten } from './types.js';
-
-const PAGE_SHEET_NOTE = 'Its look still sits in a page sheet (the sheet named here): debt, to move into a css/components/ sheet of its own.';
 
 export const SHELL_ENTRIES: UiEntryWritten[] = [
     {
@@ -60,11 +65,46 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'card', name: 'Card', kind: 'component', status: 'active',
-        summary: 'The classic card and its kin: the glass card, the content group, the stat card, the category card, the card header and title.',
+        summary: 'One thing as a tile, and the grid the tiles stand in: the ruled tile (the name in bold over its words and a grey typewriter line, a thin rule under it), the framed tile in the Object box, a section under the thick rule, a part of the overview, and a figure that opens its tab. Without a tone and a name it is still the classic card of the classic shell (title, subtitle, hover, glass).',
         module: '/components/Card.js', sheet: '/css/components/card.css',
-        data: { shape: 'Card({ title, subtitle, onClick, hoverable, variant, children })', fields: { title: 'the heading', subtitle: 'the line under it', children: 'the content' } },
-        useFor: ['The classic shell. The poster pages use the box and the row.'],
-        variants: [], example: { title: 'Storage', subtitle: 'What this node keeps' },
+        data: {
+            shape: 'Card({ tone, state, mark, kicker, name, sub, text, clamp, code, meta, lines, codeLine, doors, onOpen, openLabel, title, aside, note, rule, wide, inRow, figure, id, children }) · Card({ title, subtitle, onClick, hoverable, variant, className, children }) (the classic card) · CardGrid({ cols, children }) · tileParts(props) (for Road only)',
+            fields: {
+                tone: 'none (the ruled tile) | framed (the tile in the Object box) | section (an older Settings group under the thick rule) | panel (one part of the overview) | figure (a number that is a door to its tab)',
+                state: 'framed: current (the one you are on, a coral frame) | off (switched off: dashed, grey) | raised (the one that stands out)',
+                mark: 'an Avatar or a sign before the name', kicker: 'a small coral typewriter line over the name', name: 'the tile\'s name in bold',
+                sub: 'the same small line under the name', text: 'the sentence; clamp cuts it after two lines', code: 'a code block to copy',
+                meta: 'the grey typewriter line', lines: '[{ key, label, count, dim }]: named counts under the meta line, a hairline over each, the count at the right',
+                codeLine: 'a line of code at the foot', doors: 'the row of actions at the foot (never with onOpen)',
+                onOpen: 'the whole tile (or a panel\'s headline, or a figure) is the door: a press, Enter or Space opens it; openLabel is its tooltip',
+                title: 'section and panel: the headline', aside: 'section: what stands at the right of the title', note: 'panel: a grey typewriter line after the headline',
+                rule: 'panel: the thick rule on top', wide: 'section and panel: spans every column of its grid', inRow: 'section: stands inside a list row, row air and no margin',
+                figure: 'figure: the number; name is its word', children: 'a field or a form inside a tile; the content of a section or a panel',
+                cols: 'CardGrid: three (the default) | two | fill (as many 180px tiles as fit) | one | sections (340px or wider) | panels (the overview\'s two columns) | figures (figure doors in a line); three and two fold to one column under 860px',
+                subtitle: 'classic card: the line under the title', variant: 'classic card: "glass" for the glass ground',
+            },
+        },
+        useFor: ['A set of things of one kind, each a tile a person scans or opens: a device, an extension, an app, a place.',
+            'A section tone for an older Settings group, a panel tone for a part of the overview, a figure tone for a number that opens its tab.',
+            'The classic card is for the classic shell only; a Settings page always passes a tone or a name.'],
+        variants: [
+            { name: 'ruled tile', prop: 'name (no tone)', class: 'card-tile--ruled', when: 'one thing among many: name, words, meta line, a thin rule under it' },
+            { name: 'framed tile', prop: 'tone="framed"', class: 'card-tile--framed', when: 'a thing with its own actions, in the Object box' },
+            { name: 'door tile', prop: 'onOpen', class: 'card-tile--door', when: 'the whole tile opens the thing: coral name and frame on hover and focus' },
+            { name: 'clamp', prop: 'clamp', class: 'card-tile-text--clamp', when: 'a description cut after two lines' },
+            { name: 'lines', prop: 'lines', class: 'card-tile-lines', when: 'named counts under the meta line (a place and its workspaces)' },
+            { name: 'section', prop: 'tone="section"', class: 'card-section', when: 'an older Settings group under the thick rule, no frame (Jouni\'s decision "Classic cards")' },
+            { name: 'wide section', prop: 'tone="section" wide', class: 'card-section--wide', when: 'a section that spans the grid' },
+            { name: 'section in a row', prop: 'tone="section" inRow', class: 'card-section--in-row', when: 'a section inside a list row' },
+            { name: 'panel', prop: 'tone="panel"', class: 'card-panel', when: 'one part of the overview: its headline over its content' },
+            { name: 'panel door', prop: 'tone="panel" onOpen', class: 'card-panel-title--door', when: 'the headline opens its tab' },
+            { name: 'figure', prop: 'tone="figure"', class: 'card-figure', when: 'a number that opens its tab, a small grey word beside it' },
+            { name: 'grid', prop: 'CardGrid cols', class: 'card-grid', when: 'the tiles in three, two or one columns, as many as fit, sections, panels or figures' },
+            { name: 'classic', prop: 'title, subtitle (no tone, no name)', class: 'card', when: 'the classic shell\'s card' },
+            { name: 'glass', prop: 'variant="glass"', class: 'card-glass', when: 'the classic card on the glass ground' },
+        ],
+        example: { tone: 'framed', name: 'Firefox on this laptop', meta: 'push · since 2026-09-02', doors: 'Send a test' },
+        note: 'card.css holds the classic card and its kin (the content group, the stat card, the category card, moved from theme.css) and, at its end, the tile, grid, section, panel and figure of the Card component. Replaced the Item grid (item-grid.css), the Figure door (figure-door.css), the App cards (app-cards.css), the Notifications device card and the overview\'s .pf-home-card.',
     },
     {
         id: 'badge', name: 'Badge', kind: 'component', status: 'active',
@@ -115,12 +155,13 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         variants: [], example: { status: 'online', label: true },
     },
     {
-        id: 'key-value-row', name: 'KeyValueRow', kind: 'component', status: 'active',
+        id: 'key-value-row', name: 'KeyValueRow', kind: 'component', status: 'unused',
         summary: 'One named fact on a line: its label, its value, and a badge when asked.',
         module: '/components/KeyValueRow.js', sheet: '/css/components/key-value-row.css',
         data: { shape: 'KeyValueRow({ label, value, badge, mono })', fields: { label: 'what it is', value: 'the fact', mono: 'set the value in typewriter letters' } },
         useFor: ['A detail list in the classic shell.'],
         variants: [], example: { label: 'Node', value: 'aimeat-local-001-dev', mono: true },
+        note: 'No page draws it since 2026-09-27: its one caller, an organism document\'s dates, draws the Facts (components/Facts.js). The module and its sheet stay, and components/index.js still re-exports it, until Jouni says keep or delete.',
     },
     {
         id: 'pagination', name: 'Pagination', kind: 'component', status: 'unused',
@@ -277,26 +318,28 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     {
         id: 'agent-consent', name: 'AgentConsent', kind: 'component', status: 'active',
         summary: 'An agent asking to connect: who it is, what it may do, and approve or deny.',
-        module: '/components/AgentConsent.js', sheet: '/css/views/profile.css', classes: ['agc-card'],
+        module: '/components/AgentConsent.js', sheet: '/css/components/agent-consent.css', classes: ['agent-consent', 'agent-consent-card'],
         data: { shape: 'AgentConsent({ requests, onApprove, onDeny, busyCode, variant })', fields: { requests: 'the pending device requests' } },
         useFor: ['Where a person approves an agent (the home and the profile).'],
-        variants: [], example: {}, note: PAGE_SHEET_NOTE,
+        variants: [], example: {},
+        note: 'Its own sheet since 2026-09-27: the rules moved unchanged under its own names (.agent-consent-*) from views/profile.css, profile-poster.css and step-card.css; the Settings rules keep their .pf scope, so the home draws it as before.',
     },
     {
         id: 'contact-card', name: 'ContactCard', kind: 'component', status: 'active',
         summary: 'The node\'s own people, as a card in the dashed aside.',
-        module: '/components/ContactCard.js', sheet: '/css/views/landing.css', classes: ['ld-contact'],
+        module: '/components/ContactCard.js', sheet: '/css/components/contact-card.css', classes: ['contact-card'],
         data: { shape: 'ContactCard()', fields: {} },
         useFor: ['The front page and the help page.'],
-        variants: [], example: {}, note: PAGE_SHEET_NOTE,
+        variants: [], example: {},
     },
     {
         id: 'display-prefs-fields', name: 'DisplayPrefsFields', kind: 'component', status: 'active',
         summary: 'The region and time zone fields.',
-        module: '/components/DisplayPrefsFields.js', sheet: '/css/views/profile.css', classes: ['pf-edit-select'],
+        module: '/components/DisplayPrefsFields.js', sheet: '/css/components/display-prefs-fields.css', classes: ['display-prefs-field'],
         data: { shape: 'DisplayPrefsFields({ region, timezone, onChange })', fields: { region: 'the region', timezone: 'the time zone' } },
         useFor: ['The profile\'s settings.'],
-        variants: [], example: {}, note: PAGE_SHEET_NOTE,
+        variants: [], example: {},
+        note: 'Its own sheet since 2026-09-27 (.display-prefs-field, moved unchanged from views/profile.css .pf-edit-label and profile-poster.css); the controls are the field kit.',
     },
     {
         id: 'inbox-link', name: 'InboxLink', kind: 'component', status: 'active',
@@ -309,7 +352,7 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     {
         id: 'json-view', name: 'JsonView', kind: 'component', status: 'active',
         summary: 'A stored value shown as readable, coloured JSON.',
-        module: '/components/JsonView.js', sheet: '/css/components/json-view.css', classes: ['pf-agd-json-block'],
+        module: '/components/JsonView.js', sheet: '/css/components/json-view.css', classes: ['json-view-block'],
         data: { shape: 'JsonValue({ value }) · JsonNode({ value })', fields: { value: 'any stored value' } },
         useFor: ['A record\'s raw value in the profile.', 'A stored value opened under its row, as the library draws it: a task\'s memory value, an ecosystem app\'s data value and a guidance body; the box around it keeps only its place.'],
         variants: [], example: {},
@@ -317,10 +360,10 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     {
         id: 'link-preview', name: 'LinkPreview', kind: 'component', status: 'active',
         summary: 'A card for a link in a message: its site, title and picture.',
-        module: '/components/LinkPreview.js', sheet: '/css/views/inbox.css', classes: ['inbox-linkcard'],
+        module: '/components/LinkPreview.js', sheet: '/css/components/link-preview.css', classes: ['link-preview'],
         data: { shape: 'LinkPreview({ url, onDismiss }) · MessageLinkPreviews({ msg })', fields: { url: 'the link' } },
         useFor: ['Under a message that carries a link.'],
-        variants: [], example: {}, note: PAGE_SHEET_NOTE,
+        variants: [], example: {},
     },
     {
         id: 'memory-embed', name: 'MemoryEmbed', kind: 'component', status: 'active',
@@ -333,15 +376,15 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     {
         id: 'mermaid', name: 'Mermaid', kind: 'component', status: 'active',
         summary: 'A diagram drawn from its text.',
-        module: '/components/Mermaid.js', sheet: '/css/views/profile.css', classes: ['mmd'],
+        module: '/components/Mermaid.js', sheet: '/css/components/mermaid.css', classes: ['mermaid-diagram'],
         data: { shape: 'Mermaid({ chart })', fields: { chart: 'the diagram\'s text' } },
         useFor: ['A diagram inside a text.'],
-        variants: [], example: {}, note: PAGE_SHEET_NOTE,
+        variants: [], example: {},
     },
     {
         id: 'offer-card-view', name: 'Offer card parts', kind: 'component', status: 'unused',
         summary: 'An offer\'s badges, example and requirements.',
-        module: '/components/offer-card-view.js', sheet: '/css/views/offers.css', classes: ['of-badges'],
+        module: '/components/offer-card-view.js', sheet: '/css/components/offer-card-view.css', classes: ['offer-card-badges'],
         data: { shape: 'OfferBadges({ offer }) · OfferExample({ offer }) · OfferRequirements({ offer })', fields: { offer: 'the offer' } },
         useFor: ['The offers page and an offer\'s own page.'],
         variants: [], example: {}, note: "No routed page imports it today (the offers view draws its own). Kept until Jouni says keep or delete." 

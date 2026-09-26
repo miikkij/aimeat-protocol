@@ -29,6 +29,8 @@
  * @usage
  *   html`<${CardMenu} state=${'open'} actions=${[{ label: 'Copy', run: copy }]} />`
  * @version-history
+ *   v1.4.0 — 2026-09-26 — An action `{ divider: true }` draws a line between two groups of rows (the
+ *     Settings kebab menu had one; KebabMenu in views/profile/shared.js is this menu now).
  *   v1.3.0 — 2026-09-26 — `inline`: the dots in a line of words (a message's line under it), and an
  *     action's `danger` tone (Jouni's decision "Message": the six other actions of a message).
  *   v1.2.0 — 2026-09-24 — The rows are the shared menu row (Jouni's decision "Menu row").
@@ -100,7 +102,7 @@ export function CardMenu({
       </button>
       ${open && html`
         <div class="card-menu-list" role="menu">
-          ${actions.map((a, i) => html`
+          ${actions.map((a, i) => a.divider ? html`<div class="card-menu-sep" role="separator" key=${'sep' + i}></div>` : html`
             <button type="button" role="menuitem" key=${a.label} class=${'poster-menu-row card-menu-item' + (a.danger ? ' poster-menu-row--danger' : '')}
               onClick=${(e) => { stop(e); run(a, i); }}>
               ${flash === i ? (a.doneLabel ?? tr('cardMenu.done', 'Done')) : a.label}

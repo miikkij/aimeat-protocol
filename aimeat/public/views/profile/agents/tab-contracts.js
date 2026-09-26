@@ -9,6 +9,9 @@
  * @structure TabContracts — offered-contracts row + Active engagements + Retired (history)
  * @usage <${TabContracts} agent=${agent} agentName=${agent.name} showToast=${showToast} />
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- Onto the components: the cards are section Cards in a CardGrid, the offers
+ *     a row of Marks, each engagement list a Group heading over a List (a retired row faded), the
+ *     states Marks, the lines the Note. The file writes no class any more.
  *   v1.11.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -37,6 +40,12 @@ import { getAgentEngagements, contractNamesOf, offersWorkspaceContract, adoptCon
 import { retireEngagement, activateEngagement } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { List, Row, Name, Who, When, Doors, Group } from '/components/List.js';
+import { Mark, Marks } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -80,60 +89,51 @@ export default function TabContracts({ agent, agentName, showToast }) {
     finally { setBusy(''); }
   };
 
-  if (loading) return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading') || 'Loading…'}</div>`;
+  if (loading) return html`<${Note} kind="loading">${t('profile.loading') || 'Loading…'}<//>`;
 
   const active = engagements.filter(e => e.state === 'active');
   const retired = engagements.filter(e => e.state === 'retired');
   const label = (e) => e.contract || (t('organisms.bareContract') || 'contract');
 
   return html`
-    <div class="pf-agd-contracts pf-agd-card-grid">
-      <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.contracts.offersTitle') || 'Contracts this agent offers'}</div>
-      <div class="section-desc">${t('profile.agents.detail.contracts.offersDesc') || 'The workspace contracts this agent advertises. Owners see these when choosing an agent for a workspace.'}</div>
-      <div class="agc-caps">
+    <${CardGrid} cols="sections">
+      <${Card} tone="section" title=${t('profile.agents.detail.contracts.offersTitle') || 'Contracts this agent offers'}>
+        <${HeadDesc}>${t('profile.agents.detail.contracts.offersDesc') || 'The workspace contracts this agent advertises. Owners see these when choosing an agent for a workspace.'}<//>
         ${advertises || capabilities.length
-          ? (capabilities.length ? capabilities : ['']).map(c => html`<span class="poster-chip" key=${c}>${'📜 '}${c || (t('organisms.bareContract') || 'contract')}</span>`)
-          : html`<span class="poster-quiet pf-agd-empty">${t('profile.agents.detail.contracts.noOffers') || 'This agent advertises no workspace contract (add a workspace-contract + contract.<id> tag in Data Access).'}</span>`}
-      </div>
-      </div>
+          ? html`<${Marks}>${(capabilities.length ? capabilities : ['']).map(c => html`<${Mark} key=${c}>${'📜 '}${c || (t('organisms.bareContract') || 'contract')}<//>`)}<//>`
+          : html`<${Note} kind="quiet">${t('profile.agents.detail.contracts.noOffers') || 'This agent advertises no workspace contract (add a workspace-contract + contract.<id> tag in Data Access).'}<//>`}
+      <//>
 
-      <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title poster-day-title">${t('profile.agents.detail.contracts.activeTitle') || 'Active in these workspaces'}</div>
-      ${active.length ? html`
-        <div class="listing listing--name-who-when-doors agc-list">
-          ${active.map(e => html`
-            <div class="listing-row agc-row" key=${engKey(e)}>
-              <div class="listing-name">
-                <span class="poster-status poster-status--fine">${'✓ '}${label(e)}</span>
-                ${' '}${e.wsName || e.ws}
-              </div>
-              <div class="listing-who">${e.organismName || e.organism_id}</div>
-              <div class="poster-time">${(t('profile.agents.detail.contracts.since') || 'since {d}').replace('{d}', fmtDay(e.adoptedAt))}</div>
-              <div class="listing-doors"><button class="poster-action poster-action--small poster-action--row" disabled=${busy === engKey(e)}
-                title=${t('organisms.retireHint') || 'Stop this agent from working in this workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
-                onClick=${() => retire(e)}>${busy === engKey(e) ? '…' : (t('organisms.retire') || 'Retire')}</button></div>
-            </div>`)}
-        </div>`
-        : html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.contracts.noneActive') || 'Not active in any workspace yet. Owners adopt this agent from a workspace’s People panel.'}</div>`}
-      </div>
+      <${Card} tone="section">
+        <${Group} title=${t('profile.agents.detail.contracts.activeTitle') || 'Active in these workspaces'}>
+          <${List} cols="name-who-when-doors" apart empty=${t('profile.agents.detail.contracts.noneActive') || 'Not active in any workspace yet. Owners adopt this agent from a workspace’s People panel.'}>
+            ${active.map(e => html`
+              <${Row} key=${engKey(e)}>
+                <${Name}><${Mark} kind="status" tone="fine">${'✓ '}${label(e)}<//>${' '}${e.wsName || e.ws}<//>
+                <${Who}>${e.organismName || e.organism_id}<//>
+                <${When}>${(t('profile.agents.detail.contracts.since') || 'since {d}').replace('{d}', fmtDay(e.adoptedAt))}<//>
+                <${Doors}><${Action} small row disabled=${busy === engKey(e)}
+                  title=${t('organisms.retireHint') || 'Stop this agent from working in this workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
+                  onClick=${() => retire(e)}>${busy === engKey(e) ? '…' : (t('organisms.retire') || 'Retire')}<//><//>
+              <//>`)}
+          <//>
+        <//>
+      <//>
 
       ${retired.length ? html`
-        <div class="pf-agd-card pf-agd-card--full poster-row--thing">
-        <div class="pf-agd-section-title poster-day-title poster-day-title--quiet">${t('profile.agents.detail.contracts.retiredTitle') || 'Retired (history)'}</div>
-        <div class="listing listing--name-who-when-doors agc-list">
-          ${retired.map(e => html`
-            <div class="listing-row agc-row agc-row--retired" key=${engKey(e)}>
-              <div class="listing-name">
-                <span class="poster-status poster-status--off">${label(e)}</span>
-                ${' '}${e.wsName || e.ws}
-              </div>
-              <div class="listing-who">${e.organismName || e.organism_id}</div>
-              <div class="poster-time">${(t('profile.agents.detail.contracts.until') || 'used here until {d}').replace('{d}', fmtDay(e.retiredAt))}</div>
-              <div class="listing-doors"><button class="poster-action poster-action--small poster-action--row" disabled=${busy === engKey(e)}
-                onClick=${() => readopt(e)}>${busy === engKey(e) ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}</button></div>
-            </div>`)}
-        </div>
-        </div>` : null}
-    </div>`;
+        <${Card} tone="section" wide>
+          <${Group} quiet title=${t('profile.agents.detail.contracts.retiredTitle') || 'Retired (history)'}>
+            <${List} cols="name-who-when-doors" apart>
+              ${retired.map(e => html`
+                <${Row} faded key=${engKey(e)}>
+                  <${Name}><${Mark} kind="status" tone="off">${label(e)}<//>${' '}${e.wsName || e.ws}<//>
+                  <${Who}>${e.organismName || e.organism_id}<//>
+                  <${When}>${(t('profile.agents.detail.contracts.until') || 'used here until {d}').replace('{d}', fmtDay(e.retiredAt))}<//>
+                  <${Doors}><${Action} small row disabled=${busy === engKey(e)}
+                    onClick=${() => readopt(e)}>${busy === engKey(e) ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}<//><//>
+                <//>`)}
+            <//>
+          <//>
+        <//>` : null}
+    <//>`;
 }

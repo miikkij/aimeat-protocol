@@ -5,28 +5,33 @@
  * @description Shared ContactPicker component — input + suggestion dropdown (contacts, directory
  *   hits, email-resolve action). Theme-variable driven; loaded globally from spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — The component's own names: .cp-root → .contact-picker, every other .cp-* →
+ *     .contact-picker-*; the input's small size (.input-field.contact-picker-input) moved unchanged
+ *     from views/profile.css .input-field.input-sm, which the invitation page still writes (a move).
  *   v1.0.0 — 2026-07-16 — Initial.
  */
 /* The input is `width: 100%` of the root, so its padding and border have to be INSIDE that width
    or it grows past the element positioning the dropdown. On a 390 px viewport it did, by 21 px,
    and slid under the button beside it — visible only once the row held more than one button.
    `max-width` is the other half: a 240 px floor on a narrow screen must still yield to the row. */
-.cp-root { position: relative; display: inline-block; min-width: 240px; max-width: 100%; }
-.cp-input { width: 100%; max-width: 100%; box-sizing: border-box; }
-.cp-drop {
+.contact-picker { position: relative; display: inline-block; min-width: 240px; max-width: 100%; }
+.contact-picker-input { width: 100%; max-width: 100%; box-sizing: border-box; }
+/* The small input (formerly the page's .input-field.input-sm, the same values). */
+.input-field.contact-picker-input { padding: .4rem .6rem; font-size: .85rem; }
+.contact-picker-drop {
   position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 60;
   background: var(--card); border: 1px solid var(--border); border-radius: 8px;
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.18); overflow: hidden; max-height: 280px; overflow-y: auto;
 }
-.cp-item {
+.contact-picker-item {
   display: flex; align-items: center; gap: 0.45rem; width: 100%; text-align: left;
   padding: 0.4rem 0.6rem; border: 0; background: transparent; cursor: pointer;
   font-size: 0.83rem; color: var(--text);
 }
-.cp-item:hover, .cp-item-hi { background: var(--bg-dim); }
-.cp-item-icon { flex: 0 0 auto; }
-.cp-item-label { font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cp-item-id { color: var(--muted); font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: auto; }
-.cp-item-src { color: var(--muted); font-size: 0.7rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 0.35rem; }
-.cp-item-resolve { border-top: 1px solid var(--border); color: var(--accent); }
-.cp-item-miss { cursor: default; color: var(--muted); font-size: 0.76rem; border-top: 1px solid var(--border); }
+.contact-picker-item:hover, .contact-picker-item-hi { background: var(--bg-dim); }
+.contact-picker-item-icon { flex: 0 0 auto; }
+.contact-picker-item-label { font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contact-picker-item-id { color: var(--muted); font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: auto; }
+.contact-picker-item-src { color: var(--muted); font-size: 0.7rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 0.35rem; }
+.contact-picker-item-resolve { border-top: 1px solid var(--border); color: var(--accent); }
+.contact-picker-item-miss { cursor: default; color: var(--muted); font-size: 0.76rem; border-top: 1px solid var(--border); }

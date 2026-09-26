@@ -22,6 +22,10 @@
  * @structure secBuilders(ctx) — the section · rungRow · GrantForm
  * @usage import { secBuilders } from './builders.js';
  * @version-history
+ *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): Section,
+ *     the lead, loading and empty lines Note, the two lists the List (the rung a Tag in a Cell), their
+ *     labels Label, the invitation form Fields with a TextField and two Selects and its send the loud
+ *     action in FormActions. The page writes no class.
  *   v1.11.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.10.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.9.0 — 2026-09-25 — The two lists of builders are the Listing (listing, listing-row and its name and doors cells, the rung's tag in a plain cell), a unification: the look most tabs use.
@@ -48,9 +52,16 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
+import { List, Row, Name, Cell, Doors } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Space } from '/components/Layout.js';
 import { a, nameOf } from './frame.js';
-import { Hint } from '/components/Hint.js';
 
 /** The three rungs, in the order the node publishes them: most power first. */
 const RUNGS = ['full', 'publisher', 'drafter'];
@@ -62,13 +73,11 @@ const DEFAULT_RUNG = 'drafter';
  */
 function rungRow({ who, rung, where, onRevoke, busy }) {
   return html`
-    <div class="listing-row">
-      <div class="listing-name">${who}<small>${where}</small></div>
-      <div><span class="poster-chip">${a('bldRung_' + rung) || rung}</span></div>
-      <div class="listing-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${onRevoke}>${a('bldRevoke')}</button>
-      </div>
-    </div>`;
+    <${Row}>
+      <${Name} meta=${where}>${who}<//>
+      <${Cell}><${Mark}>${a('bldRung_' + rung) || rung}<//><//>
+      <${Doors}><${Action} small row disabled=${busy} onClick=${onRevoke}>${a('bldRevoke')}<//><//>
+    <//>`;
 }
 
 /** Give somebody a right: who, which rung, and on what. */
@@ -90,29 +99,19 @@ function GrantForm({ apps, onGrant, busy }) {
   };
 
   return html`
-    <form class="ap-form" onSubmit=${submit}>
-      <label class="ap-field">
-        <span class="poster-label">${a('bldWho')}</span>
-        <input class="og-input" type="text" value=${who} onInput=${(e) => setWho(e.target.value)}
-               placeholder=${a('bldWhoHint')} autocomplete="off" />
-      </label>
-      <label class="ap-field">
-        <span class="poster-label">${a('bldRung')}</span>
-        <select class="select-field" value=${rung} onChange=${(e) => setRung(e.target.value)}>
-          ${RUNGS.map((r) => html`<option value=${r}>${a('bldRung_' + r) || r}</option>`)}
-        </select>
-      </label>
-      <label class="ap-field">
-        <span class="poster-label">${a('bldWhere')}</span>
-        <select class="select-field" value=${scope} onChange=${(e) => setScope(e.target.value)}>
-          <option value="">${a('bldWhereAll')}</option>
-          ${apps.map((x) => html`<option value=${`${x.owner}/${x.filename}`}>${nameOf(x)}</option>`)}
-        </select>
-      </label>
-      <div class="ap-field ap-field--send">
-        <button type="submit" class="poster-slab poster-slab--control" disabled=${busy || !who.trim()}>${a('bldGrant')}</button>
-      </div>
-    </form>`;
+    <${Space} above="large">
+      <form onSubmit=${submit}>
+        <${Fields} cols=${2}>
+          <${TextField} label=${a('bldWho')} value=${who} onInput=${setWho} placeholder=${a('bldWhoHint')} autoComplete="off" />
+          <${Select} label=${a('bldRung')} value=${rung} onChange=${setRung} options=${RUNGS.map((r) => [r, a('bldRung_' + r) || r])} />
+          <${Select} label=${a('bldWhere')} value=${scope} onChange=${setScope}
+            options=${[['', a('bldWhereAll')], ...apps.map((x) => [`${x.owner}/${x.filename}`, nameOf(x)])]} />
+        <//>
+        <${Space} above="large">
+          <${FormActions} end><${Loud} control type="submit" disabled=${busy || !who.trim()}>${a('bldGrant')}<//><//>
+        <//>
+      </form>
+    <//>`;
 }
 
 /**
@@ -138,15 +137,15 @@ export function secBuilders(ctx) {
   };
 
   return html`
-    <${PageSection} id="ap-builders" num="06" title=${a('secBuilders')}>
-      <p class="og-lead">${a('secBuildersLead')}</p>
-      ${loading ? html`<p class="poster-quiet ap-empty loading-mark">${a('bldLoading')}</p>` : null}
-      ${failed ? html`<p class="poster-quiet ap-empty">${a('bldFailed')}</p>` : null}
-      ${nothing ? html`<p class="poster-quiet ap-empty">${a('bldNone')}</p>` : null}
+    <${Section} id="ap-builders" num="06" title=${a('secBuilders')}>
+      <${Note} kind="lead">${a('secBuildersLead')}<//>
+      ${loading ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
+      ${failed ? html`<${Note} kind="quiet">${a('bldFailed')}<//>` : null}
+      ${nothing ? html`<${Note} kind="quiet">${a('bldNone')}<//>` : null}
 
       ${blanket.length ? html`
-        <p class="ap-form-label poster-label">${a('bldAllTitle')}</p>
-        <div class="listing listing--cols listing--name-tag-doors">
+        <${Space} above="section"><${Label} block>${a('bldAllTitle')}<//><//>
+        <${List} cols="name-tag-doors" keepCols>
           ${blanket.map((g) => rungRow({
             who: g.grantee,
             rung: g.levelName || 'full',
@@ -154,11 +153,11 @@ export function secBuilders(ctx) {
             busy: ctx.buildersBusy,
             onRevoke: () => ctx.onRevokeBuilder({ account: g.grantee, appId: null }),
           }))}
-        </div>` : null}
+        <//>` : null}
 
       ${perAppRows.length ? html`
-        <p class="ap-form-label poster-label">${a('bldAppTitle')}</p>
-        <div class="listing listing--cols listing--name-tag-doors">
+        <${Space} above="section"><${Label} block>${a('bldAppTitle')}<//><//>
+        <${List} cols="name-tag-doors" keepCols>
           ${perAppRows.map((g) => rungRow({
             who: g.account,
             rung: g.levelName || 'full',
@@ -166,9 +165,9 @@ export function secBuilders(ctx) {
             busy: ctx.buildersBusy,
             onRevoke: () => ctx.onRevokeBuilder({ account: g.account, appId: g.appId }),
           }))}
-        </div>` : null}
+        <//>` : null}
 
       <${GrantForm} apps=${apps} busy=${ctx.buildersBusy} onGrant=${ctx.onGrantBuilder} />
-      <${Hint}>${a('bldNever')}<//>
+      <${Note}>${a('bldNever')}<//>
     <//>`;
 }

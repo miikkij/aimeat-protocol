@@ -1,7 +1,17 @@
 /**
  * @file collaboration.js
- * @description Shared app discovery, roadmap editing and a publication change note.
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Shared app discovery, roadmap editing and a publication change note. Made of the
+ *   component kit: the page passes data and never a class.
+ * @structure PublishDialog({ app, busy, onPublish, onClose }) · CollaborationSection({ ctx })
+ * @usage import { CollaborationSection, PublishDialog } from './collaboration.js';
  * @version-history
+ *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): the dialog's
+ *     form Fields with a TextArea and its submit the loud action naming the form, the section Section,
+ *     "show the shared ones" a Check, the shared apps and a roadmap's entries the List (an entry's
+ *     words kept as written, Desc pre), the halves' headings the Sub-heading, the drop-downs Select,
+ *     the entry form Fields with FormActions, the lines Note. The page writes no class.
  *   v1.11.0 — 2026-09-26 — "Show the shared ones" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.10.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -26,26 +36,33 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { Modal } from '/components/Modal.js';
-import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
+import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Check } from '/components/Check.js';
+import { Select } from '/components/Select.js';
+import { TextArea } from '/components/TextField.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { Space } from '/components/Layout.js';
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
 import { a, nameOf, appRef, day } from './frame.js';
-import { Hint } from '/components/Hint.js';
 const html = htm.bind(h);
 const pathOf = app => `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}`;
 
 export function PublishDialog({ app, busy, onPublish, onClose }) {
   const [line, setLine] = useState('');
   // The submit sits in the footer, outside the form, and names the form it submits.
-  return html`<${Modal} open=${true} title=${a('publishDraft')} onClose=${onClose} className="ap-publish-modal"
-    footer=${html`<button type="submit" form="ap-publish-form" class="poster-slab poster-slab--control" disabled=${busy || (!!line.trim() && line.trim().length < 3)}>${a('publishDraft')}</button>`}>
-    <form id="ap-publish-form" class="ap-form" onSubmit=${e => { e.preventDefault(); onPublish(app, line); }}>
-      <${Hint}>${a('publishConfirm', { name: nameOf(app) })}<//>
-      <label class="ap-field ap-field--wide"><span class="poster-label">${a('roadPublishLabel')}</span>
-        <textarea class="og-textarea" rows="3" maxLength="600" value=${line} onInput=${e => setLine(e.target.value)} />
-      </label>
-      <${Hint}>${a('roadPublishHint')}<//>
+  return html`<${Modal} open=${true} title=${a('publishDraft')} onClose=${onClose}
+    footer=${html`<${Loud} control type="submit" form="ap-publish-form" disabled=${busy || (!!line.trim() && line.trim().length < 3)}>${a('publishDraft')}<//>`}>
+    <form id="ap-publish-form" onSubmit=${e => { e.preventDefault(); onPublish(app, line); }}>
+      <${Note}>${a('publishConfirm', { name: nameOf(app) })}<//>
+      <${Space} above="medium">
+        <${TextArea} label=${a('roadPublishLabel')} hint=${a('roadPublishHint')} rows=${3} maxLength="600" value=${line} onInput=${setLine} />
+      <//>
     </form>
   <//>`;
 }
@@ -99,45 +116,50 @@ export function CollaborationSection({ ctx }) {
     finally { setBusy(false); }
   }
 
-  return html`<${PageSection} id="ap-collaboration" num="07" title=${a('roadTitle')}>
-    <label class="ap-hint check-line"><input type="checkbox" checked=${showShared} onChange=${e => setShowShared(e.target.checked)} /> ${a('sharedShow')}</label>
-    ${showShared && sharedError ? html`<p role="alert" class="poster-quiet ap-empty">${a('sharedFailed')}</p>` : null}
-    ${showShared && !sharedError && shared === null ? html`<p class="poster-quiet ap-empty loading-mark">${a('bldLoading')}</p>` : null}
-    ${showShared && shared?.length === 0 ? html`<p class="poster-quiet ap-empty">${a('sharedNone')}</p>` : null}
-    ${showShared && shared?.length ? html`<div class="listing listing--cols listing--name-doors">${shared.map(x => html`<div key=${appRef(x)} class="listing-row">
-      <div class="listing-name">${nameOf(x)}<small>${x.owner} · ${a('bldRung_' + x.dev_level_name)}</small></div>
-      <div class="listing-doors"><button class="poster-action poster-action--small poster-action--row" onClick=${() => setSelected(appRef(x))}>${a('roadOpen')}</button>
-        ${x.has_draft && x.dev_level <= 10 ? html`<button class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.publishDraft(x)}>${a('publishDraft')}</button>` : null}
-      </div>
-    </div>`)}</div>` : null}
-    <label class="ap-field"><span class="poster-label">${a('roadApp')}</span><select class="select-field" value=${selected} onChange=${e => setSelected(e.target.value)}>
-      <option value="">${a('roadChoose')}</option>
-      ${apps.map(x => html`<option key=${appRef(x)} value=${appRef(x)}>${nameOf(x)} · ${x.owner}</option>`)}
-    </select></label>
-    ${app && failed ? html`<p class="poster-quiet ap-empty" role="alert">${a('roadFailed')}</p>` : null}
-    ${app && !loaded && !failed ? html`<p class="poster-quiet ap-empty loading-mark">${a('bldLoading')}</p>` : null}
+  return html`<${Section} id="ap-collaboration" num="07" title=${a('roadTitle')}>
+    <${Check} checked=${showShared} onChange=${setShowShared}>${a('sharedShow')}<//>
+    ${showShared && sharedError ? html`<${Note} kind="quiet" role="alert">${a('sharedFailed')}<//>` : null}
+    ${showShared && !sharedError && shared === null ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
+    ${showShared && shared?.length === 0 ? html`<${Note} kind="quiet">${a('sharedNone')}<//>` : null}
+    ${showShared && shared?.length ? html`<${List} cols="name-doors" keepCols rows=${shared} render=${x => html`<${Row} key=${appRef(x)}>
+      <${Name} meta=${`${x.owner} · ${a('bldRung_' + x.dev_level_name)}`}>${nameOf(x)}<//>
+      <${Doors}>
+        <${Action} small row onClick=${() => setSelected(appRef(x))}>${a('roadOpen')}<//>
+        ${x.has_draft && x.dev_level <= 10 ? html`<${Action} small row onClick=${() => ctx.publishDraft(x)}>${a('publishDraft')}<//>` : null}
+      <//>
+    <//>`} />` : null}
+    <${Space} above="medium">
+      <${Select} label=${a('roadApp')} value=${selected} onChange=${setSelected} placeholder=${a('roadChoose')}
+        options=${apps.map(x => [appRef(x), `${nameOf(x)} · ${x.owner}`])} />
+    <//>
+    ${app && failed ? html`<${Note} kind="quiet" role="alert">${a('roadFailed')}<//>` : null}
+    ${app && !loaded && !failed ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
     ${app && loaded ? html`
-      <${Hint}>${a(road?.wantedVisibility === 'everyone' ? 'roadPublicHint' : 'roadPrivateHint')}<//>
-      ${owner ? html`<label class="ap-field"><span class="poster-label">${a('roadVisibility')}</span><select class="select-field" disabled=${busy}
-        value=${road?.wantedVisibility || 'developers'} onChange=${e => change(() => apiPatch(`${pathOf(app)}/roadmap`, { wanted_visibility: e.target.value }))}>
-        <option value="developers">${a('roadDevelopers')}</option><option value="everyone">${a('roadEveryone')}</option>
-      </select></label>` : null}
-      ${['done', 'wanted'].map(half => html`<div key=${half}>
-        <h3>${a(half === 'done' ? 'roadDone' : 'roadWanted')}</h3>
-        ${(road?.entries || []).filter(e => e.state === half).length ? html`<div class="ap-rows">
-          ${road.entries.filter(e => e.state === half).map(e => html`<div key=${e.id} class="ap-row">
-            <div class="ap-row-main"><p class="ap-road-text">${e.what}</p><small>${e.by} · ${day(e.at)}${e.version ? ` · v${e.version}` : ''}</small></div>
-            ${owner || (e.state === 'wanted' && e.by === ctx.session.owner) ? html`<button class="poster-action poster-action--small" disabled=${busy}
-              onClick=${() => change(() => apiDelete(`${pathOf(app)}/roadmap/${encodeURIComponent(e.id)}`))}>${a('roadRemove')}</button>` : null}
-          </div>`)}</div>` : html`<p class="poster-quiet ap-empty">${a('roadEmpty')}</p>`}
-      </div>`)}
-      <form class="ap-form" onSubmit=${e => { e.preventDefault(); change(() => apiPost(`${pathOf(app)}/roadmap`, { state, what })); }}>
-        <label class="ap-field"><span class="poster-label">${a('roadState')}</span><select class="select-field" value=${state} onChange=${e => setState(e.target.value)}>
-          <option value="wanted">${a('roadWanted')}</option>${inside ? html`<option value="done">${a('roadDone')}</option>` : null}
-        </select></label>
-        <label class="ap-field ap-field--wide"><span class="poster-label">${a('roadWhat')}</span><textarea class="og-textarea" rows="3" maxLength="600" required value=${what} onInput=${e => setWhat(e.target.value)} /></label>
-        <button class="poster-slab poster-slab--control" type="submit" disabled=${busy || what.trim().length < 3}>${a('roadAdd')}</button>
-      </form>
+      <${Note}>${a(road?.wantedVisibility === 'everyone' ? 'roadPublicHint' : 'roadPrivateHint')}<//>
+      ${owner ? html`<${Space} above="medium"><${Select} label=${a('roadVisibility')} disabled=${busy}
+        value=${road?.wantedVisibility || 'developers'} onChange=${v => change(() => apiPatch(`${pathOf(app)}/roadmap`, { wanted_visibility: v }))}
+        options=${[['developers', a('roadDevelopers')], ['everyone', a('roadEveryone')]]} /><//>` : null}
+      ${['done', 'wanted'].map(half => html`<${Space} key=${half} above="large">
+        <${SubHeading} level=${3}>${a(half === 'done' ? 'roadDone' : 'roadWanted')}<//>
+        <${List} cols="name-doors" empty=${a('roadEmpty')}
+          rows=${(road?.entries || []).filter(e => e.state === half)} render=${e => html`<${Row} key=${e.id}>
+            <${Desc} pre sub=${`${e.by} · ${day(e.at)}${e.version ? ` · v${e.version}` : ''}`}>${e.what}<//>
+            <${Doors}>${owner || (e.state === 'wanted' && e.by === ctx.session.owner) ? html`<${Action} small disabled=${busy}
+              onClick=${() => change(() => apiDelete(`${pathOf(app)}/roadmap/${encodeURIComponent(e.id)}`))}>${a('roadRemove')}<//>` : null}<//>
+          <//>`} />
+      <//>`)}
+      <${Space} above="large">
+        <form onSubmit=${e => { e.preventDefault(); change(() => apiPost(`${pathOf(app)}/roadmap`, { state, what })); }}>
+          <${Fields} cols=${2}>
+            <${Select} label=${a('roadState')} value=${state} onChange=${setState}
+              options=${[['wanted', a('roadWanted')], ...(inside ? [['done', a('roadDone')]] : [])]} />
+            <${TextArea} wide label=${a('roadWhat')} rows=${3} maxLength="600" required value=${what} onInput=${setWhat} />
+          <//>
+          <${Space} above="large">
+            <${FormActions}><${Loud} control type="submit" disabled=${busy || what.trim().length < 3}>${a('roadAdd')}<//><//>
+          <//>
+        </form>
+      <//>
     ` : null}
   <//>`;
 }

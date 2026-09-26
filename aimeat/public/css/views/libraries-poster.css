@@ -9,6 +9,7 @@
  *   ledger and changelog, the filter chips and the search line, and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- The page's parts are kit components (page group G8): the rules of .lb-empty, .lb-facets, .lb-me (List Cell code), .lb-out (Code block tall), .lb-warnbox, .lb-rule (Box, Label block), the dot and tag places beside a name and the code places in an opened row go; .is-warn goes from here (the List draws its own; other sheets keep theirs). The proof ledger and the changelog are components (ProofLedger.js, ChangeLog.js) on their own sheets.
  *   v1.19.0 -- 2026-09-26 -- The text for an AI is the Code block (css/components/code-block.css): the frame goes, the place and height stay (a unification: Jouni's decision "Code block").
  *   v1.18.0 -- 2026-09-25 -- The count inside a filter's rules go: it is the Count (.poster-count, tally; dark on the sun in the chosen one), a unification: Jouni's decision "Count".
  *   v1.17.0 -- 2026-09-25 -- The status dot is the library's Status dot (.status-dot, css/components/status-dot.css), a unification: .lb-dot's rules go, its place before the name stays.
@@ -37,33 +38,5 @@
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 
+/* The mast's Design Book link (an Action in the head's Actions row) is not underlined. */
 .og-libs .og-doors > a { text-decoration: none; }
-.lb-empty { margin: 0; padding: .3rem 0 .6rem; }
-.is-warn { color: var(--accent); }
-
-/* ── The status dot (css/components/status-dot.css): its place before a library's name ──────── */
-.og-libs .status-dot { margin-right: .45rem; vertical-align: middle; }
-
-/* ── Filters and the search line ───────────────────────────────────────────────────────────── */
-.lb-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
-
-/* ── The shelves: the Listing (css/components/listing.css); a tag beside a name, the in-the-app
-      words in the typewriter face on a span, the include lines in the opened panel ─────────── */
-.og-libs .listing-name .poster-chip { margin-left: .45rem; vertical-align: middle; }
-.lb-me { display: block; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
-.lb-me small { display: block; color: var(--text-dim); }
-.lb-me small.is-dim { font-style: italic; }
-.og-libs .listing-open .code-inline { display: block; width: fit-content; }
-.og-libs .listing-open .facts-v > .code-inline { display: inline-block; }
-/* The text for an AI is the Code block (css/components/code-block.css); its place and height only. */
-.lb-out.code-block { margin: .5rem 0 0; max-height: 22rem; overflow: auto; }
-.lb-warnbox { margin-top: .5rem; }
-
-/* ── The facts under an opened row: the Facts (css/components/facts.css); the proof ledger
-      (css/components/proof-ledger.css) and the changelog (css/components/changelog.css) inside a
-      value ─────────────────────────────────────────────────────────────────────────────────── */
-
-/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
-.lb-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; }
-.lb-rule .poster-label { display: block; margin-bottom: .3rem; }
-.lb-rule .og-lead { margin-bottom: .6rem; }

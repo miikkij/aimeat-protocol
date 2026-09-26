@@ -1,0 +1,33 @@
+/**
+ * @file roads.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Roads component's own rules (components/Roads.js): the columns the ways to do one
+ *   thing stand in, and the words of a chosen road. A road itself is the Card's framed tile
+ *   (card.css .card-tile--framed on the Object box, poster.css .poster-box); the lead road is the
+ *   box's raised tone and a choosable road the Choice tile (.poster-choice, chosen .on on the sun).
+ *   The columns, from the eleven copies this replaces (their values moved, the look most pages had):
+ *   two equal (Calibrator, Skills, Packages), the first wider (Access, Data wallet, Wallet; with
+ *   three, Portfolio), three equal (Notifications, Email, Companies, Contacts, Knowledge, Workflows).
+ *   Formerly how-roads.css and the page sheets' .ac-, .cal-, .ct-, .dw-, .kp-, .pk-, .pf-, .sk-,
+ *   .wal- and .wp-roads.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — A chosen road's small line and doors take the tile's own words' colour, so a
+ *     theme that draws the chosen tile on its accent (Pebble) keeps them readable.
+ *   v1.0.0 — 2026-09-26 — Initial (component plan C3).
+ */
+
+.roads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; }
+.roads--wide { grid-template-columns: 1.2fr 1fr; }
+.roads--three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.roads--three.roads--wide { grid-template-columns: 1.2fr 1fr 1fr; gap: 1.2rem; }
+
+/* A choosable road whose door chooses it keeps the plain pointer on the tile. */
+.road.road--still { cursor: auto; }
+/* The chosen road's small line and its doors take the words' colour on the sun. */
+.road.on .card-tile-kicker, .road.on .card-tile-meta, .road.on .poster-action { color: inherit; border-bottom-color: currentColor; }
+
+@media (max-width: 860px) {
+  .roads, .roads--wide, .roads--three, .roads--three.roads--wide { grid-template-columns: minmax(0, 1fr); }
+}

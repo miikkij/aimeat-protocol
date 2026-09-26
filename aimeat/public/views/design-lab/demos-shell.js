@@ -10,12 +10,16 @@
  * @structure SHELL_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHELL_DEMOS } from './demos-shell.js';
  * @version-history
+ *   v1.2.2 — 2026-09-27 — The contact card's, the link preview's and the Mermaid fallback's frames
+ *     write their components' own names (.contact-card, .link-preview, .mermaid-fallback).
+ *   v1.2.1 — 2026-09-27 — The display preferences and the agent consent are drawn by their
+ *     components (their props are enough; the consent with one sample request).
+ *   v1.2.0 — 2026-09-27 — The card's demo moves to demos-kit.js, drawn by the Card component's tones.
  *   v1.1.0 — 2026-09-24 — The dialog's footer wears the action link and the loud action (decision 22).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation: every part catalogued, every entry drawn).
  */
 import { h } from 'preact';
 import htm from 'htm';
-import { Card } from '/components/Card.js';
 import { Alert } from '/components/Alert.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { DataTable } from '/components/DataTable.js';
@@ -29,6 +33,8 @@ import { StatusDot } from '/components/StatusDot.js';
 import { ToggleSwitch } from '/components/ToggleSwitch.js';
 import { FormField } from '/components/FormField.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { AgentConsent } from '/components/AgentConsent.js';
+import { DisplayPrefsFields } from '/components/DisplayPrefsFields.js';
 import { InboxLink } from '/components/InboxLink.js';
 import { JsonValue } from '/components/JsonView.js';
 import { OfferBadges, OfferRequirements } from '/components/offer-card-view.js';
@@ -49,7 +55,6 @@ export const SHELL_DEMOS = {
     { name: 'small', render: () => html`<button type="button" class="btn-outline btn-sm">Edit</button>` },
   ] },
   'copy-button': one('default', () => html`<${CopyButton} text="Hello" label="Copy" copiedLabel="Copied" />`),
-  card: one('default', () => html`<${Card} title="Storage" subtitle="What this node keeps"><p>Two files.</p><//>`),
   badge: one('tints', () => html`<span><span class="badge badge-success">active</span> <span class="badge badge-warn">paused</span> <span class="badge badge-muted">off</span></span>`),
   pill: one('default', () => html`<span class="pill">pill</span>`),
   seg: one('default', () => html`<div class="seg"><button type="button" class="seg-btn active">Home</button><button type="button" class="seg-btn">Settings</button></div>`),
@@ -82,13 +87,13 @@ export const SHELL_DEMOS = {
   'margin-pattern': one('default', () => html`<p>The pattern sits in the page margins of the home, the chat and the settings (set in the home's settings).</p>`),
   'notification-bell': one('with a count', () => html`<div class="notif-bell"><button type="button" class="notif-bell-btn">🔔<span class="poster-count poster-count--waiting poster-count--small notif-badge">7</span></button></div>`),
   'open-items-button': one('default', () => html`<button type="button" class="open-items-btn"><span class="open-items-btn-mark">○</span><span class="open-items-btn-count">3</span></button>`),
-  'agent-consent': one('frame', () => html`<div class="card agc-card"><p>An agent asks to connect. Its request comes from the node.</p></div>`),
-  'contact-card': one('frame', () => html`<aside class="ld-contact poster-aside poster-aside--large"><p class="ld-contact-title">Who runs this node</p><p>Its people come from the node's settings.</p></aside>`),
-  'display-prefs-fields': one('frame', () => html`<label class="pf-edit-label">Region<select class="pf-edit-select"><option>Finland</option></select></label>`),
+  'agent-consent': one('frame', () => html`<${AgentConsent} requests=${[{ user_code: 'WDJB-MJHT', agent_name: 'claude', expires_in: 540 }]} onApprove=${noop} onDeny=${noop} />`),
+  'contact-card': one('frame', () => html`<aside class="contact-card poster-aside poster-aside--large"><p class="contact-card-title">Who runs this node</p><p>Its people come from the node's settings.</p></aside>`),
+  'display-prefs-fields': one('frame', () => html`<${DisplayPrefsFields} region="fi-FI" timezone="Europe/Helsinki" onChange=${noop} />`),
   'inbox-link': one('default', () => html`<${InboxLink} to="support@operators" subject="A question">Write to the operators<//>`),
-  'json-view': one('default', () => html`<div class="pf-agd-json-block"><${JsonValue} value=${{ title: 'A note', done: false, count: 3 }} /></div>`),
-  'link-preview': one('frame', () => html`<div class="inbox-linkcard"><div class="inbox-linkcard-main"><div class="inbox-linkcard-text"><span class="inbox-linkcard-site">aimeat.io</span><span class="inbox-linkcard-title">A linked page</span></div></div></div>`),
+  'json-view': one('default', () => html`<div class="json-view-block"><${JsonValue} value=${{ title: 'A note', done: false, count: 3 }} /></div>`),
+  'link-preview': one('frame', () => html`<div class="link-preview"><div class="link-preview-main"><div class="link-preview-text"><span class="link-preview-site">aimeat.io</span><span class="link-preview-title">A linked page</span></div></div></div>`),
   'memory-embed': one('frame', () => html`<div class="md-mem-value">The record's value appears here.</div>`),
-  mermaid: one('frame', () => html`<pre class="mmd-fallback">graph LR; A-->B</pre>`),
+  mermaid: one('frame', () => html`<pre class="mermaid-fallback">graph LR; A-->B</pre>`),
   'offer-card-view': one('default', () => html`<div><${OfferBadges} offer=${OFFER} /><${OfferRequirements} offer=${OFFER} /></div>`),
 };

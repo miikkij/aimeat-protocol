@@ -8,6 +8,7 @@
  *   map of kinds, the rows of entries with the query words marked, the place cards and the result
  *   groups. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.13.0 -- 2026-09-26 -- The page's parts are kit components (page group G8): the search desk is QuestionDesk (question-desk.css), the rows are the List (clip, Found), a kind's heading is the Group, "show more" the More line, the places are framed Cards with their lines (card.css). The rules of .dv-more, .dv-n, .dv-at, the name, clamp and mark rules of .dv-rows, .dv-lbl, .dv-morerow, .dv-places, .dv-place and .dv-ws go.
  *   v1.12.0 -- 2026-09-26 -- A place's frame reads --shape-frame and --shape-frame-colour, its corner --shape-corner (it has a ground) (a move: the AIMEAT values equal the old ones).
  *   v1.11.0 -- 2026-09-26 -- The map of kinds, the rows of entries and the hits are the Listing (css/components/listing.css), a unification: the look most tabs use. The grids, cells and narrow-screen columns of dv-kinds and dv-rows go (the columns move to their cuts, listing--cols); the kind and place words are the words cell; one line under an entry, two under a hit, the marked words and the headings in the hits stay.
  *   v1.10.0 -- 2026-09-26 -- The line under a name is the Listing's (.listing-meta): its body face, size and colour go; one line in a row stays (a unification: Jouni's decision "Meta line").
@@ -28,41 +29,9 @@
  */
 
 .og-dv .poster-quiet { margin: 0; }
-/* "Show more" is the action link's more tone (.poster-action--more); its line keeps its place. */
-.og-dv .dv-more { margin: .8rem 0 0; }
 .og-dv.og-page { --poster-page-size: 2.1rem; }
 
-/* ── The search desk ────────────────────────────────────────────────────────────────────────── */
-
-/* ── The map of kinds, the rows of entries, the hits: the Listing (css/components/listing.css) ── */
-/* The count is the figure cell; the stat number's own right margin goes. */
-.og-dv .dv-n { margin-right: 0; }
-.dv-at { margin-right: 0; }
-.dv-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
-.og-dv .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-/* The line under a name is the Listing's (.listing-meta); an entry keeps it to one line, a hit to two. */
-.dv-rows .listing-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dv-rows--hits .listing-name small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-/* The query's words, marked on the sun. */
-.dv-rows mark { background: var(--sun); color: var(--on-sun); padding: 0 2px; }
-/* A kind's heading and its "show the rest" span the hits' row. */
-.dv-lbl { grid-column: 1 / -1; display: flex; align-items: baseline; padding: .9rem 0 .25rem; }
-.dv-lbl em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
-.dv-morerow { grid-column: 1 / -1; padding: .5rem 0; }
-
-/* ── Places ─────────────────────────────────────────────────────────────────────────────────── */
-.dv-places { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.dv-place { display: flex; flex-direction: column; align-items: stretch; gap: .15rem; padding: .7rem .85rem; border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner); background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); color: var(--text); }
-.dv-place:hover { border-color: var(--accent); }
-.dv-place b { font-weight: 800; font-size: .92rem; overflow-wrap: anywhere; }
-.dv-place small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-bottom: .35rem; }
-.dv-ws { display: flex; gap: .5rem; padding: .3rem 0; border-top: 1px solid var(--border); font-size: .8rem; font-weight: 600; min-width: 0; }
-.dv-ws span, .dv-ws i { font-style: normal; }
-.dv-ws i { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); flex: none; }
-.dv-ws--more { color: var(--text-dim); }
-
 @media (max-width: 1100px) {
-  .dv-places { grid-template-columns: 1fr; }
   .og-dv .og-fold { flex-wrap: wrap; row-gap: .35rem; }
   .og-dv .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
 }

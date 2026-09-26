@@ -13,6 +13,12 @@
  * @structure TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode, allowPark })
  * @usage import { TrackResponseModal } from '/views/profile/track-response-modal.js';
  * @version-history
+ *   v1.7.0 — 2026-09-26 — Every part is a component that takes data: the footer's ways are Action
+ *     and Loud (the spinner on Create is components/Spinner.js), the waiting block is ProgressNow,
+ *     the form is Fields with Select, TextField and TextArea (the label over each field is the row
+ *     label, as on every Settings form), the hints and the refusal are Note. The dialog's own class
+ *     (inbox-track-modal) goes: no rule drew it. The file writes no class; its exports and props are
+ *     unchanged (page group G4).
  *   v1.6.0 — 2026-09-26 — The classify step's spinner comes from /components/Spinner.js with the same words, since the profile's Spinner helper became LoadingLine (nothing on screen changes).
  *   v1.5.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
  *   v1.4.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
@@ -34,7 +40,13 @@ import * as tracked from '/js/services/tracked-responses.js';
 import { parkMessageToNotebook } from '/js/services/notebook.js';
 import { writeDraft, publishDraft, wsRoot } from '/js/services/organisms.js';
 import { NB_STEPS, firstLine } from './notebook-helpers.js';
-import { Hint } from '/components/Hint.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Stack } from '/components/Layout.js';
+import { Fields } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { ProgressNow } from '/components/ProgressSteps.js';
 
 export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode = 'approve', allowPark = true }) {
   const [phase, setPhase] = useState('classify');   // 'classify' | 'review' | 'error'
@@ -152,74 +164,47 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
     setBusy(false);
   };
 
-  const parkBtn = allowPark ? html`<button class="poster-action" disabled=${busy} onClick=${park}>📓 ${t('inbox.trackPark')}</button>` : null;
+  const parkBtn = allowPark ? html`<${Action} disabled=${busy} onClick=${park}>📓 ${t('inbox.trackPark')}<//>` : null;
 
   const footer = phase === 'error' ? html`
-      <button class="poster-action" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
+      <${Action} disabled=${busy} onClick=${onClose}>${t('common.cancel')}<//>
       ${parkBtn}
-      <button class="poster-action" disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}</button>`
+      <${Action} disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}<//>`
     : phase === 'review' ? html`
-      <button class="poster-action" disabled=${busy} onClick=${close}>${t('common.cancel')}</button>
+      <${Action} disabled=${busy} onClick=${close}>${t('common.cancel')}<//>
       ${parkBtn}
-      <button class="poster-slab poster-slab--control" disabled=${busy || !namespace} onClick=${submit}>
-        ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
-      </button>`
+      <${Loud} control busy=${busy} disabled=${busy || !namespace} onClick=${submit}>
+        ${busy ? html`<${Spinner} /> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
+      <//>`
     : null;
 
   return html`
-    <${Modal} open=${open} onClose=${close} title=${t('inbox.trackResponse')} className="inbox-track-modal" footer=${footer}>
+    <${Modal} open=${open} onClose=${close} title=${t('inbox.trackResponse')} footer=${footer}>
       ${phase === 'classify' ? html`
-        <div class="inbox-track-classify">
-          <${Spinner} text=${t('profile.loading')} />
-          <div class="inbox-track-classify-step">${t('inbox.trackAiThinking')}</div>
-          <div class="inbox-track-classify-sub">${t(NB_STEPS[step]) || ''}</div>
-        </div>` : null}
+        <${ProgressNow} label=${t('profile.loading')} title=${t('inbox.trackAiThinking')} step=${t(NB_STEPS[step]) || ''} />` : null}
 
       ${phase === 'error' ? html`
-        <div class="inbox-track-form">
-          <${Hint}>${t('inbox.trackNeedsAi')}<//>
-          ${aiErr?.message ? html`<p class="form-message form-message--error">${escHtml(aiErr.message)}</p>` : null}
-        </div>` : null}
+        <${Stack} gap="medium">
+          <${Note}>${t('inbox.trackNeedsAi')}<//>
+          ${aiErr?.message ? html`<${Note} kind="message" error>${escHtml(aiErr.message)}<//>` : null}
+        <//>` : null}
 
       ${phase === 'review' ? html`
-        <div class="inbox-track-form">
-          <${Hint}>${t('inbox.trackHintAi')}<//>
-          <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackOrganism')}</span>
-            <select class="select-field" value=${orgId} onChange=${(e) => { setOrgId(e.target.value); setWsId(''); }}>
-              ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name || o.id)}</option>`)}
-            </select>
-          </label>
-          <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackWorkspace')}</span>
-            <select class="select-field" value=${wsId} onChange=${(e) => setWsId(e.target.value)} disabled=${!orgId}>
-              <option value="">${t('inbox.trackChoose')}</option>
-              ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name || w.id)}</option>`)}
-            </select>
-          </label>
-          <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackType')}</span>
-            <select class="select-field" value=${namespace} onChange=${(e) => setNamespace(e.target.value)} disabled=${!recTypes.length}>
-              ${recTypes.length === 0 ? html`<option value="">${t('inbox.trackNoTypes')}</option>` : null}
-              ${recTypes.map(tp => html`<option key=${tp.namespace} value=${tp.namespace}>${escHtml(tp.name)}</option>`)}
-            </select>
-          </label>
-          <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackTitle')}</span>
-            <input class="og-input" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} />
-          </label>
-          <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackContent')}</span>
-            <textarea class="og-textarea" rows="4" value=${content} onInput=${(e) => setContent(e.target.value)}></textarea>
-          </label>
-          <label class="inbox-form-row">
-            <span class="inbox-form-label">${t('inbox.trackReplyMode')}</span>
-            <select class="select-field" value=${replyMode} onChange=${(e) => setReplyMode(e.target.value)}>
-              <option value="approve">${t('inbox.trackModeApprove')}</option>
-              <option value="auto">${t('inbox.trackModeAuto')}</option>
-            </select>
-          </label>
-          <${Hint}>${t('inbox.trackFillNote')}<//>
-        </div>` : null}
+        <${Fields}>
+          <${Note}>${t('inbox.trackHintAi')}<//>
+          <${Select} label=${t('inbox.trackOrganism')} value=${orgId} onChange=${(v) => { setOrgId(v); setWsId(''); }}
+            options=${orgs.map(o => [o.id, escHtml(o.name || o.id)])} />
+          <${Select} label=${t('inbox.trackWorkspace')} value=${wsId} onChange=${(v) => setWsId(v)} disabled=${!orgId}
+            placeholder=${t('inbox.trackChoose')}
+            options=${workspaces.map(w => [w.id, escHtml(w.name || w.id)])} />
+          <${Select} label=${t('inbox.trackType')} value=${namespace} onChange=${(v) => setNamespace(v)} disabled=${!recTypes.length}
+            placeholder=${recTypes.length === 0 ? t('inbox.trackNoTypes') : null}
+            options=${recTypes.map(tp => [tp.namespace, escHtml(tp.name)])} />
+          <${TextField} label=${t('inbox.trackTitle')} type="text" value=${title} onInput=${(v) => setTitle(v)} />
+          <${TextArea} label=${t('inbox.trackContent')} rows=${4} value=${content} onInput=${(v) => setContent(v)} />
+          <${Select} label=${t('inbox.trackReplyMode')} value=${replyMode} onChange=${(v) => setReplyMode(v)}
+            options=${[['approve', t('inbox.trackModeApprove')], ['auto', t('inbox.trackModeAuto')]]} />
+          <${Note}>${t('inbox.trackFillNote')}<//>
+        <//>` : null}
     </${Modal}>`;
 }

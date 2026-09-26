@@ -47,7 +47,7 @@ async function gotoAgentsTab(page: Page) {
     await expect(card).toBeVisible({ timeout: 5_000 });
     await card.click();
   }
-  await expect(page.locator('.agent-cta, .pf-agd-card, .pf-agd-collapsed, .empty').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.agent-consent, .pf-agd-card, .pf-agd-collapsed, .empty').first()).toBeVisible({ timeout: 15_000 });
 }
 
 async function setupAgentsTab(page: Page, suffix: string) {

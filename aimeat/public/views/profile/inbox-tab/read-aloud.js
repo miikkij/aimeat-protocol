@@ -3,16 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Read-aloud controls for the profile Inbox thread — the same "listen instead of read"
- *   affordance the (L)AIMEAT Sanomat app gives its articles, brought to direct messages. Two
- *   self-contained components (they own their own hooks, so the pure ThreadPanel stays hook-free):
- *   BubbleSpeakButton (a 🔊 in a message bubble's action pill — play / click again to stop) and
+ *   affordance the (L)AIMEAT Sanomat app gives its articles, brought to direct messages:
  *   ThreadReadAloud (the thread-head button that reads the whole open conversation, sender by sender,
- *   with pause/resume). Both drive the shared /js/services/speech-reader.js engine, which keeps ONE
- *   reader active at a time — starting a message stops the thread reader and vice versa.
- * @structure useSpeechPhase (subscribe to the engine for one id) · BubbleSpeakButton · ThreadReadAloud
- *   · threadParagraphs (thread → speakable paragraphs, each message prefixed by its sender).
- * @usage import { BubbleSpeakButton, ThreadReadAloud } from './inbox-tab/read-aloud.js';
+ *   with pause/resume; it owns its hooks, so the pure ThreadPanel stays hook-free). A single message's
+ *   Listen is the Message component's (components/Message.js). Both drive the shared
+ *   /js/services/speech-reader.js engine, which keeps ONE reader active at a time — starting a message
+ *   stops the thread reader and vice versa.
+ * @structure ThreadReadAloud · threadParagraphs (thread → speakable paragraphs, each message prefixed
+ *   by its sender).
+ * @usage import { ThreadReadAloud } from './inbox-tab/read-aloud.js';
  * @version-history
+ *   v1.4.0 — 2026-09-26 — Listen is the pane head's door (ConversationPane PaneDoor): its words hide in a narrow pane, its mark stays.
+ *   v1.3.1 — 2026-09-26 — The thread head's Listen is the kit's Action (small, row), the same cut as Reply with AI beside it; its 🔊/⏸ mark, its words (Listen, Pause, Continue) and its pressed state stay; ✕ is the Icon.
+ *   v1.3.0 — 2026-09-26 — useSpeechPhase and a message's Listen (BubbleSpeakButton) moved into the
+ *     Message component unchanged; the thread head's reader stays here.
  *   v1.2.0 — 2026-09-26 — A message's read-aloud control is the chat's Listen: the word, in the text
  *     tone of the action link, in the line under the message (Jouni's decision "Message").
  *   v1.1.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
@@ -21,45 +25,14 @@
  *   v1.0.0 — 2026-07-31 — Initial version: per-message and whole-thread read-aloud in the Inbox tab.
  */
 import { h } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import {
-  isSpeechSupported, subscribeSpeech, getSpeechState, speak, stop, pause, resume, textToParagraphs,
-} from '/js/services/speech-reader.js';
-
-/** The reader phase for ONE id: '' when this id isn't the active reader, else 'speaking' | 'paused'.
- *  Every control subscribes independently; the engine only notifies on real phase changes (start /
- *  stop / pause / resume — never per spoken chunk), and an unchanged string is a no-op re-render. */
-export function useSpeechPhase(id) {
-  const [phase, setPhase] = useState(() => (getSpeechState().id === id ? getSpeechState().phase : ''));
-  useEffect(() => {
-    setPhase(getSpeechState().id === id ? getSpeechState().phase : '');
-    return subscribeSpeech((s) => setPhase(s.id === id ? s.phase : ''));
-  }, [id]);
-  // Leaving the view (thread switch, tab change) must not leave a voice reading into an empty room.
-  useEffect(() => () => { if (getSpeechState().id === id) stop(); }, [id]);
-  return phase;
-}
-
-/** Listen, in the line under a message (the text tone of the action link, as the chat's turn has it):
- *  reads that one message. Clicking it while it reads stops it. Rendered only
- *  when the browser can speak AND the message has something speakable (an attachment-only message has
- *  no body to read — we hide the button instead of offering one that does nothing). */
-export function BubbleSpeakButton({ msgId, body }) {
-  const id = `msg:${msgId}`;
-  const phase = useSpeechPhase(id);
-  if (!isSpeechSupported()) return null;
-  const paragraphs = textToParagraphs(body);
-  if (!paragraphs.length) return null;
-  const on = phase === 'speaking' || phase === 'paused';
-  return html`
-    <button type="button" class="poster-action poster-action--text"
-      title=${on ? t('inbox.speak.stop') : t('inbox.speak.message')}
-      aria-label=${on ? t('inbox.speak.stop') : t('inbox.speak.message')} aria-pressed=${on}
-      onClick=${() => (on ? stop() : speak(id, paragraphs))}>${on ? t('chat.stopListening') : t('inbox.speak.listen')}</button>`;
-}
+import { isSpeechSupported, speak, stop, pause, resume, textToParagraphs } from '/js/services/speech-reader.js';
+// The phase hook and a message's own Listen live with the Message component now.
+import { useSpeechPhase } from '/components/Message.js';
+import { Icon } from '/components/Action.js';
+import { PaneDoor } from '/components/ConversationPane.js';
 
 /** The open thread as speakable paragraphs: each message announces its sender, then its body. Messages
  *  with no speakable body (attachment-only) are skipped rather than announced into silence. */
@@ -92,13 +65,7 @@ export function ThreadReadAloud({ thread, peerLabelText, convId }) {
     speak(id, threadParagraphs(thread, t('inbox.quoteYou'), peerLabelText));
   };
   return html`
-    <span class="inbox-speak-group">
-      <button class=${`btn-ghost btn-sm inbox-speak-btn${phase ? ' inbox-speak-btn--on' : ''}`}
-        onClick=${onClick} title=${t('inbox.speak.thread')} aria-label=${t('inbox.speak.thread')}>
-        <span class="inbox-speak-ico">${phase === 'speaking' ? '⏸' : '🔊'}</span>
-        <span class="inbox-ai-btn-label">${label}</span>
-      </button>
-      ${phase ? html`<button class="poster-icon poster-icon--small inbox-speak-stop" onClick=${() => stop()}
-        title=${t('inbox.speak.stop')} aria-label=${t('inbox.speak.stop')}>✕</button>` : null}
-    </span>`;
+    <${PaneDoor} mark=${phase === 'speaking' ? '⏸' : '🔊'} label=${label} title=${t('inbox.speak.thread')}
+      pressed=${!!phase} onClick=${onClick} />
+    ${phase ? html`<${Icon} small label=${t('inbox.speak.stop')} onClick=${() => stop()}>✕<//>` : null}`;
 }

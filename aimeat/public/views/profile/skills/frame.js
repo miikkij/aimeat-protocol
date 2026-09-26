@@ -5,18 +5,18 @@
  * @description What the Skills page's views share: the words (x), the shelf a skill sits on, whom
  *   it serves (an app it is bound to, the agents that hold its ref, or nobody in particular), the
  *   words for visibility and size, the rule and the request an AI gets, the install lines, the
- *   SKILL.md splitter, the crumb and the cross-page rail links.
+ *   SKILL.md splitter, the crumb's steps and the rail's sibling pages (as data for SettingsPage).
  * @structure x · splitSkillMd · isOwn · whoOf · visibilityWord · sizeWord · dateWord · agentRule ·
  *   agentRequest · installLine · crumb · pageLinks · openTab
  * @usage import { x, whoOf, agentRule } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — crumb() and pageLinks() return data (the steps, the sibling pages) for the
+ *     SettingsPage component; openTab is the rail's own (components/Rail.js) (component plan C9).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Taidot-sivu", direction A with the
  *     Kenelle column; the registry now says linkedBy, versions, supersededBy and builtin).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 
 export const x = (key, vars) => t('skpage.' + key, vars);
@@ -81,15 +81,14 @@ export function agentRequest(ownerName) {
 
 export const installLine = (ref) => `aimeat skill install ${ref}`;
 
-export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('skills.tabLabel')}</span></div>`;
-}
+/** The crumb's steps (components/Crumb.js): Settings / Build and share / Skills, the last one here. */
+export const crumb = () => [t('nav.profile'), t('profile.landing.menuBuildShare'), t('skills.tabLabel')];
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
-export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('capabilities')}><i>→</i>${t('capabilities.tabLabel')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>`;
-}
+export { openTab };
+/** The sibling pages in the rail (components/Rail.js): each opens a Settings tab. */
+export const pageLinks = () => [
+  { tab: 'agents', label: t('profile.tabs.agents') },
+  { tab: 'apps', label: t('profile.tabs.apps') },
+  { tab: 'capabilities', label: t('capabilities.tabLabel') },
+  { tab: 'organisms', label: t('profile.tabs.organisms') },
+];

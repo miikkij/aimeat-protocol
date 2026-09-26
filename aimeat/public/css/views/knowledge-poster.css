@@ -2,14 +2,23 @@
  * @file knowledge-poster.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Knowledge page and the public knowledge library in the poster face (kp- prefix;
- *   design canvas "AIMEAT Tietopankin sivu", direction A). The shared parts (crumb, masthead, strip,
- *   sections, folds, rail) come from organism.css's og- rules; this file carries what knowledge adds:
- *   the packages table, the three roads to a new package with the paste box and its preview, an
- *   entry as text with its sources and relations, the sharing switches, and the library's desk and
- *   list. Public section headlines compose poster.css, as the profile sections do.
+ * @description The public knowledge library in the poster face (kp- prefix; design canvas "AIMEAT
+ *   Tietopankin sivu", direction A), and what the Settings Knowledge page still keys on its root
+ *   (.og-kp): a package page's title size, and the strip and the details fold on a narrow screen,
+ *   which the public library page shares. Every other part of the Settings page is drawn by the
+ *   component kit (SettingsPage, List, Roads, Box, Facts, TextArea, Check). The public page
+ *   (views/public-knowledge-viewer.js) keeps its desk, list, hints and empty lines here. Public
+ *   section headlines compose poster.css, as the profile sections do.
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.25.0 -- 2026-09-26 -- On the component kit (page group G7): the Settings page's own rules go,
+ *     since the kit draws those parts: the quiet line's margin, the closed entry's count line
+ *     (.kp-inline, now the Note), the coral "another author" line (.kp-warn, now Tinted), the name's
+ *     wrapping (list.css has it), the group heading's place (.kp-lbl, now the List's Group), the
+ *     three roads (.kp-roads, .kp-road, .kp-step and their phone line, now Roads/Road), the paste
+ *     field's and the check line's place (.kp-paste, .kp-check), and the sharing facts' places
+ *     (.kp-kv, .kp-orgshare, now Facts flush and its controls value). The title size of a package's
+ *     page, the strip's and the fold's narrow-screen lines and the public library's rules stay.
  *   v1.24.0 -- 2026-09-26 -- The packages table, the organisms' packages and the library section are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of kp-rows, kp-group and their cells go (the narrow-screen columns move to the cuts, listing--cols); a group's heading spans the row; the public library page keeps kp-lib and its cells.
  *   v1.23.0 -- 2026-09-26 -- The line under a package's name is the Listing's (.listing-meta): its two rules go (a unification: Jouni's decision "Meta line").
  *   v1.22.0 -- 2026-09-26 -- "List in the catalogue" is the Check line: its size goes, its row and place stay (a unification: Jouni's decision "Check line").
@@ -44,37 +53,11 @@
 
 .og-kp .kp-chip--case { text-transform: none; }
 .og-kp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-kp .poster-quiet { margin: 0; }
 /* The public library page's hint (views/public-knowledge-viewer.js); in Settings a hint is the Hint. */
 .og-kp .kp-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
-.og-kp .kp-inline { margin: 0; white-space: nowrap; }
-.og-kp .kp-warn { color: var(--accent); }
 .og-kp .kp-error { margin: .5rem 0 0; font-size: .85rem; color: var(--accent); }
+/* A package's own page in Settings (SettingsPage name="kp" page): its title a size smaller. */
 .og-kp.og-page { --poster-page-size: 2.1rem; }
-
-/* ── The packages tables: the Listing (css/components/listing.css) ─────────────────────────── */
-.og-kp .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-/* A group's heading spans the table's row. */
-.kp-lbl { grid-column: 1 / -1; display: flex; align-items: baseline; padding: .9rem 0 .25rem; }
-.kp-lbl em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
-
-/* ── Three roads to a package ───────────────────────────────────────────────────────────────── */
-.kp-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-/* A road is the Choice tile (.poster-choice), the chosen one on the sun; its door chooses it, so the tile itself keeps the plain pointer. */
-.kp-road { display: flex; flex-direction: column; gap: .4rem; cursor: auto; }
-.kp-road p { margin: 0; }
-.kp-road .kp-step { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
-.kp-road .og-doors { margin-top: auto; padding-top: .4rem; }
-.kp-road.on .kp-step, .kp-road.on .poster-action { color: var(--on-sun); border-bottom-color: var(--on-sun); }
-.kp-paste { margin-top: .9rem; }
-.kp-check { display: flex; align-items: center; gap: .5rem; margin-top: .8rem; }
-
-/* ── An entry ───────────────────────────────────────────────────────────────────────────────── */
-
-/* ── Sharing, details ───────────────────────────────────────────────────────────────────────── */
-.og-kp .kp-kv { margin-top: 0; }
-.kp-orgshare { display: flex; align-items: center; gap: 1rem; }
-.kp-orgshare .select-field { width: auto; }
 
 /* ── The public library page (views/public-knowledge-viewer.js); in Settings the library section
       is the Listing ──────────────────────────────────────────────────────────────────────────── */
@@ -100,7 +83,6 @@
 @media (max-width: 1100px) {
   .kp-lib { grid-template-columns: minmax(0, 1fr) 4.5rem; }
   .kp-lib > .kp-m, .kp-lib--head > div:nth-child(2), .kp-lib--head > div:nth-child(3), .kp-lib--head > div:nth-child(4) { display: none; }
-  .kp-roads { grid-template-columns: 1fr; }
   .kp-desk { grid-template-columns: 1fr; }
   .og-kp .og-fold { flex-wrap: wrap; row-gap: .35rem; }
   .og-kp .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }

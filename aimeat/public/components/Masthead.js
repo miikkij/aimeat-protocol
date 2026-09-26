@@ -15,6 +15,11 @@
  *     <${MastheadButton} onClick=${open}>${MastheadCog}<span>…</span><//>
  *   <//>`
  * @version-history
+ *   v1.2.1 — 2026-09-27 — MastheadPreview draws its own class name: .pf-avatar-preview →
+ *     .poster-masthead-preview (a move, same look).
+ *   v1.2.0 — 2026-09-26 — MastheadPreview: the head's picture framed as the head frames it, beside the
+ *     field that sets it (the account dialog; its rule moved from profile.css to masthead.css;
+ *     additive, page group G8).
  *   v1.1.0 — 2026-09-26 — `plate`: the page's own lines under the address; `onAvatar` and
  *     `avatarTitle`: a picture that opens something. The Settings overview's head is this head
  *     (Jouni's decision "Person head", a unification).
@@ -69,6 +74,15 @@ export function MastheadButton({ onClick, children }) {
     <button type="button" class="poster-action poster-masthead-button" onClick=${onClick}>
       ${children}
     </button>`;
+}
+
+/**
+ * The head's picture as a preview beside the field that sets it (added by page group G8: the
+ * account dialog's avatar field): framed as the head frames it (Jouni's decision "Person head"),
+ * 42px, the glyph at 1.3rem. Said to nobody; the field says it.
+ */
+export function MastheadPreview({ children }) {
+  return html`<span class="poster-masthead-preview poster-frame" aria-hidden="true">${children}</span>`;
 }
 
 export default Masthead;

@@ -7,8 +7,17 @@
  *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
  *   the organism pages and the admin), under its own name; the class names stay, because every page
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   Drawn by components/FigureStrip.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — Drawn by components/FigureStrip.js. The figure colours and places the pages'
+ *     own rules carried become its tones and options, each with the look it had: notice, a number in
+ *     coral (skills .is-coral, companies .og-coral, access and data wallet .is-low, 4 pages); dim, a
+ *     figure not there yet (calibrator, data wallet, wallet .is-dim, 3 pages); long, a long word such
+ *     as an address (email .em-strip-addr); wrap, the lines under the figures read whole (access and
+ *     data wallet small, white-space normal); flush, no air above (profile.css .pf-aitr-body,
+ *     .pf-cmp-body, .pf-aai-model); lead, the strip that opens a tab's content (profile.css
+ *     .pf-figures: 0 above, 1.5rem under).
  *   v1.3.0 — 2026-09-26 — The part of a figure that says "of how many" (.og-strip-of: "/4" smaller, in grey), moved unchanged from knowledge-poster.css .kp-of (a move).
  *   v1.2.0 — 2026-09-25 — A third state tone, danger (.og-strip-danger), for a figure that says a loss (UI consolidation phase 5, a unification: the P&L result's red stays a tone).
  *   v1.1.0 — 2026-09-25 — A word in place of a figure (.og-strip-word) and two state tones, warn and fine (UI consolidation phase 5, a unification: a meaning a figure carried stays a tone).
@@ -32,6 +41,16 @@
 .og-strip b .og-strip-of { font-size: 1.1rem; color: var(--text-dim); }
 .og-strip span { font-weight: 800; font-size: .9rem; }
 .og-strip small { flex-basis: 100%; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A number in coral, at the figure's size: the one to look at. A figure not there yet, in grey. A long
+   word (an address) in a smaller cut that breaks where it must. */
+.og-strip b.og-strip-notice { color: var(--accent); }
+.og-strip b.og-strip-dim { color: var(--text-dim); }
+.og-strip b.og-strip-long { font-size: 1.35rem; overflow-wrap: anywhere; }
+/* The lines under the figures read whole. */
+.og-strip--wrap small { white-space: normal; overflow: visible; }
+/* The strip opens its box; the strip opens a tab's content, with air under it. */
+.og-strip--flush { margin-top: 0; }
+.og-strip--lead { margin: 0 0 1.5rem; }
 
 @media (max-width: 1100px) {
   .og-strip { flex-wrap: wrap; }

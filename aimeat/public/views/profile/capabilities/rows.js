@@ -11,6 +11,7 @@
  * @structure providerRow · providerOpen
  * @usage import { providerRow } from './rows.js';
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- On the component kit (page group G7): a provider's row, its members and its opened panel are the List (the status dot and the version tag are the Name's, the member ids the words' line, the id form and its call line a typewriter cell), the try panel the Box's copy tone with the TextArea and the tall Code block, the facts the Facts (the copy inside a value the Action's link tone, main's crumb link). The file writes no class.
  *   v1.16.0 -- 2026-09-26 -- An opened provider's members are the Listing (listing, listing-row, the id as the name with its state as the line under it, the words cell, the figure cell, the doors), a unification: the look most tabs use.
  *   v1.15.0 -- 2026-09-26 -- A try's answer is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -37,10 +38,14 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Action, Actions } from '/components/Action.js';
+import { Code, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { TextArea } from '/components/TextField.js';
+import { List, Row, Name, Desc, Num, Cell, Doors, Panel } from '/components/List.js';
 import { x, ownerName, authWord, costWord, memberSummary, agentTextFor, schemaWords, callsWord, vouchesWord, openTab } from './frame.js';
-
-const dot = (g) => html`<i class=${`status-dot ${g.status === 'active' ? 'status-dot--active' : 'status-dot--inactive'}`} aria-hidden="true"></i>`;
 
 function subLine(g) {
   const parts = [g.own ? x('own') : x('ownedBy', { owner: ownerName(g.ownerGhii) })];
@@ -59,17 +64,19 @@ const idForm = (g) => (g.shelf === 'ext' ? `ext:${g.name}:<${x('actionWord')}>` 
 export function providerRow(ctx, g) {
   const open = ctx.expanded === g.key;
   const ids = g.members.map((m) => m.member).filter(Boolean);
+  const acts = ids.length > 1 || g.shelf !== 'other' ? `${ids.slice(0, 6).join(' · ')}${ids.length > 6 ? ` · +${ids.length - 6}` : ''}` : null;
+  const callLine = [g.callable ? authWord(g.members[0]) : x('discoveryOnly'), g.priced ? x('pricedShort') : '', g.calls ? callsWord(g.calls) : x('callsNone'), g.vouches ? vouchesWord(g.vouches) : ''].filter(Boolean).join(' · ');
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${g.key}>
-      <div class="listing-name">${dot(g)}${g.name}${g.version && g.shelf === 'ext' ? html`<span class="poster-chip">v${g.version}</span>` : null}<small>${subLine(g)}</small></div>
-      <div class="listing-desc">${g.summary || ''}${ids.length > 1 || g.shelf !== 'other' ? html`<span class="cp-acts">${ids.slice(0, 6).join(' · ')}${ids.length > 6 ? ` · +${ids.length - 6}` : ''}</span>` : null}</div>
-      <div><span class="cp-me">${idForm(g)}<small>${[g.callable ? authWord(g.members[0]) : x('discoveryOnly'), g.priced ? x('pricedShort') : '', g.calls ? callsWord(g.calls) : x('callsNone'), g.vouches ? vouchesWord(g.vouches) : ''].filter(Boolean).join(' · ')}</small></span></div>
-      <div class="listing-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggle(g)}>${open ? x('close') : x('open')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.copyForAgent(g)}>${x('copyAgent')}</button>
-      </div>
+    <${Row} key=${g.key} open=${open}>
+      <${Name} dot=${g.status === 'active' ? 'active' : 'inactive'} tag=${g.version && g.shelf === 'ext' ? 'v' + g.version : null} meta=${subLine(g)}>${g.name}<//>
+      <${Desc} sub=${acts}>${g.summary || ''}<//>
+      <${Cell} meta>${idForm(g)}<br />${callLine}<//>
+      <${Doors}>
+        <${Action} small row onClick=${() => ctx.toggle(g)}>${open ? x('close') : x('open')}<//>
+        <${Action} small row soft onClick=${() => ctx.copyForAgent(g)}>${x('copyAgent')}<//>
+      <//>
       ${open ? providerOpen(ctx, g) : null}
-    </div>`;
+    <//>`;
 }
 
 function providerOpen(ctx, g) {
@@ -78,41 +85,50 @@ function providerOpen(ctx, g) {
   const invokeLine = first ? `aimeat_capabilities_invoke { id: "${first.id}", input: { … } }` : '';
   const sourceTab = g.shelf === 'ext' ? 'extensions' : g.shelf === 'app' ? 'apps' : g.shelf === 'agent' ? 'agents' : null;
   const usage = ctx.details[first?.id]?.usage || first?.usage || '';
+  const agentText = agentTextFor(g, ctx.details);
+  const copyAgent = html`<${Action} tone="link" copy=${agentText} copiedLabel=${x('copied')}>${x('copyAgent')}<//>`;
+  const toggleVouch = () => ctx.vouch(g);
+  const doors = html`
+    <${Action} small copy=${agentText} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
+    ${g.own ? html`<${Action} small soft onClick=${() => ctx.setVisibility(g, g.visibility === 'public' ? 'private' : 'public')}>${g.visibility === 'public' ? x('hideFromAgents') : x('showToAgents')}<//>` : null}
+    ${g.own && g.type === 'manual' ? html`<${Action} small soft onClick=${() => ctx.remove(g)}>${x('remove')}<//>` : null}
+    <${Action} small soft onClick=${() => ctx.toggle(g)}>${x('close')}<//>`;
+  const member = (c) => {
+    const words = memberSummary(g, c) || (g.members.length === 1 ? '' : x('sameAsProvider'));
+    const io = `${x('inputOut', { input: schemaWords(ctx.details[c.id]?.inputSchema || c.inputSchema) || x('nothing'), output: schemaWords(ctx.details[c.id]?.outputSchema || c.outputSchema) || x('json') })}${c.cost ? ` · ${costWord(c)}` : ''}`;
+    const tryIt = () => ctx.toggleTest(g, c);
+    return html`
+      <${Row} key=${c.id}>
+        <${Name} code meta=${c.status !== 'active' ? x('status.' + c.status) : null}>${c.member || c.id}<//>
+        <${Desc} sub=${io}>${words}<//>
+        <${Num}>${callsWord(c.stats?.totalInvocations || 0)}<//>
+        <${Doors}>${c.callable ? html`<${Action} small soft onClick=${tryIt}>${test && test.id === c.id ? x('close') : x('try')}<//>` : html`<${Note} kind="meta" inline>${x('discoveryOnly')}<//>`}<//>
+      <//>`;
+  };
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${g.summary || ''}</p>
-      <span class="poster-label">${g.shelf === 'ext' ? x('actions') : g.shelf === 'app' ? x('tools') : g.shelf === 'agent' ? x('offers') : x('capability')} · ${x('idFormIs', { form: idForm(g) })}</span>
-      <div class="listing listing--id-desc-n-doors cp-act">
-        ${g.members.map((c) => html`
-          <div class="listing-row" key=${c.id}>
-            <div class="listing-name"><code class="code-inline">${c.member || c.id}</code>${c.status !== 'active' ? html`<small class="listing-meta">${x('status.' + c.status)}</small>` : null}</div>
-            <div class="listing-desc">${memberSummary(g, c) || (g.members.length === 1 ? '' : x('sameAsProvider'))}<small>${x('inputOut', { input: schemaWords(ctx.details[c.id]?.inputSchema || c.inputSchema) || x('nothing'), output: schemaWords(ctx.details[c.id]?.outputSchema || c.outputSchema) || x('json') })}${c.cost ? ` · ${costWord(c)}` : ''}</small></div>
-            <div class="listing-n">${callsWord(c.stats?.totalInvocations || 0)}</div>
-            <div class="listing-doors">${c.callable ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleTest(g, c)}>${test && test.id === c.id ? x('close') : x('try')}</button>` : html`<small class="cp-dim">${x('discoveryOnly')}</small>`}</div>
-          </div>`)}
-      </div>
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${g.summary || ''}<//>
+      <${Label} block>${g.shelf === 'ext' ? x('actions') : g.shelf === 'app' ? x('tools') : g.shelf === 'agent' ? x('offers') : x('capability')} · ${x('idFormIs', { form: idForm(g) })}<//>
+      <${List} cols="id-desc-n-doors" apart>${g.members.map(member)}<//>
       ${test ? html`
-        <div class="cp-test poster-box poster-box--copy">
-          <span class="poster-label">${x('tryTitle', { id: test.id })}</span>
-          <textarea class="og-textarea cp-test-in" rows="3" value=${test.input} onInput=${(e) => ctx.setTestInput(e.target.value)}></textarea>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" disabled=${test.running} onClick=${() => ctx.runTest()}>${x('run')}</button><span class="poster-hint">${x('tryHint')}${test.elapsed ? ` · ${test.elapsed} ms` : ''}</span></div>
-          ${test.result ? html`<span class="poster-label">${test.result.ok ? x('tryOk') : x('tryFail')}</span><pre class="code-block cp-out">${test.result.text}</pre>` : null}
-        </div>` : null}
-      <div class="facts">
-        <div class="facts-k poster-label">${x('forAgent')}</div><div class="facts-v">${g.callable ? html`<code class="code-inline">${invokeLine}</code><small>${x('forAgentSub', { id: first?.id || '' })} · <${CopyButton} text=${agentTextFor(g, ctx.details)} className="og-crumb-link" label=${x('copyAgent')} copiedLabel=${x('copied')} /></small>` : html`${usage}<small>${x('discoveryOnlySub')} · <${CopyButton} text=${agentTextFor(g, ctx.details)} className="og-crumb-link" label=${x('copyAgent')} copiedLabel=${x('copied')} /></small>`}</div>
-        <div class="facts-k poster-label">${x('whoMayCall')}</div><div class="facts-v">${first ? `${authWord(first)} · ${g.priced ? x('pricedLong') : x('cost.free')}` : ''}<small>${x('whoMayCallSub')}</small></div>
-        <div class="facts-k poster-label">${x('trust')}</div><div class="facts-v">${g.vouches ? vouchesWord(g.vouches) : x('noVouches')} · ${g.members.some((c) => c.trust?.operatorReviewed) ? x('reviewed') : x('notReviewed')}<small>${x('trustSub')}${!g.own && first ? html` · <button type="button" class="poster-action poster-action--more" onClick=${() => ctx.vouch(g)}>${g.members.some((c) => ctx.vouched[c.id]) ? x('unvouch') : x('vouch')}</button>` : null}</small></div>
-        <div class="facts-k poster-label">${x('calls')}</div><div class="facts-v">${x('callsLong', { n: g.calls, errors: g.errors })}<small>${ctx.policy?.call_counting ? x('callsCounted') : x('callsProxyOnly')}</small></div>
-        ${sourceTab ? html`<div class="facts-k poster-label">${x('sourceK')}</div><div class="facts-v"><button type="button" class="poster-action poster-action--more" onClick=${() => openTab(sourceTab)}>${x('sourceLink.' + g.shelf, { name: g.name })}</button><small>${x('sourceSub.' + g.shelf)}</small></div>` : null}
-        ${g.type === 'manual' && first ? html`<div class="facts-k poster-label">${x('webhook')}</div><div class="facts-v">${ctx.details[first.id]?.webhookUrl || first.webhookUrl || x('webhookNone')}<small>${x('webhookSub')}</small></div>` : null}
-      </div>
-      <div class="og-doors listing-open-doors">
-        <${CopyButton} text=${agentTextFor(g, ctx.details)} className="poster-action poster-action--small" label=${x('copyAgent')} copiedLabel=${x('copied')} />
-        ${g.own ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setVisibility(g, g.visibility === 'public' ? 'private' : 'public')}>${g.visibility === 'public' ? x('hideFromAgents') : x('showToAgents')}</button>` : null}
-        ${g.own && g.type === 'manual' ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.remove(g)}>${x('remove')}</button>` : null}
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggle(g)}>${x('close')}</button>
-      </div>
-    </div>`;
+        <${Box} tone="copy">
+          <${Label} block>${x('tryTitle', { id: test.id })}<//>
+          <${TextArea} rows=${3} value=${test.input} onInput=${(v) => ctx.setTestInput(v)} ariaLabel=${x('tryTitle', { id: test.id })} />
+          <${Actions}><${Action} small disabled=${test.running} onClick=${() => ctx.runTest()}>${x('run')}<//><${Note} inline>${x('tryHint')}${test.elapsed ? ` · ${test.elapsed} ms` : ''}<//><//>
+          ${test.result ? html`<${Label} block>${test.result.ok ? x('tryOk') : x('tryFail')}<//><${Code} block tall>${test.result.text}<//>` : null}
+        <//>` : null}
+      <${Facts} rows=${[
+        g.callable
+          ? { k: x('forAgent'), v: invokeLine, mono: true, sub: html`${x('forAgentSub', { id: first?.id || '' })} · ${copyAgent}` }
+          : { k: x('forAgent'), v: usage, sub: html`${x('discoveryOnlySub')} · ${copyAgent}` },
+        { k: x('whoMayCall'), v: first ? `${authWord(first)} · ${g.priced ? x('pricedLong') : x('cost.free')}` : '', sub: x('whoMayCallSub') },
+        { k: x('trust'), v: `${g.vouches ? vouchesWord(g.vouches) : x('noVouches')} · ${g.members.some((c) => c.trust?.operatorReviewed) ? x('reviewed') : x('notReviewed')}`,
+          sub: html`${x('trustSub')}${!g.own && first ? html` · <${Action} tone="more" onClick=${toggleVouch}>${g.members.some((c) => ctx.vouched[c.id]) ? x('unvouch') : x('vouch')}<//>` : null}` },
+        { k: x('calls'), v: x('callsLong', { n: g.calls, errors: g.errors }), sub: ctx.policy?.call_counting ? x('callsCounted') : x('callsProxyOnly') },
+        sourceTab && { k: x('sourceK'), v: html`<${Action} tone="more" onClick=${() => openTab(sourceTab)}>${x('sourceLink.' + g.shelf, { name: g.name })}<//>`, sub: x('sourceSub.' + g.shelf) },
+        g.type === 'manual' && first && { k: x('webhook'), v: ctx.details[first.id]?.webhookUrl || first.webhookUrl || x('webhookNone'), sub: x('webhookSub') },
+      ]} />
+    <//>`;
 }
 
-export const loadingRow = () => html`<p class="poster-quiet cp-empty loading-mark">${t('common.loading')}</p>`;
+export const loadingRow = () => html`<${List} loading=${t('common.loading')} />`;

@@ -17,6 +17,8 @@
  * @structure
  *   - TabReadme ({ readme }) -> rendered Markdown, or a quiet empty state
  * @version-history
+ *   v1.2.0 -- 2026-09-26 -- Onto the components: the reading width and the scroll are Markdown's
+ *     `scroll`, the empty line the Note. The file writes no class any more.
  *   v1.1.0 -- 2026-09-26 -- The README is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent README tab
@@ -25,17 +27,14 @@ import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
+import { Note } from '/components/Note.js';
 
 const html = htm.bind(h);
 
 export default function TabReadme({ readme }) {
   const value = typeof readme === 'string' ? readme.trim() : '';
   if (!value) {
-    return html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.empty.readme')}</div>`;
+    return html`<${Note} kind="quiet">${t('profile.agents.detail.empty.readme')}<//>`;
   }
-  return html`
-    <div class="pf-agd-readme">
-      <${Markdown} text=${value} small />
-    </div>
-  `;
+  return html`<${Markdown} text=${value} small scroll />`;
 }

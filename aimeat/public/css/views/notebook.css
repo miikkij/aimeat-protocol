@@ -2,9 +2,17 @@
  * @file notebook.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Styles for the profile Notebook tab (pf-nb-* prefix): capture box, librarian hits,
- *   and inbox notes. Dark-theme only — all colors/spacing via theme.css variables.
+ * @description What is left of the Notebook tab's own sheet: the trust settings strip, which only the
+ *   design lab's Check-line samples still draw (views/design-lab/decisions-conflicts.js,
+ *   decision-samples-conflicts.js). The Notebook tab itself draws only components now. When the lab
+ *   stops drawing .pf-nb-settings and .pf-nb-toggle, this sheet and its <link> in spa.html go.
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- Page group G4: the Notebook tab (notebook-tab.js, notebook-card.js) draws only
+ *     components (List, Card section, Peek, PlanSteps, ProgressSteps, the Field family), so every rule no file
+ *     writes any more goes: the capture box, the section, search, scope, inbox, note, its text, line, peek,
+ *     meta, foot and buttons, the suggest panel and its reason, label, alternatives and actions, the progress,
+ *     the enrich panel and its summary, the plan steps and their head, title, why and buttons, the preview and
+ *     its body, the chunk pick and body. The trust strip stays for the design lab.
  *   v1.10.0 -- 2026-09-26 -- The trust settings are the Check line: their size and grey go, their row stays (a unification: Jouni's decision "Check line").
  *   v1.9.0 -- 2026-09-26 -- The librarian's hits are the Listing: .pf-nb-hits, .pf-nb-hit and its head, title, snippet, foot, key and producer go (a unification: the look most tabs use).
  *   v1.8.0 -- 2026-09-26 -- A hit's key wears the Key (.key-name); .pf-nb-hit-key keeps only its one line (a unification: the look most tabs use).
@@ -22,177 +30,7 @@
  *   v1.2.0 — 2026-06-21 — Phase 3: trust-toggle settings strip + distribute (chunk) panel.
  */
 
-.pf-nb-capture {
-  margin-bottom: var(--space-lg, 1.5rem);
-}
-.pf-nb-textarea { min-height: 5rem; }
-.pf-nb-capture-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm, 0.75rem);
-  margin-top: var(--space-sm, 0.75rem);
-  flex-wrap: wrap;
-}
-
-.pf-nb-section {
-  margin-top: var(--space-lg, 1.5rem);
-}
-
-.pf-nb-search {
-  flex: 1;
-}
-
-.pf-nb-scope { margin-bottom: var(--space-sm, 0.75rem); }
-/* The librarian's hits are the Listing (css/components/listing.css). */
-
-.pf-nb-inbox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm, 0.75rem);
-}
-.pf-nb-note {
-  background: var(--bg-dim, var(--card));
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 8px);
-  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
-}
-.pf-nb-note-text {
-  color: var(--text);
-  word-break: break-word;
-}
-.pf-nb-note-line {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-dim, var(--text));
-}
-.pf-nb-note-text--peek {
-  max-height: 9rem;
-  overflow: hidden;
-  position: relative;
-}
-.pf-nb-note-text--peek::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2.5rem;
-  background: linear-gradient(transparent, var(--bg-dim, var(--card)));
-  pointer-events: none;
-}
-
-.pf-nb-inbox-bar { margin-bottom: var(--space-sm, 0.75rem); }
-.pf-nb-sort { max-width: 12rem; }
-.pf-nb-note-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs, 0.4rem);
-}
-.pf-nb-note-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm, 0.75rem);
-  margin-top: var(--space-xs, 0.4rem);
-}
-.pf-nb-note-btns {
-  display: flex;
-  gap: var(--space-xs, 0.4rem);
-}
-
-.pf-nb-suggest {
-  margin-top: var(--space-sm, 0.75rem);
-  padding: var(--space-md, 1rem);
-  background: var(--surface, var(--card));
-
-  border-radius: var(--radius, 8px);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs, 0.4rem);
-}
-.pf-nb-suggest-reason {
-  font-style: italic;
-  margin-bottom: var(--space-xs, 0.4rem);
-}
-/* A field's label is the row label (.poster-label); it keeps its place. */
-.pf-nb-suggest-label {
-  margin-top: var(--space-xs, 0.4rem);
-}
-.pf-nb-suggest-alts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs, 0.4rem);
-  margin-top: var(--space-xs, 0.4rem);
-}
-.pf-nb-suggest-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm, 0.75rem);
-  margin-top: var(--space-sm, 0.75rem);
-}
-
-.pf-nb-progress { gap: var(--space-sm, 0.75rem); }
-/* The steps of the sorting (.pf-nb-steps, .pf-nb-step) are a library part: css/components/progress-steps.css. */
-
-/* ── Enrich (plan) panel ── */
-.pf-nb-enrich {
-  margin-top: var(--space-sm, 0.75rem);
-  padding: var(--space-md, 1rem);
-  background: var(--surface, var(--card));
-
-  border-radius: var(--radius, 8px);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm, 0.75rem);
-}
-.pf-nb-enrich-summary { font-style: italic; }
-.pf-nb-plan-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm, 0.75rem);
-}
-.pf-nb-plan-step {
-  background: var(--card);
-
-  border-radius: var(--radius, 8px);
-  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs, 0.4rem);
-}
-.pf-nb-plan-step.done { opacity: 0.75; }
-.pf-nb-plan-step.skipped { opacity: 0.5; }
-.pf-nb-plan-step-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs, 0.4rem);
-  flex-wrap: wrap;
-}
-.pf-nb-plan-step-title { font-weight: 600; color: var(--text); }
-.pf-nb-plan-why { font-style: italic; }
-.pf-nb-plan-step-btns {
-  display: flex;
-  gap: var(--space-xs, 0.4rem);
-  margin-top: var(--space-xs, 0.4rem);
-}
-.pf-nb-enrich-preview {
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-sm, 0.75rem);
-}
-.pf-nb-enrich-preview-body {
-  max-height: 24rem;
-  overflow: auto;
-  margin: 0;
-  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
-}
-
-/* ── Trust toggles (settings strip) ── */
+/* ── Trust toggles (settings strip): drawn now only by the design lab's samples ── */
 .pf-nb-settings {
   display: flex;
   flex-wrap: wrap;
@@ -205,16 +43,4 @@
   align-items: center;
   gap: 0.3rem;
   cursor: pointer;
-}
-
-/* ── Distribute (chunk) panel ── */
-.pf-nb-chunk-pick {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-}
-.pf-nb-chunk-body {
-  max-height: 14rem;
-  margin-top: var(--space-xs, 0.4rem);
 }

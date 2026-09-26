@@ -20,6 +20,10 @@
  * @structure BasicAgentsPanel({ session, showToast, onCreated, first })
  * @usage <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.13.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the section is
+ *     Section, the leads and the hint are Note, the connector's state is the Mark status, the run
+ *     mode's tag is dim again as on main (og-chip--dim), "you have it" is the numbered step's end word,
+ *     the one press is Loud in the Actions row.
  *   v2.12.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v2.11.0 — 2026-09-26 — A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
  *   v2.10.0 — 2026-09-25 — The sentence under the two agents is a lead (.og-lead); it keeps only its margin (a unification: the look most tabs use).
@@ -52,10 +56,12 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { areaLine } from '/js/consent-vocab.js';
-import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
 import { loadFold, saveFold } from './tab-helpers.js';
-import { Hint } from '/components/Hint.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
+import { Note } from '/components/Note.js';
+import { Mark, Marks } from '/components/Mark.js';
+import { Action, Actions, Loud } from '/components/Action.js';
 
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
 
@@ -123,47 +129,49 @@ export default function BasicAgentsPanel({ session, showToast, onCreated, first 
   const actsAlone = list.filter(a => a.mode === 'task-runner');
   const names = list.map(a => a.display_name || a.name).join(', ');
   const connectorWord = connected
-    ? html`<span class="poster-status poster-status--fine">✓ ${t('profile.agents.basic.connected')}</span>`
-    : html`<span class="poster-status poster-status--attention">✗ ${t('profile.agents.basic.notConnected')}</span>`;
-  const door = html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${toggle}>${open ? p('close') : p('open')}</button>`;
+    ? html`<${Mark} kind="status" tone="fine">✓ ${t('profile.agents.basic.connected')}<//>`
+    : html`<${Mark} kind="status" tone="attention">✗ ${t('profile.agents.basic.notConnected')}<//>`;
+  const door = html`<${Action} small soft onClick=${toggle}>${open ? p('close') : p('open')}<//>`;
 
   return html`
-    <${PageSection} id="agp-basic" num="01" title=${t('profile.agents.basic.title')}
+    <${Section} id="agp-basic" num="01" title=${t('profile.agents.basic.title')}
       count=${allThere ? t('profile.agents.basic.allThere') : null} doors=${door} first=${first}>
       ${!open ? html`
-        <p class="og-lead agp-folded">
+        <${Note} kind="lead">
           ${allThere ? p('basicHaveLine', { names }) : p('basicMissingLine', { n: missing.length })}
           ${' '}${connectorWord}
-        </p>` : html`
-        <p class="og-lead">${t('profile.agents.basic.desc')}</p>
+        <//>` : html`
+        <${Note} kind="lead">${t('profile.agents.basic.desc')}<//>
         <div>${connectorWord}</div>
-        ${!connected && html`<${Hint}>${t('profile.agents.basic.notConnectedHint')}<//>`}
-        <${IndexList} steps className="agp-basic-list">
+        ${!connected && html`<${Note}>${t('profile.agents.basic.notConnectedHint')}<//>`}
+        <${IndexList} steps>
           ${list.map((a) => html`
             <${IndexStep} key=${a.name}
               line=${html`${a.description}
-                ${(a.scopes ?? []).length > 0 && html`<small>${t('profile.agents.basic.reaches')} ${areaLine(a.scopes, t)}</small>`}`}
-              end=${a.enrolled ? html`<span class="og-fold-r">${t('profile.agents.basic.have')}</span>` : null}>
-              ${a.display_name || a.name}<span class="poster-chips">
-                <span class="poster-chip">${t(`profile.agents.runMode.${a.run_mode}`)}</span>
-                ${a.mode === 'task-runner' && html`<span class="poster-chip poster-chip--coral" title=${t('profile.agents.basic.actsAloneWhy')}>${t('profile.agents.basic.actsAlone')}</span>`}
-              </span>
+                ${(a.scopes ?? []).length > 0 && html`<br /><small>${t('profile.agents.basic.reaches')} ${areaLine(a.scopes, t)}</small>`}`}
+              endWord=${a.enrolled ? t('profile.agents.basic.have') : null}>
+              ${a.display_name || a.name}
+              <${Marks}>
+                ${/* The run mode counts nothing yet, so its tag is dim, as main drew it (og-chip--dim). */''}
+                <${Mark} tone="dim">${t(`profile.agents.runMode.${a.run_mode}`)}<//>
+                ${a.mode === 'task-runner' && html`<${Mark} tone="coral" title=${t('profile.agents.basic.actsAloneWhy')}>${t('profile.agents.basic.actsAlone')}<//>`}
+              <//>
             <//>
           `)}
         <//>
         ${actsAlone.length > 0 && html`
-          <p class="og-lead agp-basic-notice">
+          <${Note} kind="lead">
             ${/* One name took the plural verb: "Workflow manager start work as soon as it
                   arrives". The template was written for a list and there is usually one. */''}
             ${t(actsAlone.length === 1 ? 'profile.agents.basic.actsAloneNoticeOne' : 'profile.agents.basic.actsAloneNotice')
               .replace('{names}', actsAlone.map(a => a.display_name || a.name).join(', '))}
-          </p>`}
+          <//>`}
         ${!allThere && html`
-          <div class="agp-basic-actions">
-            <button type="button" class="poster-slab poster-slab--control" disabled=${!connected || busy} onClick=${create}>
+          <${Actions}>
+            <${Loud} control disabled=${!connected || busy} onClick=${create}>
               ${busy ? t('profile.agents.basic.working') : t('profile.agents.basic.button')}
-            </button>
-          </div>`}
+            <//>
+          <//>`}
       `}
     <//>
   `;

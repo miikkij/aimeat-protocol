@@ -7,7 +7,16 @@
  *   and the shapes in poster.css; a page never styles it from outside.
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
+ *   The message tone (.poster-composer--message, components/MessageComposer.js) is Messages' composer:
+ *   the field over the whole width, the tools and the loud action on the line under it, the files
+ *   waiting as chips above, the Markdown fallback and the Toast UI editor behind ⤢.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The list over the field (`suggest`, .composer-suggest*): an agent's slash
+ *     commands, with main's values (css/views/agents-detail.css .pf-agd-autocomplete*,
+ *     .pf-agd-command-name/-desc); its frame and corner read the theme's shape tokens.
+ *   v1.4.0 — 2026-09-26 — The message tone replaces the stacked cut: main's layout (the field on a
+ *     line of its own, its tools under it) with the chat's field, squares and dark block; the file
+ *     chips, the fallback field, its preview and the Toast UI repaint moved here from inbox.css.
  *   v1.3.0 — 2026-09-26 — The stacked cut, .poster-composer--stack: on a phone the field keeps the
  *     whole width (Jouni's decision "Typing box").
  *   v1.2.0 — 2026-09-24 — The attachment and the field read the theme's shape values (a move).
@@ -80,14 +89,28 @@
    decision "Icon button"); this keeps their place in the row. */
 .poster-composer-tool { flex: 0 0 auto; }
 .poster-composer-send { flex: 0 0 auto; }
-/* The stacked cut (Messages): the button stands at the right end of the row even when the field is
-   not in it (the bigger editor above the row takes the field's place), and on a phone the field keeps
-   the whole first line and the tools and the button go under it, so there is room to write. */
-.poster-composer--stack .poster-composer-send { margin-left: auto; }
-@media (max-width: 760px) {
-  .poster-composer--stack .poster-composer-row { flex-wrap: wrap; }
-  .poster-composer--stack .poster-composer-input { flex: 1 1 100%; }
+/* What the typed words can become (`suggest`: an agent's slash commands), in a list over the field:
+   the command's typewriter name and its grey words, the row under the pointer on the grey ground.
+   Values from main's css/views/agents-detail.css .pf-agd-autocomplete*, .pf-agd-command-name/-desc. */
+.poster-composer--suggest { position: relative; }
+.composer-suggest {
+  position: absolute; bottom: 100%; left: 0; right: 0; z-index: 10;
+  margin: 0; padding: 0; list-style: none;
+  max-height: 200px; overflow-y: auto;
+  background: var(--card);
+  border: var(--shape-frame) solid var(--shape-frame-colour);
+  border-radius: var(--shape-corner-control);
+  box-shadow: var(--shadow-md);
 }
+.composer-suggest-item {
+  display: flex; gap: .5rem; width: 100%; padding: .4rem .75rem;
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: .8rem; color: inherit;
+  transition: background .1s;
+}
+.composer-suggest-item:hover, .composer-suggest-item:focus-visible { background: var(--card-bg-alt); outline: none; }
+.composer-suggest-name { flex-shrink: 0; min-width: 80px; font-family: var(--font-mono); font-size: .78rem; font-weight: 500; }
+.composer-suggest-desc { flex: 1; font-size: .78rem; color: var(--text-dim); }
 @media (max-width: 760px) {
   .poster-composer {
     padding: 8px 8px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
@@ -95,4 +118,108 @@
   .poster-composer-row { gap: 8px; }
   .poster-composer-tool { width: 40px; }
   .poster-composer-send { min-width: 60px; padding: 0 14px; }
+}
+
+/* ── The message tone (Messages, components/MessageComposer.js): the field over the whole width, its
+   tools under it and the loud action at the end of that line, as main lays it out; the bigger editor
+   behind ⤢; the files waiting to go as chips above the field. Values moved from css/views/inbox.css
+   (.inbox-composer, -bar, .inbox-bar-left, .inbox-file-chip*, .inbox-editor, .inbox-md-*) ── */
+.poster-composer--message {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card-bg);
+}
+.poster-composer--message .poster-composer-input { flex: none; display: block; width: 100%; height: auto; min-height: 44px; max-height: 132px; overflow-y: auto; }
+/* flex:none so the tool line can never absorb the composer's slack and grow into the reading area. */
+.poster-composer-bar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; }
+.poster-composer-tools { display: flex; align-items: center; gap: 8px; }
+.poster-composer-tools label.poster-composer-tool { cursor: pointer; }
+.poster-composer-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.poster-composer-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--text-dim); background: var(--card-bg-alt);
+  padding: 3px 4px 3px 8px; border-radius: var(--shape-corner-pill);
+}
+.poster-composer-chip--voice { gap: 6px; }
+.poster-composer-chip-voice { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.poster-composer-chip-x {
+  border: none; background: transparent; color: var(--text-dim); cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: var(--shape-corner-pill);
+}
+.poster-composer-chip-x:hover { color: var(--danger); background: var(--card-bg); }
+/* The Markdown field with its preview, when the bigger editor cannot load. */
+.poster-composer-fallback { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.poster-composer-area {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--shape-corner-control);
+  padding: 9px 12px;
+  font: inherit;
+  color: inherit;
+  resize: vertical;
+  min-height: 42px;
+}
+.poster-composer-area:focus { outline: none; border-color: var(--border-focus); }
+.poster-composer-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--shape-corner-control);
+  padding: 8px 10px;
+  overflow: auto;
+  max-height: 160px;
+  font-size: 14px;
+}
+/* The ⤢ state: the fallback field and its preview grow to ~60vh so a long or formatted draft is fully
+   visible. The Toast UI editor is resized in JS (setHeight) instead. */
+.poster-composer--tall .poster-composer-area { min-height: 60vh; }
+.poster-composer--tall .poster-composer-preview { max-height: 60vh; }
+
+/* The Toast UI editor behind ⤢. It ships light-only styles (white chrome, dark text), so in dark mode
+   the typed text was white on white — invisible (found by Jouni mid-sentence). Everything below
+   repaints the editor with the theme's own tokens, so it follows light, dark AND the palettes; only
+   the toolbar icon sprite needs a dark-only invert, because it is an image, not a colour. */
+.poster-composer-editor { border: 1px solid var(--border); border-radius: var(--shape-corner-control); overflow: hidden; }
+.poster-composer-editor .toastui-editor-defaultUI { border: none; }
+.poster-composer-editor .toastui-editor-defaultUI,
+.poster-composer-editor .toastui-editor-defaultUI-toolbar,
+.poster-composer-editor .toastui-editor-md-tab-container,
+.poster-composer-editor .toastui-editor-mode-switch,
+.poster-composer-editor .toastui-editor,
+.poster-composer-editor .toastui-editor-ww-container,
+.poster-composer-editor .toastui-editor-md-container,
+.poster-composer-editor .toastui-editor-md-preview { background: var(--card); color: var(--text); }
+.poster-composer-editor .toastui-editor-defaultUI-toolbar,
+.poster-composer-editor .toastui-editor-md-tab-container,
+.poster-composer-editor .toastui-editor-mode-switch { border-color: var(--border); }
+.poster-composer-editor .toastui-editor .ProseMirror,
+.poster-composer-editor .toastui-editor-contents { color: var(--text); caret-color: var(--text); }
+.poster-composer-editor .toastui-editor-md-container .toastui-editor md-code,
+.poster-composer-editor .toastui-editor-contents code,
+.poster-composer-editor .toastui-editor-contents pre { background: var(--bg-dim); color: var(--text); }
+.poster-composer-editor .toastui-editor-md-tab-container .tab-item {
+  background: var(--card); color: var(--text-dim); border-color: var(--border);
+}
+.poster-composer-editor .toastui-editor-md-tab-container .tab-item.active { background: var(--card); color: var(--text); }
+.poster-composer-editor .toastui-editor-mode-switch .tab-item {
+  background: var(--bg-dim); color: var(--text-dim); border-color: var(--border);
+}
+.poster-composer-editor .toastui-editor-mode-switch .tab-item.active { background: var(--card); color: var(--text); }
+.poster-composer-editor .toastui-editor-popup {
+  background: var(--card); color: var(--text); border-color: var(--border);
+}
+.poster-composer-editor .toastui-editor-popup-body label { color: var(--text-dim); }
+.poster-composer-editor .toastui-editor-popup-body input[type='text'] {
+  background: var(--bg-input); color: var(--text); border-color: var(--border);
+}
+.poster-composer-editor .toastui-editor-defaultUI-toolbar button { border-color: transparent; }
+.poster-composer-editor .toastui-editor-defaultUI-toolbar button:not(:disabled):hover { background: var(--bg-dim); border-color: var(--border); }
+[data-theme='dark'] .poster-composer-editor .toastui-editor-toolbar-icons { filter: invert(0.85) hue-rotate(180deg); }
+[data-theme='dark'] .poster-composer-editor .toastui-editor-md-tab-container .tab-item,
+[data-theme='dark'] .poster-composer-editor .toastui-editor-mode-switch .tab-item { border-color: var(--border); }
+@media (max-width: 760px) {
+  .poster-composer--message { padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .poster-composer-fallback { grid-template-columns: 1fr; }
 }

@@ -11,6 +11,9 @@
  *   <li class="pf-nb-step active">→ …</li><li class="pf-nb-step">· …</li></ol>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The ProgressSteps component's own names (.progress-steps, .progress-step
+ *     and its done and active tones) with the same values, and the ProgressNow block (.progress-now)
+ *     from the Track a response dialog (page group G4, the notebook).
  *   v1.0.0 -- 2026-09-26 -- Moved out of notebook.css (UI consolidation phase 5, a move).
  */
 
@@ -29,3 +32,28 @@
 }
 .pf-nb-step.active { opacity: 1; color: var(--text); font-weight: 600; }
 .pf-nb-step.done { opacity: 0.85; color: var(--success, var(--text)); }
+
+/* The same steps as the ProgressSteps component draws them (components/ProgressSteps.js, page group
+   G4): the values above under the component's own names. The .pf-nb-* rules above stay while the
+   design lab's demo draws them; the lead's final pass removes them with that demo. */
+.progress-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.progress-step {
+  font-size: 0.85em;
+  color: var(--text-dim, var(--text));
+  opacity: 0.6;
+}
+.progress-step--active { opacity: 1; color: var(--text); font-weight: 600; }
+.progress-step--done { opacity: 0.85; color: var(--success, var(--text)); }
+
+/* What the AI does now, in the middle of a dialog while it waits (ProgressNow; the Track a response
+   dialog's .inbox-track-classify, .inbox-track-classify-step and -sub, moved unchanged). */
+.progress-now { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px 16px; text-align: center; }
+.progress-now-title { font-weight: 600; }
+.progress-now-step { font-size: 13px; color: var(--text-dim); }

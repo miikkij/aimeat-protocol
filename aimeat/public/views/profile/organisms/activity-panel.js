@@ -9,6 +9,7 @@
  * @structure buildHeatmap, hmCell (internal helpers), ActivityPanel
  * @usage import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
  * @version-history
+ *   v1.7.0 — 2026-09-26 — Every part is a kit component (page group G2a): the panel is the Box with its name, the count and the Hide/Show action in its head; the heatmap is the ActivityCalendar (components/ActivityCalendar.js, its own sheet), fed each day's tooltip and four levels as data; the agent beside a line is the Mark. The page writes no class.
  *   v1.6.0 — 2026-09-26 — The recent activity log is the home's Timeline (components/Timeline.js): the time, a dot (made for a publish, the system's grey for an edit), one line with who, the agent's Tag, what they did and to what; the square dots and the small row go (a unification: Jouni's decision "Activity log").
  *   v1.5.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.4.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -31,6 +32,11 @@ import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { calendar } from '/js/format.js';
 import { TimelineList, TimelineRow } from '/components/Timeline.js';
+import { ActivityCalendar } from '/components/ActivityCalendar.js';
+import { Box } from '/components/Box.js';
+import { Action } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
 
 /* Build a GitHub-style contribution calendar from activity events. Each day holds FOUR counters —
  * documents draft/published and records (schema'd) draft/published — so a cell can be drawn as a 2×2
@@ -61,16 +67,13 @@ const hmLevel = (n) => (n === 0 ? 0 : n <= 1 ? 1 : n <= 3 ? 2 : n <= 6 ? 3 : 4);
 const ZERO_DAY = { dd: 0, dp: 0, rd: 0, rp: 0, total: 0 };
 
 /* One heatmap day = a 2×2 grid: ↖ docs draft, ↗ docs published, ↙ records draft, ↘ records published.
- * Each quadrant's shade is its own count's intensity. */
-function hmCell(date, b, key) {
+ * Each quadrant's shade is its own count's intensity. Returns the day as the calendar's data. */
+function hmCell(date, b) {
   const c = b || ZERO_DAY;
   const tip = b
     ? `${date} — docs: ${c.dd} draft / ${c.dp} published · records: ${c.rd} draft / ${c.rp} published`
     : `${date} — no activity`;
-  return html`<span class="pj-hm-cell" key=${key} title=${tip}>
-    <i class="q lvl${hmLevel(c.dd)}"></i><i class="q lvl${hmLevel(c.dp)}"></i>
-    <i class="q lvl${hmLevel(c.rd)}"></i><i class="q lvl${hmLevel(c.rp)}"></i>
-  </span>`;
+  return { title: tip, levels: [hmLevel(c.dd), hmLevel(c.dp), hmLevel(c.rd), hmLevel(c.rp)] };
 }
 
 /* Activity panel — a GitHub-style contribution heatmap of the workspace's history, where every day is
@@ -101,44 +104,22 @@ export function ActivityPanel({ orgId, wsId }) {
   const { cols, monthLabels } = buildHeatmap(byDay, today);
 
   return html`
-    <div class="pj-chart poster-box">
-      <div class="pj-chart-head">
-        <span class="pj-chart-title">${'📊 '}${t('organisms.activity') || 'Activity'}<span class="pj-act-count">${data.total} ${t('organisms.events') || 'events'}</span></span>
-        <button class="poster-action poster-action--small" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
-      </div>
+    <${Box} name=${html`${'📊 '}${t('organisms.activity') || 'Activity'}`}
+      marks=${html`<${Note} kind="meta" inline>${data.total} ${t('organisms.events') || 'events'}<//>`}
+      end=${html`<${Action} small onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}<//>`}>
       ${show ? html`
-        <div class="pj-act">
-          <div class="pj-hm">
-            <div class="pj-hm-monthrow">${monthLabels.map((m, i) => html`<span class="pj-hm-month" key=${i}>${m}</span>`)}</div>
-            <div class="pj-hm-body">
-              <div class="pj-hm-daycol"><span></span><span>${t('organisms.mon') || 'Mon'}</span><span></span><span>${t('organisms.wed') || 'Wed'}</span><span></span><span>${t('organisms.fri') || 'Fri'}</span><span></span></div>
-              <div class="pj-hm-cols">
-                ${cols.map((col, ci) => html`<div class="pj-hm-col" key=${ci}>
-                  ${col.map((cell, ri) => cell === null
-                    ? html`<span class="pj-hm-cell future" key=${ri}></span>`
-                    : hmCell(cell.date, cell.b, ri))}
-                </div>`)}
-              </div>
-            </div>
-          </div>
-          <div class="pj-hm-legend">
-            <div class="pj-hm-quadkey">
-              <span class="pj-hm-cell"><i class="q lvl1"></i><i class="q lvl3"></i><i class="q lvl2"></i><i class="q lvl4"></i></span>
-              <div class="pj-hm-quadlabels">
-                <span>${'↖ '}${t('organisms.docsDraft') || 'Docs draft'}</span><span>${'↗ '}${t('organisms.docsPublished') || 'Docs published'}</span>
-                <span>${'↙ '}${t('organisms.recordsDraft') || 'Records draft'}</span><span>${'↘ '}${t('organisms.recordsPublished') || 'Records published'}</span>
-              </div>
-            </div>
-            <div class="pj-hm-intensity">
-              <span>${t('organisms.less') || 'Less'}</span>
-              <i class="q lvl0"></i><i class="q lvl1"></i><i class="q lvl2"></i><i class="q lvl3"></i><i class="q lvl4"></i>
-              <span>${t('organisms.more') || 'More'}</span>
-            </div>
-          </div>
-          <${TimelineList}>
-            ${events.slice(0, 20).map((e, i) => html`<${TimelineRow} key=${i} category=${e.action === 'publish' ? 'made' : 'system'} when=${dt(e.at)}
-              text=${html`${(e.actor)}${e.agent ? html` <span class="poster-chip" title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${(e.agent)}</span>` : null} ${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')} ${(e.mode === 'document' ? '📄' : '🗂')} ${(e.type)}${' / '}${(e.instance)}`} />`)}
-          <//>
-        </div>` : null}
-    </div>`;
+        <${ActivityCalendar}
+          weeks=${cols.map((col) => col.map((cell) => (cell === null ? null : hmCell(cell.date, cell.b))))}
+          months=${monthLabels}
+          days=${['', t('organisms.mon') || 'Mon', '', t('organisms.wed') || 'Wed', '', t('organisms.fri') || 'Fri', '']}
+          quarters=${[
+            `${'↖ '}${t('organisms.docsDraft') || 'Docs draft'}`, `${'↗ '}${t('organisms.docsPublished') || 'Docs published'}`,
+            `${'↙ '}${t('organisms.recordsDraft') || 'Records draft'}`, `${'↘ '}${t('organisms.recordsPublished') || 'Records published'}`,
+          ]}
+          less=${t('organisms.less') || 'Less'} more=${t('organisms.more') || 'More'} />
+        <${TimelineList}>
+          ${events.slice(0, 20).map((e, i) => html`<${TimelineRow} key=${i} category=${e.action === 'publish' ? 'made' : 'system'} when=${dt(e.at)}
+            text=${html`${(e.actor)}${e.agent ? html` <${Mark} title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${(e.agent)}<//>` : null} ${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')} ${(e.mode === 'document' ? '📄' : '🗂')} ${(e.type)}${' / '}${(e.instance)}`} />`)}
+        <//>` : null}
+    <//>`;
 }

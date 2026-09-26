@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.19.0 -- 2026-09-26 -- On the component kit (page group G7): the frame is the SettingsPage (crumb, head with its tags as data, the loud copy, the rail's sections and sibling pages), the strip the FigureStrip, a shelf's filters, search line, rows and more line the List, the hand-added form the FoldRow over the Fields, the rule an AI gets the Box, the facts the Facts. The vouches tag counts nothing yet in the dim tone again (main's og-chip--dim). The page writes no class.
  *   v1.18.0 -- 2026-09-26 -- "Public" beside its check box is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -41,15 +42,27 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
 import { x, crumb, pageLinks, agentRule, openTab } from './frame.js';
 import { providerRow, loadingRow } from './rows.js';
 import { Hint } from '/components/Hint.js';
+import { Note } from '/components/Note.js';
+import { Label } from '/components/Mark.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { List, Filters, Filter, SearchLine, More } from '/components/List.js';
+import { FoldRow } from '/components/Folds.js';
+import { Space } from '/components/Layout.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Check } from '/components/Check.js';
 
 const PAGE = 20;
-const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--filter ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<span class="poster-count poster-count--tally">${n}</span></button>`;
+const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
+const head = (key) => [x('col.' + key), x('colGives'), x('colAgent'), ''];
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 
 export function renderPage(ctx) {
@@ -65,56 +78,44 @@ export function renderPage(ctx) {
   const vouches = all.reduce((s, g) => s + g.vouches, 0);
   const own = all.filter((g) => g.own);
   const none = groups && own.length === 0;
-  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
   const canCreate = ctx.policy && ctx.policy.publishing !== 'disabled';
 
-  const strip = html`
-    <div class="og-strip">
-      <div><b>${groups ? members(ext) : '…'}</b><span>${x('stripActions')}</span><small>${groups ? x('stripActionsSub', { ext: ext.length, own: ext.filter((g) => g.own).length, others: ext.filter((g) => !g.own).length }) : ''}</small></div>
-      <div><b>${groups ? members(app) : '…'}</b><span>${x('stripTools')}</span><small>${groups ? (app.length ? x('stripToolsSub', { apps: app.length }) : x('stripToolsNone')) : ''}</small></div>
-      <div><b>${groups ? members(agent) : '…'}</b><span>${x('stripOffers')}</span><small>${groups ? (agent.length ? x('stripOffersSub', { agents: agent.length }) : x('stripOffersNone')) : ''}</small></div>
-      <div><b>${groups ? other.length : '…'}</b><span>${x('stripOther')}</span><small>${ctx.policy ? (canCreate ? x('stripOtherOn') : x('stripOtherOff')) : ''}</small></div>
-    </div>`;
+  const strip = html`<${FigureStrip} items=${[
+    { n: groups ? members(ext) : '…', label: x('stripActions'), sub: groups ? x('stripActionsSub', { ext: ext.length, own: ext.filter((g) => g.own).length, others: ext.filter((g) => !g.own).length }) : '' },
+    { n: groups ? members(app) : '…', label: x('stripTools'), sub: groups ? (app.length ? x('stripToolsSub', { apps: app.length }) : x('stripToolsNone')) : '' },
+    { n: groups ? members(agent) : '…', label: x('stripOffers'), sub: groups ? (agent.length ? x('stripOffersSub', { agents: agent.length }) : x('stripOffersNone')) : '' },
+    { n: groups ? other.length : '…', label: x('stripOther'), sub: ctx.policy ? (canCreate ? x('stripOtherOn') : x('stripOtherOff')) : '' },
+  ]} />`;
+
+  const marks = groups ? [
+    { label: x('chipCallable', { n: callable }), tone: 'sun' },
+    { label: x('chipProviders', { n: all.length }) },
+    { label: x('chipCalls', { n: calls }) },
+    { label: x('chipVouches', { n: vouches }), tone: vouches ? undefined : 'dim' },
+    none ? { label: x('chipNone'), tone: 'coral' } : null,
+  ] : [];
+  const actions = html`
+    <${Loud} copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
+    <${Actions}><${Action} small onClick=${() => openTab('extensions')}>${t('profile.tabs.extensions')}<//><//>`;
+  const sections = [
+    { id: 'cp-ext', num: '01', label: x('secExt'), count: groups ? ext.length : '' },
+    { id: 'cp-app', num: '02', label: x('secApp'), count: groups ? app.length : '' },
+    { id: 'cp-agent', num: '03', label: x('secAgent'), count: groups ? agent.length : '' },
+    { id: 'cp-other', num: '04', label: x('secOther'), count: groups ? other.length : '' },
+    { id: 'cp-ai', num: '05', label: x('secAi') },
+  ];
 
   return html`
-    <div class="og og-caps">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('capabilities.tabLabel')}<small>${x('titleSub')}</small></h1>
-          <div class="poster-chips">
-            ${groups ? chip(x('chipCallable', { n: callable }), 'poster-chip--sun') : null}
-            ${groups ? chip(x('chipProviders', { n: all.length })) : null}
-            ${groups ? chip(x('chipCalls', { n: calls })) : null}
-            ${groups ? chip(x('chipVouches', { n: vouches })) : null}
-            ${none ? chip(x('chipNone'), 'poster-chip--coral') : null}
-          </div>
-          <p class="og-desc">${none ? x('descEmpty') : x('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <${CopyButton} text=${agentRule(ctx.nodeUrl)} className="poster-slab" label=${x('copyRule')} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))} />
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => openTab('extensions')}>${t('profile.tabs.extensions')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${shelf(ctx, 'ext', '01', x('secExt'), groups ? x('secExtSub', { actions: members(ext), ext: ext.length }) : null, ext, true)}
-          ${shelf(ctx, 'app', '02', x('secApp'), groups ? x('secAppSub', { tools: members(app), apps: app.length }) : null, app, false)}
-          ${shelf(ctx, 'agent', '03', x('secAgent'), groups ? x('secAgentSub', { offers: members(agent), agents: agent.length }) : null, agent, false)}
-          ${secOther(ctx, '04', other, canCreate)}
-          ${secAgent(ctx, '05', all, calls, vouches)}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${[['01', 'cp-ext', x('secExt'), groups ? ext.length : ''], ['02', 'cp-app', x('secApp'), groups ? app.length : ''], ['03', 'cp-agent', x('secAgent'), groups ? agent.length : ''], ['04', 'cp-other', x('secOther'), groups ? other.length : ''], ['05', 'cp-ai', x('secAi'), '']].map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="caps" crumb=${crumb()} title=${t('capabilities.tabLabel')} sub=${x('titleSub')} marks=${marks}
+      desc=${none ? x('descEmpty') : x('desc')} actions=${actions} strip=${strip}
+      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${shelf(ctx, 'ext', '01', x('secExt'), groups ? x('secExtSub', { actions: members(ext), ext: ext.length }) : null, ext, true)}
+      ${shelf(ctx, 'app', '02', x('secApp'), groups ? x('secAppSub', { tools: members(app), apps: app.length }) : null, app, false)}
+      ${shelf(ctx, 'agent', '03', x('secAgent'), groups ? x('secAgentSub', { offers: members(agent), agents: agent.length }) : null, agent, false)}
+      ${secOther(ctx, '04', other, canCreate)}
+      ${secAgent(ctx, '05', all, calls, vouches)}
+    <//>`;
 }
 
 /* ── One shelf: facets, search, rows ─────────────────────────────────────────────────────────── */
@@ -139,8 +140,8 @@ function shelf(ctx, key, num, title, sub, list, first) {
   const empty = key === 'ext' ? x('emptyExt') : key === 'app' ? x('emptyApp') : x('emptyAgent');
   return html`
     <${PageSection} id=${ids[key]} num=${num} title=${title} count=${sub} first=${first}>
-      ${!ctx.groups ? loadingRow() : !list.length ? html`<p class="poster-quiet cp-empty">${empty}</p>` : html`
-        <div class="cp-facets">
+      ${!ctx.groups ? loadingRow() : !list.length ? html`<${Note} kind="quiet">${empty}<//>` : html`
+        <${Filters}>
           ${facet(!F.who && !F.use && !F.priced && !F.vouched, x('facetAll'), list.length, () => set({ who: '', use: '', priced: false, vouched: false }), 'all')}
           ${facet(F.who === 'own', x('facetOwn'), count((g) => g.own), () => tog('who', 'own'), 'own')}
           ${facet(F.who === 'others', x('facetOthers'), count((g) => !g.own), () => tog('who', 'others'), 'others')}
@@ -148,17 +149,14 @@ function shelf(ctx, key, num, title, sub, list, first) {
           ${facet(F.use === 'never', x('facetNever'), count((g) => g.calls === 0), () => tog('use', 'never'), 'never')}
           ${count((g) => g.priced) ? facet(!!F.priced, x('facetPriced'), count((g) => g.priced), () => set({ priced: !F.priced }), 'priced') : null}
           ${count((g) => g.vouches > 0) ? facet(!!F.vouched, x('facetVouched'), count((g) => g.vouches > 0), () => set({ vouched: !F.vouched }), 'vouched') : null}
-        </div>
-        <div class="search-line"><input class="og-input" type="search" value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} aria-label=${x('search.' + key)} onInput=${(e) => ctx.setQuery(key, e.target.value)} /><small>${x('searchOrder')}</small></div>
-        ${!rows.length ? html`<p class="poster-quiet cp-empty">${x('noMatch')}</p>` : html`
-          <div class="listing listing--name-desc-call-doors">
-            <div class="listing-row listing-row--head"><div class="poster-label">${x('col.' + key)}</div><div class="poster-label">${x('colGives')}</div><div class="poster-label">${x('colAgent')}</div><div class="poster-label"></div></div>
-            ${shown.map((g) => providerRow(ctx, g))}
-          </div>`}
-        <div class="more-line">
-          ${shown.length < rows.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShown(key, ctx.shown[key] + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}</button>` : null}
-          <small>${x('shownOf', { shown: shown.length, total: rows.length })}</small>
-        </div>
+        <//>
+        <${SearchLine} value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} label=${x('search.' + key)} onInput=${(e) => ctx.setQuery(key, e.target.value)} note=${x('searchOrder')} />
+        <${List} cols="name-desc-call-doors" head=${head(key)} empty=${x('noMatch')}>
+          ${shown.map((g) => providerRow(ctx, g))}
+        <//>
+        <${More} note=${x('shownOf', { shown: shown.length, total: rows.length })}
+          label=${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}
+          onMore=${shown.length < rows.length ? () => ctx.setShown(key, ctx.shown[key] + PAGE) : null} />
         <${Hint}>${x('hint.' + key)}<//>`}
     <//>`;
 }
@@ -170,25 +168,31 @@ function secOther(ctx, num, other, canCreate) {
   return html`
     <${PageSection} id="cp-other" num=${num} title=${x('secOther')} count=${ctx.groups ? x('secOtherSub', { n: other.length }) : null}>
       ${!ctx.groups ? loadingRow() : html`
-        ${other.length ? html`<div class="listing listing--name-desc-call-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.other')}</div><div class="poster-label">${x('colGives')}</div><div class="poster-label">${x('colAgent')}</div><div class="poster-label"></div></div>
+        <${List} cols="name-desc-call-doors" head=${head('other')} empty=${x('emptyOther')}>
           ${other.map((g) => providerRow(ctx, g))}
-        </div>` : html`<p class="poster-quiet cp-empty">${x('emptyOther')}</p>`}
-        <div class="facts facts--wide">
-          <div class="facts-k poster-label">${x('manualK')}</div><div class="facts-v">${x('manualBody')}<small>${canCreate ? x('manualOn') : x('manualOff', { policy: x('policy.' + (ctx.policy?.publishing || 'disabled')) })}</small></div>
-          <div class="facts-k poster-label">${x('policyK')}</div><div class="facts-v">${x('policyBody', { publishing: x('policy.' + (ctx.policy?.publishing || 'disabled')), publishers: x('publishers.' + (ctx.policy?.publishers || 'all_users')), webhooks: x('webhooks.' + (ctx.policy?.webhooks || 'disabled')) })}<small>${x('policySub')}</small></div>
-        </div>
+        <//>
+        <${Facts} wide rows=${[
+          { k: x('manualK'), v: x('manualBody'), sub: canCreate ? x('manualOn') : x('manualOff', { policy: x('policy.' + (ctx.policy?.publishing || 'disabled')) }) },
+          { k: x('policyK'), v: x('policyBody', { publishing: x('policy.' + (ctx.policy?.publishing || 'disabled')), publishers: x('publishers.' + (ctx.policy?.publishers || 'all_users')), webhooks: x('webhooks.' + (ctx.policy?.webhooks || 'disabled')) }), sub: x('policySub') },
+        ]} />
         ${canCreate ? html`
-          <button type="button" class="og-fold og-fold--toggle cp-fold" aria-expanded=${f.open ? 'true' : 'false'} onClick=${() => ctx.setForm({ open: !f.open })}><span>${x('addManual')}</span><span class="og-fold-r">${x('addManualSub')}</span><span class="og-fold-arrow">${f.open ? '↓' : '→'}</span></button>
+          <${Space} above="large">
+            <${FoldRow} kind="toggle" name=${x('addManual')} right=${x('addManualSub')} open=${!!f.open} onClick=${() => ctx.setForm({ open: !f.open })} />
+          <//>
           ${f.open ? html`
-            <div class="cp-form">
-              <label class="cp-field"><span class="poster-label">${x('formName')}</span><input class="og-input" value=${f.name} onInput=${(e) => ctx.setForm({ name: e.target.value })} /></label>
-              <label class="cp-field"><span class="poster-label">${x('formWebhook')}</span><input class="og-input" placeholder="https://" value=${f.webhookUrl} onInput=${(e) => ctx.setForm({ webhookUrl: e.target.value })} /></label>
-              <label class="cp-field cp-field--wide"><span class="poster-label">${x('formSummary')}</span><textarea class="og-textarea" rows="2" value=${f.summary} onInput=${(e) => ctx.setForm({ summary: e.target.value })}></textarea></label>
-              <label class="cp-field"><span class="poster-label">${x('formTags')}</span><input class="og-input" value=${f.tags} onInput=${(e) => ctx.setForm({ tags: e.target.value })} /></label>
-              <label class="cp-field cp-check check-line"><input type="checkbox" checked=${f.visibility === 'public'} onChange=${(e) => ctx.setForm({ visibility: e.target.checked ? 'public' : 'private' })} /> ${x('formPublic')}</label>
-              <div class="cp-field--wide cp-form-doors"><span class="poster-hint">${x('formHint')}</span><button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'create' || !f.name.trim()} onClick=${() => ctx.createManual()}>${x('formCreate')}</button></div>
-            </div>` : null}` : null}`}
+            <${Space} above="large">
+              <${Fields} cols=${2}>
+                <${TextField} label=${x('formName')} value=${f.name} onInput=${(name) => ctx.setForm({ name })} />
+                <${TextField} label=${x('formWebhook')} placeholder="https://" value=${f.webhookUrl} onInput=${(webhookUrl) => ctx.setForm({ webhookUrl })} />
+                <${TextArea} wide label=${x('formSummary')} rows=${2} value=${f.summary} onInput=${(summary) => ctx.setForm({ summary })} />
+                <${TextField} label=${x('formTags')} value=${f.tags} onInput=${(tags) => ctx.setForm({ tags })} />
+                <${Check} checked=${f.visibility === 'public'} onChange=${(on) => ctx.setForm({ visibility: on ? 'public' : 'private' })}>${x('formPublic')}<//>
+              <//>
+              <${FormActions} apart>
+                <${Note} inline>${x('formHint')}<//>
+                <${Action} small disabled=${ctx.busy === 'create' || !f.name.trim()} onClick=${() => ctx.createManual()}>${x('formCreate')}<//>
+              <//>
+            <//>` : null}` : null}`}
     <//>`;
 }
 
@@ -197,17 +201,16 @@ function secOther(ctx, num, other, canCreate) {
 function secAgent(ctx, num, all, calls, vouches) {
   return html`
     <${PageSection} id="cp-ai" num=${num} title=${x('secAi')} count=${null}>
-      <p class="og-lead">${x('aiIntro')}</p>
-      <div class="cp-rule poster-box">
-        <span class="poster-label">${x('ruleLabel')}</span>
-        <p class="og-lead">${x('ruleBody', { base: ctx.nodeUrl })}</p>
-        <div class="og-doors"><${CopyButton} text=${agentRule(ctx.nodeUrl)} className="poster-action poster-action--small" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
-      </div>
-      <div class="facts facts--wide">
-        <div class="facts-k poster-label">${x('aiWhoK')}</div><div class="facts-v">${x('aiWhoBody')}</div>
-        <div class="facts-k poster-label">${x('aiTrustK')}</div><div class="facts-v">${x('aiTrustBody')}<small>${vouches ? x('aiTrustSub', { n: vouches }) : x('aiTrustNone')}</small></div>
-        <div class="facts-k poster-label">${x('aiCallsK')}</div><div class="facts-v">${ctx.policy?.call_counting ? x('aiCallsOn', { n: calls }) : x('aiCallsOff', { n: calls })}</div>
-        <div class="facts-k poster-label">${x('aiTwoK')}</div><div class="facts-v">${x('aiTwoBody')}</div>
-      </div>
+      <${Note} kind="lead">${x('aiIntro')}<//>
+      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+        <${Label} block>${x('ruleLabel')}<//>
+        <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>
+      <//>
+      <${Facts} wide rows=${[
+        { k: x('aiWhoK'), v: x('aiWhoBody') },
+        { k: x('aiTrustK'), v: x('aiTrustBody'), sub: vouches ? x('aiTrustSub', { n: vouches }) : x('aiTrustNone') },
+        { k: x('aiCallsK'), v: ctx.policy?.call_counting ? x('aiCallsOn', { n: calls }) : x('aiCallsOff', { n: calls }) },
+        { k: x('aiTwoK'), v: x('aiTwoBody') },
+      ]} />
     <//>`;
 }

@@ -11,6 +11,11 @@
  * @structure WorkspaceApps
  * @usage import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
  * @version-history
+ *   v2.0.0 — 2026-09-26 — Every part is a library component that takes data: the strip is the Object box
+ *     (Box), its head a Layout row of the Sub-heading, the Hint and the Manage action, a pinned app the
+ *     Card (the whole card its door, Enter and Space too) in a CardGrid, the picker a Split with the
+ *     Text field and the List (its loading and empty lines the List's own). The page writes no class
+ *     (page migration G2b).
  *   v1.9.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.8.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.7.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -32,6 +37,15 @@ import { openAppSandboxed } from '/js/app-sandbox.js';
 import { listApps } from '/js/services/apps.js';
 import { saveWorkspaceApps } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { Box } from '/components/Box.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Action } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SubHeading, HeadDesc } from '/components/SubHeading.js';
+import { TextField } from '/components/TextField.js';
+import { Row as Line, Split } from '/components/Layout.js';
+import { List, Row, Name, Desc, Doors } from '/components/List.js';
 
 /** The launch URL for a pinned app, carrying the workspace context in the fragment. */
 function launchHref(orgId, wsId, b) {
@@ -81,21 +95,16 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
     save(has ? bound.filter(b => !sameApp(a, b)) : [...bound, { owner: a.owner, filename: a.filename }]);
   };
 
+  // One pinned app is a launch card; the whole card is the door (Enter and Space too).
   const renderCard = (b) => {
     const rec = findApp(b);
     const m = rec?.manifest || {};
     const name = b.label || m.name || b.filename;
     const desc = (m.description || '').length > 110 ? m.description.slice(0, 110) + '…' : (m.description || '');
     return html`
-      <div key=${b.owner + '/' + b.filename} class="pj-app-card" role="button" tabindex="0"
-        title=${t('organisms.apps.open') || 'Open'}
-        onClick=${() => launch(b)} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); launch(b); } }}>
-        <div class="pj-app-name">${m.icon ? m.icon + ' ' : ''}${name}</div>
-        ${desc ? html`<div class="pj-app-desc">${desc}</div>` : null}
-        <div class="pj-app-meta">
-          ${catalog !== null && !rec ? html`<span class="poster-status poster-status--attention">${t('organisms.apps.missing') || 'Not in the catalog (removed?)'}</span>` : (m.authorDisplay || b.owner)}
-        </div>
-      </div>`;
+      <${Card} key=${b.owner + '/' + b.filename} name=${(m.icon ? m.icon + ' ' : '') + name} text=${desc || undefined} clamp
+        meta=${catalog !== null && !rec ? html`<${Mark} kind="status" tone="attention">${t('organisms.apps.missing') || 'Not in the catalog (removed?)'}<//>` : (m.authorDisplay || b.owner)}
+        onOpen=${() => launch(b)} openLabel=${t('organisms.apps.open') || 'Open'} />`;
   };
 
   // Picker rows: pinned apps first, then the rest alphabetically; a search filters by name/owner.
@@ -108,37 +117,38 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
       return pa !== px ? pa - px : String(a.manifest?.name || a.filename).localeCompare(String(x.manifest?.name || x.filename));
     });
 
+  const searchWords = t('organisms.apps.search') || 'Search apps…';
   return html`
-    <div class="pj-apps-strip poster-box">
-      <div class="pj-apps-head">
-        <span class="pj-apps-title sub-heading">${t('organisms.apps.title') || 'Apps'}</span>
-        <span class="poster-hint">${t('organisms.apps.hint') || 'Pinned to this workspace — they open with it as context.'}</span>
+    <${Box}>
+      <${Line} wrap gap="medium" below="small">
+        <${SubHeading} inline>${t('organisms.apps.title') || 'Apps'}<//>
+        <${Note} inline>${t('organisms.apps.hint') || 'Pinned to this workspace — they open with it as context.'}<//>
         ${canEdit ? html`
-          <button type="button" class="poster-action poster-action--small" aria-expanded=${showPicker ? 'true' : 'false'} onClick=${() => setShowPicker(s => !s)}>
+          <${Action} small expanded=${showPicker} onClick=${() => setShowPicker(s => !s)}>
             ${showPicker ? (t('organisms.apps.done') || 'Done') : ('⚙ ' + (t('organisms.apps.manage') || 'Manage'))}
-          </button>` : null}
-      </div>
+          <//>` : null}
+      <//>
       ${bound.length > 0
-        ? html`<div class="pj-apps-grid">${bound.map(renderCard)}</div>`
-        : html`<div class="poster-quiet pj-apps-empty">${(t('organisms.apps.none') || 'No apps pinned yet.')}${canEdit ? ' ' + (t('organisms.apps.noneHint') || 'Pin a published app so members can launch it from here.') : ''}</div>`}
+        ? html`<${CardGrid} cols="fill">${bound.map(renderCard)}<//>`
+        : html`<${Note} kind="quiet">${(t('organisms.apps.none') || 'No apps pinned yet.')}${canEdit ? ' ' + (t('organisms.apps.noneHint') || 'Pin a published app so members can launch it from here.') : ''}<//>`}
       ${showPicker ? html`
-        <div class="pj-apps-picker">
-          <div class="section-desc">${t('organisms.apps.pickerDesc') || 'Pick published apps to show in this workspace. Pinning only adds a launch card — data access follows workspace access.'}</div>
-          <input type="text" class="og-input" placeholder=${t('organisms.apps.search') || 'Search apps…'}
-            value=${q} onInput=${e => setQ(e.target.value)} />
-          ${catalog === null ? html`<div class="poster-quiet pj-apps-empty">…</div>`
-            : pickerRows.length === 0 ? html`<div class="poster-quiet pj-apps-empty">${ql ? (t('organisms.apps.noMatch') || 'No apps match.') : (t('organisms.apps.catalogEmpty') || 'No published apps on this node yet.')}</div>`
-            : html`<div class="listing listing--name-tags-doors listing--cols">${pickerRows.map(a => {
-                const pinned = bound.some(b => sameApp(a, b));
-                return html`
-                  <div key=${a.owner + '/' + a.filename} class="listing-row">
-                    <div class="listing-name">${a.manifest?.icon ? a.manifest.icon + ' ' : ''}${a.manifest?.name || a.filename}</div>
-                    <div class="listing-desc">${a.manifest?.authorDisplay || a.owner}</div>
-                    <div class="listing-doors"><button class="${pinned ? 'poster-action poster-action--small poster-action--row poster-action--danger' : 'poster-action poster-action--small poster-action--row'}" disabled=${busy} onClick=${() => togglePin(a)}>
-                      ${pinned ? (t('organisms.apps.unpin') || 'Unpin') : (t('organisms.apps.pin') || 'Pin')}
-                    </button></div>
-                  </div>`;
-              })}</div>`}
-        </div>` : null}
-    </div>`;
+        <${Split} gap="small">
+          <${HeadDesc}>${t('organisms.apps.pickerDesc') || 'Pick published apps to show in this workspace. Pinning only adds a launch card — data access follows workspace access.'}<//>
+          <${TextField} placeholder=${searchWords} ariaLabel=${searchWords} value=${q} onInput=${setQ} />
+          <${List} cols="name-tags-doors" keepCols loading=${catalog === null ? '…' : false}
+            empty=${ql ? (t('organisms.apps.noMatch') || 'No apps match.') : (t('organisms.apps.catalogEmpty') || 'No published apps on this node yet.')}>
+            ${pickerRows.map(a => {
+              const pinned = bound.some(b => sameApp(a, b));
+              return html`
+                <${Row} key=${a.owner + '/' + a.filename}>
+                  <${Name}>${a.manifest?.icon ? a.manifest.icon + ' ' : ''}${a.manifest?.name || a.filename}<//>
+                  <${Desc}>${a.manifest?.authorDisplay || a.owner}<//>
+                  <${Doors}><${Action} small row tone=${pinned ? 'danger' : undefined} disabled=${busy} onClick=${() => togglePin(a)}>
+                    ${pinned ? (t('organisms.apps.unpin') || 'Unpin') : (t('organisms.apps.pin') || 'Pin')}
+                  <//><//>
+                <//>`;
+            })}
+          <//>
+        <//>` : null}
+    <//>`;
 }

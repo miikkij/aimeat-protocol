@@ -5,6 +5,9 @@
  * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
  *   reach the account's API. Operator-only in the menu (the Infrastructure group).
  * @version-history
+ *   v1.22.0 -- 2026-09-26 -- Every part is a component that takes data (SettingsPage, Card section,
+ *     List, Mark, Note, Action/Loud, TextArea, SubHeading, Layout); the page writes no class. Put
+ *     back from main: an agent's name and the origins fields in the code face (main's text-code).
  *   v1.21.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.20.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.19.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -58,12 +61,19 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { LoadingLine } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
 import { swallowed } from '/js/swallowed.js';
-import { Hint } from '/components/Hint.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Card } from '/components/Card.js';
+import { Note } from '/components/Note.js';
+import { Mark, Code } from '/components/Mark.js';
+import { Action, Loud } from '/components/Action.js';
+import { TextArea } from '/components/TextField.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Row as Line, Stack, Space } from '/components/Layout.js';
+import { List, Row, Name, Desc, Cell, Doors } from '/components/List.js';
 
 export default function SecurityTab({ session, showToast }) {
   const { ConfirmUI } = useConfirm();
@@ -131,99 +141,99 @@ export default function SecurityTab({ session, showToast }) {
     } catch(e) { showToast(e.message || t('profile.error'), true); }
   }
 
-  if (loading || !securityData) return html`<${LoadingLine} text=${t('profile.security.loading')} />`;
+  if (loading || !securityData) return html`<${Note} kind="loading">${t('profile.security.loading')}<//>`;
 
   const ghii = securityData.ghii || {};
   const agentsCors = securityData.agents || [];
   const isInherited = ghii.inherited !== false;
   const effectiveOrigins = ghii.effective || [];
 
+  // One agent's overrides: its name as the identifier it is (main drew it in the code face), the
+  // origins or the field that edits them, whether they are its own or inherited, and its doors.
+  const agentRow = (ac) => {
+    const agentName = (ac.gaii || '').split('#')[0] || ac.gaii;
+    const hasCustom = ac.allowed_origins !== null && ac.allowed_origins !== undefined;
+    const isEditing = corsEditAgent && corsEditAgent.name === agentName;
+    return html`<${Row} key=${agentName}>
+      <${Name} code>${escHtml(agentName)}<//>
+      ${isEditing
+        ? html`<${Cell}><${TextArea} code rows=${2} ariaLabel=${t('profile.security.origins')}
+            value=${corsEditAgent.value}
+            onInput=${(v) => setCorsEditAgent({ name: agentName, value: v })} /><//>`
+        : html`<${Desc}>${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}<//>`}
+      <${Cell}>${hasCustom
+        ? html`<${Mark} tone="ink">${t('profile.security.custom')}<//>`
+        : html`<${Mark}>${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}<//>`}<//>
+      <${Doors}>${isEditing
+        ? html`
+            <${Loud} control onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}<//>
+            <${Action} small row tone="danger" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}<//>
+            <${Action} small row onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}<//>`
+        : html`<${Action} small row onClick=${() => setCorsEditAgent({ name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : '' })}>${t('profile.security.edit')}<//>`}<//>
+    <//>`;
+  };
+
   return html`
-    <div class="og mb-1">
-      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuInfra')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.security')}</span></div>
-      <div class="og-mast"><div class="og-mast-words">
-        <div class="og-title poster-page-title">${t('profile.security.title')}</div>
-        <div class="og-desc">${t('profile.security.desc')}</div>
-      </div></div>
-    </div>
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.security')]}
+      title=${t('profile.security.title')}
+      desc=${t('profile.security.desc')}
+      after=${html`<${ConfirmUI} />`}>
 
-    ${securityData.managedBy && html`
-      <div class="card mb-1 poster-row--thing">
-        <span class="sub-heading">${t('profile.security.managedTitle')}</span>
-        <p class="poster-hint mb-0">${t('profile.security.managedDesc').replace('{name}', securityData.managedBy.name)}</p>
-      </div>
-    `}
-
-    <p class="poster-hint mb-1">${t('profile.security.signInMoved')}</p>
-
-    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.ghiiTitle')}</h3>
-    <p class="poster-hint mb-1">${t('profile.security.ghiiDesc')}</p>
-    <div class="card poster-row--thing">
-      <div class="flex-between mb-half">
-        <span class="sub-heading">${t('profile.security.allowedOrigins')}</span>
-        <span class=${`poster-chip ${isInherited ? '' : 'poster-chip--ink'}`}>${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}</span>
-      </div>
-      <div class="poster-hint mb-half">
-        ${t('profile.security.effective')}: ${effectiveOrigins.includes('*') ? t('profile.security.wildcard') : effectiveOrigins.join(', ') || '-'}
-      </div>
-      ${corsEditGhii !== null ? html`
-        <textarea class="og-textarea mb-half"
-          placeholder=${t('profile.security.originsPlaceholder')}
-          value=${corsEditGhii}
-          onInput=${e => setCorsEditGhii(e.target.value)}></textarea>
-        <div class="flex-row">
-          <button class="poster-slab" onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}</button>
-          <button class="poster-action poster-action--small poster-action--danger" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
-          <button class="poster-action poster-action--small" onClick=${() => setCorsEditGhii(null)}>${t('profile.cancel')}</button>
-        </div>
-      ` : html`
-        <button class="poster-action poster-action--small" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
+      ${securityData.managedBy && html`
+        <${Space} below="large">
+          <${Card} tone="section" title=${t('profile.security.managedTitle')}>
+            <${Note}>${t('profile.security.managedDesc').replace('{name}', securityData.managedBy.name)}<//>
+          <//>
+        <//>
       `}
-    </div>
 
-    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.agentsTitle')}</h3>
-    <p class="poster-hint mb-1">${t('profile.security.agentsDesc')}</p>
-    ${agentsCors.length === 0
-      ? html`<div class="poster-quiet">${t('profile.security.noAgents')}</div>`
-      : html`<div class="card poster-row--thing">
-          <div class="listing listing--name-desc-state-doors">
-            <div class="listing-row listing-row--head">
-              ${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), ''].map(hd => html`<div class="poster-label">${hd}</div>`)}
-            </div>
-            ${agentsCors.map(ac => {
-              const agentName = (ac.gaii || '').split('#')[0] || ac.gaii;
-              const hasCustom = ac.allowed_origins !== null && ac.allowed_origins !== undefined;
-              const isEditing = corsEditAgent && corsEditAgent.name === agentName;
-              return html`<div class="listing-row" key=${agentName}>
-                <div class="listing-name">${escHtml(agentName)}</div>
-                ${isEditing
-                  ? html`<div><textarea class="og-textarea pf-textarea-sm"
-                      value=${corsEditAgent.value}
-                      onInput=${e => setCorsEditAgent({name: agentName, value: e.target.value})}></textarea></div>`
-                  : html`<div class="listing-desc">${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}</div>`}
-                <div>${hasCustom
-                  ? html`<span class="poster-chip poster-chip--ink">${t('profile.security.custom')}</span>`
-                  : html`<span class="poster-chip">${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}</span>`}</div>
-                <div class="listing-doors">${isEditing
-                  ? html`
-                      <button class="poster-slab poster-slab--control" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
-                      <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
-                      <button class="poster-action poster-action--small poster-action--row" onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}</button>`
-                  : html`<button class="poster-action poster-action--small poster-action--row" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`}</div>
-              </div>`;
-            })}
-          </div>
-        </div>`
-    }
+      <${Space} below="large"><${Note}>${t('profile.security.signInMoved')}<//><//>
 
-    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.inheritanceTitle')}</h3>
-    <div class="card poster-row--thing">
-      <${Hint}>${t('profile.security.inheritanceDesc')}<//>
-      <div class="mt-xs"><code class="code-inline">
-        Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
-      </code></div>
-    </div>
+      <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.ghiiTitle')}<//><//>
+      <${Space} below="large"><${Note}>${t('profile.security.ghiiDesc')}<//><//>
+      <${Card} tone="section" title=${t('profile.security.allowedOrigins')}
+        aside=${html`<${Mark} tone=${isInherited ? undefined : 'ink'}>${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}<//>`}>
+        <${Stack}>
+          <${Note}>
+            ${t('profile.security.effective')}: ${effectiveOrigins.includes('*') ? t('profile.security.wildcard') : effectiveOrigins.join(', ') || '-'}
+          <//>
+          ${corsEditGhii !== null ? html`
+            <${TextArea} code
+              placeholder=${t('profile.security.originsPlaceholder')}
+              ariaLabel=${t('profile.security.allowedOrigins')}
+              value=${corsEditGhii}
+              onInput=${setCorsEditGhii} />
+            <${Line}>
+              <${Loud} onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}<//>
+              <${Action} small tone="danger" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}<//>
+              <${Action} small onClick=${() => setCorsEditGhii(null)}>${t('profile.cancel')}<//>
+            <//>
+          ` : html`
+            <${Line}><${Action} small onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}<//><//>
+          `}
+        <//>
+      <//>
 
-    <${ConfirmUI} />
+      <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.agentsTitle')}<//><//>
+      <${Space} below="large"><${Note}>${t('profile.security.agentsDesc')}<//><//>
+      ${agentsCors.length === 0
+        ? html`<${Note} kind="quiet">${t('profile.security.noAgents')}<//>`
+        : html`<${Card} tone="section">
+            <${List} cols="name-desc-state-doors"
+              head=${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), '']}>
+              ${agentsCors.map(agentRow)}
+            <//>
+          <//>`
+      }
+
+      <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.inheritanceTitle')}<//><//>
+      <${Card} tone="section">
+        <${Note}>${t('profile.security.inheritanceDesc')}<//>
+        <${Space} above="tight"><${Code}>
+          Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
+        <//><//>
+      <//>
+    <//>
   `;
 }

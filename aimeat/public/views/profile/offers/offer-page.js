@@ -8,10 +8,20 @@
  *   whether it is for sale; then what you ask (the ask, the example, the request field and the
  *   button), what to know before asking (effects, requirements, prerequisites, data handling),
  *   what you get back (format, location, a sample), this offer's deliveries, and the selling
- *   editor as a fold. The rail names offers for the same need and the same agent's others.
+ *   editor as a fold. The rail names offers for the same need and the same agent's others. Made of
+ *   the component kit: the page passes data and never a class.
  * @structure renderOffer · SellingEditor · askWord
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
+ *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): the frame
+ *     is renderPage (SettingsPage), the tags data (the data handling and the format the dim Tag
+ *     again, main's og-chip--dim, which the previous branch lost), the strip FigureStrip (the latest
+ *     state a word in the fine colour or coral), the rail's own lists rail groups; the ask the lead,
+ *     the request a TextArea, the send the loud action with the warnings beside it as the small
+ *     attention note (solid for an effect that cannot be undone), what the request did the sun-edged
+ *     Box with its typewriter line; before asking the Facts (a requirement's fix a coral word, the
+ *     prerequisites Status marks); the sample a scrolling Box; the selling editor Fields of four with
+ *     its hints. The page writes no class.
  *   v1.12.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.11.0 — 2026-09-26 — An offer's agent is the Tag (.poster-chip; the sun tone on its own page), a unification: Jouni's decision Tag.
  *   v1.10.0 — 2026-09-25 — A prerequisite's state and a muted sender are the Status (a unification: Jouni's decision "Status").
@@ -46,9 +56,19 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { fmtMoney, microsFromInput } from '/js/utils.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
-import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tinted } from '/components/Figure.js';
+import { Facts, FactLine } from '/components/Facts.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark, Marks, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Row, Space } from '/components/Layout.js';
+import { scrollToSection } from '/components/Rail.js';
 import { dispatchMode } from '/js/services/offers.js';
 import { runsOf } from './model.js';
 import { c, word, agentMark, getWord, statusWord, deliveryRows, rel, renderPage } from './frame.js';
@@ -80,19 +100,19 @@ function SellingEditor({ it, ctx }) {
   };
   const money = microsFromInput(moneyAmt) !== null;
   return html`
-    <div class="op-sell">
-      <label class="op-field"><span class="poster-label">${c('colVisibility')}</span>
-        <select class="select-field" value=${vis} onChange=${(e) => setVis(e.target.value)}>
-          ${['private', 'unlisted', 'public'].map(v => html`<option value=${v} key=${v}>${t('profile.offers.visibility.' + v)}</option>`)}
-        </select></label>
-      <label class="op-field"><span class="poster-label">${t('profile.offers.morsels')} / ${t('profile.offers.perCall')}</span><input class="og-input" type="number" min="0" value=${morsels} onInput=${(e) => setMorsels(e.target.value)} /></label>
-      <label class="op-field"><span class="poster-label">${c('colPrice')}</span><input class="og-input" type="text" inputmode="decimal" value=${moneyAmt} placeholder="0.00" onInput=${(e) => setMoneyAmt(e.target.value)} /></label>
-      <label class="op-field op-field--cur"><span class="poster-label">EUR / USD</span><select class="select-field" value=${moneyCur} onChange=${(e) => setMoneyCur(e.target.value)}><option value="EUR">EUR</option><option value="USD">USD</option></select></label>
-      <div class="op-sell-actions"><button type="button" class="poster-slab poster-slab--control" disabled=${saving} onClick=${save}>${t('profile.offers.saveBilling')}</button></div>
-      ${money ? html`<p class="poster-hint op-sell-hint">${t('profile.offers.moneyHint')}</p>` : null}
-      ${vis !== 'private' && Number(morsels) > 0 ? html`<p class="poster-hint op-sell-hint">${t('profile.offers.billHint').replace('{n}', morsels)}</p>` : null}
-      ${vis !== 'private' && !o.callable ? html`<p class="poster-hint op-sell-hint op-st--err">${t('profile.offers.notCallableHint')}</p>` : null}
-    </div>`;
+    <${Fields} cols=${4}>
+      <${Select} label=${c('colVisibility')} value=${vis} onChange=${setVis}
+        options=${['private', 'unlisted', 'public'].map(v => [v, t('profile.offers.visibility.' + v)])} />
+      <${TextField} label=${`${t('profile.offers.morsels')} / ${t('profile.offers.perCall')}`} type="number" min="0" value=${morsels} onInput=${setMorsels} />
+      <${TextField} label=${c('colPrice')} inputMode="decimal" value=${moneyAmt} placeholder="0.00" onInput=${setMoneyAmt} />
+      <${Select} label="EUR / USD" value=${moneyCur} onChange=${setMoneyCur} options=${['EUR', 'USD']} />
+    <//>
+    <${Space} above="medium">
+      <${FormActions}><${Loud} control disabled=${saving} onClick=${save}>${t('profile.offers.saveBilling')}<//><//>
+    <//>
+    ${money ? html`<${Note}>${t('profile.offers.moneyHint')}<//>` : null}
+    ${vis !== 'private' && Number(morsels) > 0 ? html`<${Note}>${t('profile.offers.billHint').replace('{n}', morsels)}<//>` : null}
+    ${vis !== 'private' && !o.callable ? html`<${Note}><${Tinted} tone="notice">${t('profile.offers.notCallableHint')}<//><//>` : null}`;
 }
 
 export function renderOffer(ctx, it) {
@@ -113,67 +133,71 @@ export function renderOffer(ctx, it) {
   const forSale = m.selling.includes(it);
   const input = ctx.askInput[it.key] || '';
   const result = ctx.askResult[it.key] || null;
+  const openOther = (x) => () => ctx.pickView({ kind: 'offer', key: x.key });
 
-  const chips = html`
-    ${agentMark(it, 'poster-chip--sun')}
-    ${o.latency ? html`<span class="poster-chip">${word('latency', o.latency)}</span>` : null}
-    ${o.cost ? html`<span class="poster-chip">${word('cost', o.cost)}</span>` : null}
-    ${o.verification ? html`<span class="poster-chip">${word('verification', o.verification)}</span>` : null}
-    ${o.dataHandling ? html`<span class="poster-chip">${word('dataHandling', o.dataHandling)}</span>` : null}
-    ${o.deliverable?.format ? html`<span class="poster-chip">${word('format', o.deliverable.format)}</span>` : null}
-    ${consequences.map((x, i) => html`<span class="poster-chip poster-chip--coral" key=${i}>${conseqWord(x.type)}</span>`)}`;
-  const doors = html`
-    <button type="button" class="poster-slab" onClick=${() => scrollTo('op-what')}>${c('ask')}</button>
-    <button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openTab('agents')}>${c('agentPage')}</button>
-    <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setSellFoldOpen(v => !v)}>${c('sell')}</button>`;
-  const strip = html`
-    <div class="og-strip">
-      <div>${last ? html`<b class=${`og-strip-coral op-st-${last.status === 'done' ? 'ok' : 'err'}`}>${statusWord(last.status)}</b><span>${c('stripLatest')}</span><small>${rel(last.updated_at)} · ${last.title || ''}</small>` : html`<b>·</b><span>${c('stripLatest')}</span><small>${t('profile.offers.noRunsYet')}</small>`}</div>
-      <div><b>${runs.length}</b><span>${c('stripRuns')}</span><small>${runs.length ? c('stripRatedOf', { n: runs.filter(d => d.rating).length }) : ''}</small></div>
-      <div><b class="og-strip-coral">${aw.mode}</b><span>${c('stripMode')}</span><small>${aw.sub}</small></div>
-      <div><b>${forSale ? (o.price?.morsels || (o.priceMoney ? fmtMoney(o.priceMoney.amount) : '·')) : '·'}</b><span>${c('sell')}</span><small>${forSale ? `${t('profile.offers.visibility.' + o.visibility)}${o.priceMoney ? ` · ${o.priceMoney.currency}` : ''}` : c('sellPrivate')}</small></div>
-    </div>`;
-  const rail = html`
-    ${sameNeed.length ? html`<hr /><span class="og-rail-label">${c('railSameNeed', { g: needLabel(it.need) })}</span>
-      ${sameNeed.map(x => html`<button type="button" class="og-rail-link" key=${x.key} onClick=${() => ctx.pickView({ kind: 'offer', key: x.key })}><i>→</i>${x.offer.title}<em>${x.agent}</em></button>`)}` : null}
-    ${sameAgent.length ? html`<hr /><span class="og-rail-label">${c('railSameAgent', { a: it.agent })}</span>
-      ${sameAgent.map(x => html`<button type="button" class="og-rail-link" key=${x.key} onClick=${() => ctx.pickView({ kind: 'offer', key: x.key })}><i>→</i>${x.offer.title}</button>`)}` : null}`;
+  const marks = [
+    agentMark(it, 'sun'),
+    o.latency ? { label: word('latency', o.latency) } : null,
+    o.cost ? { label: word('cost', o.cost) } : null,
+    o.verification ? { label: word('verification', o.verification) } : null,
+    o.dataHandling ? { label: word('dataHandling', o.dataHandling), tone: 'dim' } : null,
+    o.deliverable?.format ? { label: word('format', o.deliverable.format), tone: 'dim' } : null,
+    ...consequences.map((x) => ({ label: conseqWord(x.type), tone: 'coral' })),
+  ];
+  const actions = html`
+    <${Loud} onClick=${() => scrollToSection('op-what')}>${c('ask')}<//>
+    <${Action} small onClick=${() => ctx.openTab('agents')}>${c('agentPage')}<//>
+    <${Action} small soft onClick=${() => ctx.setSellFoldOpen(v => !v)}>${c('sell')}<//>`;
+  const strip = html`<${FigureStrip} items=${[
+    last
+      ? { key: 'latest', n: statusWord(last.status), tone: last.status === 'done' ? 'word fine' : 'coral', label: c('stripLatest'), sub: `${rel(last.updated_at)} · ${last.title || ''}` }
+      : { key: 'latest', n: '·', label: c('stripLatest'), sub: t('profile.offers.noRunsYet') },
+    { key: 'runs', n: runs.length, label: c('stripRuns'), sub: runs.length ? c('stripRatedOf', { n: runs.filter(d => d.rating).length }) : '' },
+    { key: 'mode', n: aw.mode, tone: 'coral', label: c('stripMode'), sub: aw.sub },
+    { key: 'sell', n: forSale ? (o.price?.morsels || (o.priceMoney ? fmtMoney(o.priceMoney.amount) : '·')) : '·', label: c('sell'), sub: forSale ? `${t('profile.offers.visibility.' + o.visibility)}${o.priceMoney ? ` · ${o.priceMoney.currency}` : ''}` : c('sellPrivate') },
+  ]} />`;
+  const rail = [
+    sameNeed.length ? { label: c('railSameNeed', { g: needLabel(it.need) }), items: sameNeed.map(x => ({ key: x.key, mark: '→', label: x.offer.title, count: x.agent, onClick: openOther(x) })) } : null,
+    sameAgent.length ? { label: c('railSameAgent', { a: it.agent }), items: sameAgent.map(x => ({ key: x.key, mark: '→', label: x.offer.title, onClick: openOther(x) })) } : null,
+  ].filter(Boolean);
 
   return renderPage(ctx, {
-    id: 'offer', crumbs: [o.title], title: o.title, chips, doors, strip, rail,
+    id: 'offer', crumbs: [o.title], title: o.title, marks, actions, strip, rail,
     children: html`
-      <${PageSection} id="op-what" num="01" title=${c('secWhat')} first=${true}>
-        <p class="op-ask">${o.ask}</p>
-        ${o.example ? html`<div class="facts facts--wide"><div class="facts-k poster-label">${t('profile.offers.example')}</div><div class="facts-v">${o.example}</div></div>` : null}
-        <textarea class="og-textarea op-request" rows="3" placeholder=${t('profile.offers.requestPlaceholder')} value=${input} onInput=${(e) => ctx.setAskInput(it.key, e.target.value)}></textarea>
-        <div class="op-ask-row">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy || blocked} onClick=${() => ctx.ask(it)}>${aw.btn}</button>
-          ${gated ? html`<span class="op-warn">${c('gatedWarn', { effects: consequences.map(x => conseqWord(x.type)).join(', ') })}</span>` : null}
-          ${blocked ? html`<span class="op-warn">${t('profile.offers.blockedReason').replace('{what}', blockedReasons.join(', '))}</span>` : null}
-        </div>
-        ${result ? html`<div class="op-result">
-          ${result.kind === 'prompt' ? t('profile.offers.promptCopied') : result.kind === 'triggered' ? t('profile.offers.triggered') : t('profile.offers.requested').replace('{agent}', it.agent)}
-          ${result.kind === 'task' ? html` <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')} →</button>` : null}
-          <small>${t('profile.offers.provenance')}: ${it.agent}${result.taskId ? ` · ${t('profile.offers.task')} ${result.taskId}` : ''}</small>
-        </div>` : null}
+      <${Section} id="op-what" num="01" title=${c('secWhat')} first=${true}>
+        <${Note} kind="lead">${o.ask}<//>
+        ${o.example ? html`<${Facts} wide rows=${[{ k: t('profile.offers.example'), v: o.example }]} />` : null}
+        <${Space} above="large">
+          <${TextArea} rows=${3} placeholder=${t('profile.offers.requestPlaceholder')} value=${input} onInput=${(v) => ctx.setAskInput(it.key, v)} />
+        <//>
+        <${Row} gap="large" wrap above="medium">
+          <${Loud} control disabled=${ctx.busy || blocked} onClick=${() => ctx.ask(it)}>${aw.btn}<//>
+          ${gated ? html`<${Note} kind="aside" size="small" tone="irreversible">${c('gatedWarn', { effects: consequences.map(x => conseqWord(x.type)).join(', ') })}<//>` : null}
+          ${blocked ? html`<${Note} kind="aside" size="small">${t('profile.offers.blockedReason').replace('{what}', blockedReasons.join(', '))}<//>` : null}
+        <//>
+        ${result ? html`<${Box} tone="edge">
+          <b>${result.kind === 'prompt' ? t('profile.offers.promptCopied') : result.kind === 'triggered' ? t('profile.offers.triggered') : t('profile.offers.requested').replace('{agent}', it.agent)}</b>
+          ${result.kind === 'task' ? html` <${Action} small soft onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')} →<//>` : null}
+          <${Note} kind="meta" mono>${t('profile.offers.provenance')}: ${it.agent}${result.taskId ? ` · ${t('profile.offers.task')} ${result.taskId}` : ''}<//>
+        <//>` : null}
       <//>
-      ${hasBefore ? html`<${PageSection} id="op-before" num="02" title=${c('secBefore')}>
-        <div class="facts facts--wide">
-          ${consequences.length ? html`<div class="facts-k poster-label">${t('profile.offers.consequences')}</div><div class="facts-v">${consequences.map(x => conseqWord(x.type)).join(', ')}${consequences.some(x => x.requiresApproval || x.persistent) ? ` · ${c('lastingNote')}` : ''}</div>` : null}
-          ${reqs.length ? html`<div class="facts-k poster-label">${t('profile.offers.requirements')}</div><div class="facts-v">${reqs.map((r, i) => html`<div key=${i}>${r.need}${r.instruction ? html` <span class="poster-hint">${r.instruction}</span>` : null}${r.fix ? html` <b class="op-st--err">${r.fix}</b>` : null}</div>`)}</div>` : null}
-          ${prereq && prereq.items?.length ? html`<div class="facts-k poster-label">${t('profile.offers.needsFirst')}</div><div class="facts-v op-prereqs">${prereq.items.map((p, i) => html`<span class=${`poster-status ${p.ok ? 'poster-status--fine' : (p.hard ? 'poster-status--danger' : 'poster-status--attention')}`} key=${i}>${p.ok ? '✓' : (p.hard ? '✗' : '!')} ${p.label}</span>`)}</div>` : null}
-          ${o.dataHandling ? html`<div class="facts-k poster-label">${t('profile.offers.facet.dataHandling')}</div><div class="facts-v">${c('data.' + o.dataHandling) || word('dataHandling', o.dataHandling)}</div>` : null}
-        </div>
+      ${hasBefore ? html`<${Section} id="op-before" num="02" title=${c('secBefore')}>
+        <${Facts} wide rows=${[
+          consequences.length && { k: t('profile.offers.consequences'), v: `${consequences.map(x => conseqWord(x.type)).join(', ')}${consequences.some(x => x.requiresApproval || x.persistent) ? ` · ${c('lastingNote')}` : ''}` },
+          reqs.length && { k: t('profile.offers.requirements'), v: reqs.map((r, i) => html`<${FactLine} key=${i}>${r.need}${r.instruction ? html` <${Note} inline>${r.instruction}<//>` : null}${r.fix ? html` <${Tinted} strong tone="notice">${r.fix}<//>` : null}<//>`) },
+          prereq && prereq.items?.length && { k: t('profile.offers.needsFirst'), v: html`<${Marks}>${prereq.items.map((p, i) => html`<${Mark} kind="status" key=${i} tone=${p.ok ? 'fine' : (p.hard ? 'danger' : 'attention')}>${p.ok ? '✓' : (p.hard ? '✗' : '!')} ${p.label}<//>`)}<//>` },
+          o.dataHandling && { k: t('profile.offers.facet.dataHandling'), v: c('data.' + o.dataHandling) || word('dataHandling', o.dataHandling) },
+        ]} />
       <//>` : null}
-      ${o.deliverable ? html`<${PageSection} id="op-get" num="03" title=${c('secGet')} count=${getWord(o)}>
-        ${o.deliverable.sample === 'untested' ? html`<p class="poster-quiet">${t('profile.offers.untested')}</p>`
-          : o.deliverable.sample ? html`<div class="op-frame poster-box"><span class="poster-label">${c('sampleLabel')}</span><div class="op-sample"><${DeliverableBody} value=${o.deliverable.sample} alt=${o.title} format=${o.deliverable.format} /></div></div>`
-          : html`<p class="poster-quiet">${c('noSample')}</p>`}
+      ${o.deliverable ? html`<${Section} id="op-get" num="03" title=${c('secGet')} count=${getWord(o)}>
+        ${o.deliverable.sample === 'untested' ? html`<${Note} kind="quiet">${t('profile.offers.untested')}<//>`
+          : o.deliverable.sample ? html`<${Box} scroll><${Label} block>${c('sampleLabel')}<//><${DeliverableBody} value=${o.deliverable.sample} alt=${o.title} format=${o.deliverable.format} /><//>`
+          : html`<${Note} kind="quiet">${c('noSample')}<//>`}
       <//>` : null}
-      <${PageSection} id="op-runs" num="04" title=${c('secRuns')} count=${runs.length || null}>
-        ${runs.length ? deliveryRows(ctx, runs) : html`<p class="poster-quiet">${t('profile.offers.noRunsYet')}</p>`}
+      <${Section} id="op-runs" num="04" title=${c('secRuns')} count=${runs.length || null}>
+        ${runs.length ? deliveryRows(ctx, runs) : html`<${Note} kind="quiet">${t('profile.offers.noRunsYet')}<//>`}
       <//>
-      <${FoldSection} id="op-sellfold" num="05" title=${c('sell')} sub=${forSale ? c('sellingSub', { n: 1 }) : c('sellSub')} open=${ctx.sellFoldOpen} onToggle=${() => ctx.setSellFoldOpen(v => !v)}>
+      <${Section} fold wrap id="op-sellfold" num="05" title=${c('sell')} sub=${forSale ? c('sellingSub', { n: 1 }) : c('sellSub')} open=${ctx.sellFoldOpen} onToggle=${() => ctx.setSellFoldOpen(v => !v)}>
         <${SellingEditor} key=${it.key} it=${it} ctx=${ctx} />
       <//>`,
   });

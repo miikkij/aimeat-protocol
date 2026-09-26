@@ -9,6 +9,10 @@
  *   node would tell you what you had been given. Everything else on this page answers "who can see
  *   my things"; this one answers "what of other people's may I see".
  * @version-history
+ *   v1.6.0 — 2026-09-26 — Every part is a component that takes data, and the file writes no class
+ *     (component plan, page group G3): the heading is the SubHeading with its intro, the shares a
+ *     List (its loading line the List's), the date a dim tag as main's muted badge. `inRow` leaves
+ *     out the heading and intro where the page's section says what they are (Access 06).
  *   v1.5.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.4.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.3.0 — 2026-09-25 — What others share with you is the Listing (css/components/listing.css), a unification: the look most tabs use.
@@ -26,8 +30,16 @@ import { escHtml } from '/js/utils.js';
 import * as sharesApi from '/js/services/shares.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { List, Row, Name, Cell } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Space } from '/components/Layout.js';
 
-export function SharesIncomingSection() {
+/**
+ * @param {{ inRow?: boolean }} props `inRow`: the list stands inside a page section that already says
+ *   what it is (Access, 06), so it leaves out its own heading and intro, as .ac-kept hid them on main.
+ */
+export function SharesIncomingSection({ inRow } = {}) {
   const [shares, setShares] = useState(null);
 
   const load = useCallback(async () => {
@@ -56,16 +68,14 @@ export function SharesIncomingSection() {
   if (shares !== null && shares.length === 0) return null;
 
   return html`
-    <h3 class="card-h3 sub-heading access-h3 mt-section" id="access-shares-incoming">${t('profile.access.shIncomingTitle')}</h3>
-    <div class="section-desc">${t('profile.access.shIncomingDesc')}</div>
-    ${shares === null
-      ? html`<div class="poster-quiet loading-mark">${t('profile.access.sgLoading') || 'Loading...'}</div>`
-      : html`<div class="listing listing--cols listing--name-state">${shares.map(s => html`
-        <div class="listing-row" key=${s.id}>
-          <div class="listing-name"><span title=${s.key_pattern}>${escHtml(s.key_pattern)}</span><small>${t('profile.access.shIncomingFrom')} ${escHtml(s.owner_gaii)}</small></div>
-          <div>${s.expires_at && html`<span class="poster-chip">${fmtDate(s.expires_at)}</span>`}</div>
-        </div>
-      `)}</div>`
-    }
+    ${inRow ? null : html`<${Space} above="section"><${SubHeading} level=${3} id="access-shares-incoming" desc=${t('profile.access.shIncomingDesc')}>${t('profile.access.shIncomingTitle')}<//><//>`}
+    <${List} cols="name-state" keepCols loading=${shares === null ? (t('profile.access.sgLoading') || 'Loading...') : false}>
+      ${(shares || []).map(s => html`
+        <${Row} key=${s.id}>
+          <${Name} title=${s.key_pattern} meta=${`${t('profile.access.shIncomingFrom')} ${escHtml(s.owner_gaii)}`}>${escHtml(s.key_pattern)}<//>
+          <${Cell}>${s.expires_at && html`<${Mark} tone="dim">${fmtDate(s.expires_at)}<//>`}<//>
+        <//>
+      `)}
+    <//>
   `;
 }

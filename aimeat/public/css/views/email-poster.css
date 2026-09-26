@@ -8,6 +8,7 @@
  *   carries what email adds: the uses list, the mailbox rows with their delegations, the sent log,
  *   the letters rows, the mail log. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.13.0 -- 2026-09-26 -- The page's parts are kit components (page group G8): the strip's address (FigureStrip long), the change form (Fields), the mailbox marks and delegations (List Lead, Row below), the select, the sent log's and the letters' places (List, CardGrid, Label, More) go.
  *   v1.12.0 -- 2026-09-26 -- The dashed avatar is the avatar's agent tone in css/poster.css (.poster-box--agent); its rule here goes.
  *   v1.11.0 -- 2026-09-25 -- The code field is the Text field as it is, a unification: the look most tabs use. Its typewriter face and wide letter spacing go; its width stays.
  *   v1.10.0 -- 2026-09-25 -- The last emails from here are the Item grid (css/components/item-grid.css, two columns), a unification: the look most tabs use. The rules of .em-maillog and its phone rule go; its margin stays.
@@ -30,25 +31,3 @@
 .og-em .poster-hint { display: block; }
 .og-em .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-em .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.og-em .em-more { margin-top: .8rem; }
-.og-em .em-label { display: block; margin-top: 1.2rem; }
-.og-em .og-strip b.em-strip-addr { font-size: 1.35rem; overflow-wrap: anywhere; }
-
-/* ── The uses of the address: the Uses list (css/components/uses-list.css); the change form ─── */
-.em-form { margin-top: .2rem; }
-.em-form .og-input { width: 100%; box-sizing: border-box; }
-.em-form .em-code { max-width: 10rem; }
-.em-form-doors { margin-top: 1rem; }
-
-/* ── Mailboxes and letters: the Listing (css/components/listing.css) ─────────────────────────── */
-/* The mark is a whole box of its own here: the contacts and notifications rules are scoped to their rows. */
-.og-em .nt-av { width: 2.2rem; height: 2.2rem; }
-/* How many delegations, on its own typewriter line under the words. */
-.og-em .listing-desc small { display: block; font-family: var(--font-mono); font-size: .7rem; }
-/* The delegations of a mailbox (css/components/delegation-lines.css): a line of the row's own under
-   the name, the words and the doors. */
-.og-em .listing-row > .em-deleg { grid-column: 2 / -1; row-gap: .3rem; }
-.em-select { max-width: 10rem; }
-
-/* ── The sent log (css/components/sent-log.css); the mail log is the Item grid, in its place ── */
-.og-em .item-grid { margin-top: .4rem; }

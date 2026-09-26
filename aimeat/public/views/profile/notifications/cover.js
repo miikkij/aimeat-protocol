@@ -11,6 +11,7 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold · howFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Tabs in the fold tone; List via frame.js; More; the groups under the AIMEAT row on the sun edge Box; the devices as framed Cards, the one you are on current, a switched-off digest off; the quiet hours as Fields with Switch, TextField, Choice; Roads; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.12.0 -- 2026-09-26 -- The groups under AIMEAT's sender row are the Panel (.poster-panel, its sun edge), a unification: the look the library carries for a part set apart by the sun.
@@ -41,9 +42,22 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { More } from '/components/List.js';
+import { Box } from '/components/Box.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Roads, Road } from '/components/Roads.js';
+import { Tabs } from '/components/Tabs.js';
+import { Fields, Field, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Choice } from '/components/Choice.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Row as Line } from '/components/Layout.js';
 import { groupWord, kindWord, sourceName, titleOf } from '/js/services/notifications.js';
-import { c, rel, day, firstLine, Switch, inboxRows, inboxHead, senderRows, crumb, pageLinks } from './frame.js';
+import { c, rel, day, firstLine, Switch, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
 
 const PAGE = 12;
@@ -56,50 +70,48 @@ export function renderCover(ctx) {
   const senderNames = (() => { const m = new Map(); for (const n of recent) { const k = sourceName(n); m.set(k, (m.get(k) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); })();
   const appSenders = ctx.senders.filter(s => s.kind === 'app').length;
   const devices = ctx.devices.length;
-  const chip = (n, key, cls = '') => html`<span class=${`poster-chip ${cls}`}>${c(key, { n })}</span>`;
-  const strip = html`
-    <div class="og-strip">
-      <div>${items[0] ? html`<b>${rel(items[0].createdAt)}</b><span>${c('stripLatest')}</span><small>${sourceName(items[0])} · ${titleOf(items[0])}</small>` : html`<b>·</b><span>${c('stripLatest')}</span><small>${c('nothingYet')}</small>`}</div>
-      <div><b class=${unread ? 'og-strip-coral' : ''}>${unread}</b><span>${c('stripUnread')}</span><small>${unread ? [...new Set(items.filter(n => !n.read).map(n => sourceName(n)))].join(' · ') : c('stripUnreadNone')}</small></div>
-      <div><b>${senderNames.length}</b><span>${c('stripSenders')}</span><small>${senderNames.slice(0, 4).map(([k, n]) => `${k} ${n}`).join(' · ') || c('nothingYet')}</small></div>
-      <div><b>${devices}</b><span>${c('stripDevices')}</span><small>${devices ? ctx.devices.map(d => (d.thisBrowser ? c('thisBrowser') : c('family.' + d.family))).join(' · ') : c('stripDevicesNone')}</small></div>
-    </div>`;
+  const mark = (n, key, tone) => ({ label: c(key, { n }), tone });
+  const strip = html`<${FigureStrip} items=${[
+    items[0]
+      ? { key: 'latest', n: rel(items[0].createdAt), label: c('stripLatest'), sub: `${sourceName(items[0])} · ${titleOf(items[0])}` }
+      : { key: 'latest', n: '·', label: c('stripLatest'), sub: c('nothingYet') },
+    { key: 'unread', n: unread, tone: unread ? 'coral' : undefined, label: c('stripUnread'),
+      sub: unread ? [...new Set(items.filter(n => !n.read).map(n => sourceName(n)))].join(' · ') : c('stripUnreadNone') },
+    { key: 'senders', n: senderNames.length, label: c('stripSenders'), sub: senderNames.slice(0, 4).map(([k, n]) => `${k} ${n}`).join(' · ') || c('nothingYet') },
+    { key: 'devices', n: devices, label: c('stripDevices'), sub: devices ? ctx.devices.map(d => (d.thisBrowser ? c('thisBrowser') : c('family.' + d.family))).join(' · ') : c('stripDevicesNone') },
+  ]} />`;
   return html`
-    <div class="og og-nt">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${c('title')}</h1>
-          <div class="poster-chips">
-            ${unread ? chip(unread, 'chipUnread', 'poster-chip--coral') : null}${chip(recent.length, 'chipRecent')}${appSenders ? chip(appSenders, 'chipApps') : null}${devices ? chip(devices, 'chipDevices') : null}
-          </div>
-          <p class="og-desc">${c('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy || !unread} onClick=${() => ctx.markAllRead()}>${c('markAllRead')}</button>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy || !items.length} onClick=${() => ctx.clearAll()}>${c('clear')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secInbox(ctx)}
-          ${secSenders(ctx)}
-          ${secDevices(ctx)}
-          <${FoldSection} id="nt-quiet" num="04" title=${c('quietTitle')} sub=${quietSub(ctx)} open=${ctx.folds.quiet} onToggle=${() => ctx.setFold('quiet', !ctx.folds.quiet)}>${quietFold(ctx)}<//>
-          <${FoldSection} id="nt-how" num="05" title=${c('howTitle')} sub=${c('howSub')} open=${ctx.folds.how} onToggle=${() => ctx.setFold('how', !ctx.folds.how)}>${howFold()}<//>
-        </div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${c('railTitle')}</span>
-          ${[['01', 'nt-inbox', c('secInbox'), items.length], ['02', 'nt-senders', c('secSenders'), ctx.senders.length + 1], ['03', 'nt-devices', c('secDevices'), devices], ['04', 'nt-quiet', c('quietTitle'), ''], ['05', 'nt-how', c('howTitle'), '']]
-            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="nt"
+      crumb=${crumb()}
+      title=${c('title')}
+      marks=${[
+        unread ? mark(unread, 'chipUnread', 'coral') : null,
+        mark(recent.length, 'chipRecent'),
+        appSenders ? mark(appSenders, 'chipApps') : null,
+        devices ? mark(devices, 'chipDevices') : null,
+      ]}
+      desc=${c('desc')}
+      actions=${html`
+        <${Loud} control disabled=${ctx.busy || !unread} onClick=${() => ctx.markAllRead()}>${c('markAllRead')}<//>
+        <${Actions}><${Action} small soft disabled=${ctx.busy || !items.length} onClick=${() => ctx.clearAll()}>${c('clear')}<//><//>`}
+      strip=${strip}
+      railTitle=${c('railTitle')}
+      sections=${[
+        { id: 'nt-inbox', num: '01', label: c('secInbox'), count: items.length },
+        { id: 'nt-senders', num: '02', label: c('secSenders'), count: ctx.senders.length + 1 },
+        { id: 'nt-devices', num: '03', label: c('secDevices'), count: devices },
+        { id: 'nt-quiet', num: '04', label: c('quietTitle'), count: '' },
+        { id: 'nt-how', num: '05', label: c('howTitle'), count: '' },
+      ]}
+      pagesLabel=${c('pages')}
+      pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${secInbox(ctx)}
+      ${secSenders(ctx)}
+      ${secDevices(ctx)}
+      <${FoldSection} id="nt-quiet" num="04" title=${c('quietTitle')} sub=${quietSub(ctx)} open=${ctx.folds.quiet} onToggle=${() => ctx.setFold('quiet', !ctx.folds.quiet)}>${quietFold(ctx)}<//>
+      <${FoldSection} id="nt-how" num="05" title=${c('howTitle')} sub=${c('howSub')} open=${ctx.folds.how} onToggle=${() => ctx.setFold('how', !ctx.folds.how)}>${howFold()}<//>
+    <//>`;
 }
 
 function secInbox(ctx) {
@@ -110,14 +122,16 @@ function secInbox(ctx) {
   else if (f === 'needs') list = list.filter(n => Array.isArray(n.actions) && n.actions.length);
   else if (f !== 'all') list = list.filter(n => (n.source?.kind || 'aimeat') === f);
   const shown = ctx.showAll ? list : list.slice(0, PAGE);
-  const door = (key, label) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--fold ${f === key ? 'is-on' : ''}`} onClick=${() => ctx.setFilter(key)}>${label}</button>`;
-  const doors = html`${door('all', c('all'))}${door('unread', c('unreadOnes'))}${door('needs', c('needsYou'))}${kinds.length > 1 ? kinds.map(k => door(k, kindWord(k))) : null}`;
+  const doors = html`<${Tabs} tone="fold" value=${f} onSelect=${(v) => ctx.setFilter(v)} items=${[
+    { value: 'all', label: c('all') }, { value: 'unread', label: c('unreadOnes') }, { value: 'needs', label: c('needsYou') },
+    ...(kinds.length > 1 ? kinds.map(k => ({ value: k, label: kindWord(k) })) : []),
+  ]} />`;
   return html`
     <${PageSection} id="nt-inbox" num="01" title=${c('secInbox')} count=${`${ctx.items.length} · ${c('secInboxSub')}`} doors=${doors} first>
-      ${ctx.loading && !ctx.items.length ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>`
-        : !shown.length ? html`<p class="poster-quiet">${ctx.items.length ? c('emptyFiltered') : c('emptyInbox')}</p>`
-        : html`${inboxHead()}${inboxRows(ctx, shown)}`}
-      ${list.length > shown.length ? html`<div class="og-doors nt-more"><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShowAll(true)}>${c('showRest', { n: list.length - shown.length })}</button></div>` : null}
+      ${ctx.loading && !ctx.items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : !shown.length ? html`<${Note} kind="quiet">${ctx.items.length ? c('emptyFiltered') : c('emptyInbox')}<//>`
+        : inboxRows(ctx, shown)}
+      ${list.length > shown.length ? html`<${More} onMore=${() => ctx.setShowAll(true)} label=${c('showRest', { n: list.length - shown.length })} />` : null}
       <${Hint}>${c('inboxHint')}<//>
     <//>`;
 }
@@ -128,19 +142,20 @@ function secSenders(ctx) {
     const st = ctx.groups.find(x => x.group === g) || { count: 0, last_at: null, prefs: {} };
     return { key: 'group:' + g, kind: 'aimeat', group: g, name: groupWord(g), sub: c('group.' + g + 'Sub'), what: st.count ? c('sentN', { n: st.count, when: rel(st.last_at) }) : c('sentNone'), prefs: (s.groups || {})[g] || {}, door: null };
   });
-  const aimeatRow = { key: 'aimeat', kind: 'aimeat', name: c('aimeatItself'), sub: GROUPS.map(g => groupWord(g)).join(' · '), what: c('aimeatWhat'), prefs: {}, door: html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setGroupsOpen(!ctx.groupsOpen)}>${ctx.groupsOpen ? c('byGroupClose') : c('byGroup')}</button>` };
+  const aimeatRow = { key: 'aimeat', kind: 'aimeat', name: c('aimeatItself'), sub: GROUPS.map(g => groupWord(g)).join(' · '), what: c('aimeatWhat'), prefs: {},
+    door: html`<${Action} small soft expanded=${!!ctx.groupsOpen} onClick=${() => ctx.setGroupsOpen(!ctx.groupsOpen)}>${ctx.groupsOpen ? c('byGroupClose') : c('byGroup')}<//>` };
   const others = ctx.senders.map(r => ({
     ...r,
     sub: [kindWord(r.kind), r.granted_at ? c('grantedOn', { when: day(r.granted_at) }) : null, r.count ? c('sentN', { n: r.count, when: rel(r.last_at) }) : c('sentNone')].filter(Boolean).join(' · '),
     what: r.kind === 'app' ? c('appWhat') : r.kind === 'extension' ? c('extensionWhat') : c('agentWhat'),
-    door: r.kind === 'app' && r.grant_id ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.revokeApp(r)}>${c('revokeGrant')}</button>`
-      : r.kind === 'agent' ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openTab('agents')}>${t('profile.tabs.agents')}</button>` : null,
+    door: r.kind === 'app' && r.grant_id ? html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.revokeApp(r)}>${c('revokeGrant')}<//>`
+      : r.kind === 'agent' ? html`<${Action} small soft onClick=${() => ctx.openTab('agents')}>${t('profile.tabs.agents')}<//>` : null,
   }));
   return html`
     <${PageSection} id="nt-senders" num="02" title=${c('secSenders')} count=${c('secSendersSub')}>
       ${senderRows({ ...ctx, setPref: (r, patch) => ctx.setPref(r, patch) }, [aimeatRow])}
-      ${ctx.groupsOpen ? html`<div class="poster-panel nt-groups">${senderRows(ctx, groupRows)}</div>` : null}
-      ${others.length ? senderRows(ctx, others) : html`<p class="poster-quiet nt-empty-senders">${c('noOtherSenders')}</p>`}
+      ${ctx.groupsOpen ? html`<${Box} tone="edge">${senderRows(ctx, groupRows, { under: true })}<//>` : null}
+      ${others.length ? senderRows(ctx, others) : html`<${Note} kind="quiet">${c('noOtherSenders')}<//>`}
       <${Hint}>${c('sendersHint')}<//>
     <//>`;
 }
@@ -149,29 +164,26 @@ function secDevices(ctx) {
   const s = ctx.settings || {};
   const digest = s.emailDigest || { enabled: false, afterHours: 8 };
   const mine = ctx.devices.find(d => d.thisBrowser);
-  const doors = html`<button type="button" class="poster-action poster-action--small" disabled=${ctx.busy || !mine} onClick=${() => ctx.testPush()}>${c('sendTest')}</button>`;
+  const doors = html`<${Action} small disabled=${ctx.busy || !mine} onClick=${() => ctx.testPush()}>${c('sendTest')}<//>`;
+  const setDigest = (patch) => ctx.saveSettings({ ...s, emailDigest: { ...digest, ...patch } });
   return html`
     <${PageSection} id="nt-devices" num="03" title=${c('secDevices')} count=${c('secDevicesSub')} doors=${doors}>
-      <div class="nt-dev">
-        <div class=${`nt-dev-card poster-box ${mine ? 'this' : ''}`}>
-          <b>${c('thisBrowser')}</b><small>${ctx.pushSupport === false ? c('noBrowserSupport') : ctx.vapid === false ? c('notConfigured') : mine ? c('pushOn') : c('pushOff')}</small>
-          <div class="og-doors">${mine
-            ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.unsubscribe()}>${c('turnOff')}</button>`
-            : html`<button type="button" class="poster-action poster-action--small" disabled=${ctx.busy || ctx.pushSupport === false || ctx.vapid === false} onClick=${() => ctx.subscribe()}>${c('turnOn')}</button>`}</div>
-        </div>
+      <${CardGrid}>
+        <${Card} tone="framed" state=${mine ? 'current' : undefined} name=${c('thisBrowser')}
+          meta=${ctx.pushSupport === false ? c('noBrowserSupport') : ctx.vapid === false ? c('notConfigured') : mine ? c('pushOn') : c('pushOff')}
+          doors=${mine
+            ? html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.unsubscribe()}>${c('turnOff')}<//>`
+            : html`<${Action} small disabled=${ctx.busy || ctx.pushSupport === false || ctx.vapid === false} onClick=${() => ctx.subscribe()}>${c('turnOn')}<//>`} />
         ${ctx.devices.filter(d => !d.thisBrowser).map(d => html`
-          <div class="nt-dev-card poster-box" key=${d.endpoint}>
-            <b>${c('family.' + d.family)}</b><small>${c('deviceSince', { added: day(d.created_at), used: rel(d.last_used_at) })}</small>
-            <div class="og-doors"><button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.removeDevice(d)}>${c('remove')}</button></div>
-          </div>`)}
-        <div class=${`nt-dev-card poster-box ${digest.enabled ? '' : 'dim'}`}>
-          <b>${c('emailDigest')}</b><small>${ctx.emailVerified === false ? c('emailNotVerified') : digest.enabled ? c('digestOn', { h: digest.afterHours }) : c('digestOff')}</small>
-          <div class="og-doors nt-digest-doors">
-            ${digest.enabled ? html`<select class="select-field nt-select" value=${String(digest.afterHours)} onChange=${e => ctx.saveSettings({ ...s, emailDigest: { ...digest, afterHours: Number(e.target.value) } })}>${[2, 4, 8, 24, 72].map(h => html`<option key=${h} value=${String(h)}>${c('afterHours', { h })}</option>`)}</select>` : null}
-            <${Switch} on=${digest.enabled} label=${c('digestSwitch')} disabled=${ctx.busy || ctx.emailVerified === false} onToggle=${() => ctx.saveSettings({ ...s, emailDigest: { ...digest, enabled: !digest.enabled } })} />
-          </div>
-        </div>
-      </div>
+          <${Card} tone="framed" key=${d.endpoint} name=${c('family.' + d.family)} meta=${c('deviceSince', { added: day(d.created_at), used: rel(d.last_used_at) })}
+            doors=${html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.removeDevice(d)}>${c('remove')}<//>`} />`)}
+        <${Card} tone="framed" state=${digest.enabled ? undefined : 'off'} name=${c('emailDigest')}
+          meta=${ctx.emailVerified === false ? c('emailNotVerified') : digest.enabled ? c('digestOn', { h: digest.afterHours }) : c('digestOff')}
+          doors=${html`
+            ${digest.enabled ? html`<${Select} fit ariaLabel=${c('emailDigest')} value=${String(digest.afterHours)} onChange=${(v) => setDigest({ afterHours: Number(v) })}
+              options=${[2, 4, 8, 24, 72].map(h => [String(h), c('afterHours', { h })])} />` : null}
+            <${Switch} on=${digest.enabled} label=${c('digestSwitch')} disabled=${ctx.busy || ctx.emailVerified === false} onToggle=${() => setDigest({ enabled: !digest.enabled })} />`} />
+      <//>
       <${Hint}>${c('devicesHint')}<//>
     <//>`;
 }
@@ -185,42 +197,36 @@ function quietFold(ctx) {
   const s = ctx.settings || {};
   const f = ctx.quietForm;
   const set = (patch) => ctx.setQuietForm({ ...f, ...patch });
-  const toggleGroup = (g) => set({ breakthrough: f.breakthrough.includes(g) ? f.breakthrough.filter(x => x !== g) : [...f.breakthrough, g] });
+  const save = () => ctx.saveSettings({ ...s, quiet: f.enabled ? { start: f.start, end: f.end, tz: f.tz.trim() || 'UTC', breakthrough: f.breakthrough } : null, throttleMinutes: f.throttleMinutes });
   return html`
-    <div class="ct-kv nt-kv">
-      <div class="k poster-label">${c('quietWhen')}</div><div class="v">
-        <div class="nt-quiet-row">
+    <${Fields}>
+      <${Field} label=${c('quietWhen')} hint=${c('quietHint')} group>
+        <${Line} gap="medium" wrap>
           <${Switch} on=${f.enabled} label=${f.enabled ? c('quietOnWord') : c('quietOffWord')} onToggle=${() => set({ enabled: !f.enabled })} />
-          <input class="og-input nt-time" type="time" value=${f.start} disabled=${!f.enabled} onInput=${e => set({ start: e.target.value })} />
-          <span class="nt-dash">–</span>
-          <input class="og-input nt-time" type="time" value=${f.end} disabled=${!f.enabled} onInput=${e => set({ end: e.target.value })} />
-          <input class="og-input nt-tz" value=${f.tz} disabled=${!f.enabled} placeholder="Europe/Helsinki" onInput=${e => set({ tz: e.target.value })} />
-        </div>
-        <small class="poster-hint">${c('quietHint')}</small>
-      </div>
-      <div class="k poster-label">${c('breakthrough')}</div><div class="v">
-        <div class="pf-tabs nt-choice">${GROUPS.map(g => html`<button type="button" key=${g} class=${`poster-tab ${f.breakthrough.includes(g) ? 'is-on' : ''}`} disabled=${!f.enabled} onClick=${() => toggleGroup(g)}>${groupWord(g)}</button>`)}</div>
-        <small class="poster-hint">${c('breakthroughHint')}</small>
-      </div>
-      <div class="k poster-label">${c('throttle')}</div><div class="v">
-        <div class="pf-tabs nt-choice">${[0, 5, 10, 30].map(m => html`<button type="button" key=${m} class=${`poster-tab ${f.throttleMinutes === m ? 'is-on' : ''}`} onClick=${() => set({ throttleMinutes: m })}>${m ? c('throttleN', { n: m }) : c('throttleOff')}</button>`)}</div>
-        <small class="poster-hint">${c('throttleHint')}</small>
-      </div>
-    </div>
-    <div class="og-doors nt-form-doors">
-      <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy} onClick=${() => ctx.saveSettings({ ...s, quiet: f.enabled ? { start: f.start, end: f.end, tz: f.tz.trim() || 'UTC', breakthrough: f.breakthrough } : null, throttleMinutes: f.throttleMinutes })}>${c('save')}</button>
-    </div>`;
+          <${TextField} type="time" size="short" ariaLabel=${c('quietWhen')} value=${f.start} disabled=${!f.enabled} onInput=${(v) => set({ start: v })} />
+          –
+          <${TextField} type="time" size="short" ariaLabel=${c('quietWhen')} value=${f.end} disabled=${!f.enabled} onInput=${(v) => set({ end: v })} />
+          <${TextField} size="medium" ariaLabel=${c('quietWhen')} value=${f.tz} disabled=${!f.enabled} placeholder="Europe/Helsinki" onInput=${(v) => set({ tz: v })} />
+        <//>
+      <//>
+      <${Choice} multi label=${c('breakthrough')} hint=${c('breakthroughHint')} disabled=${!f.enabled}
+        value=${f.breakthrough} options=${GROUPS.map(g => [g, groupWord(g)])} onChange=${(list) => set({ breakthrough: list })} />
+      <${Choice} label=${c('throttle')} hint=${c('throttleHint')} value=${f.throttleMinutes}
+        options=${[0, 5, 10, 30].map(m => [m, m ? c('throttleN', { n: m }) : c('throttleOff')])} onChange=${(m) => set({ throttleMinutes: m })} />
+    <//>
+    <${FormActions}>
+      <${Loud} control disabled=${ctx.busy} onClick=${save}>${c('save')}<//>
+    <//>`;
 }
 
 function howFold() {
-  const road = (k, title, body, code) => html`
-    <div class="nt-road poster-box" key=${k}><span class="nt-road-k">${c('how.' + k + 'K')}</span><b>${title}</b><p>${body}</p><code class="code-inline">${code}</code></div>`;
+  const road = (k, title, body, code) => html`<${Road} key=${k} kicker=${c('how.' + k + 'K')} name=${title} text=${body} codeLine=${code} />`;
   return html`
-    <div class="nt-roads">
+    <${Roads} cols="three">
       ${road('app', c('how.appTitle'), c('how.appBody'), "await session.notify('Report ready', { body: 'Q2 numbers are in.' })")}
       ${road('ext', c('how.extTitle'), c('how.extBody'), "await ctx.notify(message, { title, link })")}
       ${road('agent', c('how.agentTitle'), c('how.agentBody'), 'aimeat_notify { title, body, link }')}
-    </div>
+    <//>
     <${Hint}>${c('how.hint')}<//>`;
 }
 

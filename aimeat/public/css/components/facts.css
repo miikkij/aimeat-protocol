@@ -6,9 +6,17 @@
  *   and its value on the right, with an optional grey line under the value; one column on a phone.
  *   The look most Settings & Controls tabs already draw (skills, extensions, capabilities, libraries,
  *   packages: identical copies), taken as the one look for this kind (UI consolidation phase 5).
- *   Drawn as markup: <dl class="facts"><dt class="facts-k poster-label">…</dt><dd class="facts-v">…</dd></dl>.
+ *   Drawn by components/Facts.js: <dl class="facts"><dt class="facts-k poster-label">…</dt><dd class="facts-v">…</dd></dl>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — Drawn by components/Facts.js. The meanings the pages' own rules carried become
+ *     the component's options, each with the look it had: flush (formerly appdev .ad-kv, apps .ap-kv,
+ *     knowledge .kp-kv margin-top 0, and extensions .ex-kv--wide .2rem), missing (a value not known:
+ *     contacts .ct-dim and AI .is-unset grey, 2 pages; companies .facts-v.miss grey italic takes it),
+ *     pre (memory .mp-value .facts-v), controls (knowledge .kp-orgshare), the action after a value
+ *     (agent tasks .facts-v > .poster-action), the actions under a value (contacts and portfolio
+ *     .facts-v .og-doors .3rem, 2 pages; the AI tab's .6rem takes it), the coral grey line
+ *     (extensions small.is-coral), and a meter inside a value (AI .ai-bar margin-top .5rem).
  *   v1.2.0 — 2026-09-26 — The value's warn tone, .facts-v--warn: a figure that needs a look in the Status's attention colour (formerly agents-detail.css .pf-agd-warning-text), a meaning.
  *   v1.1.0 — 2026-09-25 — The Settings facts move onto it (a unification: the look most tabs use). The
  *     grey line under a value leaves a Form message (small.form-message) to its own look, as the AI
@@ -26,6 +34,22 @@
 .facts-v--warn { color: var(--warn-fg); }
 .facts-v small:where(:not(.form-message)) { display: block; margin-top: .15rem; font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
 .facts-v .og-crumb-link { font-size: inherit; }
+/* The top cut: the facts open their box, no air above. */
+.facts--flush { margin-top: 0; }
+/* A value that is not known or not set ("unknown", "the model's default"): grey. */
+.facts-v--missing { color: var(--text-dim); }
+/* A value that keeps its own line breaks (a record's text). */
+.facts-v--pre { white-space: pre-wrap; }
+/* A value that is controls in a row: a picker and its action. */
+.facts-v--controls { display: flex; align-items: center; gap: 1rem; }
+.facts-v--controls .select-field { width: auto; }
+/* One action after the value, on its line. */
+.facts-after { margin-left: .6rem; }
+/* A grey line in coral: something about the value needs a look. */
+.facts-v small.facts-sub--notice { color: var(--accent); }
+/* The row of actions under a value, and a meter inside one. */
+.facts-v .og-doors { margin-top: .3rem; }
+.facts-v .meter { margin-top: .5rem; }
 
 @media (max-width: 860px) {
   .facts, .facts--wide { grid-template-columns: 1fr; gap: .3rem 0; }

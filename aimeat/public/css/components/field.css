@@ -1,0 +1,31 @@
+/**
+ * @file field.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Field's own options (components/Field.js): a field that spans both columns of a
+ *   two-column form, a field whose label says it is required and still empty, and a field with its
+ *   buttons in one row after it. The field itself (a column: the row label, the control, the hint)
+ *   is .og-field in css/components/form-fields.css, the look most Settings forms draw; the label is
+ *   the row label (.poster-label, poster.css). Reads only the theme's tokens.
+ *   Drawn by components/Field.js and the controls of the Field family; a page never writes these.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-26 — .field-label-note, the Field's labelNote (page group G4, additive).
+ *   v1.0.0 — 2026-09-26 — Initial, with the values of the page copies it replaces: the wide cut of
+ *     ap-field, cp-field, ex-field and inbox-org-wide; pj-field-invalid's label; the field-and-button
+ *     rows of the AI settings' key (pf-or-key-row), the memory tag field and an agent's tag field
+ *     (component plan C5).
+ */
+
+/* Wide: the field spans both columns of a two-column form (.og-fields--2). */
+.field--wide { grid-column: 1 / -1; }
+/* Invalid: a required field the person left empty; the label says so in the danger colour. */
+.field--invalid > .poster-label { color: var(--danger); }
+/* A field with its buttons in one row: the field takes the room, the buttons keep their words on one
+   line; the row wraps on a narrow screen. (The same row in a thin dashed frame is .field-row.) */
+.field-line { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+.field-line > .og-input, .field-line > .text-field-secret { flex: 1 1 12rem; min-width: 0; }
+.field-line > .poster-action, .field-line > .poster-slab { flex: none; white-space: nowrap; }
+/* The label's note: a small typewriter word beside the row label (a count of characters), not in
+   the label's capitals (Field labelNote; formerly prompt-versions.css .cal-field .poster-label small). */
+.field-label-note { margin-left: .6rem; font-family: var(--font-mono); font-size: .66rem; letter-spacing: 0; text-transform: none; color: var(--text-dim); }

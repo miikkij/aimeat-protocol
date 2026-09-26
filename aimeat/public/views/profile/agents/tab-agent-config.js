@@ -6,6 +6,15 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   v1.17.1 -- 2026-09-26 -- The file's text scrolls after 300px again, as main's
+ *     .pf-agd-config-preview did (Code scroll="medium"; fix pass).
+ *   v1.17.0 -- 2026-09-26 -- Onto the components: the budget guards are the section Card with two
+ *     Checks (the number stays inside each check line, as on main) and the Loud save in FormActions;
+ *     the delete zone is the SettingBox (irreversible) with its SettingRow and SettingConfirm; the
+ *     upload is the FileDrop button; the files are the List (a row opens its file in the Panel, the
+ *     name a button with aria-expanded), the file's text the scrolling Code block, the editor a
+ *     TextArea in the typewriter face again (main drew it mono; the branch had lost it). The page
+ *     writes no class.
  *   v1.16.0 -- 2026-09-26 -- The configuration files are the Listing (css/components/listing.css, cut name-state): the name with its date or description on the grey line under it, the green dot beside it, the platform tag at the end; the file you pick opens under its own row in the raised panel, its text the Code block (a unification: Jouni's decision "File pick list").
  *   v1.15.0 -- 2026-09-26 -- The run limits beside their check boxes are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.14.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -54,6 +63,18 @@ import { copyToClipboard } from '/js/utils.js';
 import { apiGet, apiPut, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Mark, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Card } from '/components/Card.js';
+import { SettingBox, SettingRow, SettingConfirm } from '/components/Box.js';
+import { Check } from '/components/Check.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { FormActions } from '/components/Field.js';
+import { FileDrop } from '/components/FileDrop.js';
+import { SubHeading, HeadDesc } from '/components/SubHeading.js';
+import { Row as Line, Split, Space } from '/components/Layout.js';
+import { List, Row, Name, Doors } from '/components/List.js';
 import { AgentAiSection } from './agent-ai-section.js';
 
 const html = htm.bind(h);
@@ -81,28 +102,27 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
     finally { setSaving(false); }
   };
 
+  // The number sits inside the check line's words, as on main: a press on the number field edits it,
+  // a press on the words ticks the box.
   return html`
-    <div class="sch-form sch-budget-section poster-row--thing">
-      <div class="pf-agd-section-title sub-heading">${t('profile.scheduler.budgetTitle')}</div>
-      <div class="section-desc">${t('profile.scheduler.budgetDesc')}</div>
-      <div class="sch-constraints">
-        <label class="sch-check check-line">
-          <input type="checkbox" checked=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
+    <${Card} tone="section" title=${t('profile.scheduler.budgetTitle')}>
+      <${HeadDesc}>${t('profile.scheduler.budgetDesc')}<//>
+      <${Split} gap="small">
+        <${Check} checked=${maxRuns.enabled} onChange=${(on) => setMaxRuns(s => ({ ...s, enabled: on }))}>
           ${t('profile.scheduler.maxRuns')}
-          <input type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
-            onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="og-input sch-num" />
-        </label>
-        <label class="sch-check check-line">
-          <input type="checkbox" checked=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
+          <${TextField} type="number" size="short" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
+            ariaLabel=${t('profile.scheduler.maxRuns')} onInput=${(v) => setMaxRuns(s => ({ ...s, limit: v }))} />
+        <//>
+        <${Check} checked=${dailyLimit.enabled} onChange=${(on) => setDailyLimit(s => ({ ...s, enabled: on }))}>
           ${t('profile.scheduler.dailyLimit')}
-          <input type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
-            onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="og-input sch-num" />
-        </label>
-      </div>
-      <div class="sch-form-actions">
-        <button class="poster-slab poster-slab--control" disabled=${saving} onClick=${save}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.budgetSave')}</button>
-      </div>
-    </div>`;
+          <${TextField} type="number" size="short" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
+            ariaLabel=${t('profile.scheduler.dailyLimit')} onInput=${(v) => setDailyLimit(s => ({ ...s, limit: v }))} />
+        <//>
+      <//>
+      <${FormActions} end>
+        <${Loud} control disabled=${saving} onClick=${save}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.budgetSave')}<//>
+      <//>
+    <//>`;
 }
 
 /** Danger zone — deleting the agent lives HERE (not on every tab's footer): a red-bordered box
@@ -112,23 +132,20 @@ function AgentDangerZone({ agent, agentName, onDeleteClick }) {
   const [typed, setTyped] = useState('');
   if (!onDeleteClick) return null;
   return html`
-    <div class="pj-danger pj-danger-box poster-aside poster-aside--small poster-aside--irreversible">
-      <div class="pj-danger-row">
-        <div class="pj-danger-text">
-          <div class="pj-danger-title">${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}</div>
-          <div class="pj-danger-sub">${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}</div>
-        </div>
-        <button class="poster-action poster-action--small poster-action--danger" onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…</button>
-      </div>
+    <${SettingBox} irreversible label=${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}>
+      <${SettingRow}>
+        <${Note} inline>${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}<//>
+        <${Action} small tone="danger" expanded=${open} onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…<//>
+      <//>
       ${open && html`
-        <div class="pj-danger-confirm">
-          <label class="pj-field"><span class="poster-label">${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}</span>
-            <input type="text" class="og-input" value=${typed} onInput=${(e) => setTyped(e.target.value)} placeholder=${agentName} /></label>
-          <button class="poster-slab poster-slab--control poster-slab--danger" disabled=${typed.trim() !== agentName}
-            onClick=${() => onDeleteClick(agent.name)}>${t('profile.agents.deleteAgent')}</button>
-        </div>
+        <${SettingConfirm}>
+          <${TextField} label=${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}
+            value=${typed} onInput=${setTyped} placeholder=${agentName} />
+          <${Loud} control danger disabled=${typed.trim() !== agentName}
+            onClick=${() => onDeleteClick(agent.name)}>${t('profile.agents.deleteAgent')}<//>
+        <//>
       `}
-    </div>`;
+    <//>`;
 }
 
 export default function TabAgentConfig({ agent, agentName, showToast, onDeleteClick }) {
@@ -138,7 +155,6 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
-  const fileInputRef = useRef(null);
 
   async function loadFiles({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
@@ -223,10 +239,6 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
     URL.revokeObjectURL(url);
   }
 
-  function handleUploadClick() {
-    fileInputRef.current?.click();
-  }
-
   async function handleFileUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -249,19 +261,22 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
   }
 
   if (loading) {
-    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
+    return html`<${Note} kind="loading">${t('profile.loading')}<//>`;
   }
+
+  // The upload opens the browser's file window; the chosen file is read here (handleFileUpload).
+  const upload = html`
+    <${Space} below="large">
+      <${FileDrop} button=${'+ ' + t('profile.agents.detail.agent_config.upload')} accept=".md,.yaml,.yml,.json" onChange=${handleFileUpload} />
+    <//>`;
 
   if (files.length === 0) {
     return html`
       <div>
         <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
         <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
-        <div class="pf-agd-config-upload">
-          <button class="poster-action poster-action--small" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
-          <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
-        </div>
-        <div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.empty.agent_config')}</div>
+        ${upload}
+        <${Note} kind="quiet">${t('profile.agents.detail.empty.agent_config')}<//>
         <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
       </div>
     `;
@@ -271,56 +286,46 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
     <div>
       <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
       <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
-      <div class="pf-agd-config-upload">
-        <button class="poster-action poster-action--small" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
-        <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
-      </div>
+      ${upload}
 
-      <div class="listing listing--name-state pf-agd-config-list">
+      <${List} cols="name-doors" apart>
         ${files.map(file => html`
-          <div key=${file.key}
-               class=${`listing-row ${selectedFile === file.key ? 'is-open' : ''}`}
-               onClick=${(e) => { if (!e.target.closest?.('.listing-open')) selectFile(file); }}>
-            <div class="listing-name">
-              ${file.active !== false && html`<span class="status-dot pf-agd-status-dot status-dot--active"></span>`}
-              ${file.filename}
-              ${file.description && html`<small>${file.description}</small>`}
-              ${!file.description && html`<small>${file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${fmtDate(file.updatedAt)}` : ''}</small>`}
-            </div>
-            <div class="listing-doors">${file.platform && html`<span class="poster-chip">${file.platform}</span>`}</div>
-            ${selectedFile === file.key && renderOpened()}
-          </div>
+          <${Row} key=${file.key} open=${selectedFile === file.key} onToggle=${() => selectFile(file)}
+            panel=${selectedFile === file.key ? renderOpened() : null}>
+            <${Name} dot=${file.active !== false ? 'active' : undefined}
+              meta=${file.description || (file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${fmtDate(file.updatedAt)}` : '')}>${file.filename}<//>
+            <${Doors}>${file.platform && html`<${Mark}>${file.platform}<//>`}<//>
+          <//>
         `)}
-      </div>
+      <//>
       <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
     </div>
   `;
 
-  /** The file you picked, opened under its own row (the Listing's opened panel, raised). */
+  /** The file you picked, opened under its own row (the List's opened panel, raised). */
   function renderOpened() {
     return html`
-        <div class="listing-open poster-box poster-box--raised">
-          <div class="pf-agd-config-preview-header">
-            <span>${t('profile.agents.detail.agent_config.viewing')}: ${files.find(f => f.key === selectedFile)?.filename || ''}</span>
-            <div class="pf-agd-config-actions">
-              ${!editing && html`
-                <button class="poster-action poster-action--small" onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}</button>
-                <button class="poster-action poster-action--small" onClick=${handleCopy}>${t('common.copy')}</button>
-                <button class="poster-action poster-action--small" onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}</button>
-              `}
-            </div>
-          </div>
-          ${editing ? html`
-            <div class="pf-agd-config-edit">
-              <textarea class="og-textarea pf-agd-config-textarea" value=${editContent} onInput=${(e) => setEditContent(e.target.value)}></textarea>
-              <div class="pf-agd-form-actions">
-                <button class="poster-slab poster-slab--control" onClick=${handleSave}>${t('profile.agents.detail.agent_config.save')}</button>
-                <button class="poster-action poster-action--small" onClick=${handleCancelEdit}>${t('profile.agents.detail.agent_config.cancel')}</button>
-              </div>
-            </div>
-          ` : html`
-            <div class="code-block pf-agd-config-preview">${preview}</div>
-          `}
-        </div>`;
+      <${Line} justify="between" wrap>
+        <${SubHeading} inline>${t('profile.agents.detail.agent_config.viewing')}: ${files.find(f => f.key === selectedFile)?.filename || ''}<//>
+        ${!editing && html`
+          <${Actions}>
+            <${Action} small onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}<//>
+            <${Action} small onClick=${handleCopy}>${t('common.copy')}<//>
+            <${Action} small onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}<//>
+          <//>
+        `}
+      <//>
+      ${editing ? html`
+        <${Space} above="small">
+          <${TextArea} code rows=${8} value=${editContent} onInput=${setEditContent}
+            ariaLabel=${files.find(f => f.key === selectedFile)?.filename || t('profile.agents.detail.agent_config.edit')} />
+          <${FormActions}>
+            <${Loud} control onClick=${handleSave}>${t('profile.agents.detail.agent_config.save')}<//>
+            <${Action} small onClick=${handleCancelEdit}>${t('profile.agents.detail.agent_config.cancel')}<//>
+          <//>
+        <//>
+      ` : html`
+        <${Code} block scroll="medium">${preview}<//>
+      `}`;
   }
 }

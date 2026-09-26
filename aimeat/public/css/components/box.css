@@ -1,0 +1,97 @@
+/**
+ * @file box.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Box component's own rules (components/Box.js): what the Object box's shapes in
+ *   poster.css (.poster-box and its tones) do not draw. The head of a box (a name in bold with its
+ *   tags, from the Knowledge package preview .kp-preview-h), the row of ways at its foot
+ *   (.kp-preview-actions), the frame colours a box takes by meaning (from Notifications'
+ *   .nt-dev-card.this and .dim, Workflows' .wp-verdict--bad and --wait), and the box's padding,
+ *   margin and scroll by meaning (flush, packed, scroll). The meter is components/Figure.js
+ *   (css/components/figure.css). Reads colours and shapes from the theme tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.6.0 — 2026-09-26 — .box--dim (the grey ground, main's .pf-eco-tech), .box--scroll-page (32rem,
+ *     main's .pj-struct-body), .box-beside (the doors at the right, main's .wp-verdict); fix pass.
+ *   v1.5.0 — 2026-09-26 — BoxList and BoxLine (.box-list, .box-line and its parts), from main's AI tab
+ *     cards (.pf-aitr-list, .pf-aitr-row, .pf-aitr-policy, .pf-cmp-entries; page group G8).
+ *   v1.4.0 — 2026-09-26 — The field box (.box--field): Jouni's "Dashed field box" around a field to
+ *     fill in for one action, from Extensions' .ex-test (page group G6).
+ *   v1.3.0 — 2026-09-26 — The edge box (.box--edge on .poster-panel), from Packages' .pk-expects (page group G7).
+ *   v1.2.0 — 2026-09-26 — The document box: a rendered document's padding on any ground (from .pf-nb-enrich-preview-body; page group G4).
+ *   v1.1.0 — 2026-09-26 — The folded box and its fade (from the Skills page's .sk-md, .sk-fade; page group G7).
+ *   v1.0.0 — 2026-09-26 — Initial (component plan C3, the framed boxes).
+ */
+
+/* ── The head and the foot of a box ── */
+.box-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: 1rem; }
+.box-name { font-weight: 800; color: var(--text); }
+.box-end { margin-left: auto; }
+.box-head + * { margin-top: .6rem; }
+.box-doors { align-items: center; gap: 1.2rem; margin-top: .9rem; }
+
+/* ── Its padding and margin by meaning ── */
+/* flush: the parts pad themselves (a chart, a picture, a table; formerly .pf-eco-tech, .pf-prev, .mem-cart). */
+.poster-box.box--flush { padding: 0; overflow: hidden; }
+/* packed: the box stands in a grid or a row that spaces it (formerly .op-block, .pf-2fa-device and kin). */
+.poster-box.box--packed { margin: 0; }
+/* scroll: a long text scrolls inside the box (formerly .pj-doc-preview, .pj-struct-body, .pf-nb-enrich-preview-body). */
+.poster-box.box--scroll { max-height: 24rem; overflow: auto; }
+/* scroll="page": a map of a whole structure scrolls after 32rem (main's .pj-struct-body). */
+.poster-box.box--scroll-page { max-height: 32rem; }
+/* folded: a long text shows its first 22rem under a fade, "show all" at the fade's foot (formerly
+   the Skills page's .sk-md and .sk-fade; added by page group G7). */
+.poster-box.box--folded { position: relative; max-height: 22rem; overflow: hidden; }
+.box-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 6rem; background: linear-gradient(to bottom, transparent, var(--card-bg) 70%); }
+.box-fade .poster-action { position: absolute; left: 1rem; bottom: .8rem; }
+/* document: a rendered document's words keep their space from the frame, also on the copy ground,
+   whose parts otherwise pad themselves (formerly .pf-nb-enrich-preview-body's padding; added by page
+   group G4, living). */
+.poster-box.box--document { padding: .75rem 1rem; }
+
+/* ── The frame by meaning ── */
+/* attention: a result that needs a look; current: the one you are on. Both in coral. */
+.poster-box.box--attention, .poster-box.box--current { border-color: var(--accent); }
+/* waiting: a thing that waits for an answer. */
+.poster-box.box--waiting { border-color: var(--sun); }
+/* off: a thing that is switched off, dashed and grey. */
+.poster-box.box--off { border-style: dashed; color: var(--text-dim); }
+.poster-box.box--off .box-name, .poster-box.box--off b { color: var(--text-dim); }
+/* dim: the grey ground, optional under-the-hood details (main's Ecosystem .pf-eco-tech). */
+.poster-box.box--dim { background: var(--bg-dim); }
+
+/* beside: the doors at the right of the words, in the middle of their height; under them on a
+   narrow screen (main's Workflows .wp-verdict: the same grid, gap and breakpoint). */
+.box-beside { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: center; }
+.box-beside-words { min-width: 0; }
+.box-beside > .box-doors { margin-top: 0; }
+@media (max-width: 900px) {
+  .box-beside { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* edge: no frame, the sun edge at the left (poster.css .poster-panel): what a thing needs from
+   elsewhere, its label over one line per need (main's Packages .pk-expects; added by page group G7). */
+.poster-panel.box--edge { margin: .6rem 0; padding: .6rem .8rem; }
+.box--edge > .poster-label--block { margin-bottom: .25rem; }
+.box--edge > .og-lead { margin: 0 0 .2rem; }
+.box--edge > .og-lead:last-child { margin-bottom: 0; }
+
+/* field: a field to fill in for one action, the thin dashed frame on the page's ground (Jouni's
+   decision "Dashed field box"; main's Extensions .ex-test, its parts' places with it; page group G6). */
+.box--field { margin-top: .8rem; padding: .8rem 1rem; border: 1px dashed var(--shape-field-colour); background: var(--bg); }
+.box--field > .poster-label--block { margin-bottom: .3rem; }
+.box--field > .og-doors { margin-top: .6rem; align-items: center; gap: 1rem; }
+.box--field > .og-doors .poster-hint { margin: 0; }
+
+/* BoxList, BoxLine: a stack of small boxes, one thing in each, its parts in a wrapping line (main's
+   AI tab cards: .pf-aitr-list, .pf-aitr-row, .pf-aitr-policy, .pf-cmp-entries; page group G8). */
+.box-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+.box-list--apart { margin-top: .3rem; }
+.poster-box.box-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .7rem; padding: .55rem .7rem; margin: 0; min-width: 0; }
+.poster-box.box-line--column { flex-direction: column; align-items: stretch; }
+.poster-box.box-line--split { justify-content: space-between; }
+.box-line-name { font-size: .85rem; font-weight: 600; overflow-wrap: anywhere; }
+.box-line .box-line-meta { margin-top: 0; overflow-wrap: anywhere; }
+.box-line-end { font-size: .78rem; color: var(--text-dim); flex-shrink: 0; }
+.box-line-doors { display: flex; flex-wrap: wrap; gap: .9rem; margin-top: .35rem; }
+.box-line--column > .box-line-doors { margin-top: .3rem; }

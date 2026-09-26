@@ -5,21 +5,53 @@
  * @description The document tree of a workspace's document space: the index on the left (sections that
  *   nest, each with its name, the documents under it with a drag grip, a series of parts folded under
  *   one row) and the open document beside it; the open document's row on the sun with an ink rail.
- *   Drawn by views/profile/organisms/workspace/doc-space.js.
- *   Moved unchanged out of views/profile.css (the tree) and views/organism.css (its poster-face
- *   overrides inside .og-page), in that order, so they keep their order against each other; the class
- *   names stay. Shape values: the rail's 3px reads --shape-frame-heavy, the square corners
- *   --shape-corner and the section name's capitals --shape-case-heading (the same values). The
- *   index's and a row's corners read --shape-corner, a series' head (a button) --shape-corner-control;
- *   the open row is marked by its ground (outside the page kit) or its ink rail (inside it).
+ *   Drawn by components/DocTree.js (.doc-tree*). The sun ground of the open row is the markup's
+ *   .poster-chip--sun (poster.css) and a section's name is the Sub-heading (.sub-heading); a colour a
+ *   person gave draws its rail from the colour token of css/components/colour-tag.css.
+ *   Shape values: the rail's 3px reads --shape-frame-heavy, a row's corner --shape-corner, a series'
+ *   head (a button) --shape-corner-control.
+ *   The second and third blocks are the old names (.pj-*), which only the design lab's demo
+ *   (views/design-lab/demos-settings.js, "sections, one open") still writes; they go with it.
  *   NOTE: this file must be linked in spa.html, just before views/organism.css.
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- The component's own names (.doc-tree*) for components/DocTree.js, with the look the
+ *     tree had inside a workspace page (the only place it is drawn). A section's name is the Sub-heading
+ *     (Jouni's decision "Sub-heading"); a coloured section or document shows its colour's rail (on main
+ *     the tree's own line hid it on a document and on a nested section) (page migration G2b).
  *   v1.2.0 -- 2026-09-26 -- The index's 10px corner and a row's 6px corner read --shape-corner, a series' head's 6px --shape-corner-control; the open row's inset 3px coral shadow goes, its ground stays (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
  *   v1.1.0 -- 2026-09-26 -- A series' arrow (.pj-ov-chevron), a part of the tree left in views/profile.css, moved here unchanged (UI consolidation phase 5, a move).
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css and views/organism.css (UI consolidation phase 5, a move).
  */
 
-/* ── The tree (was views/profile.css) ── */
+/* ── The tree (components/DocTree.js) ── */
+.doc-tree { display: flex; gap: 2.75rem; align-items: flex-start; }
+.doc-tree-index { flex: 0 0 250px; min-width: 200px; padding: .4rem 0 0; overflow: auto; }
+.doc-tree-main { flex: 1; min-width: 0; }
+.doc-tree-sec { margin-bottom: .25rem; }
+.doc-tree-sec .doc-tree-sec { margin-left: .85rem; border-left: 1px solid var(--border); padding-left: .4rem; }
+.doc-tree-sec-head { display: flex; align-items: center; gap: .2rem; }
+.doc-tree-sec-name { flex: 1; cursor: text; }
+.doc-tree-sec-name--quiet { color: var(--muted); font-size: .82rem; font-weight: 500; padding: .15rem 0; cursor: default; }
+.doc-tree-grow { flex: 1; min-width: 0; }
+.doc-tree-grip { cursor: grab; color: var(--muted); font-size: .8rem; user-select: none; }
+.doc-tree-item { display: flex; align-items: center; gap: .3rem; padding: .3rem .4rem .3rem .6rem; border-radius: var(--shape-corner); border-left: var(--shape-frame-heavy) solid transparent; cursor: grab; }
+.doc-tree-item:not(.is-active):hover { background: var(--bg-surface); }
+.doc-tree-link { flex: 1; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .88rem; font-weight: 600; color: var(--text); }
+.doc-tree-link:hover { text-decoration: underline; }
+.doc-tree-item.is-active .doc-tree-link { color: var(--on-sun); font-weight: 800; }
+.doc-tree-series-head { display: flex; align-items: center; gap: .3rem; width: 100%; padding: .15rem .3rem; border: 0; background: none; border-radius: var(--shape-corner-control); cursor: pointer; text-align: left; font-family: inherit; font-size: .85rem; font-weight: 600; color: var(--text); }
+.doc-tree-series-head:hover { background: var(--bg-surface); }
+.doc-tree-series-head .poster-count { margin-left: .3rem; }
+.doc-tree-series-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-tree-arrow { color: var(--muted); font-size: .8rem; width: 1em; flex-shrink: 0; }
+.doc-tree-parts { margin-left: .85rem; border-left: 1px solid var(--border); padding-left: .4rem; }
+/* A colour a person gave: its rail on the left (the open document's rail stays ink). */
+.doc-tree-sec.doc-tree-rail, .doc-tree-sec .doc-tree-sec.doc-tree-rail { border-left: var(--shape-frame-heavy) solid var(--colour-tag); padding-left: .45rem; }
+.doc-tree-item.doc-tree-rail { border-left-color: var(--colour-tag); }
+.doc-tree-item.is-active { border-left-color: var(--text); }
+@media (max-width: 640px) { .doc-tree { flex-direction: column; } .doc-tree-index { flex: none; width: 100%; } }
+
+/* ── The old names: the design lab's demo only (was views/profile.css) ── */
 .pj-doc-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; text-align: left; flex: 1; padding: 0; }
 .pj-doc-link:hover { text-decoration: underline; }
 .pj-docspace { display: flex; gap: 0.75rem; align-items: flex-start; }
@@ -48,7 +80,7 @@
 .pj-doc-series-parts { margin-left: 0.85rem; border-left: 1px solid var(--border); padding-left: 0.4rem; }
 @media (max-width: 640px) { .pj-docspace { flex-direction: column; } .pj-doc-index { flex: none; width: 100%; } }
 
-/* ── Inside a workspace page (was views/organism.css) ── */
+/* ── The old names inside a workspace page: the design lab's demo only (was views/organism.css) ── */
 /* The document index and the document lose the card: paper, an ink rule, the sun on the open one. */
 .og-page .pj-doc-index { flex: 0 0 250px; border-radius: var(--shape-corner); background: transparent; padding: .4rem 0 0; max-height: none; }
 .og-page .pj-doc-item { border-radius: var(--shape-corner); border-left: var(--shape-frame-heavy) solid transparent; padding: .3rem .4rem .3rem .6rem; }

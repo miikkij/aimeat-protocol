@@ -1,0 +1,51 @@
+/**
+ * @file plan-steps.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The steps of a plan (components/PlanSteps.js): the list, one step under the section
+ *   rule (poster.css .poster-row--thing, drawn in the markup), its head in a line, its ways at its
+ *   foot, the dimmed done and skipped steps, the check box of a step to pick, and the grey line in
+ *   italics that says why. The values are the Notebook's (.pf-nb-plan-steps, .pf-nb-plan-step, its
+ *   head, title, why and buttons, .pf-nb-chunk-pick, .pf-nb-enrich-summary in css/views/notebook.css,
+ *   and the section values css/views/profile-poster.css gave .pf .pf-nb-plan-step), moved unchanged.
+ *   Reads colours and spaces from the theme tokens only; no corner, frame, shadow or case of its own.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial (page group G4, the notebook).
+ */
+
+.plan-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.plan-step {
+  padding: 1rem 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.plan-step--done { opacity: 0.75; }
+.plan-step--skipped { opacity: 0.5; }
+.plan-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+  flex-wrap: wrap;
+}
+.plan-step-title { font-weight: 600; color: var(--text); }
+.plan-step-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+.plan-step-doors {
+  display: flex;
+  gap: var(--space-xs, 0.4rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.plan-note { font-style: italic; }

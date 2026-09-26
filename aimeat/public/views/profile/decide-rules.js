@@ -20,6 +20,7 @@
  * @structure DecideRules({ available, providers }) · toRule / fromRule (the editor's draft ↔ the record)
  * @usage import { DecideRules } from './decide-rules.js'; html`<${DecideRules} available=${true} providers=${view} />`
  * @version-history
+ *   v1.18.0 — 2026-09-26 — Every part is a kit component (Touch keeps every control 44px; BoxList and BoxLine for the proposals and the rules, the message each door caused after it; the editor in the dashed field Box with TextField, TextArea, Select, Check and Fields, a question in a row Box; SubHeading; Note with a refusal kept one problem per line; Action; Layout): the part writes no class (page group G8).
  *   v1.17.0 — 2026-09-26 — A rule's lines beside its title are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.16.0 — 2026-09-26 — "Gate" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.15.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -55,11 +56,24 @@ import { swallowed } from '/js/swallowed.js';
 import { providerTitle } from './decide-providers.js';
 import { Hint } from '/components/Hint.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
+import { Box, BoxList, BoxLine } from '/components/Box.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Fields } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
+import { Stack, Space, Touch } from '/components/Layout.js';
 
 const shortDay = (iso) => String(iso ?? '').slice(0, 10);
 const money = (usd) => `$${Number(usd || 0) < 1 ? Number(usd || 0).toFixed(4) : Number(usd || 0).toFixed(2)}`;
 const EMPTY_Q = { id: '', type: 'noul', instructions: '', criteriaText: '', threshold: '' };
 const EMPTY = { id: '', title: '', decides: '', sendsText: '', use: 'both', gate: false, questions: [{ ...EMPTY_Q }], act: '', ask: '', sampleText: '', provider: '' };
+
+/** The small headings inside the card, with main's space above them. */
+const sub4 = (words) => html`<${Space} above="large"><${SubHeading} level=${4}>${words}<//><//>`;
+const sub5 = (words) => html`<${Space} above="large"><${SubHeading} level=${5}>${words}<//><//>`;
 
 /** Options or levels as the editor shows them: one per line, `option: meaning` for a choice. */
 function criteriaToText(q) {
@@ -127,100 +141,102 @@ export function cannotCarryText(v) {
   });
 }
 
-/** A message where it was caused: `at` names the place, and only that place draws it. */
-function Note({ msg, at }) {
+/** A message where it was caused: `at` names the place, and only that place draws it. A refusal
+ *  keeps its own line breaks (the node names every problem, one per line). */
+function Said({ msg, at }) {
   if (!msg || msg.at !== at) return null;
-  return html`<p class=${msg.error ? 'form-message form-message--error pf-dr-pre' : 'form-message'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`;
+  return html`<${Note} kind="message" error=${!!msg.error} pre=${!!msg.error} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}<//>`;
+}
+
+/** One question of a rule in the editor: its id, its type and its threshold in a row, its
+ *  instructions, the options or levels of a choice or a score, and the way to remove it. */
+function QuestionBox({ q, i, busy, count, setQ, onRemove }) {
+  return html`
+    <${Box} tone="row" packed>
+      <${Stack} gap="small">
+        <${Fields} cols=${3}>
+          <${TextField} code ariaLabel=${t('decideRules.q.id')} placeholder=${t('decideRules.q.id')}
+            value=${q.id} disabled=${busy} onInput=${(v) => setQ(i, 'id', v)} />
+          <${Select} ariaLabel=${t('decideRules.q.type')} value=${q.type} disabled=${busy}
+            options=${[['noul', t('decideRules.type.noul')], ['choice', t('decideRules.type.choice')], ['score', t('decideRules.type.score')]]}
+            onChange=${(v) => setQ(i, 'type', v)} />
+          <${TextField} type="number" step="any" min="0" ariaLabel=${t('decideRules.q.threshold')}
+            placeholder=${t(`decideRules.q.thresholdHint.${q.type}`)}
+            value=${q.threshold} disabled=${busy} onInput=${(v) => setQ(i, 'threshold', v)} />
+        <//>
+        <${TextArea} rows=${2} ariaLabel=${t('decideRules.q.instructions')} placeholder=${t('decideRules.q.instructions')}
+          value=${q.instructions} disabled=${busy} onInput=${(v) => setQ(i, 'instructions', v)} />
+        ${q.type !== 'noul' && html`
+          <${TextArea} rows=${3} ariaLabel=${t(`decideRules.q.criteria.${q.type}`)} placeholder=${t(`decideRules.q.criteria.${q.type}`)}
+            value=${q.criteriaText} disabled=${busy} onInput=${(v) => setQ(i, 'criteriaText', v)} />`}
+        ${count > 1 && html`<${Actions}><${Action} small soft disabled=${busy} onClick=${onRemove}>${t('decideRules.q.remove')}<//><//>`}
+      <//>
+    <//>`;
 }
 
 function RuleEditor({ draft, isNew, busy, providers, msg, onChange, onSave, onCancel }) {
   const set = (k, v) => onChange({ ...draft, [k]: v });
   const setQ = (i, k, v) => onChange({ ...draft, questions: draft.questions.map((q, n) => (n === i ? { ...q, [k]: v } : q)) });
+  const removeQ = (i) => onChange({ ...draft, questions: draft.questions.filter((_, n) => n !== i) });
   return html`
-    <div class="pf-dr-editor">
-      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.id')}</span>
-        <input class="og-input og-input--mono" value=${draft.id} disabled=${!isNew || busy} placeholder="send-reply"
-               onInput=${e => set('id', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.title')}</span>
-        <input class="og-input" value=${draft.title} disabled=${busy} onInput=${e => set('title', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.decides')}</span>
-        <input class="og-input" value=${draft.decides} disabled=${busy} placeholder=${t('decideRules.f.decidesHint')}
-               onInput=${e => set('decides', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.sends')}</span>
-        <input class="og-input og-input--mono" value=${draft.sendsText} disabled=${busy} placeholder="draft, question"
-               onInput=${e => set('sendsText', e.currentTarget.value)} /></label>
+    <${Box} tone="field">
+      <${Stack} gap="medium">
+        <${TextField} code label=${t('decideRules.f.id')} value=${draft.id} disabled=${!isNew || busy} placeholder="send-reply"
+          onInput=${(v) => set('id', v)} />
+        <${TextField} label=${t('decideRules.f.title')} value=${draft.title} disabled=${busy} onInput=${(v) => set('title', v)} />
+        <${TextField} label=${t('decideRules.f.decides')} value=${draft.decides} disabled=${busy} placeholder=${t('decideRules.f.decidesHint')}
+          onInput=${(v) => set('decides', v)} />
+        <${TextField} code label=${t('decideRules.f.sends')} value=${draft.sendsText} disabled=${busy} placeholder="draft, question"
+          onInput=${(v) => set('sendsText', v)} />
 
-      <h5 class="pf-dr-h sub-heading">${t('decideRules.questions')}</h5>
-      <${Hint}>${t('decideRules.questionsHelp')}<//>
-      ${draft.questions.map((q, i) => html`
-        <div class="pf-dr-q poster-box" key=${i}>
-          <div class="pf-dr-q-top">
-            <input class="og-input og-input--mono" aria-label=${t('decideRules.q.id')} placeholder=${t('decideRules.q.id')}
-                   value=${q.id} disabled=${busy} onInput=${e => setQ(i, 'id', e.currentTarget.value)} />
-            <select class="select-field" aria-label=${t('decideRules.q.type')} value=${q.type} disabled=${busy}
-                    onChange=${e => setQ(i, 'type', e.currentTarget.value)}>
-              <option value="noul">${t('decideRules.type.noul')}</option>
-              <option value="choice">${t('decideRules.type.choice')}</option>
-              <option value="score">${t('decideRules.type.score')}</option>
-            </select>
-            <input class="og-input" type="number" step="any" min="0" aria-label=${t('decideRules.q.threshold')}
-                   placeholder=${t(`decideRules.q.thresholdHint.${q.type}`)}
-                   value=${q.threshold} disabled=${busy} onInput=${e => setQ(i, 'threshold', e.currentTarget.value)} />
-          </div>
-          <textarea class="og-textarea" rows="2" aria-label=${t('decideRules.q.instructions')} placeholder=${t('decideRules.q.instructions')}
-                    value=${q.instructions} disabled=${busy} onInput=${e => setQ(i, 'instructions', e.currentTarget.value)}></textarea>
-          ${q.type !== 'noul' && html`
-            <textarea class="og-textarea" rows="3" aria-label=${t(`decideRules.q.criteria.${q.type}`)} placeholder=${t(`decideRules.q.criteria.${q.type}`)}
-                      value=${q.criteriaText} disabled=${busy} onInput=${e => setQ(i, 'criteriaText', e.currentTarget.value)}></textarea>`}
-          ${draft.questions.length > 1 && html`
-            <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
-                    onClick=${() => onChange({ ...draft, questions: draft.questions.filter((_, n) => n !== i) })}>
-              ${t('decideRules.q.remove')}</button>`}
-        </div>`)}
-      <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
-              onClick=${() => onChange({ ...draft, questions: [...draft.questions, { ...EMPTY_Q }] })}>
-        ${t('decideRules.q.add')}</button>
+        ${sub5(t('decideRules.questions'))}
+        <${Hint}>${t('decideRules.questionsHelp')}<//>
+        ${draft.questions.map((q, i) => html`<${QuestionBox} key=${i} q=${q} i=${i} busy=${busy} count=${draft.questions.length} setQ=${setQ} onRemove=${() => removeQ(i)} />`)}
+        <${Actions}>
+          <${Action} small soft disabled=${busy} onClick=${() => onChange({ ...draft, questions: [...draft.questions, { ...EMPTY_Q }] })}>${t('decideRules.q.add')}<//>
+        <//>
 
-      <h5 class="pf-dr-h sub-heading">${t('decideRules.bands')}</h5>
-      <${Hint}>${t('decideRules.bandsHelp')}<//>
-      <div class="pf-dr-pair">
-        <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.act')}</span>
-          <input class="og-input" type="number" step="any" min="0" max="1" value=${draft.act} disabled=${busy}
-                 onInput=${e => set('act', e.currentTarget.value)} /></label>
-        <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.ask')}</span>
-          <input class="og-input" type="number" step="any" min="0" max="1" value=${draft.ask} disabled=${busy}
-                 onInput=${e => set('ask', e.currentTarget.value)} /></label>
-      </div>
+        ${sub5(t('decideRules.bands'))}
+        <${Hint}>${t('decideRules.bandsHelp')}<//>
+        <${Fields} cols=${2}>
+          <${TextField} type="number" step="any" min="0" max="1" label=${t('decideRules.f.act')} value=${draft.act} disabled=${busy}
+            onInput=${(v) => set('act', v)} />
+          <${TextField} type="number" step="any" min="0" max="1" label=${t('decideRules.f.ask')} value=${draft.ask} disabled=${busy}
+            onInput=${(v) => set('ask', v)} />
+        <//>
 
-      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.use')}</span>
-        <select class="select-field" value=${draft.use} disabled=${busy} onChange=${e => set('use', e.currentTarget.value)}>
-          <option value="both">${t('decideRules.use.both')}</option>
-          <option value="agent">${t('decideRules.use.agent')}</option>
-          <option value="app">${t('decideRules.use.app')}</option>
-        </select></label>
-      ${providers && (providers.providers || []).length > 0 && html`
-        <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.provider')}</span>
-          <select class="select-field" value=${draft.provider} disabled=${busy} onChange=${e => set('provider', e.currentTarget.value)}>
-            <option value="">${t('decideRules.provider.any')}</option>
-            ${providers.providers.map(p => html`<option key=${p.id} value=${p.id}>${p.title}</option>`)}
-          </select></label>
-        <${Hint}>${t('decideRules.providerHelp')}<//>`}
-      <label class="pf-dr-check check-line">
-        <input type="checkbox" class="checkbox checkbox-sm" checked=${draft.gate} disabled=${busy}
-               onChange=${() => set('gate', !draft.gate)} />
-        ${' '}${t('decideRules.f.gate')}
-      </label>
-      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.sample')}</span>
-        <textarea class="og-textarea og-input--mono" rows="4" value=${draft.sampleText} disabled=${busy}
-                  placeholder='{ "draft": "…", "question": "…" }'
-                  onInput=${e => set('sampleText', e.currentTarget.value)}></textarea></label>
+        <${Select} label=${t('decideRules.f.use')} value=${draft.use} disabled=${busy} onChange=${(v) => set('use', v)}
+          options=${[['both', t('decideRules.use.both')], ['agent', t('decideRules.use.agent')], ['app', t('decideRules.use.app')]]} />
+        ${providers && (providers.providers || []).length > 0 && html`
+          <${Select} label=${t('decideRules.f.provider')} value=${draft.provider} disabled=${busy} onChange=${(v) => set('provider', v)}
+            options=${[['', t('decideRules.provider.any')], ...providers.providers.map(p => [p.id, p.title])]} />
+          <${Hint}>${t('decideRules.providerHelp')}<//>`}
+        <${Check} checked=${draft.gate} disabled=${busy} onChange=${() => set('gate', !draft.gate)}>${t('decideRules.f.gate')}<//>
+        <${TextArea} code rows=${4} label=${t('decideRules.f.sample')} value=${draft.sampleText} disabled=${busy}
+          placeholder='{ "draft": "…", "question": "…" }'
+          onInput=${(v) => set('sampleText', v)} />
 
-      <${Note} msg=${msg} at="editor" />
-      <div class="og-doors">
-        <button type="button" class="poster-action poster-action--small" onClick=${onSave} disabled=${busy}>${t('decideRules.save')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${onCancel} disabled=${busy}>${t('decideRules.cancel')}</button>
-      </div>
-    </div>`;
+        <${Said} msg=${msg} at="editor" />
+        <${Actions}>
+          <${Action} small onClick=${onSave} disabled=${busy}>${t('decideRules.save')}<//>
+          <${Action} small soft onClick=${onCancel} disabled=${busy}>${t('decideRules.cancel')}<//>
+        <//>
+      <//>
+    <//>`;
+}
+
+/**
+ * What trying a rule gave. A null result is not 0 %: it means the model returned no certainty at
+ * all, so the bands had nothing to cut and the rule sent it to a person. Printing it as zero would
+ * read as "the model was sure it is wrong".
+ */
+function triedWords(tried) {
+  const result = typeof tried.result === 'number'
+    ? t('decideRules.triedResult', { result: String(Math.round(tried.result * 100)) })
+    : t('decideRules.triedNoResult');
+  const answers = Object.entries(tried.answers || {}).map(([id, a]) =>
+    `${id}: ${a.type === 'noul' ? `${Math.round(Number(a.value) * 100)} %` : String(a.value)}`).join(' · ');
+  return `${t(`decideRules.outcome.${tried.outcome}`)} · ${result} · ${answers}`;
 }
 
 export function DecideRules({ available, providers }) {
@@ -291,92 +307,68 @@ export function DecideRules({ available, providers }) {
     setTried({ id, ...(r?.data ?? {}) });
   }, undefined, { at: `rule:${id}` });
 
-  if (!data) return msg?.error ? html`<p class="form-message form-message--error">${msg.text}</p>` : html`<p class="poster-quiet loading-mark">${t('decideRules.loading')}</p>`;
+  if (!data) return msg?.error ? html`<${Note} kind="message" error>${msg.text}<//>` : html`<${Note} kind="loading">${t('decideRules.loading')}<//>`;
   const quality = data.quality || {};
+  const approve = (p) => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/approve`, {}), 'decideRules.approved', { at: `prop:${p.id}`, okAt: `rule:${p.rule.id}` });
+  const decline = (p) => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/decline`, {}), 'decideRules.declined', { at: `prop:${p.id}`, okAt: 'top' });
+  const remove = (r) => act(() => apiDelete(`/v1/ai/decide/rules/${encodeURIComponent(r.id)}`), 'decideRules.deleted', { at: `rule:${r.id}`, okAt: 'list' });
 
   return html`
-    <div class="pf-dr" id="decide-rules">
-      <h4 class="pf-aitr-sub sub-heading">${t('decideRules.title')}</h4>
+    <${Touch} id="decide-rules">
+      ${sub4(t('decideRules.title'))}
       <${Hint}>${t('decideRules.desc')}<//>
-      <${IndexList} steps className="pf-dr-order">
-        ${[1, 2, 3, 4, 5, 6].map(n => html`<${IndexStep} key=${n}>${t(`decideRules.order.${n}`)}<//>`)}
+      <${Space} above="small">
+        <${IndexList} steps>
+          ${[1, 2, 3, 4, 5, 6].map(n => html`<${IndexStep} key=${n}>${t(`decideRules.order.${n}`)}<//>`)}
+        <//>
       <//>
-      <${Note} msg=${msg} at="top" />
+      <${Said} msg=${msg} at="top" />
 
       ${(data.proposals || []).length > 0 && html`
-        <h5 class="pf-dr-h sub-heading">${t('decideRules.proposals')}</h5>
-        <ul class="pf-aitr-list">
+        ${sub5(t('decideRules.proposals'))}
+        <${BoxList}>
           ${data.proposals.map(p => html`
-            <li key=${p.id} class="pf-aitr-row poster-box">
-              <span class="pf-aitr-row-main">${p.rule.title}</span>
-              <span class="pf-aitr-row-meta listing-meta">${t('decideRules.proposedBy', { who: String(p.proposed_by).split('#')[0] })} · ${p.reason}</span>
-              <span class="pf-aitr-row-meta listing-meta">${t('decideRules.decidesLine', { what: p.rule.decides })}</span>
-              <span class="og-doors">
-                <button type="button" class="poster-action poster-action--small" disabled=${busy}
-                        onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/approve`, {}), 'decideRules.approved', { at: `prop:${p.id}`, okAt: `rule:${p.rule.id}` })}>
-                  ${t('decideRules.approve')}</button>
-                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
-                        onClick=${() => openEditor(fromRule(p.rule), true)}>
-                  ${t('decideRules.readFirst')}</button>
-                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
-                        onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/decline`, {}), 'decideRules.declined', { at: `prop:${p.id}`, okAt: 'top' })}>
-                  ${t('decideRules.decline')}</button>
-              </span>
-              <${Note} msg=${msg} at=${`prop:${p.id}`} />
-            </li>`)}
-        </ul>`}
+            <${BoxLine} key=${p.id} column name=${p.rule.title}
+              meta=${[`${t('decideRules.proposedBy', { who: String(p.proposed_by).split('#')[0] })} · ${p.reason}`, t('decideRules.decidesLine', { what: p.rule.decides })]}
+              doors=${html`
+                <${Action} small disabled=${busy} onClick=${() => approve(p)}>${t('decideRules.approve')}<//>
+                <${Action} small soft disabled=${busy} onClick=${() => openEditor(fromRule(p.rule), true)}>${t('decideRules.readFirst')}<//>
+                <${Action} small soft disabled=${busy} onClick=${() => decline(p)}>${t('decideRules.decline')}<//>`}
+              after=${html`<${Said} msg=${msg} at=${`prop:${p.id}`} />`} />`)}
+        <//>`}
 
-      ${data.rules.length === 0 && !draft && html`<p class="poster-quiet">${t('decideRules.none')}</p>`}
-      <ul class="pf-aitr-list">
+      ${data.rules.length === 0 && !draft && html`<${Note} kind="quiet">${t('decideRules.none')}<//>`}
+      <${BoxList}>
         ${data.rules.map(r => {
           const q = quality[r.id] || { decisions: 0, gateStops: 0, overridden: 0, costUsd: 0 };
+          const tryTitle = !available ? t('decideRules.tryNeedsKey') : r.sample === null ? t('decideRules.tryNeedsSample') : '';
           return html`
-            <li key=${r.id} class="pf-aitr-row poster-box">
-              <span class="pf-aitr-row-main">${r.title}</span>
-              <span class="pf-aitr-row-meta listing-meta">${t('decideRules.decidesLine', { what: r.decides })}</span>
-              <span class="pf-aitr-row-meta listing-meta">
-                ${t(`decideRules.use.${r.use}`)} · ${r.gate ? t('decideRules.isGate') : t('decideRules.notGate')} · v${r.version}${r.provider ? ` · ${t('decideRules.runsOn', { provider: providerTitle(providers, r.provider) })}` : ''}
-              </span>
-              <span class="pf-aitr-row-meta listing-meta">
-                ${t('decideRules.quality', {
+            <${BoxLine} key=${r.id} column name=${r.title}
+              meta=${[
+                t('decideRules.decidesLine', { what: r.decides }),
+                `${t(`decideRules.use.${r.use}`)} · ${r.gate ? t('decideRules.isGate') : t('decideRules.notGate')} · v${r.version}${r.provider ? ` · ${t('decideRules.runsOn', { provider: providerTitle(providers, r.provider) })}` : ''}`,
+                t('decideRules.quality', {
                   decisions: String(q.decisions), stops: String(q.gateStops), overridden: String(q.overridden),
                   cost: money(q.costUsd), changed: shortDay(r.updatedAt),
-                })}
-              </span>
-              <span class="og-doors">
-                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
-                        onClick=${() => openEditor(fromRule(r), false)}>${t('decideRules.edit')}</button>
-                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy || !available || r.sample === null}
-                        title=${!available ? t('decideRules.tryNeedsKey') : r.sample === null ? t('decideRules.tryNeedsSample') : ''}
-                        onClick=${() => tryRule(r.id)}>${t('decideRules.try')}</button>
-                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
-                        onClick=${() => act(() => apiDelete(`/v1/ai/decide/rules/${encodeURIComponent(r.id)}`), 'decideRules.deleted', { at: `rule:${r.id}`, okAt: 'list' })}>
-                  ${t('decideRules.delete')}</button>
-              </span>
-              <${Note} msg=${msg} at=${`rule:${r.id}`} />
-              ${tried && tried.id === r.id && html`
-                <span class="form-message" role="status">
-                  ${/* A null result is not 0 %: it means the model returned no certainty at all, so
-                       the bands had nothing to cut and the rule sent it to a person. Printing it as
-                       zero would read as "the model was sure it is wrong". */''}
-                  ${t(`decideRules.outcome.${tried.outcome}`)} · ${typeof tried.result === 'number'
-                    ? t('decideRules.triedResult', { result: String(Math.round(tried.result * 100)) })
-                    : t('decideRules.triedNoResult')}
-                  ${' · '}${Object.entries(tried.answers || {}).map(([id, a]) =>
-                    `${id}: ${a.type === 'noul' ? `${Math.round(Number(a.value) * 100)} %` : String(a.value)}`).join(' · ')}
-                </span>`}
-            </li>`;
+                }),
+              ]}
+              doors=${html`
+                <${Action} small soft disabled=${busy} onClick=${() => openEditor(fromRule(r), false)}>${t('decideRules.edit')}<//>
+                <${Action} small soft disabled=${busy || !available || r.sample === null} title=${tryTitle} onClick=${() => tryRule(r.id)}>${t('decideRules.try')}<//>
+                <${Action} small soft disabled=${busy} onClick=${() => remove(r)}>${t('decideRules.delete')}<//>`}
+              after=${html`
+                <${Said} msg=${msg} at=${`rule:${r.id}`} />
+                ${tried && tried.id === r.id && html`<${Note} kind="message" role="status">${triedWords(tried)}<//>`}`} />`;
         })}
-      </ul>
-      <${Note} msg=${msg} at="list" />
+      <//>
+      <${Said} msg=${msg} at="list" />
 
       ${!draft && html`
-        <div class="og-doors">
-          <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => openEditor({ ...EMPTY, questions: [{ ...EMPTY_Q }] }, true)}>
-            ${t('decideRules.new')}</button>
-        </div>`}
+        <${Actions}>
+          <${Action} small disabled=${busy} onClick=${() => openEditor({ ...EMPTY, questions: [{ ...EMPTY_Q }] }, true)}>${t('decideRules.new')}<//>
+        <//>`}
       ${draft && html`<${RuleEditor} draft=${draft} isNew=${isNew} busy=${busy} providers=${providers} msg=${msg} onChange=${setDraft} onSave=${save} onCancel=${closeEditor} />`}
-    </div>`;
+    <//>`;
 }
 
 export default DecideRules;

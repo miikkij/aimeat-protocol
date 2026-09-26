@@ -9,6 +9,12 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.1 — 2026-09-27 — The List's Name and the Week rhythm no longer draw .og-tbl-name: each has its
+ *     own class with the same values (list.css .list-name-link, week-rhythm.css .week-rhythm-open).
+ *     .og-tbl-name stays for the public knowledge viewer and the design lab's space table.
+ *   v1.3.0 — 2026-09-26 — .og-tbl-dot goes: the workspace's table of spaces is the List (its "·" the List's
+ *     faint Cell) and nothing else writes it. The rest stays: the List's Name draws .og-tbl-name,
+ *     Contacts writes .og-tbl-go, the design lab's sample the table (page migration G2b).
  *   v1.2.0 — 2026-09-25 — The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
  *   v1.1.0 — 2026-09-25 — The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
@@ -29,7 +35,6 @@
 .og-tbl-last:where(:not(.poster-time)) { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
 .og-tbl-go { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--text-dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-tbl-go:hover { color: var(--accent); }
-.og-tbl-dot { color: var(--border); }
 .og-tbl-door { text-align: right; }
 .og-tbl-door .og-door { font-size: .72rem; }
 

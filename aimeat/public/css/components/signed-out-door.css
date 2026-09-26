@@ -7,11 +7,12 @@
  *   headline with the sun's offset shadow, where the address leads under a heavy rule, the lead, the
  *   loud action and the action link, and the dashed coral aside that says what this is. Every value is
  *   a theme.css token, and the faces are read through --font-showroom and --font-showroom-body.
- *   Moved unchanged out of views/profile-door.css (the file itself, renamed); the class names stay. Its
+ *   Drawn by components/SignedOutDoor.js under its own names (.signed-out-door-*). Its
  *   2px and 3px frames and its capitals read the shape values whose built-in values equal them
  *   (--shape-frame, --shape-frame-heavy, --shape-case-label, --shape-case-heading), so nothing changes.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 -- 2026-09-27 -- The component's own names: every .pf-door* is .signed-out-door* (a move: the declarations, the selector shapes and the reveal are unchanged).
  *   v1.4.0 -- 2026-09-25 -- Moved out of views/profile-door.css into the component library, unchanged (UI consolidation phase 5, a move).
  *   v1.3.0 -- 2026-09-25 -- Sign in is the dark block (.poster-slab); its coral showroom slab goes, on a phone it keeps the full width (Jouni's decision "Loud action", a unification).
  *   v1.2.0 -- 2026-09-25 -- The last quiet ways on with a look of their own are the action link (.poster-action; the danger tone for detach, the small link for a link inside a part, the quiet cut in the account dialogs): pn-detach-btn, pn-setup-link, pf-aitr-row-link, pf-edit-link, pf-pw-eye and the door's underlined words; a place keeps only its layout (Jouni's decision "Action link", a unification).
@@ -19,7 +20,7 @@
  *   2026-09-13 -- Compose the canonical aside; preserve the door's layout.
  *   v1.0.0 — 2026-09-06 — Initial. The wall it replaces (.login-prompt) lived in profile.css.
  */
-.pf-door {
+.signed-out-door {
   width: 100%; max-width: 1100px; box-sizing: border-box; margin: 0 auto;
   padding: 2.75rem 2rem 3.5rem;
   display: flex; flex-direction: column; gap: 1.5rem;
@@ -27,67 +28,67 @@
 }
 
 /* The address the visitor arrived at, as a machine thing, and the small coral line beside it. */
-.pf-door-kicker { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
-.pf-door-address {
+.signed-out-door-kicker { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.signed-out-door-address {
   display: inline-flex; align-items: center; padding: 6px 10px; border: var(--shape-frame) solid var(--text);
   font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; color: var(--text);
   word-break: break-all;
 }
-.pf-door-label {
+.signed-out-door-label {
   font-family: var(--font-showroom); text-transform: var(--shape-case-label); font-size: 0.8rem;
   letter-spacing: 0.04em; color: var(--accent);
 }
 
-.pf-door-title {
+.signed-out-door-title {
   margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: var(--shape-case-heading);
   font-size: clamp(2.4rem, 5.2vw, 4.75rem); line-height: 0.96; letter-spacing: var(--font-poster-tracking);
   color: var(--text); text-shadow: 0.075em 0.075em 0 var(--sun);
   display: flex; flex-direction: column;
 }
-.pf-door-title-accent { color: var(--accent); }
+.signed-out-door-title-accent { color: var(--accent); }
 
 /* Where the address leads: one row under a rule, the path on the left and the chip on the right. */
-.pf-door-target {
+.signed-out-door-target {
   display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
   margin-top: 0.5rem; padding: 0.875rem 0;
   border-top: var(--shape-frame-heavy) solid var(--text); border-bottom: 1px solid var(--border);
 }
-.pf-door-target-path { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.pf-door-crumb { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 1.06rem; font-weight: 800; color: var(--text); }
-.pf-door-crumb-root { color: var(--text-dim); font-weight: 700; }
-.pf-door-crumb-arrow { color: var(--accent); }
+.signed-out-door-target-path { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.signed-out-door-crumb { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 1.06rem; font-weight: 800; color: var(--text); }
+.signed-out-door-crumb-root { color: var(--text-dim); font-weight: 700; }
+.signed-out-door-crumb-arrow { color: var(--accent); }
 
-.pf-door-cols {
+.signed-out-door-cols {
   display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 3.5rem;
   align-items: start; margin-top: 0.5rem;
 }
-.pf-door-say { display: flex; flex-direction: column; gap: 1.4rem; }
-.pf-door-lead { margin: 0; font-size: 1.25rem; line-height: 1.5; font-weight: 600; color: var(--text); }
-.pf-door-actions { display: flex; align-items: center; gap: 1.75rem; flex-wrap: wrap; }
+.signed-out-door-say { display: flex; flex-direction: column; gap: 1.4rem; }
+.signed-out-door-lead { margin: 0; font-size: 1.25rem; line-height: 1.5; font-weight: 600; color: var(--text); }
+.signed-out-door-actions { display: flex; align-items: center; gap: 1.75rem; flex-wrap: wrap; }
 
 /* The one loud action on the page is the dark block (.poster-slab), the other ways on the action link. */
-.pf-door-after { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text-dim); }
+.signed-out-door-after { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text-dim); }
 
 /* The aside that says what this is, for the visitor who came with a link and no account. */
-.pf-door-what { display: flex; flex-direction: column; gap: 0.75rem; }
-.pf-door-what-head { display: flex; flex-direction: column; gap: 0.35rem; }
-.pf-door-what-title { font-family: var(--font-showroom); text-transform: var(--shape-case-heading); font-size: 1.6rem; line-height: 1.05; color: var(--text); }
-.pf-door-what-text { margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--text); }
-.pf-door-what .pf-door-more { align-self: flex-start; }
+.signed-out-door-what { display: flex; flex-direction: column; gap: 0.75rem; }
+.signed-out-door-what-head { display: flex; flex-direction: column; gap: 0.35rem; }
+.signed-out-door-what-title { font-family: var(--font-showroom); text-transform: var(--shape-case-heading); font-size: 1.6rem; line-height: 1.05; color: var(--text); }
+.signed-out-door-what-text { margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--text); }
+.signed-out-door-what .signed-out-door-more { align-self: flex-start; }
 
 /* One reveal, top to bottom, and none for a person who asked for none. */
 @keyframes pfDoorRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-.pf-door > * { animation: pfDoorRise 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.pf-door > :nth-child(2) { animation-delay: 90ms; }
-.pf-door > :nth-child(3) { animation-delay: 180ms; }
-.pf-door > :nth-child(4) { animation-delay: 270ms; }
-@media (prefers-reduced-motion: reduce) { .pf-door > * { animation: none; } }
+.signed-out-door > * { animation: pfDoorRise 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.signed-out-door > :nth-child(2) { animation-delay: 90ms; }
+.signed-out-door > :nth-child(3) { animation-delay: 180ms; }
+.signed-out-door > :nth-child(4) { animation-delay: 270ms; }
+@media (prefers-reduced-motion: reduce) { .signed-out-door > * { animation: none; } }
 
 @media (max-width: 900px) {
-  .pf-door-cols { grid-template-columns: 1fr; gap: 1.5rem; }
+  .signed-out-door-cols { grid-template-columns: 1fr; gap: 1.5rem; }
 }
 @media (max-width: 600px) {
-  .pf-door { padding: 1.75rem 1.25rem 3rem; gap: 1.25rem; }
-  .pf-door-slab { display: block; width: 100%; box-sizing: border-box; }
-  .pf-door-actions { gap: 1.25rem; }
+  .signed-out-door { padding: 1.75rem 1.25rem 3rem; gap: 1.25rem; }
+  .signed-out-door-slab { display: block; width: 100%; box-sizing: border-box; }
+  .signed-out-door-actions { gap: 1.25rem; }
 }

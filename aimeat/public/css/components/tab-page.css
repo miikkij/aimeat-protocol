@@ -10,6 +10,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The rail's note line (Rail.js `note`; additive, page group G7).
+ *   v1.3.0 — 2026-09-26 — The rail's plain line, code label and notice label (Rail.js `plain`, `code`, `notice`; additive, page group G5).
  *   v1.2.0 — 2026-09-26 — The contents rail is the ink ground (--ink-ground, --on-ink-ground): dark in both modes, so its sun labels read in dark mode (Jouni).
  *   v1.1.0 — 2026-09-26 — The contents rail's corner reads --shape-corner (it has a ground); the rail's and the tree's label spacing read the label spacing (calc(var(--shape-tracking-label) * .6) and * .5) (a move: the AIMEAT values equal the old ones).
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
@@ -24,6 +26,14 @@
 .og-rail-link:hover, .og-rail-link.on { opacity: 1; }
 .og-rail-link i { flex: 0 0 auto; min-width: 18px; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
 .og-rail-link em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
+/* A line that only says something: no pointer (Workflows' .wp-rail-static). A label that is an
+   identifier, in the typewriter letters as written (.wp-rail-key); one that asks for a look, coral (.wp-bad). */
+.og-rail-plain { cursor: default; }
+.og-rail-code { font-family: var(--font-mono); font-size: .72rem; font-weight: 400; text-transform: none; overflow-wrap: anywhere; }
+.og-rail-notice { color: var(--accent); }
+/* Small grey words under the item above, indented to its label (the Boards poster's standing,
+   formerly .og-bp .bp-rail-note; added by page group G7). */
+.og-rail-note { padding: .3rem 0 0 1.7rem; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
 .og-rail hr { border: 0; border-top: 1px solid color-mix(in srgb, var(--on-ink-ground) 25%, transparent); margin: .3rem 0; width: 100%; }
 .og-tree { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; padding: .2rem 0 0; }
 .og-tree-group { display: flex; flex-direction: column; margin-bottom: .8rem; }

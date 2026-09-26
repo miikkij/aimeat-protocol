@@ -11,6 +11,16 @@
  * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · secLibrary
  * @usage import { renderKnowledgeView } from './knowledge/cover.js';
  * @version-history
+ *   v1.19.0 -- 2026-09-26 -- On the component kit (page group G7): the page is the SettingsPage (crumb,
+ *     marks, the rail and its sibling pages as data), the strip the FigureStrip; the sections are
+ *     Section; the packages table, the organisms' packages and the library are the List (its head,
+ *     Group headings with their tally for the drafts, published and datasets; the loading and empty
+ *     lines are the List's); the sort is Tabs in the fold tone; the three roads are Roads/Road
+ *     (chosen on the sun, the door chooses); the paste field is the TextArea, its refusal the Note
+ *     message; a pasted package's preview is the Box (its name and tags in the head, import and
+ *     discard at its foot) with its entries as a List and "List in the catalogue" as the Check.
+ *     main's dim tags come back (drafts, the synthesis and the count of a pasted package, a private
+ *     entry in it), and a different author in the preview says so in coral again. No class is written here.
  *   v1.18.0 -- 2026-09-26 -- The packages table with its groups, the organisms' packages, the library's packages and a pasted package's entries are the Listing (listing, listing-row and its head row, name, words and doors cells, the line under a name; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.17.0 -- 2026-09-26 -- The line under a package's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.16.0 -- 2026-09-26 -- "List in the catalogue" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -43,11 +53,27 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { c, num, rel, ctWord, synthWord, visWord, relWord, manifestOf, statsOf, groupOf, GROUP_ORDER, pkgId, authorName, crumb, packageRows, pageLinks } from './frame.js';
-import { renderPackage } from './package.js';
+import { Section } from '/components/Section.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { scrollToSection, openTab } from '/components/Rail.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tinted } from '/components/Figure.js';
+import { Box } from '/components/Box.js';
+import { Roads, Road } from '/components/Roads.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextArea } from '/components/TextField.js';
+import { Check } from '/components/Check.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { List, Row, Name, Desc, Cell, Doors, Group } from '/components/List.js';
 import { Hint } from '/components/Hint.js';
+import { c, num, rel, ctWord, synthWord, visWord, relWord, manifestOf, statsOf, groupOf, GROUP_ORDER, pkgId, authorName, crumb, packageHead, packageRow, pageLinks } from './frame.js';
+import { renderPackage } from './package.js';
+
+/** The public library, in a new window. */
+const openLibraryPage = () => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener');
+const libraryUrl = (id) => '/v1/publicknowledgeviewer?id=' + encodeURIComponent(id);
 
 export function renderKnowledgeView(ctx) {
   const v = ctx.view;
@@ -67,49 +93,36 @@ function renderCover(ctx) {
   const drafts = pkgs.filter(p => groupOf(manifestOf(p)) === 'draft').length;
   const datasets = pkgs.filter(p => groupOf(manifestOf(p)) === 'dataset').length;
   const latest = [...pkgs].sort((a, b) => new Date(manifestOf(b).updated || b.updated_at || 0).getTime() - new Date(manifestOf(a).updated || a.updated_at || 0).getTime())[0];
-  const chip = (n, key, cls = '') => html`<span class=${`poster-chip ${cls}`}>${c(key, { n })}</span>`;
-  const strip = html`
-    <div class="og-strip">
-      <div>${latest ? html`<b>${rel(manifestOf(latest).updated || latest.updated_at)}</b><span>${c('stripLatest')}</span><small>${manifestOf(latest).name}</small>` : html`<b>·</b><span>${c('stripLatest')}</span><small>${c('noneYet')}</small>`}</div>
-      <div><b>${listed}<span class="og-strip-of">/${pkgs.length}</span></b><span>${c('stripListed')}</span><small>${c('stripListedSub')}</small></div>
-      <div><b>${totals.verified}<span class="og-strip-of">/${totals.refs}</span></b><span>${c('stripRefs')}</span><small>${totals.refs - totals.verified ? c('stripRefsSub', { n: totals.refs - totals.verified }) : c('stripRefsAll')}</small></div>
-      <div><b class=${federated ? 'og-strip-coral' : ''}>${federated}</b><span>${c('stripFederated')}</span><small>${c('stripFederatedSub')}</small></div>
-    </div>`;
+  const chip = (n, key, tone) => ({ label: c(key, { n }), tone });
+  // Drafts are dim (they count nothing yet), datasets coral, as main drew them.
+  const marks = [
+    chip(pkgs.length, 'chipPackages'), chip(totals.entries, 'chipEntries'), chip(listed, 'chipListed'), chip(clonable, 'chipClonable'),
+    federated ? chip(federated, 'chipFederated') : null, drafts ? chip(drafts, 'chipDrafts', 'dim') : null, datasets ? chip(datasets, 'chipDatasets', 'coral') : null,
+  ];
+  const strip = html`<${FigureStrip} items=${[
+    latest ? { n: rel(manifestOf(latest).updated || latest.updated_at), label: c('stripLatest'), sub: manifestOf(latest).name || '' } : { n: '·', label: c('stripLatest'), sub: c('noneYet') },
+    { n: listed, of: '/' + pkgs.length, label: c('stripListed'), sub: c('stripListedSub') },
+    { n: totals.verified, of: '/' + totals.refs, label: c('stripRefs'), sub: totals.refs - totals.verified ? c('stripRefsSub', { n: totals.refs - totals.verified }) : c('stripRefsAll') },
+    { n: federated, tone: federated ? 'coral' : undefined, label: c('stripFederated'), sub: c('stripFederatedSub') },
+  ]} />`;
+  const toMake = () => scrollToSection('kp-make');
+  const actions = html`
+    <${Loud} onClick=${toMake}>${c('make')}<//>
+    <${Actions}><${Action} small onClick=${openLibraryPage}>${c('library')} ↗<//><//>`;
+  const sections = [
+    { id: 'kp-packages', num: '01', label: c('secPackages'), count: pkgs.length },
+    { id: 'kp-make', num: '02', label: c('make'), count: '' },
+    { id: 'kp-orgs', num: '03', label: c('secOrganisms'), count: ctx.organismPackages.length },
+    { id: 'kp-library', num: '04', label: c('secLibrary'), count: ctx.discovered.length },
+  ];
   return html`
-    <div class="og og-kp">
-      ${crumb(ctx, [])}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('knowledge.tabLabel')}</h1>
-          <div class="poster-chips">
-            ${chip(pkgs.length, 'chipPackages')}${chip(totals.entries, 'chipEntries')}${chip(listed, 'chipListed')}${chip(clonable, 'chipClonable')}
-            ${federated ? chip(federated, 'chipFederated') : null}${drafts ? chip(drafts, 'chipDrafts') : null}${datasets ? chip(datasets, 'chipDatasets', 'poster-chip--coral') : null}
-          </div>
-          <p class="og-desc">${c('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <button type="button" class="poster-slab" onClick=${() => scrollTo('kp-make')}>${c('make')}</button>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener')}>${c('library')} ↗</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secPackages(ctx)}
-          ${secMake(ctx)}
-          ${secOrganisms(ctx)}
-          ${secLibrary(ctx)}
-        </div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${c('railTitle')}</span>
-          ${[['01', 'kp-packages', c('secPackages'), pkgs.length], ['02', 'kp-make', c('make'), ''], ['03', 'kp-orgs', c('secOrganisms'), ctx.organismPackages.length], ['04', 'kp-library', c('secLibrary'), ctx.discovered.length]]
-            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+    <${SettingsPage} name="kp" crumb=${crumb(ctx, [])} title=${t('knowledge.tabLabel')} marks=${marks} desc=${c('desc')}
+      actions=${actions} strip=${strip} railTitle=${c('railTitle')} sections=${sections} pagesLabel=${c('pages')} pages=${pageLinks()}>
+      ${secPackages(ctx)}
+      ${secMake(ctx)}
+      ${secOrganisms(ctx)}
+      ${secLibrary(ctx)}
+    <//>`;
 }
 
 /* ── 01 My packages ────────────────────────────────────────────────────────────────────────── */
@@ -117,36 +130,36 @@ function secPackages(ctx) {
   const pkgs = ctx.packages;
   const byUpdated = (a, b) => new Date(manifestOf(b).updated || b.updated_at || 0).getTime() - new Date(manifestOf(a).updated || a.updated_at || 0).getTime();
   const byName = (a, b) => String(manifestOf(a).name || '').localeCompare(String(manifestOf(b).name || ''));
-  const sortDoor = (id, label) => html`<button type="button" class=${`poster-tab poster-tab--fold ${ctx.sort === id ? 'is-on' : ''}`} onClick=${() => ctx.setSort(id)}>${label}</button>`;
-  const doors = html`${sortDoor('state', c('byState'))}${sortDoor('name', c('byName'))}${sortDoor('newest', c('byNewest'))}`;
+  const doors = html`<${Tabs} tone="fold" label=${c('secPackages')} value=${ctx.sort} onSelect=${(v) => ctx.setSort(v)}
+    items=${[{ value: 'state', label: c('byState') }, { value: 'name', label: c('byName') }, { value: 'newest', label: c('byNewest') }]} />`;
   let body;
-  if (ctx.loading) body = html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>`;
-  else if (!pkgs.length) body = html`<p class="poster-quiet">${c('nonePackages')}</p>`;
-  else if (ctx.sort === 'state') {
+  if (ctx.sort === 'state') {
     const groups = GROUP_ORDER.map(g => ({ g, list: pkgs.filter(p => groupOf(manifestOf(p)) === g).sort(byUpdated) })).filter(x => x.list.length);
-    body = groups.map(({ g, list }, i) => html`<div key=${g}>${packageRows(ctx, list, { head: i === 0, label: html`<div class="kp-lbl poster-day-title">${c('group.' + g)}<em>${list.length}</em></div>` })}</div>`);
+    body = groups.map(({ g, list }) => html`<${Group} key=${g} title=${c('group.' + g)} count=${list.length}>${list.map(pkg => packageRow(ctx, pkg))}<//>`);
   } else {
-    body = packageRows(ctx, [...pkgs].sort(ctx.sort === 'name' ? byName : byUpdated), { head: true });
+    body = [...pkgs].sort(ctx.sort === 'name' ? byName : byUpdated).map(pkg => packageRow(ctx, pkg));
   }
-  return html`<${PageSection} id="kp-packages" num="01" title=${c('secPackages')} count=${pkgs.length} doors=${doors} first=${true}>${body}<//>`;
+  return html`<${Section} id="kp-packages" num="01" title=${c('secPackages')} count=${pkgs.length} doors=${doors} first=${true}>
+    <${List} cols="name-count-words-when-doors" keepCols head=${packageHead()} loading=${ctx.loading && t('common.loading')} empty=${c('nonePackages')}>${body}<//>
+  <//>`;
 }
 
 /* ── 02 Make a package: three roads ────────────────────────────────────────────────────────── */
 function secMake(ctx) {
+  // A road is chosen by its door (no onPick): the tile keeps the plain pointer.
   const road = (id, title, step, body, doorLabel, onClick) => html`
-    <div class=${`poster-choice kp-road ${ctx.road === id ? 'on' : ''}`} key=${id}>
-      <b>${title}</b><span class="kp-step">${step}</span><p>${body}</p>
-      <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${onClick}>${doorLabel}</button></div>
-    </div>`;
-  return html`<${PageSection} id="kp-make" num="02" title=${c('make')} count=${c('makeSub')}>
-    <div class="kp-roads">
+    <${Road} key=${id} chosen=${ctx.road === id} name=${title} sub=${step} text=${body}
+      doors=${html`<${Action} small onClick=${onClick}>${doorLabel}<//>`} />`;
+  const paste = (v) => ctx.handleImportPaste(v);
+  return html`<${Section} id="kp-make" num="02" title=${c('make')} count=${c('makeSub')}>
+    <${Roads} cols="three">
       ${road('mcp', c('roadMcp'), c('roadMcpStep'), c('roadMcpBody'), c('roadMcpDoor'), () => { ctx.setRoad('mcp'); ctx.copyPrompt('mcp'); })}
       ${road('chat', c('roadChat'), c('roadChatStep'), c('roadChatBody'), c('roadChatDoor'), () => { ctx.setRoad('chat'); ctx.copyPrompt('human'); })}
       ${road('paste', c('roadPaste'), c('roadPasteStep'), c('roadPasteBody'), c('roadPasteDoor'), () => { ctx.setRoad('paste'); ctx.setPasteOpen(true); })}
-    </div>
+    <//>
     ${ctx.road === 'chat' || ctx.road === 'paste' || ctx.pasteOpen || ctx.importText ? html`
-      <textarea class="og-textarea kp-paste" rows="4" placeholder=${t('knowledge.import.placeholder')} value=${ctx.importText} onInput=${(e) => ctx.handleImportPaste(e.target.value)}></textarea>
-      ${ctx.importError ? html`<p class="form-message form-message--error">${ctx.importError}</p>` : null}
+      <${TextArea} rows=${4} ariaLabel=${c('roadPaste')} placeholder=${t('knowledge.import.placeholder')} value=${ctx.importText} onInput=${paste} />
+      ${ctx.importError ? html`<${Note} kind="message" error>${ctx.importError}<//>` : null}
       ${ctx.importPreview ? importPreview(ctx) : html`<${Hint}>${c('pasteHint', { ghii: ctx.ghii })}<//>`}` : null}
   <//>`;
 }
@@ -155,47 +168,49 @@ function importPreview(ctx) {
   const p = ctx.importPreview;
   const pkg = p.pkg;
   const entries = pkg.entries || [];
+  const ghiiLine = p.ghiiMatch ? t('knowledge.import.ghiiConfirm').replace('{ghii}', ctx.ghii) : t('knowledge.import.ghiiMismatch').replace('{ghii}', p.targetGhii);
+  const discard = () => ctx.handleImportPaste('');
+  const marks = html`<${Mark}>${ctWord(pkg.content_type || 'document')}<//><${Mark} tone="dim">${synthWord(pkg.synthesis?.level)}<//><${Mark} tone="dim">${c('entriesN', { n: entries.length })}<//>`;
+  const doors = html`
+    <${Loud} control disabled=${ctx.importing} onClick=${ctx.confirmImport}>${ctx.importing ? '…' : c('importN', { n: entries.length })}<//>
+    <${Action} small soft onClick=${discard}>${c('discard')}<//>`;
   return html`
-    <div class="kp-preview poster-box">
-      <div class="kp-preview-h">
-        <b>${pkg.name || pkg.title || pkg.id || c('untitled')}</b>
-        <span class="poster-chip">${ctWord(pkg.content_type || 'document')}</span>
-        <span class="poster-chip">${synthWord(pkg.synthesis?.level)}</span>
-        <span class="poster-chip">${c('entriesN', { n: entries.length })}</span>
-      </div>
-      <p class=${`poster-hint ${p.ghiiMatch ? '' : 'kp-warn'}`}>${p.ghiiMatch ? t('knowledge.import.ghiiConfirm').replace('{ghii}', ctx.ghii) : t('knowledge.import.ghiiMismatch').replace('{ghii}', p.targetGhii)}</p>
-      <div class="listing listing--cols listing--tag-name kp-preview-entries">
-        ${entries.map((e, i) => { const data = p.raw?.entry_data?.[e.key] || e.value; const val = typeof data === 'string' ? data : (data?.body || data?.summary || data?.description || ''); return html`
-          <div class="listing-row" key=${i}>
-            <div><span class=${`poster-chip ${e.visibility === 'public' ? 'poster-chip--sun' : ''}`}>${visWord(e.visibility)}</span></div>
-            <div class="listing-name">${e.title || e.key || c('entryN', { n: i + 1 })}
-              ${val ? html`<small class="listing-meta">${val.length > 140 ? val.slice(0, 140) + '…' : val}</small>` : null}
-              ${(e.references || []).length ? html`<small class="listing-meta">${c('refsVerified', { v: (e.references || []).filter(r => r.verified).length, n: e.references.length })}</small>` : null}
-              ${(e.related_entries || []).length ? html`<small class="listing-meta">${e.related_entries.map(r => `${relWord(r.relation)} ${r.key}`).join(' · ')}</small>` : null}
-            </div>
-          </div>`; })}
-      </div>
-      <label class="kp-check check-line"><input type="checkbox" checked=${p.catalogListed} onChange=${(e) => ctx.setImportPreview({ ...p, catalogListed: e.target.checked })} />${t('knowledge.import.catalogToggle')}</label>
-      <div class="kp-preview-actions">
-        <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.importing} onClick=${ctx.confirmImport}>${ctx.importing ? '…' : c('importN', { n: entries.length })}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.handleImportPaste('')}>${c('discard')}</button>
-      </div>
-    </div>`;
+    <${Box} name=${pkg.name || pkg.title || pkg.id || c('untitled')} marks=${marks} doors=${doors}>
+      <${Note}>${p.ghiiMatch ? ghiiLine : html`<${Tinted} tone="notice">${ghiiLine}<//>`}<//>
+      <${List} cols="tag-name" keepCols apart>
+        ${entries.map((e, i) => {
+          const data = p.raw?.entry_data?.[e.key] || e.value;
+          const val = typeof data === 'string' ? data : (data?.body || data?.summary || data?.description || '');
+          const refs = e.references || [];
+          const lines = [
+            val ? (val.length > 140 ? val.slice(0, 140) + '…' : val) : null,
+            refs.length ? c('refsVerified', { v: refs.filter(r => r.verified).length, n: refs.length }) : null,
+            (e.related_entries || []).length ? e.related_entries.map(r => `${relWord(r.relation)} ${r.key}`).join(' · ') : null,
+          ].filter(Boolean);
+          return html`
+            <${Row} key=${i}>
+              <${Cell}><${Mark} tone=${e.visibility === 'public' ? 'sun' : 'dim'}>${visWord(e.visibility)}<//><//>
+              <${Name} meta=${lines.length ? lines.map((l, j) => html`${j ? html`<br />` : null}${l}`) : null}>${e.title || e.key || c('entryN', { n: i + 1 })}<//>
+            <//>`;
+        })}
+      <//>
+      <${Check} checked=${p.catalogListed} onChange=${(on) => ctx.setImportPreview({ ...p, catalogListed: on })}>${t('knowledge.import.catalogToggle')}<//>
+    <//>`;
 }
 
 /* ── 03 The organisms' packages ────────────────────────────────────────────────────────────── */
 function secOrganisms(ctx) {
   const list = ctx.organismPackages;
-  return html`<${PageSection} id="kp-orgs" num="03" title=${c('secOrganisms')} count=${c('secOrganismsSub', { n: new Set(list.map(p => p.organismName)).size })} doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }))}>${t('profile.tabs.organisms')}</button>`}>
-    ${ctx.organismLoading ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>` : !list.length ? html`<p class="poster-quiet">${t('knowledge.organisms.empty')}</p>` : html`
-      <div class="listing listing--cols listing--name-count-when">
-        ${list.map((p, i) => html`
-          <div class="listing-row" key=${i}>
-            <div class="listing-name">${p.manifest?.name || c('untitled')}<small class="listing-meta">${p.organismName || ''}</small></div>
-            <div class="listing-desc">${p.manifest?.entries?.length ? html`<b>${p.manifest.entries.length}</b> ${c('entriesWord', { n: p.manifest.entries.length })}` : ''}</div>
-            <div class="listing-desc">${p.contributed_at ? c('contributedOn', { d: rel(p.contributed_at) }) : ''}</div>
-          </div>`)}
-      </div>`}
+  const toOrganisms = () => openTab('organisms');
+  return html`<${Section} id="kp-orgs" num="03" title=${c('secOrganisms')} count=${c('secOrganismsSub', { n: new Set(list.map(p => p.organismName)).size })} doors=${html`<${Action} small soft onClick=${toOrganisms}>${t('profile.tabs.organisms')}<//>`}>
+    <${List} cols="name-count-when" keepCols loading=${ctx.organismLoading && t('common.loading')} empty=${t('knowledge.organisms.empty')}>
+      ${list.map((p, i) => html`
+        <${Row} key=${i}>
+          <${Name} meta=${p.organismName || ''}>${p.manifest?.name || c('untitled')}<//>
+          <${Desc}>${p.manifest?.entries?.length ? html`<b>${p.manifest.entries.length}</b> ${c('entriesWord', { n: p.manifest.entries.length })}` : ''}<//>
+          <${Desc}>${p.contributed_at ? c('contributedOn', { d: rel(p.contributed_at) }) : ''}<//>
+        <//>`)}
+    <//>
     <${Hint}>${c('sharedNote')}<//>
   <//>`;
 }
@@ -205,18 +220,22 @@ function secLibrary(ctx) {
   const mine = new Set(ctx.packages.map(p => pkgId(p)));
   const list = ctx.discovered.filter(p => !mine.has(p.package_id) && authorName(p.author) !== authorName(ctx.ghii));
   const clonable = list.filter(p => p.sharing?.allow_clone !== false);
-  return html`<${PageSection} id="kp-library" num="04" title=${c('secLibrary')} count=${c('secLibrarySub', { n: ctx.discovered.length, k: clonable.length })} doors=${html`<button type="button" class="poster-action poster-action--small" onClick=${() => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener')}>${c('openLibrary')} ↗</button>`}>
-    ${ctx.discoverLoading ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>` : !list.length ? html`<p class="poster-quiet">${c('noneLibrary')}</p>` : html`
-      <div class="listing listing--cols listing--name-kind-count-state-doors">
-        ${list.slice(0, 8).map(p => { const cl = p.sharing?.allow_clone !== false; return html`
-          <div class="listing-row" key=${p.package_id}>
-            <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => window.open('/v1/publicknowledgeviewer?id=' + encodeURIComponent(p.package_id), '_blank', 'noopener')}>${p.name || c('untitled')}</button>${p.synthesis?.description ? html`<small class="listing-meta">${p.synthesis.description}</small>` : null}</div>
-          <div class="listing-desc">${[ctWord(p.content_type), p.maturity ? t('knowledge.maturity.' + p.maturity) : '', p.language].filter(Boolean).join(' · ')}<br /><b>${authorName(p.author)}</b></div>
-          <div class="listing-desc">${c('entriesN', { n: p.entries_count || 0 })}${p.references_count ? html`<br />${c('refsVerified', { v: p.verified_references || 0, n: p.references_count })}` : null}</div>
-          <div class="listing-desc">${cl ? html`<b>${c('clonable')}</b>` : c('readOnly')}</div>
-          <div class="listing-doors">${cl ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.handleClone(p.package_id)}>${c('clone')}</button>` : html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => window.open('/v1/publicknowledgeviewer?id=' + encodeURIComponent(p.package_id), '_blank', 'noopener')}>${c('open')}</button>`}</div>
-          </div>`; })}
-      </div>`}
+  return html`<${Section} id="kp-library" num="04" title=${c('secLibrary')} count=${c('secLibrarySub', { n: ctx.discovered.length, k: clonable.length })} doors=${html`<${Action} small onClick=${openLibraryPage}>${c('openLibrary')} ↗<//>`}>
+    <${List} cols="name-kind-count-state-doors" keepCols loading=${ctx.discoverLoading && t('common.loading')} empty=${c('noneLibrary')}>
+      ${list.slice(0, 8).map(p => {
+        const cl = p.sharing?.allow_clone !== false;
+        const clone = () => ctx.handleClone(p.package_id);
+        const open = () => window.open(libraryUrl(p.package_id), '_blank', 'noopener');
+        return html`
+          <${Row} key=${p.package_id}>
+            <${Name} href=${libraryUrl(p.package_id)} newTab meta=${p.synthesis?.description || null}>${p.name || c('untitled')}<//>
+            <${Desc}>${[ctWord(p.content_type), p.maturity ? t('knowledge.maturity.' + p.maturity) : '', p.language].filter(Boolean).join(' · ')}<br /><b>${authorName(p.author)}</b><//>
+            <${Desc}>${c('entriesN', { n: p.entries_count || 0 })}${p.references_count ? html`<br />${c('refsVerified', { v: p.verified_references || 0, n: p.references_count })}` : null}<//>
+            <${Desc}>${cl ? html`<b>${c('clonable')}</b>` : c('readOnly')}<//>
+            <${Doors}>${cl ? html`<${Action} small row onClick=${clone}>${c('clone')}<//>` : html`<${Action} small row onClick=${open}>${c('open')}<//>`}<//>
+          <//>`;
+      })}
+    <//>
     <${Hint}>${c('libraryHint')} ${t('knowledge.discover.trustAdvisory')}<//>
   <//>`;
 }

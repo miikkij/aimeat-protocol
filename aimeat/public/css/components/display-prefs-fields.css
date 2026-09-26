@@ -1,0 +1,16 @@
+/**
+ * @file display-prefs-fields.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The date-format and time-zone fields (components/DisplayPrefsFields.js): each field a
+ *   column of its row label, its control and its hint, and the zone's search box at the column's
+ *   full width. Reads no colour and no shape; the controls wear the field kit (.og-input,
+ *   .select-field) and the labels poster.css.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Moved unchanged from views/profile.css (.pf-edit-label) and
+ *     views/profile-poster.css (.pf-edit-label .pf-edit-input), under the component's own names.
+ */
+
+.display-prefs-field { display: flex; flex-direction: column; gap: 5px; }
+.display-prefs-field .display-prefs-search { width: 100%; min-width: 0; box-sizing: border-box; }

@@ -1,0 +1,38 @@
+/**
+ * @file activity-calendar.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The ActivityCalendar component's own rules (components/ActivityCalendar.js): a year of
+ *   days in week columns under the month names, each day a small square split 2x2, each quarter shaded
+ *   by its level (0 to 4), and under it the key to the quarters and the less-to-more ramp. The values
+ *   are heatmap.css's (the .pj-hm-* rules a workspace's activity panel drew), under the component's
+ *   own class names. Corners read --shape-corner; colours the theme tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Initial: heatmap.css's values under the component's class names (page group G2a).
+ */
+
+.activity-calendar-scroll { overflow-x: auto; padding-bottom: 0.2rem; }
+.activity-calendar-months { display: flex; padding-left: 28px; }
+.activity-calendar-months > span { flex: 0 0 16px; font-size: 0.64rem; color: var(--muted); white-space: nowrap; overflow: visible; }
+.activity-calendar-body { display: flex; }
+.activity-calendar-days { display: flex; flex-direction: column; gap: 2px; width: 28px; flex-shrink: 0; }
+.activity-calendar-days > span { height: 14px; line-height: 14px; font-size: 0.62rem; color: var(--muted); }
+.activity-calendar-weeks { display: flex; gap: 2px; }
+.activity-calendar-week { display: flex; flex-direction: column; gap: 2px; }
+.activity-calendar-day { width: 14px; height: 14px; border-radius: var(--shape-corner); flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 1px; overflow: hidden; }
+.activity-calendar-day--future { background: transparent; }
+.activity-calendar-day .activity-calendar-q { width: 100%; height: 100%; border-radius: var(--shape-corner); }
+.activity-calendar-q { display: inline-block; }
+.activity-calendar-q--0 { background: var(--bg-dim); }
+.activity-calendar-q--1 { background: color-mix(in srgb, var(--success) 32%, var(--bg-dim)); }
+.activity-calendar-q--2 { background: color-mix(in srgb, var(--success) 56%, var(--bg-dim)); }
+.activity-calendar-q--3 { background: color-mix(in srgb, var(--success) 80%, var(--bg-dim)); }
+.activity-calendar-q--4 { background: var(--success); }
+/* The key: the four quarters named, and the ramp from less to more. */
+.activity-calendar-legend { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; flex-wrap: wrap; margin: 0.55rem 0 0.7rem; font-size: 0.72rem; color: var(--muted); }
+.activity-calendar-key { display: flex; align-items: center; gap: 0.55rem; }
+.activity-calendar-day--key { width: 28px; height: 28px; gap: 2px; }
+.activity-calendar-key-words { display: grid; grid-template-columns: auto auto; gap: 0.12rem 0.9rem; }
+.activity-calendar-ramp { display: flex; align-items: center; gap: 3px; }
+.activity-calendar-ramp .activity-calendar-q { width: 13px; height: 13px; border-radius: var(--shape-corner); }

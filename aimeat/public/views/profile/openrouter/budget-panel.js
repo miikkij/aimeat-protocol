@@ -14,6 +14,11 @@
  * @structure AiAppsBudgetPanel (default export of the section) · fmtCompact
  * @usage <${AiAppsBudgetPanel} />
  * @version-history
+ *   v1.17.0 — 2026-09-26 — Every part is a component that gets data (component plan, page group G4): the split
+ *     (Split), the title (Label), the daily budget bar (Meter quota fill, with `early` putting back main's warn
+ *     colour from 60 %), the fields (TextField), the per-app fold (Tab fold, open at first as the details element
+ *     was) and its table (List name-n-n-n), the metric choice (Tabs), the ways on (Loud, Action), the lines (Note).
+ *     The page writes no class.
  *   v1.16.0 — 2026-09-26 — The budget part is set off by the split (.og-split, a hairline) instead of its own 2px grey rule (a unification: the lead's ruling on the one 2px grey rule).
  *   v1.15.0 — 2026-09-26 — The figure on the daily budget bar is the Meter's figure (.poster-meter-figure), the Wallet meter's look: small typewriter figures at the left instead of bold 11px in the middle (a unification: the lead's ruling on a figure written on a meter).
  *   v1.14.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -45,6 +50,15 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { swallowed } from '/js/swallowed.js';
+import { Action, Loud } from '/components/Action.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Meter } from '/components/Figure.js';
+import { TextField } from '/components/TextField.js';
+import { FormActions } from '/components/Field.js';
+import { Tab, Tabs } from '/components/Tabs.js';
+import { List, Row as ListRow, Name, Num } from '/components/List.js';
+import { Row, Stack, Split } from '/components/Layout.js';
 
 /** Compact number (73306 → "73.3k") for token axis/labels. */
 export function fmtCompact(n) {
@@ -149,64 +163,65 @@ export function AiAppsBudgetPanel() {
   const appNames = Array.from(new Set([...perAppEntries.map(([a]) => a), ...historyApps, ...Object.keys(caps)]));
 
   return html`
-    <div class="pf-or-field pf-or-spend-section og-split">
-      <label class="poster-label pf-or-label">${t('profile.openrouter.budget.title')}</label>
-      <div class="poster-hint">${t('profile.openrouter.budget.desc')}</div>
+    <${Split}>
+      <${Stack}>
+      <${Label} block>${t('profile.openrouter.budget.title')}<//>
+      <${Note}>${t('profile.openrouter.budget.desc')}<//>
 
-      <div class="pf-or-spend-bar-row">
-        <div class=${`pf-or-spend-bar poster-box poster-box--meter poster-box--quota ${pct >= 90 ? 'is-full' : ''}`}>
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width=${pct} height="100" /></svg>
-          <div class="poster-meter-figure">$${spent.toFixed(4)} / $${budget.toFixed(2)} (${pct}%)</div>
-        </div>
+      <${Row} wrap>
+        <${Meter} quota early fill pct=${pct} figure=${`$${spent.toFixed(4)} / $${budget.toFixed(2)} (${pct}%)`} />
         ${editing ? html`
-          <input type="number" min="0" max="1000" step="0.10" value=${budgetInput}
-                 onInput=${e => setBudgetInput(e.target.value)}
-                 class="og-input pf-or-spend-budget-input" />
-          <button class="poster-slab poster-slab--control" onClick=${saveBudget} disabled=${saving}>
+          <${TextField} type="number" size="short" min="0" max="1000" step="0.10" value=${budgetInput}
+                 ariaLabel=${t('profile.openrouter.budget.title')}
+                 onInput=${setBudgetInput} />
+          <${Loud} control onClick=${saveBudget} disabled=${saving}>
             ${saving ? '…' : t('profile.openrouter.save')}
-          </button>
-          <button class="poster-action poster-action--small" onClick=${() => setEditing(false)}>${t('profile.openrouter.cancel')}</button>
+          <//>
+          <${Action} small onClick=${() => setEditing(false)}>${t('profile.openrouter.cancel')}<//>
         ` : html`
-          <button class="poster-action poster-action--small" onClick=${() => setEditing(true)}>${t('profile.openrouter.budget.change')}</button>
+          <${Action} small onClick=${() => setEditing(true)}>${t('profile.openrouter.budget.change')}<//>
         `}
-      </div>
+      <//>
 
-      ${message && html`<div class="form-message ${message.error ? 'form-message--error' : ''}">${message.text}</div>`}
+      ${message && html`<${Note} kind="message" error=${message.error}>${message.text}<//>`}
 
       ${appNames.length > 0 && html`
-        <details class="pf-or-spend-details" open onToggle=${(e) => setPerAppOpen(e.currentTarget.open)}>
-          <summary class=${`poster-tab poster-tab--fold ${perAppOpen ? 'is-on' : ''}`}>${t('profile.openrouter.budget.perApp', { n: appNames.length })}</summary>
-          <div class="poster-hint">${t('profile.openrouter.budget.perAppHint')}</div>
-          <div class="listing listing--cols listing--name-n-n-n pf-or-spend-table">
-              <div class="listing-row listing-row--head">
-                <div class="poster-label">${t('profile.openrouter.budget.colApp')}</div>
-                <div class="poster-label listing-n">${t('profile.openrouter.budget.colSpent')}</div>
-                <div class="poster-label listing-n">${t('profile.openrouter.budget.colCap')}</div>
-                <div class="poster-label listing-n">${t('profile.openrouter.budget.colCalls')}</div>
-              </div>
+        <${Stack}>
+          <${Row}>
+            <${Tab} tone="fold" on=${perAppOpen} expanded=${perAppOpen}
+              onClick=${() => setPerAppOpen(o => !o)}>${t('profile.openrouter.budget.perApp', { n: appNames.length })}<//>
+          <//>
+          ${perAppOpen && html`
+            <${Note}>${t('profile.openrouter.budget.perAppHint')}<//>
+            <${List} cols="name-n-n-n" keepCols apart head=${[
+              t('profile.openrouter.budget.colApp'),
+              { label: t('profile.openrouter.budget.colSpent'), num: true },
+              { label: t('profile.openrouter.budget.colCap'), num: true },
+              { label: t('profile.openrouter.budget.colCalls'), num: true },
+            ]}>
               ${appNames.map((app) => {
                 const s = usage.per_app[app] || { cost_usd: 0, calls: 0 };
                 return html`
-                <div class="listing-row" key=${app}>
-                  <div class="listing-name">${app}</div>
-                  <div class="listing-n">$${(s.cost_usd || 0).toFixed(4)}</div>
-                  <div class="listing-n">
-                    <input type="number" min="0" max="1000" step="0.10"
+                <${ListRow} key=${app}>
+                  <${Name}>${app}<//>
+                  <${Num}>$${(s.cost_usd || 0).toFixed(4)}<//>
+                  <${Num}>
+                    <${TextField} type="number" size="short" min="0" max="1000" step="0.10"
+                      ariaLabel=${`${t('profile.openrouter.budget.colCap')}: ${app}`}
                       value=${caps[app] ?? ''} placeholder=${budget.toFixed(2)}
-                      onInput=${e => setCaps(c => ({ ...c, [app]: e.target.value }))}
-                      class="og-input pf-or-spend-cap-input" />
-                  </div>
-                  <div class="listing-n">${s.calls || 0}</div>
-                </div>`;
+                      onInput=${v => setCaps(c => ({ ...c, [app]: v }))} />
+                  <//>
+                  <${Num}>${s.calls || 0}<//>
+                <//>`;
               })}
-          </div>
-          <div class="pf-or-spend-actions">
-            <button class="poster-slab poster-slab--control" onClick=${saveCaps} disabled=${savingCaps}>
-              ${savingCaps ? '…' : t('profile.openrouter.budget.saveCaps')}
-            </button>
-            ${capsMsg && html`<span class="form-message ${capsMsg.error ? 'form-message--error' : ''}">${capsMsg.text}</span>`}
-          </div>
-        </details>
+            <//>
+            <${FormActions}>
+              <${Loud} control onClick=${saveCaps} disabled=${savingCaps}>
+                ${savingCaps ? '…' : t('profile.openrouter.budget.saveCaps')}
+              <//>
+              ${capsMsg && html`<${Note} kind="message" error=${capsMsg.error}>${capsMsg.text}<//>`}
+            <//>`}
+        <//>
       `}
 
       ${history && Array.isArray(history.days) && history.days.length > 0 && (() => {
@@ -221,24 +236,22 @@ export function AiAppsBudgetPanel() {
         const yFormat = metric === 'tokens' ? ((v) => fmtCompact(v))
           : metric === 'seconds' ? ((v) => fmtSeconds(v))
           : ((v) => '$' + (Number(v) < 1 ? Number(v).toFixed(3) : Number(v).toFixed(2)));
-        const btn = (key, label) => html`
-          <button class=${`poster-tab${metric === key ? ' is-on' : ''}`}
-                  onClick=${() => setMetric(key)}>${label}</button>`;
         return html`
-          <div class="pf-or-spend-chart-wrap">
-            <div class="pf-or-spend-chart-head">
-              <span class="poster-label">${t('profile.openrouter.budget.chartTitle')}</span>
-              <span class="pf-or-spend-metric-toggle">
-                ${btn('cost', t('profile.openrouter.budget.metricCost'))}
-                ${btn('tokens', t('profile.openrouter.budget.metricTokens'))}
-                ${btn('seconds', t('profile.openrouter.budget.metricSeconds'))}
-              </span>
-            </div>
+          <${Stack} above="medium">
+            <${Row} wrap justify="between">
+              <${Label}>${t('profile.openrouter.budget.chartTitle')}<//>
+              <${Tabs} label=${t('profile.openrouter.budget.chartTitle')} value=${metric} onSelect=${setMetric} items=${[
+                { value: 'cost', label: t('profile.openrouter.budget.metricCost') },
+                { value: 'tokens', label: t('profile.openrouter.budget.metricTokens') },
+                { value: 'seconds', label: t('profile.openrouter.budget.metricSeconds') },
+              ]} />
+            <//>
             <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${220} yFormat=${yFormat} />
-          </div>`;
+          <//>`;
       })()}
 
-      <div class="poster-hint">${t('profile.openrouter.budget.footnote')}</div>
-    </div>
+      <${Note}>${t('profile.openrouter.budget.footnote')}<//>
+      <//>
+    <//>
   `;
 }

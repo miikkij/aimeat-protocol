@@ -8,14 +8,14 @@
  *   folded into one tag), a token's level in words, the rows of section 02 built from the grants and
  *   the tokens with the filters that turn them, dates, the crumb and the rail links.
  * @structure x · n · dateWord · timeWord · daysAgo · scopeSentence · rightsInWords · rightGroups ·
- *   levelWords · keyRows · crumb · pageLinks · openTab
+ *   levelWords · keyRows · crumb · pageLinks
  * @usage import { x, keyRows, rightsInWords } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (the steps,
+ *     and { tab, label, count } items); the local openTab goes, the Rail opens a tab itself (page
+ *     parts, a move: nothing on the page changes).
  *   v1.0.0 — 2026-09-05 — Initial (design canvas "AIMEAT Pääsy-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime, num as fmtNum } from '/js/format.js';
 
@@ -184,17 +184,19 @@ export function filterRows(rows, filter, now = Date.now()) {
   }
 }
 
-/* ── The crumb and the rail ───────────────────────────────────────────────────────────────── */
+/* ── The crumb and the rail, as data for SettingsPage (components/SettingsPage.js) ─────────── */
 
+/** The crumb's steps: Settings / Account / Access, the last one the page you are on. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAccount')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.access')}</span></div>`;
+  return [t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.access')];
 }
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The sibling pages in the rail, each a Settings tab (→ … →); Security is the operator's only. */
 export function pageLinks(isOperator) {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('fleet')}><i>→</i>${t('profile.tabs.fleet')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('dataWallet')}><i>→</i>${t('profile.tabs.dataWallet')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('mcp')}><i>→</i>${t('profile.tabs.mcp')}<em>→</em></button>
-    ${isOperator ? html`<button type="button" class="og-rail-link" onClick=${() => openTab('security')}><i>→</i>${t('profile.tabs.security')}<em>${x('operatorOnly')}</em></button>` : null}`;
+  return [
+    { tab: 'fleet', label: t('profile.tabs.fleet') },
+    { tab: 'dataWallet', label: t('profile.tabs.dataWallet') },
+    { tab: 'mcp', label: t('profile.tabs.mcp') },
+    isOperator ? { tab: 'security', label: t('profile.tabs.security'), count: x('operatorOnly') } : null,
+  ];
 }

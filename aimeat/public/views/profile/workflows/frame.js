@@ -12,6 +12,7 @@
  * @version-history
  *   v1.3.1 -- 2026-09-26 -- A run stopped because its next AI step's estimate did not fit in what was
  *            left of the spending limit says so: the step, the estimate, the spend and the limit.
+ *   v1.10.0 -- 2026-09-26 -- The page frame is the SettingsPage (the crumb and the rail's groups and page links as data), the workflows table the List (the last run's word a Tinted word in its tone, main's .wp-m--ok/--bad/--wait), a state the Status Mark (statusMark); the file writes no class (page group G5).
  *   v1.3.0 -- 2026-09-26 -- Words for a run the node stopped at its spending limit and one its trigger
  *            did not start, and the verdict says why in the reader's language: the cap, the spend
  *            and the step, or who saved the workflow and what they lack.
@@ -36,6 +37,11 @@ import { t, getLocale } from '/js/i18n.js';
 import { date as fmtDate, money } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { cronWords } from '../scheduler/cron-words.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { List, Row, Name, Desc, Cell, Doors } from '/components/List.js';
+import { Action, Actions } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Tinted } from '/components/Figure.js';
 
 export const c = (key, vars) => t('profile.workflows.cover.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -69,8 +75,13 @@ export const runWord = (s) => (s ? c(RUN_WORDS[s] || 'run.unknown') : '·');
 export const stepWord = (s) => (s ? c(STEP_WORDS[s] || 'step.pending') : '·');
 export const runTone = (s) => (s === 'done' ? 'ok' : s === 'partial' || s === 'red' || s === 'stopped' || s === 'refused' ? 'bad' : s === 'waiting-step' || s === 'running' ? 'wait' : '');
 export const stepTone = (s) => (s === 'green' ? 'ok' : s === 'output-red' || s === 'input-red' || s === 'timed-out' || s === 'agent-offline' ? 'bad' : s === 'waiting-human' || s === 'dispatched' ? 'wait' : '');
-/** A run's or a step's tone as a Status: ok is fine, bad is danger, wait needs a look, the rest is off. */
-export const toneStatus = (tone) => `poster-status poster-status--${({ ok: 'fine', bad: 'danger', wait: 'attention' })[tone] || 'off'}`;
+/** A run's or a step's tone as a Status tone: ok is fine, bad is danger, wait needs a look, the rest is off. */
+export const toneStatus = (tone) => ({ ok: 'fine', bad: 'danger', wait: 'attention' })[tone] || 'off';
+/** A run's or a step's word as the Status Mark in its tone. */
+export const statusMark = (tone, word) => html`<${Mark} kind="status" tone=${toneStatus(tone)}>${word}<//>`;
+/** A run's word in a table cell, in its tone's colour (the runs' own cut, main's .wp-m--ok/--bad/--wait). */
+const TINT = { ok: 'fine', bad: 'notice', wait: 'warn' };
+export const runTint = (tone, word) => html`<${Tinted} strong tone=${TINT[tone]}>${word}<//>`;
 export const isRed = (s) => s === 'output-red' || s === 'input-red' || s === 'timed-out' || s === 'agent-offline';
 
 /** "every day at 00:17 (Helsinki)", "by hand", "when news.* is written". */
@@ -180,61 +191,54 @@ export function lastRunWords(item) {
 
 /** Rows of the workflows table: name and its line, when it runs, the last run's word, what happened, the doors. */
 export function workflowRows(ctx, items, { head = false } = {}) {
-  return html`<div class="listing listing--cols listing--name-trigger-state-words-doors">
-    ${head ? rowsHead() : null}
+  return html`<${List} cols="name-trigger-state-words-doors" keepCols
+    head=${head ? [c('colWorkflow'), c('colTrigger'), c('colLast'), c('colWhat'), ''] : null}>
     ${items.map(item => { const def = item.def; const w = lastRunWords(item); const agents = new Set(def.steps.flatMap(s => Array.isArray(s.agent) ? s.agent : s.agent ? [s.agent] : [])); const gates = def.steps.filter(s => s.action?.kind === 'human-input').length; return html`
-      <div class="listing-row" key=${def.id}>
-        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${loc(def.title) || def.id}</button><small class="listing-meta">${[c('stepsN', { n: def.steps.length }), agents.size ? c('agentsN', { n: agents.size }) : '', gates ? c('gatesN', { n: gates }) : ''].filter(Boolean).join(' · ')}</small></div>
-        <div class="listing-desc">${triggerWords(def.trigger)}</div>
-        <div class=${`wp-m wp-m--${w.tone}`}><b>${w.word}</b></div>
-        <div class="wp-m wp-m--sub">${w.sub}</div>
-        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.handleCheck(def.id)}>${c('checkNow')}</button><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${item.waiting ? c('answer') : c('open')}</button></div>
-      </div>`; })}
-  </div>`;
+      <${Row} key=${def.id}>
+        <${Name} onOpen=${() => ctx.pickView({ kind: 'detail', id: def.id })}
+          meta=${[c('stepsN', { n: def.steps.length }), agents.size ? c('agentsN', { n: agents.size }) : '', gates ? c('gatesN', { n: gates }) : ''].filter(Boolean).join(' · ')}>${loc(def.title) || def.id}<//>
+        <${Desc}>${triggerWords(def.trigger)}<//>
+        <${Cell} meta>${runTint(w.tone, w.word)}<//>
+        <${Desc}>${w.sub}<//>
+        <${Doors}>
+          <${Action} small row soft onClick=${() => ctx.handleCheck(def.id)}>${c('checkNow')}<//>
+          <${Action} small row onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${item.waiting ? c('answer') : c('open')}<//>
+        <//>
+      <//>`; })}
+  <//>`;
 }
-const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colWorkflow')}</div><div class="poster-label">${c('colTrigger')}</div><div class="poster-label">${c('colLast')}</div><div class="poster-label">${c('colWhat')}</div><div class="poster-label"></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
+/**
+ * The crumb's steps: Settings / Workflows / the parts. A part is words (the page you are on, in
+ * ink) or { label, onClick } (a way back to the workflow).
+ */
 export function crumb(ctx, parts) {
-  return html`
-    <div class="og-crumb">
-      <span>${t('nav.profile')}</span><span>/</span>
-      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('profile.workflows.title')}</button>` : html`<span class="og-crumb-here">${t('profile.workflows.title')}</span>`}
-      ${parts.map((p, i) => html`<span key=${i}>/</span>${typeof p === 'string' ? html`<span class="og-crumb-here">${p}</span>` : p}`)}
-    </div>`;
+  const name = t('profile.workflows.title');
+  return [t('nav.profile'), parts.length ? { label: name, onClick: () => ctx.pickView({ kind: 'cover' }) } : name,
+    ...parts.map((p) => (typeof p === 'string' ? { label: p, here: true } : p))];
 }
 
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The rail's sibling pages, as data (each opens its Settings tab). */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('scheduler')}><i>→</i>${t('profile.tabs.scheduler')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('offers')}><i>→</i>${t('profile.tabs.offers')}<em>→</em></button>`;
+  return [
+    { tab: 'scheduler', label: t('profile.tabs.scheduler') },
+    { tab: 'agents', label: t('profile.tabs.agents') },
+    { tab: 'offers', label: t('profile.tabs.offers') },
+  ];
 }
 
-export function renderPage(ctx, { crumbs, label = null, title, chips = null, doors = null, strip = null, rail = null, back = null, children }) {
-  return html`
-    <div class="og og-wp og-page">
-      ${crumb(ctx, crumbs)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          ${label ? html`<div class="poster-label">${label}</div>` : null}
-          <h1 class="og-title poster-page-title wp-title--page">${title}</h1>
-          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${t('profile.workflows.title')}</span>
-          ${back || html`<button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>`}
-          ${rail}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+/**
+ * A page of Workflows: the crumb, the head (`label` over the title, `marks` as Mark data, `doors`),
+ * the strip, the page's own sections, and the rail: the way back (`back`: { label, onClick }), the
+ * page's own groups (`railGroups`), the sibling pages.
+ */
+export function renderPage(ctx, { crumbs, label = null, title, marks = null, desc = null, doors = null, strip = null, railGroups = [], back = null, children }) {
+  return html`<${SettingsPage} name="wp" page crumb=${crumb(ctx, crumbs)} label=${label} title=${title} marks=${marks || undefined} desc=${desc}
+    actions=${doors ? html`<${Actions}>${doors}<//>` : null} strip=${strip}
+    rail=${{ title: c('railTitle'), groups: [
+      { label: t('profile.workflows.title'), items: [{ back: true, key: 'back', ...(back || { label: c('backTo'), onClick: () => ctx.pickView({ kind: 'cover' }) }) }] },
+      ...railGroups,
+      { label: c('pages'), items: pageLinks().map((p) => ({ mark: '→', count: '→', ...p })) },
+    ] }}>${children}<//>`;
 }

@@ -9,6 +9,8 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- On the component kit (page group G7): the boards table is the List (the name's line cut to one line, the empty counts faint), the crumb and the sibling pages are data, and a board's or a notice's page is the SettingsPage in its page cut with the rail as data. The file writes no class.
+ *   v1.10.0 -- 2026-09-26 -- A notice's row is the BoardNotice component (components/BoardNotice.js): the same markup and look, given as data.
  *   v1.9.0 -- 2026-09-26 -- The boards table is the Listing (listing, listing-row and its head row, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.8.0 -- 2026-09-26 -- The line under a board's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.7.0 -- 2026-09-25 -- A notice's category is the Tag (.poster-chip, plain), a unification: Jouni's decision "Tag".
@@ -24,6 +26,11 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { BoardNotice } from '/components/BoardNotice.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Actions } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
@@ -94,78 +101,77 @@ export function boardSub(ctx, b) {
 
 /** Rows of a boards table: name and its line, visibility, notices, latest, a door. */
 export function boardRows(ctx, list, door, { head = false } = {}) {
-  return html`<div class="listing listing--cols listing--name-state-count-last-doors bp-rows">
-    ${head ? rowsHead() : null}
-    ${list.map(b => { const id = bid(b); const page = ctx.pages[id]; const n = page ? page.posts.length : null; const latest = page?.posts[0]; return html`
-      <div class="listing-row" key=${id}>
-        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'board', id })}>${b.name}</button><small class="listing-meta">${boardSub(ctx, b)}</small></div>
-        <div class="listing-desc">${visWord(b.visibility)}</div>
-        <div class=${`listing-desc ${n ? '' : 'bp-m--q'}`}>${n === null ? html`<span class="loading-mark">${t('common.loading')}</span>` : n ? html`<b>${n}${page.cursor ? '+' : ''}</b> ${c('noticesWord', { n })}` : c('noNotices')}</div>
-        <div class=${`listing-desc ${latest ? '' : 'bp-m--q'}`}>${latest ? html`${rel(latest.created_at)}<br />${who(latest.author_gaii).label}` : '·'}</div>
-        <div class="listing-doors">${door(b)}</div>
-      </div>`; })}
-  </div>`;
+  const row = (b) => {
+    const id = bid(b);
+    const page = ctx.pages[id];
+    const n = page ? page.posts.length : null;
+    const latest = page?.posts[0];
+    const open = () => ctx.pickView({ kind: 'board', id });
+    return html`
+      <${Row} key=${id}>
+        <${Name} onOpen=${open} meta=${boardSub(ctx, b)} clip>${b.name}<//>
+        <${Desc}>${visWord(b.visibility)}<//>
+        <${Desc} faint=${!n}>${n === null ? html`<${Note} kind="loading" inline>${t('common.loading')}<//>` : n ? html`<b>${n}${page.cursor ? '+' : ''}</b> ${c('noticesWord', { n })}` : c('noNotices')}<//>
+        <${Desc} faint=${!latest}>${latest ? html`${rel(latest.created_at)}<br />${who(latest.author_gaii).label}` : '·'}<//>
+        <${Doors}>${door(b)}<//>
+      <//>`;
+  };
+  return html`<${List} cols="name-state-count-last-doors" keepCols head=${head ? rowsHead() : null}>${list.map(row)}<//>`;
 }
-const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colBoard')}</div><div class="poster-label">${c('colVisibility')}</div><div class="poster-label">${c('colNotices')}</div><div class="poster-label">${c('colLatest')}</div><div class="poster-label"></div></div>`;
+const rowsHead = () => [c('colBoard'), c('colVisibility'), c('colNotices'), c('colLatest'), ''];
 
 /** A notice as a row: category, title and text, who and their standing, when and how long left. */
 export function noticeRow(ctx, boardId, p, authors, withBoard) {
   const w = who(p.author_gaii);
   const thanks = (p.reactions?.thanks || []).length;
   const board = withBoard ? ctx.boardById(boardId) : null;
-  return html`
-    <div class="bp-notice" key=${p.id}>
-      <div class=${`bp-cat ${p.category || isAgentPost(p) ? '' : 'bp-cat--q'}`}>${p.category || isAgentPost(p) ? html`<span class="poster-chip">${p.category || c('byAgent')}</span>` : '·'}</div>
-      <div class="bp-notice-body">
-        <button type="button" class="bp-notice-title" onClick=${() => ctx.pickView({ kind: 'notice', boardId, postId: p.id })}>${p.title}</button>
-        <p>${String(p.body || '').slice(0, 220)}${String(p.body || '').length > 220 ? '…' : ''}</p>
-        <div class="bp-who"><b>${w.label}</b>${authors?.[p.author_gaii] ? ` · ${standingWords(authors[p.author_gaii])}` : ''}${board ? html` · <button type="button" class="bp-who-board" onClick=${() => ctx.pickView({ kind: 'board', id: boardId })}>${board.name}</button>` : null}</div>
-      </div>
-      <div class="bp-r"><b class="poster-time">${rel(p.created_at)}</b>${leftWords(p.ttl_expires_at)}<br />${p.replies ? c('repliesN', { n: p.replies }) + ' · ' : ''}${c('thanksN', { n: thanks })}</div>
-    </div>`;
+  return html`<${BoardNotice} key=${p.id}
+    kind=${p.category || (isAgentPost(p) ? c('byAgent') : null)}
+    title=${p.title} onOpen=${() => ctx.pickView({ kind: 'notice', boardId, postId: p.id })}
+    words=${`${String(p.body || '').slice(0, 220)}${String(p.body || '').length > 220 ? '…' : ''}`}
+    who=${w.label} whoNote=${authors?.[p.author_gaii] ? standingWords(authors[p.author_gaii]) : ''}
+    board=${board ? { name: board.name, onOpen: () => ctx.pickView({ kind: 'board', id: boardId }) } : null}
+    time=${rel(p.created_at)} left=${leftWords(p.ttl_expires_at)}
+    counts=${`${p.replies ? c('repliesN', { n: p.replies }) + ' · ' : ''}${c('thanksN', { n: thanks })}`} />`;
 }
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
+/**
+ * The crumb's steps (components/Crumb.js): Settings / Boards, then the parts of a sub-page. A part is
+ * words (ink, the page you are on) or a step back ({ label, onClick }).
+ */
 export function crumb(ctx, parts) {
-  return html`
-    <div class="og-crumb">
-      <span>${t('nav.profile')}</span><span>/</span>
-      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('profile.tabs.boards')}</button>` : html`<span class="og-crumb-here">${t('profile.tabs.boards')}</span>`}
-      ${parts.map((p, i) => html`<span key=${i}>/</span>${typeof p === 'string' ? html`<span class="og-crumb-here">${p}</span>` : p}`)}
-    </div>`;
+  const home = () => ctx.pickView({ kind: 'cover' });
+  return [
+    t('nav.profile'),
+    parts.length ? { label: t('profile.tabs.boards'), onClick: home } : t('profile.tabs.boards'),
+    ...parts.map((p) => (typeof p === 'string' ? { label: p, here: true } : p)),
+  ];
 }
 
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
-export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('messages')}><i>→</i>${t('profile.tabs.inbox')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>`;
-}
+/** The sibling pages in the rail (components/Rail.js): each opens a Settings tab (→ … →). */
+export const pageLinks = () => [
+  { tab: 'messages', label: t('profile.tabs.inbox') },
+  { tab: 'organisms', label: t('profile.tabs.organisms') },
+  { tab: 'apps', label: t('profile.tabs.apps') },
+];
 
-export function renderPage(ctx, { crumbs, label = null, title, chips = null, doors = null, strip = null, rail = null, back = null, children }) {
+/**
+ * A page inside the Boards page (a board, a notice): the SettingsPage in its page cut. `back` is the
+ * rail's way back (an item; default: back to the boards), `rail` the page's own rail groups after it.
+ */
+export function renderPage(ctx, { crumbs, label = null, title, marks = null, desc = null, doors = null, strip = null, rail = null, back = null, after = null, children }) {
+  const railData = {
+    title: c('railTitle'),
+    groups: [
+      { label: t('profile.tabs.boards'), items: [back || { back: true, label: c('backTo'), onClick: () => ctx.pickView({ kind: 'cover' }) }] },
+      ...(rail || []),
+      { label: c('pages'), items: pageLinks() },
+    ],
+  };
   return html`
-    <div class="og og-bp og-page">
-      ${crumb(ctx, crumbs)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          ${label ? html`<div class="poster-label">${label}</div>` : null}
-          <h1 class="og-title poster-page-title bp-title--page">${title}</h1>
-          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${t('profile.tabs.boards')}</span>
-          ${back || html`<button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>`}
-          ${rail}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+    <${SettingsPage} name="bp" page crumb=${crumb(ctx, crumbs)} label=${label} title=${title} marks=${marks} desc=${desc}
+      actions=${doors ? html`<${Actions}>${doors}<//>` : null} strip=${strip} rail=${railData} after=${after}>
+      ${children}
+    <//>`;
 }

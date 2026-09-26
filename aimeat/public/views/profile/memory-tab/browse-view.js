@@ -5,8 +5,16 @@
  * @description Cross-node / public-discovery browse panel for the Memory tab and its handlers —
  *   browse the home node or a remote peer's shared memory, pull entries (single/all), and discover
  *   public memories to copy. Extracted verbatim from memory-tab.js; handlers and the render function
- *   take the shared ctx so all state/handlers still live in the MemoryTab component.
+ *   take the shared ctx so all state/handlers still live in the MemoryTab component. Every part is a
+ *   component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- On the component kit, class-free (page group G3): a panel is a section
+ *     (Card tone="section") with its grey line (HeadDesc); the search is the SearchLine (Enter
+ *     searches); loading is the loading line (the words main's Spinner said); an error is the
+ *     attention note; the counts are meta lines; the public list is the List whose row opens its
+ *     value in the raised panel (the key, the owner under it, the tags, the time, Copy); the home
+ *     and remote entries are the List (the key, the visibility tag and the tags, Pull); the peer
+ *     picker is the Select.
  *   v1.8.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.7.0 -- 2026-09-26 -- A key is the Key (.key-name, css/components/key-name.css): the public list's coral key and the listings' .mp-key (a unification: the look most tabs use).
  *   v1.6.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -30,7 +38,14 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { LoadingLine, VisibilityPill } from '../shared.js';
+import { VisibilityPill } from '../shared.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Card } from '/components/Card.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { List, Row, Name, Desc, When, Cell, Doors, SearchLine } from '/components/List.js';
+import { Row as Line, Stack } from '/components/Layout.js';
+import { Select } from '/components/Select.js';
 import * as memoryService from '/js/services/memory.js';
 import { listPeers } from '/js/services/federation.js';
 import { formatRelativeTime } from './helpers.js';
@@ -181,63 +196,45 @@ export function renderBrowsePanel(ctx) {
 
   if (browseMode === 'discover') {
     return html`
-      <div class="mem-browse-panel poster-row--thing">
-        <div class="mem-browse-header">
-          <div>
-            <div class="section-desc">${t('profile.memory.discoverDesc')}</div>
-          </div>
-        </div>
-        <div class="search-line mb-half">
-          <input type="text" class="og-input" placeholder=${t('profile.memory.discoverSearchPlaceholder')}
-            value=${discoverSearch}
+      <${Card} tone="section">
+        <${Stack}>
+          <${HeadDesc}>${t('profile.memory.discoverDesc')}<//>
+          <${SearchLine} text value=${discoverSearch} placeholder=${t('profile.memory.discoverSearchPlaceholder')}
             onInput=${e => setDiscoverSearch(e.target.value)}
-            onKeyDown=${e => e.key === 'Enter' && loadDiscoverEntries(ctx, discoverSearch)} />
-          <button class="poster-action poster-action--small" onClick=${() => loadDiscoverEntries(ctx, discoverSearch)}>${t('profile.memory.searchBtn')}</button>
-        </div>
+            onEnter=${() => loadDiscoverEntries(ctx, discoverSearch)}>
+            <${Action} small onClick=${() => loadDiscoverEntries(ctx, discoverSearch)}>${t('profile.memory.searchBtn')}<//>
+          <//>
 
-        ${discoverLoading && html`<${LoadingLine} text=${t('profile.memory.discoverLoading')} />`}
+          ${discoverLoading ? html`<${Note} kind="loading">${t('profile.memory.discoverLoading')}<//>` : null}
 
-        ${discoverError && !discoverLoading && html`
-          <div class="alert alert-warning"><span class="alert-msg">${discoverError}</span></div>
-        `}
+          ${discoverError && !discoverLoading ? html`<${Note} kind="aside" size="small" role="alert">${discoverError}<//>` : null}
 
-        ${discoverEntries && !discoverLoading && !discoverError && html`
-          <div class="mb-half text-meta">
-            ${t('profile.memory.discoverCount').replace('{count}', discoverEntries.length)}
-          </div>
-          ${discoverEntries.length === 0
-            ? html`<div class="poster-quiet">${t('profile.memory.discoverEmpty')}</div>`
-            : html`<div class="mem-browse-list">
-                ${discoverEntries.map(entry => {
-                  const ownerShort = entry.owner_gaii?.split('@')[0] || entry.owner_gaii;
-                  const isExpanded = expandedDiscover === entry.owner_gaii + '/' + entry.key;
-                  return html`
-                    <div key=${entry.owner_gaii + '/' + entry.key} class="mem-discover-item">
-                      <div class="mem-discover-row" onClick=${() => setExpandedDiscover(isExpanded ? null : entry.owner_gaii + '/' + entry.key)}>
-                        <div class="mem-discover-info">
-                          <div class="mem-browse-key key-name" title=${entry.key}>${escHtml(entry.key)}</div>
-                          <div class="mem-discover-owner">${escHtml(ownerShort)}</div>
-                        </div>
-                        <div class="mem-browse-meta">
-                          ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
-                          <span class="mem-time poster-time">${formatRelativeTime(entry.updated_at || entry.created_at)}</span>
-                        </div>
-                        <button class="poster-action poster-action--small"
-                          disabled=${copyingKeys.has(entry.key)}
-                          onClick=${(e) => { e.stopPropagation(); handleCopyEntry(ctx, entry.owner_gaii, entry.key); }}>
-                          ${copyingKeys.has(entry.key) ? '...' : t('common.copy')}
-                        </button>
-                      </div>
-                      ${isExpanded && html`
-                        <${DiscoverPreview} ownerGaii=${entry.owner_gaii} memKey=${entry.key} />
-                      `}
-                    </div>
-                  `;
-                })}
-              </div>`
-          }
-        `}
-      </div>
+          ${discoverEntries && !discoverLoading && !discoverError ? html`
+            <${Note} kind="meta">${t('profile.memory.discoverCount').replace('{count}', discoverEntries.length)}<//>
+            <${List} cols="name-desc-when-doors" empty=${t('profile.memory.discoverEmpty')}>
+              ${discoverEntries.map(entry => {
+                const id = entry.owner_gaii + '/' + entry.key;
+                const ownerShort = entry.owner_gaii?.split('@')[0] || entry.owner_gaii;
+                const isExpanded = expandedDiscover === id;
+                return html`
+                  <${Row} key=${id} open=${isExpanded} onToggle=${() => setExpandedDiscover(isExpanded ? null : id)}
+                    panel=${isExpanded ? html`<${DiscoverPreview} ownerGaii=${entry.owner_gaii} memKey=${entry.key} />` : null}>
+                    <${Name} asKey title=${entry.key} meta=${escHtml(ownerShort)}>${escHtml(entry.key)}<//>
+                    <${Desc} clip title=${entry.tags?.length > 0 ? entry.tags.join(', ') : undefined}>${entry.tags?.length > 0 ? entry.tags.join(', ') : ''}<//>
+                    <${When}>${formatRelativeTime(entry.updated_at || entry.created_at)}<//>
+                    <${Doors}>
+                      <${Action} small disabled=${copyingKeys.has(entry.key)}
+                        onClick=${(e) => { e.stopPropagation(); handleCopyEntry(ctx, entry.owner_gaii, entry.key); }}>
+                        ${copyingKeys.has(entry.key) ? '...' : t('common.copy')}
+                      <//>
+                    <//>
+                  <//>
+                `;
+              })}
+            <//>
+          ` : null}
+        <//>
+      <//>
     `;
   }
 
@@ -245,65 +242,47 @@ export function renderBrowsePanel(ctx) {
   const desc = isHome ? t('profile.memory.browseHomeDesc') : t('profile.memory.browseRemoteDesc');
 
   return html`
-    <div class="mem-browse-panel poster-row--thing">
-      <div class="mem-browse-header">
-        <div>
-          <div class="section-desc">${desc}</div>
-        </div>
-      </div>
+    <${Card} tone="section">
+      <${Stack}>
+        <${HeadDesc}>${desc}<//>
 
-      ${!isHome && !selectedPeer && html`
-        <div class="mb-1">
-          ${remotePeers.length === 0
-            ? html`<div class="poster-quiet">${t('profile.memory.noPeers')}</div>`
-            : html`
-              <select class="select-field" onChange=${e => loadBrowseRemote(ctx, e.target.value)}>
-                <option value="">${t('profile.memory.browseRemoteSelect')}</option>
-                ${remotePeers.map(p => html`<option key=${p.node_id} value=${p.node_id}>${escHtml(p.node_id)} (${escHtml(p.url || '')})</option>`)}
-              </select>
-            `}
-        </div>
-      `}
+        ${!isHome && !selectedPeer ? (remotePeers.length === 0
+          ? html`<${Note} kind="quiet">${t('profile.memory.noPeers')}<//>`
+          : html`<${Select} fit ariaLabel=${t('profile.memory.browseRemoteSelect')} placeholder=${t('profile.memory.browseRemoteSelect')}
+              onChange=${(peer) => loadBrowseRemote(ctx, peer)}
+              options=${remotePeers.map(p => [p.node_id, `${escHtml(p.node_id)} (${escHtml(p.url || '')})`])} />`) : null}
 
-      ${browseLoading && html`<${LoadingLine} text=${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')} />`}
+        ${browseLoading ? html`<${Note} kind="loading">${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')}<//>` : null}
 
-      ${browseError && !browseLoading && html`
-        <div class="alert alert-warning">
-          <span class="alert-msg">${browseError}</span>
-        </div>
-      `}
+        ${browseError && !browseLoading ? html`<${Note} kind="aside" size="small" role="alert">${browseError}<//>` : null}
 
-      ${remoteEntries && !browseLoading && !browseError && html`
-        <div class="mb-half text-meta">
-          ${isHome
-            ? t('profile.memory.homeEntries').replace('{count}', remoteEntries.length)
-            : t('profile.memory.remoteEntries').replace('{count}', remoteEntries.length).replace('{node}', selectedPeer)}
-          ${remoteEntries.length > 0 && html`
-            <button class="poster-action poster-action--small pf-ml-half" onClick=${() => handlePullAll(ctx)}>${t('profile.memory.pullAllBtn')}</button>
-          `}
-        </div>
-        ${remoteEntries.length === 0
-          ? html`<div class="poster-quiet">${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}</div>`
-          : html`<div class="listing listing--name-tags-doors listing--cols">
-              ${remoteEntries.map(entry => html`
-                <div key=${entry.key} class="listing-row">
-                  <div class="listing-name" title=${entry.key}><span class="key-name">${escHtml(entry.key)}</span></div>
-                  <div><span class="poster-chips">
-                    <${VisibilityPill} visibility=${entry.visibility} />
-                    ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
-                  </span></div>
-                  <div class="listing-doors">
-                    <button class="poster-action poster-action--small poster-action--row"
-                      disabled=${pullingKeys.has(entry.key)}
-                      onClick=${() => handlePullRemoteEntry(ctx, entry.key)}>
-                      ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}
-                    </button>
-                  </div>
-                </div>
-              `)}
-            </div>`
-        }
-      `}
-    </div>
+        ${remoteEntries && !browseLoading && !browseError ? html`
+          <${Line} wrap>
+            <${Note} kind="meta" inline>
+              ${isHome
+                ? t('profile.memory.homeEntries').replace('{count}', remoteEntries.length)
+                : t('profile.memory.remoteEntries').replace('{count}', remoteEntries.length).replace('{node}', selectedPeer)}
+            <//>
+            ${remoteEntries.length > 0 ? html`<${Action} small onClick=${() => handlePullAll(ctx)}>${t('profile.memory.pullAllBtn')}<//>` : null}
+          <//>
+          <${List} cols="name-tags-doors" keepCols empty=${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}>
+            ${remoteEntries.map(entry => html`
+              <${Row} key=${entry.key}>
+                <${Name} asKey title=${entry.key}>${escHtml(entry.key)}<//>
+                <${Cell} line>
+                  <${VisibilityPill} visibility=${entry.visibility} />
+                  ${entry.tags?.length > 0 ? html`<${Note} kind="meta" inline title=${entry.tags.join(', ')}>${entry.tags.join(', ')}<//>` : null}
+                <//>
+                <${Doors}>
+                  <${Action} small row disabled=${pullingKeys.has(entry.key)} onClick=${() => handlePullRemoteEntry(ctx, entry.key)}>
+                    ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}
+                  <//>
+                <//>
+              <//>
+            `)}
+          <//>
+        ` : null}
+      <//>
+    <//>
   `;
 }

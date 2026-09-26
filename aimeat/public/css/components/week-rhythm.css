@@ -6,32 +6,44 @@
  *   its name with a typewriter note, a mark on each day it fires, the last run), the days as columns
  *   under their heads, today's column on a pale sun and its head on the sun; a mark is coral when an
  *   agent does the job, and faint on a day it does not fire. On a narrow screen the last run and the
- *   note go and the day columns narrow. Drawn only by the Scheduler page; moved here unchanged with
- *   its class names (UI consolidation phase 5, a move).
- *   Drawn as markup by views/profile/scheduler/cover.js.
+ *   note go and the day columns narrow. Drawn by components/WeekRhythm.js, with its own class names
+ *   (.week-rhythm, .week-rhythm-*).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — The component's own class names (.sc-rhythm → .week-rhythm, .sc-hd →
+ *     .week-rhythm-head, .sc-hd--day → .week-rhythm-head--day, .sc-today → .week-rhythm-today, .sc-t →
+ *     .week-rhythm-time, .sc-nm → .week-rhythm-name, .sc-d → .week-rhythm-day, .sc-d--no →
+ *     .week-rhythm-day--no, .sc-d--agent → .week-rhythm-day--agent, .sc-last → .week-rhythm-last); the
+ *     name's way in is .week-rhythm-open, which carries the values of .og-tbl-name (space-table.css)
+ *     that it wore before. Every declaration and selector shape is kept (Jouni: components draw only
+ *     their own class names, a move).
+ *   v1.1.0 — 2026-09-26 — Drawn by components/WeekRhythm.js, which takes data (page group G5); the name's narrow-screen break moves in from scheduler-poster.css.
  *   v1.0.0 — 2026-09-25 — Moved out of scheduler-poster.css (UI consolidation phase 5, a move).
  */
 
-.sc-rhythm { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) repeat(7, 2.2rem) minmax(0, 9rem); gap: 0 .6rem; align-items: center; }
-.sc-rhythm > div { padding: .45rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.sc-rhythm .sc-hd { padding: 0 0 .35rem; border-bottom: 0; }
-.sc-rhythm .sc-hd--day { text-align: center; }
-.sc-rhythm .sc-hd--day small { display: block; font-family: var(--font-mono); font-size: .68rem; letter-spacing: 0; color: var(--text-dim); }
-.sc-rhythm .sc-hd.sc-today { background: var(--sun); color: var(--on-sun); }
-.sc-rhythm .sc-hd.sc-today small { color: var(--on-sun); }
-.sc-rhythm .sc-t { font-family: var(--font-mono); font-weight: 500; font-size: .8rem; color: var(--text); white-space: nowrap; }
-.sc-rhythm .sc-nm { font-weight: 700; font-size: .9rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sc-rhythm .sc-nm i { font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); margin-left: .5rem; }
-.sc-rhythm .sc-d { text-align: center; font-size: .95rem; line-height: 1; color: var(--text); }
-.sc-rhythm .sc-d--no { color: var(--border); }
-.sc-rhythm .sc-d--agent { color: var(--accent); }
-.sc-rhythm .sc-d.sc-today { background: color-mix(in srgb, var(--sun) 30%, transparent); }
-.sc-rhythm .sc-last { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.week-rhythm { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) repeat(7, 2.2rem) minmax(0, 9rem); gap: 0 .6rem; align-items: center; }
+.week-rhythm > div { padding: .45rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.week-rhythm .week-rhythm-head { padding: 0 0 .35rem; border-bottom: 0; }
+.week-rhythm .week-rhythm-head--day { text-align: center; }
+.week-rhythm .week-rhythm-head--day small { display: block; font-family: var(--font-mono); font-size: .68rem; letter-spacing: 0; color: var(--text-dim); }
+.week-rhythm .week-rhythm-head.week-rhythm-today { background: var(--sun); color: var(--on-sun); }
+.week-rhythm .week-rhythm-head.week-rhythm-today small { color: var(--on-sun); }
+.week-rhythm .week-rhythm-time { font-family: var(--font-mono); font-weight: 500; font-size: .8rem; color: var(--text); white-space: nowrap; }
+.week-rhythm .week-rhythm-name { font-weight: 700; font-size: .9rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.week-rhythm .week-rhythm-name i { font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); margin-left: .5rem; }
+.week-rhythm .week-rhythm-day { text-align: center; font-size: .95rem; line-height: 1; color: var(--text); }
+.week-rhythm .week-rhythm-day--no { color: var(--border); }
+.week-rhythm .week-rhythm-day--agent { color: var(--accent); }
+.week-rhythm .week-rhythm-day.week-rhythm-today { background: color-mix(in srgb, var(--sun) 30%, transparent); }
+.week-rhythm .week-rhythm-last { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The name as the way into the schedule (the values of .og-tbl-name, space-table.css, which it wore before). */
+.week-rhythm-open { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left; }
+.week-rhythm-open:hover { color: var(--accent); }
 
 @media (max-width: 1100px) {
-  .sc-rhythm { grid-template-columns: 4.6rem minmax(0, 1fr) repeat(7, 1.5rem); gap: 0 .3rem; }
-  .sc-rhythm .sc-last, .sc-rhythm .sc-hd:last-child { display: none; }
-  .sc-rhythm .sc-nm i { display: none; }
+  .week-rhythm { grid-template-columns: 4.6rem minmax(0, 1fr) repeat(7, 1.5rem); gap: 0 .3rem; }
+  .week-rhythm .week-rhythm-last, .week-rhythm .week-rhythm-head:last-child { display: none; }
+  .week-rhythm .week-rhythm-name i { display: none; }
+  /* The name breaks where it must (formerly scheduler-poster.css .og-sc .og-tbl-name). */
+  .week-rhythm .week-rhythm-open { white-space: normal; overflow-wrap: anywhere; }
 }

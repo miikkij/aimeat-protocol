@@ -7,19 +7,24 @@
  *   typewriter, a hint under both, the desk closed by a heavy ink rule; on a narrow screen the tabs go
  *   under the field. Drawn only by Discover; moved here unchanged with its class names (UI
  *   consolidation phase 5, a move). The heavy rules read the shape tokens.
- *   Drawn as markup by views/profile/discover/frame.js.
+ *   Drawn by components/QuestionDesk.js (.question-desk, .question-desk-field); the scope row is the
+ *   Tabs component, the hint the Note.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
  *   v1.0.0 — 2026-09-25 — Moved out of discover-poster.css (UI consolidation phase 5, a move).
+ *   v1.1.0 — 2026-09-27 — The component's own names: .dv-desk is .question-desk and .dv-field is
+ *     .question-desk-field (a move: the same declarations, the same selector shapes). The
+ *     .dv-scope rule goes: nothing has written .dv-scope since the scope row became the Tabs, whose
+ *     count is the Count. The Developer portal's own .dv-field block keeps the look this sheet gave
+ *     it by the shared name, in css/views/portal-dev.css.
  */
 
-.dv-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem 1.6rem; align-items: end; margin-top: 1.4rem; padding: 1.1rem 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-frame-colour); }
-.dv-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); background: transparent; padding: .5rem 0; font: inherit; font-size: 1.35rem; color: var(--text); }
-.dv-field:focus { outline: none; border-bottom-color: var(--accent); }
-.dv-field::placeholder { color: var(--text-dim); }
-.dv-scope .poster-tab i { font-family: var(--font-mono); font-size: .68rem; font-style: normal; margin-left: .4rem; opacity: .8; }
-.dv-desk .poster-hint { grid-column: 1 / -1; margin: 0; }
+.question-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem 1.6rem; align-items: end; margin-top: 1.4rem; padding: 1.1rem 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-frame-colour); }
+.question-desk-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); background: transparent; padding: .5rem 0; font: inherit; font-size: 1.35rem; color: var(--text); }
+.question-desk-field:focus { outline: none; border-bottom-color: var(--accent); }
+.question-desk-field::placeholder { color: var(--text-dim); }
+.question-desk .poster-hint { grid-column: 1 / -1; margin: 0; }
 
 @media (max-width: 1100px) {
-  .dv-desk { grid-template-columns: 1fr; }
+  .question-desk { grid-template-columns: 1fr; }
 }

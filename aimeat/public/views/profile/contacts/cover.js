@@ -11,6 +11,7 @@
  * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents · whereUsed
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Tabs and Tab in their fold tone; TextField; List; More; Note; Tinted; Action): the page passes data and writes no class. Put back from main: the blocked people are a dim tag (page group G8).
  *   v1.11.0 -- 2026-09-26 -- "Where" is the Listing (listing, listing-row, the name with its line; cut name-name, two to a line), a unification: the look most tabs use.
  *   v1.10.0 -- 2026-09-26 -- The line under each place in "Where" is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -37,7 +38,15 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name, More } from '/components/List.js';
+import { Tabs, Tab } from '/components/Tabs.js';
+import { Tinted } from '/components/Figure.js';
+import { TextField } from '/components/TextField.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Space } from '/components/Layout.js';
 import { c, rel, nameOf, crumb, pageLinks, peopleRows, noAccountRows, agentRows, sortPeople } from './frame.js';
 import { renderPerson } from './person.js';
 import { addBody } from './add.js';
@@ -60,50 +69,50 @@ function renderCover(ctx) {
   const savedByMe = ctx.contacts.filter(r => r.origin === 'saved').length;
   const sharedTotal = people.reduce((n, r) => n + (r.shared_organisms || []).length, 0);
   const sharedNames = (() => { const m = new Map(); for (const r of people) for (const o of r.shared_organisms || []) m.set(o.name, (m.get(o.name) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, k]) => `${n} ${k}`).join(' · '); })();
-  const chip = (n, key, cls = '') => html`<span class=${`poster-chip ${cls}`}>${c(key, { n })}</span>`;
-  const strip = html`
-    <div class="og-strip">
-      <div>${latest ? html`<b>${rel(latest.last_message_at)}</b><span>${c('stripLast')}</span><small>${nameOf(latest)} · ${latest.last_message || ''}</small>` : html`<b>·</b><span>${c('stripLast')}</span><small>${c('noMessagesYet')}</small>`}</div>
-      <div><b class=${invitesOpen ? 'og-strip-coral' : ''}>${invitesOpen}</b><span>${c('stripInvites')}</span><small>${invitesOpen ? noAccount.filter(r => r.invitation).map(r => `${nameOf(r)} · ${c('sentOn', { when: rel(r.invitation.created_at) })}`).join(' · ') : c('stripInvitesNone')}</small></div>
-      <div><b>${sharedTotal}</b><span>${c('stripShared')}</span><small>${sharedNames || c('stripSharedNone')}</small></div>
-      <div><b>${savedByMe}</b><span>${c('stripSaved')}</span><small>${c('stripSavedSub', { n: Math.max(0, ctx.contacts.length - savedByMe) })}</small></div>
-    </div>`;
+  const mark = (n, key, tone) => ({ label: c(key, { n }), tone });
+  const strip = html`<${FigureStrip} items=${[
+    latest
+      ? { key: 'last', n: rel(latest.last_message_at), label: c('stripLast'), sub: `${nameOf(latest)} · ${latest.last_message || ''}` }
+      : { key: 'last', n: '·', label: c('stripLast'), sub: c('noMessagesYet') },
+    { key: 'invites', n: invitesOpen, tone: invitesOpen ? 'coral' : undefined, label: c('stripInvites'),
+      sub: invitesOpen ? noAccount.filter(r => r.invitation).map(r => `${nameOf(r)} · ${c('sentOn', { when: rel(r.invitation.created_at) })}`).join(' · ') : c('stripInvitesNone') },
+    { key: 'shared', n: sharedTotal, label: c('stripShared'), sub: sharedNames || c('stripSharedNone') },
+    { key: 'saved', n: savedByMe, label: c('stripSaved'), sub: c('stripSavedSub', { n: Math.max(0, ctx.contacts.length - savedByMe) }) },
+  ]} />`;
   return html`
-    <div class="og og-ct">
-      ${crumb(ctx, [])}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('contacts.title')}</h1>
-          <div class="poster-chips">
-            ${chip(people.length, 'chipPeople')}${noAccount.length ? chip(noAccount.length, 'chipNoAccount') : null}${agents.length ? chip(agents.length, 'chipAgents') : null}${invitesOpen ? chip(invitesOpen, 'chipInvites', 'poster-chip--coral') : null}${ctx.blockedCount ? chip(ctx.blockedCount, 'chipBlocked') : null}
-          </div>
-          <p class="og-desc">${c('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <button type="button" class="poster-slab" onClick=${() => ctx.openAdd('name')}>${c('add')}</button>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secPeople(ctx)}
-          ${secNoAccount(ctx)}
-          ${secAgents(ctx)}
-          <${FoldSection} id="ct-add" num="04" title=${c('add')} sub=${c('addSub')} open=${ctx.folds.add} onToggle=${() => ctx.setFold('add', !ctx.folds.add)}>${addBody(ctx)}<//>
-          <${FoldSection} id="ct-where" num="05" title=${c('whereTitle')} sub=${c('whereSub')} open=${ctx.folds.where} onToggle=${() => ctx.setFold('where', !ctx.folds.where)}>${whereUsed()}<//>
-        </div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${c('railTitle')}</span>
-          ${[['01', 'ct-people', c('secPeople'), people.length], ['02', 'ct-noaccount', c('secNoAccount'), noAccount.length], ['03', 'ct-agents', c('secAgents'), agents.length], ['04', 'ct-add', c('add'), ''], ['05', 'ct-where', c('whereTitle'), '']]
-            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks(ctx)}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="ct"
+      crumb=${crumb(ctx, [])}
+      title=${t('contacts.title')}
+      marks=${[
+        mark(people.length, 'chipPeople'),
+        noAccount.length ? mark(noAccount.length, 'chipNoAccount') : null,
+        agents.length ? mark(agents.length, 'chipAgents') : null,
+        invitesOpen ? mark(invitesOpen, 'chipInvites', 'coral') : null,
+        // The people you blocked count nothing here: main's dim tag.
+        ctx.blockedCount ? mark(ctx.blockedCount, 'chipBlocked', 'dim') : null,
+      ]}
+      desc=${c('desc')}
+      actions=${html`
+        <${Loud} onClick=${() => ctx.openAdd('name')}>${c('add')}<//>
+        <${Actions}><${Action} small onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}<//><//>`}
+      strip=${strip}
+      railTitle=${c('railTitle')}
+      sections=${[
+        { id: 'ct-people', num: '01', label: c('secPeople'), count: people.length },
+        { id: 'ct-noaccount', num: '02', label: c('secNoAccount'), count: noAccount.length },
+        { id: 'ct-agents', num: '03', label: c('secAgents'), count: agents.length },
+        { id: 'ct-add', num: '04', label: c('add'), count: '' },
+        { id: 'ct-where', num: '05', label: c('whereTitle'), count: '' },
+      ]}
+      pagesLabel=${c('pages')}
+      pages=${pageLinks(ctx)}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${secPeople(ctx)}
+      ${secNoAccount(ctx)}
+      ${secAgents(ctx)}
+      <${FoldSection} id="ct-add" num="04" title=${c('add')} sub=${c('addSub')} open=${ctx.folds.add} onToggle=${() => ctx.setFold('add', !ctx.folds.add)}>${addBody(ctx)}<//>
+      <${FoldSection} id="ct-where" num="05" title=${c('whereTitle')} sub=${c('whereSub')} open=${ctx.folds.where} onToggle=${() => ctx.setFold('where', !ctx.folds.where)}>${whereUsed()}<//>
+    <//>`;
 }
 
 function secPeople(ctx) {
@@ -115,25 +124,28 @@ function secPeople(ctx) {
   else if (f && f !== 'all') list = list.filter(r => r.relation === f);
   if (q) list = list.filter(r => nameOf(r).toLowerCase().includes(q) || r.contact_id.toLowerCase().includes(q) || (r.email || '').toLowerCase().includes(q) || (r.tags || []).some(x => x.toLowerCase().includes(q)));
   const shown = ctx.showAll ? list : list.slice(0, PAGE);
-  const door = (key, label) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--fold ${f === key ? 'is-on' : ''}`} onClick=${() => ctx.setPeopleFilter(key)}>${label}</button>`;
-  const doors = html`${door('all', c('all'))}${door('saved', c('savedOnes'))}${relations.map(r => door(r, r))}<button type="button" class=${`poster-tab poster-tab--fold ${ctx.searchOpen ? 'is-on' : ''}`} aria-pressed=${ctx.searchOpen ? 'true' : 'false'} onClick=${() => ctx.setSearchOpen(!ctx.searchOpen)}>${c('search')}</button>`;
+  // Which people show (all, the saved ones, one relation), and the search that stays pressed while it is shown.
+  const doors = html`
+    <${Tabs} tone="fold" value=${f} onSelect=${(v) => ctx.setPeopleFilter(v)}
+      items=${[{ value: 'all', label: c('all') }, { value: 'saved', label: c('savedOnes') }, ...relations.map(r => ({ value: r, label: r }))]} />
+    <${Tab} tone="fold" on=${ctx.searchOpen} pressed=${ctx.searchOpen} onClick=${() => ctx.setSearchOpen(!ctx.searchOpen)}>${c('search')}<//>`;
   return html`
     <${PageSection} id="ct-people" num="01" title=${c('secPeople')} count=${`${ctx.people.length} · ${c('secPeopleSub')}`} doors=${doors} first>
-      ${ctx.searchOpen ? html`<input class="og-input ct-search" placeholder=${c('searchPlaceholder')} value=${ctx.q} onInput=${e => ctx.setQ(e.target.value)} autofocus />` : null}
-      ${ctx.loading && !ctx.contacts.length ? html`<p class="poster-quiet ct-loading">${t('common.loading')}</p>`
-        : !shown.length ? html`<p class="poster-quiet">${ctx.people.length ? c('emptyFiltered') : c('emptyPeople')}</p>`
+      ${ctx.searchOpen ? html`<${Space} below="medium"><${TextField} size="medium" placeholder=${c('searchPlaceholder')} value=${ctx.q} onInput=${(v) => ctx.setQ(v)} autoFocus /><//>` : null}
+      ${ctx.loading && !ctx.contacts.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : !shown.length ? html`<${Note} kind="quiet">${ctx.people.length ? c('emptyFiltered') : c('emptyPeople')}<//>`
         : peopleRows(ctx, shown)}
-      ${list.length > shown.length ? html`<div class="og-doors ct-more"><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShowAll(true)}>${c('showRest', { n: list.length - shown.length })}</button></div>` : null}
-      ${ctx.truncated ? html`<p class="poster-hint ct-bad">${c('truncated')}</p>` : null}
+      ${list.length > shown.length ? html`<${More} onMore=${() => ctx.setShowAll(true)} label=${c('showRest', { n: list.length - shown.length })} />` : null}
+      ${ctx.truncated ? html`<${Hint}><${Tinted} tone="notice">${c('truncated')}<//><//>` : null}
       <${Hint}>${c('peopleHint')}<//>
     <//>`;
 }
 
 function secNoAccount(ctx) {
-  const doors = html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openAdd('person')}>${c('writeDown')}</button>`;
+  const doors = html`<${Action} small onClick=${() => ctx.openAdd('person')}>${c('writeDown')}<//>`;
   return html`
     <${PageSection} id="ct-noaccount" num="02" title=${c('secNoAccount')} count=${ctx.noAccount.length} doors=${doors}>
-      ${!ctx.noAccount.length ? html`<p class="poster-quiet">${c('emptyNoAccount')}</p>` : noAccountRows(ctx, ctx.noAccount)}
+      ${!ctx.noAccount.length ? html`<${Note} kind="quiet">${c('emptyNoAccount')}<//>` : noAccountRows(ctx, ctx.noAccount)}
       <${Hint}>${c('noAccountHint')}<//>
     <//>`;
 }
@@ -141,16 +153,17 @@ function secNoAccount(ctx) {
 function secAgents(ctx) {
   const mine = ctx.agents.filter(r => r.owner === ctx.me), others = ctx.agents.filter(r => r.owner !== ctx.me);
   const list = ctx.agentsFilter === 'mine' ? mine : others;
-  const doors = html`<button type="button" class=${`poster-tab poster-tab--fold ${ctx.agentsFilter !== 'mine' ? 'is-on' : ''}`} onClick=${() => ctx.setAgentsFilter('others')}>${c('othersN', { n: others.length })}</button><button type="button" class=${`poster-tab poster-tab--fold ${ctx.agentsFilter === 'mine' ? 'is-on' : ''}`} onClick=${() => ctx.setAgentsFilter('mine')}>${c('mineN', { n: mine.length })}</button>`;
+  const doors = html`<${Tabs} tone="fold" value=${ctx.agentsFilter === 'mine' ? 'mine' : 'others'} onSelect=${(v) => ctx.setAgentsFilter(v)}
+    items=${[{ value: 'others', label: c('othersN', { n: others.length }) }, { value: 'mine', label: c('mineN', { n: mine.length }) }]} />`;
   return html`
     <${PageSection} id="ct-agents" num="03" title=${c('secAgents')} count=${`${ctx.agents.length} · ${c('secAgentsSub')}`} doors=${doors}>
-      ${!list.length ? html`<p class="poster-quiet">${ctx.agentsFilter === 'mine' ? c('emptyMine') : c('emptyOthers')}</p>` : agentRows(ctx, sortPeople(list))}
+      ${!list.length ? html`<${Note} kind="quiet">${ctx.agentsFilter === 'mine' ? c('emptyMine') : c('emptyOthers')}<//>` : agentRows(ctx, sortPeople(list))}
       <${Hint}>${c('agentsHint')}<//>
     <//>`;
 }
 
-/** Where contacts are used: the six doors, once. */
+/** Where contacts are used: the six doors, once, two to a line. */
 function whereUsed() {
   const rows = ['organism', 'workspace', 'group', 'message', 'wallet', 'app'];
-  return html`<div class="listing listing--name-name ct-where">${rows.map(k => html`<div class="listing-row" key=${k}><div class="listing-name">${c('where.' + k + 'T')}<small class="listing-meta">${c('where.' + k + 'D')}</small></div></div>`)}</div><${Hint}>${c('whereHint')}<//>`;
+  return html`<${List} cols="name-name">${rows.map(k => html`<${Row} key=${k}><${Name} meta=${c('where.' + k + 'D')}>${c('where.' + k + 'T')}<//><//>`)}<//><${Hint}>${c('whereHint')}<//>`;
 }

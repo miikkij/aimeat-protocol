@@ -9,6 +9,13 @@
  * @structure recordAiLabel (internal), recordFields (internal), renderRecordSpace
  * @usage import { renderRecordSpace } from '/views/profile/organisms/workspace/record-space.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- The records are the List (mark-name-doors): the colour picker as the row's
+ *     mark and the colour's rail on the row, a draft's warn rail and its status before the name, the
+ *     name as the door that opens the record, the AI label after it, the status as a tag, and the doors
+ *     (Edit, Publish, Unarchive, the archive and delete icons); an opened record (its AI label, its
+ *     fields as Facts, its comments) and a draft's editor stand in the row's Panel; the new record's
+ *     form in the raised Object box. The space's own head and description, which the page head
+ *     already says (main's page rule hid the head), go. The page writes no class (page migration G2b).
  *   v1.11.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -37,12 +44,16 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { LoadingLine } from '/views/profile/shared.js';
-import { QuietNote } from '/components/QuietNote.js';
 import { AiLabel } from '/components/ai-label.js';
+import { ColorPicker } from '/components/ColorPicker.js';
+import { Action, Loud, Icon } from '/components/Action.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { List, Row, Name, Lead, Doors } from '/components/List.js';
 import { SchemaForm } from '/views/profile/organisms/schema-form.js';
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
-import { ColorPicker } from './color-picker.js';
 import { PRIMARY_FIELD, renderFieldVal } from './helpers.js';
 
 /**
@@ -65,82 +76,79 @@ function recordFields(ctx, ot, rec) {
   const { wsT } = ctx;
   const rows = Object.entries(rec || {}).filter(([k, v]) =>
     !k.startsWith('_') && v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
-  if (!rows.length) return html`<div class="poster-quiet pj-rec-empty">${t('organisms.noFields') || 'No fields'}</div>`;
-  return html`<div class="facts">${rows.map(([k, v]) => html`
-    <div class="facts-k poster-label" key=${'k:' + k}>${wsT(`${ot.namespace}.${k}`) || k}</div>
-    <div class="facts-v" key=${k}>${renderFieldVal(v)}</div>`)}</div>`;
+  if (!rows.length) return html`<${Note} kind="quiet">${t('organisms.noFields') || 'No fields'}<//>`;
+  return html`<${Facts} rows=${rows.map(([k, v]) => ({ key: k, k: wsT(`${ot.namespace}.${k}`) || k, v: renderFieldVal(v) }))} />`;
 }
 
 // A record-space tab: schema-form add/edit + draft and published record lists (with comments).
+// The space's name, its "+ Add draft" and its description are the page head's (cover.js renderPage).
 export function renderRecordSpace(ctx, ot) {
   const {
-    wsT, startAdd, spaceDesc, adding, addingId, addingSchema, busy, addingInitial, saveDraft,
+    wsT, adding, addingId, addingSchema, busy, addingInitial, saveDraft,
     cancelForm, draftsFor, itemColor, setItemColor, toggleExpand, startEdit, publish, removeObject,
     expandedRec, orgId, wsId, showToast, commentsByKey, cKey, reloadComments, objectsFor,
     showArchived, reopen, setRecordArchived,
   } = ctx;
+  const drafts = draftsFor(ot.name);
+  const objects = objectsFor(ot.name);
+  const comments = (id) => html`<${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, id)]} onReload=${reloadComments} />`;
+  const opened = (rec) => html`${recordAiLabel(rec, 'block')}${recordFields(ctx, ot, rec)}${comments(rec.id)}`;
+  const colour = (id) => html`<${Lead}><${ColorPicker} value=${itemColor(ot.name, id)} onPick=${(c) => setItemColor(ot.name, id, c)} /><//>`;
+  const del = (id, name) => html`<${Icon} small label=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, id, name)}>🗑<//>`;
+
   return html`
-    <div class="pj-section poster-row--thing" key=${ot.name}>
-      <div class="pj-section-head">
-        <span class="pj-section-title sub-heading">${(wsT('type.' + ot.name) || ot.name)}</span>
-        ${ot.append ? null : html`<button class="poster-action poster-action--small" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
-      </div>
-      ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
+    ${adding === ot.name && !addingId && (addingSchema
+      ? html`<div ref=${(el) => {
+          // Scroll the freshly opened form into view ONCE. On a phone the form used to open
+          // below the fold, so "+ Add draft" looked like a dead button (UX-remake v3, P12,
+          // measured). The dataset flag stops re-scrolling on every keystroke re-render.
+          if (el && !el.dataset.scrolledIntoView) {
+            el.dataset.scrolledIntoView = '1';
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          }
+        }}><${Box} tone="raised"><${SchemaForm} key=${'sf-new'} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+          idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
+          onSave=${(v) => saveDraft(ot, v)} onCancel=${cancelForm} /><//></div>`
+      : html`<${Note} kind="loading" />`)}
 
-      ${adding === ot.name && !addingId && (addingSchema
-        ? html`<div class="pj-rec-edit pj-rec-edit-new" ref=${(el) => {
-            // Scroll the freshly opened form into view ONCE. On a phone the form used to open
-            // below the fold, so "+ Add draft" looked like a dead button (UX-remake v3, P12,
-            // measured). The dataset flag stops re-scrolling on every keystroke re-render.
-            if (el && !el.dataset.scrolledIntoView) {
-              el.dataset.scrolledIntoView = '1';
-              el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            }
-          }}>${html`<${SchemaForm} key=${'sf-new'} schema=${addingSchema} busy=${busy} initial=${addingInitial}
-            idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
-            onSave=${(v) => saveDraft(ot, v)} onCancel=${cancelForm} />`}</div>`
-        : html`<${LoadingLine} />`)}
-
-      ${draftsFor(ot.name).map((d, i) => html`
-        <div class="pj-rec ${itemColor(ot.name, d.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, d.id) : ''}" key=${'d' + i}>
-          <div class="pj-item pj-item-draft">
-            <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />
-            <span class="poster-status poster-status--attention">${t('organisms.draft') || 'draft'}</span>
-            <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || '')}</button>
-            ${recordAiLabel(d, 'inline')}
-            <button class="poster-action poster-action--small" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}</button>
-            <button class="poster-slab poster-slab--control" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
-            <button class="poster-icon poster-icon--small" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
-          </div>
-          ${adding === ot.name && addingId === d.id
-            ? html`<div class="pj-rec-edit">${addingSchema
+    <${List} key=${ot.name} cols="mark-name-doors" keepCols empty=${t('organisms.noneYet') || 'none yet'}>
+      ${drafts.map((d, i) => {
+        const name = String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || '');
+        const editing = adding === ot.name && addingId === d.id;
+        return html`
+          <${Row} key=${'d' + i} colour=${itemColor(ot.name, d.id) || undefined} rail="warn"
+            open=${editing || !!expandedRec[ot.name + ':' + d.id]}
+            panel=${editing
+              ? (addingSchema
                 ? html`<${SchemaForm} key=${'sf-' + d.id} schema=${addingSchema} busy=${busy} initial=${addingInitial}
                     idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
                     onSave=${(v) => saveDraft(ot, { ...v, id: addingId })} onCancel=${cancelForm} />`
-                : html`<${LoadingLine} />`}</div>`
-            : (expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordAiLabel(d, 'block')}${recordFields(ctx, ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, d.id)]} onReload=${reloadComments} />` : null)}
-        </div>
-      `)}
-
-      ${objectsFor(ot.name).length === 0 && draftsFor(ot.name).length === 0
-        ? html`<${QuietNote}>${t('organisms.noneYet') || 'none yet'}<//>`
-        : objectsFor(ot.name).map((o, i) => html`
-          <div class="pj-rec ${itemColor(ot.name, o.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, o.id) : ''}" key=${'o' + i}>
-            <div class="pj-item">
-              <${ColorPicker} value=${itemColor(ot.name, o.id)} onPick=${(c) => setItemColor(ot.name, o.id, c)} />
-              <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
-              ${recordAiLabel(o, 'inline')}
-              ${o.status ? html`<span class="poster-chip">${(o.status)}</span>` : null}
-              ${!showArchived && !draftsFor(ot.name).some(dr => dr.id === o.id) ? html`
-                <button class="poster-action poster-action--small" title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}</button>` : null}
-              ${showArchived
-                ? html`<button class="poster-action poster-action--small" title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, false)}>${'♻️ '}${t('organisms.unarchive') || 'Unarchive'}</button>`
-                : html`<button class="poster-icon poster-icon--small" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, true)}>🗄️</button>`}
-              <button class="poster-icon poster-icon--small" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
-            </div>
-            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordAiLabel(o, 'block')}${recordFields(ctx, ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, o.id)]} onReload=${reloadComments} />` : null}
-          </div>
-        `)
-      }
-    </div>`;
+                : html`<${Note} kind="loading" />`)
+              : opened(d)}>
+            ${colour(d.id)}
+            <${Name} onOpen=${() => toggleExpand(ot, d.id)} before=${html`<${Mark} kind="status" tone="attention">${t('organisms.draft') || 'draft'}<//>`}
+              after=${recordAiLabel(d, 'inline')}>${name}<//>
+            <${Doors}>
+              <${Action} small onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}<//>
+              <${Loud} control onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}<//>
+              ${del(d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}
+            <//>
+          <//>`;
+      })}
+      ${objects.map((o, i) => html`
+        <${Row} key=${'o' + i} colour=${itemColor(ot.name, o.id) || undefined}
+          open=${!!expandedRec[ot.name + ':' + o.id]} panel=${opened(o)}>
+          ${colour(o.id)}
+          <${Name} onOpen=${() => toggleExpand(ot, o.id)} after=${recordAiLabel(o, 'inline')}
+            tag=${o.status ? String(o.status) : null}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}<//>
+          <${Doors}>
+            ${!showArchived && !drafts.some(dr => dr.id === o.id) ? html`
+              <${Action} small title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}<//>` : null}
+            ${showArchived
+              ? html`<${Action} small title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, false)}>${'♻️ '}${t('organisms.unarchive') || 'Unarchive'}<//>`
+              : html`<${Icon} small label=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, true)}>🗄️<//>`}
+            ${del(o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}
+          <//>
+        <//>`)}
+    <//>`;
 }

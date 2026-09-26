@@ -8,10 +8,11 @@
  *   proposals as lists, the synthesis as numbered proposals and three options), and carries the
  *   same three doors: run this step here, copy this step's prompt to your own AI, paste the answer
  *   back. The empty runs (created and never started) are one row with one door.
- * @structure runRow · emptiesRow · runBody · stepFold · stepGenerate · stepAnalyze · stepReflect ·
- *   stepSynthesize · pasteBox · pre · proposalList
+ * @structure runRow · emptiesRow · runBody · stepFold · stepDoors · stepGenerate · stepAnalyze ·
+ *   stepReflect · proposalList · stepSynthesize · output · pasteBox
  * @usage import { runRow, emptiesRow } from './run.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the row is the List's Row with its Panel, a score the Figure, what opens the Run view (components/RunView.js: the steps as folds, the model blocks, the checkpoints, the proposals, a folded output, the paste box), the options the boxed Choice with its radio dots, the lines Note (component plan, page group G4).
  *   v1.18.0 -- 2026-09-26 -- A folded output is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -44,12 +45,23 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { CopyButton } from '/components/CopyButton.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
+import { Row, Name, Desc, Cell, Doors } from '/components/List.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Figure, Tinted } from '/components/Figure.js';
+import { Choice } from '/components/Choice.js';
+import { TextArea } from '/components/TextField.js';
+import { Split } from '/components/Layout.js';
+import {
+  RunSteps, RunStep, RunStepDoors, RunCopies, RunModel, RunChecks, RunColumns, RunColumn, RunProposals, RunOutput, RunApply, RunPaste,
+} from '/components/RunView.js';
 import { x, STEPS, dateWord, timeWord, durationWords, runAverage, failedWords, stepsDone, labelWords } from './frame.js';
 import { stepPrompts, optionProposals } from './engine.js';
 
-const scoreClass = (v) => (v == null ? 'is-dim' : v >= 80 ? 'is-good' : v >= 50 ? 'is-mid' : 'is-low');
+/** A score's state colour: none yet grey, fine from 80 %, the plain colour from 50 %, coral under it. */
+const scoreTone = (v) => (v == null ? 'dim' : v >= 80 ? 'fine' : v >= 50 ? undefined : 'notice');
 const text = (v) => (typeof v === 'string' ? v : JSON.stringify(v ?? '', null, 2));
 const proposalText = (p) => (typeof p === 'string' ? p : p?.text || p?.proposal || JSON.stringify(p));
 
@@ -67,13 +79,13 @@ export function runRow(ctx, run) {
       : run.status === 'synthesized' ? x('stateDone') : x('stateAt', { step: x('stepShort.' + statusStep(run.status)) });
   const fails = detail ? (detail.models || []).map((m) => ({ label: labelWords(m.modelLabel), words: failedWords(m) })).filter((f) => f.words.length) : [];
   return html`
-    <div class=${`listing-row cal-run ${open ? 'is-open' : ''}`} key=${id} id=${'cal-run-' + id}>
-      <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleRun(id)}>${x('runN', { n: run.number })}</button><small>v${run.promptVersion} · ${dateWord(run.createdAt)} ${timeWord(run.createdAt)} · ${state}</small></div>
-      <div class="cal-sc"><span class="cal-sc--many">${(run.scores || []).map((s) => html`<span key=${s.modelId}><b class=${`poster-stat-number poster-stat-number--small ${scoreClass(s.overallScore)}`}>${s.overallScore != null ? s.overallScore + ' %' : '·'}</b><small title=${s.modelLabel}>${labelWords(s.modelLabel)}</small></span>`)}</span></div>
-      <div class="listing-desc cal-w">${avg != null ? html`<b>${x('averageN', { n: avg })}</b> ` : null}${fails.length ? fails.map((f) => `${f.label}: ${f.words.join(', ')}`).join(' · ') : (detail && avg != null ? x('allPassed') : '')}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggleRun(id)}>${open ? x('close') : x('open')}</button></div>
-      ${open ? html`<div class="listing-open poster-box poster-box--raised">${detail ? runBody(ctx, run, detail) : html`<p class="poster-quiet cal-empty loading-mark">${x('loading')}</p>`}</div>` : null}
-    </div>`;
+    <${Row} key=${id} id=${'cal-run-' + id} open=${open}
+      panel=${detail ? runBody(ctx, run, detail) : html`<${Note} kind="loading">${x('loading')}<//>`}>
+      <${Name} onOpen=${() => ctx.toggleRun(id)} meta=${html`v${run.promptVersion} · ${dateWord(run.createdAt)} ${timeWord(run.createdAt)} · ${state}`}>${x('runN', { n: run.number })}<//>
+      <${Cell} line>${(run.scores || []).map((s) => html`<${Figure} key=${s.modelId} small tone=${scoreTone(s.overallScore)} n=${s.overallScore != null ? s.overallScore + ' %' : '·'} sub=${labelWords(s.modelLabel)} title=${s.modelLabel} />`)}<//>
+      <${Desc}>${avg != null ? html`<b>${x('averageN', { n: avg })}</b> ` : null}${fails.length ? fails.map((f) => `${f.label}: ${f.words.join(', ')}`).join(' · ') : (detail && avg != null ? x('allPassed') : '')}<//>
+      <${Doors}><${Action} small row onClick=${() => ctx.toggleRun(id)}>${open ? x('close') : x('open')}<//><//>
+    <//>`;
 }
 
 const statusStep = (status) => (status === 'reflected' ? 'reflect' : status === 'analyzed' ? 'analyze' : status === 'generated' ? 'generate' : 'none');
@@ -81,12 +93,12 @@ const statusStep = (status) => (status === 'reflected' ? 'reflect' : status === 
 export function emptiesRow(ctx, empties) {
   if (!empties.length) return null;
   return html`
-    <div class="listing-row cal-run is-empty">
-      <div class="listing-name"><span class="og-tbl-name">${x('emptyRunsN', { n: empties.length })}</span><small>${x('emptyRunsSub')}</small></div>
-      <div></div>
-      <div class="listing-desc">${x('emptyRunsWhat')}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--danger poster-action--lower" disabled=${ctx.busy === 'runs'} onClick=${() => ctx.deleteEmpties()}>${x('deleteEmpties')}</button></div>
-    </div>`;
+    <${Row} key="empties" faded>
+      <${Name} meta=${x('emptyRunsSub')}>${x('emptyRunsN', { n: empties.length })}<//>
+      <${Cell} />
+      <${Desc}>${x('emptyRunsWhat')}<//>
+      <${Doors}><${Action} small row soft tone="danger" disabled=${ctx.busy === 'runs'} onClick=${() => ctx.deleteEmpties()}>${x('deleteEmpties')}<//><//>
+    <//>`;
 }
 
 /* ── What opens under a run ───────────────────────────────────────────────────────────────────── */
@@ -97,16 +109,18 @@ function runBody(ctx, run, detail) {
   const nDone = STEPS.filter((s) => done[s]).length;
   const running = !!ctx.running[run.batchId];
   return html`
-    <p class="og-lead">${x('runLead', { n: run.number, v: run.promptVersion, date: dateWord(run.createdAt), time: timeWord(run.createdAt) })}${slowest ? ' ' + x('runLeadTook', { d: durationWords(slowest) }) : ''} ${x('runLeadSteps', { n: nDone })}${done.synthesize && detail.step4_synthesis?.options ? ' ' + x('runLeadOptions') : ''}</p>
-    ${running ? html`<p class="form-message">${ctx.progress[run.batchId] || x('stateRunning')}</p>` : null}
-    ${ctx.runMsg && ctx.runMsg.id === run.batchId ? html`<p class=${`form-message ${ctx.runMsg.error ? 'form-message--error' : ''}`}>${ctx.runMsg.text}</p>` : null}
-    <div class="cal-steps">
+    <${Note} kind="lead">${x('runLead', { n: run.number, v: run.promptVersion, date: dateWord(run.createdAt), time: timeWord(run.createdAt) })}${slowest ? ' ' + x('runLeadTook', { d: durationWords(slowest) }) : ''} ${x('runLeadSteps', { n: nDone })}${done.synthesize && detail.step4_synthesis?.options ? ' ' + x('runLeadOptions') : ''}<//>
+    ${running ? html`<${Note} kind="message">${ctx.progress[run.batchId] || x('stateRunning')}<//>` : null}
+    ${ctx.runMsg && ctx.runMsg.id === run.batchId ? html`<${Note} kind="message" error=${!!ctx.runMsg.error}>${ctx.runMsg.text}<//>` : null}
+    <${RunSteps}>
       ${STEPS.map((step, i) => stepFold(ctx, run, detail, step, i, done))}
-    </div>
-    <div class="og-doors cal-run-doors">
-      ${!done.synthesize && !running ? html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.runRest(run.batchId)}>${nDone ? x('runRest') : x('runAllSteps')}</button>` : null}
-      <button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" disabled=${running || ctx.busy === 'runs'} onClick=${() => ctx.deleteRun(run.batchId)}>${x('deleteRun')}</button>
-    </div>`;
+    <//>
+    <${Split} above="large">
+      <${Actions}>
+        ${!done.synthesize && !running ? html`<${Action} small onClick=${() => ctx.runRest(run.batchId)}>${nDone ? x('runRest') : x('runAllSteps')}<//>` : null}
+        <${Action} small soft tone="danger" disabled=${running || ctx.busy === 'runs'} onClick=${() => ctx.deleteRun(run.batchId)}>${x('deleteRun')}<//>
+      <//>
+    <//>`;
 }
 
 function stepFold(ctx, run, detail, step, i, done) {
@@ -118,16 +132,11 @@ function stepFold(ctx, run, detail, step, i, done) {
         : x('stepRightDone'))
     : x('stepRightPending');
   return html`
-    <section class=${`cal-step ${open ? 'is-open' : ''} ${done[step] ? 'is-done' : ''}`} key=${step}>
-      <button type="button" class=${`og-fold og-fold--toggle ${done[step] ? 'og-fold--done' : ''}`} aria-expanded=${open ? 'true' : 'false'} onClick=${() => ctx.setOpenStep(open ? null : step)}>
-        <i>${i + 1}</i><span>${x('step.' + step)}</span><span class="og-fold-r">${right}</span><span class="og-fold-arrow">${open ? '↓' : '→'}</span>
-      </button>
-      ${open ? html`<div class="cal-step-body">
-        <p class="og-lead">${x('stepWhat.' + step)}</p>
-        ${step === 'generate' ? stepGenerate(ctx, run, detail) : step === 'analyze' ? stepAnalyze(ctx, run, detail) : step === 'reflect' ? stepReflect(ctx, run, detail) : stepSynthesize(ctx, run, detail)}
-        ${stepDoors(ctx, run, detail, step)}
-      </div>` : null}
-    </section>`;
+    <${RunStep} key=${step} num=${i + 1} name=${x('step.' + step)} right=${right} done=${!!done[step]} open=${open} onToggle=${() => ctx.setOpenStep(open ? null : step)}>
+      <${Note} kind="lead">${x('stepWhat.' + step)}<//>
+      ${step === 'generate' ? stepGenerate(ctx, run, detail) : step === 'analyze' ? stepAnalyze(ctx, run, detail) : step === 'reflect' ? stepReflect(ctx, run, detail) : stepSynthesize(ctx, run, detail)}
+      ${stepDoors(ctx, run, detail, step)}
+    <//>`;
 }
 
 function stepDoors(ctx, run, detail, step) {
@@ -135,16 +144,16 @@ function stepDoors(ctx, run, detail, step) {
   const prompts = stepPrompts(step, ctx.engineFor(detail), detail);
   const can = step === 'generate' || (step === 'analyze' && (detail.models || []).some((m) => m.step1_generation?.status === 'done')) || (step === 'reflect' && (detail.models || []).some((m) => m.step2_analysis?.status === 'done')) || (step === 'synthesize' && (detail.models || []).some((m) => m.step3_reflection?.status === 'done'));
   return html`
-    <div class="cal-step-doors">
-      <div class="og-doors">
-        <button type="button" class="poster-action poster-action--small" disabled=${running || !can || !ctx.keyed} onClick=${() => ctx.runStep(run.batchId, step)}>${x('runStepHere')}</button>
-        ${prompts.length === 1 ? html`<${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${prompts[0].text} label=${x('copyStepPrompt')} />` : null}
-        ${step === 'synthesize' ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openPaste({ batchId: run.batchId, step, index: 0 })}>${x('pasteAnswer')}</button>` : null}
-      </div>
-      ${prompts.length > 1 ? html`<div class="cal-copies"><small>${x('copyStepPrompts')}</small>${prompts.map((p, i) => html`<${CopyButton} key=${i} className="poster-action poster-action--small poster-action--lower" text=${p.text} label=${p.label} />`)}</div>` : null}
-      ${!can ? html`<small class="poster-hint">${x('stepNeedsPrevious')}</small>` : null}
+    <${RunStepDoors}>
+      <${Actions}>
+        <${Action} small disabled=${running || !can || !ctx.keyed} onClick=${() => ctx.runStep(run.batchId, step)}>${x('runStepHere')}<//>
+        ${prompts.length === 1 ? html`<${Action} small soft copy=${prompts[0].text}>${x('copyStepPrompt')}<//>` : null}
+        ${step === 'synthesize' ? html`<${Action} small soft onClick=${() => ctx.openPaste({ batchId: run.batchId, step, index: 0 })}>${x('pasteAnswer')}<//>` : null}
+      <//>
+      ${prompts.length > 1 ? html`<${RunCopies} label=${x('copyStepPrompts')}>${prompts.map((p, i) => html`<${Action} key=${i} small soft copy=${p.text}>${p.label}<//>`)}<//>` : null}
+      ${!can ? html`<${Note}>${x('stepNeedsPrevious')}<//>` : null}
       ${step === 'synthesize' ? pasteBox(ctx, { batchId: run.batchId, step, index: 0 }) : null}
-    </div>`;
+    <//>`;
 }
 
 /* ── Step 1: the models answer ────────────────────────────────────────────────────────────────── */
@@ -153,15 +162,15 @@ function stepGenerate(ctx, run, detail) {
   return html`${(detail.models || []).map((m, i) => {
     const g = m.step1_generation || {};
     return html`
-      <div class="cal-m" key=${m.modelId}>
-        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b><small>${g.status === 'done' ? (durationWords(g.durationMs) || x('pasted')) : g.status === 'error' ? html`<span class="is-err">${g.error}</span>` : x('stepRightPending')}</small></div>
-        ${g.output ? pre(x('viewOutput'), g.output) : null}
-        <div class="og-doors">
-          ${g.output ? html`<${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${g.output} label=${x('copyOutput')} />` : null}
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openPaste({ batchId: run.batchId, step: 'generate', index: i })}>${x('pasteAnswer')}</button>
-        </div>
+      <${RunModel} key=${m.modelId} name=${labelWords(m.modelLabel)}
+        meta=${g.status === 'done' ? (durationWords(g.durationMs) || x('pasted')) : g.status === 'error' ? html`<${Tinted} tone="notice">${g.error}<//>` : x('stepRightPending')}>
+        ${g.output ? output(x('viewOutput'), g.output) : null}
+        <${Actions}>
+          ${g.output ? html`<${Action} small soft copy=${g.output}>${x('copyOutput')}<//>` : null}
+          <${Action} small soft onClick=${() => ctx.openPaste({ batchId: run.batchId, step: 'generate', index: i })}>${x('pasteAnswer')}<//>
+        <//>
         ${pasteBox(ctx, { batchId: run.batchId, step: 'generate', index: i })}
-      </div>`;
+      <//>`;
   })}`;
 }
 
@@ -169,31 +178,24 @@ function stepGenerate(ctx, run, detail) {
 
 function stepAnalyze(ctx, run, detail) {
   const models = (detail.models || []).filter((m) => m.step1_generation?.status === 'done');
-  if (!models.length) return html`<p class="poster-quiet cal-empty">${x('noOutputsYet')}</p>`;
+  if (!models.length) return html`<${Note} kind="quiet">${x('noOutputsYet')}<//>`;
   return html`${models.map((m) => {
     const i = detail.models.indexOf(m);
     const a = m.step2_analysis || {};
     const dims = a.dimensions || [];
     return html`
-      <div class="cal-m" key=${m.modelId}>
-        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b>${a.overallScore != null ? html`<b class=${'cal-pct poster-stat-number poster-stat-number--small ' + scoreClass(a.overallScore)}>${a.overallScore} %</b>` : null}<small>${a.status === 'error' ? html`<span class="is-err">${a.error}</span>` : a.status === 'done' ? x('checkpointsN', { n: dims.length, ok: dims.filter((d) => d.pass).length }) : x('stepRightPending')}</small></div>
-        ${dims.length ? html`
-          <div class="cal-dims">
-            <div class="cal-dh poster-label"></div><div class="cal-dh poster-label">${x('colCheckpoint')}</div><div class="cal-dh poster-label">${x('colExpected')}</div><div class="cal-dh poster-label">${x('colActual')}</div><div class="cal-dh poster-label">${x('colWeight')}</div>
-            ${dims.map((d, k) => html`
-              <div key=${'p' + k} class=${d.pass ? 'is-good' : 'is-low'}>${d.pass ? '✓' : '✗'}</div>
-              <div key=${'n' + k}><b>${String(d.name || '').replace(/_/g, ' ')}</b>${d.description ? html`<small>${d.description}</small>` : null}</div>
-              <div key=${'e' + k}>${d.expected || ''}</div>
-              <div key=${'a' + k}>${d.actual || ''}</div>
-              <div key=${'s' + k}><small>${x('severity.' + (d.severity || 'minor'))}</small></div>`)}
-          </div>` : null}
-        ${a.analysis ? pre(x('viewAnalysis'), text(a.analysis)) : null}
-        ${a.promptSent ? pre(x('viewPromptSent'), a.promptSent) : null}
-        <div class="og-doors">
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openPaste({ batchId: run.batchId, step: 'analyze', index: i })}>${x('pasteAnswer')}</button>
-        </div>
+      <${RunModel} key=${m.modelId} name=${labelWords(m.modelLabel)}
+        figure=${a.overallScore != null ? `${a.overallScore} %` : null} tone=${scoreTone(a.overallScore)}
+        meta=${a.status === 'error' ? html`<${Tinted} tone="notice">${a.error}<//>` : a.status === 'done' ? x('checkpointsN', { n: dims.length, ok: dims.filter((d) => d.pass).length }) : x('stepRightPending')}>
+        ${dims.length ? html`<${RunChecks} head=${['', x('colCheckpoint'), x('colExpected'), x('colActual'), x('colWeight')]}
+          rows=${dims.map((d, k) => ({ key: k, pass: !!d.pass, name: String(d.name || '').replace(/_/g, ' '), description: d.description, expected: d.expected, actual: d.actual, weight: x('severity.' + (d.severity || 'minor')) }))} />` : null}
+        ${a.analysis ? output(x('viewAnalysis'), text(a.analysis)) : null}
+        ${a.promptSent ? output(x('viewPromptSent'), a.promptSent) : null}
+        <${Actions}>
+          <${Action} small soft onClick=${() => ctx.openPaste({ batchId: run.batchId, step: 'analyze', index: i })}>${x('pasteAnswer')}<//>
+        <//>
         ${pasteBox(ctx, { batchId: run.batchId, step: 'analyze', index: i })}
-      </div>`;
+      <//>`;
   })}`;
 }
 
@@ -201,34 +203,33 @@ function stepAnalyze(ctx, run, detail) {
 
 function stepReflect(ctx, run, detail) {
   const models = (detail.models || []).filter((m) => m.step2_analysis?.status === 'done');
-  if (!models.length) return html`<p class="poster-quiet cal-empty">${x('noScoresYet')}</p>`;
+  if (!models.length) return html`<${Note} kind="quiet">${x('noScoresYet')}<//>`;
   return html`${models.map((m) => {
     const i = detail.models.indexOf(m);
     const r = m.step3_reflection || {};
     return html`
-      <div class="cal-m" key=${m.modelId}>
-        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b><small>${r.status === 'done' ? x('proposalsN', { n: (r.judgeProposals?.proposals?.length || 0) + (r.selfProposals?.proposals?.length || 0) }) : x('stepRightPending')}</small></div>
-        <div class="cal-cols">
+      <${RunModel} key=${m.modelId} name=${labelWords(m.modelLabel)}
+        meta=${r.status === 'done' ? x('proposalsN', { n: (r.judgeProposals?.proposals?.length || 0) + (r.selfProposals?.proposals?.length || 0) }) : x('stepRightPending')}>
+        <${RunColumns}>
           ${proposalList(ctx, run, i, 'judge', x('judgeProposals'), r.judgeProposals)}
           ${proposalList(ctx, run, i, 'self', x('selfProposals', { model: labelWords(m.modelLabel) }), r.selfProposals)}
-        </div>
-      </div>`;
+        <//>
+      <//>`;
   })}`;
 }
 
 function proposalList(ctx, run, index, which, title, part) {
   const list = part?.proposals || [];
   return html`
-    <div class="cal-col">
-      <span class="poster-label">${title}</span>
-      ${part?.error ? html`<p class="form-message form-message--error">${part.error}</p>` : null}
-      ${list.length ? html`<${IndexList} steps className="cal-ol">${list.map((p, k) => html`<${IndexStep} key=${k}>${proposalText(p)}<//>`)}<//>` : (!part?.error ? html`<p class="poster-quiet cal-empty">${x('noProposals')}</p>` : null)}
-      ${part?.reasoning && list.length ? pre(x('viewReasoning'), text(part.reasoning)) : null}
-      <div class="og-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openPaste({ batchId: run.batchId, step: 'reflect', index, which })}>${x('pasteAnswer')}</button>
-      </div>
+    <${RunColumn} label=${title}>
+      ${part?.error ? html`<${Note} kind="message" error>${part.error}<//>` : null}
+      ${list.length ? html`<${IndexList} steps>${list.map((p, k) => html`<${IndexStep} key=${k}>${proposalText(p)}<//>`)}<//>` : (!part?.error ? html`<${Note} kind="quiet">${x('noProposals')}<//>` : null)}
+      ${part?.reasoning && list.length ? output(x('viewReasoning'), text(part.reasoning)) : null}
+      <${Actions}>
+        <${Action} small soft onClick=${() => ctx.openPaste({ batchId: run.batchId, step: 'reflect', index, which })}>${x('pasteAnswer')}<//>
+      <//>
       ${pasteBox(ctx, { batchId: run.batchId, step: 'reflect', index, which })}
-    </div>`;
+    <//>`;
 }
 
 /* ── Step 4: the synthesis and the next version ───────────────────────────────────────────────── */
@@ -240,55 +241,46 @@ function stepSynthesize(ctx, run, detail) {
   const key = ctx.option[run.batchId] || (options?.B ? 'B' : options?.A ? 'A' : 'C');
   const chosen = new Set((options?.[key]?.proposalIds || []).map((v) => (typeof v === 'number' ? v : -1)));
   const applying = ctx.busy === 'apply:' + run.batchId;
-  if (s.status !== 'done' && !props.length) return html`${s.error ? html`<p class="form-message form-message--error">${s.error}</p>` : html`<p class="poster-quiet cal-empty">${x('noSynthesisYet')}</p>`}`;
+  if (s.status !== 'done' && !props.length) return html`${s.error ? html`<${Note} kind="message" error>${s.error}<//>` : html`<${Note} kind="quiet">${x('noSynthesisYet')}<//>`}`;
   return html`
-    ${s.error ? html`<p class="form-message form-message--error">${s.error}</p>` : null}
+    ${s.error ? html`<${Note} kind="message" error>${s.error}<//>` : null}
     ${props.length ? html`
-      <span class="poster-label">${x('groupedProposals')}</span>
-      <div class="cal-props">
-        ${props.map((gp, i) => html`
-          <div class="cal-prop" key=${i}>
-            <span class=${`cal-prop-n ${chosen.has(i) ? 'is-on' : ''}`}>${i + 1}</span>
-            <span class="cal-prop-t">${proposalText(gp)}${gp.explanation ? html`<small>${gp.explanation}</small>` : null}${gp.sources ? html`<small>${x('sources')}: ${Array.isArray(gp.sources) ? gp.sources.join(', ') : gp.sources}</small>` : null}</span>
-            <span class="cal-prop-tag">${gp.impact ? html`<em class=${`poster-chip ${gp.impact === 'high' ? 'poster-chip--coral' : ''}`}>${x('impact.' + gp.impact) || gp.impact}</em>` : null}${gp.risk ? html`<em class="poster-chip">${x('risk.' + gp.risk) || gp.risk}</em>` : null}</span>
-          </div>`)}
-      </div>` : null}
+      <${Label} block>${x('groupedProposals')}<//>
+      <${RunProposals} items=${props.map((gp, i) => ({
+        key: i, n: i + 1, chosen: chosen.has(i), text: proposalText(gp),
+        notes: [gp.explanation, gp.sources ? html`${x('sources')}: ${Array.isArray(gp.sources) ? gp.sources.join(', ') : gp.sources}` : null],
+        tags: [gp.impact ? { label: x('impact.' + gp.impact) || gp.impact, tone: gp.impact === 'high' ? 'coral' : undefined } : null, gp.risk ? { label: x('risk.' + gp.risk) || gp.risk } : null],
+      }))} />` : null}
     ${options ? html`
-      <span class="poster-label">${x('options')}</span>
-      <div class="cal-opts">
-        ${['A', 'B', 'C'].filter((k) => options[k]).map((k) => html`
-          <label class=${`poster-choice cal-opt ${key === k ? 'on' : ''}`} key=${k}>
-            <input type="radio" name=${'cal-opt-' + run.batchId} checked=${key === k} onChange=${() => ctx.setOption(run.batchId, k)} />
-            <span><b>${x('option.' + k)}</b><small>${x('optionCount', { n: (options[k].proposalIds || []).length })}${options[k].expectedImpact ? ' · ' + options[k].expectedImpact : ''}</small></span>
-          </label>`)}
-      </div>` : null}
-    ${s.recommendation ? html`<p class="og-lead"><b>${x('recommendation')}:</b> ${s.recommendation}</p>` : null}
-    ${s.analysis && props.length ? pre(x('viewAnalysis'), text(s.analysis)) : null}
+      <${Label} block>${x('options')}<//>
+      <${Choice} boxed dot cols=${3} name=${'cal-opt-' + run.batchId} ariaLabel=${x('options')} value=${key} onChange=${(k) => ctx.setOption(run.batchId, k)}
+        options=${['A', 'B', 'C'].filter((k) => options[k]).map((k) => ({ value: k, label: x('option.' + k), hint: `${x('optionCount', { n: (options[k].proposalIds || []).length })}${options[k].expectedImpact ? ' · ' + options[k].expectedImpact : ''}` }))} />` : null}
+    ${s.recommendation ? html`<${Note} kind="lead"><b>${x('recommendation')}:</b> ${s.recommendation}<//>` : null}
+    ${s.analysis && props.length ? output(x('viewAnalysis'), text(s.analysis)) : null}
     ${options ? html`
-      <div class="cal-apply">
-        <button type="button" class="poster-slab poster-slab--control" disabled=${applying || !ctx.keyed || !optionProposals(s, key).length} onClick=${() => ctx.applyOption(run.batchId, key)}>${applying ? x('applying') : x('applyOption', { option: key, v: (ctx.project.currentVersion || 0) + 1 })}</button>
-        <${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${ctx.applyText(detail, key)} label=${x('copyApplyPrompt')} />
-        <small>${applying ? x('applyingHint') : x('applyHint')}</small>
-      </div>` : null}`;
+      <${RunApply} note=${applying ? x('applyingHint') : x('applyHint')}>
+        <${Loud} control disabled=${applying || !ctx.keyed || !optionProposals(s, key).length} onClick=${() => ctx.applyOption(run.batchId, key)}>${applying ? x('applying') : x('applyOption', { option: key, v: (ctx.project.currentVersion || 0) + 1 })}<//>
+        <${Action} small soft copy=${ctx.applyText(detail, key)}>${x('copyApplyPrompt')}<//>
+      <//>` : null}`;
 }
 
 /* ── Small parts ──────────────────────────────────────────────────────────────────────────────── */
 
-function pre(label, body) {
+/** A long output folded behind its label; nothing when there is no output. */
+function output(label, body) {
   if (!body) return null;
-  return html`<details class="cal-pre"><summary>${label}</summary><pre class="code-block">${body}</pre></details>`;
+  return html`<${RunOutput} label=${label}>${body}<//>`;
 }
 
 function pasteBox(ctx, spec) {
   const p = ctx.paste;
   if (!p || p.batchId !== spec.batchId || p.step !== spec.step || p.index !== spec.index || (p.which || '') !== (spec.which || '')) return null;
   return html`
-    <div class="cal-paste">
-      <span class="poster-label">${x('pasteLabel.' + spec.step)}</span>
-      <textarea class="og-textarea" rows="6" value=${ctx.pasteText} placeholder=${x('pastePlaceholder')} aria-label=${x('pasteAnswer')} onInput=${(e) => ctx.setPasteText(e.target.value)}></textarea>
-      <div class="og-doors">
-        <button type="button" class="poster-action poster-action--small" disabled=${!ctx.pasteText.trim() || ctx.busy === 'paste'} onClick=${() => ctx.savePaste()}>${x('save')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openPaste(null)}>${x('cancel')}</button>
-      </div>
-    </div>`;
+    <${RunPaste} label=${x('pasteLabel.' + spec.step)}>
+      <${TextArea} rows=${6} value=${ctx.pasteText} placeholder=${x('pastePlaceholder')} ariaLabel=${x('pasteAnswer')} onInput=${(v) => ctx.setPasteText(v)} />
+      <${Actions}>
+        <${Action} small disabled=${!ctx.pasteText.trim() || ctx.busy === 'paste'} onClick=${() => ctx.savePaste()}>${x('save')}<//>
+        <${Action} small soft onClick=${() => ctx.openPaste(null)}>${x('cancel')}<//>
+      <//>
+    <//>`;
 }

@@ -12,6 +12,7 @@
  * @structure renderPerson · secKnow · secTogether · secMessages · foldPermissions · orgChooser
  * @usage import { renderPerson } from './person.js';
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- Every part is a kit component (the page frame as data, FigureStrip, Facts with what is not written down grey, List, Box, Tab in its fold tone, Mark, Note, Action): the page passes data and writes no class. Put back from main: how a person came into the book, how often you wrote and a sent invitation are dim tags (page group G8).
  *   v1.14.0 -- 2026-09-26 -- What you share with a person is the Listing (listing, listing-row, the name with its line; cut name-name, two to a line), a unification: the look most tabs use.
  *   v1.13.0 -- 2026-09-26 -- The line under an organism or an agent you share is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.12.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -42,6 +43,14 @@ import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { PresenceDot } from '/components/PresenceDot.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts } from '/components/Facts.js';
+import { List, Row, Name, Desc } from '/components/List.js';
+import { Box } from '/components/Box.js';
+import { Tab } from '/components/Tabs.js';
+import { Mark, Marks, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
 import { c, rel, day, nameOf, parts, kindWord, stateWord, originWords, isPerson, renderPage } from './frame.js';
 import { personForm } from './add.js';
 import { Hint } from '/components/Hint.js';
@@ -50,54 +59,62 @@ export function renderPerson(ctx, row) {
   const tg = ctx.personData?.together || null;
   const person = isPerson(row);
   const mail = row.kind === 'mail';
-  const chips = html`
-    ${row.relation ? html`<span class="poster-chip poster-chip--ink">${row.relation}</span>` : null}
-    ${(row.tags || []).map(x => html`<span class="poster-chip" key=${x}>${x}</span>`)}
-    <span class="poster-chip">${originWords(row)}</span>
-    ${row.origin === 'saved' && row.message_count ? html`<span class="poster-chip">${c('messagedTimes', { n: row.message_count })}</span>` : null}`;
+  const marks = [
+    row.relation ? { label: row.relation, tone: 'ink' } : null,
+    ...(row.tags || []).map(x => ({ label: x })),
+    // How the person came into the book and how often you wrote count nothing to do: main's dim tags.
+    { label: originWords(row), tone: 'dim' },
+    row.origin === 'saved' && row.message_count ? { label: c('messagedTimes', { n: row.message_count }), tone: 'dim' } : null,
+  ];
   const doors = html`
-    ${mail ? (row.invitation ? html`<span class="poster-chip">${c('inviteSent', { when: day(row.invitation.created_at) })}</span>` : html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy} onClick=${() => ctx.invite(row)}>${c('invite')}</button>`)
-      : html`<button type="button" class="poster-slab" onClick=${() => ctx.message(row.contact_id)}>${c('message')}</button>`}
-    ${person ? html`<button type="button" class=${`poster-tab poster-tab--fold ${ctx.orgChooser ? 'is-on' : ''}`} aria-pressed=${ctx.orgChooser ? 'true' : 'false'} onClick=${() => ctx.toggleOrgChooser()}>${c('inviteToOrganism')}</button><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openTab('organisms')}>${c('shareWorkspace')}</button>` : null}
-    <button type="button" class=${`poster-tab poster-tab--fold ${ctx.editing ? 'is-on' : ''}`} aria-pressed=${ctx.editing ? 'true' : 'false'} onClick=${() => ctx.startEdit(row)}>${c('edit')}</button>`;
-  const strip = person ? html`
-    <div class="og-strip">
-      <div>${row.last_message_at ? html`<b>${rel(row.last_message_at)}</b><span>${c('stripLastOne')}</span><small>${row.last_sender === row.contact_id ? '' : c('youWrote') + ' '}${row.last_message || ''}</small>` : html`<b>·</b><span>${c('stripLastOne')}</span><small>${c('noMessagesYet')}</small>`}</div>
-      <div><b>${tg ? tg.organisms.length : '·'}</b><span>${c('stripOrganisms')}</span><small>${tg ? (tg.organisms.map(o => o.name).join(' · ') || c('none')) : t('common.loading')}</small></div>
-      <div><b>${tg ? tg.agents.length : '·'}</b><span>${c('stripAgents')}</span><small>${tg ? (tg.agents.map(a => a.display_name || parts(a.gaii).agent).join(' · ') || c('none')) : t('common.loading')}</small></div>
-      <div><b>${tg ? tg.workspaces.length : '·'}</b><span>${c('stripWorkspaces')}</span><small>${tg ? (tg.workspaces.map(w => w.name).join(' · ') || c('none')) : t('common.loading')}</small></div>
-    </div>` : null;
+    ${mail ? (row.invitation ? html`<${Mark} tone="dim">${c('inviteSent', { when: day(row.invitation.created_at) })}<//>` : html`<${Loud} control disabled=${ctx.busy} onClick=${() => ctx.invite(row)}>${c('invite')}<//>`)
+      : html`<${Loud} onClick=${() => ctx.message(row.contact_id)}>${c('message')}<//>`}
+    <${Actions}>
+      ${person ? html`<${Tab} tone="fold" on=${ctx.orgChooser} pressed=${!!ctx.orgChooser} onClick=${() => ctx.toggleOrgChooser()}>${c('inviteToOrganism')}<//><${Action} small onClick=${() => ctx.openTab('organisms')}>${c('shareWorkspace')}<//>` : null}
+      <${Tab} tone="fold" on=${ctx.editing} pressed=${!!ctx.editing} onClick=${() => ctx.startEdit(row)}>${c('edit')}<//>
+    <//>`;
+  const loadingWord = t('common.loading');
+  const strip = person ? html`<${FigureStrip} items=${[
+    row.last_message_at
+      ? { key: 'last', n: rel(row.last_message_at), label: c('stripLastOne'), sub: `${row.last_sender === row.contact_id ? '' : c('youWrote') + ' '}${row.last_message || ''}` }
+      : { key: 'last', n: '·', label: c('stripLastOne'), sub: c('noMessagesYet') },
+    { key: 'orgs', n: tg ? tg.organisms.length : '·', label: c('stripOrganisms'), sub: tg ? (tg.organisms.map(o => o.name).join(' · ') || c('none')) : loadingWord },
+    { key: 'agents', n: tg ? tg.agents.length : '·', label: c('stripAgents'), sub: tg ? (tg.agents.map(a => a.display_name || parts(a.gaii).agent).join(' · ') || c('none')) : loadingWord },
+    { key: 'ws', n: tg ? tg.workspaces.length : '·', label: c('stripWorkspaces'), sub: tg ? (tg.workspaces.map(w => w.name).join(' · ') || c('none')) : loadingWord },
+  ]} />` : null;
   const sameRelation = row.relation ? ctx.people.filter(r => r.contact_id !== row.contact_id && r.relation === row.relation).slice(0, 5) : [];
-  const rail = html`
-    ${tg?.agents?.length ? html`<hr /><span class="og-rail-label">${c('railTheirAgents')}</span>${tg.agents.map(a => html`<button type="button" class="og-rail-link" key=${a.gaii} onClick=${() => ctx.message(a.gaii)}><i>→</i>${a.display_name || parts(a.gaii).agent}<em>${a.last_message_at ? rel(a.last_message_at) : ''}</em></button>`)}` : null}
-    ${sameRelation.length ? html`<hr /><span class="og-rail-label">${c('railSameRelation')}</span>${sameRelation.map(r => html`<button type="button" class="og-rail-link" key=${r.contact_id} onClick=${() => ctx.openPerson(r.contact_id)}><i>→</i>${nameOf(r)}<em></em></button>`)}` : null}`;
+  const railGroups = [
+    tg?.agents?.length ? { label: c('railTheirAgents'), items: tg.agents.map(a => ({ key: a.gaii, mark: '→', label: a.display_name || parts(a.gaii).agent, count: a.last_message_at ? rel(a.last_message_at) : '', onClick: () => ctx.message(a.gaii) })) } : null,
+    sameRelation.length ? { label: c('railSameRelation'), items: sameRelation.map(r => ({ key: r.contact_id, mark: '→', label: nameOf(r), count: '', onClick: () => ctx.openPerson(r.contact_id) })) } : null,
+  ];
   return renderPage(ctx, {
     crumbs: [nameOf(row)],
     label: html`${kindWord(row.kind)} · ${mail ? row.email : parts(row.contact_id).owner}${person ? html` · <${PresenceDot} ghii=${row.contact_id} />` : null}`,
-    title: nameOf(row), chips, doors, strip, rail,
+    title: nameOf(row), marks, doors, strip, railGroups,
+    after: html`<${ctx.ConfirmUI} />`,
     children: html`
       ${ctx.orgChooser ? orgChooser(ctx, row) : null}
       ${secKnow(ctx, row)}
       ${person ? secTogether(ctx, row, tg) : null}
       ${person || row.kind !== 'mail' ? secMessages(ctx, row) : null}
-      ${foldPermissions(ctx, row)}
-      <${ctx.ConfirmUI} />`,
+      ${foldPermissions(ctx, row)}`,
   });
 }
 
 function secKnow(ctx, row) {
-  const doors = ctx.editing ? null : html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.startEdit(row)}>${c('edit')}</button>`;
+  const doors = ctx.editing ? null : html`<${Action} small soft onClick=${() => ctx.startEdit(row)}>${c('edit')}<//>`;
   const verified = isPerson(row) && row.email;
+  // A thing the owner has not written down says so in grey (main's .ct-dim): the Facts' missing value.
   return html`
     <${PageSection} id="ct-know" num="01" title=${c('secKnow')} doors=${doors} first>
       ${ctx.editing ? personForm(ctx, { editing: true }) : html`
-        <div class="facts">
-          <div class="facts-k poster-label">${c('fEmail')}</div><div class="facts-v">${row.email || html`<span class="ct-dim">${c('unknown')}</span>`}${verified ? html` <small class="poster-hint">${c('verifiedOnAccount')}</small>` : null}</div>
-          <div class="facts-k poster-label">${c('fRelation')}</div><div class="facts-v">${row.relation || html`<span class="ct-dim">${c('unknown')}</span>`}</div>
-          <div class="facts-k poster-label">${c('fTags')}</div><div class="facts-v">${(row.tags || []).length ? html`<span class="poster-chips">${row.tags.map(x => html`<span class="poster-chip" key=${x}>${x}</span>`)}</span>` : html`<span class="ct-dim">${c('none')}</span>`}</div>
-          <div class="facts-k poster-label">${c('fLinks')}</div><div class="facts-v">${(row.links || []).length ? row.links.map((l, i) => html`<a key=${i} class="poster-action poster-action--more ct-link" href=${l.url} target="_blank" rel="noopener noreferrer">${l.label || l.url}</a>`) : html`<span class="ct-dim">${c('none')}</span>`}</div>
-          <div class="facts-k poster-label">${c('fNote')}</div><div class="facts-v">${row.note || html`<span class="ct-dim">${c('none')}</span>`}</div>
-        </div>
+        <${Facts} rows=${[
+          { k: c('fEmail'), v: row.email || c('unknown'), missing: !row.email, sub: verified ? c('verifiedOnAccount') : undefined },
+          { k: c('fRelation'), v: row.relation || c('unknown'), missing: !row.relation },
+          { k: c('fTags'), v: (row.tags || []).length ? html`<${Marks}>${row.tags.map(x => html`<${Mark} key=${x}>${x}<//>`)}<//>` : c('none'), missing: !(row.tags || []).length },
+          { k: c('fLinks'), v: (row.links || []).length ? html`<${Actions}>${row.links.map((l, i) => html`<${Action} tone="more" key=${i} href=${l.url} newTab noReferrer>${l.label || l.url}<//>`)}<//>` : c('none'), missing: !(row.links || []).length },
+          { k: c('fNote'), v: row.note || c('none'), missing: !row.note },
+        ]} />
         ${row.kind === 'mail' ? html`<${Hint}>${t('contacts.personHint')}<//>` : null}`}
     <//>`;
 }
@@ -106,24 +123,24 @@ function secTogether(ctx, row, tg) {
   const roleWord = (r) => c('role.' + (r === 'creator' ? 'creator' : r === 'admin' ? 'admin' : 'member'));
   return html`
     <${PageSection} id="ct-together" num="02" title=${c('secTogether')} count=${c('secTogetherSub')}>
-      ${!tg ? html`<p class="poster-quiet ct-loading">${t('common.loading')}</p>`
-        : !tg.organisms.length && !tg.agents.length ? html`<p class="poster-quiet">${c('togetherNone')}</p>`
-        : html`<div class="listing listing--name-name ct-where">
-            ${tg.organisms.map(o => { const ws = tg.workspaces.filter(w => w.organism_id === o.id); return html`<div class="listing-row" key=${o.id}><div class="listing-name">${o.name}<small class="listing-meta">${roleWord(o.role)}${ws.length ? ' · ' + ws.map(w => w.name).join(', ') : ''}</small></div></div>`; })}
-            ${tg.agents.map(a => html`<div class="listing-row" key=${a.gaii}><div class="listing-name">${a.display_name || parts(a.gaii).agent}<small class="listing-meta">${c('theirAgent')}${a.message_count ? ' · ' + c('messagedTimes', { n: a.message_count }) : ''}${a.last_seen ? ' · ' + c('seen', { when: rel(a.last_seen) }) : ''}</small></div></div>`)}
-          </div>`}
+      ${!tg ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : !tg.organisms.length && !tg.agents.length ? html`<${Note} kind="quiet">${c('togetherNone')}<//>`
+        : html`<${List} cols="name-name">
+            ${tg.organisms.map(o => { const ws = tg.workspaces.filter(w => w.organism_id === o.id); return html`<${Row} key=${o.id}><${Name} meta=${`${roleWord(o.role)}${ws.length ? ' · ' + ws.map(w => w.name).join(', ') : ''}`}>${o.name}<//><//>`; })}
+            ${tg.agents.map(a => html`<${Row} key=${a.gaii}><${Name} meta=${`${c('theirAgent')}${a.message_count ? ' · ' + c('messagedTimes', { n: a.message_count }) : ''}${a.last_seen ? ' · ' + c('seen', { when: rel(a.last_seen) }) : ''}`}>${a.display_name || parts(a.gaii).agent}<//><//>`)}
+          <//>`}
     <//>`;
 }
 
 function secMessages(ctx, row) {
   const thread = ctx.personData?.thread;
-  const doors = row.conversation_id ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openConversation(row.conversation_id)}>${c('openInMessages')}</button>` : null;
+  const doors = row.conversation_id ? html`<${Action} small soft onClick=${() => ctx.openConversation(row.conversation_id)}>${c('openInMessages')}<//>` : null;
   return html`
     <${PageSection} id="ct-messages" num="03" title=${c('secMessages')} count=${row.message_count ? `${row.message_count} · ${c('secMessagesSub')}` : null} doors=${doors}>
-      ${!row.conversation_id ? html`<p class="poster-quiet">${c('noMessagesYet')}</p><div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.message(row.contact_id)}>${c('writeFirst')}</button></div>`
-        : !thread ? html`<p class="poster-quiet ct-loading">${t('common.loading')}</p>`
-        : !thread.length ? html`<p class="poster-quiet">${c('noMessagesYet')}</p>`
-        : thread.slice(0, 3).map(m => html`<div class="ct-msg" key=${m.id}>${firstLines(m.body)}<small>${m.senderGhii === row.contact_id ? nameOf(row) : c('you')} · ${rel(m.createdAt)}</small></div>`)}
+      ${!row.conversation_id ? html`<${Note} kind="quiet">${c('noMessagesYet')}<//><${Actions}><${Action} small onClick=${() => ctx.message(row.contact_id)}>${c('writeFirst')}<//><//>`
+        : !thread ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : !thread.length ? html`<${Note} kind="quiet">${c('noMessagesYet')}<//>`
+        : html`<${List} cols="name">${thread.slice(0, 3).map(m => html`<${Row} key=${m.id}><${Desc} sub=${`${m.senderGhii === row.contact_id ? nameOf(row) : c('you')} · ${rel(m.createdAt)}`}>${firstLines(m.body)}<//><//>`)}<//>`}
     <//>`;
 }
 const firstLines = (s) => String(s || '').split(/\r?\n/).filter(l => l.trim()).slice(0, 3).join(' ').slice(0, 240);
@@ -131,10 +148,12 @@ const firstLines = (s) => String(s || '').split(/\r?\n/).filter(l => l.trim()).s
 function foldPermissions(ctx, row) {
   return html`
     <${FoldSection} id="ct-perm" num="04" title=${c('permTitle')} sub=${c('permSub')} open=${ctx.folds.perm} onToggle=${() => ctx.setFold('perm', !ctx.folds.perm)}>
-      <div class="facts">
-        ${row.kind !== 'mail' ? html`<div class="facts-k poster-label">${c('permGate')}</div><div class="facts-v">${stateWord(row)}<div class="og-doors"><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openTab('messages')}>${c('manageInMessages')}</button></div></div>` : null}
-        <div class="facts-k poster-label">${c('permRemove')}</div><div class="facts-v">${row.has_messages ? c('removeKeepsHistory') : row.kind === 'mail' ? c('removeDeletesCard') : c('removePlain')}<div class="og-doors"><button type="button" class="poster-action poster-action--small poster-action--danger" disabled=${ctx.busy} onClick=${() => ctx.remove(row)}>${c('removeFromBook')}</button></div></div>
-      </div>
+      <${Facts} rows=${[
+        row.kind !== 'mail' && { k: c('permGate'), v: stateWord(row),
+          actions: html`<${Action} small soft onClick=${() => ctx.openTab('messages')}>${c('manageInMessages')}<//>` },
+        { k: c('permRemove'), v: row.has_messages ? c('removeKeepsHistory') : row.kind === 'mail' ? c('removeDeletesCard') : c('removePlain'),
+          actions: html`<${Action} small tone="danger" disabled=${ctx.busy} onClick=${() => ctx.remove(row)}>${c('removeFromBook')}<//>` },
+      ]} />
     <//>`;
 }
 
@@ -144,11 +163,11 @@ function orgChooser(ctx, row) {
   const inAlready = new Set((ctx.personData?.together?.organisms || []).map(o => o.id));
   const candidates = list ? list.filter(o => !inAlready.has(o.id)) : null;
   return html`
-    <div class="ct-box poster-box">
-      <span class="poster-label">${c('inviteToOrganism')}</span>
-      ${!candidates ? html`<p class="poster-quiet ct-loading">${t('common.loading')}</p>`
-        : !candidates.length ? html`<p class="poster-quiet">${c('noOrganismsToInvite')}</p>`
-        : html`<div class="og-doors">${candidates.map(o => html`<button type="button" class="poster-action poster-action--small" key=${o.id} disabled=${ctx.busy} onClick=${() => ctx.inviteToOrganism(o, row)}>${o.name}</button>`)}</div>`}
+    <${Box}>
+      <${Label} block>${c('inviteToOrganism')}<//>
+      ${!candidates ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : !candidates.length ? html`<${Note} kind="quiet">${c('noOrganismsToInvite')}<//>`
+        : html`<${Actions}>${candidates.map(o => html`<${Action} small key=${o.id} disabled=${ctx.busy} onClick=${() => ctx.inviteToOrganism(o, row)}>${o.name}<//>`)}<//>`}
       <${Hint}>${c('inviteToOrganismHint', { name: nameOf(row) })}<//>
-    </div>`;
+    <//>`;
 }

@@ -19,6 +19,18 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.80.3 -- 2026-09-27 -- The offer card's .pf rules (.pf .of-card, :hover, --open, -title, .of-offer-title, .of-req, .of-md, .of-badge) leave with components/offer-card-view.js under its own names (css/components/offer-card-view.css, a move).
+ *   v1.80.2 -- 2026-09-27 -- The schedule calendar's rules (.pf .sch-cal-freq in the sections group, .pf .sch-cal-cell, -weekcol, their --today, -weekcol-head, -head) and .pf .pf-eco-auto-flow-card leave this file: they move, with the same .pf scope and values, into css/components/schedule-calendar.css and eco-automation.css under the components' own class names.
+ *   v1.80.1 -- 2026-09-27 -- .pf .sub-tabs goes: the Tabs component's row under a page head draws .tab-row--bar (tab-row.css, the same values), and the design lab keeps its own copy for its picture. .pf-edit-label .pf-edit-input goes to display-prefs-fields.css, .pf .agent-cta leaves the sections group for agent-consent.css, and .pf .input-sm leaves the fields group (ContactPicker's input is .contact-picker-input now; no page under .pf writes .input-sm): each under the component's own name, the same values.
+ *   v1.80.0 -- 2026-09-26 -- Page group G8: .pf-account-modal leaves the action and field lists (the account dialogs are the field kit), its eye and link places go, the DisplayPrefsFields field keeps its width on .pf-edit-label; .pf .pn-setup and .pf .pf-usage-card leave the section list (no user left).
+ *   v1.79.0 -- 2026-09-26 -- Page group G1a: .pf .pf-agd-form-actions, .pf .platform-tabs, .pf .platform-content,
+ *     .pf .agd-services-info, .pf .agd-service-card, .pf .pf-agd-crew-card, .pf .pf-agd-crew-tools-group leave their groups, and
+ *     .pf .pf-agd-tab-content (both), .pf .pf-agd-active and .pf .pf-agd-active-row go: the Agents page, its tasks, services and
+ *     crew draw only components now and nothing writes the classes.
+ *   v1.78.0 -- 2026-09-26 -- Page group G2a: .pf .pj-field > span and .pf .pj-form-group leave the row labels' group, and .pf .pf-skl-body-md, .pf .pf-skl-section-title and .pf .pf-skl-version go: a workspace's Skills panel and the organism forms draw only components now and nothing writes the classes.
+ *   v1.77.0 -- 2026-09-26 -- Page group G3: .pf .access-empty-row and .pf .mem-search-summary leave the rows group, .pf .mem-tools-section, .mem-detail, .mem-browse-panel and .mem-bulkbar the sections group, .pf .mem-discover-item the rows group: Memory and Access draw only components now and nothing writes the classes.
+ *   v1.76.0 -- 2026-09-26 -- Page group G1b: .pf .pf-agd-crew-live, .pf .pf-agd-governance-section and .pf .pf-agd-directives-content leave the sections group: the agent detail tabs draw only components now and nothing writes the classes.
+ *   v1.75.0 -- 2026-09-26 -- Page group G4: .pf .pf-or-section, .pf .pf-or-section-title, the living tab's .pf .pf-ld-pending, -charter-box, -editor, -chart and the notebook's .pf .pf-nb-suggest, -enrich, -plan-step, -note leave their groups: those pages draw only components now and nothing writes the classes.
  *   v1.74.0 -- 2026-09-26 -- The raw fields read the shape values: a one-line field's line --shape-frame-heavy and --shape-field-colour, a drop-down's and a text box's frame --shape-frame, --shape-field-colour and --shape-corner-control; a one-line field keeps its square corner, a line has none to show (a move: the AIMEAT values equal the old ones).
  *   v1.73.0 -- 2026-09-26 -- The configuration files leave the rows' group and their preview the boxes' group: they are the Listing and the Code block (a unification: Jouni's decision "File pick list").
  *   v1.72.0 -- 2026-09-26 -- The Connect prompts, a record field's object, a stored value, a try's answer and a sample prompt leave the frame groups: they are the Code block (a unification: Jouni's decision "Code block").
@@ -152,9 +164,7 @@
 .pf .pf-agd-section-title,
 .pf .pj-section-title,
 .pf .form-row label,
-.pf .detail-label,
-.pf .pj-field > span,
-.pf .pj-form-group { margin-bottom: 0.4rem; }
+.pf .detail-label { margin-bottom: 0.4rem; }
 /* A settings box's label (formerly .og-box-label) stands on its own line over the box's words. */
 .pf .og-box > .poster-label { display: block; margin-bottom: .3rem; }
 .pf .card-title { font-size: 1.05rem; letter-spacing: -0.01em; text-transform: none; color: var(--text); }
@@ -183,26 +193,25 @@
 .pf .empty, .portfolio-not-found { border: 3px dashed var(--text); border-radius: 0; font-weight: var(--font-poster-text-weight); color: var(--text); }
 
 /* ── The loud action is an ink slab; the quiet ones are underlined words ────────────────── */
-.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary, .pf-account-modal .btn-primary {
+.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary {
   background: var(--text); color: var(--bg);
   border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
   padding: 10px 16px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.pf .btn-primary:hover, .portfolio-container .btn-primary:hover, .portfolio-viewer-full .btn-primary:hover, .pf-account-modal .btn-primary:hover {
+.pf .btn-primary:hover, .portfolio-container .btn-primary:hover, .portfolio-viewer-full .btn-primary:hover {
   color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun);
 }
 .pf .btn-primary.success, .pf .btn-primary.copied { background: var(--success-fg); box-shadow: 4px 4px 0 var(--text); }
-.pf .btn-primary:disabled, .pf-account-modal .btn-primary:disabled { opacity: 0.45; transform: none; }
+.pf .btn-primary:disabled { opacity: 0.45; transform: none; }
 .pf .btn-outline,
 .pf .btn-ghost,
 .pf .btn-danger,
 .portfolio-container .btn-outline,
 .portfolio-container .btn-ghost,
 .portfolio-viewer-full .btn-ghost,
-.portfolio-viewer-full .btn-outline,
-.pf-account-modal .btn-outline {
+.portfolio-viewer-full .btn-outline {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
   padding: 0 0 1px; min-height: 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
@@ -212,8 +221,7 @@
 .pf .btn-ghost:hover,
 .portfolio-container .btn-outline:hover,
 .portfolio-container .btn-ghost:hover,
-.portfolio-viewer-full .btn-ghost:hover,
-.pf-account-modal .btn-outline:hover {
+.portfolio-viewer-full .btn-ghost:hover {
   background: none; color: var(--accent); border-color: var(--accent); box-shadow: none; transform: none;
 }
 .pf .btn-danger { color: var(--accent); border-color: var(--accent); }
@@ -221,10 +229,10 @@
 .pf .btn-outline.copied, .pf .btn-ghost.copied { color: var(--success-fg); border-color: var(--success-fg); }
 .pf .btn-sm { padding: 0 0 1px; font-size: 0.74rem; }
 .pf .btn-primary.btn-sm { padding: 7px 12px; }
-.pf .form-actions, .pf .pf-agd-form-actions, .portfolio-prompt-actions, .portfolio-paste-actions { gap: 0.6rem 1.6rem; align-items: center; }
+.pf .form-actions, .portfolio-prompt-actions, .portfolio-paste-actions { gap: 0.6rem 1.6rem; align-items: center; }
 
 /* ── Fields: an underline for one line, an ink box for many ────────────────────────────── */
-.pf .input-field, .portfolio-container .input-field, .pf .input-sm {
+.pf .input-field, .portfolio-container .input-field {
   background: transparent; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); border-radius: 0;
   padding: 8px 0; font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text);
 }
@@ -252,8 +260,6 @@
 .pf .badge-muted { border-color: var(--border); color: var(--text-dim); }
 
 /* ── Tabs inside a tab: underlined words, the open one on the sun ───────────────────────── */
-.pf .sub-tabs,
-.pf .platform-tabs { gap: .4rem .9rem; align-items: center; border-bottom: 0; padding: 0; margin-bottom: 1.2rem; }
 /* A row of tabs (Jouni's decision "Tabs and filters"): the tabs are .poster-tab; this only lays them out. */
 .pf-tabs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; min-width: 0; }
 .pf .tab {
@@ -266,13 +272,10 @@
 .pf .tab.active {
   background: var(--sun); color: var(--on-sun); border-bottom-color: var(--text); font-weight: var(--font-poster-strong-weight);
 }
-.pf .pf-agd-tab-content { padding: 1rem 0; }
 
 /* ── Lists: one rule per row, the row's own words in bold ───────────────────────────────── */
 .pf .mem-item,
-.pf .kv-row,
-.pf .access-empty-row,
-.pf .mem-search-summary {
+.pf .kv-row {
   background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none;
   padding: 0.75rem 0; font-weight: var(--font-poster-text-weight);
 }
@@ -285,13 +288,11 @@
 /* ── An agent, opened: an ink frame with a sun shadow, its zones ruled inside ───────────── */
 
 /* ── The fleet board above the agent list: a ruled grid of names, the state as a left stripe ── */
-.pf .pf-agd-active { background: none; border-radius: 0; padding: 0.9rem 0 0.5rem; }
 .tag-pill {
   border-radius: 0; border: 2px solid var(--text); background: none; color: var(--text);
   font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; padding: 1px 8px;
 }
 .tag-pill--active, .tag-pill.active { background: var(--sun); color: var(--on-sun); }
-.pf .pf-agd-active-row { border-radius: 0; border-bottom: 1px solid var(--border); }
 /* The install row (components/McpInstall) outside an aside: an ink frame. It also reaches the home's
    first steps. An agent's quick-connect box and its one-liner draw their own look (Jouni's decision
    "MCP guide", the option classic). */
@@ -320,11 +321,9 @@
 .pf .pagination { font-family: var(--font-mono); }
 
 /* ── Dialogs ────────────────────────────────────────────────────────────────────────────── */
-/* The frame, header, X and footer of every dialog are /css/dialog.css. What stays here is how the
-   account dialogs' fields look; those dialogs also open from Home, outside the profile shell. */
-.pf-account-modal .pf-edit-input { width: 100%; min-width: 0; box-sizing: border-box; }
-.pf-account-modal .pf-pw-eye { right: 0; top: 0; bottom: 3px; transform: none; margin: auto 0; height: fit-content; }
-.pf-account-modal .pf-edit-link { align-self: flex-start; width: fit-content; }
+/* The frame, header, X and footer of every dialog are /css/dialog.css. The account dialogs' fields
+   are the field kit now (page group G8); the display preferences' fields are
+   css/components/display-prefs-fields.css. */
 
 /* ── The portfolio builder and the viewer chrome (outside .pf) ──────────────────────────── */
 .portfolio-step { padding-top: 1.4rem; margin-bottom: 2.4rem; }
@@ -369,8 +368,6 @@
 .portfolio-profile-head h2 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.4rem; text-transform: uppercase; letter-spacing: var(--font-poster-tracking); }
 
 /* ── What the browser tour of 2026-08-29 added: the agents tab's details ────────────────── */
-.pf .pf-agd-tab-content { padding-top: 0.5rem; }
-.pf .pf-agd-tab-content > :first-child { margin-top: 0; }
 .pf input:not([type]) {
   background: transparent; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); border-radius: 0;
   padding: 8px 0; font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text); outline: none;
@@ -384,65 +381,26 @@
    prefix the view sheets use, so the cascade order decides. */
 /* Sections: a rule on top, no frame */
 .pf .sch-form,
-.pf .sch-cal-freq,
-.pf .pf-nb-suggest,
-.pf .pf-nb-enrich,
-.pf .pf-nb-plan-step,
-.pf .pf-ld-pending,
-.pf .pf-ld-charter-box,
-.pf .pf-ld-editor,
-.pf .pf-ld-chart,
-.pf .pf-agd-crew-live,
-.pf .pf-agd-crew-tools-group,
-.pf .mem-tools-section,
-.pf .mem-detail,
-.pf .mem-browse-panel,
-.pf .mem-bulkbar,
-.pf .pn-setup,
-.pf .agent-cta,
-.pf .create-form,
-.pf .platform-content,
-.pf .pf-agd-governance-section,
-.pf .agd-services-info,
-.pf .pf-agd-directives-content,
-.pf .pf-usage-card {
+.pf .create-form {
   background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
 /* Rows: one rule under each, the row's own words in bold */
-.pf .of-card,
-.pf .pf-nb-note,
-.pf .mem-discover-item,
 .pf .app-card,
 .pf .post-card,
-.pf .agd-service-card,
-.pf .pf-agd-crew-card,
 .pf .mbr-card,
 .pf .pf-agd-quality-review-row {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0;
 }
-.pf .of-card:hover,
 .pf .app-card:hover,
 .pf .mbr-card:hover {
   transform: none; box-shadow: none; border-color: var(--accent); background: none;
 }
-.pf .of-card--open { border-bottom-color: var(--accent); }
-.pf .of-card-title,
-.pf .of-offer-title { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
-/* Boxes: the ink frame for a thing that must read as one object (a preview, a sample, a schema) */
-.pf .of-req,
-.pf .of-md {
-  border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
-}
+/* The offer card's row, box and chip (.pf .of-*) are the component's: css/components/offer-card-view.css. */
 /* Chips: square, mono, the colour kept as the frame */
-.pf .of-badge,
 .pf .brd-member-tag {
   border-radius: 0; background: none; border: 2px solid currentColor;
   font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
 }
-/* The calendar */
-.pf .sch-cal-cell, .pf .sch-cal-weekcol { border-radius: 0; border: 2px solid var(--border); background: none; }
-.pf .sch-cal-cell--today, .pf .sch-cal-weekcol--today { border-color: var(--text); }
-.pf .sch-cal-weekcol-head, .pf .sch-cal-head { background: none; border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); }
 /* The message tab: square panes and bubbles; inbox-poster.css sets the face. */
 .inbox-body { border-radius: 0; box-shadow: none; }
 .inbox-bubble { border-radius: 0; border: 2px solid var(--border); }
@@ -455,21 +413,12 @@
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0; margin-bottom: 0;
 }
 /* Sections and panels */
-.pf .pf-or-section, .pf .pf-eco-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp {
+.pf .pf-eco-section, .pf .pf-eco-mcp {
   background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
-/* A skill's body is the Object box's copy tone; this keeps its place. */
-.pf .pf-skl-body-md { margin: 0; overflow: visible; }
-.pf .pf-or-section-title,
-.pf .pf-eco-section-title,
-.pf .pf-skl-section-title {
+.pf .pf-eco-section-title {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
   font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
-}
-/* Chips */
-.pf .pf-skl-version {
-  border-radius: 0; background: none; border: 2px solid currentColor; color: var(--text);
-  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
 }
 /* ── The starter card: "begin with two agents" ──────────────────────────────────────────────
    It was written in the classic shell in September, after this skin, and named nothing this file

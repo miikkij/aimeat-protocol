@@ -1,0 +1,68 @@
+/**
+ * @file figure.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The figure, the meter and a word in a state colour, drawn by components/Figure.js. The
+ *   numeral's face and cuts, the sticker and the meter's fill are the library's shapes in poster.css
+ *   (.poster-stat-number, .poster-sticker, .poster-box--meter, .poster-meter-figure); this sheet holds
+ *   what the pages' own rules gave them in every place: the numeral standing in a cell, its line under
+ *   it, its state colours, and the meter's size. Reads only theme tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.3.0 — 2026-09-26 — Tinted's whole cut (.tinted--whole), from main's .ac-shost-h (additive, page group G3).
+ *   v1.2.0 — 2026-09-26 — The quota meter's early warn step (.is-warn, --warn from 60 %), from main's
+ *     .pf-or-spend-bar-fill.warn (additive, page group G4).
+ *   v1.1.0 — 2026-09-26 — Tinted's faint tone (--border), the Scheduler's "never" (additive, page group G5).
+ *   v1.0.0 — 2026-09-26 — Initial, with the values the pages' own rules held (component plan C4):
+ *     - .figure: every Settings figure in a cell set margin-right 0 (wallet .wal-amt, data wallet
+ *       .dw-n, scheduler .sc-at, .sc-n, offers .op-at, discover .dv-at, .dv-n, calibrator .cal-ver-n,
+ *       .cal-pct, access .ac-n, apps .ap-kn-n, space table .og-tbl-n).
+ *     - its line under it: .66rem, .15rem above, weight 400 (wallet, data wallet, calibrator: 3 pages;
+ *       scheduler, offers and discover drew .7rem with .2rem above: 3 pages; the tie goes to the cut
+ *       the library already held in prompt-versions.css).
+ *     - end: right-aligned on one line (wallet .wal-amt, data wallet .dw-n, space table .og-tbl-n).
+ *     - tones: fine (wallet .is-in, data wallet and calibrator .is-good), notice (wallet .is-out, data
+ *       wallet and calibrator .is-low, apps .ap-kn-n--loud), dim (wallet and calibrator .is-dim).
+ *     - the meter: 18px (memory .pf-mem-quota-bar, overview .pf-usage-bar: 2 of 3 bare meters); the
+ *       thin cut 12px with .35rem around it (agents .pf-agd-progress-bar); a meter with words on it
+ *       1.5rem with the words at 1.3rem (wallet .wal-bar, the source of the meter figure's look; the AI
+ *       tab's 1.6rem and the classic budget's 20px take it); beside (wallet 15rem, the whole width
+ *       under 860px); fill (the classic budget .pf-or-spend-bar: the rest of the line, 200px at least).
+ *     - Tinted: fine is --success-fg, notice --accent, warn --warn-fg, danger --danger-fg, dim
+ *       --text-dim (portfolio .is-on and .is-off, offers .op-st--err, wallet's strip .is-good and
+ *       .is-low, extensions .is-dim).
+ */
+
+/* ── The figure in a cell ─────────────────────────────────────────────────────────────────── */
+.figure { margin-right: 0; }
+.figure small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
+.figure--end { display: block; text-align: right; white-space: nowrap; }
+.figure--fine { color: var(--success-fg); }
+.figure--notice { color: var(--accent); }
+.figure--dim { color: var(--text-dim); }
+
+/* ── The meter's size ─────────────────────────────────────────────────────────────────────── */
+.meter { position: relative; height: 18px; overflow: hidden; }
+.meter svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.meter--thin { height: 12px; margin: .35rem 0; }
+.meter--figure { height: 1.5rem; }
+.meter--figure .poster-meter-figure { line-height: 1.3rem; }
+.meter--beside { flex: 0 0 15rem; }
+.meter--fill { flex: 1; min-width: 200px; }
+/* Early: a quota meter that warns from 60 % before it turns red at 90 % (main's AI budget bar). */
+.poster-box--quota.is-warn rect { fill: var(--warn); }
+
+@media (max-width: 860px) {
+  .meter--beside { flex-basis: auto; }
+}
+
+/* ── A word or a number in a state colour ─────────────────────────────────────────────────── */
+.tinted--fine { color: var(--success-fg); }
+.tinted--notice { color: var(--accent); }
+.tinted--warn { color: var(--warn-fg); }
+.tinted--danger { color: var(--danger-fg); }
+.tinted--dim { color: var(--text-dim); }
+/* Faint: a word that says nothing is there ("never"), in the rule's grey (the Scheduler's .og-tbl-dot). */
+.tinted--faint { color: var(--border); }
+/* Whole: words kept on one line, never broken inside (one label of a host name, Access's .ac-shost-h). */
+.tinted--whole { white-space: nowrap; }

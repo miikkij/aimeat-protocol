@@ -10,6 +10,15 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.70.2 — 2026-09-27 — The instruction block's entry id is instruction-block (formerly hello-mcp).
+ *   v1.70.1 — 2026-09-27 — The list and conversation family's words: List, Message, MessageComposer, MessageFile,
+ *     MessageQuestions, ConversationList, ConversationPane.
+ *   v1.70.0 — 2026-09-27 — Settings & Controls on components: the kit's parts and the special views get their words;
+ *     the parts no page draws any more go (page row, tier list, uses list, sent log, delegation lines, app
+ *     picker, item grid, access log, heatmap, to-do list, crew DAG, drag grip, figure door, requirement list,
+ *     organism timeline, organism row, comments, record row, people list, app cards, calibration run, prompt
+ *     versions, offer lines, offer hits, package preview, notification feed, how roads, device list, agent chip,
+ *     search hits); the box and choice shapes are box-shape and choice-shape.
  *   v1.69.0 — 2026-09-26 — The Check line: edit, pick (Jouni's decision "Check line").
  *   v1.68.0 — 2026-09-26 — The Sub-heading: explain (Jouni's decision "Sub-heading").
  *   v1.67.0 — 2026-09-26 — The Job prompt: view (Jouni's decision "Box").
@@ -105,7 +114,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     // The older shared parts
     'card-menu': ['act'], markdown: ['view'], 'ai-label': ['explain', 'status'], 'voice-recorder': ['converse', 'act'],
     'image-deliverable': ['view'], 'install-cta': ['notify', 'act'], 'managed-env': ['explain'], 'mcp-install': ['copy', 'explain'],
-    'hello-mcp': ['explain', 'act'], 'contact-picker': ['pick', 'search'], tags: ['pick', 'list'], 'app-sandbox': ['view', 'open'],
+    'instruction-block': ['explain', 'copy'], 'contact-picker': ['pick', 'search'], tags: ['pick', 'list'], 'app-sandbox': ['view', 'open'],
     'own-aimeat': ['explain', 'navigate'],
     // The shell and the parts catalogued on 2026-09-24
     'page-base': ['layout'], 'top-bar': ['navigate', 'notify'], button: ['act'], 'copy-button': ['copy'], card: ['layout', 'view'],
@@ -121,53 +130,58 @@ export const USE_OF: Record<string, UiUse[]> = {
     // Settings & Controls (phase 5)
     'settings-frame': ['layout', 'navigate'], 'side-menu': ['navigate', 'count'],
     'tab-page': ['layout', 'navigate'], 'crumb-trail': ['navigate'], 'page-head': ['explain', 'act'], 'figure-strip': ['count'],
-    'page-section': ['layout'], 'fold-row': ['list', 'open'], 'setting-box': ['edit', 'confirm'], 'form-fields': ['edit'],
+    'page-section': ['layout'], 'fold-row': ['open', 'layout'], 'setting-box': ['edit', 'confirm'], 'form-fields': ['edit'],
     'space-table': ['list', 'open'], facts: ['view'], listing: ['list', 'open', 'act'], 'search-line': ['search'],
     'code-block': ['view', 'copy'], 'form-message': ['status', 'notify'], switch: ['edit', 'status'], 'select-field': ['pick', 'edit'],
-    'page-row': ['view', 'open'], 'proof-ledger': ['list', 'status'], changelog: ['list'], 'tier-list': ['explain'], 'uses-list': ['explain', 'status'], 'sent-log': ['list', 'status'], 'delegation-lines': ['list', 'act'], 'app-picker': ['pick'], 'item-grid': ['view', 'count'], 'access-log': ['list', 'status'], 'address-preview': ['status', 'explain'], 'loading-mark': ['wait'], 'more-line': ['navigate', 'count'],
-    heatmap: ['view', 'compare'], 'colour-tag': ['pick', 'status'], 'doc-tree': ['navigate', 'list'], 'file-preview': ['view', 'open'], 'file-drop': ['pick', 'edit'], 'tag-input': ['edit'],
-    'todo-list': ['list', 'status'], 'crew-dag': ['view', 'explain'], 'gaii-chip': ['copy', 'view'], 'drag-grip': ['act', 'list'],
+    'proof-ledger': ['list', 'status'], changelog: ['list'], 'address-preview': ['status', 'explain'], 'loading-mark': ['wait'], 'more-line': ['navigate', 'count'],
+    'colour-tag': ['pick', 'status'], 'doc-tree': ['navigate', 'list'], 'file-preview': ['view', 'open'], 'file-drop': ['pick', 'edit'], 'tag-input': ['edit'],
+    'gaii-chip': ['copy', 'view'],
     'model-picker': ['pick', 'search'],
     'schedule-calendar': ['view', 'navigate'],
     'eco-automation': ['edit', 'status'],
     'signed-out-door': ['navigate', 'explain'],
-    'figure-door': ['count', 'navigate'],
-    'requirement-list': ['status', 'explain'],
-    'org-timeline': ['view', 'list', 'pick'],
     'progress-steps': ['wait', 'status'],
-    'org-row': ['list', 'open', 'act'],
-    comments: ['list', 'edit'],
     'key-name': ['view'],
-    'record-row': ['list', 'open', 'edit'],
-    'people-list': ['list', 'view'],
-    'app-cards': ['open', 'list'],
-    'calibration-run': ['view', 'compare'], 'prompt-versions': ['list', 'edit'],
     'score-chart': ['view', 'compare'],
-    'offer-lines': ['list', 'status'],
     'offer-map': ['list', 'navigate'],
     'offer-request': ['act', 'status'],
     'rating-stars': ['edit', 'pick'],
-    'offer-hits': ['search', 'list'],
     'week-rhythm': ['view', 'list'],
     'job-chips': ['list', 'navigate'],
     'workflow-steps': ['list', 'status'],
     'board-notices': ['list', 'view'],
     'knowledge-entry': ['view', 'open'],
-    'package-preview': ['view', 'confirm'],
     'field-row': ['edit', 'act'],
     'job-prompt': ['view'],
     'sub-heading': ['explain'],
     'check-line': ['edit', 'pick'],
     'morsel-flow': ['count', 'view'],
-    'notification-feed': ['list', 'notify'],
-    'how-roads': ['explain', 'navigate'],
     'question-desk': ['search', 'pick'],
-    'device-list': ['list', 'status'],
-    'agent-chip': ['list', 'status'],
-    'search-hits': ['search', 'list', 'open'],
+    // The kit of Settings & Controls on components (2026-09-27): one block per family, each filled by its own hand.
+    // KIT (Action, Mark, Note, Box, Avatar, Roads, Figure)
+    'action-component': ['act', 'navigate', 'copy'], mark: ['status', 'explain', 'count'],
+    note: ['explain', 'status', 'wait', 'notify'], box: ['view', 'layout', 'confirm'], avatar: ['view'],
+    roads: ['pick', 'act', 'copy'], figure: ['count', 'status'],
+    // FIELDS (Field, TextField, Choice)
+    field: ['edit', 'layout'], 'text-field': ['edit', 'search'], choice: ['pick', 'edit'],
+    // PAGE KIT (SettingsPage, Section, Folds, Tabs, Layout, ContentsTree)
+    'settings-page': ['layout', 'navigate'], 'section-component': ['layout', 'open'], folds: ['list', 'open'],
+    'tab-row': ['pick', 'navigate'], layout: ['layout'], 'contents-tree': ['navigate', 'count'],
+    // LIST AND CONVERSATION (List, Message, MessageComposer, MessageFile, MessageQuestions, ConversationList)
+    list: ['list', 'open', 'pick', 'search', 'act', 'count'], message: ['converse', 'view', 'copy'],
+    'message-composer': ['converse', 'edit'], 'message-file': ['view', 'open'], 'message-questions': ['pick', 'converse'],
+    'conversation-list': ['list', 'navigate', 'pick'], 'conversation-pane': ['layout', 'converse', 'navigate'],
+    // KNOWLEDGE VIEWS (organisms, documents, account)
+    'activity-calendar': ['view', 'count'], people: ['list', 'view'], 'snapshot-timeline': ['compare', 'pick', 'view'],
+    'mind-map': ['view', 'navigate'], 'doc-view': ['view', 'edit'], 'qr-code': ['view'], 'code-grid': ['view', 'copy'],
+    'stored-value': ['view'], 'page-preview': ['view', 'wait'], 'number-band': ['count', 'navigate'],
+    'open-card': ['open', 'view', 'navigate'], 'how-to': ['explain'], 'setup-guide': ['explain', 'pick', 'copy'],
+    // WORK VIEWS (automation, offers, calibrator)
+    'task-graph': ['view', 'status'], 'series-bars': ['view', 'compare', 'count'], peek: ['view', 'open'],
+    'plan-steps': ['list', 'act', 'pick'], 'run-view': ['view', 'compare', 'open', 'act'], 'step-strip': ['status', 'navigate'],
     // The shapes of poster.css
     'page-title': ['explain'], section: ['layout'], panel: ['layout'], row: ['layout', 'list'], label: ['explain'],
-    action: ['act', 'navigate', 'pick'], slab: ['act'], icon: ['act'], 'menu-row': ['pick', 'act'], box: ['view'], frame: ['view'], record: ['view', 'open'], choice: ['pick'],
+    action: ['act', 'navigate', 'pick'], slab: ['act'], icon: ['act'], 'menu-row': ['pick', 'act'], 'box-shape': ['view'], frame: ['view'], record: ['view', 'open'], 'choice-shape': ['pick'],
     sticker: ['status', 'navigate'], aside: ['explain', 'notify'], chip: ['status'], status: ['status'], crumb: ['navigate'], count: ['count', 'status'],
     time: ['view'], stat: ['count', 'navigate'], 'showroom-band': ['layout'], 'showroom-section': ['layout'],
     'showroom-door': ['navigate'], 'showroom-slab': ['act'],

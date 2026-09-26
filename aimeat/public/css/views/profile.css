@@ -6,6 +6,20 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.162.2 -- 2026-09-27 -- Components draw only their own class names: .pf .sub-tabs (Tabs bar: tab-row.css .tab-row--bar), .pf-edit-label (DisplayPrefsFields: display-prefs-fields.css), .pf .agent-cta and its h3 and p, .pf .pf-device-code, .agc-preset-desc, .agc-boundary and the utilities only AgentConsent still wrote (.pf .flex-row, .pf .text-caption, .pf .mb-1, .pf .mb-half, .pf .p-1, .pf .mt-1; agent-consent.css) go. .pf .text-meta and .input-field.input-sm stay: other pages write them (the invitation page writes .input-sm). The list in v3.162.0 no longer closes this comment early (its star and slash after .pf-edit- did).
+ *   v3.162.1 -- 2026-09-27 -- .mmd and .mmd-fallback leave with the Mermaid component under its own names (css/components/mermaid.css, .mermaid-diagram and .mermaid-fallback, a move).
+ *   v3.162.0 -- 2026-09-26 -- Page group G8 (Settings overview, P&L, Nodes, Node stats, the AI tab's cards, shared.js): the rules of their classes go with their last user: .pf .vis-pill (Mark onClick, mark.css), the kebab menu (.pj-menu*, CardMenu), the nodes' .pn-* and radio rules, node stats' .pf-figures and .stat-*, the AI cards' .pf-aitr-*, .pf-dr-*, .pf-cmp-* (BoxList, BoxLine, Touch), P&L's .pf-pnl-* and .pf-acc-*, the overview's .pf-lp-* (moved unchanged to number-band.css), .pf-fed-dot, .pf-presence-pill-* (moved unchanged to presence-dot.css), .pf-next, .pf-cortex-*, .pf-landing-section, .pf-menu-title, the dialogs' .pf-edit-*, .pf-pw-*, .pf-presence-*, .pf-waiting*, .pf-home-*, .pf-usage-*, .pf-ai-*, .pf-promo-dismiss, .pf-avatar-* (moved to masthead.css), .pf-start-page (start-page.css footer) and the overview's font rule. .pf-edit-label stays (DisplayPrefsFields writes it).
+ *   v3.161.0 -- 2026-09-26 -- Page group G1a: the Agents page, its scope dialog and one agent's AI settings draw
+ *     only components now, so .agent-prompt-box, .platform-instructions, .platform-tabs, .platform-content (its
+ *     words move to css/components/how-to.css), the scope dialog's .scope-* rules, .pf-chevron, .pf-chevron-open,
+ *     .pf-agent-divider, .pf .gh-mark and .pf-aai* (its 44px targets are Layout's Touch with its tabs) go:
+ *     nothing writes them.
+ *   v3.160.0 -- 2026-09-26 -- Page group G5: the Ecosystem apps tab and the Chat sessions tab draw only components now, so .pf-eco-dim, .pf-eco-pending, -title, .pf-eco-valid, the width rule of the automation's, subscription's and pending selects, .pf-eco-empty, .pf-eco-row.pf-eco-card-revoked (the List's faded row), .pf-eco-section, -title, .pf-eco-sub-row, -add, -direction, .pf-eco-data, -key, -row, -time, -body, .pf-eco-recipe-agents, -agent, -toggle, -radios, -radio, -radio-title, .pf-eco-rec-* (the recommended agent picker), .pf-eco-revoke-input, .pf-eco-adv-* (the advisories, now row boxes), .pf-eco-mcp* (the MCP promo, now the Box), .pf-eco-tech* (the technical details, now the Box), .cs-create-body, .cs-create-desc, and .cs-row and .pf-eco-row in the toggle rows' selector go: nothing writes them. .pf-eco-auto-how, -steps, -doc and .pf-eco-setup-guide-md stay for the design lab's conflict samples.
+ *   v3.159.0 -- 2026-09-26 -- Page group G2b: a workspace's cover, its pages, its document and record spaces, its settings, share and review panels, the workspace list, the apps strip, the document view and editor and the map draw only components now, so .pj-ws, .pj-gate-label, .pj-inbox, .pj-section, -head, -title, .pj-space-notice, .pj-rec-field-text, -list, .pj-rec-json, .pj-rec-empty, .pj-errors, .pj-share-* , .pj-space-name, .pj-doc-view (+ its reading width), .pj-doc-meta, .pj-ws-bar, .pj-ws-name-input, .pj-spaces-add, .pj-space-row, .pj-doc-editor, .pj-doc-grid, .pj-doc-preview, .pj-divider, .pj-danger, -title, .pj-doc-toolbar, .pj-doc-vtitle, .pj-tui, .pj-doc-imgbar, .pj-file-btn, -icon, .pj-img-vis, -head, .pj-obj*, .pj-mindmap*, .pj-mm-* and .pj-apps-strip, -head, -empty, -picker go: nothing writes them. The map's rules move to css/components/mind-map.css, the document's to css/components/doc-view.css.
+ *   v3.158.0 -- 2026-09-26 -- Page group G2a: the organisms list, an organism's home and settings, its members, agents, invitations, board preview, README, timeline, structure map, and a workspace's People, Activity, Sources and Skills panels and record form draw only components now, so .pj-joined-banner, -actions, .pj-contract-agents, .pj-adopt-btn, .pj-eng, .pj-retire-btn, .pj-draft-form, .pj-empty, .pj-org-globalsearch, .pj-field, -inline, -invalid, .pj-chart, -head, -title, .pj-access, -title, -note, -add, .pj-act, -count, .pj-hidden-input, .pj-sources-desc, .pj-src-*, .pj-org-topbar-actions, .pj-org-sort, .pj-struct-overview, -body, .pj-readme-empty, -bar, -actions, .pj-timeline-body, .pj-tabhead, -desc, .pj-attach, .pj-invite-btns, .pj-eminvite*, .pj-invpanel-accept, .pj-member-access, .pj-orgsearch, .pj-board-composer, -input, .pj-meta-line, .pj-form-group, .pj-form-card and .pj-members-cap go: nothing writes them. .pj-readme, .pj-part-owner, .pj-org-desc and the .pj-search-group* rules stay for the design lab's samples.
+ *   v3.157.0 -- 2026-09-26 -- Page group G3: Memory, Access, Security and Usage draw only components now, so the memory list's rules (.mem-group*, .mem-item--grouped, .mem-detail*, .mem-shares, .mem-share-row, .mem-row-check, .mem-vis-pop, .mem-vis-select, .mem-bulkbar*, .mem-actions, .mem-delete-btn, .mem-edit-textarea*, .mem-time, .mem-sort-*, .mem-tools-*, .mem-import-group, .mem-bottom-bar, .mem-new-btn, .mem-search-summary, .key-rules-box), the browse and discover panels (.mem-browse-*, .mem-discover-*), the cart (.mem-cart*), .pf-mem-quota*, .pf-mem-size, .file-tag-cloud, .mem-file-search, .access-empty-row, .access-fed-add, .access-cx-own*, .access-cx-add, .sg-row (from the toggle rows' selector), .pf-2fa-* (now QrCode, CodeGrid and list rows), .pf-ureport-*, .pf-textarea-sm, .pf-code-break, .pf-nowrap, .pf-shrink-0, .pf-hidden and .pf-label-inline go: nothing writes them. .mem-item and .mem-key stay (agents/agent-defaults-section.js), .pf-bold and .pf-flex-fill stay (the design lab's samples).
+ *   v3.156.0 -- 2026-09-26 -- Page group G1b: .pj-danger-box, -row, -text, -sub and -confirm go: the agent config tab's delete zone is the SettingBox now and nothing writes them (.pj-danger and .pj-danger-title stay for the workspace panels).
+ *   v3.155.0 -- 2026-09-26 -- Page group G4: the classic AI settings (openrouter-settings.js, openrouter/budget-panel.js) and the Services tab draw only components now, so every .pf-or-* rule, .svc-row (from the toggle rows' selector), .svc-detail-code (the Code block's scroll cut), .pf-select-narrow and .action-bar (with its phone lines) go: nothing writes them.
  *   v3.154.0 -- 2026-09-26 -- The overview's figure words read --shape-case-label and the label spacing (* .8, .08em) (a move: the AIMEAT values equal the old ones).
  *   v3.153.0 -- 2026-09-26 -- A rule's and an advisory's lines are the Listing's (.listing-meta): .pf-aitr-row-meta's size and colour and .pf-eco-adv-meta go (a unification: Jouni's decision "Meta line").
  *   v3.152.0 -- 2026-09-26 -- Check lines are the Check line (css/components/check-line.css): the sizes, weights and colours of the permission words, the classic AI radio and retry, the review gate, the share rows, the map options, the invite choice, the recipe choices and the decision rule's gate go; their rows stay (a unification: Jouni's decision "Check line").
@@ -296,7 +310,6 @@
  *     -save), .pf-eco-auto-how(-toggle/-lead/-steps/-doc), .pf-eco-auto-produces(-cap),
  *     .pf-eco-auto-status(-timeline/-step/-head/-dot/-dot-* /-label/-body/-agents/-note/-chip/-pending-count),
  *     .pf-eco-auto-status-{ok,wait,off,error}.
-.pf .pf-usage-exhausted{margin:.25rem 0 .5rem;display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}
  *   v2.1.0 — 2026-06-15 — Ecosystem Setup playbook + MCP promo (top of expanded card):
  *     .pf-eco-setup(-lead/-progress/-progress-chip/-steps/-step/-step-done/-dot/-dot-done/-dot-wait/
  *     -step-body/-step-title/-step-why/-step-note/-cta), .pf-eco-mcp(-head/-icon/-title/-sub/-connect/
@@ -415,92 +428,15 @@
    keys read like an error log and burned out red's alarm meaning. */
 /* A key's face is the Key (.key-name, css/components/key-name.css); these keep only their place. */
 .pf .mem-key{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* ── Grouped key list (2026-06-10): collapsible groups by first key segment ── */
-.pf .mem-group{margin-bottom:.35rem}
-/* A group's head is the folded row (og-fold, css/components/fold-row.css); it keeps its pointer. */
-.pf .mem-group-header{cursor:pointer}
-.pf .mem-item--grouped{padding-left:1.4rem;cursor:pointer}
-.pf .mem-detail-key{margin-bottom:.4rem;word-break:break-all}
-.pf .mem-detail-visrow{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}
-
-/* Every share that reaches this key, each with the way to end it. A share is a rule over a pattern,
-   so the row names the pattern rather than pretending one record can be unshared on its own. */
-.mem-shares { display: flex; flex-direction: column; gap: 4px; }
-.mem-share-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.pf .mem-row-check{flex:none;margin:0 .15rem 0 0;cursor:pointer}
-.pf .mem-vis-pop{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem .75rem;margin:.25rem 0 .25rem 1.4rem;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm)}
-.pf .mem-bulkbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.45rem .75rem;margin-bottom:.5rem;background:var(--bg-surface,var(--bg-dim));border-radius:8px}
-.pf .mem-bulkbar-count{font-size:.82rem;font-weight:600;color:var(--text)}
-.pf .mem-actions .mem-delete-btn{margin-left:auto}
-.pf .mem-vis-select{min-width:auto;width:auto}
-.pf .mem-edit-textarea{min-height:280px}
-.pf .mem-edit-textarea--error{border-color:var(--danger-fg,#DC2626)}
 .pf .tag-pill.tag-more{border-style:dashed;color:var(--text-dim)}
 /* A removable tag and its x (.tag-removable, .tag-x) are the tag editor's: css/components/tags.css. */
-/* ── Access tab polish (2026-06-10): neutral headers, compact empties, fed coupling ── */
-.pf .access-empty-row{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}
-.pf .mem-time { white-space:nowrap; flex-shrink:0; }
-.pf .mem-sort-bar{display:flex;align-items:center;gap:.35rem}
-.pf .mem-sort-select{min-width:auto;width:auto}
-/* ── Scalable Memory tab (2026-06-22): storage bar, size column, tools bar, group actions ── */
-.pf .pf-mem-quota{margin:.25rem 0 .6rem}
-.pf .pf-mem-quota-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem}
-/* The storage bar is the quota meter (.poster-box--meter.poster-box--quota); its height is the overview's. */
-.pf .pf-mem-quota-bar{height:18px;overflow:hidden}
-.pf .pf-mem-size{font-size:.68rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
-/* Data-management tools grouped in their own bordered panel, above the search/sort rows */
-.pf .mem-tools-section{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;padding:.5rem .75rem;margin:.25rem 0 .6rem;background:var(--bg-surface,var(--bg-dim));border-radius:8px}
-.pf .mem-tools-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-.pf .mem-import-group{display:inline-flex;align-items:center;gap:.35rem}
-.pf .mem-bottom-bar{gap:.75rem}
-.pf .mem-bottom-bar .mem-new-btn{margin-left:auto}
-.pf .mem-group-actions{margin-left:.6rem;display:inline-flex;align-items:center;gap:.15rem;opacity:0;transition:opacity .15s}
-.pf .mem-group-header:hover .mem-group-actions{opacity:1}
-.pf .mem-search-summary{display:flex;justify-content:space-between;align-items:center;padding:.35rem .2rem;border-bottom:1px solid var(--border);margin-bottom:.25rem}
-.pf .key-rules-box{margin-top:.75rem;margin-bottom:.5rem}
-.pf .mem-detail{background:rgba(0,0,0,.04);border-radius:8px;padding:1rem;margin-top:.5rem;font-size:.85rem}
-.pf .mem-detail .mem-actions{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
-.pf .mem-browse-panel{background:var(--surface,#F9FAFB);border-radius:var(--radius,12px);padding:1rem;margin-bottom:1rem}
-.pf .mem-browse-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
-.pf .mem-browse-list{display:flex;flex-direction:column;gap:.5rem}
-.pf .mem-browse-key{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pf .mem-browse-meta{display:flex;align-items:center;gap:.5rem;flex-shrink:0;max-width:40%;overflow:hidden}
-.pf .mem-browse-tags{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
-.pf .mem-browse-buttons{display:flex;gap:.5rem;flex-wrap:wrap}
-.pf .mem-discover-item{border:1px solid var(--border,#E5E7EB);border-radius:8px;overflow:hidden;background:var(--card,#FFFFFF)}
-.pf .mem-discover-item:hover{border-color:var(--accent,#E8564A)}
-.pf .mem-discover-row{display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;cursor:pointer;min-width:0}
-.pf .mem-discover-info{flex:1;min-width:0;overflow:hidden}
-.pf .mem-discover-owner{font-size:.7rem;color:var(--text-dim,#6B7280);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pf .mem-discover-preview{padding:.5rem .75rem;border-top:1px solid var(--border,#E5E7EB);background:var(--bg-dim,#F3F4F6)}
-.pf .mem-discover-preview .code-block{max-height:300px;overflow-y:auto;margin:0}
-/* A list whose rows open (chat sessions, services, nodes, sharing groups) is the Listing; a press
-   anywhere on the row opens it, so its cells take the pointer (the open panel does not). */
-.pf :is(.cs-row, .svc-row, .pn-row, .sg-row, .pf-eco-row) > div:not(.listing-open) { cursor: pointer; user-select: none; }
-.pf .pn-agent-list{display:flex;flex-direction:column;gap:.3rem;margin:.5rem 0}
-.pf .pn-vis-toggle{display:flex;align-items:center;gap:.9rem}
-.pf .pn-setup{display:none;margin-top:.75rem}
-.pf .pn-setup.open{display:block}
-.pf .pn-detach-btn{margin-top:.75rem}
-.pf .agent-cta{margin-bottom:1.5rem}
-.pf .agent-cta h3{color:var(--accent,#E8564A);margin-bottom:.5rem;font-size:1.05rem}
-.pf .agent-cta p{font-size:.9rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem}
-.pf .agent-prompt-box{position:relative;margin:0 0 1rem;max-height:300px;overflow-y:auto}
-.pf .platform-instructions{display:none;margin-top:1rem}
-.pf .platform-instructions.expanded{display:block}
-.pf .platform-tabs{display:flex;flex-wrap:wrap;}
-.pf .platform-content{font-size:.85rem;line-height:1.7}
-.pf .platform-content ol{margin-left:1.5rem;margin-bottom:.75rem}
-.pf .platform-content li{margin-bottom:.4rem}
-.pf .platform-content code{background:rgba(232,86,74,.1);padding:1px 5px;border-radius:3px;font-size:.8rem;color:var(--accent,#E8564A)}
+/* A list whose rows open (nodes) is the List's Row with onToggle: it gives its cells the pointer. */
+/* The Agents page's commands are Code blocks and its platform steps the HowTo (css/components/how-to.css). */
 .pf .empty{text-align:center;padding:2rem;font-size:.9rem}
 .pf .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border,#E5E7EB);border-top-color:var(--accent,#E8564A);border-radius:50%;animation:pfSpin .6s linear infinite;margin-right:.5rem;vertical-align:middle}
 @keyframes pfSpin{to{transform:rotate(360deg)}}
 .pf .loading-text{color:var(--text-dim,#6B7280);font-size:.9rem}
-.pf .sub-tabs{display:flex;}
-.pf .action-bar{display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
 .pf .search-bar{display:flex;gap:.5rem;flex:1;max-width:500px}
-.pf .action-bar .search-line{flex:1;max-width:500px;margin:0}
 /* .pf .input-field base+focus override removed — profile inputs use canonical
    theme.css .input-field (tokenized focus ring, theme-flips). Unified 2026-06-02 (#5).
    Keep only the select/textarea behavior extensions canonical lacks. */
@@ -513,49 +449,14 @@
    btn-ghost / btn-danger-solid classes directly (incl. btn-primary, unified 2026-06-02).
    See docs/frontend-development-guide.md "Banned Patterns" for the rationale. */
 .pf .card-detail{margin-top:.75rem;padding-top:.75rem;}
-.pf .file-tag-cloud{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 0}
-.pf .file-tag-cloud .poster-chip{cursor:pointer}
-/* Files: name/type search + click-to-preview affordances */
-.pf .mem-file-search{max-width:500px}
-/* The file preview (.pf-file-preview-*) is a library part: css/components/file-preview.css. */
-/* Collection cart: the tray. The per-row toggle is the Icon button (.poster-icon, pressed .is-on). */
-.pf .mem-cart{margin:0 0 1rem;padding:0;overflow:hidden}
-.pf .mem-cart-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.5rem .75rem;cursor:pointer}
-.pf .mem-cart-title{display:flex;align-items:center;gap:.4rem}
-.pf .mem-cart-head-actions{display:flex;align-items:center;gap:.4rem}
-.pf .mem-cart-body{padding:.25rem .75rem .75rem;border-top:1px solid var(--border,#E5E7EB)}
-.pf .mem-cart-list{max-height:220px;overflow:auto;margin:.5rem 0}
-.pf .mem-cart-actions{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.25rem}
-.pf .mem-cart-send{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--border,#E5E7EB)}
+/* The file preview is a library part: components/FilePreview.js, css/components/file-preview.css. */
 /* The dialog itself (frame, header, X, body, footer) is /css/dialog.css, for every dialog on the
    site. Width modifiers (.pf .scope-modal, .pf .ext-modal-narrow) still layer on top of it. */
 @media(max-width:600px){
-  .pf .action-bar{flex-direction:column;align-items:stretch}
   .pf .search-bar{max-width:100%}
-  .pf .action-bar .search-line{max-width:100%}
 }
-/* === Scope Management UI: the permission dialog in the poster face (2026-08-29). The three
-   presets are one segmented row with the chosen one on the sun; the advanced editor opens from an
-   underlined word; each domain is a section under a 3px ink rule, its rows over hairlines; the
-   machine name of a permission and the small notes are mono chips. No fill, no radius. === */
-.pf .scope-readonly-list {display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem}
-.pf .scope-modal {max-width:620px}
-.pf .scope-modal h3 {margin-bottom:.25rem}
-.pf .scope-modal .scope-agent-info {display:flex;align-items:center;gap:.6rem;margin-bottom:1.25rem;overflow-wrap:anywhere}
-.pf .scope-agent-msg {text-decoration:none;flex:none}
-.pf .scope-agent-msg svg {width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
-.pf .scope-templates {display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .9rem;margin-bottom:1.25rem}
-.pf .scope-advanced-toggle {margin-bottom:1rem}
-.pf .scope-domain {padding:.75rem 0 .5rem;margin:0}
-.pf .scope-domain-header {display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.35rem;cursor:pointer}
-.pf .scope-row {display:flex;align-items:center;gap:.6rem;padding:.45rem 0;border-top:1px solid var(--border)}
-.pf .scope-row label {display:flex;align-items:center;gap:.6rem;cursor:pointer;flex:1;flex-wrap:wrap}
-.pf .scope-row input[type="checkbox"] {accent-color:var(--accent);width:16px;height:16px;margin:0;cursor:pointer;flex:none}
-.pf .scope-row .scope-friendly {flex:1 1 20rem}
-.pf .scope-row.disabled {opacity:.45;pointer-events:none}
-/* A scope the "Full access" template does not carry — says so where the tick is made. */
-/* Scopes take effect on the next connection — said where the Save button is, not after the fact. */
-.pf .scope-reconnect-note {margin:1rem 0 0;padding-top:.75rem}
+/* === Scope Management UI: the permission dialog draws only components now (agents/scopes-modal.js:
+   Tabs, a fold Tab, parts under the heavy rule, the List's pick rows, Note). === */
 /* === Extensions === */
 /* .ext-status-dot removed — extension status uses canonical <StatusDot> (was hardcoded #4ade80/#9ca3af). Unified 2026-06-02 (#11). */
 /* Extensions hero */
@@ -575,7 +476,6 @@
 /* Import preview: per-entry ref/rel chips */
 
 /* A service's schema in its opened row */
-.pf .svc-detail-code{margin-top:.35rem;max-height:200px;overflow-y:auto;width:100%}
 .pf .badge-outline{background:transparent;border:1px solid var(--border,rgba(232,86,74,.3));color:var(--accent,#E8564A);font-size:.7rem;padding:2px 8px;border-radius:4px}
 
 /* ── Service Generator (pf-gen-*) ─────────────────────── */
@@ -624,7 +524,6 @@
 /* ══ Shared Profile Utilities (2026-03-17) ══════════════ */
 
 /* ── Layout Utilities ── */
-.pf .flex-row         { display: flex; gap: .5rem; align-items: center; }
 .pf .flex-row-wrap    { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .pf .flex-between     { display: flex; justify-content: space-between; align-items: center; }
 .pf .flex-col         { display: flex; flex-direction: column; gap: .5rem; }
@@ -633,20 +532,15 @@
 /* ── Text Utilities ── */
 .pf .text-meta        { font-size: .8rem; color: var(--text-dim, #6B7280); }
 .pf .text-meta-sm     { font-size: .75rem; color: var(--text-dim, #6B7280); }
-.pf .text-caption     { font-size: .85rem; color: var(--text-dim, #6B7280); }
 
 /* ── Spacing Utilities ── */
 .pf .mt-section       { margin-top: 1.5rem; }
 .pf .mt-xs            { margin-top: 4px; }
-.pf .mb-1             { margin-bottom: 1rem; }
-.pf .mb-half          { margin-bottom: .5rem; }
-.pf .p-1              { padding: 1rem; }
 
 /* ── Input size modifier ── */
 .input-field.input-sm { padding: .4rem .6rem; font-size: .85rem; }
 
-/* The visibility pill is the Tag (.poster-chip, css/poster.css); it stays a button. */
-.pf .vis-pill { cursor: pointer; }
+/* The visibility pill is the Tag with onClick (components/Mark.js; its pointer: css/components/mark.css). */
 
 /* Toggle Switch moved to theme.css .toggle* (canonical /components/ToggleSwitch.js, #14). */
 
@@ -662,137 +556,12 @@
 /* ── Agent-driven generator UI ──────────────────────── */
 @keyframes pf-gen-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-/* ── OpenRouter Settings (pf-or-*) ──────────────── */
-.pf-or-wrapper { margin-bottom: 1.25rem; }
-.pf-or-panel {
-  padding: 0 14px 14px; margin: 0;
-}
-.pf-or-field {
-  margin-bottom: 12px;
-}
-.pf-or-label {
-  display: block;
-  margin-bottom: 4px;
-}
-.pf-or-input-sm { max-width: 100px; }
-.pf-or-param-row { display: flex; align-items: center; gap: 10px; }
-/* Model refresh row: sits below the model <select>; let the hint/error wrap on narrow widths. */
-.pf-or-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-.pf-or-checkbox input[type="checkbox"] { accent-color: var(--accent, #E8564A); width: 16px; height: 16px; cursor: pointer; }
-.pf-or-radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.pf-or-radio-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-.pf-or-radio-label input[type="radio"] { accent-color: var(--accent, #E8564A); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
-/* ── AI-apps daily-budget / spend section (generator-settings OpenRouterSettings) ──
-   Lifted out of ~28 inline styles + hardcoded hex; all tokenized so it flips in dark mode. */
-/* The budget part is set off by the split (.og-split, css/components/page-section.css); its place only. */
-.pf-or-spend-section { padding-top: 14px; margin-top: 14px; }
-.pf-or-spend-bar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pf-or-spend-bar { flex: 1; min-width: 200px; height: 20px; position: relative; overflow: hidden; }
-.pf-or-spend-bar svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-/* The figure on the bar is the Meter's figure (poster.css .poster-meter-figure); its line height here. */
-.pf-or-spend-bar .poster-meter-figure { line-height: 20px; }
-.og-input.pf-or-spend-budget-input { width: 90px; }
-.pf-or-spend-details { margin-top: 10px; }
-.pf-or-spend-table { margin-top: 4px; }
-.og-input.pf-or-spend-cap-input { width: 74px; text-align: right; }
-.pf-or-spend-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.pf-or-spend-chart-wrap { margin-top: 14px; }
-.pf-or-spend-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.pf-or-spend-metric-toggle { display: inline-flex; gap: .4rem .9rem; align-items: center; }
-
-/* ── AI provider settings v3: sections, model picker, STT (2026-08-01) ──
-   The panel is four sections that each save their own fields, so the answer to "did that save?"
-   appears where the question is asked instead of at the bottom of one long form. */
-.pf-or-section { padding: 14px 0; }
-/* The why-lead: three sentences a first-time visitor reads before any field asks for anything. */
-.pf-or-why { padding-top: 4px; }
-.pf-or-section:first-child { padding-top: 4px; }
-.pf-or-section-title { font-size: 13px; font-weight: 700; margin: 0 0 10px; color: var(--text); }
-
-/* Key row: the save button sits next to the field it saves. */
-.pf-or-key-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.pf-or-key-input { flex: 1; min-width: 220px; }
-.pf-or-links { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
-
-.pf-or-models-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-.pf-or-wrapper .poster-hint { display: block; }
-.pf-or-models-head .poster-hint, .pf-or-stt-test-head .poster-hint, .pf-or-models-head .form-message { margin: 0; }
-.pf-or-loading { padding: 8px 0; }
-.pf-or-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
-
-.pf-or-roles-summary { margin-bottom: 8px; }
-
-.pf-or-inline-field { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
-.pf-or-label--inline { margin: 0; }
-.select-field.pf-or-select--sm { width: auto; min-width: 150px; }
-
-/* ── Model picker ──
-   Replaces a <select> holding the provider's whole catalogue (336 options on OpenRouter, unlabelled
-   and unsearchable). Prices are tabular so a column of them can actually be compared. */
-/* The picker is the library's Model picker (css/components/model-picker.css); this keeps what only the
-   classic one holds in its place: the chosen value's line on top, the link column, the own-id row. */
-.pf-or-picker--off { opacity: .55; }
-.pf-or-picker-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: .5rem .75rem; }
-.pf-or-picked-warn { margin-left: 6px; }
-.pf-or-picker .model-picker-row { grid-template-columns: minmax(0, 1.3fr) auto auto auto; }
-.pf-or-mcustom { display: flex; gap: 8px; flex-wrap: wrap; padding: .5rem .75rem; }
-.pf-or-picker > .poster-hint { display: block; margin: 0; padding: 0 .75rem .6rem; }
-.pf-or-mcustom .og-input { flex: 1; min-width: 180px; }
-
-/* ── Speech-to-text ──
-   The measured result is the point of the test: an audio model's listed price carries no unit, so
-   one real transcription says more than any number derived from the catalogue. */
-.pf-or-stt { border-top: 1px dashed var(--border); padding-top: 12px; margin-top: 12px; }
-.pf-or-stt-test { margin-top: 10px; }
-.pf-or-stt-test-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.pf-or-stt-result { margin: 8px 0 0; padding: 8px; }
-.pf-or-stt-text { font-size: 13px; white-space: pre-wrap; word-break: break-word; }
-.pf-or-stt-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
-
-@media (max-width: 860px) {
-  .pf-or-picker .model-picker-row { grid-template-columns: minmax(0, 1fr) auto; }
-}
-@media (max-width: 520px) {
-  .pf-or-key-row { flex-direction: column; align-items: stretch; }
-  .pf-or-key-input { min-width: 0; }
-}
-
-/* ── OpenRouter Autopilot (pf-or-*) ──────────────── */
-@keyframes pf-or-spin {
-  to { transform: rotate(360deg); }
-}
-
 /* ── Input for verification codes (email-tab) ── */
 
 /* ══ Refactored inline styles (2026-03-17) ══════════════ */
 
-/* ── Node Stats tab ── */
-/* A row of figures is the figure strip (og-strip, css/components/figure-strip.css); here it keeps
-   its place: no gap above, the gap the stat grid left under it. */
-.pf .pf-figures      { margin: 0 0 1.5rem; }
-.pf .stat-two-col    { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-.pf .stat-section-h3 { margin: 1.5rem 0 .75rem; }
-.pf .stat-panel-h4   { margin: 0 0 .75rem; }
-.pf .stat-footer     { margin-top: 1rem; }
-
-/* ── Nodes tab ── */
-.pf .radio-row       { display: flex; gap: 1rem; }
-.pf .radio-label     { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
-.pf .pn-no-agents    { margin-top: .3rem; }
+/* The Node stats and Nodes tabs are kit components (FigureStrip lead, CardGrid of section Cards,
+   List, Facts, Fields, Check): their rules went with their classes. */
 
 /* The Email tab lives in css/views/email-poster.css (the poster face, 2026-08-30). */
 
@@ -802,14 +571,8 @@
 /* Spending limit on a connected app's card. Only an app that asked to spend shows one, so this
    never appears on the majority of cards and must not push the rest of the layout around. */
 
-.pf .access-fed-add  { margin-top: .5rem; }
-
 /* ── Wallet tab ── */
 /* .wl-val-success/-danger removed — wallet uses canonical .stat-card-value.success/.danger. (#6) */
-
-/* ── Chat sessions tab ── */
-.pf .cs-create-body  { padding: .75rem 1rem .5rem; }
-.pf .cs-create-desc  { margin: 0 0 .5rem; }
 
 /* ── Federation tab ── */
 
@@ -821,26 +584,11 @@
 
 /* ── Utility classes added during inline-style refactor (2026-03-17) ── */
 .pf .mb-0             { margin-bottom: 0; }
-.pf .mt-1             { margin-top: 1rem; }
 .pf .pf-bold          { font-weight: 600; }
-.pf .pf-nowrap        { white-space: nowrap; }
-.pf .pf-shrink-0      { flex-shrink: 0; }
 .pf .pf-flex-fill     { flex: 1; min-width: 0; }
-.pf .pf-hidden         { display: none; }
 .pf .pf-no-underline  { text-decoration: none; }
-.pf .pf-code-break    { word-break: break-all; }
-.pf .pf-label-inline  { margin: 0; }
-.pf .pf-select-narrow { max-width: 200px; }
-.pf .pf-textarea-sm   { width: 200px; min-height: 40px; }
 
-/* Chevron animation (expand/collapse) */
-.pf .pf-chevron       { transition: transform .2s; display: inline-block; }
-.pf .pf-chevron-open  { transform: rotate(180deg); }
 
-/* Agent tab: device auth layout */
-.pf .pf-device-code       { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: .15em; }
-.pf .pf-agent-divider     { margin-top: 1.25rem; padding-top: 1.25rem; }
-.pf .gh-mark { flex: none; }
 
 /* Memory tab: sharing rules row */
 
@@ -850,26 +598,6 @@
 
 /* Apps tab: inline edit panel */
 
-/* Security tab: two-step sign-in. The QR sits on white whatever the theme, because a scanner
-   reads dark-on-light and the code the library draws is black. The backup codes wrap as a grid so
-   ten of them stay countable at a glance instead of running as one line. */
-.pf .pf-2fa-qr {
-  display: block; width: 200px; height: 200px; margin-bottom: .75rem;
-  background: #fff; padding: .5rem; border: 1px solid var(--border); border-radius: 8px;
-}
-.pf .pf-2fa-codes {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: .35rem;
-  padding: .6rem; margin: 0;
-}
-.pf .pf-2fa-code-input { width: 8rem; text-align: center; }
-
-/* Security tab: one registered device per row, its name and what it is on the left, its two
-   controls on the right. Wraps rather than squeezing on a phone. */
-.pf .pf-2fa-devices { display: flex; flex-direction: column; gap: .5rem; }
-.pf .pf-2fa-device {
-  display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between;
-  padding: .6rem; margin: 0;
-}
 
 /* ========================================================================
    LANDING PAGE — Adaptive profile dashboard (new / active / experienced)
@@ -883,94 +611,11 @@
 
 /* Container */
 
-/* --- Profile Card (landing variant): the masthead, then the numbers on the band --- */
-.pf .pf-lp-card { background: none; padding: 0.75rem 0 0; position: relative; overflow: hidden; }
-/* The head is the home's head, the Masthead (components/Masthead.js, masthead.css; Jouni's decision
-   "Person head"). What the overview adds under the address keeps its own lines here. */
-.pf .pf-lp-node { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
-/* The numbers ride one diagonal coral band with a sun stripe, the same band the home's chat door
-   is. Contained in the card so it never crosses the index. */
-.pf .pf-lp-stats {
-  position: relative; overflow: hidden;
-  display: flex; gap: 44px; flex-wrap: wrap; align-items: flex-end;
-  margin: 2.5rem -1.5rem 0; padding: 4.5rem 2.5rem 5rem;
-  color: var(--bg);
-}
-.pf .pf-lp-stats::before, .pf .pf-lp-stats::after {
-  content: ''; position: absolute; left: -10%; right: -10%; top: 50%; z-index: 0;
-}
-/* No numbers yet (the composite still loading, or an account with nothing to count): no band.
-   An empty coral block measured 104px tall on the first paint and read as a broken picture. */
-.pf .pf-lp-stats:empty { display: none; }
-.pf .pf-lp-stats::before { height: 200px; background: var(--accent); transform: translateY(-50%) rotate(-3deg); }
-.pf .pf-lp-stats::after { height: 24px; background: var(--sun); transform: translateY(calc(-50% + 113px)) rotate(-3deg); }
-.pf .pf-lp-stat {
-  position: relative; z-index: 1;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-  background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--bg);
-}
-.pf .pf-lp-stat:hover .pf-lp-stat-val { color: var(--sun); }
-.pf .pf-lp-stat-ico { display: none; }
-.pf .pf-lp-stat-val { font-variant-numeric: tabular-nums; margin-right: 0; }
-.pf .pf-lp-stat-green { color: var(--bg); }
-.pf .pf-lp-stat-label { font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.78rem; letter-spacing: calc(var(--shape-tracking-label) * .8); text-transform: var(--shape-case-label); }
-/* A phone: the masthead shrinks to what the width holds, and the numbers halve. Measured before
-   this: a 4.4rem HAPPYADMIN was 501px wide on a 390px screen and the card's overflow ate the end. */
-@media (max-width: 760px) {
-  .pf .pf-lp-stats { margin: 1.5rem -1rem 0; padding: 3rem 1.5rem 3.5rem; gap: 20px 28px; }
-  .pf .pf-lp-stats::before { height: 150px; }
-  .pf .pf-lp-stats::after { transform: translateY(calc(-50% + 88px)) rotate(-3deg); }
-}
-.pf .pf-lp-info .poster-chip { display: inline-flex; align-items: center; gap: 6px; margin: 12px 8px 0 0; }
-.pf .pf-fed-dot { width: 8px; height: 8px; background: var(--success); }
-
-/* --- The presence pill (in the Masthead's doors) --- */
-.pf .pf-presence-pill-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  border: 0; background: none;
-  color: var(--text); border-radius: 0; padding: 0;
-  cursor: pointer; font: inherit; font-weight: 800; font-size: .85rem;
-}
-.pf .pf-presence-pill-btn:hover { border-color: var(--accent, #E8564A); background: var(--surface, var(--card)); }
-.pf .pf-presence-pill-caret { font-size: .7rem; color: var(--text-dim, #9CA3AF); margin-left: 2px; }
-
-/* --- Suggested next steps (home dashboard): a numbered index under a headline --- */
-.pf .pf-next { background: none; padding: 2.5rem 0 0; }
-/* The steps are the numbered list (components/NumberedIndex.js IndexList and IndexItem, the tones with a
-   line and first; Jouni's decision "Numbered list"). */
-
-/* --- Cortex Extensions (new user) --- */
-.pf .pf-cortex-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.pf .pf-cortex-card {
-  padding: 14px 16px; margin: 0;
-  cursor: pointer; transition: all .15s;
-}
-.pf .pf-cortex-card:hover { border-color: var(--accent, #E8564A); }
-.pf .pf-cortex-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: .87rem; font-weight: 600; }
-.pf .pf-cortex-desc { font-size: .75rem; color: var(--text-dim, #6B7280); line-height: 1.4; margin: 0; }
-
-/* --- App Strip (active/experienced) --- */
-
-/* --- Menu Sections --- */
-.pf .pf-landing-section {
-  padding: 16px 20px; margin: 0;
-}
-.pf .pf-menu-title {
-  font-size: .68rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .7px; color: var(--text-dim, #9CA3AF); margin-bottom: 10px;
-}
-
-/* --- Edit Profile, Change Password and Presence dialogs ---
-   The frame, header, X and footer are the site's one dialog (/css/dialog.css); these are the fields. */
-.pf-edit-loading { padding: 40px 22px; text-align: center; }
-.pf-account-modal .dlg-body, .pf-presence-modal .dlg-body { display: flex; flex-direction: column; gap: 14px; }
-.pf-edit-label { display: flex; flex-direction: column; gap: 5px; }
-.pf-edit-textarea { resize: vertical; min-height: 72px; }
-/* Directory opt-in checkbox row (member "phone book"). */
-.pf-edit-check { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; }
-.pf-edit-check input { margin-top: .2rem; flex-shrink: 0; }
-.pf-edit-check > span { display: flex; flex-direction: column; gap: .15rem; }
-.pf-edit-check-title { font-size: .9rem; }
+/* The Settings overview is kit components (page group G8): the head is the Masthead, its numbers
+   the NumberBand (css/components/number-band.css, the .pf-lp-stat* rules moved there unchanged),
+   its tags Mark with the live square, the presence door PresenceButton (presence-dot.css), the next
+   steps a panel Card, the promo a Box with framed Cards; the account and presence dialogs are the
+   field kit in a Stack. */
 
 /* --- Inline Preview Panels --- */
 /* Panel content items */
@@ -990,17 +635,11 @@
 
 /* ─── Component Detail: Test Section ─── */
 
-/* ─── Responsive: tablet ─── */
-@media (min-width: 640px) {
-  .pf .pf-cortex-grid  { grid-template-columns: 1fr 1fr; }
-}
 
 /* ── Generator Debug Panel ──────────────────────────── */
 
 /* The frame and its side menu are library components now: components/settings-frame.css and
    components/side-menu.css. */
-/* The overview wears the poster face; a tab opened from the index keeps its own. */
-.settings-frame-content > .pf-lp-card, .settings-frame-content > .pf-next, .settings-frame-content > .pf-home-grid, .settings-frame-content > .pf-start-page { font-family: var(--font-showroom-body); }
 
 @media (max-width: 900px) {
   /* Screen space is valuable on mobile — minimal side margins. */
@@ -1008,66 +647,13 @@
 }
 
 /* ── Projects tab (pj-) ── */
-.pj-ws { display: flex; flex-direction: column; gap: 0.5rem; }
-
-/* Workspace breadcrumb — keeps the parent organism visible so you always know
-   which organism this workspace belongs to. */
-
-/* Title row — workspace name + status badge sit on one line. */
-
-/* Workspace action toolbar — a tinted bar so the (otherwise transparent) buttons
-   read as real buttons rather than blending into the page. Consistent gap +
-   vertical separators group the Settings/Add, AI-prompt, and review-gate controls. */
-/* Publish-gate toggle: a chip grouped with the toolbar (after a separator) so it doesn't float alone */
-.pj-gate-label { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-.pj-inbox { padding: 0.75rem; margin: 0 0 0.5rem; }
-.pj-section { border-radius: 10px; padding: 0.6rem 0.75rem; background: var(--card); }
-/* Action buttons sit right after the title (not pushed to the far edge) so they
-   stay visually tied to the panel they act on. */
-/* Fresh-join welcome banner (invite-accept redirect, UX-remake v3 P8): says whose team the
-   person just joined and points at the chat connection as the next step. */
-.pj-joined-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.75rem;
-}
-.pj-joined-actions { display: flex; gap: 0.5rem; align-items: center; }
-
-.pj-section-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
-.pj-section-title { margin-right: 0.25rem; }
-/* A declared space whose data does not live in workspace records (backing 'tasks', or a legacy
-   unsupported backing) — shown as a notice instead of silently dropped from the view. */
-.pj-space-notice { padding: 0.2rem 0 0.3rem; }
-/* The viewer's own contract-advertising agents (tag 'workspace-contract'), surfaced in the
-   workspace People panel so the user sees which of their agents can serve this workspace. */
-.pj-contract-agents { padding: 0.5rem 0.75rem; margin: 0 0 0.6rem; }
-/* The per-contract one-click adopt action inside a contract-agent chip. */
-.pj-adopt-btn { margin-left: 0.4rem; }
-/* A per-contract engagement group (state badge + its adopt/retire action). */
-.pj-eng { display: inline-flex; align-items: center; gap: 0.2rem; }
-/* Retire an active contract engagement: the action link, its place beside the badge. */
-.pj-retire-btn { margin-left: 0.25rem; }
-.pj-draft-form { margin: 0.4rem 0; }
-/* A record's row (.pj-rec, its draft rail, title, fields and editor) is a library part:
-   css/components/record-row.css. */
+/* The workspace's own pages are library components now (page migration G2b): the page frame is the
+   SettingsPage, its lists the List, its boxes the Box, its fields the Field family, the document
+   tree DocTree, the document DocView, the map MindMap, the tree beside the page ContentsTree, the
+   colour tag ColorPicker (components/*.js with their own sheets). A record is the List's row. */
 /* The comment thread on a workspace object is a library part: css/components/comments.css. */
-/* Record fields: label ON TOP (small, muted), value below at full width, LEFT-aligned and wrapping
-   — natural left-to-right reading (was a right-aligned single line that ran off and didn't wrap). */
-.pj-rec-field-text { white-space: pre-wrap; }
-.pj-rec-field-list { margin: 0.1rem 0 0; padding-left: 1.1rem; }
-.pj-rec-field-list li { margin: 0.1rem 0; }
-/* An object in a record field is the Code block (css/components/code-block.css); its place and height only. */
-.pj-rec-json.code-block { margin: 0.1rem 0 0; max-height: 18rem; overflow: auto; }
-/* Markdown inside a record field is the library Markdown reader (css/components/markdown.css). */
-.pj-rec-empty { padding: 0.2rem 0; }
-.pj-empty { padding: 0.2rem 0; }
 
 /* ── In-context content search (Kerros 1): filter tabs to matches + grouped result list ── */
-.pj-org-globalsearch { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0.6rem; }
-.pj-org-globalsearch .search-bar { flex: 1; }
 .pj-search-results { margin-top: 0.4rem; }
 .pj-search-group { margin: 0 0 0.9rem; }
 .pj-search-group-head { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.35rem; padding-bottom: 0.25rem; }
@@ -1083,107 +669,21 @@
 .cmdk-item-label { font-size: 0.9rem; font-weight: 600; }
 .cmdk-item-sub { font-size: 0.75rem; color: var(--muted); }
 .cmdk-item-snippet { font-size: 0.76rem; color: var(--text-dim); overflow-wrap: anywhere; max-height: 2.6em; overflow: hidden; }
-.pj-field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.35rem; }
-.pj-field-inline { flex-direction: row; align-items: center; gap: 0.4rem; }
-/* SchemaForm: per-field hint text + missing-required highlight after a Save attempt. */
-.pj-field-invalid > span:first-child { color: var(--danger); }
-.pj-field-invalid .input-field { border-color: var(--danger); }
-.pj-errors { margin: 0.5rem 0; }
-/* A failed generation's heading is the row label and each reason the Form message (refused). */
-.pj-errors .poster-label { margin-bottom: 0.3rem; }
-.pj-section-title .poster-chip, .pj-space-name .poster-chip, .pj-share-row .poster-chip, .pj-section-title .poster-count { margin-left: 0.4rem; vertical-align: middle; }
-
-/* Public-sharing panel: per-space and per-doc public toggles + the viewer link. */
-.pj-share-space { padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
-.pj-share-space:last-of-type { border-bottom: none; }
-.pj-share-row { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
-.pj-share-row input, .pj-share-doc input { cursor: pointer; }
-.pj-share-docs { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.3rem 0 0.4rem 1.6rem; }
-.pj-share-doc { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
-.pj-share-doc-title { flex: 1; }
-.pj-share-empty { margin: 0.2rem 0 0.4rem 1.6rem; }
-/* "Publish to public feed" banner at the top of the Share tab. */
-.pj-share-feed { margin: 0 0 1rem; }
-.pj-share-feed-on { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.6rem 0.9rem; margin: 0; font-size: 0.9rem; color: var(--text); }
-.pj-share-feed-on span { flex: 1; }
-/* Access-mode picker (open / password / account) + the share-password controls (TARGET-025). */
-.pj-share-access { margin: 1rem 0; padding: 0.7rem 0.9rem; display: flex; flex-direction: column; gap: 0.45rem; }
-.pj-share-access .card-h3 { margin: 0 0 0.2rem; }
-.pj-share-pw { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0 0 0.2rem 1.6rem; }
-.pj-share-pw-input { flex: 1; min-width: 12rem; max-width: 18rem; }
-.pj-share-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-/* The detail / reading pane — a white, slightly elevated card so it reads as the focused content,
-   distinct from the flat tree panel beside it. */
-.pj-doc-view { padding: 1.4rem 1.8rem; margin: 0.4rem 0; }
-.pj-doc-meta { margin: 0 0 0.5rem; }
-/* Popped-out single-document window (doc-solo.js) */
+/* Popped-out single-document window (doc-solo.js); the document itself is DocView (css/components/doc-view.css). */
 .pj-doc-solo { max-width: 920px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
 .pj-doc-solo-empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
 
-/* The document reads in the library Markdown reader (css/components/markdown.css); its width stays here. */
-.pj-doc-view .md-body { max-width: 78ch; }
-/* Deterministic Mermaid charts (organism overview, workspace edit-flow) */
-.pj-chart { padding: 0.5rem 0.75rem; margin: 0 0 0.6rem; }
-.pj-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }
-.pj-chart-title { font-weight: 600; font-size: 0.9rem; color: var(--text); }
-.mmd { overflow-x: auto; text-align: center; }
-.mmd svg { max-width: 100%; height: auto; }
-.mmd-fallback { font-size: 0.74rem; white-space: pre-wrap; color: var(--text-dim); background: var(--bg-dim); padding: 0.5rem; border-radius: 6px; overflow: auto; }
+/* Deterministic Mermaid charts are the Mermaid component's: css/components/mermaid.css. */
 /* Participants panel — node → owner → agents listing */
 /* The People list (.pj-parts, -list, .pj-part-human, -node, -agents) is a library part:
    css/components/people-list.css. A person's framed card stays here (the box is a question in the lab). */
 .pj-part-owner { padding: 0.5rem 0.7rem; margin: 0; }
-/* One agent under its person (.pj-part-agent) is a library part: css/components/agent-chip.css. */
-/* Manage access — creator adds/roles/removes members in the participants panel */
-.pj-access { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 0.45rem; }
-.pj-access-title { font-size: 0.82rem; font-weight: 600; color: var(--muted); }
-.pj-access-note { font-size: 0.78rem; color: var(--muted); }
-.pj-access-add { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.2rem; }
-.pj-access-add .select-field { width: auto; }
-/* Activity panel — GitHub-style contribution heatmap + audit-log feed */
-.pj-act { padding: 0.1rem; }
-.pj-act-count { font-size: 0.72rem; font-weight: 500; color: var(--muted); margin-left: 0.5rem; }
-/* The heatmap (the activity calendar) is a library part: css/components/heatmap.css. The log under
-   it is the Timeline (components/Timeline.js). */
-/* Workspace list (an organism's many workspaces) */
-.pj-ws-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
-.pj-ws-name-input { flex: 0 1 260px; }
-.pj-spaces-add { margin-bottom: 0.6rem; }
-.pj-space-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
-.pj-space-row .input-field { flex: 0 1 220px; }
-.pj-doc-editor { margin: 0.4rem 0; }
-.pj-doc-editor > input { margin-bottom: 0.4rem; }
-.pj-doc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-.pj-doc-preview { padding: 0.4rem 0.8rem; margin: 0; overflow: auto; max-height: 360px; }
-@media (max-width: 640px) { .pj-doc-grid { grid-template-columns: 1fr; } }
-.pj-divider { border-top: 1px solid var(--border); margin: 0.8rem 0; }
-.pj-danger { margin-top: 0.8rem; }
-.pj-danger-title { font-weight: 600; color: var(--danger); margin-bottom: 0.3rem; }
-.pj-space-name { flex: 1; color: var(--text); font-size: 0.9rem; }
-/* The document tree (.pj-docspace, .pj-doc-index, .pj-sec*, .pj-doc-item, .pj-doc-series-*, .pj-doc-link) is a library part: css/components/doc-tree.css. */
-/* The colour tag (.pj-tag-*, .pj-colored, .pj-cp-*) is a library part: css/components/colour-tag.css. */
+/* One agent under its person (.pj-part-agent) is a library part: css/components/agent-chip.css.
+   The People panel itself draws the People component (components/People.js, css/components/people.css),
+   its access manager the List, and the activity panel the ActivityCalendar (css/components/activity-calendar.css). */
+/* The document tree is components/DocTree.js (css/components/doc-tree.css), the colour tag
+   components/ColorPicker.js (css/components/colour-tag.css). */
 .pj-mini { font-size: 0.6rem; padding: 0 0.25rem; vertical-align: middle; }
-.pj-doc-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
-.pj-doc-vtitle { flex: 1; font-weight: 700; font-size: 1.05rem; color: var(--text); }
-.pj-tui { margin: 0.3rem 0 0.5rem; }
-.pj-doc-imgbar { margin: 0.3rem 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
-.pj-file-btn { cursor: pointer; }
-.pj-file-btn input { display: none; }
-/* Visually-hidden file input (organism / workspace ZIP import) — replaces inline style="display:none". */
-.pj-hidden-input { display: none; }
-.pj-file-btn-icon { margin-right: 0.15rem; }
-.pj-doc-imgbar .poster-hint { margin: 0; }
-.pj-img-vis { margin: 0.2rem 0 0.5rem; padding: 0.55rem 0.65rem; }
-.pj-img-vis-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.35rem; }
-.pj-img-vis-head .poster-hint { flex: 1; margin: 0; }
-/* A file's row is the Listing (css/components/listing.css). */
-.pj-sources-desc { margin: 0.1rem 0 0.5rem; }
-.pj-src-picker { padding: 0.6rem; margin: 0 0 0.6rem; }
-.pj-src-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
-.pj-src-search { flex: 1; min-width: 140px; }
-.pj-src-search.search-line { margin: 0; }
-.pj-src-results { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.15rem; }
-/* A result is a row of the Listing (css/components/listing.css). */
 .md-wikilink { color: var(--accent); cursor: pointer; text-decoration: none; border-bottom: 1px dashed var(--accent); }
 .md-wikilink:hover { border-bottom-style: solid; }
 .md-img { max-width: 100%; height: auto; border-radius: 6px; }
@@ -1192,31 +692,18 @@
  * The landing view: a "what happened here" strip + every space stacked on one vertical scroll.
  * Sections collapse as accordions on mobile; documents expand inline there (no popups). */
 
-/* ── Measurability objectives card (workspace header) ── */
-.pj-obj { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.75rem 0; }
-.pj-obj-card { padding: 0.6rem 0.75rem; margin: 0; }
-.pj-obj-statement { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.pj-obj-why { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
+/* ── Measurability objectives: the Object box with Facts under a Group heading (workspace/overview.js) ── */
 /* A series' arrow in the document tree (.pj-ov-chevron) is the Document tree's: css/components/doc-tree.css. */
 /* Unseen-changes badge on workspace tabs — neutral gray pill (red is reserved for errors). */
 
 /* ───────────────── Organisms list renew (phase 1) ─────────────────
  * Compact list rows + kebab menu + organism home page. All colors via theme tokens. */
 
-/* Topbar action cluster (sort select + Import + Create) */
-.pj-org-topbar-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.select-field.pj-org-sort { width: auto; }
-
 /* The organism row (.pj-org-list, .pj-org-row and its parts, the panels it opens) is a library
    part: css/components/org-row.css. The line under the name stays here (a question in the lab). */
 .pj-org-desc { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48ch; }
 
-/* Kebab ("…") menu */
-.pj-menu { position: relative; flex: none; }
-.pj-menu-pop { position: absolute; right: 0; top: calc(100% + 4px); background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-md); display: flex; flex-direction: column; min-width: 170px; z-index: 30; padding: 0.25rem; }
-/* Its rows are the shared menu row (poster.css .poster-menu-row, Jouni's decision "Menu row"); a row
-   keeps to one line, as it did. */
-.pj-menu-pop .poster-menu-row { white-space: nowrap; }
+/* The kebab ("…") menu is the ⋯ CardMenu (components/CardMenu.js, css/components/card-menu.css). */
 
 /* Organism home page */
 .pj-search-group-head .poster-count, .pj-doc-series-head .poster-count { margin-left: 0.3rem; }
@@ -1225,247 +712,49 @@
    contract), each a small caption above its member tabs, separated by a wider column gap. ── */
 /* vertical divider between groups so the clusters read as separated at a glance */
 
-/* ── OKF-style structure overview (collapsible Markdown map of an organism / workspace) ── */
-.pj-struct-overview { margin: 0.4rem 0 0.8rem; }
-/* Its toggle is the FoldSection (components/FoldSection.js, css/components/fold-row.css). */
-.pj-struct-body { margin: 0.75rem 0 0; max-height: 32rem; overflow: auto; padding: 0.75rem 0.9rem; }
-/* The map's Markdown is the library Markdown reader (css/components/markdown.css). */
-
 /* ── README panel (free-form description, Osa A) ── */
+/* The panel itself is the Box now (views/profile/organisms/readme-panel.js); this rule is kept for
+   the design lab's conflict sample, which still writes .pj-readme. */
 .pj-readme { margin: 0.75rem 0 0.9rem; padding: 0.75rem 1rem 0.85rem; }
-.pj-readme-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; justify-content: space-between; }
-.pj-readme-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
-.pj-readme-actions { display: inline-flex; gap: 0.4rem; flex-wrap: wrap; }
 
-/* ── Interactive mindmap (Osa C) — reuses .of-mapwrap--clickable cursor/hover from offers.css ── */
-.pj-mindmap { margin: 0.4rem 0 0.9rem; }
-.pj-mindmap-body { margin: 0.75rem 0 0; padding: 0.75rem 0.9rem; }
-.pj-mindmap-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem; margin-bottom: 0.6rem; }
-.pj-mm-opt { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-dim); }
-.pj-mm-opt .select-field { width: auto; }
-.pj-mm-check { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }
-.pj-mindmap-canvas { overflow: auto; max-height: 36rem; }
-.pj-mindmap-canvas .node, .pj-mindmap-canvas .mindmap-node { cursor: pointer; }
-.pj-mindmap-canvas .node:hover, .pj-mindmap-canvas .mindmap-node:hover { opacity: 0.82; }
-/* Mindmap heatmap: `:::heatN` attaches the class to the node; colour its shape from theme vars
-   (flowchart modes colour via Mermaid classDef with the same theme-derived values). */
-.pj-mindmap-canvas .heat1 rect, .pj-mindmap-canvas .heat1 path, .pj-mindmap-canvas .heat1 circle { fill: var(--success-bg); stroke: var(--success-fg); }
-.pj-mindmap-canvas .heat2 rect, .pj-mindmap-canvas .heat2 path, .pj-mindmap-canvas .heat2 circle { fill: var(--warn-bg); stroke: var(--warn-fg); }
-.pj-mindmap-canvas .heat3 rect, .pj-mindmap-canvas .heat3 path, .pj-mindmap-canvas .heat3 circle { fill: var(--danger-bg); stroke: var(--danger-fg); }
+/* ── Interactive mindmap (Osa C): components/MindMap.js (css/components/mind-map.css) ── */
 
 /* ── Structure timeline / development (Osa D) ── */
-/* The timeline's diagram, list and map are a library part: css/components/org-timeline.css. Its
-   framed box stays here (the box is a question in the lab). */
-.pj-timeline-body { margin: 0.75rem 0 0; padding: 0.75rem 0.9rem; }
+/* The timeline is the SnapshotTimeline component (css/components/snapshot-timeline.css) in the Box. */
 
 /* ── Workspace renew (phase 2): header actions, review banner, add-space tab ── */
 
 /* ── Organism home tab contents (feedback round): tab headers, pills, agent picker, board preview ── */
-.pj-tabhead { display: flex; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.6rem; }
-.pj-tabhead-desc { flex: 1; margin: 0.2rem 0 0; }
 .pj-linklike { background: none; border: none; padding: 0.2rem 0; font-size: 0.78rem; color: var(--accent); cursor: pointer; text-align: left; }
 .pj-linklike:hover { text-decoration: underline; }
-.pj-attach { padding: 0.6rem 0.75rem; margin: 0 0 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; }
-
-/* ── Email invitations (invite people not yet on the node) ── */
-.pj-invite-btns { display: flex; gap: 0.4rem; }
-.pj-eminvite { padding: 0.7rem 0.8rem; margin: 0 0 0.7rem; }
-.pj-eminvite-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
-.pj-eminvite-field { display: flex; flex-direction: column; gap: 0.2rem; }
-/* The label over the workspace list is the row label (.poster-label); it keeps its place. */
-.pj-eminvite-wslabel { margin: 0.5rem 0 0.2rem; }
-.pj-eminvite-wslist { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
-.pj-eminvite-wsrow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.83rem; color: var(--text); }
-.pj-eminvite-wsrow label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-.pj-eminvite-wsrow .select-field { margin-left: auto; }
-.pj-eminvite-actions { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
-.pj-eminvite-url { margin-top: 0.5rem; padding: 0.5rem 0.6rem; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg-dim); font-family: var(--font-mono, monospace); font-size: 0.76rem; color: var(--text); word-break: break-all; }
-/* The pending invitations are the Listing (css/components/listing.css); an opened one's editor is its open panel. */
-/* Unified add/invite panel + pending-invite inline editor + per-member access editor */
-.pj-invpanel-accept { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem; cursor: pointer; }
-.pj-member-access { margin: 0.2rem 0 0.6rem 2.6rem; }
 
 /* The Contacts tab lives in css/views/contacts-poster.css (the poster face, 2026-08-30). */
-.pj-orgsearch { margin: 0 0 0.6rem; }
-/* A message in the preview is the Board notices' row (css/components/board-notices.css). */
-.pj-board-composer { margin-top: 0.6rem; }
-.pj-board-input { flex: 1; min-width: 220px; }
-
-/* ── Organism settings form (labels, groups, hints, tag input, separated danger zone) ── */
-.pj-meta-line { display: flex; flex-wrap: wrap; gap: 0.25rem 0; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.8rem; align-items: center; }
-.pj-meta-line > span + span::before { content: '·'; margin: 0 0.45rem; color: var(--muted); }
-.pj-form-group { margin: 0.9rem 0 0.45rem; }
+/* A message in the board preview is the Board notices' row (css/components/board-notices.css). */
 /* The tag input (.pj-taginput, .pj-tag, .pj-tag-x, .pj-taginput-field) is a library part: css/components/tag-input.css. */
-.pj-danger-box { margin-top: 1.1rem; margin-bottom: 0.75rem; }
-.pj-danger-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.pj-danger-text { flex: 1; min-width: 220px; }
-.pj-danger-sub { font-size: 0.78rem; color: var(--muted); }
-.pj-danger-confirm { margin-top: 0.6rem; display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; }
-.pj-members-cap { font-size: 0.74rem; color: var(--muted); }
 
 /* ── Workspace row: clickable participants counter + inline people list ── */
 /* The counter is the Tab's fold tone (.poster-tab--fold, pressed .is-on); the people list is the
    organism row's (css/components/org-row.css). */
 
-/* ── Settings polish: menu divider, bounded form card ── */
-.pj-menu-sep { height: 1px; background: var(--border); margin: 0.25rem 0.3rem; }
-.pj-form-card { padding: 0.75rem 0.9rem 0.6rem; margin: 0 0 0.25rem; }
-.pj-form-card .pj-form-group:first-child { margin-top: 0; }
 
-/* ── Home dashboard: waiting-for-you box, continue/agents cards, clickable stats, promo dismiss ── */
-.pf-waiting { margin: 1rem 0; }
-.pf-waiting-title { margin-bottom: 0.5rem; }
-/* The rows are the Listing (css/components/listing.css); a row's words keep their face. */
-.pf-waiting-text { font-size: 0.88rem; color: var(--text-dim); }
-.pf-waiting-text b { font-weight: 600; color: var(--text); }
-.pf-waiting-where { color: var(--muted); }
-/* The dashboard: sections under headlines, ink rules instead of cards. Two columns for the short
-   ones (agents, commerce), the full width for the ones that carry bars and charts. */
-.pf-home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem 2.75rem; margin: 3rem 0 0; }
-@media (max-width: 760px) { .pf-home-grid { grid-template-columns: 1fr; gap: 2.5rem; } }
-/* min-width:0 is load-bearing: grid/flex items default to min-width:auto and refuse to shrink
-   below their content's intrinsic width. Without it, a card with unbreakable inner content (long
-   app names, the 3-col number grid, the chart canvas) forces its grid column — and thus the whole
-   home dashboard — wider than a narrow phone, overflowing the right edge. */
-.pf-home-card { background: none; padding: 0; min-width: 0; }
-.pf-home-card-title {
-  display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; text-align: left;
-  border-top: 0; border-right: 0; border-left: 0;
-}
-.pf-home-card-link { cursor: pointer; }
-.pf-home-card-link:hover { color: var(--accent); }
-.pf-home-card-note { font-family: var(--font-mono); font-weight: 400; font-size: 0.8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); }
-.pf-home-row-ico { flex: none; }
-.pf-home-row-meta { flex: none; margin-left: auto; }
-.pf-home-row-meta.pf-ok { color: var(--success-fg, var(--text)); }
-.pf-lp-stat-link { background: none; border: none; padding: 0; border-radius: 0; cursor: pointer; font: inherit; color: inherit; }
-/* Home "Usage & quotas" card — thick quota bars + the counts as a row of numerals */
-.pf-usage-card { grid-column: 1 / -1; }
-.pf-usage-row { padding: 0.9rem 0; border-bottom: 1px solid var(--border); margin: 0; }
-.pf-usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
-.pf-usage-card .text-meta-sm { font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-dim); }
-.pf-usage-bar { height: 18px; overflow: hidden; }
-/* The figures that open their tab (.pf-usage-chip*) are the Figure door: css/components/figure-door.css. */
-/* Home "AI apps spend" card — 24h/7d/30d as big numerals + per-app stacked bar + top apps */
-.pf-ai-card { grid-column: 1 / -1; }
-.pf-ai-chart { margin: 0.2rem 0 1rem; padding-top: 0.6rem; }
-.pf-ai-apps-head { margin-bottom: 0.3rem; padding-bottom: 0.4rem; }
-.pf-ai-app-dot { width: 14px; height: 14px; border-radius: 0; flex: none; }
-/* A very long quota value wraps under its label instead of forcing the row wider than the screen. */
-.pf-usage-head { flex-wrap: wrap; }
-.pf-promo-dismiss { float: right; }
-/* Edit profile / password dialogs */
-.pf-avatar-row { display: flex; align-items: center; gap: 0.6rem; }
-/* The preview of your picture is framed as the head frames it (.poster-frame, Jouni's decision "Person head"); its size and the glyph's size stay here. */
-.pf-avatar-preview { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
-.pf-pw-wrap { position: relative; }
-.pf-pw-wrap .pf-edit-input { padding-right: 4.2rem; }
-.pf-pw-eye { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); }
-/* The password's requirements (.pf-pw-rules) are the Requirement list: css/components/requirement-list.css. */
+/* The overview's waiting box, panels, band, usage lines, figures and dialogs are kit components now
+   (page group G8): Note aside with a Group, CardGrid of panel Cards, NumberBand, List with Meter,
+   Card figure doors, FigureStrip; the picture's preview is MastheadPreview (masthead.css). */
 
-/* ── Ecosystem apps tab (pf-eco-*) — sibling of the agents tab ── */
-.pf-eco-dim { color: var(--text-dim); font-size: .82rem; }
-.pf-eco-pending { margin-bottom: 1rem; }
-.pf-eco-pending-title { margin-bottom: .15rem; }
-.pf-eco-valid { cursor: help; }
-.pf-eco-auto-flow-controls .select-field, .pf-eco-sub-add .select-field, .pf-eco-pending .select-field { width: auto; }
-.pf-eco-empty { padding: 1.5rem; text-align: center; }
-.pf-eco-row.pf-eco-card-revoked > div:not(.listing-open) { opacity: .6; }
-.pf-eco-section { padding: .6rem 0; }
-.pf-eco-section:first-child { padding-top: 0; }
-.pf-eco-section-title { font-weight: 700; font-size: .9rem; margin-bottom: .5rem; color: var(--accent); }
-.pf-eco-sub-row { display: flex; align-items: center; gap: .5rem; padding: .25rem 0; }
-.pf-eco-sub-add { display: flex; align-items: center; gap: .4rem; margin-top: .5rem; }
-.pf-eco-data { display: flex; flex-direction: column; gap: .3rem; }
-/* A data entry's row is the folded row (og-fold og-fold--event, css/components/fold-row.css). */
-.pf-eco-data-key { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pf-eco-data-row .poster-chip { flex: 0 0 auto; }
-.pf-eco-data-time { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
-/* A data entry's value, opened under its row, is the JSON view (css/components/json-view.css); its place only. */
-.pf-eco-data-body { padding: 0 0 .5rem 1.2rem; line-height: 1.5; }
-.pf .pf-eco-sub-direction { margin: -.25rem 0 .5rem; }
-/* Automation recipe (B4) */
-.pf-eco-recipe-agents { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
-.pf-eco-recipe-agent { display: flex; align-items: center; gap: .35rem; cursor: pointer; }
-
-/* Recommended-agent picker: recommended first (subtle highlight), the rest behind a disclosure. */
-.pf-eco-rec-picker { display: flex; flex-direction: column; gap: .55rem; }
-.pf-eco-rec-list { display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-rec-agent {
-  display: flex; align-items: flex-start; gap: .5rem; cursor: pointer;
-  padding: .5rem .6rem; margin: 0;
-}
-.pf-eco-rec-agent-body { display: flex; flex-direction: column; gap: .2rem; }
-.pf-eco-rec-agent-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-.pf-eco-rec-agent-name { font-weight: 600; font-size: .85rem; color: var(--text); }
-.pf-eco-rec-why { font-size: .78rem; line-height: 1.35; }
-.pf-eco-rec-missing { display: flex; flex-direction: column; gap: .3rem; }
-.pf .pf-eco-rec-missing-line { margin: 0; }
-.pf-eco-rec-rest { display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-rec-rest-list { margin-top: .2rem; }
-.pf-eco-recipe-toggle { display: flex; align-items: center; gap: .45rem; cursor: pointer; }
-.pf-eco-recipe-radios { display: flex; flex-direction: column; gap: .45rem; }
-.pf-eco-recipe-radio { display: flex; align-items: flex-start; gap: .45rem; cursor: pointer; }
-.pf-eco-recipe-radio-title { display: block; }
-.pf-eco-recipe-radio .poster-hint { display: block; margin: 0; }
-.pf-eco-revoke-input { margin: .6rem 0; }
-/* Pending advisories approval surface (B7/B8) */
-.pf-eco-adv-list { display: flex; flex-direction: column; gap: .6rem; }
-.pf-eco-adv-item { border: 1px solid var(--border); border-radius: 8px; padding: .6rem .7rem; background: var(--bg-dim); display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-adv-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-.pf-eco-adv-title { font-size: .92rem; }
-.pf-eco-adv-rationale { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; }
-.pf-eco-adv-actions { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .15rem; }
-
-/* ── Ecosystem Automation — one turnkey flow (pf-eco-auto-flow-*) ── */
-/* How the automation runs: the steps are the numbered list and leave their grey box (Jouni's decision "Numbered list"); the part keeps its place. */
+/* ── Ecosystem apps tab: its parts are components now (page group G5). What stays is drawn only by
+      the design lab's conflict samples (decision-samples-conflicts.js): the how-it-runs steps and the
+      setup guide's width. ── */
 .pf-eco-auto-how { margin: .3rem 0 .6rem; }
 .pf .pf-eco-auto-how-steps { margin: .5rem 0 0; }
 .pf .pf-eco-auto-how-doc { margin: .5rem 0 0; }
-
-/* ── Ecosystem app's OWN setup guide (pf-eco-setup-guide-*) — rendered Markdown from the manifest ── */
-/* The guide is the Markdown reader's small cut (Markdown `small`); its width only. */
 .pf-eco-setup-guide-md { max-width: 74ch; }
-/* The guide's Markdown is the library Markdown reader (css/components/markdown.css). */
 
-/* ── Ecosystem Setup playbook + MCP promo (pf-eco-setup-* / pf-eco-mcp-*) ── */
-.pf-eco-mcp { margin-top: .9rem; padding: .8rem .9rem; border-radius: 10px; background: var(--bg-dim); display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-mcp-head { display: flex; align-items: center; gap: .5rem; }
-.pf-eco-mcp-icon { font-size: 1.1rem; }
-.pf-eco-mcp-title { font-size: .92rem; color: var(--text); }
-.pf-eco-mcp-sample { margin-top: .35rem; display: flex; flex-direction: column; gap: .35rem; }
-.pf-eco-mcp-sample-row { display: flex; align-items: flex-start; gap: .5rem; }
-/* A sample prompt is the Code block (css/components/code-block.css); its place in the row only. */
-.pf-eco-mcp-sample-prompt.code-block { flex: 1 1 auto; min-width: 0; margin: 0; }
-
-/* ── Ecosystem card — collapsed "Technical details" disclosure (pf-eco-tech-*) ── */
-.pf-eco-tech { margin: .6rem 0 0; padding: 0; overflow: hidden; }
-.pf-eco-tech-toggle { margin: .35rem .75rem; }
-.pf-eco-tech-body { padding: .2rem .75rem .7rem; border-top: 1px solid var(--border); }
-.pf-eco-tech-section { padding: .6rem 0; border-top: 1px solid var(--border); }
-.pf-eco-tech-section:first-of-type { border-top: none; }
-.pf-eco-tech-section-title { margin-bottom: .4rem; }
-.pf .pf-eco-tech-access { margin: -.15rem 0 .4rem; }
-
-/* ── Presence settings dialog — backed by PresenceDialog in landing-page.js, opened
-   from the <PresencePill> in the ProfileCard header; previews the same <PresenceDot>
-   shown next to people. ── */
-.pf-presence-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.pf-presence-head .section-desc { margin-bottom: .75rem; }
-.pf-presence-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .5rem 0; }
-.pf-presence-modes { display: inline-flex; gap: .4rem; }
+/* The presence settings dialog is the field kit (Choice, Select) in a Stack (page group G8). */
 
 /* ── Discover tab (master directory) ───────────────────────────────────── */
 
-/* ── Workspace Apps strip (pinned apps on the workspace Overview) ── */
-.pj-apps-strip { padding: .75rem .9rem; margin: 0 0 1rem; }
-.pj-apps-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .5rem; }
-.pj-apps-head .poster-hint { flex: 1; margin: 0; }
-/* The launch cards (.pj-apps-grid, .pj-app-card and its name, description and meta) are a library
-   part: css/components/app-cards.css. */
-.pj-apps-empty { padding: .25rem 0; }
-.pj-apps-picker { margin-top: .75rem; border-top: 1px solid var(--border); padding-top: .6rem; display: flex; flex-direction: column; gap: .45rem; }
-/* The picker's apps are the Listing (css/components/listing.css). */
+/* ── Workspace Apps strip (pinned apps on the workspace Overview): the Box, the Card grid and the List
+   (views/profile/organisms/workspace-apps.js draws only components). ── */
 
 /* ── App-bound skills (2d) on My Apps cards ── */
 
@@ -1473,187 +762,26 @@
    The owner's own view of what they published with a model in it. The one visual decision here is
    that the "public and unlabelled" tile changes colour only when the number is ABOVE zero: a
    compliance surface that is always red teaches people to stop looking at it. */
-/* The figures are the figure strip (css/components/figure-strip.css); it starts at the top of the body. */
-.pf-aitr-body > .og-strip { margin-top: 0; }
-.pf-aitr-sub { margin: 1.2rem 0 0.4rem; }
-/* The decision card's "remove my key" door sits under the dashed key field, not against it. */
-.pf-aitr .og-doors { margin-top: 0.6rem; }
-.pf-aitr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.pf-aitr-row, .pf-aitr-policy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; padding: 0.55rem 0.7rem; margin: 0; min-width: 0; }
-.pf-aitr-policy { flex-direction: column; }
-.pf-aitr-row-main { font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
-.pf-aitr-row-meta { overflow-wrap: anywhere; }
-/* The two verdict buttons on a decision. A 44 px box at every width, a thumb's width apart: they are
-   the one control in this card a person presses about something that already happened, and the two
-   answers are opposites. They are the action link; the box around the words grows, the words do not. */
-.pf-aitr-row-verdict { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.35rem; }
-.pf-aitr-row-verdict .poster-action {
-  min-height: 44px; padding: 12px 0 11px;
-}
-/* EVERY control in the decision-model card and the rules screen is a real tap target, 44 px at every
-   width. The house's poster buttons are text with an underline and `min-height: 0`, which reads well
-   and measures 15 to 18 px high: on a phone, the key, the test, the delete and the eight policy
-   checkboxes were all under the 40 px floor this repo holds itself to. The look is kept — the box
-   around the words grows, the words do not. `.pf` in front because profile-poster.css sets that
-   `min-height: 0` and loads after this file.
-   A checkbox is its LABEL: the whole row is the target, and the box itself grows to 20 px so it can
-   be hit on its own. */
-.pf .pf-aitr .poster-action,
-.pf .pf-aitr .btn-primary,
-.pf .pf-dr .poster-action {
-  min-height: 44px; min-width: 44px;
-}
-/* Both dimensions: "Edit" measured 26.8 px wide and "Test" 28.8, which are as easy to miss as a
-   short button is. A field is a target too, and the card's key field sat at 36 px under a 44 px
-   Save, which read as a mismatch as well as measuring short. */
-.pf .pf-aitr .og-input,
-.pf .pf-aitr select,
-.pf .pf-aitr input[type="number"],
-.pf .pf-dr .og-input,
-.pf .pf-dr select,
-.pf .pf-dr input[type="number"] {
-  min-height: 44px;
-}
-.pf .pf-aitr .pf-aitr-row > label.pf-aitr-row-main,
-.pf .pf-dr .pf-dr-check {
-  display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin: 0;
-}
-.pf .pf-aitr .checkbox, .pf .pf-dr .checkbox { width: 20px; height: 20px; flex: none; }
+/* The cards themselves are kit components now (FoldSection, FigureStrip, BoxList and BoxLine in
+   components/Box.js, Touch in components/Layout.js); their list and row rules went with their
+   last user (page group G8). */
+/* Every control of the decision-model card and its rules and providers screens is a real tap
+   target, 44 px at every width: that is the Touch part now (components/Layout.js, layout.css). */
 
-/* ── Decision rules (pf-dr-*) and one agent's AI settings (pf-aai-*) ──
-   Both sit inside furniture that already exists (the decision-model card, the agent's config tab)
-   and reuse its rows and stats; what is here is only the editor's form and the section's spacing. */
-/* The order is the numbered list (IndexList, Jouni's decision "Numbered list"); its place only. */
-.pf .pf-dr-order { margin: 0.6rem 0 0; }
-.pf-dr-h { margin: 1rem 0 0.3rem; }
-.pf-dr-pre { white-space: pre-line; }
-.pf-dr .pf-aitr-row { flex-direction: column; align-items: stretch; }
-.pf-dr .pf-aitr-row .og-doors { margin-top: 0.3rem; }
-.pf-dr-editor { margin-top: 0.9rem; padding: 0.9rem; border: 1px dashed var(--text); background: var(--bg); display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
-.pf-dr-field { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
-.pf-dr-field .og-input, .pf-dr-field .og-textarea, .pf-dr-field .select-field, .pf-dr-q .og-input, .pf-dr-q .og-textarea, .pf-dr-q .select-field { width: 100%; box-sizing: border-box; min-width: 0; }
-.pf-dr-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
-.pf-dr-q { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem; margin: 0; min-width: 0; }
-.pf-dr-q-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 0.6rem; }
-.pf-dr-q .poster-action { align-self: flex-start; }
-.pf-aai { min-width: 0; }
-.pf-aai-model { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border); min-width: 0; }
-.pf-aai-model .og-strip { margin: 0; }
-.pf-aai-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; margin-top: 0.4rem; }
-.pf-aai-row .og-input, .pf-aai-row .select-field { flex: 1 1 12rem; min-width: 0; width: auto; }
-.pf-aai-row .poster-action { flex: none; }
-.pf-aai .pf-tabs { margin-top: 0.5rem; }
-/* The agent's keys, its cap and its gate: every control a thumb has to hit, 44 px at every width.
-   Measured at 390 before this: the three SAVE buttons 16 px, the two tests 18, the gate's three
-   positions 28, the four fields 36. Same reason and same shape as the decision-model card above. */
-.pf .pf-aai .poster-action,
-.pf .pf-aai .og-input,
-.pf .pf-aai .select-field,
-.pf .pf-aai .poster-tab {
-  min-height: 44px;
-}
-/* The three SAVE buttons measured 37.2 px wide and the two tests 28.8: short in the other
-   dimension is just as easy to miss. */
-.pf .pf-aai .poster-action, .pf .pf-aai .poster-tab { min-width: 44px; }
-.pf-aai-rules { margin-top: 0.6rem; }
-@media (max-width: 600px) {
-  .pf-dr-q-top, .pf-dr-pair { grid-template-columns: minmax(0, 1fr); }
-}
+/* ── One agent's AI settings: components now (agents/agent-ai-section.js); its 44px thumb targets
+   are the Touch part with its tabs (css/components/layout.css). ── */
 
-/* ── The account's own compliance slice (BR-02) ──
-   Deliberately the same furniture as the card above it: they answer consecutive questions about the
-   same subject, and giving the second one its own visual language would read as a different feature.
-   Only the "not written down" tile changes colour, and only above zero, for the reason the sibling
-   states — a surface that is always red teaches people to stop looking at it. */
-.pf-cmp-body > .og-strip { margin-top: 0; }
-.pf-cmp-sub { margin: 1.2rem 0 0.4rem; }
-/* The notes are the numbered list (IndexList, Jouni's decision "Numbered list"); their place, and a long model name breaks. */
-.pf .pf-cmp-models, .pf .pf-cmp-limits { margin: 0.3rem 0 0; }
-.pf-cmp-models .poster-index-item, .pf-cmp-limits .poster-index-item { overflow-wrap: anywhere; }
-.pf-cmp-entries { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.pf-cmp-entries li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 0.7rem; padding: 0.55rem 0.7rem; margin: 0; min-width: 0; }
-.pf-cmp-entry-title { font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
-.pf-cmp-entry-risk { font-size: 0.78rem; color: var(--muted); flex-shrink: 0; }
-
-/* Bring-your-own-app, under each service. Indented and quiet on purpose: it is the advanced door,
-   and it must not compete with the Connect button that almost everyone wants instead. */
-.access-cx-own {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2, 0.5rem);
-  padding-left: var(--space-3, 0.75rem);
-  border-left: 2px solid var(--border);
-  margin: var(--space-2, 0.5rem) 0 var(--space-3, 0.75rem);
-}
-.access-cx-own-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2, 0.5rem);
-  width: 100%;
-}
-
-/* One service per block, and the eye has to be able to tell where one ends.
-   MEASURED before this existed: the "use your own app" control sat 52-83px below the Connect button
-   it belongs to and 16px above the NEXT service's, so proximity said it belonged to the wrong one
-   in every single case. Grouping is not decoration; it was reading as a different feature. */
-.access-cx-add + .access-cx-add {
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-4, 1rem);
-  margin-top: var(--space-4, 1rem);
-}
-
-/* ── P&L tab (pf-pnl) — company-in-a-box phase 7 ─────────────────────────── */
-.pf-pnl-controls { display: flex; gap: var(--space-3, 0.75rem); align-items: flex-end; flex-wrap: wrap; margin-bottom: var(--space-4, 1rem); }
-.pf-pnl-controls label { display: flex; flex-direction: column; gap: 4px; }
-.pf-pnl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4, 1rem); }
-.pf-pnl-block { margin-bottom: var(--space-4, 1rem); }
-.pf-pnl-result { margin-bottom: var(--space-4, 1rem); }
-.pf-pnl-note { margin: var(--space-2, 0.5rem) 0 0; }
-.pf-pnl-empty { margin: var(--space-2, 0.5rem) 0 0; }
-.pf-acc-list { margin: var(--space-3, 0.75rem) 0; }
-.pf-acc-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 200px; }
+/* The account's own compliance slice (BR-02) and the P&L tab are kit components now (FigureStrip,
+   BoxList and BoxLine; List, Card, TextField): their rules went with their classes. */
 
 /* The Companies tab's pf-co rules left for css/views/companies-poster.css (co- prefix) when the
    tab moved to the poster face. */
 
-/* The start-page setting, at the foot of the overview. Separated by a rule so it reads as a footer
-   preference rather than another card in the grid. */
-.pf .pf-start-page {
-  margin: 4rem 0 1rem; padding-top: 1.2rem;
-  flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
-}
-.pf .pf-start-page .start-page-title { font-weight: 800; font-size: 1rem; }
+/* The start-page setting at the foot of the overview is StartPageSetting's footer (start-page.css). */
 
 /* The prompt card owns its corner, like every other card. */
 /* The card owns its corner, and the head stops short of it. Measured before this: the dots
    overlapped the primary button by 18x18px and hung 12px outside the head, where the card edge
    clipped them into a smudge. */
 
-/* ── Usage reports tab (pf-ureport-*) ──────────────────────────────────────
-   NOT pf-usage-*, which is the Home quota card. Reusing that prefix made
-   .pf-usage-chip's surface background win over the selected button's white
-   text, so the chosen report rendered white on white.
-
-   Stats use the canonical .stat-grid/.stat-card, and the reports and the time
-   window are tabs (.poster-tab, Jouni's decision "Tabs and filters"), so nothing
-   is defined here twice. The report bar WRAPS: eight report labels do not fit
-   one line on a phone, and a horizontal scroller would hide the questions this
-   page exists to offer. */
-.pf-ureport-controls {
-  display: flex; flex-wrap: wrap; justify-content: space-between;
-  align-items: flex-start; gap: var(--space-3, 0.75rem);
-  margin-bottom: var(--space-4, 1rem);
-}
-.pf-ureport-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; }
-
-/* A fixed height so the canvas has something to be 100 % of, and so switching
-   report does not make the table below it jump. */
-.pf-ureport-chart { height: 200px; margin-bottom: var(--space-4, 1rem); }
-
-.pf-ureport-empty { padding: var(--space-4, 1rem) 0; }
-
-/* AgentConsent (both mounts: .pf Agents tab and the home's koti-step, so unscoped) */
-.agc-preset-desc { margin: 0.35rem 0 0; line-height: 1.45; }
-.agc-boundary { margin: 0.6rem 0 0; padding-left: 1.1rem; line-height: 1.45; }
-.agc-boundary li { margin-bottom: 0.2rem; }
+/* AgentConsent (both mounts) is css/components/agent-consent.css. */

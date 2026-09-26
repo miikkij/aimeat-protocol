@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.13.0 — 2026-09-27 — The box and choice tile shapes' demos are box-shape and choice-shape, as their entries.
  *   v1.12.0 — 2026-09-26 — The Markdown reader's small cut beside the full one (Jouni's decision "Small reader").
  *   v1.11.0 — 2026-09-26 — The box's raised tone.
  *   v1.10.0 — 2026-09-26 — The action link's Settings tones: small, lower and row.
@@ -38,7 +39,6 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { TagList } from '/components/TagList.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
-import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
 import { OwnAimeatBlock } from '/views/surface/blocks-home.js';
 
 const html = htm.bind(h);
@@ -93,9 +93,6 @@ export const SHARED_DEMOS = {
   'mcp-install': { variants: [
     { name: 'quick connect', render: (ex) => html`<${McpQuickConnect} serverName=${ex.serverName} title=${ex.title} lead="The shortest way in, for each tool." />` },
   ] },
-  'hello-mcp': { variants: [
-    { name: 'the setup guide', render: () => html`<${McpSetupGuide} />` },
-  ] },
   'contact-picker': { height: 320, variants: [
     { name: 'default', render: (ex) => html`<${ContactPicker} value=${ex.value} placeholder=${ex.placeholder} onChange=${noop} onSubmit=${noop} />` },
   ] },
@@ -148,7 +145,7 @@ export const SHAPE_DEMOS = {
     { name: 'disabled', render: () => html`<button type="button" class="poster-icon" aria-label="Attach a file" disabled>📎</button>` },
     { name: 'pressed', render: () => html`<button type="button" class="poster-icon poster-icon--small" aria-pressed="false" title="Add to collection">🛒</button> <button type="button" class="poster-icon poster-icon--small is-on" aria-pressed="true" title="Remove from collection">🛒</button>` },
   ] },
-  'box': { variants: [
+  'box-shape': { variants: [
     { name: 'default', render: () => el('div', 'poster-box', 'A framed object.') },
     { name: 'raised', render: () => el('div', 'poster-box poster-box--raised', 'The row you opened, or the way to take first.') },
     { name: 'copy', render: () => el('div', 'poster-box poster-box--copy', 'A text to copy.') },
@@ -164,7 +161,7 @@ export const SHAPE_DEMOS = {
     { name: 'default', render: () => html`<div class="poster-record"><h3 class="poster-record-title">A record</h3><p>Its details.</p></div>` },
     { name: 'small title', render: () => html`<div class="poster-record"><h3 class="poster-record-title poster-record-title--small">A record</h3></div>` },
   ] },
-  'choice': { variants: [
+  'choice-shape': { variants: [
     { name: 'default', render: () => html`<button type="button" class="poster-choice"><b>Daily</b>Every morning at eight.</button>` },
     { name: 'chosen', render: () => html`<button type="button" class="poster-choice on"><b>Weekly</b>On Mondays.</button>` },
   ] },

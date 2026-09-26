@@ -1,0 +1,88 @@
+/**
+ * @file offer-card-view.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The offer card and its parts (components/offer-card-view.js): the card with the
+ *   offer's name and its agent, the trust and price chips, the ask, and the opened detail (the
+ *   example, the requirements as chips, what comes back and its sample as rendered Markdown). In
+ *   Settings & Controls (.pf) the card is a row over an ink rule, the chips square and mono with
+ *   their colour as the frame, a requirement and a sample in the ink frame.
+ *   Theme tokens only.
+ *   NOTE: this file must be linked in spa.html, where offers.css is.
+ * @version-history
+ *   v1.0.1 — 2026-09-27 — The Settings skin (.pf) reads the shape values (frame, rule, corner, pill: the AIMEAT values, so nothing changes there; a theme reaches it).
+ *   v1.0.0 — 2026-09-27 — Moved unchanged out of css/views/offers.css (the base look) and
+ *     css/views/profile-poster.css (the .pf look) under the component's own names: .of-card →
+ *     .offer-card (--open, -head, -title), .of-offer-title → .offer-card-name, .of-agent →
+ *     .offer-card-agent, .of-badges/.of-badge(--…) → .offer-card-badges/.offer-card-badge(--…),
+ *     .of-ask/-detail/-example/-label/-mini/-fix → .offer-card-ask/-detail/-example/-label/-mini/-fix,
+ *     .of-req-list → .offer-card-reqs, .of-req → .offer-card-req, .of-md → .offer-card-md,
+ *     .of-sample-md → .offer-card-sample (a move: the same declarations, the same selector shapes;
+ *     the .pf rules keep their weight, so they win where they won).
+ */
+
+.offer-card { border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0.5rem 0; }
+.offer-card--open { border-color: var(--accent, var(--border)); }
+.offer-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; cursor: pointer; }
+.offer-card-title { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.offer-card-name { font-weight: 600; }
+.offer-card-agent { font-size: 0.82rem; color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; }
+
+.offer-card-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: flex-start; }
+.offer-card-badge { font-size: 0.72rem; padding: 0.05rem 0.4rem; border-radius: 10px; background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; }
+.offer-card-badge--ver { color: var(--success, #10b981); }
+.offer-card-badge--data { color: var(--info, var(--accent)); }
+.offer-card-badge--cost { color: var(--warn, #f59e0b); }
+.offer-card-badge--untested { color: var(--muted); font-style: italic; }
+
+.offer-card-ask { margin: 0.35rem 0 0; color: var(--text); }
+.offer-card-detail { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.4rem; }
+.offer-card-example { font-size: 0.88rem; color: var(--muted); }
+.offer-card-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+.offer-card-mini { font-size: 0.8rem; color: var(--muted); }
+
+.offer-card-reqs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.offer-card-req { font-size: 0.82rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.45rem; }
+.offer-card-fix { color: var(--accent); font-weight: 600; }
+
+/* Billing badges */
+.offer-card-badge--vis { color: var(--accent); border-color: var(--accent); }
+.offer-card-badge--price { color: var(--warn, #f59e0b); font-weight: 600; }
+
+/* Rendered markdown (the sample) */
+.offer-card-md { font-size: 0.86rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.7rem; overflow-x: auto; max-height: 360px; }
+.offer-card-md > :first-child { margin-top: 0; }
+.offer-card-md > :last-child { margin-bottom: 0; }
+.offer-card-sample { max-height: 200px; }
+/* Scale headings/tables/lists to the card context (an LLM h1 must not be giant here). */
+.offer-card-md h1, .offer-card-md h2, .offer-card-md h3, .offer-card-md h4, .offer-card-md h5, .offer-card-md h6 { font-size: 0.95rem; font-weight: 700; line-height: 1.3; margin: 0.45rem 0 0.2rem; }
+.offer-card-md h1 { font-size: 1.02rem; }
+.offer-card-md p { margin: 0.3rem 0; }
+.offer-card-md ul, .offer-card-md ol { margin: 0.3rem 0; padding-left: 1.2rem; }
+.offer-card-md li { margin: 0.1rem 0; }
+.offer-card-md table { border-collapse: collapse; font-size: 0.8rem; margin: 0.3rem 0; }
+.offer-card-md th, .offer-card-md td { border: 1px solid var(--border); padding: 0.15rem 0.45rem; text-align: left; }
+.offer-card-md th { background: var(--surface); font-weight: 600; }
+.offer-card-md pre { font-size: 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; overflow-x: auto; }
+.offer-card-md code { font-size: 0.82em; }
+
+/* ── In Settings & Controls (.pf), moved from profile-poster.css: the card is a row with one rule
+      under it and its own words in bold; a requirement and a sample are in the ink frame; a chip
+      is square and mono with its colour kept as the frame. ── */
+.pf .offer-card {
+  background: none; border: 0; border-bottom: var(--shape-frame) solid var(--shape-rule-colour); border-radius: var(--shape-corner); box-shadow: none; padding: 0.9rem 0;
+}
+.pf .offer-card:hover {
+  transform: none; box-shadow: none; border-color: var(--accent); background: none;
+}
+.pf .offer-card--open { border-bottom-color: var(--accent); }
+.pf .offer-card-title,
+.pf .offer-card-name { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
+.pf .offer-card-req,
+.pf .offer-card-md {
+  border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner); background: var(--bg-dim); box-shadow: none;
+}
+.pf .offer-card-badge {
+  border-radius: var(--shape-corner-pill); background: none; border: var(--shape-frame) solid currentColor;
+  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
+}

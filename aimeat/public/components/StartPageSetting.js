@@ -20,6 +20,8 @@
  *   import { StartPageSetting } from '/components/StartPageSetting.js';
  *   html`<${StartPageSetting} />`
  * @version-history
+ *   v1.2.0 — 2026-09-26 — `footer`: at the foot of a page under the heavy rule, words and tabs on one
+ *     line (the Settings overview's .pf-start-page, moved to start-page.css; page group G8, additive).
  *   v1.1.0 — 2026-09-24 — The choices are tabs, the chosen one on the sun (Jouni's decision "Choice").
  *   v1.0.0 — 2026-08-27 — Initial, in place of HomeUiSwitch.js.
  */
@@ -39,7 +41,12 @@ const OPTIONS = [
   { id: 'profile', key: 'home.startPage.controls', fallback: 'Settings & controls' },
 ];
 
-export function StartPageSetting({ className = '' }) {
+/**
+ * `footer` (added by page group G8): the preference at the foot of a page, under the heavy rule,
+ * its words and its tabs on one line (the Settings overview; formerly its .pf-start-page).
+ * `className` stays for the home's settings dialog, which passes its own place.
+ */
+export function StartPageSetting({ className = '', footer = false }) {
   const [ui, setUi] = useState(null);           // 'home' | 'chat' | 'profile'
   const [chatHere, setChatHere] = useState(true); // whether this node has a chat to land in
   const [busy, setBusy] = useState(false);
@@ -74,7 +81,7 @@ export function StartPageSetting({ className = '' }) {
 
   const options = OPTIONS.filter(o => o.id !== 'chat' || chatHere || ui === 'chat');
   return html`
-    <div class="start-page ${className}">
+    <div class="start-page ${footer ? 'start-page--footer poster-row--thing' : ''} ${className}">
       <div class="start-page-words">
         <span class="start-page-title">${tr('home.startPage.title', 'Start page')}</span>
         <span class="start-page-hint">

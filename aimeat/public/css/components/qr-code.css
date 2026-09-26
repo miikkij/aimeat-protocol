@@ -1,0 +1,17 @@
+/**
+ * @file qr-code.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The QR code (components/QrCode.js). It stands on white whatever the theme, because a
+ *   scanner reads dark on light and the code the server draws is black: the one literal colour here,
+ *   on purpose (no theme token means "white paper in every style"). Its corner reads the theme.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Moved from css/views/profile.css .pf .pf-2fa-qr (G3 page migration, a move;
+ *     the corner now reads --shape-corner instead of 8px).
+ */
+
+.qr-code {
+  display: block; width: 200px; height: 200px; margin-bottom: .75rem;
+  background: #fff; padding: .5rem; border: 1px solid var(--border); border-radius: var(--shape-corner);
+}

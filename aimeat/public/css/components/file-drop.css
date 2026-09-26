@@ -10,6 +10,12 @@
  *   reads --shape-frame (the same value); a file row's corner reads --shape-corner, a box's corner.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.2 -- 2026-09-27 -- .file-drop-or and .file-drop-size carry the small dim words that
+ *     FileDrop took from the page's .pf .text-meta (the same values; a move).
+ *   v1.2.1 -- 2026-09-26 -- The drop zone's focus ring reads var(--shape-frame) (2px in AIMEAT), not a
+ *     literal (check:shape-tokens; fix pass).
+ *   v1.2.0 -- 2026-09-26 --Drawn by components/FileDrop.js; its own names for the hidden field, the arrow,
+ *     a row's mark, name and size, the keyboard ring and the closed area (component plan C5).
  *   v1.1.0 -- 2026-09-26 -- A file row's 8px corner reads --shape-corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
  */
@@ -21,5 +27,18 @@
 .pf .file-dropzone-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;color:var(--text-dim,#6B7280);font-size:.9rem}
 .pf .file-upload-list{display:flex;flex-direction:column;gap:.5rem;margin:.75rem 0}
 .pf .file-upload-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--bg-surface);border:1px solid var(--border,rgba(232,86,74,.15));border-radius:var(--shape-corner)}
+/* The FileDrop component's own names (components/FileDrop.js): the hidden file field, the big arrow
+   and a file row's mark (formerly .pf-hidden, .pf-upload-icon, .pf-file-icon), a row's name field
+   and size, the ring the area shows under the keyboard, and the area that cannot take a file now. */
+.file-drop-input { display: none; }
+.file-drop-arrow { font-size: 2rem; opacity: .5; }
+.file-drop-mark { font-size: 1.2rem; flex-shrink: 0; }
+.file-upload-item > .og-input, .file-drop-name { flex: 1 1 auto; min-width: 0; }
+.file-drop-size { white-space: nowrap; flex-shrink: 0; }
+/* The "or click" line and a row's size: the small dim words (formerly the page's .pf .text-meta,
+   whose values these are). */
+.pf .file-drop-or, .pf .file-drop-size { font-size: .8rem; color: var(--text-dim, #6B7280); }
+.file-dropzone:focus-visible { outline: var(--shape-frame) solid var(--accent); outline-offset: 2px; }
+.file-dropzone.is-off { cursor: default; opacity: .6; }
 .pf .pf-upload-icon   { font-size: 2rem; opacity: .5; }
 .pf .pf-file-icon     { font-size: 1.2rem; flex-shrink: 0; }

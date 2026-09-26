@@ -8,9 +8,18 @@
  *   then what the package is about, the entries as text with their sources named verified or
  *   unchecked and their relations in words, the sharing switches, and the details as a fold. Every
  *   write goes through the handlers the old card called.
- * @structure renderPackage · entryBlock
+ * @structure renderPackage · entryRow · sourceRows · relationDoors
  * @usage import { renderPackage } from './package.js';
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- On the component kit (page group G7): the page is the SettingsPage (via
+ *     frame.js renderPage, marks and the rail as data), the strip the FigureStrip, the sections
+ *     Section (the details a fold, as on main); an entry is a List row (the name opens it; the
+ *     public/private Tab, the closed entry's counts and open/close in its doors; the text, the
+ *     sources and the relations in its Panel); a source is a dense List row (verified in green,
+ *     unchecked in coral, Tinted in the typewriter cell; the title a link that opens beside), a
+ *     relation an Action; the sharing switches and the details are Facts (wide, flush; the organism
+ *     picker a Select and its Action as the value's controls). main's dim tags come back (language,
+ *     version, licence, tags, "+N", a private entry when it cannot be changed). No class is written here.
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.15.0 -- 2026-09-26 -- The figure's "of how many" is the Figure strip's own cut (.og-strip-of), moved unchanged from .kp-of (a move).
  *   v1.14.0 -- 2026-09-26 -- A package's id in its details is the inline code (.code-inline), a unification: the look most tabs use for an identifier.
@@ -40,44 +49,72 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
+import { Section } from '/components/Section.js';
 import { Switch } from '/components/Switch.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tinted } from '/components/Figure.js';
+import { Facts } from '/components/Facts.js';
+import { Select } from '/components/Select.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Tab } from '/components/Tabs.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { List, Row, Name, Cell, Doors, Panel } from '/components/List.js';
 import { c, day, rel, ctWord, maturityWord, synthWord, visWord, relWord, manifestOf, statsOf, pkgId, entryText, renderPage } from './frame.js';
 
 const VIS_CYCLE = ['private', 'owner', 'group', 'public'];
+const libraryUrl = (id) => '/v1/publicknowledgeviewer?id=' + encodeURIComponent(id);
 
-function entryBlock(ctx, pkg, entry, i, allEntries) {
+/** An entry's sources: verified (green) or unchecked (coral), the title (a link that opens beside when it has an address), its type. */
+function sourceRows(refs) {
+  return html`<${List} cols="tag-name" keepCols dense>
+    ${refs.map((r, j) => html`<${Row} key=${j}>
+      <${Cell} meta><${Tinted} tone=${r.verified ? 'fine' : 'notice'}>${r.verified ? c('verified') : c('unverified')}<//><//>
+      ${r.url ? html`<${Name} href=${r.url} newTab tag=${r.type || null}>${r.title || r.url} ↗<//>` : html`<${Name} tag=${r.type || null}>${r.title || c('untitled')}<//>`}
+    <//>`)}
+  <//>`;
+}
+
+/** An entry's relations: "relation: entry", each opening the entry it names and bringing it into view. */
+function relationDoors(ctx, rels, allEntries) {
+  const target = (k) => allEntries.find(e => e.key === k || String(e.key || '').endsWith('/' + k));
+  return html`<${Actions}>${rels.map((r, j) => {
+    const tg = target(r.key); const idx = tg ? allEntries.indexOf(tg) : -1;
+    const go = () => { if (idx >= 0) { ctx.openEntry(allEntries[idx].key || String(idx)); document.getElementById('kp-e-' + idx)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
+    return html`<${Action} key=${j} small soft onClick=${go}>${relWord(r.relation)}: ${tg ? (tg.title || r.key) : r.key}<//>`;
+  })}<//>`;
+}
+
+/** One entry as a row of the entries list: its name opens it; its text, sources and relations stand in the opened panel. */
+function entryRow(ctx, pkg, entry, i, allEntries) {
   const key = entry.key || String(i);
   const open = ctx.openEntries.has(key);
   const data = ctx.entryData[entry.key] ?? entry.value;
   const text = entryText(data);
   const vis = entry.visibility || 'private';
+  const pub = vis === 'public';
   const next = VIS_CYCLE[(VIS_CYCLE.indexOf(vis) + 1) % VIS_CYCLE.length];
   const refs = entry.references || [];
   const rels = entry.related_entries || [];
   const label = entry.title || entry.key || c('entryN', { n: i + 1 });
-  const target = (k) => allEntries.find(e => e.key === k || String(e.key || '').endsWith('/' + k));
+  const toggle = () => ctx.toggleEntry(key);
+  const flip = () => ctx.handleEntryVisibility(pkg, entry, next);
+  const counts = [refs.length ? c('refsN', { n: refs.length }) : '', rels.length ? c('relsN', { n: rels.length }) : ''].filter(Boolean).join(' · ');
   return html`
-    <div class=${`kp-entry ${open ? 'is-open' : ''}`} key=${key} id=${'kp-e-' + i}>
-      <div class="kp-entry-h">
-        <button type="button" class="kp-entry-title" onClick=${() => ctx.toggleEntry(key)}>${label}</button>
-        <div class="kp-entry-r">
-          ${ctx.readOnly ? html`<span class=${`poster-chip ${vis === 'public' ? 'poster-chip--sun' : ''}`}>${visWord(vis)}</span>`
-            : html`<button type="button" class=${`poster-tab poster-tab--fold ${vis === 'public' ? 'is-on' : ''}`} aria-pressed=${vis === 'public' ? 'true' : 'false'} title=${`${visWord(vis)} → ${visWord(next)}`} onClick=${() => ctx.handleEntryVisibility(pkg, entry, next)}>${visWord(vis)} ▾</button>`}
-          ${!open ? html`<span class="poster-hint kp-inline">${[refs.length ? c('refsN', { n: refs.length }) : '', rels.length ? c('relsN', { n: rels.length }) : ''].filter(Boolean).join(' · ')}</span>` : null}
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleEntry(key)}>${open ? c('close') : c('open')}</button>
-        </div>
-      </div>
-      ${open ? html`
-        ${ctx.loadingEntries && !text ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>` : text ? html`<p class="kp-entry-text">${text}</p>` : html`<p class="poster-quiet">${c('noContent')}</p>`}
-        ${refs.length ? html`<div class="kp-refs">${refs.map((r, j) => html`
-          <div class="kp-ref" key=${j}><i class=${r.verified ? '' : 'kp-ref--no'}>${r.verified ? c('verified') : c('unverified')}</i>
-            ${r.url ? html`<a href=${r.url} target="_blank" rel="noopener">${r.title || r.url} ↗</a>` : html`<span>${r.title || c('untitled')}</span>`}
-            ${r.type ? html`<span class="poster-chip">${r.type}</span>` : null}</div>`)}</div>` : null}
-        ${rels.length ? html`<div class="kp-rels">${rels.map((r, j) => { const tg = target(r.key); const idx = tg ? allEntries.indexOf(tg) : -1; return html`
-          <button type="button" class="kp-rel" key=${j} onClick=${() => { if (idx >= 0) { ctx.openEntry(allEntries[idx].key || String(idx)); document.getElementById('kp-e-' + idx)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }}><b>${relWord(r.relation)}</b>${tg ? (tg.title || r.key) : r.key}</button>`; })}</div>` : null}` : null}
-    </div>`;
+    <${Row} key=${key} open=${open} id=${'kp-e-' + i}>
+      <${Name} onOpen=${toggle}>${label}<//>
+      <${Doors}>
+        ${ctx.readOnly ? html`<${Mark} tone=${pub ? 'sun' : 'dim'}>${visWord(vis)}<//>`
+          : html`<${Tab} tone="fold" on=${pub} pressed=${pub} title=${`${visWord(vis)} → ${visWord(next)}`} onClick=${flip}>${visWord(vis)} ▾<//>`}
+        ${!open ? html`<${Note} inline>${counts}<//>` : null}
+        <${Action} small soft onClick=${toggle}>${open ? c('close') : c('open')}<//>
+      <//>
+      ${open ? html`<${Panel} text=${text}>
+        ${text ? null : ctx.loadingEntries ? html`<${Note} kind="loading">${t('common.loading')}<//>` : html`<${Note} kind="quiet">${c('noContent')}<//>`}
+        ${refs.length ? sourceRows(refs) : null}
+        ${rels.length ? relationDoors(ctx, rels, allEntries) : null}
+      <//>` : null}
+    <//>`;
 }
 
 export function renderPackage(ctx, pkg) {
@@ -90,67 +127,75 @@ export function renderPackage(ctx, pkg) {
   const tags = m.tags || [];
   const others = ctx.packages.filter(p => pkgId(p) !== id).slice(0, 6);
   const allOpen = entries.length && entries.every((e, i) => ctx.openEntries.has(e.key || String(i)));
+  const saving = ctx.savingSharing === pkg.key;
 
-  const chips = html`
-    <span class=${`poster-chip ${m.maturity === 'published' || m.maturity === 'stable' ? 'poster-chip--sun' : ''}`}>${maturityWord(m.maturity)}</span>
-    <span class="poster-chip">${ctWord(m.content_type || 'document')}</span>
-    <span class="poster-chip">${synthWord(m.synthesis?.level)}</span>
-    ${m.language ? html`<span class="poster-chip">${String(m.language).toLowerCase()}</span>` : null}
-    ${m.version ? html`<span class="poster-chip">v${m.version}</span>` : null}
-    ${m.sharing?.license ? html`<span class="poster-chip">${m.sharing.license}</span>` : null}
-    ${federated ? html`<span class="poster-chip poster-chip--coral">${t('knowledge.federated')}</span>` : null}
-    ${tags.slice(0, 4).map(tag => html`<span class="poster-chip" key=${tag}>${tag}</span>`)}
-    ${tags.length > 4 ? html`<span class="poster-chip">+${tags.length - 4}</span>` : null}`;
+  // The tags under the title; the ones that only describe (language, version, licence, the person's
+  // own tags) are dim, as main drew them.
+  const marks = [
+    { label: maturityWord(m.maturity), tone: m.maturity === 'published' || m.maturity === 'stable' ? 'sun' : undefined },
+    { label: ctWord(m.content_type || 'document') },
+    { label: synthWord(m.synthesis?.level) },
+    m.language ? { label: String(m.language).toLowerCase(), tone: 'dim' } : null,
+    m.version ? { label: `v${m.version}`, tone: 'dim' } : null,
+    m.sharing?.license ? { label: m.sharing.license, tone: 'dim' } : null,
+    federated ? { label: t('knowledge.federated'), tone: 'coral' } : null,
+    ...tags.slice(0, 4).map(tag => ({ label: tag, tone: 'dim' })),
+    tags.length > 4 ? { label: `+${tags.length - 4}`, tone: 'dim' } : null,
+  ];
+  const exportIt = () => ctx.handleExport(pkg);
+  const showInLibrary = () => window.open(libraryUrl(id), '_blank', 'noopener');
+  const remove = () => ctx.handleDelete(pkg);
   const doors = html`
-    <button type="button" class="poster-slab" onClick=${() => ctx.handleExport(pkg)}>${t('knowledge.myKnowledge.export')}</button>
-    ${listed ? html`<button type="button" class="poster-action poster-action--small" onClick=${() => window.open('/v1/publicknowledgeviewer?id=' + encodeURIComponent(id), '_blank', 'noopener')}>${c('showInLibrary')} ↗</button>` : null}
-    <button type="button" class="poster-action poster-action--small poster-action--danger" disabled=${ctx.deleting === pkg.key} onClick=${() => ctx.handleDelete(pkg)}>${t('profile.delete')}</button>`;
-  const strip = html`
-    <div class="og-strip">
-      <div><b>${s.entries}</b><span>${c('stripEntries')}</span><small>${c('stripEntriesSub', { n: s.publicN })}</small></div>
-      <div><b>${s.verified}<span class="og-strip-of">/${s.refs}</span></b><span>${c('stripRefs')}</span><small>${s.refs - s.verified ? c('stripRefsSub', { n: s.refs - s.verified }) : (s.refs ? c('stripRefsAll') : c('noRefs'))}</small></div>
-      <div><b class="og-strip-coral">${listed ? c('listedShort') : c('privateShort')}</b><span>${c('stripSharing')}</span><small>${[m.sharing?.allow_clone ? c('clonable') : c('notClonable'), federated ? t('knowledge.federated') : ''].filter(Boolean).join(' · ')}</small></div>
-      <div><b>${rel(m.updated || pkg.updated_at)}</b><span>${c('stripUpdated')}</span><small>${m.created ? c('createdOn', { d: day(m.created) }) : ''}${m.author ? ` · ${m.author}` : ''}</small></div>
-    </div>`;
-  const rail = html`
-    <hr /><span class="og-rail-label">${c('inPackage')}</span>
-    ${[['01', 'kp-about', c('secAbout')], ['02', 'kp-entries', c('secEntries')], ['03', 'kp-sharing', c('secSharing')], ['04', 'kp-details', c('secDetails')]].map(([n, sid, label]) => html`<button type="button" class="og-rail-link" key=${sid} onClick=${() => document.getElementById(sid)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><i>${n}</i>${label}${sid === 'kp-entries' ? html`<em>${entries.length}</em>` : null}</button>`)}
-    ${others.length ? html`<hr /><span class="og-rail-label">${c('otherPackages')}</span>
-      ${others.map(p => html`<button type="button" class="og-rail-link" key=${pkgId(p)} onClick=${() => ctx.pickView({ kind: 'package', id: pkgId(p) })}><i>→</i>${manifestOf(p).name || c('untitled')}</button>`)}` : null}`;
-  const toggle = (field, on, label, hint) => html`
-    <div class="facts-k poster-label">${label}</div>
-    <div class="facts-v"><${Switch} on=${on} label=${hint} disabled=${ctx.savingSharing === pkg.key} onToggle=${() => ctx.handleSharingChange(pkg, field, !on)} /></div>`;
+    <${Loud} onClick=${exportIt}>${t('knowledge.myKnowledge.export')}<//>
+    ${listed ? html`<${Action} small onClick=${showInLibrary}>${c('showInLibrary')} ↗<//>` : null}
+    <${Action} small tone="danger" disabled=${ctx.deleting === pkg.key} onClick=${remove}>${t('profile.delete')}<//>`;
+  const strip = html`<${FigureStrip} items=${[
+    { n: s.entries, label: c('stripEntries'), sub: c('stripEntriesSub', { n: s.publicN }) },
+    { n: s.verified, of: '/' + s.refs, label: c('stripRefs'), sub: s.refs - s.verified ? c('stripRefsSub', { n: s.refs - s.verified }) : (s.refs ? c('stripRefsAll') : c('noRefs')) },
+    { n: listed ? c('listedShort') : c('privateShort'), tone: 'coral', label: c('stripSharing'), sub: [m.sharing?.allow_clone ? c('clonable') : c('notClonable'), federated ? t('knowledge.federated') : ''].filter(Boolean).join(' · ') },
+    { n: rel(m.updated || pkg.updated_at), label: c('stripUpdated'), sub: `${m.created ? c('createdOn', { d: day(m.created) }) : ''}${m.author ? ` · ${m.author}` : ''}` },
+  ]} />`;
+  const railGroups = [
+    { label: c('inPackage'), items: [['01', 'kp-about', c('secAbout')], ['02', 'kp-entries', c('secEntries')], ['03', 'kp-sharing', c('secSharing')], ['04', 'kp-details', c('secDetails')]]
+      .map(([n, sid, label]) => ({ key: sid, section: sid, mark: n, label, count: sid === 'kp-entries' ? entries.length : undefined })) },
+    others.length ? { label: c('otherPackages'), items: others.map(p => ({ key: pkgId(p), mark: '→', label: manifestOf(p).name || c('untitled'), onClick: () => ctx.pickView({ kind: 'package', id: pkgId(p) }) })) } : null,
+  ];
+  const toggle = (field, on, label, hint) => ({ k: label, v: html`<${Switch} on=${on} label=${hint} disabled=${saving} onToggle=${() => ctx.handleSharingChange(pkg, field, !on)} />` });
+  const contribute = () => ctx.contributeToOrganism(pkg);
+  const sharing = [
+    toggle('catalog_listed', listed, c('kLibrary'), listed ? c('listedHint') : c('notListedHint')),
+    toggle('allow_clone', !!m.sharing?.allow_clone, c('kClone'), m.sharing?.allow_clone ? c('cloneOn') : c('cloneOff')),
+    { k: c('kFederation'), v: html`<${Switch} on=${federated} label=${federated ? c('fedOn') : c('fedOff')} disabled=${ctx.togglingFed === pkg.key} onToggle=${() => ctx.toggleFederation(pkg)} />` },
+    ctx.organisms.length ? { k: c('kOrganism'), controls: true, v: html`
+      <${Select} ariaLabel=${c('kOrganism')} placeholder=${c('pickOrganism')} value=${ctx.shareOrg} onChange=${(v) => ctx.setShareOrg(v)}
+        options=${ctx.organisms.map(o => ({ value: o.id || o.organismId, label: o.name || o.id }))} />
+      <${Action} small disabled=${!ctx.shareOrg} onClick=${contribute}>${t('knowledge.organisms.contribute')}<//>` } : null,
+  ];
+  const details = [
+    { k: 'ID', v: id, mono: true },
+    m.author ? { k: t('pkv.author'), v: m.author } : null,
+    m.synthesis?.model ? { k: c('kModel'), v: m.synthesis.model } : null,
+    m.sharing?.license ? { k: t('pkv.license'), v: m.sharing.license } : null,
+    m.created ? { k: t('pkv.created'), v: day(m.created) } : null,
+    m.updated ? { k: t('pkv.updated'), v: day(m.updated) } : null,
+    tags.length ? { k: c('kTags'), v: tags.join(', ') } : null,
+  ];
+  const openAll = () => ctx.setAllEntries(entries, !allOpen);
 
   return renderPage(ctx, {
-    crumbs: [m.name || c('untitled')], title: m.name || c('untitled'), chips, doors, strip, rail,
+    crumbs: [m.name || c('untitled')], title: m.name || c('untitled'), marks, doors, strip, railGroups,
     children: html`
-      <${PageSection} id="kp-about" num="01" title=${c('secAbout')} first=${true}>
-        ${m.synthesis?.description ? html`<p class="kp-about">${m.synthesis.description}</p>` : html`<p class="poster-quiet">${c('noAbout')}</p>`}
+      <${Section} id="kp-about" num="01" title=${c('secAbout')} first=${true}>
+        ${m.synthesis?.description ? html`<${Note} kind="lead">${m.synthesis.description}<//>` : html`<${Note} kind="quiet">${c('noAbout')}<//>`}
       <//>
-      <${PageSection} id="kp-entries" num="02" title=${c('secEntries')} count=${entries.length} doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setAllEntries(entries, !allOpen)}>${allOpen ? c('closeAll') : c('openAll')}</button>`}>
-        ${entries.length ? entries.map((e, i) => entryBlock(ctx, pkg, e, i, entries)) : html`<p class="poster-quiet">${c('noEntries')}</p>`}
+      <${Section} id="kp-entries" num="02" title=${c('secEntries')} count=${entries.length} doors=${html`<${Action} small soft onClick=${openAll}>${allOpen ? c('closeAll') : c('openAll')}<//>`}>
+        <${List} cols="name-doors" keepCols empty=${c('noEntries')}>${entries.map((e, i) => entryRow(ctx, pkg, e, i, entries))}<//>
       <//>
-      <${PageSection} id="kp-sharing" num="03" title=${c('secSharing')}>
-        <div class="facts facts--wide kp-kv">
-          ${toggle('catalog_listed', listed, c('kLibrary'), listed ? c('listedHint') : c('notListedHint'))}
-          ${toggle('allow_clone', !!m.sharing?.allow_clone, c('kClone'), m.sharing?.allow_clone ? c('cloneOn') : c('cloneOff'))}
-          <div class="facts-k poster-label">${c('kFederation')}</div>
-          <div class="facts-v"><${Switch} on=${federated} label=${federated ? c('fedOn') : c('fedOff')} disabled=${ctx.togglingFed === pkg.key} onToggle=${() => ctx.toggleFederation(pkg)} /></div>
-          ${ctx.organisms.length ? html`<div class="facts-k poster-label">${c('kOrganism')}</div>
-            <div class="facts-v kp-orgshare"><select class="select-field" value=${ctx.shareOrg} onChange=${(e) => ctx.setShareOrg(e.target.value)}><option value="">${c('pickOrganism')}</option>${ctx.organisms.map(o => html`<option value=${o.id || o.organismId} key=${o.id || o.organismId}>${o.name || o.id}</option>`)}</select>
-              <button type="button" class="poster-action poster-action--small" disabled=${!ctx.shareOrg} onClick=${() => ctx.contributeToOrganism(pkg)}>${t('knowledge.organisms.contribute')}</button></div>` : null}
-        </div>
+      <${Section} id="kp-sharing" num="03" title=${c('secSharing')}>
+        <${Facts} wide flush rows=${sharing} />
       <//>
-      <${FoldSection} id="kp-details" num="04" title=${c('secDetails')} sub=${`${id}${m.author ? ` · ${m.author}` : ''}`} open=${ctx.detailsOpen} onToggle=${() => ctx.setDetailsOpen(v => !v)}>
-        <div class="facts facts--wide kp-kv">
-          <div class="facts-k poster-label">ID</div><div class="facts-v"><code class="code-inline">${id}</code></div>
-          ${m.author ? html`<div class="facts-k poster-label">${t('pkv.author')}</div><div class="facts-v">${m.author}</div>` : null}
-          ${m.synthesis?.model ? html`<div class="facts-k poster-label">${c('kModel')}</div><div class="facts-v">${m.synthesis.model}</div>` : null}
-          ${m.sharing?.license ? html`<div class="facts-k poster-label">${t('pkv.license')}</div><div class="facts-v">${m.sharing.license}</div>` : null}
-          ${m.created ? html`<div class="facts-k poster-label">${t('pkv.created')}</div><div class="facts-v">${day(m.created)}</div>` : null}
-          ${m.updated ? html`<div class="facts-k poster-label">${t('pkv.updated')}</div><div class="facts-v">${day(m.updated)}</div>` : null}
-          ${tags.length ? html`<div class="facts-k poster-label">${c('kTags')}</div><div class="facts-v">${tags.join(', ')}</div>` : null}
-        </div>
+      <${Section} fold id="kp-details" num="04" title=${c('secDetails')} sub=${`${id}${m.author ? ` · ${m.author}` : ''}`} open=${ctx.detailsOpen} onToggle=${() => ctx.setDetailsOpen(v => !v)}>
+        <${Facts} wide flush rows=${details} />
       <//>`,
   });
 }

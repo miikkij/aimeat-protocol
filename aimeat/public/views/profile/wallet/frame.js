@@ -10,12 +10,12 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, rowWords, sourcesOf } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — On the component kit (page group G7): the crumb and the rail's page links are
+ *     data for SettingsPage (components/Crumb.js, Rail.js), and openTab is Rail.js's.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate, time as fmtTime, money as fmtMoney } from '/js/format.js';
 
 export const x = (key, vars) => t('walpage.' + key, vars);
@@ -141,15 +141,16 @@ export function sourcesOf(rows, self, agents, top = 4) {
   return { in: group(real.filter((tx) => Number(tx.amount) > 0)), out: group(real.filter((tx) => Number(tx.amount) < 0)) };
 }
 
-export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAccount')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.wallet')}</span></div>`;
-}
+/* ── The crumb and the rail ───────────────────────────────────────────────────────────────────── */
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
-export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('usage')}><i>→</i>${t('profile.tabs.usage')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('pnl')}><i>→</i>${t('profile.tabs.pnl')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('offers')}><i>→</i>${t('profile.tabs.offers')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>`;
-}
+/** The crumb's steps (components/Crumb.js): Settings / Account / Wallet, the last one here. */
+export const crumb = () => [t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.wallet')];
+
+export { openTab };
+/** The sibling pages in the rail (components/Rail.js): each opens a Settings tab, → … →. */
+export const pageLinks = () => [
+  { tab: 'usage', label: t('profile.tabs.usage') },
+  { tab: 'pnl', label: t('profile.tabs.pnl') },
+  { tab: 'offers', label: t('profile.tabs.offers') },
+  { tab: 'agents', label: t('profile.tabs.agents') },
+];

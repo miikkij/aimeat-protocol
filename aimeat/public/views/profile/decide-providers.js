@@ -20,6 +20,7 @@
  * @usage import { DecideProviders } from './decide-providers.js';
  *   html`<${DecideProviders} view=${settings.providers} onSaved=${load} />`
  * @version-history
+ *   v1.13.0 — 2026-09-26 — Every part is a kit component (Touch keeps every control 44px; BoxList and BoxLine for the providers, their address never translated; the form in the dashed field Box with TextField, Select, Check and Fields; SubHeading; Note with a refusal kept one problem per line; Action; Layout): the part writes no class (page group G8).
  *   v1.12.0 — 2026-09-26 — A provider's lines beside its name are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.11.0 — 2026-09-26 — "Takes a key" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.10.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -49,17 +50,27 @@ import { t } from '/js/i18n.js';
 import { num, money } from '/js/format.js';
 import { apiPut, apiDelete } from '/js/api.js';
 import { Hint } from '/components/Hint.js';
+import { Box, BoxList, BoxLine } from '/components/Box.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Fields } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
+import { Stack, Space, Touch } from '/components/Layout.js';
 
 const EMPTY = { id: '', title: '', kind: 'hosted', url: '', model: '', takesKey: true, apiKey: '', maxOptions: '', context: '', price: '' };
-
-/** The meta lines' class. One place, so a contrast fix is one line. */
-const META = 'pf-aitr-row-meta listing-meta';
 
 /** A text length as a person reads it: to the nearest hundred once it is over a thousand. */
 function roundChars(c) { return c >= 1000 ? Math.round(c / 100) * 100 : c; }
 
 /** A typical decision's size, in the node's token estimate, for a price a person can picture. */
 const TYPICAL_DECISION_TOKENS = 1000;
+
+/** The small headings inside the card, with main's space above them. */
+const sub4 = (words) => html`<${Space} above="large"><${SubHeading} level=${4}>${words}<//><//>`;
+const sub5 = (words, id) => html`<${Space} above="large"><${SubHeading} level=${5} id=${id}>${words}<//><//>`;
 
 /**
  * What a provider costs, in words. A local model costs nothing. A hosted one with a price is priced per
@@ -102,10 +113,11 @@ export function toProviderBody(d) {
   };
 }
 
-/** A message where it was caused: `at` names the place, and only that place draws it. */
-function Note({ msg, at }) {
+/** A message where it was caused: `at` names the place, and only that place draws it. A refusal
+ *  keeps its own line breaks (the node names every problem, one per line). */
+function Said({ msg, at }) {
   if (!msg || msg.at !== at) return null;
-  return html`<p class=${msg.error ? 'form-message form-message--error pf-dr-pre' : 'form-message'} role="status">${msg.key ? t(msg.key) : msg.text}</p>`;
+  return html`<${Note} kind="message" error=${!!msg.error} pre=${!!msg.error} role="status">${msg.key ? t(msg.key) : msg.text}<//>`;
 }
 
 /** The three hosts the node accepts as "on this machine" (services/decide/providers.ts). */
@@ -122,56 +134,54 @@ function ProviderForm({ draft, busy, msg, onChange, onSave, onCancel }) {
   const set = (k, v) => onChange({ ...draft, [k]: v });
   const notHere = localButNotHere(draft);
   return html`
-    <div class="pf-dr-editor">
-      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.id')}</span>
-        <input class="og-input og-input--mono" value=${draft.id} disabled=${busy} placeholder="my-model"
-               onInput=${e => set('id', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.title')}</span>
-        <input class="og-input" value=${draft.title} disabled=${busy} onInput=${e => set('title', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.kind')}</span>
-        <select class="select-field" value=${draft.kind} disabled=${busy}
-                onChange=${e => onChange({ ...draft, kind: e.currentTarget.value, takesKey: e.currentTarget.value === 'hosted' ? draft.takesKey : false })}>
-          <option value="hosted">${t('decideProviders.kind.hosted')}</option>
-          <option value="local">${t('decideProviders.kind.local')}</option>
-        </select></label>
-      <${Hint}>${t('decideProviders.localHelp')}<//>
-      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.url')}</span>
-        <input class="og-input og-input--mono" value=${draft.url} disabled=${busy}
-               placeholder=${draft.kind === 'local' ? 'http://127.0.0.1:8801/v1/systemone' : 'https://…/v1/systemone'}
-               onInput=${e => set('url', e.currentTarget.value)} /></label>
-      ${notHere && html`<p class="form-message form-message--error" role="status">${t('decideProviders.notHere')}</p>`}
-      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.model')}</span>
-        <input class="og-input og-input--mono" value=${draft.model} disabled=${busy} placeholder="multilingual"
-               onInput=${e => set('model', e.currentTarget.value)} /></label>
-      <label class="pf-dr-check check-line">
-        <input type="checkbox" class="checkbox checkbox-sm" checked=${draft.takesKey} disabled=${busy}
-               onChange=${() => set('takesKey', !draft.takesKey)} />
-        ${' '}${t('decideProviders.f.takesKey')}
-      </label>
-      ${draft.takesKey && html`
-        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.key')}</span>
-          <input class="og-input" type="password" autocomplete="off" data-1p-ignore data-lpignore="true"
-                 value=${draft.apiKey} disabled=${busy} onInput=${e => set('apiKey', e.currentTarget.value)} /></label>`}
-      ${draft.kind === 'hosted' && html`
-        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.price')}</span>
-          <input class="og-input" type="number" min="0" step="any" value=${draft.price} disabled=${busy} placeholder="0.042"
-                 onInput=${e => set('price', e.currentTarget.value)} /></label>`}
-      <h5 class="pf-dr-h sub-heading">${t('decideProviders.limitsTitle')}</h5>
-      <${Hint}>${t('decideProviders.limitsHelp')}<//>
-      <div class="pf-dr-pair">
-        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.maxOptions')}</span>
-          <input class="og-input" type="number" min="2" step="1" value=${draft.maxOptions} disabled=${busy} placeholder="20"
-                 onInput=${e => set('maxOptions', e.currentTarget.value)} /></label>
-        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.context')}</span>
-          <input class="og-input" type="number" min="256" step="1" value=${draft.context} disabled=${busy} placeholder="4096"
-                 onInput=${e => set('context', e.currentTarget.value)} /></label>
-      </div>
-      <${Note} msg=${msg} at="form" />
-      <div class="og-doors">
-        <button type="button" class="poster-action poster-action--small" onClick=${onSave} disabled=${busy || notHere}>${t('decideProviders.save')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${onCancel} disabled=${busy}>${t('decideProviders.cancel')}</button>
-      </div>
-    </div>`;
+    <${Box} tone="field">
+      <${Stack} gap="medium">
+        <${TextField} code label=${t('decideProviders.f.id')} value=${draft.id} disabled=${busy} placeholder="my-model"
+          onInput=${(v) => set('id', v)} />
+        <${TextField} label=${t('decideProviders.f.title')} value=${draft.title} disabled=${busy} onInput=${(v) => set('title', v)} />
+        <${Select} label=${t('decideProviders.f.kind')} value=${draft.kind} disabled=${busy}
+          options=${[['hosted', t('decideProviders.kind.hosted')], ['local', t('decideProviders.kind.local')]]}
+          onChange=${(v) => onChange({ ...draft, kind: v, takesKey: v === 'hosted' ? draft.takesKey : false })} />
+        <${Hint}>${t('decideProviders.localHelp')}<//>
+        <${TextField} code label=${t('decideProviders.f.url')} value=${draft.url} disabled=${busy}
+          placeholder=${draft.kind === 'local' ? 'http://127.0.0.1:8801/v1/systemone' : 'https://…/v1/systemone'}
+          onInput=${(v) => set('url', v)} />
+        ${notHere && html`<${Note} kind="message" error role="status">${t('decideProviders.notHere')}<//>`}
+        <${TextField} code label=${t('decideProviders.f.model')} value=${draft.model} disabled=${busy} placeholder="multilingual"
+          onInput=${(v) => set('model', v)} />
+        <${Check} checked=${draft.takesKey} disabled=${busy} onChange=${() => set('takesKey', !draft.takesKey)}>${t('decideProviders.f.takesKey')}<//>
+        ${draft.takesKey && html`
+          <${TextField} unmanaged label=${t('decideProviders.f.key')} value=${draft.apiKey} disabled=${busy} onInput=${(v) => set('apiKey', v)} />`}
+        ${draft.kind === 'hosted' && html`
+          <${TextField} type="number" min="0" step="any" label=${t('decideProviders.f.price')} value=${draft.price} disabled=${busy} placeholder="0.042"
+            onInput=${(v) => set('price', v)} />`}
+        ${sub5(t('decideProviders.limitsTitle'))}
+        <${Hint}>${t('decideProviders.limitsHelp')}<//>
+        <${Fields} cols=${2}>
+          <${TextField} type="number" min="2" step="1" label=${t('decideProviders.f.maxOptions')} value=${draft.maxOptions} disabled=${busy} placeholder="20"
+            onInput=${(v) => set('maxOptions', v)} />
+          <${TextField} type="number" min="256" step="1" label=${t('decideProviders.f.context')} value=${draft.context} disabled=${busy} placeholder="4096"
+            onInput=${(v) => set('context', v)} />
+        <//>
+        <${Said} msg=${msg} at="form" />
+        <${Actions}>
+          <${Action} small onClick=${onSave} disabled=${busy || notHere}>${t('decideProviders.save')}<//>
+          <${Action} small soft onClick=${onCancel} disabled=${busy}>${t('decideProviders.cancel')}<//>
+        <//>
+      <//>
+    <//>`;
+}
+
+/** One provider's lines: kind, source and model; what it carries and costs; whether a request leaves
+ *  the machine; its address (never translated). */
+function providerLines(p) {
+  const key = p.source === 'owner' && p.auth?.type === 'key' ? ` · ${p.auth.has_key ? t('decideProviders.keySaved') : t('decideProviders.keyMissing')}` : '';
+  return [
+    `${t(`decideProviders.kind.${p.kind === 'local' ? 'local' : 'hosted'}`)} · ${t(`decideProviders.source.${p.source}`)} · ${p.model}`,
+    `${t('decideProviders.carries', { options: num(p.limits.max_choice_options), chars: num(roundChars(p.limits.context_tokens * 4)) })} · ${priceText(p)}${key}`,
+    t(p.leaves === false ? 'decideProviders.stays' : 'decideProviders.leaves'),
+    { text: p.url, keep: true },
+  ];
 }
 
 export function DecideProviders({ view, onSaved }) {
@@ -213,52 +223,34 @@ export function DecideProviders({ view, onSaved }) {
 
   if (!view) return null;
   const list = view.providers || [];
+  const remove = (p) => act(() => apiDelete(`/v1/ai/decide/providers/${encodeURIComponent(p.id)}`), 'decideProviders.removed', `row:${p.id}`, 'list');
 
   return html`
-    <div class="pf-dr" id="decide-providers">
-      <h4 class="pf-aitr-sub sub-heading">${t('decideProviders.title')}</h4>
+    <${Touch} id="decide-providers">
+      ${sub4(t('decideProviders.title'))}
       <${Hint}>${t('decideProviders.desc')}<//>
-      <h5 class="pf-dr-h sub-heading" id="decide-providers-default">${t('decideProviders.defaultLabel')}</h5>
-      <label class="pf-dr-field">
-        <select class="select-field" aria-labelledby="decide-providers-default" value=${view.default} disabled=${busy} onChange=${e => setDefault(e.currentTarget.value)}>
-          ${list.map(p => html`<option key=${p.id} value=${p.id}>
-            ${p.title}${p.id === view.node_default ? ` · ${t('decideProviders.serverDefault')}` : ''}</option>`)}
-        </select></label>
+      ${sub5(t('decideProviders.defaultLabel'), 'decide-providers-default')}
+      <${Select} ariaLabel=${t('decideProviders.defaultLabel')} value=${view.default} disabled=${busy} onChange=${(v) => setDefault(v)}
+        options=${list.map(p => ({ value: p.id, label: `${p.title}${p.id === view.node_default ? ` · ${t('decideProviders.serverDefault')}` : ''}` }))} />
 
-      <${Note} msg=${msg} at="default" />
+      <${Said} msg=${msg} at="default" />
 
-      <ul class="pf-aitr-list">
+      <${BoxList}>
         ${list.map(p => html`
-          <li key=${p.id} class="pf-aitr-row poster-box">
-            <span class="pf-aitr-row-main">${p.title}${p.id === view.default ? ` · ${t('decideProviders.isDefault')}` : ''}</span>
-            <span class=${META}>
-              ${t(`decideProviders.kind.${p.kind === 'local' ? 'local' : 'hosted'}`)} · ${t(`decideProviders.source.${p.source}`)} · ${p.model}
-            </span>
-            <span class=${META}>
-              ${t('decideProviders.carries', { options: num(p.limits.max_choice_options), chars: num(roundChars(p.limits.context_tokens * 4)) })}
-              ${' · '}${priceText(p)}
-              ${p.source === 'owner' && p.auth?.type === 'key' ? ` · ${p.auth.has_key ? t('decideProviders.keySaved') : t('decideProviders.keyMissing')}` : ''}
-            </span>
-            <span class=${META}>${t(p.leaves === false ? 'decideProviders.stays' : 'decideProviders.leaves')}</span>
-            <span class=${`${META} og-input--mono`} translate="no">${p.url}</span>
-            ${p.source === 'owner' && html`
-              <span class="og-doors">
-                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
-                        onClick=${() => act(() => apiDelete(`/v1/ai/decide/providers/${encodeURIComponent(p.id)}`), 'decideProviders.removed', `row:${p.id}`, 'list')}>
-                  ${t('decideProviders.remove')}</button>
-              </span>`}
-            <${Note} msg=${msg} at=${`row:${p.id}`} />
-          </li>`)}
-      </ul>
-      <${Note} msg=${msg} at="list" />
+          <${BoxLine} key=${p.id} column
+            name=${`${p.title}${p.id === view.default ? ` · ${t('decideProviders.isDefault')}` : ''}`}
+            meta=${providerLines(p)}
+            doors=${p.source === 'owner' ? html`<${Action} small soft disabled=${busy} onClick=${() => remove(p)}>${t('decideProviders.remove')}<//>` : null}
+            after=${html`<${Said} msg=${msg} at=${`row:${p.id}`} />`} />`)}
+      <//>
+      <${Said} msg=${msg} at="list" />
 
       ${!draft && html`
-        <div class="og-doors">
-          <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => { setMsg(null); setDraft({ ...EMPTY }); }}>
-            ${t('decideProviders.add')}</button>
-        </div>`}
+        <${Actions}>
+          <${Action} small disabled=${busy} onClick=${() => { setMsg(null); setDraft({ ...EMPTY }); }}>${t('decideProviders.add')}<//>
+        <//>`}
       ${draft && html`<${ProviderForm} draft=${draft} busy=${busy} msg=${msg} onChange=${setDraft} onSave=${save} onCancel=${cancel} />`}
-    </div>`;
+    <//>`;
 }
 
 export default DecideProviders;

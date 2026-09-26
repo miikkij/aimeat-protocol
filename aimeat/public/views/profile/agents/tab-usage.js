@@ -11,6 +11,11 @@
  *   TabUsage({ agentName }) -- fetch (by-model + runs) -> stat cards + two lists.
  * @usage rendered by agent-card.js renderTabContent for activeTab === 'usage'.
  * @version-history
+ *   v1.8.1 -- 2026-09-26 -- The two lists scroll after 300px again, as main's
+ *     .pf-agd-event-log-scroll did (List scroll="medium"; fix pass).
+ *   v1.8.0 -- 2026-09-26 -- Onto the components: the figures the FigureStrip (lead), each list a Group
+ *     heading over a List that scrolls (the List's scroll cut: 17rem in a thin frame, where the page
+ *     capped it at 300px), the lines the Note. The file writes no class any more.
  *   v1.7.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.6.0 -- 2026-09-25 -- A list of things, one per row, is the Listing (css/components/listing.css), a unification: the look most tabs use.
  *   v1.5.0 -- 2026-09-25 -- A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
@@ -32,6 +37,9 @@ import { t } from '/js/i18n.js';
 import { getLedgerUsage, getLedgerRuns, getLedgerUsageOverview } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
 import { num } from '/js/format.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name, Who, Group } from '/components/List.js';
+import { Note } from '/components/Note.js';
 
 const html = htm.bind(h);
 
@@ -97,64 +105,47 @@ export default function TabUsage({ agent, agentName }) {
   }, []);
 
   if (loading) {
-    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
+    return html`<${Note} kind="loading" />`;
   }
 
   const hasData = (totals?.calls || 0) > 0 || byModel.length > 0;
   if (!hasData) {
-    return html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.usage.empty')}</div>`;
+    return html`<${Note} kind="quiet">${t('profile.agents.detail.usage.empty')}<//>`;
   }
 
   return html`
     <div>
-      <div class="og-strip pf-figures">
-        <div>
-          <b>${fmtUsd(totals?.cost_usd)}</b>
-          <span>${t('profile.agents.detail.usage.cost')}</span>
-        </div>
-        <div>
-          <b>${fmtNum(totals?.total_tokens)}</b>
-          <span>${t('profile.agents.detail.usage.tokens')}</span>
-        </div>
-        <div>
-          <b>${fmtNum(totals?.calls)}</b>
-          <span>${t('profile.agents.detail.usage.calls')}</span>
-        </div>
-      </div>
+      <${FigureStrip} lead items=${[
+        { key: 'cost', n: fmtUsd(totals?.cost_usd), label: t('profile.agents.detail.usage.cost') },
+        { key: 'tokens', n: fmtNum(totals?.total_tokens), label: t('profile.agents.detail.usage.tokens') },
+        { key: 'calls', n: fmtNum(totals?.calls), label: t('profile.agents.detail.usage.calls') },
+      ]} />
 
-      <div class="pf-agd-section-title poster-day-title">${t('profile.agents.detail.usage.byModel')}</div>
-      <div class="pf-agd-event-log-scroll">
-        <div class="listing listing--name-state listing--cols">
-        ${byModel.map(g => html`
-          <div key=${g.key} class="listing-row">
-            <div class="listing-name">${g.key || '(unknown)'}<small>
-              ${(g.providers && g.providers.length) ? html`<strong>${g.providers.join(', ')}</strong> · ` : ''}${fmtNum(g.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} (${fmtNum(g.prompt_tokens)} + ${fmtNum(g.completion_tokens)}) · ${fmtNum(g.calls)} ${t('profile.agents.detail.usage.callsLc')}
-            </small></div>
-            <div class="listing-who">
-                ${fmtUsd(g.cost_usd)}${(g.unpriced_calls || 0) > 0 ? ` · ${g.unpriced_calls} ${t('profile.agents.detail.usage.unpriced')}` : ''}
-            </div>
-          </div>
-        `)}
-        </div>
-      </div>
+      <${Group} title=${t('profile.agents.detail.usage.byModel')}>
+        <${List} cols="name-state" keepCols scroll="medium">
+          ${byModel.map(g => html`
+            <${Row} key=${g.key}>
+              <${Name} meta=${html`${(g.providers && g.providers.length) ? html`<strong>${g.providers.join(', ')}</strong> · ` : ''}${fmtNum(g.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} (${fmtNum(g.prompt_tokens)} + ${fmtNum(g.completion_tokens)}) · ${fmtNum(g.calls)} ${t('profile.agents.detail.usage.callsLc')}`}>${g.key || '(unknown)'}<//>
+              <${Who}>${fmtUsd(g.cost_usd)}${(g.unpriced_calls || 0) > 0 ? ` · ${g.unpriced_calls} ${t('profile.agents.detail.usage.unpriced')}` : ''}<//>
+            <//>
+          `)}
+        <//>
+      <//>
 
       ${runs.length > 0 && html`
-        <div class="pf-agd-section-title poster-day-title poster-day-title--quiet">${t('profile.agents.detail.usage.recentRuns')}</div>
-        <div class="pf-agd-event-log-scroll">
-          <div class="listing listing--name-state listing--cols">
-          ${runs.map(r => html`
-            <div key=${r.run_id} class="listing-row">
-              <div class="listing-name">${r.run_id}<small>
-                ${fmtNum(r.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} · ${fmtNum(r.calls)} ${t('profile.agents.detail.usage.callsLc')}${(r.models && r.models.length) ? ` · ${r.models.join(', ')}` : ''}
-              </small></div>
-              <div class="listing-who">${fmtUsd(r.cost_usd)}</div>
-            </div>
-          `)}
-          </div>
-        </div>
+        <${Group} quiet title=${t('profile.agents.detail.usage.recentRuns')}>
+          <${List} cols="name-state" keepCols scroll="medium">
+            ${runs.map(r => html`
+              <${Row} key=${r.run_id}>
+                <${Name} meta=${`${fmtNum(r.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} · ${fmtNum(r.calls)} ${t('profile.agents.detail.usage.callsLc')}${(r.models && r.models.length) ? ` · ${r.models.join(', ')}` : ''}`}>${r.run_id}<//>
+                <${Who}>${fmtUsd(r.cost_usd)}<//>
+              <//>
+            `)}
+          <//>
+        <//>
       `}
 
-      <div class="poster-hint pf-agd-help-text">${t('profile.agents.detail.usage.help')}</div>
+      <${Note}>${t('profile.agents.detail.usage.help')}<//>
     </div>
   `;
 }

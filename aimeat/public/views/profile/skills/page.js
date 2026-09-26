@@ -10,6 +10,11 @@
  * @structure renderPage · shelf · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.24.0 -- 2026-09-26 -- On the component kit (page group G7): the empty lines and leads are the Note, the editor is the TextArea with the Tabs for who may see it and the Action doors, the rule an AI gets is the Box with its copy door; the workspace tag counts nothing yet in the dim tone again (main's og-chip--dim). The page writes no class.
+ *   v1.23.0 -- 2026-09-26 -- A shelf's filters, search line, rows and more line are the List component (components/List.js: Filters, SearchLine, List, More): the page passes the words, the counts and the rows (component plan C1).
+ *   v1.23.0 -- 2026-09-26 -- The page's frame is the SettingsPage component (components/SettingsPage.js): the crumb, the head (its tags as data, the loud copy and the new-skill link from the Action kit), the rail's sections and its sibling pages are data, and the rail owns the scroll (component plan C9).
+ *   v1.22.0 -- 2026-09-26 -- The two roads to a new skill are the Roads component (components/Roads.js): the page passes the words, the request and the doors; the copy door is the Action's copy (component plan C3).
+ *   v1.21.0 -- 2026-09-26 -- The strip is the FigureStrip component (the agents figure's coral is its notice tone) and the AI section's facts are the Facts component: the page passes data (component plan C4).
  *   v1.20.0 -- 2026-09-26 -- The request for an agent is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.19.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.18.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -43,15 +48,25 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { scrollToSection } from '/components/Rail.js';
 import { x, crumb, pageLinks, agentRule, agentRequest, bindingFile, daysAgo, visibilityWord } from './frame.js';
 import { skillRow, loadingRow } from './rows.js';
 import { Hint } from '/components/Hint.js';
+import { Facts } from '/components/Facts.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Code, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextArea } from '/components/TextField.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Roads, Road } from '/components/Roads.js';
+import { List, Filters, Filter, SearchLine, More } from '/components/List.js';
 
 const PAGE = 20;
-const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--filter ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<span class="poster-count poster-count--tally">${n}</span></button>`;
+const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 
 export function renderPage(ctx) {
@@ -63,55 +78,43 @@ export function renderPage(ctx) {
   const linked = [...own, ...node, ...ws].filter((s) => (s.linkedBy || []).length);
   const agentsLinking = new Set(linked.flatMap((s) => s.linkedBy.map((l) => l.agent)));
   const none = lib && own.length === 0;
-  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
 
-  const strip = html`
-    <div class="og-strip">
-      <div><b>${lib ? own.length : '…'}</b><span>${x('stripOwn')}</span><small>${lib ? (own.length ? x('stripOwnSub', { bound: bound.length, mine: own.filter((s) => s.visibility === 'owner').length }) : x('stripOwnNone')) : ''}</small></div>
-      <div><b>${lib ? node.length : '…'}</b><span>${x('stripNode')}</span><small>${lib ? x('stripNodeSub', { pub: node.filter((s) => s.visibility === 'public').length, members: node.filter((s) => s.visibility !== 'public').length }) : ''}</small></div>
-      <div><b>${lib ? ws.length : '…'}</b><span>${x('stripWs')}</span><small>${lib ? (ws.length ? x('stripWsSub', { n: new Set(ws.map((s) => s.org)).size }) : x('stripWsNone')) : ''}</small></div>
-      <div><b class=${agentsLinking.size ? '' : 'is-coral'}>${lib ? agentsLinking.size : '…'}</b><span>${x('stripAgents')}</span><small>${lib ? x('stripAgentsSub', { total: ctx.agentCount ?? '?', apps: new Set(bound.map(bindingFile)).size }) : ''}</small></div>
-    </div>`;
+  const strip = html`<${FigureStrip} items=${[
+    { n: lib ? own.length : '…', label: x('stripOwn'), sub: lib ? (own.length ? x('stripOwnSub', { bound: bound.length, mine: own.filter((s) => s.visibility === 'owner').length }) : x('stripOwnNone')) : '' },
+    { n: lib ? node.length : '…', label: x('stripNode'), sub: lib ? x('stripNodeSub', { pub: node.filter((s) => s.visibility === 'public').length, members: node.filter((s) => s.visibility !== 'public').length }) : '' },
+    { n: lib ? ws.length : '…', label: x('stripWs'), sub: lib ? (ws.length ? x('stripWsSub', { n: new Set(ws.map((s) => s.org)).size }) : x('stripWsNone')) : '' },
+    { n: lib ? agentsLinking.size : '…', tone: agentsLinking.size ? undefined : 'notice', label: x('stripAgents'), sub: lib ? x('stripAgentsSub', { total: ctx.agentCount ?? '?', apps: new Set(bound.map(bindingFile)).size }) : '' },
+  ]} />`;
+
+  const marks = lib ? [
+    { label: none ? x('chipNone') : x('chipOwn', { n: own.length }), tone: none ? 'coral' : 'sun' },
+    { label: x('chipNode', { n: node.length }) },
+    { label: x('chipWs', { n: ws.length }), tone: ws.length ? undefined : 'dim' },
+    bound.length ? { label: x('chipBound', { n: bound.length }) } : null,
+    { label: x('chipLinked', { n: linked.length }), tone: linked.length ? undefined : 'coral' },
+  ] : [];
+  const actions = html`
+    <${Loud} copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
+    <${Actions}><${Action} small onClick=${() => { ctx.openEditor(); scrollToSection('sk-new'); }}>${x('newSkill')}<//><//>`;
+  const sections = [
+    { id: 'sk-own', num: '01', label: x('secOwn'), count: lib ? own.length : '' },
+    { id: 'sk-node', num: '02', label: x('secNode'), count: lib ? node.length : '' },
+    { id: 'sk-ws', num: '03', label: x('secWs'), count: lib ? ws.length : '' },
+    { id: 'sk-new', num: '04', label: x('secNew') },
+    { id: 'sk-ai', num: '05', label: x('secAi') },
+  ];
 
   return html`
-    <div class="og og-skills">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('skills.tabLabel')}<small>${x('titleSub')}</small></h1>
-          <div class="poster-chips">
-            ${lib ? chip(none ? x('chipNone') : x('chipOwn', { n: own.length }), none ? 'poster-chip--coral' : 'poster-chip--sun') : null}
-            ${lib ? chip(x('chipNode', { n: node.length })) : null}
-            ${lib ? chip(x('chipWs', { n: ws.length })) : null}
-            ${lib && bound.length ? chip(x('chipBound', { n: bound.length })) : null}
-            ${lib ? chip(x('chipLinked', { n: linked.length }), linked.length ? '' : 'poster-chip--coral') : null}
-          </div>
-          <p class="og-desc">${none ? x('descEmpty', { n: node.length }) : x('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <${CopyButton} text=${agentRule(ctx.nodeUrl)} className="poster-slab" label=${x('copyRule')} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))} />
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => { ctx.openEditor(); scrollTo('sk-new'); }}>${x('newSkill')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${shelf(ctx, 'own', '01', x('secOwn'), lib ? (own.length ? x('secOwnSub', { n: own.length, bound: bound.length }) : x('secOwnNone')) : null, own, true)}
-          ${shelf(ctx, 'node', '02', x('secNode'), lib ? x('secNodeSub', { n: node.length }) : null, node, false)}
-          ${shelf(ctx, 'ws', '03', x('secWs'), lib ? (ws.length ? x('secWsSub', { n: ws.length, orgs: new Set(ws.map((s) => s.org)).size }) : x('secWsNone')) : null, ws, false)}
-          ${secNew(ctx, '04')}
-          ${secAgent(ctx, '05', node)}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${[['01', 'sk-own', x('secOwn'), lib ? own.length : ''], ['02', 'sk-node', x('secNode'), lib ? node.length : ''], ['03', 'sk-ws', x('secWs'), lib ? ws.length : ''], ['04', 'sk-new', x('secNew'), ''], ['05', 'sk-ai', x('secAi'), '']].map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="skills" crumb=${crumb()} title=${t('skills.tabLabel')} sub=${x('titleSub')} marks=${marks}
+      desc=${none ? x('descEmpty', { n: node.length }) : x('desc')} actions=${actions} strip=${strip}
+      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${shelf(ctx, 'own', '01', x('secOwn'), lib ? (own.length ? x('secOwnSub', { n: own.length, bound: bound.length }) : x('secOwnNone')) : null, own, true)}
+      ${shelf(ctx, 'node', '02', x('secNode'), lib ? x('secNodeSub', { n: node.length }) : null, node, false)}
+      ${shelf(ctx, 'ws', '03', x('secWs'), lib ? (ws.length ? x('secWsSub', { n: ws.length, orgs: new Set(ws.map((s) => s.org)).size }) : x('secWsNone')) : null, ws, false)}
+      ${secNew(ctx, '04')}
+      ${secAgent(ctx, '05', node)}
+    <//>`;
 }
 
 /* ── One shelf: facets, search, rows ─────────────────────────────────────────────────────────── */
@@ -139,8 +142,8 @@ function shelf(ctx, key, num, title, sub, list, first) {
   const clear = () => set({ who: '', vis: '', recent: false, replaced: false, builtin: false });
   return html`
     <${PageSection} id=${ids[key]} num=${num} title=${title} count=${sub} first=${first}>
-      ${!ctx.library ? loadingRow() : !list.length ? (key === 'own' ? null : html`<p class="poster-quiet sk-empty">${x(key === 'node' ? 'emptyNode' : 'emptyWs')}</p>`) : html`
-        <div class="sk-facets">
+      ${!ctx.library ? loadingRow() : !list.length ? (key === 'own' ? null : html`<${Note} kind="quiet">${x(key === 'node' ? 'emptyNode' : 'emptyWs')}<//>`) : html`
+        <${Filters}>
           ${facet(isAll, x('facetAll'), list.length, clear, 'all')}
           ${key === 'own' ? facet(F.who === 'bound', x('facetBound'), count((s) => bindingFile(s)), () => tog('who', 'bound'), 'bound') : null}
           ${key === 'own' ? facet(F.who === 'free', x('facetFree'), count((s) => !bindingFile(s) && !(s.linkedBy || []).length && !s.supersededBy), () => tog('who', 'free'), 'free') : null}
@@ -151,18 +154,15 @@ function shelf(ctx, key, num, title, sub, list, first) {
           ${facet(!!F.recent, x('facetRecent'), count(recent), () => set({ recent: !F.recent }), 'recent')}
           ${count((s) => s.supersededBy) ? facet(!!F.replaced, x('facetReplaced'), count((s) => s.supersededBy), () => set({ replaced: !F.replaced }), 'replaced') : null}
           ${key === 'node' && count((s) => s.builtin) ? facet(!!F.builtin, x('facetBuiltin'), count((s) => s.builtin), () => set({ builtin: !F.builtin }), 'builtin') : null}
-        </div>
-        <div class="search-line"><input class="og-input" type="search" value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} aria-label=${x('search.' + key)} onInput=${(e) => ctx.setQuery(key, e.target.value)} /><small>${x('searchOrder')}</small></div>
-        ${!rows.length ? html`<p class="poster-quiet sk-empty">${x('noMatch')}</p>` : html`
-          <div class="listing listing--name-desc-who-doors">
-            <div class="listing-row listing-row--head"><div class="poster-label">${x('colSkill')}</div><div class="poster-label">${x('colTeaches')}</div><div class="poster-label">${x('colWho')}</div><div class="poster-label"></div></div>
-            ${shown.map((s) => skillRow(ctx, s))}
-          </div>`}
-        <div class="more-line">
-          ${shown.length < rows.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShown(key, ctx.shown[key] + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}</button>` : null}
-          <small>${x('shownOf', { shown: shown.length, total: rows.length })}</small>
-        </div>`}
-      ${ctx.library && key === 'own' && !list.length ? html`<p class="poster-quiet sk-empty"><b>${x('emptyOwn')}</b> ${x('emptyOwnSub')}</p>` : null}
+        <//>
+        <${SearchLine} value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} onInput=${(e) => ctx.setQuery(key, e.target.value)} note=${x('searchOrder')} />
+        <${List} cols="name-desc-who-doors" head=${[x('colSkill'), x('colTeaches'), x('colWho'), '']} empty=${x('noMatch')}>
+          ${shown.map((s) => skillRow(ctx, s))}
+        <//>
+        <${More} note=${x('shownOf', { shown: shown.length, total: rows.length })}
+          label=${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}
+          onMore=${shown.length < rows.length ? () => ctx.setShown(key, ctx.shown[key] + PAGE) : null} />`}
+      ${ctx.library && key === 'own' && !list.length ? html`<${Note} kind="quiet"><b>${x('emptyOwn')}</b> ${x('emptyOwnSub')}<//>` : null}
       ${ctx.library && list.length ? html`<${Hint}>${x('hint.' + key)}<//>` : null}
     <//>`;
 }
@@ -173,29 +173,24 @@ function secNew(ctx, num) {
   const e = ctx.editor;
   return html`
     <${PageSection} id="sk-new" num=${num} title=${x('secNew')} count=${null}>
-      <p class="og-lead">${x('newIntro')}</p>
-      <div class="sk-roads">
-        <div class="sk-road poster-box poster-box--raised">
-          <span class="sk-road-t">${x('roadAsk')}</span>
-          <p class="og-lead">${x('roadAskBody')}</p>
-          <pre class="code-block">${agentRequest(ctx.ownerName)}</pre>
-          <div class="og-doors"><${CopyButton} text=${agentRequest(ctx.ownerName)} className="poster-action poster-action--small" label=${x('copyRequest')} copiedLabel=${x('copied')} /></div>
-        </div>
-        <div class="sk-road poster-box">
-          <span class="sk-road-t">${e.editing ? x('roadEdit', { name: e.editing }) : x('roadWrite')}</span>
-          <p class="og-lead">${x('roadWriteBody')}</p>
+      <${Note} kind="lead">${x('newIntro')}<//>
+      <${Roads}>
+        <${Road} lead name=${x('roadAsk')} text=${x('roadAskBody')} code=${agentRequest(ctx.ownerName)}
+          doors=${html`<${Action} small copy=${agentRequest(ctx.ownerName)} copiedLabel=${x('copied')}>${x('copyRequest')}<//>`} />
+        <${Road} name=${e.editing ? x('roadEdit', { name: e.editing }) : x('roadWrite')} text=${x('roadWriteBody')}
+          doors=${e.open ? null : html`<${Action} small onClick=${() => ctx.openEditor()}>${x('openEditor')}<//>`}>
           ${e.open ? html`
-            <textarea class="og-textarea sk-editor" rows="16" value=${e.md} onInput=${(ev) => ctx.setEditor({ md: ev.target.value })} placeholder=${x('editorPlaceholder')}></textarea>
-            <div class="og-doors sk-editor-doors">
-              <span class="poster-label">${x('vis.k')}</span>
-              ${['owner', 'members', 'public'].map((v) => html`<button type="button" key=${v} class=${`poster-tab ${e.visibility === v ? 'is-on' : ''}`} onClick=${() => ctx.setEditor({ visibility: v })}>${visibilityWord(v)}</button>`)}
-              <button type="button" class="poster-action poster-action--small" disabled=${e.publishing || !e.md.trim()} onClick=${() => ctx.publish()}>${e.publishing ? x('publishing') : x('publish')}</button>
-              <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.closeEditor()}>${x('cancel')}</button>
-            </div>
-            <${Hint}>${x('editorHint')}<//>` : html`
-            <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openEditor()}>${x('openEditor')}</button></div>`}
-        </div>
-      </div>
+            <${TextArea} rows=${16} value=${e.md} onInput=${(md) => ctx.setEditor({ md })} placeholder=${x('editorPlaceholder')} ariaLabel=${x('roadWrite')} />
+            <${Actions}>
+              <${Label}>${x('vis.k')}<//>
+              <${Tabs} label=${x('vis.k')} value=${e.visibility} onSelect=${(v) => ctx.setEditor({ visibility: v })}
+                items=${['owner', 'members', 'public'].map((v) => ({ value: v, label: visibilityWord(v) }))} />
+              <${Action} small disabled=${e.publishing || !e.md.trim()} onClick=${() => ctx.publish()}>${e.publishing ? x('publishing') : x('publish')}<//>
+              <${Action} small soft onClick=${() => ctx.closeEditor()}>${x('cancel')}<//>
+            <//>
+            <${Hint}>${x('editorHint')}<//>` : null}
+        <//>
+      <//>
     <//>`;
 }
 
@@ -205,17 +200,16 @@ function secAgent(ctx, num, node) {
   const pub = node.filter((s) => s.visibility === 'public').length;
   return html`
     <${PageSection} id="sk-ai" num=${num} title=${x('secAi')} count=${null}>
-      <p class="og-lead">${x('aiIntro')}</p>
-      <div class="sk-rule poster-box">
-        <span class="poster-label">${x('ruleLabel')}</span>
-        <p class="og-lead">${x('ruleBody')}</p>
-        <div class="og-doors"><${CopyButton} text=${agentRule(ctx.nodeUrl)} className="poster-action poster-action--small" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
-      </div>
-      <div class="facts facts--wide">
-        <div class="facts-k poster-label">${x('who.k')}</div><div class="facts-v">${x('aiWhoBody')}<small>${x('aiWhoSub')}</small></div>
-        <div class="facts-k poster-label">${x('vis.k')}</div><div class="facts-v">${x('aiVisBody')}<small>${x('aiVisSub', { n: pub, url: `${ctx.nodeUrl}/.well-known/agent-skills/index.json` })}</small></div>
-        <div class="facts-k poster-label">${x('aiVersionsK')}</div><div class="facts-v">${x('aiVersionsBody')}</div>
-        <div class="facts-k poster-label">${x('aiInstallK')}</div><div class="facts-v">${x('aiInstallBody')}<code class="code-inline">aimeat skill install node:aimeat-node-guide</code></div>
-      </div>
+      <${Note} kind="lead">${x('aiIntro')}<//>
+      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+        <${Label} block>${x('ruleLabel')}<//>
+        <${Note} kind="lead">${x('ruleBody')}<//>
+      <//>
+      <${Facts} wide rows=${[
+        { k: x('who.k'), v: x('aiWhoBody'), sub: x('aiWhoSub') },
+        { k: x('vis.k'), v: x('aiVisBody'), sub: x('aiVisSub', { n: pub, url: `${ctx.nodeUrl}/.well-known/agent-skills/index.json` }) },
+        { k: x('aiVersionsK'), v: x('aiVersionsBody') },
+        { k: x('aiInstallK'), v: html`${x('aiInstallBody')}<${Code}>aimeat skill install node:aimeat-node-guide<//>` },
+      ]} />
     <//>`;
 }

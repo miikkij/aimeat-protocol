@@ -7,12 +7,10 @@
  * @structure c · rel · day · providerWord · kindWord · channelWord · Switch · crumb · pageLinks
  * @usage import { c, rel, Switch, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The crumb and the rail's sibling pages are data for SettingsPage (component plan C9); this file writes no markup (page group G8).
  *   v1.1.0 — 2026-09-25 — A setting that is on or off is the library's Switch (components/Switch.js), the look most Settings tabs draw (UI consolidation phase 5, a unification).
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Sähköpostin sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
@@ -37,13 +35,15 @@ export const statusWord = (s) => c('status.' + (['sent', 'failed', 'suppressed',
 /** The switch is the library's: the word on the left, the box on the right; `locked` is on for good. */
 export { Switch } from '/components/Switch.js';
 
+/** The crumb's steps (SettingsPage draws them). */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span class="og-crumb-here">${c('title')}</span></div>`;
+  return [t('nav.profile'), c('title')];
 }
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The sibling pages in the rail, as data (SettingsPage draws them → … →). */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('notifications')}><i>→</i>${t('profile.tabs.notifications')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('contacts')}><i>→</i>${t('contacts.title')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('access')}><i>→</i>${t('profile.tabs.access')}<em>→</em></button>`;
+  return [
+    { tab: 'notifications', label: t('profile.tabs.notifications') },
+    { tab: 'contacts', label: t('contacts.title') },
+    { tab: 'access', label: t('profile.tabs.access') },
+  ];
 }

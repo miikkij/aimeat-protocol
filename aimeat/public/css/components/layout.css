@@ -1,0 +1,88 @@
+/**
+ * @file layout.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description How the parts of a page stand beside and under each other (components/Layout.js):
+ *   the row, the stack, and one scale of named spaces for their gaps, the space above and below a
+ *   part, and the space under a split's hairline. The values are the profile utilities' own
+ *   (profile.css .flex-row, .flex-row-wrap, .flex-col, .flex-between, .flex-actions, .mt-xs,
+ *   .mb-half, .mb-1, .mt-1, .mt-section), unscoped so a page and the admin read them alike.
+ *   Reads no colour and no shape. The hairline of the split is .og-split (page-section.css).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.4.0 — 2026-09-26 — .layout-list, the Stack as a list (Layout.js Stack `list`), and
+ *     .layout-stack--narrow, 60rem (Stack `narrow`); fix pass.
+ *   v1.3.0 — 2026-09-26 — Touch's tabs cut, .layout-touch--tabs (Layout.js Touch `tabs`; page group G1a).
+ *   v1.2.0 — 2026-09-26 — Touch, a part whose every control is 44px (Layout.js Touch; page group G8).
+ *   v1.1.0 — 2026-09-26 — Beside, the main part and a side part (Layout.js Beside; page group G7).
+ *   v1.0.0 — 2026-09-26 — Initial (component plan C9, page parts).
+ */
+
+.layout-row { display: flex; align-items: center; }
+.layout-row--wrap { flex-wrap: wrap; }
+.layout-row--start { align-items: flex-start; }
+.layout-row--end { align-items: flex-end; }
+.layout-row--baseline { align-items: baseline; }
+.layout-row--stretch { align-items: stretch; }
+.layout-row--justify-between { justify-content: space-between; }
+.layout-row--justify-end { justify-content: flex-end; }
+.layout-stack { display: flex; flex-direction: column; }
+/* Stack list: a list's items, no bullets (main's .pf-ld-ledger: list-style none, margin 0, padding 0). */
+.layout-list { list-style: none; margin: 0; padding: 0; }
+.layout-list > li { margin: 0; padding: 0; }
+/* Stack narrow: a page of settings forms kept to 60rem (main's .inbox-org). */
+.layout-stack--narrow { max-width: 60rem; }
+
+.layout-gap--none { gap: 0; }
+.layout-gap--tight { gap: .25rem; }
+.layout-gap--small { gap: .5rem; }
+.layout-gap--medium { gap: .75rem; }
+.layout-gap--large { gap: 1rem; }
+.layout-gap--section { gap: 1.5rem; }
+
+.layout-above--none { margin-top: 0; }
+.layout-above--tight { margin-top: .25rem; }
+.layout-above--small { margin-top: .5rem; }
+.layout-above--medium { margin-top: .75rem; }
+.layout-above--large { margin-top: 1rem; }
+.layout-above--section { margin-top: 1.5rem; }
+
+.layout-below--none { margin-bottom: 0; }
+.layout-below--tight { margin-bottom: .25rem; }
+.layout-below--small { margin-bottom: .5rem; }
+.layout-below--medium { margin-bottom: .75rem; }
+.layout-below--large { margin-bottom: 1rem; }
+.layout-below--section { margin-bottom: 1.5rem; }
+
+.layout-pad--none { padding-top: 0; }
+.layout-pad--tight { padding-top: .25rem; }
+.layout-pad--small { padding-top: .5rem; }
+.layout-pad--medium { padding-top: .75rem; }
+.layout-pad--large { padding-top: 1rem; }
+.layout-pad--section { padding-top: 1.5rem; }
+
+/* Beside: the main part and a side part (formerly the Boards page's .bp-composer, .bp-composer--reply
+   and .bp-app; added by page group G7). One column under 900px. */
+.layout-beside { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem 1.6rem; align-items: start; }
+.layout-beside--narrow { grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); }
+.layout-beside--wide { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.layout-beside--end { align-items: end; }
+.layout-beside-main, .layout-beside-side { min-width: 0; }
+@media (max-width: 900px) {
+  .layout-beside, .layout-beside--narrow, .layout-beside--wide { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Touch: every control inside is a thumb's target, 44px at every width; the box around the words
+   grows, the words do not. A check line's whole line is the target and its box grows to 20px.
+   Main's decision-model card and rules screen (.pf .pf-aitr, .pf .pf-dr in profile.css); `.pf` in
+   front because profile-poster.css sets the action link's min-height to 0 and loads after this
+   file (added by page group G8). */
+.pf .layout-touch .poster-action,
+.pf .layout-touch .poster-slab { min-height: 44px; min-width: 44px; }
+.pf .layout-touch .og-input,
+.pf .layout-touch select,
+.pf .layout-touch input[type="number"] { min-height: 44px; }
+.pf .layout-touch .check-line { display: flex; align-items: center; gap: .5rem; min-height: 44px; margin: 0; }
+.pf .layout-touch .check-line input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
+/* Touch `tabs`: the tabs are thumb targets too (an agent's AI gate; main's .pf .pf-aai .poster-tab, G1a). */
+.pf .layout-touch--tabs .poster-tab { min-height: 44px; min-width: 44px; }

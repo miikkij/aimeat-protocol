@@ -7,10 +7,15 @@
  *   description · thumbnail); the thumbnail is pulled through the node's image proxy into a `blob:`
  *   URL so the SPA's remote-image CSP is satisfied. `MessageLinkPreviews` extracts the URLs from a
  *   message body and renders a card per link, each with a ✕ that hides it (persisted in localStorage,
- *   so a dismissed card stays hidden). `extractUrls` is exported for reuse/testing.
+ *   so a dismissed card stays hidden). `extractUrls` is exported for reuse/testing. Its look is
+ *   css/components/link-preview.css (.link-preview-list, .link-preview and its parts).
  * @structure extractUrls(text,max) · useSeenInViewport(ref) · LinkPreview({url,onDismiss}) · MessageLinkPreviews({msg})
  * @usage html`<${MessageLinkPreviews} msg=${msg} />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — Draws its own names: .inbox-linkcards is .link-preview-list,
+ *     .inbox-linkcard(-main/-thumb/-text/-site/-title/-desc) is .link-preview(-…), and the ✕
+ *     .inbox-linkcard-x is .link-preview-hide; the rules moved with them out of css/views/inbox.css
+ *     into css/components/link-preview.css (a move).
  *   v1.1.0 — 2026-08-03 — Lazy unfurl: a message's preview cards mount only once the message scrolls
  *     near the viewport (IntersectionObserver, 200px margin) — opening a long thread no longer fires
  *     an unfurl request for every link in the whole history.
@@ -90,16 +95,16 @@ export function LinkPreview({ url, onDismiss }) {
 
   if (meta === undefined || meta === null) return null;
   return html`
-    <div class="inbox-linkcard">
-      <a class="inbox-linkcard-main" href=${meta.resolvedUrl || url} target="_blank" rel="noopener noreferrer nofollow">
-        ${imgUrl ? html`<span class="inbox-linkcard-thumb"><img src=${imgUrl} alt="" loading="lazy" /></span>` : null}
-        <span class="inbox-linkcard-text">
-          ${meta.siteName ? html`<span class="inbox-linkcard-site">${escHtml(meta.siteName)}</span>` : null}
-          ${meta.title ? html`<span class="inbox-linkcard-title">${escHtml(meta.title)}</span>` : null}
-          ${meta.description ? html`<span class="inbox-linkcard-desc">${escHtml(meta.description)}</span>` : null}
+    <div class="link-preview">
+      <a class="link-preview-main" href=${meta.resolvedUrl || url} target="_blank" rel="noopener noreferrer nofollow">
+        ${imgUrl ? html`<span class="link-preview-thumb"><img src=${imgUrl} alt="" loading="lazy" /></span>` : null}
+        <span class="link-preview-text">
+          ${meta.siteName ? html`<span class="link-preview-site">${escHtml(meta.siteName)}</span>` : null}
+          ${meta.title ? html`<span class="link-preview-title">${escHtml(meta.title)}</span>` : null}
+          ${meta.description ? html`<span class="link-preview-desc">${escHtml(meta.description)}</span>` : null}
         </span>
       </a>
-      <button class="inbox-linkcard-x" title=${t('inbox.linkPreview.hide')}
+      <button class="link-preview-hide" title=${t('inbox.linkPreview.hide')}
         onClick=${() => onDismiss?.(url)}>✕</button>
     </div>`;
 }
@@ -120,7 +125,7 @@ export function MessageLinkPreviews({ msg }) {
     setDismissed(next);
     saveDismissed(next);
   };
-  return html`<div class="inbox-linkcards" ref=${hostRef}>
+  return html`<div class="link-preview-list" ref=${hostRef}>
     ${seen ? visible.map(u => html`<${LinkPreview} key=${u} url=${u} onDismiss=${dismiss} />`) : null}
   </div>`;
 }

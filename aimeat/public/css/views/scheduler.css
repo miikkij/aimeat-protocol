@@ -6,6 +6,9 @@
  *   and the agent Schedules sub-tab (agents/tab-schedules.js). Prefix: sch-.
  *   Theme-token driven (no hardcoded colors) so it flips with dark/light mode.
  * @version-history
+ *   v1.23.0 -- 2026-09-26 -- The Scheduler's forms, its schedule row and its calendar draw only components now (page group G5): .sch-loading, .sch-purpose, .sch-form-row, .sch-check, .sch-num, .sch-form-actions, .sch-card-meta, .sch-card-dispatch, .sch-edit, .sch-card-io and the unused schFlash keyframes go (nothing writes them); .sch-muted moves to css/components/schedule-calendar.css, its only user. .sch-form stays for agents/agent-ai-section.js.
+ *   v1.22.0 -- 2026-09-26 -- .sch-tab, .sch-section, .sch-constraints and .sch-budget-section go: the agent
+ *     Schedules and Agent config tabs draw only components now and nothing writes them (page group G1b).
  *   v1.21.0 -- 2026-09-26 -- The run limits' words are the Check line: their size and colour go, their row stays (a unification: Jouni's decision "Check line").
  *   v1.20.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.19.0 -- 2026-09-26 -- An agent's schedules are the Listing (css/components/listing.css): the kind, name and by-agent tags in the name cell, the facts, the copy box and the purpose in the words cell, the actions in the doors, the edit form the open panel; the classic card's rules go (a unification: the look most tabs use).
@@ -42,51 +45,8 @@
  *   v1.4.0 -- 2026-09-25 -- The inline code rules go: code is the Code block's inline cut (css/components/code-block.css); the layout declarations of their places stay, on .code-inline (UI consolidation phase 5, a unification).
  */
 
-.sch-tab { display: flex; flex-direction: column; gap: 1.25rem; }
-
-.sch-loading { padding: 0.75rem 0; }
-
-.sch-section { display: flex; flex-direction: column; gap: 0.5rem; }
-
-.sch-purpose { margin-top: 0.15rem; }
-.sch-muted { color: var(--text-dim); font-size: 0.82rem; }
-
-
-/* ── Create form ── */
+/* ── The agent's AI settings box (agents/agent-ai-section.js still writes .sch-form) ── */
 .sch-form {
   background: var(--card);
   border-radius: var(--radius); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.75rem;
-}
-.sch-form-row { display: flex; flex-direction: column; gap: 0.3rem; }
-
-.sch-constraints {
-  border-top: 1px solid var(--border); padding-top: 0.65rem; display: flex; flex-direction: column; gap: 0.4rem;
-}
-.sch-check { display: flex; align-items: center; gap: 0.5rem; }
-.sch-num { width: 5rem !important; }
-
-.sch-form-actions { display: flex; justify-content: flex-end; }
-
-.sch-budget-section { margin-bottom: 1rem; }
-
-/* ── Editable schedule card (master + agent views) ── */
-.sch-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; }
-.sch-card-dispatch { margin: 0.5rem 0 0; padding: 0.5rem 0.7rem; }
-.sch-edit { display: flex; flex-direction: column; gap: 0.55rem; }
-
-/* highlight a card/row jumped to from the calendar */
-@keyframes schFlash {
-  0%   { outline-color: var(--accent); background-color: var(--bg-dim); }
-  70%  { outline-color: var(--accent); }
-  100% { outline-color: transparent; background-color: transparent; }
-}
-
-/* What a scheduled job reads and what it writes, on the card. These were carried all along and
-   shown only inside the edit form, appended to the prompt as an unlabelled arrow — a job that
-   writes into your store every night should say so on its face. */
-.sch-card-io {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2) var(--sp-4);
-  margin-top: var(--sp-2);
 }

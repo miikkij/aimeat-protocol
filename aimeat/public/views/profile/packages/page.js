@@ -8,9 +8,14 @@
  *   roads to a new package (ask your AI with the package-builder request, or import a zip); and the
  *   section that says how an agent installs. What opens under a row is rows.js. Pure render over the
  *   ctx bag.
- * @structure renderPage · secInstalled · secOffers · secOwn · secNew · secAgent
+ * @structure renderPage · secInstalled · secOffers · secOwn · secNew · composeForm · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.22.0 — 2026-09-26 — On the component kit (page group G7): the page is SettingsPage (crumb, mast,
+ *     marks, strip, rail as data), the lists are List (Filters, SearchLine, More, the pick rows of the
+ *     compose road), the roads Roads/Road, the AI rule a Box, the facts Facts, the hidden zip field
+ *     FileDrop; the page writes no class. Put back from main: the dim tag on "0 own" and "0 from
+ *     other nodes" (og-chip--dim); the sync door is the soft action link, as main's quiet door.
  *   v1.21.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.20.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.19.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -48,15 +53,24 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Hint } from '/components/Hint.js';
+import { Facts } from '/components/Facts.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { TextField } from '/components/TextField.js';
+import { FileDrop } from '/components/FileDrop.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Roads, Road } from '/components/Roads.js';
+import { List, Row, Name, Desc, Filters, Filter, SearchLine, More } from '/components/List.js';
 import { x, crumb, pageLinks, agentRule, categoryWord } from './frame.js';
 import { instanceRow, offerRow, ownRow, loadingRow } from './rows.js';
-import { Hint } from '/components/Hint.js';
 
 const PAGE = 20;
-const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--filter ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<span class="poster-count poster-count--tally">${n}</span></button>`;
+const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 
 export function renderPage(ctx) {
@@ -67,66 +81,58 @@ export function renderPage(ctx) {
   const remote = offers.filter((o) => o.remote);
   const parts = instances.reduce((s, i) => s + (i.installedComponents || []).length, 0);
   const none = d && instances.length === 0;
-  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
 
-  const strip = html`
-    <div class="og-strip">
-      <div><b>${d ? instances.length : '…'}</b><span>${x('stripInstalled')}</span><small>${d ? (instances.length ? x('stripInstalledSub', { parts, running: instances.filter((i) => i.status === 'installed').length === instances.length ? x('allRunning') : x('someStopped') }) : x('stripInstalledNone')) : ''}</small></div>
-      <div><b>${d ? offers.length : '…'}</b><span>${x('stripOffers')}</span><small>${d ? x('stripOffersSub', { system: offers.filter((o) => o.system).length, others: offers.filter((o) => !o.system && !o.remote).length }) : ''}</small></div>
-      <div><b>${d ? own.length : '…'}</b><span>${x('stripOwn')}</span><small>${d ? (own.length ? x('stripOwnSub', { pub: own.filter((p) => p.visibility === 'public').length, listed: own.filter((p) => ctx.listingByGroup[p.packageGroupId]).length }) : x('stripOwnNone')) : ''}</small></div>
-      <div><b>${d ? remote.length : '…'}</b><span>${x('stripRemote')}</span><small>${d ? (remote.length ? x('stripRemoteSub', { n: new Set(remote.map((r) => r.sourceNode)).size }) : x('stripRemoteNone')) : ''}</small></div>
-    </div>`;
+  const strip = html`<${FigureStrip} items=${[
+    { n: d ? instances.length : '…', label: x('stripInstalled'), sub: d ? (instances.length ? x('stripInstalledSub', { parts, running: instances.filter((i) => i.status === 'installed').length === instances.length ? x('allRunning') : x('someStopped') }) : x('stripInstalledNone')) : '' },
+    { n: d ? offers.length : '…', label: x('stripOffers'), sub: d ? x('stripOffersSub', { system: offers.filter((o) => o.system).length, others: offers.filter((o) => !o.system && !o.remote).length }) : '' },
+    { n: d ? own.length : '…', label: x('stripOwn'), sub: d ? (own.length ? x('stripOwnSub', { pub: own.filter((p) => p.visibility === 'public').length, listed: own.filter((p) => ctx.listingByGroup[p.packageGroupId]).length }) : x('stripOwnNone')) : '' },
+    { n: d ? remote.length : '…', label: x('stripRemote'), sub: d ? (remote.length ? x('stripRemoteSub', { n: new Set(remote.map((r) => r.sourceNode)).size }) : x('stripRemoteNone')) : '' },
+  ]} />`;
+
+  // A tag that counts nothing yet is dim, as main drew it (og-chip--dim).
+  const marks = d ? [
+    { label: none ? x('chipNone') : x('chipInstalled', { n: instances.length }), tone: none ? 'coral' : 'sun' },
+    { label: x('chipOffers', { n: offers.length }) },
+    { label: x('chipOwn', { n: own.length }), tone: own.length ? undefined : 'dim' },
+    { label: x('chipRemote', { n: remote.length }), tone: remote.length ? undefined : 'dim' },
+  ] : [];
+  const actions = html`
+    <${Loud} control disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}<//>
+    <${Actions}><${Action} small onClick=${() => ctx.pickZip()}>${x('importZip')}<//><//>`;
+  const sections = [
+    { id: 'pk-installed', num: '01', label: x('secInstalled'), count: d ? instances.length : '' },
+    { id: 'pk-offers', num: '02', label: x('secOffers'), count: d ? offers.length : '' },
+    { id: 'pk-own', num: '03', label: x('secOwn'), count: d ? own.length : '' },
+    { id: 'pk-new', num: '04', label: x('secNew'), count: '' },
+    { id: 'pk-ai', num: '05', label: x('secAi'), count: '' },
+  ];
+  // The zip field is hidden; the mast's door and the third road open it (ctx.pickZip).
+  const after = html`
+    <${FileDrop} hidden accept=".zip" inputRef=${ctx.fileRef} onChange=${(e) => ctx.importZip(e)} />
+    <${ctx.ConfirmUI} />`;
 
   return html`
-    <div class="og og-packages">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('profile.tabs.packages')}<small>${x('titleSub')}</small></h1>
-          <div class="poster-chips">
-            ${d ? chip(none ? x('chipNone') : x('chipInstalled', { n: instances.length }), none ? 'poster-chip--coral' : 'poster-chip--sun') : null}
-            ${d ? chip(x('chipOffers', { n: offers.length })) : null}
-            ${d ? chip(x('chipOwn', { n: own.length })) : null}
-            ${d ? chip(x('chipRemote', { n: remote.length })) : null}
-          </div>
-          <p class="og-desc">${none ? x('descEmpty', { n: offers.length }) : x('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}</button>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.pickZip()}>${x('importZip')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secInstalled(ctx, instances)}
-          ${secOffers(ctx, offers)}
-          ${secOwn(ctx, own)}
-          ${secNew(ctx)}
-          ${secAgent(ctx)}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${[['01', 'pk-installed', x('secInstalled'), d ? instances.length : ''], ['02', 'pk-offers', x('secOffers'), d ? offers.length : ''], ['03', 'pk-own', x('secOwn'), d ? own.length : ''], ['04', 'pk-new', x('secNew'), ''], ['05', 'pk-ai', x('secAi'), '']].map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <input type="file" accept=".zip" class="pk-file" ref=${ctx.fileRef} onChange=${(e) => ctx.importZip(e)} />
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="packages" crumb=${crumb()} title=${t('profile.tabs.packages')} sub=${x('titleSub')} marks=${marks}
+      desc=${none ? x('descEmpty', { n: offers.length }) : x('desc')} actions=${actions} strip=${strip}
+      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      after=${after}>
+      ${secInstalled(ctx, instances)}
+      ${secOffers(ctx, offers)}
+      ${secOwn(ctx, own)}
+      ${secNew(ctx)}
+      ${secAgent(ctx)}
+    <//>`;
 }
 
 function secInstalled(ctx, instances) {
   return html`
     <${PageSection} id="pk-installed" num="01" title=${x('secInstalled')} count=${ctx.data ? (instances.length ? x('secInstalledSub', { n: instances.length, parts: instances.reduce((s, i) => s + (i.installedComponents || []).length, 0) }) : x('secNone')) : null} first=${true}>
-      ${!ctx.data ? loadingRow() : instances.length ? html`
-        <div class="listing listing--name-desc-who-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('colPackage')}</div><div class="poster-label">${x('colBrought')}</div><div class="poster-label">${x('colFrom')}</div><div class="poster-label"></div></div>
+      ${!ctx.data ? loadingRow() : html`
+        <${List} cols="name-desc-who-doors" head=${[x('colPackage'), x('colBrought'), x('colFrom'), '']}
+          empty=${html`<${Note} kind="quiet"><b>${x('emptyInstalled')}</b> ${x('emptyInstalledSub')}<//>`}>
           ${instances.map((i) => instanceRow(ctx, i))}
-        </div>
-        <${Hint}>${x('hintInstalled')}<//>` : html`<p class="poster-quiet pk-empty"><b>${x('emptyInstalled')}</b> ${x('emptyInstalledSub')}</p>`}
+        <//>
+        ${instances.length ? html`<${Hint}>${x('hintInstalled')}<//>` : null}`}
     <//>`;
 }
 
@@ -143,27 +149,27 @@ function secOffers(ctx, offers) {
   const shown = rows.slice(0, ctx.shown);
   const set = (patch) => ctx.setFilter(patch);
   const tog = (field, value) => set({ [field]: F[field] === value ? '' : value });
+  // Only an operator syncs the other nodes' listings, and only when there are any.
+  const sync = ctx.isOperator && offers.some((o) => o.remote)
+    ? html`<${Action} small soft disabled=${ctx.busy === 'sync'} onClick=${() => ctx.syncRemote()}>${ctx.busy === 'sync' ? x('syncing') : x('syncRemote')}<//>`
+    : null;
   return html`
     <${PageSection} id="pk-offers" num="02" title=${x('secOffers')} count=${ctx.data ? x('secOffersSub', { n: offers.length, system: offers.filter((o) => o.system).length }) : null}>
-      ${!ctx.data ? loadingRow() : !offers.length ? html`<p class="poster-quiet pk-empty">${x('emptyOffers')}</p>` : html`
-        <div class="pk-facets">
+      ${!ctx.data ? loadingRow() : !offers.length ? html`<${Note} kind="quiet">${x('emptyOffers')}<//>` : html`
+        <${Filters}>
           ${facet(!F.who && !F.cat, x('facetAll'), offers.length, () => set({ who: '', cat: '' }), 'all')}
           ${facet(F.who === 'system', x('facetSystem'), offers.filter((o) => o.system).length, () => tog('who', 'system'), 'system')}
           ${offers.some((o) => !o.system && !o.remote) ? facet(F.who === 'others', x('facetOthers'), offers.filter((o) => !o.system && !o.remote).length, () => tog('who', 'others'), 'others') : null}
           ${offers.some((o) => o.remote) ? facet(F.who === 'remote', x('facetRemote'), offers.filter((o) => o.remote).length, () => tog('who', 'remote'), 'remote') : null}
           ${cats.map((c) => facet(F.cat === c, categoryWord(c), offers.filter((o) => o.category === c).length, () => tog('cat', c), 'c:' + c))}
-        </div>
-        <div class="search-line"><input class="og-input" type="search" value=${ctx.query || ''} placeholder=${x('search')} aria-label=${x('search')} onInput=${(e) => ctx.setQuery(e.target.value)} /><small>${x('searchOrder')}</small></div>
-        ${!rows.length ? html`<p class="poster-quiet pk-empty">${x('noMatch')}</p>` : html`
-          <div class="listing listing--name-desc-who-doors">
-            <div class="listing-row listing-row--head"><div class="poster-label">${x('colPackage')}</div><div class="poster-label">${x('colDoes')}</div><div class="poster-label">${x('colInstall')}</div><div class="poster-label"></div></div>
-            ${shown.map((o) => offerRow(ctx, o))}
-          </div>`}
-        <div class="more-line pk-more">
-          ${shown.length < rows.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShown(ctx.shown + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}</button>` : null}
-          <small>${x('shownOf', { shown: shown.length, total: rows.length })}</small>
-          ${ctx.isOperator && offers.some((o) => o.remote) ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'sync'} onClick=${() => ctx.syncRemote()}>${ctx.busy === 'sync' ? x('syncing') : x('syncRemote')}</button>` : null}
-        </div>
+        <//>
+        <${SearchLine} value=${ctx.query || ''} placeholder=${x('search')} label=${x('search')} onInput=${(e) => ctx.setQuery(e.target.value)} note=${x('searchOrder')} />
+        <${List} cols="name-desc-who-doors" head=${[x('colPackage'), x('colDoes'), x('colInstall'), '']} empty=${x('noMatch')}>
+          ${shown.map((o) => offerRow(ctx, o))}
+        <//>
+        <${More} wrap note=${x('shownOf', { shown: shown.length, total: rows.length })}
+          label=${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}
+          onMore=${shown.length < rows.length ? () => ctx.setShown(ctx.shown + PAGE) : null}>${sync}<//>
         <${Hint}>${x('hintOffers')}<//>`}
     <//>`;
 }
@@ -171,37 +177,29 @@ function secOffers(ctx, offers) {
 function secOwn(ctx, own) {
   return html`
     <${PageSection} id="pk-own" num="03" title=${x('secOwn')} count=${ctx.data ? (own.length ? x('secOwnSub', { n: own.length, pub: own.filter((p) => p.visibility === 'public').length }) : x('secNone')) : null}>
-      ${!ctx.data ? loadingRow() : own.length ? html`
-        <div class="listing listing--name-desc-who-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('colPackage')}</div><div class="poster-label">${x('colDoes')}</div><div class="poster-label">${x('vis.k')}</div><div class="poster-label"></div></div>
+      ${!ctx.data ? loadingRow() : html`
+        <${List} cols="name-desc-who-doors" head=${[x('colPackage'), x('colDoes'), x('vis.k'), '']} empty=${x('emptyOwn')}>
           ${own.map((p) => ownRow(ctx, p))}
-        </div>
-        <${Hint}>${x('hintOwn')}<//>` : html`<p class="poster-quiet pk-empty">${x('emptyOwn')}</p>`}
+        <//>
+        ${own.length ? html`<${Hint}>${x('hintOwn')}<//>` : null}`}
     <//>`;
 }
 
 function secNew(ctx) {
+  const open = ctx.compose.open;
   return html`
     <${PageSection} id="pk-new" num="04" title=${x('secNew')} count=${null}>
-      <p class="og-lead">${x('newIntro')}</p>
-      <div class="pk-roads">
-        <div class="pk-road poster-box poster-box--raised">
-          <span class="pk-road-t">${x('roadApps')}</span>
-          <p class="og-lead">${x('roadAppsBody')}</p>
-          ${ctx.compose.open ? composeForm(ctx) : html`
-            <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.openCompose()}>${x('pickApps')}</button><span class="poster-hint">${x('roadAppsSub')}</span></div>`}
-        </div>
-        <div class="pk-road poster-box">
-          <span class="pk-road-t">${x('roadAsk')}</span>
-          <p class="og-lead">${x('roadAskBody')}</p>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}</button><span class="poster-hint">${x('roadAskSub')}</span></div>
-        </div>
-        <div class="pk-road poster-box">
-          <span class="pk-road-t">${x('roadZip')}</span>
-          <p class="og-lead">${x('roadZipBody')}</p>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'import'} onClick=${() => ctx.pickZip()}>${ctx.busy === 'import' ? x('importing') : x('pickFile')}</button></div>
-        </div>
-      </div>
+      <${Note} kind="lead">${x('newIntro')}<//>
+      <${Roads}>
+        <${Road} lead name=${x('roadApps')} text=${x('roadAppsBody')}
+          doors=${open ? null : html`<${Action} small onClick=${() => ctx.openCompose()}>${x('pickApps')}<//><${Note} inline>${x('roadAppsSub')}<//>`}>
+          ${open ? composeForm(ctx) : null}
+        <//>
+        <${Road} name=${x('roadAsk')} text=${x('roadAskBody')}
+          doors=${html`<${Action} small disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}<//><${Note} inline>${x('roadAskSub')}<//>`} />
+        <${Road} name=${x('roadZip')} text=${x('roadZipBody')}
+          doors=${html`<${Action} small disabled=${ctx.busy === 'import'} onClick=${() => ctx.pickZip()}>${ctx.busy === 'import' ? x('importing') : x('pickFile')}<//>`} />
+      <//>
     <//>`;
 }
 
@@ -231,45 +229,36 @@ function composeForm(ctx) {
   };
 
   return html`
-    <div class="pk-compose">
-      <label class="pk-compose-name">
-        <span class="poster-label">${x('composeNameK')}</span>
-        <input class="og-input" type="text" value=${ctx.compose.name} placeholder=${x('composeNamePlaceholder')}
-          onInput=${(e) => ctx.setComposeName(e.target.value)} />
-      </label>
-      ${apps === null ? html`<p class="poster-quiet pk-empty loading-mark">${x('loadingApps')}</p>`
-      : apps.length === 0 ? html`<p class="poster-quiet pk-empty">${x('noAppsYet')}</p>` : html`
-        <div class="pk-compose-list">
-          ${apps.map((a) => html`
-            <label class="pk-compose-app" key=${a.filename}>
-              <input type="checkbox" checked=${picked.includes(a.filename)} onChange=${() => ctx.togglePick(a.filename)} />
-              <span class="pk-compose-app-nm">${a.manifest?.name || a.name || a.filename}<small>${a.filename}</small></span>
-              <small class="pk-compose-app-needs">${needsOf(a)}</small>
-            </label>`)}
-        </div>`}
-      <${Hint}>${x('composeCarries')}<//>
-      <div class="og-doors">
-        <button type="button" class="poster-action poster-action--small" disabled=${!ready || ctx.busy === 'compose'} onClick=${() => ctx.doCompose()}>
-          ${ctx.busy === 'compose' ? x('composing') : x('composeN', { n: picked.length })}
-        </button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.closeCompose()}>${x('cancel')}</button>
-      </div>
-    </div>`;
+    <${TextField} label=${x('composeNameK')} value=${ctx.compose.name} placeholder=${x('composeNamePlaceholder')}
+      onInput=${(v) => ctx.setComposeName(v)} />
+    <${List} cols="check-name-desc" keepCols scroll loading=${apps === null ? x('loadingApps') : false} empty=${x('noAppsYet')}>
+      ${(apps || []).map((a) => html`
+        <${Row} key=${a.filename} picked=${picked.includes(a.filename)} onPick=${() => ctx.togglePick(a.filename)}>
+          <${Name} meta=${a.filename}>${a.manifest?.name || a.name || a.filename}<//>
+          <${Desc}>${needsOf(a)}<//>
+        <//>`)}
+    <//>
+    <${Hint}>${x('composeCarries')}<//>
+    <${Actions}>
+      <${Action} small disabled=${!ready || ctx.busy === 'compose'} onClick=${() => ctx.doCompose()}>
+        ${ctx.busy === 'compose' ? x('composing') : x('composeN', { n: picked.length })}
+      <//>
+      <${Action} small soft onClick=${() => ctx.closeCompose()}>${x('cancel')}<//>
+    <//>`;
 }
 
 function secAgent(ctx) {
   return html`
     <${PageSection} id="pk-ai" num="05" title=${x('secAi')} count=${null}>
-      <p class="og-lead">${x('aiIntro')}</p>
-      <div class="pk-rule poster-box">
-        <span class="poster-label">${x('ruleLabel')}</span>
-        <p class="og-lead">${x('ruleBody')}</p>
-        <div class="og-doors"><${CopyButton} text=${agentRule(ctx.nodeUrl)} className="poster-action poster-action--small" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
-      </div>
-      <div class="facts facts--wide">
-        <div class="facts-k poster-label">${x('aiInstallK')}</div><div class="facts-v">${x('aiInstallBody')}<small>${x('aiInstallSub')}</small></div>
-        <div class="facts-k poster-label">${x('aiUpdateK')}</div><div class="facts-v">${x('aiUpdateBody')}</div>
-        <div class="facts-k poster-label">${x('aiPublishK')}</div><div class="facts-v">${x('aiPublishBody')}</div>
-      </div>
+      <${Note} kind="lead">${x('aiIntro')}<//>
+      <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+        <${Label} block>${x('ruleLabel')}<//>
+        <${Note} kind="lead">${x('ruleBody')}<//>
+      <//>
+      <${Facts} wide rows=${[
+        { k: x('aiInstallK'), v: x('aiInstallBody'), sub: x('aiInstallSub') },
+        { k: x('aiUpdateK'), v: x('aiUpdateBody') },
+        { k: x('aiPublishK'), v: x('aiPublishBody') },
+      ]} />
     <//>`;
 }

@@ -7,9 +7,10 @@
  *   a row: the same catalogue, the same search and the same recommended group as the AI page, so
  *   a model is chosen the same way everywhere. Without a key on the AI page the rows say so and
  *   point there.
- * @structure secModels · judgeRow · candidateRow · picker · pickerRow
+ * @structure secModels · judgeRow · candidateRow · picker
  * @usage import { secModels } from './models.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the rows are the List with its Panel, the picker the library's Model list (components/ModelPicker.js ModelList, a taken model dimmed with "already added"), the lines Note (component plan, page group G4).
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.12.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
@@ -34,11 +35,17 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
+import { List, Row, Name, Who, Desc, Doors } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { ModelList } from '/components/ModelPicker.js';
+import { Row as Line } from '/components/Layout.js';
+import { openTab } from '/components/Rail.js';
 import { rankModels, matchesQuery, modelPageUrl, answersInText } from '/views/profile/openrouter/pricing.js';
 import { modelWords, priceWords, contextWords, findModel } from '../ai/frame.js';
-import { x, judgeOf, candidatesOf, openTab } from './frame.js';
-import { Hint } from '/components/Hint.js';
+import { x, judgeOf, candidatesOf } from './frame.js';
 
 const RECOMMENDED = 8;
 const CHAT_ROLE = { pool: 'chat' };
@@ -49,19 +56,18 @@ export function secModels(ctx) {
   const candidates = candidatesOf(p);
   const count = x('secModelsSub', { n: candidates.length });
   return html`
-    <${PageSection} id="cal-models" num="03" title=${x('secModels')} count=${count}>
-      ${!ctx.keyed ? html`<p class="poster-quiet cal-empty"><b>${x('noKeyLead')}</b> ${x('noKeyBody')} <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => openTab('ai')}>${x('openAiPage')}</button></p>` : null}
-      <div class="listing listing--name-who-facts-doors">
-        <div class="listing-row listing-row--head"><div class="poster-label">${x('colRole')}</div><div class="poster-label">${x('colModel')}</div><div class="poster-label">${x('colFacts')}</div><div class="poster-label"></div></div>
+    <${Section} id="cal-models" num="03" title=${x('secModels')} count=${count}>
+      ${!ctx.keyed ? html`<${Note} kind="quiet"><b>${x('noKeyLead')}</b> ${x('noKeyBody')} <${Action} small soft onClick=${() => openTab('ai')}>${x('openAiPage')}<//><//>` : null}
+      <${List} cols="name-who-facts-doors" head=${[x('colRole'), x('colModel'), x('colFacts'), '']}>
         ${judgeRow(ctx, judge)}
         ${candidates.map((m, i) => candidateRow(ctx, m, i))}
-        ${ctx.pick === 'add' ? html`<div class="listing-row is-open"><div class="listing-open poster-box poster-box--raised">${picker(ctx, 'add', '')}</div></div>` : null}
-      </div>
-      <div class="og-doors cal-add">
-        <button type="button" class="poster-action poster-action--small" disabled=${!ctx.keyed || !ctx.models.length} onClick=${() => ctx.setPick(ctx.pick === 'add' ? null : 'add')}>${ctx.pick === 'add' ? x('close') : x('addModel')}</button>
-        ${!candidates.length ? html`<small class="poster-hint">${x('noCandidatesHint')}</small>` : null}
-      </div>
-      <${Hint}>${x('hintModels')}<//>
+        ${ctx.pick === 'add' ? html`<${Row} key="add" open panel=${picker(ctx, 'add', '')} />` : null}
+      <//>
+      <${Line} gap="medium" above="medium" wrap>
+        <${Action} small disabled=${!ctx.keyed || !ctx.models.length} onClick=${() => ctx.setPick(ctx.pick === 'add' ? null : 'add')}>${ctx.pick === 'add' ? x('close') : x('addModel')}<//>
+        ${!candidates.length ? html`<${Note} inline>${x('noCandidatesHint')}<//>` : null}
+      <//>
+      <${Note}>${x('hintModels')}<//>
     <//>`;
 }
 
@@ -71,66 +77,45 @@ function judgeRow(ctx, judge) {
   const name = judge.modelId ? modelWords(model, judge.modelId) : x('judgeServerDefault');
   const sub = judge.own ? x('judgeOwn') : judge.source === 'reasoning' ? x('judgeFromAiReasoning') : judge.source === 'default' ? x('judgeFromAiDefault') : x('judgeFromServer');
   const facts = model ? [priceWords(model, CHAT_ROLE), contextWords(model)].filter(Boolean).join(' · ') : '';
+  const panel = html`
+    <${Note} kind="lead">${judge.own ? x('judgeLeadOwn', { name }) : x('judgeLeadAi', { name })}<//>
+    ${picker(ctx, 'judge', judge.own ? judge.modelId : '')}`;
+  const doors = html`
+    ${judge.own ? html`<${Action} small soft disabled=${ctx.busy === 'models'} onClick=${() => ctx.setJudge(null)}>${x('judgeUseAiPage')}<//>` : null}
+    ${judge.modelId && ctx.isOpenRouter ? html`<${Action} small soft href=${modelPageUrl(judge.modelId)} newTab>${x('openModelPage')}<//>` : null}
+    <${Action} small soft onClick=${() => ctx.setPick(null)}>${x('close')}<//>`;
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} id="cal-judge">
-      <div class="listing-name">${x('judge')}<small>${x('judgeSub')}</small></div>
-      <div class="listing-who cal-model"><b>${name}</b>${judge.modelId ? html`<code class="code-inline">${judge.modelId}</code>` : null}<small>${sub}</small></div>
-      <div class="listing-desc cal-facts">${facts}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" disabled=${!ctx.keyed} onClick=${() => ctx.setPick(open ? null : 'judge')}>${open ? x('close') : x('change')}</button></div>
-      ${open ? html`<div class="listing-open poster-box poster-box--raised">
-        <p class="og-lead">${judge.own ? x('judgeLeadOwn', { name }) : x('judgeLeadAi', { name })}</p>
-        ${picker(ctx, 'judge', judge.own ? judge.modelId : '')}
-        <div class="og-doors listing-open-doors">
-          ${judge.own ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'models'} onClick=${() => ctx.setJudge(null)}>${x('judgeUseAiPage')}</button>` : null}
-          ${judge.modelId && ctx.isOpenRouter ? html`<a class="poster-action poster-action--small poster-action--lower" href=${modelPageUrl(judge.modelId)} target="_blank" rel="noopener">${x('openModelPage')}</a>` : null}
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setPick(null)}>${x('close')}</button>
-        </div>
-      </div>` : null}
-    </div>`;
+    <${Row} key="judge" id="cal-judge" open=${open} panel=${panel} panelDoors=${doors}>
+      <${Name} meta=${x('judgeSub')}>${x('judge')}<//>
+      <${Who} sub=${sub}><b>${name}</b>${judge.modelId ? html`<${Code}>${judge.modelId}<//>` : null}<//>
+      <${Desc}>${facts}<//>
+      <${Doors}><${Action} small row disabled=${!ctx.keyed} onClick=${() => ctx.setPick(open ? null : 'judge')}>${open ? x('close') : x('change')}<//><//>
+    <//>`;
 }
 
 function candidateRow(ctx, m, i) {
   const model = findModel(m.modelId, ctx.models);
   const facts = model ? [priceWords(model, CHAT_ROLE), contextWords(model)].filter(Boolean).join(' · ') : (ctx.keyed && ctx.models.length ? x('modelNotInList') : '');
   return html`
-    <div class="listing-row" key=${m.id}>
-      <div class="listing-name">${x('candidateN', { n: i + 1 })}<small>${x('candidateSub')}</small></div>
-      <div class="listing-who cal-model"><b>${modelWords(model, m.modelId)}</b><code class="code-inline">${m.modelId}</code></div>
-      <div class="listing-desc cal-facts">${facts}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--danger poster-action--lower" disabled=${ctx.busy === 'models'} onClick=${() => ctx.removeCandidate(m.id)}>${x('remove')}</button></div>
-    </div>`;
+    <${Row} key=${m.id}>
+      <${Name} meta=${x('candidateSub')}>${x('candidateN', { n: i + 1 })}<//>
+      <${Who}><b>${modelWords(model, m.modelId)}</b><${Code}>${m.modelId}<//><//>
+      <${Desc}>${facts}<//>
+      <${Doors}><${Action} small row soft tone="danger" disabled=${ctx.busy === 'models'} onClick=${() => ctx.removeCandidate(m.id)}>${x('remove')}<//><//>
+    <//>`;
 }
 
-/** The catalogue under an opened row: search, the recommended group, a row per model. */
+/** The catalogue under an opened row: search, the recommended group, a row per model (ModelList). */
 function picker(ctx, slot, chosenId) {
   const pool = (ctx.models || []).filter(answersInText);
-  if (!pool.length) return html`<p class="poster-quiet cal-empty">${ctx.keyed ? x('modelsNone') : x('noKeyBody')}</p>`;
-  const q = (ctx.query || '').trim().toLowerCase();
-  const recommended = rankModels(pool, 'chat').slice(0, RECOMMENDED);
-  const filtered = pool.filter((m) => matchesQuery(m, q));
-  const visible = q ? filtered : (ctx.showAll ? filtered : recommended);
-  const taken = new Set(candidatesOf(ctx.project).map((m) => m.modelId));
+  if (!pool.length) return html`<${Note} kind="quiet">${ctx.keyed ? x('modelsNone') : x('noKeyBody')}<//>`;
+  const taken = new Set(slot === 'add' ? candidatesOf(ctx.project).map((m) => m.modelId) : []);
+  const act = (m) => (slot === 'judge' ? ctx.setJudge(m) : ctx.addCandidate(m));
   return html`
-    <div class="model-picker cal-pick">
-      <input class="og-input" type="search" value=${ctx.query || ''} placeholder=${x('searchModels', { n: pool.length })} aria-label=${x('searchModels', { n: pool.length })} onInput=${(e) => ctx.setQuery(e.target.value)} />
-      ${!q && !ctx.showAll ? html`<div class="model-picker-group poster-day-title">${x('recommended')}</div>` : null}
-      ${visible.length ? html`<ul class="model-picker-list">${visible.map((m) => pickerRow(ctx, slot, m, m.id === chosenId, slot === 'add' && taken.has(m.id)))}</ul>` : html`<div class="poster-quiet model-picker-empty">${x('noMatch')}</div>`}
-      <div class="model-picker-more">
-        ${!q && !ctx.showAll && filtered.length > visible.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShowAll(true)}>${x('showAll', { n: filtered.length })}</button>` : null}
-        <span>${x('poolFacts', { n: pool.length })}</span>
-      </div>
-    </div>`;
-}
-
-function pickerRow(ctx, slot, m, on, taken) {
-  const act = () => (slot === 'judge' ? ctx.setJudge(m) : ctx.addCandidate(m));
-  return html`
-    <li class=${`model-picker-row ${on ? 'is-on' : ''} ${taken ? 'is-taken' : ''}`} key=${m.id}>
-      <button type="button" disabled=${ctx.busy === 'models' || taken} onClick=${act}>
-        <span><b>${modelWords(m, m.id)}</b><code>${m.id}</code></span>
-        <span class="model-picker-note">${taken ? x('alreadyAdded') : ''}</span>
-        <span class="model-picker-price">${priceWords(m, CHAT_ROLE)}</span>
-        <span class="model-picker-ctx">${contextWords(m)}</span>
-      </button>
-    </li>`;
+    <${ModelList} models=${pool} recommended=${rankModels(pool, 'chat').slice(0, RECOMMENDED)} value=${chosenId}
+      taken=${[...taken]} disabled=${ctx.busy === 'models'} onPick=${act} match=${matchesQuery}
+      query=${ctx.query || ''} onQuery=${(v) => ctx.setQuery(v)} showAll=${!!ctx.showAll} onShowAll=${(v) => ctx.setShowAll(v)}
+      searchLabel=${x('searchModels', { n: pool.length })} recommendedLabel=${x('recommended')} noMatchLabel=${x('noMatch')}
+      showAllLabel=${(n) => x('showAll', { n })} facts=${x('poolFacts', { n: pool.length })}
+      describe=${(m) => ({ name: modelWords(m, m.id), note: taken.has(m.id) ? x('alreadyAdded') : '', price: priceWords(m, CHAT_ROLE), context: contextWords(m) })} />`;
 }

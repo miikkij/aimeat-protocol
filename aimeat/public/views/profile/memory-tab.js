@@ -5,6 +5,8 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.2.0 — 2026-09-26 — The federated session's note is the Note component (the attention note, as
+ *     the branch drew it) with the space under it; the tab writes no class (page group G3).
  *   v3.1.0 — 2026-09-25 — A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
  *   v3.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Muistin sivu", direction A). The render
  *     is one call into memory-tab/cover.js: the cover (the store in four parts, what has happened,
@@ -101,6 +103,8 @@ import { useKeySpaceSharing } from './memory-tab/sharing.js';
 import { useMemoryBackup } from './memory-tab/backup.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
+import { Note } from '/components/Note.js';
+import { Space } from '/components/Layout.js';
 import { shortTok } from './memory-tab/helpers.js';
 import { fetchFileBytes, uploadFilesPresigned } from './memory-tab/file-helpers.js';
 import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
@@ -738,11 +742,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
   };
 
   return html`
-    ${session.federated && html`
-      <div class="poster-aside poster-aside--small poster-aside--irreversible mb-half">
-        <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
-      </div>
-    `}
+    ${session.federated ? html`
+      <${Space} below="small">
+        <${Note} kind="aside" size="small" tone="irreversible">${t('profile.memory.federatedSession')}<//>
+      <//>
+    ` : null}
 
     ${renderMemoryView(ctx)}
 

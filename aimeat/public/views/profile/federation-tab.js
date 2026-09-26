@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing federated peer nodes and their online/offline status.
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage, List, Mark, Note): the page passes data and writes no class. Put back from main: a member peer and a permanent one stand out (the success colour on main, the tag's fine tone now) from a visiting, genesis or temporary one (the plain tag) (page group G8).
  *   v1.10.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.9.0 -- 2026-09-25 -- A list drawn as classic cards is the Listing (css/components/listing.css), a row that opens shows the Listing's open panel; the card, its header, arrow and detail rules go (a unification: the look most tabs use).
  *   v1.8.0 -- 2026-09-25 -- The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
@@ -31,6 +32,10 @@ import { escHtml } from '/js/utils.js';
 import { LoadingLine } from './shared.js';
 import { PageSection } from '/components/PageSection.js';
 import { StatusDot } from '/components/StatusDot.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
 import { listPeers } from '/js/services/federation.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -53,34 +58,36 @@ export default function FederationTab() {
   loadRef.current = loadData;
   useEffect(() => onLiveUpdate(['federation'], () => loadRef.current()), []);
 
+  // A peer's tier and availability are kinds (tags); main drew the settled ones (a member, a
+  // permanent node) in the success colour and the passing ones (visiting, genesis, temporary) in
+  // the info colour: the settled one is the tag's fine tone now, the others the plain tag.
+  const kindMark = (settled, words) => html`<${Mark} tone=${settled ? 'fine' : undefined}>${words}<//>`;
+
   return html`
-    <div class="og">
-    <div class="mb-1">
-      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuInfra')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.federation')}</span></div>
-      <div class="og-mast"><div class="og-mast-words">
-        <div class="og-title poster-page-title">${t('profile.federation.title')}</div>
-        <div class="og-desc">${t('profile.federation.desc')}</div>
-      </div></div>
-    </div>
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.federation')]}
+      title=${t('profile.federation.title')}
+      desc=${t('profile.federation.desc')}>
     ${!federation ? html`<${LoadingLine} text=${t('profile.federation.loading')} />`
-      : federation.length === 0 ? html`<div class="poster-quiet">${t('profile.federation.empty')}</div>`
+      : federation.length === 0 ? html`<${Note} kind="quiet">${t('profile.federation.empty')}<//>`
       : html`<${PageSection} title=${t('profile.federation.peers')}>
-          <div class="listing listing--name-desc-doors">
+          <${List} cols="name-desc-doors">
           ${federation.map(p => {
             const alive = p.status === 'active' || p.alive;
+            const tier = p.tier || 'member';
             return html`
-              <div class="listing-row">
-                <div class="listing-name">${escHtml(p.node_id || p.nodeId || p.url)}</div>
-                <div class="listing-desc">${escHtml(p.url || '')}</div>
-                <div class="listing-doors">
-                    <span class="poster-chip">${t('profile.federation.tier_' + (p.tier || 'member')) || (p.tier || 'member')}</span>
-                    ${p.availability && p.availability !== 'unknown' ? html`<span class="poster-chip">${t('profile.federation.avail_' + p.availability) || p.availability}</span>` : null}
+              <${Row} key=${p.node_id || p.nodeId || p.url}>
+                <${Name}>${escHtml(p.node_id || p.nodeId || p.url)}<//>
+                <${Desc}>${escHtml(p.url || '')}<//>
+                <${Doors}>
+                    ${kindMark(tier === 'member', t('profile.federation.tier_' + tier) || tier)}
+                    ${p.availability && p.availability !== 'unknown' ? kindMark(p.availability === 'permanent', t('profile.federation.avail_' + p.availability) || p.availability) : null}
                     <${StatusDot} status=${alive ? 'alive' : 'dead'} />
-                    <span class="poster-status ${alive ? 'poster-status--fine' : 'poster-status--danger'}">${alive ? t('profile.federation.online') : t('profile.federation.offline')}</span>
-                </div>
-              </div>`;
+                    <${Mark} kind="status" tone=${alive ? 'fine' : 'danger'}>${alive ? t('profile.federation.online') : t('profile.federation.offline')}<//>
+                <//>
+              <//>`;
           })}
-          </div><//>`
+          <//><//>`
     }
-    </div>`;
+    <//>`;
 }

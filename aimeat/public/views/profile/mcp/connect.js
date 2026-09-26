@@ -10,6 +10,14 @@
  * @structure secConnect · quickWays · proofBlock · failList
  * @usage import { secConnect } from './connect.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the
+ *     sections Section (fold for the guide and the proof, in Folds), the leads and hints Note, the
+ *     short ways in Facts with Action links, the before-you-start note the aside Note with its Label,
+ *     the proof's heading the Sub-heading, its prompt the Code block (tall: it scrolls after 24rem),
+ *     its copy Loud or Action with `copy`, the failure path the aside with the numbered steps
+ *     (IndexList steps, Jouni's decision "Numbered list"), the managed-environment note its poster
+ *     tone, the setup guide the SetupGuide component with its named options (poster, asideInstall,
+ *     facts, stepRows; page group G1a's). The page writes no class.
  *   v1.12.0 -- 2026-09-26 -- The proof prompt is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.10.0 -- 2026-09-26 -- A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
@@ -36,37 +44,49 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section } from '/components/Section.js';
+import { Folds } from '/components/Folds.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Facts } from '/components/Facts.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Space, Stack } from '/components/Layout.js';
+import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
-import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
+import { SetupGuide } from '/components/SetupGuide.js';
 import { m, day } from './frame.js';
-import { Hint } from '/components/Hint.js';
+
+/** The per-tool setup guide: the tool tabs, the install row in the attention note, facts, numbered steps. */
+const guide = () => html`<${SetupGuide} poster asideInstall facts stepRows />`;
 
 export function secConnect(ctx, proven) {
   const toolCount = Array.isArray(ctx.tools) ? ctx.tools.length : null;
   return html`
-    <${PageSection} id="mcp-connect" num="02" title=${proven ? m('secConnect') : m('secConnectFirst')} count=${toolCount ? m('toolCount', { n: toolCount }) : null}>
+    <${Section} id="mcp-connect" num="02" title=${proven ? m('secConnect') : m('secConnectFirst')} count=${toolCount ? m('toolCount', { n: toolCount }) : null}>
       ${proven ? html`
-        <p class="og-lead">${m('connectLeadProven')}</p>
+        <${Note} kind="lead">${m('connectLeadProven')}<//>
         ${quickWays(ctx)}
-        <div class="og-folds">
-          <${FoldSection} id="mcp-guide" num="·" title=${m('guideFold')} sub=${m('guideFoldSub')} open=${ctx.folds.guide} onToggle=${() => ctx.setFold('guide', !ctx.folds.guide)}>
-            <${McpSetupGuide} installClassName="poster-aside" tabClass="poster-tab" activeClass="is-on" facts stepRows />
+        <${Folds}>
+          <${Section} fold clip id="mcp-guide" num="·" title=${m('guideFold')} sub=${m('guideFoldSub')} open=${ctx.folds.guide} onToggle=${() => ctx.setFold('guide', !ctx.folds.guide)}>
+            ${guide()}
           <//>
-          <${FoldSection} id="mcp-proof" num="·" title=${m('proofFold')} sub=${m('proofFoldSub', { date: day(ctx.proof?.at) })} open=${ctx.folds.proof} onToggle=${() => ctx.setFold('proof', !ctx.folds.proof)}>
+          <${Section} fold clip id="mcp-proof" num="·" title=${m('proofFold')} sub=${m('proofFoldSub', { date: day(ctx.proof?.at) })} open=${ctx.folds.proof} onToggle=${() => ctx.setFold('proof', !ctx.folds.proof)}>
             ${proofBlock(ctx, true)}
           <//>
-        </div>` : html`
-        <p class="og-lead">${m('connectLeadNew')}</p>
-        <${McpSetupGuide} installClassName="poster-aside" tabClass="poster-tab" activeClass="is-on" facts stepRows />
-        <div class="mc-pre poster-aside">
-          <span class="mc-pre-label poster-label">${m('preTitle')}</span>
-          <p>${m('preAddress')}</p>
-          <p>${m('preManaged')}</p>
-          <p>${m('preTime')}</p>
-        </div>
+        <//>` : html`
+        <${Note} kind="lead">${m('connectLeadNew')}<//>
+        ${guide()}
+        <${Space} above="large">
+          <${Note} kind="aside">
+            <${Stack} gap="small">
+              <${Label} block>${m('preTitle')}<//>
+              <span>${m('preAddress')}</span>
+              <span>${m('preManaged')}</span>
+              <span>${m('preTime')}</span>
+            <//>
+          <//>
+        <//>
         ${quickWays(ctx)}
         ${proofBlock(ctx, false)}`}
     <//>`;
@@ -77,55 +97,58 @@ function quickWays(ctx) {
   const tools = (ctx.tools || []).filter((tool) => tool?.mcp?.install && (tool.mcp.install.link || tool.mcp.install.scripts?.length || tool.mcp.install.file));
   if (!tools.length) return null;
   return html`
-    <div class="mc-quick">
-      <span class="poster-label">${m('quickTitle')}</span>
-      <div class="facts">
-        ${tools.map((tool) => {
-          const ins = tool.mcp.install;
-          return html`
-            <div class="facts-k poster-label" key=${'k' + tool.id}>${tool.label}</div>
-            <div class="facts-v" key=${'v' + tool.id}>
-              <div class="og-doors">
-                ${ins.link ? html`<a class="poster-action poster-action--small" href=${ins.link.href}>${ins.link.label}</a>` : null}
-                ${(ins.scripts || []).map((sc) => html`<a class="poster-action poster-action--small" key=${sc.os} href=${sc.url} download=${sc.filename} title=${sc.note}>${sc.label}</a>`)}
-                ${ins.file ? html`<a class="poster-action poster-action--small poster-action--lower" href=${ins.file.url} download=${ins.file.filename} title=${ins.file.where}>${ins.file.label}</a>` : null}
-              </div>
-              <small>${ins.link ? ins.link.note : ins.scripts?.[0] ? ins.scripts[0].note : ins.file.where}</small>
-            </div>`;
-        })}
-      </div>
-      <${Hint}>${m('quickHint')}<//>
-    </div>`;
+    <${Space} above="large">
+      <${Label} block>${m('quickTitle')}<//>
+      <${Facts} rows=${tools.map((tool) => {
+        const ins = tool.mcp.install;
+        return {
+          key: tool.id,
+          k: tool.label,
+          v: html`<${Actions}>
+            ${ins.link ? html`<${Action} small href=${ins.link.href}>${ins.link.label}<//>` : null}
+            ${(ins.scripts || []).map((sc) => html`<${Action} small key=${sc.os} href=${sc.url} download=${sc.filename} title=${sc.note}>${sc.label}<//>`)}
+            ${ins.file ? html`<${Action} small soft href=${ins.file.url} download=${ins.file.filename} title=${ins.file.where}>${ins.file.label}<//>` : null}
+          <//>`,
+          sub: ins.link ? ins.link.note : ins.scripts?.[0] ? ins.scripts[0].note : ins.file.where,
+        };
+      })} />
+      <${Note}>${m('quickHint')}<//>
+    <//>`;
 }
 
 /** The proof: paste one prompt into the chat, press check, read the answer here. */
 function proofBlock(ctx, again) {
+  const copy = { copy: ctx.prompt, copiedLabel: t('common.copied') };
   return html`
-    <div class="mc-proof">
-      ${!again && html`<h3 class="mc-h3 poster-section-title">${m('proofTitle')}</h3>`}
-      <p class="og-lead">${again ? m('proofLeadAgain') : m('proofLead')}</p>
-      <pre class="code-block mc-code">${ctx.prompt || t('helloMcp.proof.loading')}</pre>
-      <div class="og-doors mc-proof-doors">
-        <${CopyButton} text=${ctx.prompt} className=${again ? 'poster-action poster-action--small' : 'poster-slab'} label=${t('helloMcp.proof.copy')} copiedLabel=${t('common.copied')} />
-        <button type="button" class="poster-action poster-action--small" disabled=${ctx.checking} onClick=${ctx.check}>${ctx.checking ? t('helloMcp.proof.checking') : t('helloMcp.proof.check')}</button>
-      </div>
-      ${ctx.proofState === 'fail' ? failList() : html`<${Hint}>${m('proofHint')}<//>`}
-      <${ManagedEnvNote} compact=${true} />
-    </div>`;
+    <${Space} above=${again ? undefined : 'section'}>
+      ${!again && html`<${SubHeading} level=${3}>${m('proofTitle')}<//>`}
+      <${Note} kind="lead">${again ? m('proofLeadAgain') : m('proofLead')}<//>
+      <${Code} block tall>${ctx.prompt || t('helloMcp.proof.loading')}<//>
+      <${Actions}>
+        ${again
+          ? html`<${Action} small ...${copy}>${t('helloMcp.proof.copy')}<//>`
+          : html`<${Loud} ...${copy}>${t('helloMcp.proof.copy')}<//>`}
+        <${Action} small disabled=${ctx.checking} onClick=${ctx.check}>${ctx.checking ? t('helloMcp.proof.checking') : t('helloMcp.proof.check')}<//>
+      <//>
+      ${ctx.proofState === 'fail' ? failList() : html`<${Note}>${m('proofHint')}<//>`}
+      <${ManagedEnvNote} compact poster />
+    <//>`;
 }
 
 /** The failure path, the usual cause first. */
 function failList() {
   return html`
-    <div class="mc-fail poster-aside poster-aside--small poster-aside--irreversible">
-      <b>${t('helloMcp.fail.title')}</b>
-      <ol>
-        <li>${t('helloMcp.fail.s1')}</li>
-        <li>${t('helloMcp.fail.s2')}</li>
-        <li>${t('helloMcp.fail.s3')}</li>
-        <li>${t('helloMcp.fail.s4')}</li>
-        <li>${t('helloMcp.fail.s5')}</li>
-      </ol>
-      <${Hint}>${t('helloMcp.fail.retry')}<//>
-    </div>`;
+    <${Space} above="medium">
+      <${Note} kind="aside" size="small" tone="irreversible">
+        <b>${t('helloMcp.fail.title')}</b>
+        <${IndexList} steps>
+          <${IndexStep}>${t('helloMcp.fail.s1')}<//>
+          <${IndexStep}>${t('helloMcp.fail.s2')}<//>
+          <${IndexStep}>${t('helloMcp.fail.s3')}<//>
+          <${IndexStep}>${t('helloMcp.fail.s4')}<//>
+          <${IndexStep}>${t('helloMcp.fail.s5')}<//>
+        <//>
+        <${Note}>${t('helloMcp.fail.retry')}<//>
+      <//>
+    <//>`;
 }

@@ -2,12 +2,22 @@
  * @file public/views/profile/inbox-tab/components.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Presentational sub-components for the profile Inbox tab: Avatar, AttachmentItem,
- *   MarkdownViewer, PollBuilder,
- *   MessageBubble, Composer (Toast UI editor + markdown fallback), CommandBar/CommandFill (agent
- *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
- *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
+ * @description Presentational sub-components for the profile Inbox tab: MarkdownViewer, PollBuilder,
+ *   CommandBar/CommandFill (agent chat.commands), SchedulePanel (own-agent scheduler),
+ *   ReplyWithAiPopover (TARGET-031) and ConversationToNotebookPopover. Each is self-contained (owns
+ *   its own hooks). MessageBubble (./message-turn.js) and Avatar (components/Avatar.js) are
+ *   re-exported from here; the composer is the Composer component's message tone
+ *   (components/Composer.js, tone="message"). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.31.0 -- 2026-09-26 -- Written on components only (no class): the poll builder's questions are Boxes
+ *     of TextFields and Checks; the command bar and fill and the schedule are the pane's strips
+ *     (ConversationPane PaneStrip) with the field family's controls, the command a Mark that is a
+ *     button, the jobs a dense List; the popovers' ways are Tabs and their panel the edge Box.
+ *   v1.30.0 -- 2026-09-26 -- The composer moved into the Composer component as its message tone
+ *     (components/MessageComposer.js), with main's layout back: the field over the whole width, its
+ *     tools under it. Avatar is the Avatar component. The ways on are the kit
+ *     (components/Action.js Action, Loud, Icon; Note for the hints and the quiet lines): this file
+ *     writes no action, hint or quiet class of its own.
  *   v1.29.0 -- 2026-09-26 -- The typing box is the chat's one row (.poster-composer, its stacked cut): the thin field with the thick line under it, attach, voice and the bigger editor as three framed squares, and the dark block that sends with its own word; on a phone the field keeps the whole width and the rest goes under it (a unification: Jouni's decision "Typing box").
  *   v1.28.0 -- 2026-09-26 -- MessageBubble and AttachmentItem moved to ./message-turn.js, where a message is the chat's turn (a unification: Jouni's decision "Message"); re-exported from here.
  *   v1.27.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
@@ -88,32 +98,34 @@
  *       ⧉, which uses the new ariaLabel/copiedTitle props so an icon keeps its screen-reader name.
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { AiInteractionNotice } from '/components/ai-label.js';
-import { minidenticon } from '/lib/minidenticons.min.js';
+import { Action, Loud, Icon } from '/components/Action.js';
+import { Mark, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { FormActions } from '/components/Field.js';
+import { Stack, Row } from '/components/Layout.js';
+import { List, Row as ListRow, Name, Cell } from '/components/List.js';
+import { PaneStrip } from '/components/ConversationPane.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
-import { bigEditorHeight, loadToastUI } from './helpers.js';
-import { fmtClock, stopOtherAudio } from './voice-parts.js';
-import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { swallowed } from '/js/swallowed.js';
-// A message and its attachments are the chat's turn now, in their own module; the names stay
-// reachable from here for the pages that take them from this file.
-export { MessageBubble, AttachmentItem } from './message-turn.js';
-
-export function Avatar({ seed, size = 36 }) {
-  const svg = minidenticon(typeof seed === 'string' && seed ? seed : 'user');
-  return html`<span class=${`inbox-avatar inbox-avatar--${size} poster-box poster-box--avatar`}
-    dangerouslySetInnerHTML=${{ __html: svg }}></span>`;
-}
+// A message is the Message component, given its data in ./message-turn.js; the name stays reachable
+// from here for the pages that take it from this file. A picture of a person is the Avatar component
+// (components/Avatar.js), under the name this page has always used.
+export { MessageBubble } from './message-turn.js';
+export { Avatar } from '/components/Avatar.js';
 
 
 /** In-app viewer for a markdown attachment — browsers don't render .md, so we fetch the (same-origin,
@@ -127,12 +139,12 @@ export function MarkdownViewer({ url, name, onClose }) {
     return () => { alive = false; };
   }, [url]);
   return html`
-    <${Modal} open=${true} onClose=${onClose} title=${name} size="lg" guard=${false} className="inbox-mdviewer"
+    <${Modal} open=${true} onClose=${onClose} title=${name} size="lg" guard=${false}
       footer=${html`
-        <a class="poster-action" href=${url} target="_blank" rel="noopener">${t('inbox.attachmentOpenRaw')}</a>
-        <a class="poster-action" href=${url} download=${name}>${t('inbox.attachmentDownload')}</a>`}>
-      ${failed ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.attachmentLoadError')}</div>`
-        : text === null ? html`<div class="poster-quiet inbox-empty-sm">…</div>`
+        <${Action} href=${url} newTab>${t('inbox.attachmentOpenRaw')}<//>
+        <${Action} href=${url} download=${name}>${t('inbox.attachmentDownload')}<//>`}>
+      ${failed ? html`<${Note} kind="quiet">${t('inbox.attachmentLoadError')}<//>`
+        : text === null ? html`<${Note} kind="quiet">…<//>`
         : html`<${Markdown} text=${text} />`}
     <//>`;
 }
@@ -154,301 +166,31 @@ export function PollBuilder({ questions, setQuestions }) {
   const removeOpt = (qi, oi) => update(qi, { options: questions[qi].options.filter((_, j) => j !== oi) });
 
   return html`
-    <div class="inbox-poll-builder">
+    <${Stack} gap="medium">
       ${questions.map((q, qi) => html`
-        <div class="inbox-poll-q" key=${q.id}>
-          <div class="inbox-poll-q-head">
-            <span class="inbox-poll-q-n">${qi + 1}.</span>
-            <input class="og-input" placeholder=${t('inbox.pollHeader')} value=${q.header} onInput=${(e) => update(qi, { header: e.target.value })} />
-            <button class="inbox-bc-chip-x" title=${t('inbox.pollRemoveQ')} onClick=${() => removeQ(qi)}>✕</button>
-          </div>
-          <input class="og-input" placeholder=${t('inbox.pollPrompt')} value=${q.prompt} onInput=${(e) => update(qi, { prompt: e.target.value })} />
-          <div class="inbox-poll-opts">
-            ${q.options.map((o, oi) => html`<div class="inbox-poll-opt" key=${o.id}>
-              <input class="og-input" placeholder=${`${t('inbox.pollOption')} ${oi + 1}`} value=${o.label} onInput=${(e) => updateOpt(qi, oi, e.target.value)} />
-              ${q.options.length > 1 ? html`<button class="inbox-bc-chip-x" onClick=${() => removeOpt(qi, oi)}>✕</button>` : null}
-            </div>`)}
-            <button class="poster-action" onClick=${() => addOpt(qi)}>+ ${t('inbox.pollAddOption')}</button>
-          </div>
-          <div class="inbox-poll-flags">
-            <label><input type="checkbox" checked=${q.multiSelect} onChange=${(e) => update(qi, { multiSelect: e.target.checked })} /> ${t('inbox.pollMulti')}</label>
-            <label><input type="checkbox" checked=${q.allowOther} onChange=${(e) => update(qi, { allowOther: e.target.checked })} /> ${t('inbox.pollAllowOther')}</label>
-            <label><input type="checkbox" checked=${q.required} onChange=${(e) => update(qi, { required: e.target.checked })} /> ${t('inbox.pollRequired')}</label>
-          </div>
-        </div>`)}
-      <button class="poster-action" onClick=${addQ}>+ ${t('inbox.pollAddQuestion')}</button>
-    </div>`;
-}
-
-/* Composer — the Toast UI editor (Markdown⇄WYSIWYG toggle, same as workspace documents), with a
- * markdown-textarea + live-preview fallback if the editor can't load. Owns its own draft + file
- * state; calls onSend(recipient, markdown, files, reset). Remount it (via key) per conversation so
- * the draft doesn't leak between threads. */
-export function Composer({
-  recipient, sendLabel, sending, onSend, initialText = '', draftKey = '', focusNonce = 0,
-  voiceMaxSeconds = 300,
-}) {
-  // Restore an in-progress draft for this conversation/compose (localStorage), or the passed initialText.
-  const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
-  const seeded = initialText || readDraft();   // an explicit suggested reply wins; else restore a draft
-  // 'simple' = a thin auto-growing textarea, the way every chat works: one line that grows as you type.
-  // 'rich' = the Toast UI editor with its toolbar and preview tabs, which costs 92px of chrome before a
-  // single character — worth having, not worth spending the reading area on by default. The ⤢ button
-  // switches between them. 'markdown' = the textarea+preview fallback when Toast UI cannot load.
-  //
-  // Desktop used to open in 'rich', which handed the composer a third of the window and pushed the
-  // conversation into the strip above it. The messages are what the screen is for.
-  const [mode, setMode] = useState('simple');
-  const [md, setMd] = useState(seeded);
-  const mdRef = useRef(seeded);
-  useEffect(() => { mdRef.current = md; }, [md]);
-  // Temporarily enlarge the editor (~60% of the viewport) so long/formatted drafts are fully visible.
-  const [expanded, setExpanded] = useState(false);
-  const [files, setFiles] = useState([]);
-  const containerRef = useRef(null);
-  const editorRef = useRef(null);
-  const taRef = useRef(null);
-  const fileRef = useRef(null);
-  const saveTimer = useRef(null);
-  // Debounced auto-save of the draft (skipped when there's no key). Empty text clears the draft.
-  const saveDraft = (text) => {
-    if (!draftKey) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try { if (text && text.trim()) localStorage.setItem(draftKey, text); else localStorage.removeItem(draftKey); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
-    }, 400);
-  };
-  const clearDraft = () => { try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ } };   // eslint-disable-line aimeat/no-silent-catch -- noop
-
-  // A pasted / dropped image is added to the SAME file-attachment queue as the 📎 button (uploaded to
-  // storage + rendered as an image on the bubble) — never base64-inlined into the body, which would
-  // blow the server's 50k body limit. Wrap a bare clipboard Blob in a named File so uploadAttachment
-  // (which needs .name) and the file chip both work. Functional setFiles avoids a stale closure in the
-  // editor hook (created once at construction).
-  const addPastedImage = (blob) => {
-    if (!blob) return;
-    const ext = (blob.type && blob.type.split('/')[1]) || 'png';
-    const orig = (blob instanceof File && blob.name) ? blob.name : '';
-    // Clipboard images always arrive as a File generically named "image.png", so every paste would share
-    // that one name (and read as the same file in the thread). Give each pasted image a unique name; keep
-    // a genuine dropped filename as-is.
-    const generic = !orig || orig.toLowerCase() === 'image.png';
-    const name = generic ? `pasted-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}` : orig;
-    const file = (blob instanceof File && !generic) ? blob : new File([blob], name, { type: blob.type || 'image/png' });
-    setFiles((prev) => [...prev, file]);
-  };
-  // A finished recording joins the same attachment queue as a picked file, so it travels the one
-  // upload path (presigned PUT) everything else uses. The measured length rides ON the File: the
-  // send path reads it back as `duration_seconds`, which lets the recipient's thread show "0:14"
-  // before a single byte of audio has been fetched.
-  const addRecording = (file, durationSeconds) => {
-    file.durationSeconds = durationSeconds;
-    // Minted ONCE here, not in render: createObjectURL in a render body allocates a new blob URL on
-    // every re-render and never releases the old ones.
-    file.previewUrl = URL.createObjectURL(file);
-    setFiles((prev) => [...prev, file]);
-  };
-  const releasePreview = (file) => {
-    if (file?.previewUrl) { URL.revokeObjectURL(file.previewUrl); file.previewUrl = null; }
-  };
-
-  // Pull image files out of a clipboard/drop event; returns true if any were handled (caller preventDefaults).
-  const handleImagePaste = (e) => {
-    const items = Array.from(e.clipboardData?.items || e.dataTransfer?.items || []);
-    const imgs = items.filter((it) => it.kind === 'file' && (it.type || '').startsWith('image/'))
-      .map((it) => it.getAsFile()).filter(Boolean);
-    if (imgs.length === 0) return false;
-    e.preventDefault();
-    imgs.forEach(addPastedImage);
-    return true;
-  };
-
-  useEffect(() => {
-    if (mode !== 'rich') return undefined;
-    let inst = null, cancelled = false;
-    (async () => {
-      const Editor = await loadToastUI().catch(err => { swallowed('components: handleImagePaste', err); return null; });
-      if (cancelled) return;
-      if (!Editor) { setMode('markdown'); return; }
-      if (!containerRef.current) return;
-      inst = new Editor({
-        el: containerRef.current,
-        // 160px left about 68px to type in: the toolbar and the markdown/preview tab row take 92px of
-        // it between them. Writing the message is the point of this screen, so on a desktop window the
-        // box gets a share of the height instead of a constant. A phone keeps the small default — its
-        // composer is the auto-growing single line, and the keyboard owns the bottom half anyway.
-        height: bigEditorHeight() + 'px',
-        initialEditType: 'markdown',     // open in markdown mode; the built-in toggle switches to WYSIWYG
-        previewStyle: 'tab',
-        initialValue: mdRef.current || seeded,   // whatever is in the thin input right now, else the draft
-        usageStatistics: false,
-        // editorRef is set only AFTER construction, so the constructor's own change (initialValue) is
-        // skipped — only real user edits auto-save the draft.
-        events: { change: () => { if (editorRef.current) saveDraft(editorRef.current.getMarkdown()); } },
-        // Intercept pasted / dropped images: queue them as file attachments and DON'T call the callback,
-        // so Toast UI skips its default base64 <img> insertion into the markdown body.
-        hooks: { addImageBlobHook: (blob /* , callback, source */) => { addPastedImage(blob); } },
-        toolbarItems: [
-          ['bold', 'italic', 'strike'],
-          ['ul', 'ol', 'task'],
-          ['quote', 'code', 'codeblock'],
-          ['link'],
-        ],
-      });
-      editorRef.current = inst;
-    })();
-    return () => {
-      cancelled = true;
-      if (inst) { try { inst.destroy(); } catch (err) { swallowed('components: handleImagePaste', err); } }
-      editorRef.current = null;
-    };
-    // Create the editor once when mode becomes 'rich': `seeded` is intentionally read only at
-    // construction (later initialText changes are applied by the effect below via setMarkdown, not a
-    // remount) and `saveDraft` is a stable-behavior closure over refs — adding either would destroy +
-    // recreate the editor on every render / initialText change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
-
-  // Seed the rich editor with an initial draft (e.g. a Tracked Response suggested reply) once it mounts.
-  useEffect(() => {
-    if (mode === 'rich' && initialText && editorRef.current) {
-      try { editorRef.current.setMarkdown(initialText); } catch (err) { swallowed('components: handleImagePaste', err); }
-    }
-  }, [mode, initialText]);
-
-  // Focus the composer when the parent bumps focusNonce (e.g. after clicking ↩ Reply on a bubble) so the
-  // user can start typing straight away instead of clicking into the editor. A short delay lets the reply
-  // bar / editor settle first. Skip the initial 0 so a fresh mount never steals focus / pops the keyboard.
-  useEffect(() => {
-    if (!focusNonce) return undefined;
-    const id = setTimeout(() => {
-      try {
-        if (mode === 'rich' && editorRef.current?.focus) editorRef.current.focus();
-        else if (taRef.current) taRef.current.focus();
-      } catch (err) { swallowed('components: handleImagePaste', err); }
-    }, 60);
-    return () => clearTimeout(id);
-    // Only focusNonce is the trigger; mode/refs are read at fire time.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusNonce]);
-
-  // Resize the Toast UI editor when the expand toggle flips (rich mode sets its own inline height via
-  // JS, so a CSS class can't reach it — the fallback/simple textareas are sized by `.inbox-composer--tall`
-  // in CSS instead). `160px` matches the construction default.
-  useEffect(() => {
-    if (mode !== 'rich' || !editorRef.current?.setHeight) return undefined;
-    // The editor holds whatever height it was built with, so a window that gets shorter would keep an
-    // editor sized for the taller one and squeeze the conversation instead.
-    const apply = () => {
-      try { editorRef.current.setHeight(bigEditorHeight() + 'px'); } catch (err) { swallowed('components: composer resize', err); }
-    };
-    apply();
-    window.addEventListener('resize', apply);
-    return () => window.removeEventListener('resize', apply);
-  }, [expanded, mode]);
-
-  // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread. When
-  // expanded, the cap lifts to ~60vh so a long draft is fully visible.
-  const autoGrow = (ta) => {
-    if (!ta) return;
-    const cap = expanded && typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 132;
-    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, cap) + 'px';
-  };
-  // Size the simple textarea to any seeded draft on mount (and keep it 1 row when empty); re-fit when the
-  // expand cap changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mode === 'simple') autoGrow(taRef.current); }, [mode, expanded]);
-
-  /**
-   * ⤢ / ⤡ — swap the thin chat input for the full editor and back.
-   *
-   * Not a height toggle. The thin input IS the default because the conversation above it is what the
-   * screen is for; the toolbar, the preview tabs and the room to format are a thing you ask for when
-   * you are writing something long. The draft travels in both directions, so switching mid-sentence
-   * never costs a word.
-   */
-  const toggleBigEditor = () => {
-    if (mode === 'rich') {
-      const text = editorRef.current?.getMarkdown ? editorRef.current.getMarkdown() : md;
-      setMd(text); mdRef.current = text; saveDraft(text);
-      setExpanded(false); setMode('simple');
-      return;
-    }
-    setExpanded(true); setMode('rich');
-  };
-
-  const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
-  const reset = () => {
-    try { editorRef.current?.setMarkdown(''); } catch (err) { swallowed('components: reset', err); }
-    setMd('');
-    setFiles((prev) => { prev.forEach(releasePreview); return []; });
-    if (fileRef.current) fileRef.current.value = '';
-    if (mode === 'simple' && taRef.current) taRef.current.style.height = 'auto';
-    clearDraft();   // a sent message is no longer a draft
-  };
-  const submit = () => onSend(recipient, getText(), files, reset);
-  // Remove one queued attachment before sending (a mis-paste shouldn't force starting the message over).
-  // Also clear the hidden file input when the last chip goes, so re-picking the same file fires onChange.
-  const removeFile = (idx) => setFiles((prev) => {
-    releasePreview(prev[idx]);
-    const next = prev.filter((_, j) => j !== idx);
-    if (next.length === 0 && fileRef.current) fileRef.current.value = '';
-    return next;
-  });
-
-  return html`
-    <div class="poster-composer poster-composer--stack poster-row--thing inbox-composer ${expanded ? 'inbox-composer--tall' : ''}">
-      ${files.length > 0 ? html`<div class="inbox-file-chips">
-        ${files.map((f, i) => {
-          // A recording gets its own chip with a player: a bad take should be caught here, not in
-          // the other person's mailbox.
-          const isVoice = (f.type || '').startsWith('audio/') && f.durationSeconds;
-          return html`<span class=${`inbox-file-chip${isVoice ? ' inbox-file-chip--voice' : ''}`} key=${f.name + i}>
-            ${isVoice
-              ? html`<span class="inbox-chip-voice">🎤 ${fmtClock(f.durationSeconds)}
-                  <audio class="inbox-audio inbox-audio--chip" controls preload="metadata"
-                         src=${f.previewUrl}
-                         onPlay=${(e) => stopOtherAudio(e.currentTarget)}></audio></span>`
-              : html`<span>📎 ${escHtml(f.name)}</span>`}
-            <button class="inbox-bc-chip-x" title=${t('inbox.attachmentRemove')} onClick=${() => removeFile(i)}>✕</button>
-          </span>`;
-        })}
-      </div>` : null}
-      ${mode === 'rich'
-        // Keys, because the three branches are different DOM shapes sharing one slot. Without them
-        // Preact reused the rich editor's <div> as the toolbar row below when switching back to the
-        // thin input, and Toast UI's inline height=450px rode along with it — the composer stayed
-        // half the pane while the textarea inside it was 40px.
-        ? html`<div key="rich" class="inbox-editor" ref=${containerRef}></div>`
-        : mode === 'simple'
-        ? null
-        : html`<div key="fallback" class="inbox-md-fallback">
-            <textarea class="inbox-textarea" rows="3" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
-              value=${md} onPaste=${handleImagePaste}
-              onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); }}></textarea>
-            <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
-          </div>`}
-      <!-- The chat's one row (Jouni's decision "Typing box"): the thin field, then attach, voice and
-           the bigger editor as three squares, and the dark block that sends with this page's word.
-           With the bigger editor open, the editor stands above the row and the row keeps the rest. -->
-      <div key="bar" class="poster-composer-row">
-        ${mode === 'simple'
-          ? html`<textarea key="thin" class="poster-composer-input" rows="1" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
-              value=${md} onPaste=${handleImagePaste}
-              onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); autoGrow(e.target); }}></textarea>`
-          : null}
-        <label class="poster-icon poster-composer-tool" title=${t('inbox.attach')}>
-          📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
-        </label>
-        <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} className="poster-icon poster-composer-tool" plain=${true}
-          onRecorded=${addRecording} />
-        <button type="button" class=${`poster-icon poster-composer-tool${mode === 'rich' ? ' is-on' : ''}`} title=${mode === 'rich' ? t('inbox.collapse') : t('inbox.expand')}
-          aria-pressed=${mode === 'rich'} onClick=${toggleBigEditor}>${mode === 'rich' ? '⤡' : '⤢'}</button>
-        <button type="button" class="poster-slab poster-slab--control poster-composer-send" disabled=${sending || !recipient} onClick=${submit}>
-          ${sending ? t('inbox.sending') : sendLabel}
-        </button>
-      </div>
-    </div>`;
+        <${Box} tone="row" packed key=${q.id}>
+          <${Stack}>
+            <${Row}>
+              <${Label}>${qi + 1}.<//>
+              <${TextField} placeholder=${t('inbox.pollHeader')} value=${q.header} onInput=${(v) => update(qi, { header: v })}
+                actions=${html`<${Icon} small label=${t('inbox.pollRemoveQ')} onClick=${() => removeQ(qi)}>✕<//>`} />
+            <//>
+            <${TextField} placeholder=${t('inbox.pollPrompt')} value=${q.prompt} onInput=${(v) => update(qi, { prompt: v })} />
+            <${Stack}>
+              ${q.options.map((o, oi) => html`<${TextField} key=${o.id} placeholder=${`${t('inbox.pollOption')} ${oi + 1}`}
+                value=${o.label} onInput=${(v) => updateOpt(qi, oi, v)}
+                actions=${q.options.length > 1 ? html`<${Icon} small label=${t('common.remove')} onClick=${() => removeOpt(qi, oi)}>✕<//>` : null} />`)}
+              <span><${Action} onClick=${() => addOpt(qi)}>+ ${t('inbox.pollAddOption')}<//></span>
+            <//>
+            <${Row} wrap gap="large">
+              <${Check} inline checked=${q.multiSelect} onChange=${(on) => update(qi, { multiSelect: on })}>${t('inbox.pollMulti')}<//>
+              <${Check} inline checked=${q.allowOther} onChange=${(on) => update(qi, { allowOther: on })}>${t('inbox.pollAllowOther')}<//>
+              <${Check} inline checked=${q.required} onChange=${(on) => update(qi, { required: on })}>${t('inbox.pollRequired')}<//>
+            <//>
+          <//>
+        <//>`)}
+      <span><${Action} onClick=${addQ}>+ ${t('inbox.pollAddQuestion')}<//></span>
+    <//>`;
 }
 
 /* ── Agent chat commands (Phase A) — a peer agent advertises fill-in templates via its public
@@ -456,35 +198,31 @@ export function Composer({
  *    default,options}]}]). We render a chip per command; the human fills the params; the resulting prose
  *    drops into the composer to review + send. The agent receives the filled template it advertised. ── */
 export function CommandBar({ commands, onPick }) {
-  return html`<div class="inbox-cmdbar">
-    <span class="inbox-cmdbar-label">⚡ ${t('inbox.cmdTitle')}</span>
-    ${commands.map(c => html`<button class="inbox-cmd-chip" key=${c.id} title=${c.description || ''}
-      onClick=${() => onPick(c)}>${escHtml(c.label || c.id)}</button>`)}
-  </div>`;
+  return html`<${PaneStrip}>
+    <${Row} wrap>
+      <${Note} inline>⚡ ${t('inbox.cmdTitle')}<//>
+      ${commands.map(c => html`<${Mark} key=${c.id} title=${c.description || ''} onClick=${() => onPick(c)}>${c.label || c.id}<//>`)}
+    <//>
+  <//>`;
 }
 
 export function CommandFill({ command, onInsert, onCancel }) {
   const [values, setValues] = useState({});
   const params = Array.isArray(command.params) ? command.params : [];
   const valOf = (p) => String(values[p.name] ?? p.default ?? '');
+  const set = (name) => (v) => setValues(prev => ({ ...prev, [name]: v }));
   const missing = params.some(p => p.required && !valOf(p).trim());
-  return html`<div class="inbox-cmdfill">
-    <div class="inbox-cmdfill-head">⚡ ${escHtml(command.label || command.id)}
-      <button class="poster-icon poster-icon--small" onClick=${onCancel} title=${t('inbox.close')}>✕</button></div>
-    ${command.description ? html`<div class="inbox-cmdfill-desc">${escHtml(command.description)}</div>` : null}
-    ${params.map(p => html`<label class="inbox-cmdfill-field" key=${p.name}>
-      <span class="inbox-cmdfill-pname">${escHtml(p.name)}${p.required ? ' *' : ''}</span>
-      ${p.type === 'select' && Array.isArray(p.options)
-        ? html`<select class="select-field" value=${valOf(p)}
-            onChange=${e => setValues(v => ({ ...v, [p.name]: e.target.value }))}>
-            ${p.options.map(o => html`<option key=${o} value=${o}>${escHtml(String(o))}</option>`)}</select>`
-        : html`<input class="og-input" type=${p.type === 'number' ? 'number' : 'text'}
-            placeholder=${p.placeholder || ''} value=${valOf(p)}
-            onInput=${e => setValues(v => ({ ...v, [p.name]: e.target.value }))} />`}
-    </label>`)}
-    <button class="poster-slab poster-slab--control inbox-cmdfill-go" disabled=${missing}
-      onClick=${() => onInsert(command, values)}>${t('inbox.cmdInsert')}</button>
-  </div>`;
+  return html`<${PaneStrip} grey>
+    <${Row} justify="between"><b>⚡ ${command.label || command.id}</b>
+      <${Icon} small label=${t('inbox.close')} onClick=${onCancel}>✕<//><//>
+    ${command.description ? html`<${Note}>${command.description}<//>` : null}
+    ${params.map(p => (p.type === 'select' && Array.isArray(p.options)
+      ? html`<${Select} key=${p.name} label=${`${p.name}${p.required ? ' *' : ''}`} value=${valOf(p)}
+          options=${p.options.map(o => [o, String(o)])} onChange=${set(p.name)} />`
+      : html`<${TextField} key=${p.name} label=${`${p.name}${p.required ? ' *' : ''}`} type=${p.type === 'number' ? 'number' : 'text'}
+          placeholder=${p.placeholder || ''} value=${valOf(p)} onInput=${set(p.name)} />`))}
+    <${FormActions}><${Loud} control disabled=${missing} onClick=${() => onInsert(command, values)}>${t('inbox.cmdInsert')}<//><//>
+  <//>`;
 }
 
 /* ── Agent schedule (Phase B) — surfaces the node scheduler scoped to one of YOUR OWN agents
@@ -514,23 +252,27 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
     } catch (e) { showToast?.(e?.message || t('inbox.schedError'), true); }
     finally { setBusy(false); }
   };
-  return html`<div class="inbox-sched">
-    <div class="inbox-sched-head">📅 ${t('inbox.schedTitle')}
-      <button class="poster-icon poster-icon--small" onClick=${onClose} title=${t('inbox.close')}>✕</button></div>
-    ${jobs == null ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.loading')}</div>`
-      : jobs.length === 0 ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.schedNone')}</div>`
-      : html`<ul class="inbox-sched-list">${jobs.map(j => html`<li class="inbox-sched-item" key=${j.id}>
-          <span class="inbox-sched-name">${escHtml(j.displayName || j.input?.taskTemplate?.title || j.id)}</span>
-          <span class="inbox-sched-cron">${escHtml(j.cron)}${j.enabled === false ? ' · ' + t('inbox.schedOff') : ''}</span>
-        </li>`)}</ul>`}
-    <div class="inbox-sched-new">
-      <input class="og-input" placeholder=${t('inbox.schedTaskPh')} value=${title} onInput=${e => setTitle(e.target.value)} />
-      <input class="og-input" placeholder="0 9 * * *" value=${cron} onInput=${e => setCron(e.target.value)} />
-      <textarea class="og-textarea inbox-sched-desc" placeholder=${t('inbox.schedDescPh')} value=${desc} onInput=${e => setDesc(e.target.value)}></textarea>
-      <button class="poster-slab poster-slab--control" disabled=${busy || !title.trim() || !cron.trim()} onClick=${create}>${t('inbox.schedCreate')}</button>
-    </div>
-  </div>`;
+  return html`<${PaneStrip} grey>
+    <${Row} justify="between"><b>📅 ${t('inbox.schedTitle')}</b>
+      <${Icon} small label=${t('inbox.close')} onClick=${onClose}>✕<//><//>
+    ${jobs == null ? html`<${Note} kind="quiet">${t('inbox.loading')}<//>`
+      : html`<${List} cols="name-state" keepCols dense empty=${jobs.length === 0 ? t('inbox.schedNone') : null}>
+          ${jobs.map(j => html`<${ListRow} key=${j.id}>
+            <${Name}>${j.displayName || j.input?.taskTemplate?.title || j.id}<//>
+            <${Cell} meta>${j.cron}${j.enabled === false ? ' · ' + t('inbox.schedOff') : ''}<//>
+          <//>`)}
+        <//>`}
+    <${Stack}>
+      <${TextField} placeholder=${t('inbox.schedTaskPh')} value=${title} onInput=${setTitle} />
+      <${TextField} placeholder="0 9 * * *" value=${cron} onInput=${setCron} />
+      <${TextArea} rows=${2} placeholder=${t('inbox.schedDescPh')} value=${desc} onInput=${setDesc} />
+      <${FormActions}><${Loud} control disabled=${busy || !title.trim() || !cron.trim()} onClick=${create}>${t('inbox.schedCreate')}<//><//>
+    <//>
+  <//>`;
 }
+
+/** The ways of a popover as tabs (what the chosen one decides sits under the sun bar). */
+const modeTabs = (items, value, onSelect) => html`<${Tabs} kind="view" items=${items} value=${value} onSelect=${onSelect} />`;
 
 /* ── Reply with AI (TARGET-031) — hand the conversation (or one message) to the user's OWN AI chat so
  *    it can craft a reply WITH access to their AIMEAT (organisms, memory, workspaces, librarian). Two
@@ -540,24 +282,20 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
 export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
   const [mode, setMode] = useState(MODES.COPY);
   const text = build(mode);
-  // The two ways are tabs; what the chosen one decides sits under a sun bar (poster-panel).
+  // The two ways are tabs; what the chosen one decides sits under a sun bar (the edge box).
   return html`
-    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" guard=${false} className="inbox-ai-modal"
-      footer=${html`<${CopyButton} text=${text} className="poster-slab poster-slab--control"
-        label=${t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
-        onCopied=${() => showToast?.(t('inbox.ai.copied'))} />`}>
-      <div class="inbox-ai-modes" role="tablist">
-        <button type="button" role="tab" aria-selected=${mode === MODES.COPY} class=${`poster-tab${mode === MODES.COPY ? ' is-on' : ''}`} onClick=${() => setMode(MODES.COPY)}>
-          ${t('common.copyPrompt')}
-        </button>
-        <button type="button" role="tab" aria-selected=${mode === MODES.MCP} class=${`poster-tab${mode === MODES.MCP ? ' is-on' : ''}`} onClick=${() => setMode(MODES.MCP)}>
-          ${t('inbox.ai.modeMcp')}
-        </button>
-      </div>
-      <div class="poster-panel">
-        <div class="poster-hint">${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}</div>
-        <textarea class="og-textarea" readOnly rows="14" value=${text}></textarea>
-      </div>
+    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" guard=${false}
+      footer=${html`<${Loud} control copy=${text} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
+        onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copy')}<//>`}>
+      <${Stack} gap="medium">
+        ${modeTabs([{ value: MODES.COPY, label: t('common.copyPrompt') }, { value: MODES.MCP, label: t('inbox.ai.modeMcp') }], mode, setMode)}
+        <${Box} tone="edge">
+          <${Stack} gap="medium">
+            <${Note}>${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}<//>
+            <${TextArea} readOnly rows=${14} value=${text} />
+          <//>
+        <//>
+      <//>
     <//>`;
 }
 
@@ -598,50 +336,51 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
     catch (e) { showToast?.(e?.message || t('inbox.failed'), true); setParking(false); }
   };
 
-  const tab = (id, label) => html`<button type="button" role="tab" aria-selected=${mode === id}
-    class=${`poster-tab${mode === id ? ' is-on' : ''}`} onClick=${() => setMode(id)}>${label}</button>`;
   // A summary being written or pasted is a half-written form: Modal's guard keeps it open.
   return html`
-    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" className="inbox-ai-modal">
-        <div class="inbox-ai-modes" role="tablist">
-          ${tab('ai', t('inbox.notebook.modeAi'))}
-          ${tab('copy', t('common.copyPrompt'))}
-          ${tab('raw', t('inbox.notebook.modeRaw'))}
-        </div>
-        <div class="poster-panel">
-        ${mode === 'ai' ? html`
-          <div class="poster-hint">${t('inbox.notebook.hintAi')}</div>
-          ${!aiSummary ? html`
-            <div class="inbox-ai-actions">
-              <button class="poster-slab poster-slab--control" disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}</button>
-            </div>`
-          : html`
-            <${AiInteractionNotice} titleKey="aiLabel.draftTitle" bodyKey="aiLabel.draftBody"
-              recordUrl=${aiProvenance?.recordUrl} />
-            <textarea class="og-textarea" rows="12" value=${aiSummary} onInput=${(e) => setAiSummary(e.target.value)}></textarea>
-            <div class="inbox-ai-actions">
-              <button class="poster-action" disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}</button>
-              <button class="poster-slab poster-slab--control" disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
-            </div>`}
-        ` : mode === 'copy' ? html`
-          <div class="poster-hint">${t('inbox.notebook.hintCopy')}</div>
-          <textarea class="og-textarea" readOnly rows="8" value=${promptText}></textarea>
-          <div class="inbox-ai-actions">
-            <${CopyButton} text=${promptText} className="poster-slab poster-slab--control"
-              label=${'📋 ' + t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
-              onCopied=${() => showToast?.(t('inbox.ai.copied'))} />
-          </div>
-          <div class="poster-hint">${t('inbox.notebook.pasteHint')}</div>
-          <textarea class="og-textarea" rows="8" placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${(e) => setPasted(e.target.value)}></textarea>
-          <div class="inbox-ai-actions">
-            <button class="poster-slab poster-slab--control" disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
-          </div>
-        ` : html`
-          <div class="poster-hint">${t('inbox.notebook.hintRaw')}</div>
-          <div class="inbox-ai-actions">
-            <button class="poster-slab poster-slab--control" disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}</button>
-          </div>
-        `}
-        </div>
+    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg">
+      <${Stack} gap="medium">
+        ${modeTabs([
+          { value: 'ai', label: t('inbox.notebook.modeAi') },
+          { value: 'copy', label: t('common.copyPrompt') },
+          { value: 'raw', label: t('inbox.notebook.modeRaw') },
+        ], mode, setMode)}
+        <${Box} tone="edge">
+          <${Stack} gap="medium">
+          ${mode === 'ai' ? html`
+            <${Note}>${t('inbox.notebook.hintAi')}<//>
+            ${!aiSummary ? html`
+              <${FormActions} end>
+                <${Loud} control disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}<//>
+              <//>`
+            : html`
+              <${AiInteractionNotice} titleKey="aiLabel.draftTitle" bodyKey="aiLabel.draftBody"
+                recordUrl=${aiProvenance?.recordUrl} />
+              <${TextArea} rows=${12} value=${aiSummary} onInput=${setAiSummary} />
+              <${FormActions} end>
+                <${Action} disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}<//>
+                <${Loud} control disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}<//>
+              <//>`}
+          ` : mode === 'copy' ? html`
+            <${Note}>${t('inbox.notebook.hintCopy')}<//>
+            <${TextArea} readOnly rows=${8} value=${promptText} />
+            <${FormActions} end>
+              <${Loud} control copy=${promptText} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
+                onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${'📋 ' + t('common.copy')}<//>
+            <//>
+            <${Note}>${t('inbox.notebook.pasteHint')}<//>
+            <${TextArea} rows=${8} placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${setPasted} />
+            <${FormActions} end>
+              <${Loud} control disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}<//>
+            <//>
+          ` : html`
+            <${Note}>${t('inbox.notebook.hintRaw')}<//>
+            <${FormActions} end>
+              <${Loud} control disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}<//>
+            <//>
+          `}
+          <//>
+        <//>
+      <//>
     <//>`;
 }

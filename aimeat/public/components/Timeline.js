@@ -7,13 +7,15 @@
  *   quiet-days nudge and a door to the whole record; `band` makes it one of the page's bands.
  *   TimelineList is the ruled list alone and TimelineRow one row; the row happening now pulses.
  *   Its look is css/components/timeline.css; the catalogue entry is `timeline`.
- * @structure Timeline({ title, band, quiet, more, children }) · TimelineList({ children }) ·
+ * @structure Timeline({ title, band, quiet, more, children }) · TimelineList({ scroll, children }) ·
  *   TimelineRow({ category, live, href, text, when })
  * @usage
  *   html`<${Timeline} title=${t('home.feed.title')} band=${true} more=${{ href, text }}>
  *     <${TimelineRow} category="made" href=${link} text=${line} when=${ago} />
  *   <//>`
  * @version-history
+ *   v1.1.0 — 2026-09-26 — TimelineList `scroll`: a long log capped at 300px that scrolls, so the agent's
+ *     activity log needs no page class (G1b, additive).
  *   v1.0.0 — 2026-09-23 — Moved out of views/home/feed.js and history.js with its markup unchanged
  *     (UI consolidation phase 1, a move).
  */
@@ -42,9 +44,12 @@ export function Timeline({ title, band = false, quiet, more, children }) {
     </section>`;
 }
 
-/** The ruled list of rows, alone (a day of the record uses it under its own heading). */
-export function TimelineList({ children }) {
-  return html`<ul class="poster-timeline-list">${children}</ul>`;
+/**
+ * The ruled list of rows, alone (a day of the record uses it under its own heading). `scroll`: a
+ * long log inside a tab, capped in height and scrolling (the agent's activity log).
+ */
+export function TimelineList({ scroll, children }) {
+  return html`<ul class=${scroll ? 'poster-timeline-list poster-timeline-list--scroll' : 'poster-timeline-list'}>${children}</ul>`;
 }
 
 /**

@@ -10,7 +10,22 @@
  *   keeps its own layout (a row, a gap); this part sets only the words.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The Check (components/Check.js) and its line's layout (.check, --inline, --hint,
+ *     --off), the values most Settings check lines draw (component plan C5).
  *   v1.0.0 — 2026-09-26 — Initial, with the values of the body-size check lines (Archivo 16px 400, ink).
  */
 
 .check-line { font-size: var(--text-md); font-weight: var(--weight-regular); color: var(--text); }
+
+/* The Check (components/Check.js) lays its line out itself, with the layout most Settings check
+   lines draw (sch-check, pj-share-row, pf-dr-check, cp-check, kp-check, wp-check, flex-row: a row,
+   the box level with the words, .5rem between, the whole line pressable). `inline`: several side by
+   side in a line of words (ai-radio, sk-check, pj-mm-check, pf-agd-crew-check--inline). With a hint,
+   the box stands level with the first line and the hint is a grey line under the words
+   (pf-eco-recipe-radio). */
+.check { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+.check--inline { display: inline-flex; margin-right: 1rem; }
+.check--hint { align-items: flex-start; }
+.check--hint input { margin-top: .3rem; }
+.check-words .poster-hint { display: block; margin: 0; }
+.check--off { cursor: default; opacity: .6; }
