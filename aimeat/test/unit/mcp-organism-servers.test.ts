@@ -9,6 +9,9 @@
  *   would look like it working: somebody outside the group reaching it, and a workspace binding
  *   turning out to be no narrower than the organism it sits in.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A visitor from another node named like a member, an admin or the owner
+ *     reaches, lists and attaches nothing; attaching takes the caller's owner GHII (secaudit 2026-09,
+ *     a0ecb62eafb3).
  *   v1.1.0 — 2026-09-24 — Changing one: the group's owners and admins may change or remove its
  *     server, a member may only use it (requireManageableServer, secaudit 2026-09 A2-1).
  *   v1.0.0 — 2026-09-16 — Phase 5 of the MCP proxy.
@@ -99,6 +102,18 @@ describe('a server bound to the whole group', () => {
     expect(await listUsableServers(storage, OUTSIDER, config)).toEqual([]);
   });
 
+  it('is not reachable by a visitor from another node named like a member or an owner', async () => {
+    // A roll lists this node's accounts. Compared by the name before the '@', `member@other-node` was
+    // the local member, listed the group's server and called it (secaudit 2026-09, a0ecb62eafb3).
+    const storage = new SqliteStorage(':memory:');
+    await withOrganism(storage);
+    await storage.createMcpServer(orgServer());
+    for (const visitor of ['member@aimeat-other-001', 'boss@aimeat-other-001', 'admin@aimeat-other-001']) {
+      expect(await organismAdmits(storage, config, orgServer(), visitor, true)).toBe(false);
+      expect(await listUsableServers(storage, visitor, config)).toEqual([]);
+    }
+  });
+
   it('is invisible to every caller when the config is not passed', async () => {
     const storage = new SqliteStorage(':memory:');
     await withOrganism(storage);
@@ -148,9 +163,10 @@ describe('a server bound to ONE workspace inside it', () => {
 });
 
 describe('attaching one', () => {
-  const attach = (storage: SqliteStorage, callerName: string) => attachOrganismServer({
-    storage, config, organismId: ORG, callerName,
-    createdBy: `${callerName}@${NODE}`, slug: 'wiki', title: 'Wiki',
+  /** The caller as the doors hand it over: the owner GHII, `name@<this node>` unless named whole. */
+  const attach = (storage: SqliteStorage, name: string) => attachOrganismServer({
+    storage, config, organismId: ORG, callerGhii: name.includes('@') ? name : `${name}@${NODE}`,
+    createdBy: name.includes('@') ? name : `${name}@${NODE}`, slug: 'wiki', title: 'Wiki',
     transport: { kind: 'http', url: 'https://wiki.example/mcp' },
     // Deferred, so the test asserts the AUTHORITY rather than reaching a real server.
     deferCredential: true,
@@ -176,6 +192,17 @@ describe('attaching one', () => {
     expect(r.code).toBe('NOT_ALLOWED');
   });
 
+  it('is refused for a visitor from another node named like the owner, in the same words', async () => {
+    // The route handed the service the caller's owner name and the service cut it at the '@', so
+    // `boss@other-node` attached servers to the local boss's group (secaudit 2026-09, a0ecb62eafb3).
+    const storage = new SqliteStorage(':memory:');
+    await withOrganism(storage);
+    const r = await attach(storage, 'boss@aimeat-other-001');
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe('NOT_ALLOWED');
+  });
+
   it('is refused for an outsider, in the same words', async () => {
     const storage = new SqliteStorage(':memory:');
     await withOrganism(storage);
@@ -188,7 +215,7 @@ describe('attaching one', () => {
   it('is refused for an organism that does not exist, in the same words', async () => {
     const storage = new SqliteStorage(':memory:');
     const r = await attachOrganismServer({
-      storage, config, organismId: 'org-nope', callerName: 'boss',
+      storage, config, organismId: 'org-nope', callerGhii: BOSS,
       createdBy: BOSS, slug: 'wiki', title: 'Wiki',
       transport: { kind: 'http', url: 'https://wiki.example/mcp' },
       deferCredential: true,

@@ -30,6 +30,8 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.3.1 — 2026-09-26 — Attaching to a group hands the service the owner GHII, not a name cut from it,
+ *     the same identity POST /v1/mcp-servers/organism hands it (secaudit 2026-09, a0ecb62eafb3).
  *   v1.3.0 — 2026-09-24 — SECURITY (audit A8-1): the registry pair asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName). The account alone
  *     let any agent of the operator switch a node-wide server off for everybody.
@@ -200,8 +202,8 @@ export function registerMcpProxyTools(
           storage, config,
           organismId: group,
           ...(ws ? { ws } : {}),
-          // The bare owner name, because that is what an organism's rolls are compared against.
-          callerName: ownerGhii().split('@')[0],
+          // The owner GHII, which the organism's rolls are compared against whole, as the REST twin does.
+          callerGhii: ownerGhii(),
           createdBy: getAgentGaii(),
           slug: name,
           title: title ?? name,
