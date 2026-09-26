@@ -486,7 +486,8 @@ The one builtin today: the two doors a living document uses to talk to the world
 
 A refusal is a normal answer carrying `{ error: { code, message } }`, not a thrown error, so the
 browser half can show the words: `ALLOWLIST_REFUSED`, `RATE_LIMITED` (60 sends and 120 reads a
-minute per owner), `PAYLOAD_TOO_LARGE` (256 kB), `TOO_LARGE` (1 MB read), `UPSTREAM_FAILED` (with
+minute per owner), `PAYLOAD_TOO_LARGE` (256 kB), `TOO_LARGE` (a read over 1 MB, or any answer
+over the 4 MB the node reads, on send as well), `UPSTREAM_FAILED` (with
 the far end's status), `BAD_PATH`, plus `NOT_AUTHORIZED`, `SCOPE_DENIED`, `HEADER_REFUSED`,
 `SECRET_UNKNOWN` and `INVALID_INPUT`.
 

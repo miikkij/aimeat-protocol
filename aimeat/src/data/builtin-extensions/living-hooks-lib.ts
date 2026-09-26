@@ -19,10 +19,13 @@
  *   here would still be interpolation, so there is none.
  * @structure
  *   - LIVING_HOOKS_LIB_JS — livingHost, livingHostAllowed, livingPath, livingHeaderAllowed,
- *     livingBytes, livingHosts, livingShape, livingPrune
+ *     livingBytes, livingHosts, livingShape, livingFetchFailure, livingPrune
  * @usage
  *   const script = LIVING_HOOKS_LIB_JS + '\n\n' + SEND_ACTION_JS;
  * @version-history
+ *   v1.2.0 — 2026-09-26 — livingFetchFailure: the one answer send and read give when ctx.fetch
+ *     throws. An answer past the 4 MB the node reads is TOO_LARGE, the code a read over 1 MB answers
+ *     as well; SECRET_UNKNOWN keeps its code; anything else is UPSTREAM_FAILED (secaudit 2026-09, N3).
  *   v1.1.0 — 2026-09-06 — livingSecrets and livingResolveSecret are gone: resolving a secret inside
  *     the VM means handing the credential to the guest, and the platform now does it in ctx.fetch
  *     after this script has let go of the request. The header ALLOWLIST stays, because which
@@ -271,6 +274,28 @@ function livingShape(text, raw, path) {
         + '". Write it the way you would say it, in dots and brackets, such as prices[0].price.' };
   }
   return { ok: true, value: got.value };
+}
+
+/**
+ * What a call answers when ctx.fetch itself throws, the same for send and read, as { code, message }.
+ *
+ * Two of the node's refusals keep a code of their own, because neither is fixed at the far end's
+ * door: SECRET_UNKNOWN is fixed in the vault, and RESPONSE_TOO_LARGE, an answer past the 4 MB the
+ * node reads of one answer, is TOO_LARGE, the code a read over 1 MB answers as well. So a caller gets
+ * one code for an answer that was too large, whatever its size. Anything else is the far end not
+ * answering.
+ */
+function livingFetchFailure(host, err) {
+  var msg = err && err.message ? err.message : String(err);
+  if (msg.indexOf('SECRET_UNKNOWN:') === 0) {
+    return { code: 'SECRET_UNKNOWN', message: msg.slice(15).replace(/^\s+/, '') };
+  }
+  if (msg.indexOf('RESPONSE_TOO_LARGE:') === 0) {
+    return { code: 'TOO_LARGE',
+      message: 'The answer from ' + host + ' is larger than 4 MB, the most this node reads of one '
+        + 'answer. Ask the far end for a smaller answer.' };
+  }
+  return { code: 'UPSTREAM_FAILED', message: 'The call to ' + host + ' did not complete: ' + msg };
 }
 
 /**
