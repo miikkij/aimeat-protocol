@@ -34,16 +34,25 @@
  *   cursor has passed it. An open the rollup has not counted yet would otherwise be counted later
  *   under the marker, and that day's number of people would come out wrong. A node whose fold has
  *   never run folds nothing.
+ *
+ *   THE MEMBER LIST'S GUESTS TOO. An app with members shows its owner, by name, the signed-in people
+ *   who opened it and hold no role (services/app-members.ts noteVisit): a visit record that names an
+ *   account, kept apart from the usage rows. Nothing counts them, so there is nothing to fold: a
+ *   guest whose last visit is older than the cutoff leaves the list, whatever the fold's cursor says.
  * @structure
  *   - VISIT_NAME_RETENTION_MONTHS / ACCOUNT_ACTIVITY_CUTS
  *   - visitNameCutoffDay(now) -- the first day that still keeps its names
- *   - runVisitRetentionJob(storage, now?) -- bounded sweeps until nothing is left to fold
+ *   - runVisitRetentionJob(storage, now?) -- the member lists' old guests, then bounded sweeps until
+ *     nothing is left to fold
  * @usage
  *   scheduler.registerCoreHandler('usage-visit-retention', () => runVisitRetentionJob(storage));
  * @version-history
+ *   v1.1.0 — 2026-09-26 — An app's member list forgets a signed-in visitor thirteen months after their
+ *     last visit (secaudit 2026-09, A6-14); the result says how many (`guestsForgotten`).
  *   v1.0.0 — 2026-09-25 — Initial, with the thirteen-month rule in the privacy notice.
  */
 import type { Storage, UsageVisitFoldResult } from '../../storage/interface.js';
+import { forgetVisitsLastSeenBefore } from '../app-members.js';
 import { logger } from '../../utils/logger.js';
 
 /** How long a visit record may name the visitor's account. The privacy notice says thirteen months. */
@@ -74,14 +83,24 @@ export function visitNameCutoffDay(now: Date): string {
 export interface VisitRetentionResult extends UsageVisitFoldResult {
   /** The first day that kept its names on this run, or null when the rollup fold has not run yet. */
   beforeDay: string | null;
+  /** Signed-in visitors taken off an app's member list, their last visit being older than the cutoff. */
+  guestsForgotten: number;
 }
 
 export async function runVisitRetentionJob(storage: Storage, now: Date = new Date()): Promise<VisitRetentionResult> {
   const total: UsageVisitFoldResult = { hotRows: 0, archiveRows: 0, rollupRows: 0, appUseRows: 0 };
+  const cutoff = visitNameCutoffDay(now);
+
+  // An app's member list names the signed-in people who opened it and hold no role there, with how
+  // often and when they came (services/app-members.ts). Nothing counts them, so there is no fold to
+  // wait for: a guest whose last visit is older than the cutoff leaves the list.
+  const guestsForgotten = await forgetVisitsLastSeenBefore(storage, cutoff);
+  if (guestsForgotten > 0) {
+    logger.info('visit-retention: took visitors off app member lists', { beforeDay: cutoff, guestsForgotten });
+  }
 
   const cursor = await storage.getUsageCursor('call');
-  if (!cursor?.lastTs) return { ...total, beforeDay: null };
-  const cutoff = visitNameCutoffDay(now);
+  if (!cursor?.lastTs) return { ...total, beforeDay: null, guestsForgotten };
   // The day the cursor stands on is not finished yet, so it is not folded either.
   const cursorDay = cursor.lastTs.slice(0, 10);
   const beforeDay = cursorDay < cutoff ? cursorDay : cutoff;
@@ -98,5 +117,5 @@ export async function runVisitRetentionJob(storage: Storage, now: Date = new Dat
   if (total.hotRows + total.archiveRows + total.rollupRows > 0) {
     logger.info('visit-retention: folded the account out of old app visits', { beforeDay, ...total });
   }
-  return { ...total, beforeDay };
+  return { ...total, beforeDay, guestsForgotten };
 }

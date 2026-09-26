@@ -1748,10 +1748,10 @@
      "slug": "g-10-app-members",
      "cells": [
       "<strong>App members</strong>",
-      "Manage membership requests and roles through one private roster. Approval notifies the applicant. Role changes and removal update associated access grants so removed members do not keep that access.",
+      "Manage membership requests and roles through one private roster. Approval notifies the applicant. Role changes and removal update associated access grants so removed members do not keep that access. The owner also sees, by name, the signed-in people who opened the app and are not members yet, with how often they came; a person leaves that list 13 months after their last visit.",
       "<code>/v1/apps/:owner/:filename/members</code>, app membership requests"
      ],
-     "plain": "App members Manage membership requests and roles through one private roster. Approval notifies the applicant. Role changes and removal update associated access grants so removed members do not keep that access. /v1/apps/:owner/:filename/members, app membership requests"
+     "plain": "App members Manage membership requests and roles through one private roster. Approval notifies the applicant. Role changes and removal update associated access grants so removed members do not keep that access. The owner also sees, by name, the signed-in people who opened the app and are not members yet, with how often they came; a person leaves that list 13 months after their last visit. /v1/apps/:owner/:filename/members, app membership requests"
     },
     {
      "slug": "g-10-app-store",

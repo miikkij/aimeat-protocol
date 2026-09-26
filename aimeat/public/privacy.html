@@ -117,7 +117,8 @@
     <h3>2.3 Data automatically collected</h3>
     <ul>
       <li><strong>Technical logs:</strong> standard request logs (IP address, user agent, requested path, HTTP status, response time). Retained 30 days.</li>
-      <li><strong>Visits to published apps:</strong> when someone opens an app published here, the node counts the visit for the app's owner, including whether the visitor was signed in. The owner sees numbers and never names: how many visits, how many of them by signed-in people, and how many different people. What kind of visitor it was (a person, a named AI or another program) and where a person came from are recorded only when the app's owner turns measurement on. The place is kept as a country, a region or a city, at the precision the owner chose, and never as an address.</li>
+      <li><strong>Visits to published apps:</strong> when someone opens an app published here, the node counts the visit for the app's owner, including whether the visitor was signed in. In these figures the owner sees numbers and never names: how many visits, how many of them by signed-in people, and how many different people. What kind of visitor it was (a person, a named AI or another program) and where a person came from are recorded only when the app's owner turns measurement on. The place is kept as a country, a region or a city, at the precision the owner chose, and never as an address.</li>
+      <li><strong>Visitors on an app's member list:</strong> an app that people can join as members shows its owner, by name, the signed-in people who opened it and are not members yet, with how many times each came and when they came first and last, so that the owner can let them in. A person leaves the list when they become a member or the owner removes them, and at the latest 13 months after their last visit.</li>
       <li><strong>Cookies and local storage:</strong> a sign-in cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>No third-party analytics, no third-party tracking, no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
     </ul>
 
@@ -205,6 +206,7 @@
         <tr><td>Moderation reports, appeals and dispute records</td><td>Kept as the record of a decision that affected someone, including after the account that filed it is gone</td></tr>
         <tr><td>Authentication-failure log</td><td>A file of refused sign-in attempts, with IP addresses. It rotates by size rather than by age, because its volume is chosen by whoever is attacking rather than by this node</td></tr>
         <tr><td>Visit records that name an account</td><td>13 months. After that only counts without names remain, so app owners keep their long-term figures</td></tr>
+        <tr><td>A signed-in visitor on an app's member list</td><td>Until they become a member or the owner removes them, and at most 13 months after their last visit</td></tr>
         <tr><td>Server access logs</td><td>30 days</td></tr>
         <tr><td>Backups</td><td>30 days, then automatically purged</td></tr>
       </tbody>

@@ -21,6 +21,9 @@
  *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest · writePrivateRecord
  * @usage const roster = await listMembers(storage, 'alice/app.html');
  * @version-history
+ *   v1.3.0 — 2026-09-26 — forgetVisitsLastSeenBefore: the visit retention job takes a guest off an
+ *     app's list thirteen months after their last visit, as the privacy notice says of every visit
+ *     record that names an account (secaudit 2026-09, A6-14).
  *   v1.2.0 — 2026-09-08 — Every reader compares the app id the way the KEY already compares it
  *     (sameApp). The row is addressed by a lowercased slug, so two spellings of one app id have
  *     always shared a record, and the exact-equality test then hid that record from whichever
@@ -92,7 +95,8 @@ export function isLive(rec: AppMemberRecord | null, now: Date = new Date()): boo
 }
 
 /**
- * Somebody who turned up and holds no role. A guest.
+ * Somebody who turned up and holds no role. A guest. Kept until they become a member, the owner
+ * dismisses them, or thirteen months pass after their last visit (forgetVisitsLastSeenBefore).
  *
  * Every app with members has the same three groups and only ever had names for two: the people you
  * approved, and the people who asked. The third is everybody else who actually came — and they are
@@ -155,6 +159,32 @@ export async function listVisits(storage: Storage, appId: string): Promise<AppMe
 export async function forgetVisit(storage: Storage, appId: string, principal: string): Promise<void> {
   await readAppRecord(storage, NS_SEEN, seenKey(appId, principal), appId);
   await storage.deleteMemory(NS_SEEN, seenKey(appId, principal));
+}
+
+/**
+ * Forget every visitor, on every app, whose last visit came before `beforeDay` (YYYY-MM-DD, UTC).
+ * A visit that names an account is kept for thirteen months (services/usage/visit-retention.ts, the
+ * privacy notice), and this list is a visit record too: it shows the owner a person's name, how often
+ * they came and when. Somebody not seen for that long is no longer there to say yes to.
+ *
+ * Reads the namespace itself rather than through listAppRecords, so a record under the older key
+ * form goes as well, and deletes after the scan so no page is skipped. Returns how many it forgot.
+ */
+export async function forgetVisitsLastSeenBefore(storage: Storage, beforeDay: string): Promise<number> {
+  const stale: string[] = [];
+  for (let offset = 0; ; ) {
+    const page = await storage.listAllMemory({ ownerPrefix: NS_SEEN, prefix: 'appmemseen.', limit: 1000, offset });
+    for (const r of page.items) {
+      if (r.ownerGaii !== NS_SEEN) continue;
+      const lastSeen = (r.value as Partial<AppMemberVisit> | null)?.lastSeen;
+      if (typeof lastSeen === 'string' && lastSeen < beforeDay) stale.push(r.key);
+    }
+    offset += page.items.length;
+    if (!page.items.length || offset >= page.total) break;
+  }
+  let forgotten = 0;
+  for (const key of stale) if (await storage.deleteMemory(NS_SEEN, key)) forgotten++;
+  return forgotten;
 }
 
 /** Somebody asking to be let in. */
