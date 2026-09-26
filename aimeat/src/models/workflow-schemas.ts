@@ -51,6 +51,7 @@
  *     trigger starts answers to it. A run whose saver is gone, or lacks a word the steps need, is
  *     not started: it is recorded with status `refused` and `refusal`, once per episode.
  *   v1.12.0 — 2026-09-25 — WorkflowDef.authority, the rules a save was checked under.
+ *   v1.12.1 — 2026-09-26 — costCapMorsels names its removal: 4.0.0.
  */
 import { z } from 'zod';
 
@@ -470,9 +471,9 @@ export interface WorkflowDef {
    */
   maxCostUsd?: number | null;
   /**
-   * Ignored since 2026-09-25, and nothing read it before: a morsel paces what agents store and is not
-   * money, so it cannot cap a spend. A save that sets it is answered with a warning naming maxCostUsd,
-   * and a new save does not keep it. Definitions saved before then may still carry it.
+   * Deprecated 2026-09-25 and removed in 4.0.0; nothing ever read it: a morsel paces what agents store,
+   * is not money and cannot cap a spend. Until 4.0.0 a save that sets it succeeds, does not keep it and
+   * answers with a warning naming maxCostUsd. Definitions saved before 2026-09-25 may still carry it.
    */
   costCapMorsels?: number | null;
   /**
@@ -779,7 +780,7 @@ export const WorkflowDefInputSchema = z.object({
   llm: z.object({ approved: z.boolean() }).optional(),
   /** US dollars per run; see WorkflowDef.maxCostUsd. */
   maxCostUsd: z.number().positive().max(10000).nullable().optional(),
-  /** Accepted and ignored; the save answers with a warning. See WorkflowDef.costCapMorsels. */
+  /** Accepted and ignored until its removal in 4.0.0; the save warns. See WorkflowDef.costCapMorsels. */
   costCapMorsels: z.number().int().nonnegative().nullable().optional(),
 });
 

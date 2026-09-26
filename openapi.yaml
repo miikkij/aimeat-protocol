@@ -5608,9 +5608,9 @@ components:
           nullable: true
           deprecated: true
           description: >-
-            Ignored since 2026-09-25, and nothing read it before: a morsel paces what agents store and
-            is not money, so it cannot cap a spend. A save that sets it still succeeds, is not kept, and
-            answers with `warnings` naming maxCostUsd.
+            Deprecated 2026-09-25 and removed in 4.0.0; nothing ever read it: a morsel paces what agents
+            store and is not money, so it cannot cap a spend. Until 4.0.0 a save that sets it still
+            succeeds, does not keep it, and answers with `warnings` naming maxCostUsd.
     WorkflowDef:
       allOf:
         - $ref: '#/components/schemas/WorkflowDefInput'

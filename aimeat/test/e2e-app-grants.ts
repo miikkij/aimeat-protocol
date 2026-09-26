@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   v1.4.1 — 2026-09-26 — The work-door comment says work:request is askable by an app now; the
+ *     grant it tests holds no work word, so what it asserts is unchanged.
  *   v1.4.0 — 2026-09-16 — Phase 5b: openrouter.apikey and commerce.psp show no credential on any
  *     generic memory door (app grant, owner, operator), and the generic write doors refuse them.
  *   v1.3.0 — 2026-08-17 — GET /request/:id also proves the `description_keys` localization chain
@@ -687,11 +689,10 @@ async function main() {
         await refused('/v1/boards/subscriptions', 'GET', quiet);
         await refused('/v1/storage/upload/nope/0', 'PUT', quiet);
 
-        // Work, disputes, the catalogue and actions are past the role gate too, but no app can
-        // reach them yet for a different reason: `work:*` is not in APP_GRANTABLE_SCOPES, so an
-        // owner cannot grant it to an app however much they want to. The refusal these assert is
-        // therefore the SCOPE, never the role again — the two are different failures and only one
-        // of them is still open. Give the vocabulary a work word and these become admitted.
+        // Work, disputes, the catalogue and actions are past the role gate too. This grant holds no
+        // work word (`work:request` has been askable by an app since 2026-09-26, and `work:read` is
+        // not in APP_GRANTABLE_SCOPES), so the refusal these assert is the SCOPE, never the role
+        // again: the two are different failures, and only the scope is left to decide.
         for (const [path, method] of [['/v1/work/inbox', 'GET'], ['/v1/work/sent', 'GET'],
             ['/v1/work/overview', 'GET'], ['/v1/work/tc-does-not-exist/dispute', 'GET']] as const) {
             const r = await json(path, { method, headers: head(worker) });

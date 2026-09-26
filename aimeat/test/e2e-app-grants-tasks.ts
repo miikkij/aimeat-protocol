@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants-tasks
  * @version-history
+ *   v1.1.0 — 2026-09-26 — work:request is an app word: an app granted it with workflow:write saves a
+ *     workflow with an agent step, and without it the save is refused naming the word.
  *   v1.0.0 — 2026-07-07 — Initial (TARGET-006 AGENCY: task and workflow app-grant scopes).
  */
 import * as ed from '@noble/ed25519';
@@ -166,6 +168,32 @@ async function main() {
     await test('app (workflow:read) may GET /v1/workflows → 200', async () => {
         const r = await json('/v1/workflows', { headers: { Authorization: `Bearer ${appFull}` } });
         assert(r.status === 200, `workflows list: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+
+    console.log('\nPhase 3b: work:request — the app gives an agent work through a workflow step');
+    await test('an app granted workflow:write and work:request saves a new workflow with an agent step', async () => {
+        // The step names the owner's agent and one of its offers, so the agent publishes one first.
+        const offers = await json(`/v1/agents/${AGENT}/offers`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ offers: [{
+                id: 'fetch', title: 'Fetch', ask: 'fetch the material',
+                deliverable: { format: 'document', location: { key: 'agency.raw' } },
+                required_to_function: { kind: 'deterministic', key: 'agency.go', op: 'exists' },
+                success_signal: { kind: 'deterministic', key: 'agency.raw', op: 'nonempty' },
+            }] }),
+        });
+        assert(offers.status === 200, `offers: ${offers.status} ${JSON.stringify(offers.body)}`);
+        const flow = {
+            title: 'Agency flow', description: 'the app gives the agent work', trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+            steps: [{ id: 'fetch', agent: AGENT, offer: 'fetch', description: 'Fetch', required_to_function: 'none', timeout_min: 10 }],
+        };
+        // Without the word, the save is refused and names it: an agent step gives an agent work.
+        const refused = await json('/v1/workflows/agency-flow', { method: 'PUT', headers: { Authorization: `Bearer ${appFull}` }, body: JSON.stringify(flow) });
+        assert(refused.status === 403 && /work:request/.test(refused.body?.error?.message ?? ''), `without work:request: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+        // The owner approves the word in the ordinary consent window, and the same save goes through.
+        const giver = await grantApp(['workflow:read', 'workflow:write', 'work:request', 'memory:read']);
+        const saved = await json('/v1/workflows/agency-flow', { method: 'PUT', headers: { Authorization: `Bearer ${giver}` }, body: JSON.stringify(flow) });
+        assert(saved.status === 200 && saved.body.data.savedBy?.kind === 'app', `with work:request: ${saved.status} ${JSON.stringify(saved.body.error ?? saved.body.data?.savedBy)}`);
     });
 
     console.log('\nPhase 4: least-privilege — no scope, no access');

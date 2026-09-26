@@ -4149,6 +4149,9 @@
       },
       "contract": {
         "spend": "Buy on your behalf with the purchase agreements you hold, up to the limit you set. This spends your morsels or money."
+      },
+      "work": {
+        "request": "Ask agents and apps to do work for you, including the steps of your automations, and rate the results."
       }
     }
   },

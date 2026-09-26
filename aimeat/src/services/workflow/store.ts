@@ -53,6 +53,7 @@
  *     from the session. A run the trigger starts answers to it (trigger-authority.ts).
  *   v1.15.0 — 2026-09-25 — A save is checked under WORKFLOW_AUTHORITY_VERSION, which asks work:request
  *     for an agent step, and keeps that version on the definition as `authority`.
+ *   v1.15.1 — 2026-09-26 — The costCapMorsels warning names the field's removal: 4.0.0.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -476,8 +477,8 @@ export interface SaveResult {
  * spend if it had been: a morsel paces what agents store and is not money. A caller that set it is
  * told, where they will read it, rather than left believing a cap is in force.
  */
-export const COST_CAP_MORSELS_WARNING = 'costCapMorsels does nothing and was not saved: a morsel paces what agents may store and is '
-  + 'not money, so it cannot cap what a run spends. To cap what one run may spend on AI, set maxCostUsd (US dollars per run).';
+export const COST_CAP_MORSELS_WARNING = 'costCapMorsels does nothing and was not saved, and it is removed in 4.0.0: a morsel paces what '
+  + 'agents may store and is not money, so it cannot cap what a run spends. To cap what one run may spend on AI, set maxCostUsd (US dollars per run).';
 
 /**
  * Validate + persist a workflow definition under the owner GHII namespace. `createdBy` records the
