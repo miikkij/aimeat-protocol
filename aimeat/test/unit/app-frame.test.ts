@@ -5,6 +5,7 @@
  *   the frame support script lands in an app's markup.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-frame.test.ts
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The page loads its script as a module.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -82,7 +83,7 @@ describe('the page that holds the frame', () => {
         expect(directives).toContain("script-src 'self'");
         expect(directives).toContain("frame-ancestors 'self'");
         const html = readFileSync(join(STATIC, 'app-frame.html'), 'utf-8');
-        expect(html).toContain('<script src="/app-frame.js" defer></script>');
+        expect(html).toContain('<script type="module" src="/app-frame.js"></script>');
         expect(html).not.toMatch(/<script>(?!\s*<\/script>)/);
     });
 });

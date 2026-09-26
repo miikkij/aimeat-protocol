@@ -20,6 +20,10 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.17.0 — 2026-09-26 — The App Catalog's preview asks the same way, on every node: `?app=` is
+ *     answered wherever a page of the node asks, and the app's own path is a bound redirect on every
+ *     node (services/app-frame-redirect.ts). The catalog handed the owner's session to the code it
+ *     previewed instead.
  *   v1.16.0 — 2026-09-26 — The isolated frame (audit A7-1). On a node several people share with no
  *     app origin, the page that holds an app in its frame asks the silent bridge by the app's name
  *     (`?app=owner/filename`) instead of by an address the app does not have, and the visible flow
@@ -354,8 +358,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       return res.status(400).json(error(config.nodeId, 'PKCE_REQUIRED', 'code_challenge with code_challenge_method S256 (or plain on non-secure-context clients) is required'));
     }
     let rd = validRedirect(redirectUri);
-    // On a node that runs apps in the isolated frame, the node's own address is a redirect only as the
-    // frame page of exactly this app (frameRedirect above), and never as any other page.
+    // The app's own path on the node is a redirect bound to exactly this app, on every node. A node that
+    // runs apps in the isolated frame takes no other address of its own (services/app-frame-redirect.ts).
     const frame = await frameRedirect(config, storage, redirectUri, app);
     if (frame.onNode) rd = frame.bound ? { ok: true, origin: frame.origin } : { ok: false };
     if (!rd.ok) {
@@ -578,10 +582,11 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // (services/app-origin-target.ts). The origin is a value the CALLER writes; nothing downstream
     // trusts it beyond what this node actually publishes at that hostname.
     //
-    // `app` instead of `origin` is the isolated frame's page (audit A7-1): on a node several people
-    // share with no app origin, an app has no address of its own, so the page holding it names it.
-    // The caller check above is what makes that safe: only a page of the node's own can be here, and
-    // on such a node no app runs in the node's origin any more.
+    // `app` instead of `origin` is a page of the node holding app code in an opaque-origin frame (audit
+    // A7-1): the isolated frame's page, or the App Catalog's preview. The frame has no address of its
+    // own, so the page names the app. The caller check above is what makes that safe: only a page of
+    // the node's own origin gets here, and what runs on that origin is the node's pages or, on a node
+    // one person uses, that person's own apps, which hold that person's session already.
     const frameApp = typeof req.query.app === 'string' ? req.query.app.trim() : '';
     const resolvedOrigin = frameApp
       ? await resolveFrameAppTarget(config, storage, frameApp)

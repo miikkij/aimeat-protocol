@@ -26,9 +26,11 @@
  *   v2.9.0 — 2026-09-18 — Visitors: expose visitorsSetDays / visitorsApplyDays / visitorsToggle /
  *     visitorsSetGeo / visitorsCountry / visitorsZoom.
  *   v2.10.0 — 2026-09-26 — initSecretFields(): the access code fields hide their value behind an eye.
+ *   v2.11.0 — 2026-09-26 — The preview frame's `aimeat-request-auth` handler, which answered with the
+ *     owner's session token, is gone: preview-host.js answers the preview with the app's own grant.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
-import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
+import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, currentOwnerName, generateId, readFileAsText } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 import { loadConfig, saveConfig } from './config.js';
@@ -46,12 +48,13 @@ import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref,
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
 import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, refreshFavoritesUI, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp, getServerAppRow } from './server-io.js';
 import { toggleRow } from './rows.js';
-import { initRender, filterByState, KUNTO_KEYS, setBoundSkillApps, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
+import { initRender, filterByState, KUNTO_KEYS, setBoundSkillApps, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
 import { checkLegacyLocalApps } from './migrate.js';
 import { toggleFavorite } from './favorites.js';
 import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
 import { initSecretFields } from './secret-field.js';
+import { initPreviewHost } from './preview-host.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -544,44 +547,8 @@ import { initSecretFields } from './secret-field.js';
       });
     });
 
-    // ── PostMessage auth protocol for sandboxed iframes ──
-    window.addEventListener('message', function(e) {
-      var iframe = document.getElementById('app-iframe');
-      if (!iframe || !iframe.contentWindow) return;
-      // Only respond to messages from our iframe
-      if (e.source !== iframe.contentWindow) return;
-      if (!e.data || e.data.type !== 'aimeat-request-auth') return;
-
-      // Defense in depth: never hand the session token to a cross-origin framed page. After the
-      // launchInIframe guard, currentIframeUrl is only ever empty (our own srcdoc blob) or a
-      // same-origin apex URL — re-check here so a stray external frame can never receive it.
-      if (currentIframeUrl && !isSameOriginUrl(currentIframeUrl)) return;
-
-      // Get JWT from aimeat-auth library if available, else from localStorage
-      var jwt = null;
-      var nodeUrl = '';
-      try {
-        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-          var session = window.AIMEAT.auth.getSession();
-          jwt = session.jwt;
-          nodeUrl = session.nodeUrl || '';
-        } else {
-          var stored = localStorage.getItem('aimeat_session');
-          if (stored) {
-            var parsed = JSON.parse(stored);
-            jwt = parsed.jwt || null;
-          }
-          var config = loadConfig();
-          nodeUrl = config.aimeatUrl || '';
-        }
-      } catch(err) { /* ignore parse errors */ }
-
-      iframe.contentWindow.postMessage({
-        type: 'aimeat-auth',
-        jwt: jwt,
-        nodeUrl: nodeUrl
-      }, '*');
-    });
+    // ── The preview frame: the app's own grant, never the owner's session (preview-host.js) ──
+    initPreviewHost();
 
     // ── Click anywhere to close context menu ────────
     document.addEventListener('click', function () {

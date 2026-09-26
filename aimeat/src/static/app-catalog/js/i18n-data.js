@@ -5,6 +5,7 @@
  *   stay in main.js and import this table. Keep en + fi keys in lockstep (Rule 4).
  * @usage import { I18N } from './i18n-data.js'
  * @version-history
+ *   v1.6.0 — 2026-09-26 — preview.popupBlocked (en, fi): the preview's sign-in window was stopped.
  *   v1.5.0 — 2026-09-26 — Finnish says "sovellus", never "appi" (78 strings, Jouni's ruling), and
  *     secret.show / secret.hide name the eye beside the access code (en, fi).
  *   v1.4.0 — 2026-09-26 — marks.authorIsStrict and marks.legalStrict (en, fi): what a named reviewer
@@ -1036,6 +1037,7 @@ export const I18N = {
       'wc.confirmDelete': 'Delete this checkpoint permanently?',
       'wc.restored': 'Restored into your working copy. The published app is unchanged.',
       'wc.gone': 'That checkpoint is no longer stored.',
+      'preview.popupBlocked': 'Your browser blocked the sign-in window. Allow pop-ups for this page and press the app\'s sign-in button again.',
       'wc.loginNeeded': 'Sign in to save a working copy.',
       'wc.noteManual': 'manual source edit',
       'wc.noteRestore': 'restored an earlier checkpoint',
@@ -2135,6 +2137,7 @@ export const I18N = {
       'wc.confirmDelete': 'Poistetaanko tämä tarkistuspiste pysyvästi?',
       'wc.restored': 'Palautettu työkopioon. Julkaistu sovellus on ennallaan.',
       'wc.gone': 'Tätä tarkistuspistettä ei ole enää tallessa.',
+      'preview.popupBlocked': 'Selaimesi esti kirjautumisikkunan. Salli ponnahdusikkunat tälle sivulle ja paina sovelluksen kirjautumispainiketta uudelleen.',
       'wc.loginNeeded': 'Kirjaudu sisään tallentaaksesi työkopion.',
       'wc.noteManual': 'käsin muokattu lähdekoodi',
       'wc.noteRestore': 'palautettu aiempi tarkistuspiste',

@@ -8,6 +8,7 @@
     the app its own grant. The node's session stays on this page.
   @version-history
     v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
+    v1.1.0 — 2026-09-26 — app-frame.js loads as a module (it imports app-frame-core.js).
 -->
 <html lang="en">
 <head>
@@ -34,7 +35,7 @@
   #aimeat-frame-bar button.primary { background: #E8564A; border-color: #E8564A; }
   #aimeat-frame-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 </style>
-<script src="/app-frame.js" defer></script>
+<script type="module" src="/app-frame.js"></script>
 </head>
 <body></body>
 </html>

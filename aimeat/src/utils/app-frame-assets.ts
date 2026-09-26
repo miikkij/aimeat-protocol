@@ -7,7 +7,7 @@
  *   (src/static/app-frame.js), and the script the node puts in front of the app's own markup
  *   (src/static/app-frame-shim.js). They are real files rather than strings in this module so an
  *   editor, a linter and `node --check` can read them, the same reason app-sw-source.ts gives.
- * @structure appFrameHostHtml() · appFrameHostScript() · appFrameShimSource() — each the file's text,
+ * @structure appFrameHostHtml() · appFrameHostScript() · appFrameCoreScript() · appFrameShimSource() — each the file's text,
  *   or null when the static tree was not shipped with this node. Cached after the first read.
  *   FRAME_SUPPORT_MARK · withFrameShim(body) — the support script put in front of an app's markup,
  *   under the attribute services/app-serve-marks-strip.ts recognises it by.
@@ -15,6 +15,7 @@
  *   import { appFrameHostHtml } from '../utils/app-frame-assets.js';
  *   const html = appFrameHostHtml(); if (html) res.send(html);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — appFrameCoreScript(): the grant and consent module app-frame.js imports.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
 import { readFileSync } from 'node:fs';
@@ -55,6 +56,11 @@ export function appFrameHostHtml(): string | null {
 /** That page's script, served at /app-frame.js. */
 export function appFrameHostScript(): string | null {
   return staticFile('app-frame.js');
+}
+
+/** The grant and consent module that script imports, served at /app-frame-core.js (the App Catalog bundles it). */
+export function appFrameCoreScript(): string | null {
+  return staticFile('app-frame-core.js');
 }
 
 /**

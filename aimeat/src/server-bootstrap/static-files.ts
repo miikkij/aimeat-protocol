@@ -11,6 +11,8 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.13.1 -- 2026-09-26 -- /app-frame-core.js, the module /app-frame.js imports (shared with the App
+ *     Catalog's preview), is served with no-cache like the script that imports it.
  *   v1.13.0 -- 2026-09-25 -- The isolated frame (audit A7-1): /app-frame.js, the script of the page
  *     that holds an app on a node several people share, is served with no-cache, so a node update
  *     reaches the next open instead of the next day; and every /lib/ file answers any origin, because
@@ -76,7 +78,7 @@ import { serveSpa } from '../routes/portal.js';
 import { buildAuthMd } from '../services/auth-md.js';
 import { resolveAssetDir } from './asset-dirs.js';
 import { appOriginServiceWorker } from '../utils/app-sw-source.js';
-import { appFrameHostScript } from '../utils/app-frame-assets.js';
+import { appFrameHostScript, appFrameCoreScript } from '../utils/app-frame-assets.js';
 
 /**
  * This module's own directory, which is what asset-dirs.ts measures the asset trees against:
@@ -461,6 +463,13 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     // the node answering them, or a node update breaks sign-in in apps for a day.
     app.get('/app-frame.js', (_req, res, next) => {
       const source = appFrameHostScript();
+      if (!source) { next(); return; }
+      res.setHeader('Cache-Control', 'no-cache');
+      res.type('application/javascript').send(source);
+    });
+    // The module it imports: the grant and the consent window, shared with the App Catalog's preview.
+    app.get('/app-frame-core.js', (_req, res, next) => {
+      const source = appFrameCoreScript();
       if (!source) { next(); return; }
       res.setHeader('Cache-Control', 'no-cache');
       res.type('application/javascript').send(source);

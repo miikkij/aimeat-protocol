@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-26 — A checkpoint preview and an AI draft preview open through preview-host.js as the app
+ *     they are, so the code in them gets that app's own grant and never the owner's session.
  *   2026-09-26 — The access code editor hides the code behind an eye (secret-field.js); dates and
  *     times follow the page language (dateLocale), not the browser's.
  *   2026-09-18 — The Visitors section (visitors.js) for the owner's own published app, after the
@@ -88,6 +90,7 @@ import { isFavorite } from './favorites.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
 import { detailRailPage, renderDetailRail, resetDetailRail } from './detail-rail.js';
 import { openDlg, closeDlg, isDlgOpen } from './dialogs.js';
+import { openPreview, previewTarget } from './preview-host.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
@@ -904,10 +907,9 @@ function detailCheckpointPreview(id) {
     var view = document.getElementById('iframe-view');
     var iframe = document.getElementById('app-iframe');
     document.getElementById('iframe-title').textContent = (app.name || 'App') + ' — ' + t('wc.previewTitle');
-    iframe.removeAttribute('src');
-    iframe.srcdoc = blobToHtml(b64);
-    setIframeUrl('');
     delete iframe.dataset.appId;
+    openPreview(blobToHtml(b64), previewTarget(detailServerOwner(app), app.publishedFilename));
+    setIframeUrl('');
     view.hidden = false;
   });
 }
@@ -1857,10 +1859,9 @@ function detailAiTest() {
   var iframe = document.getElementById('app-iframe');
   var title = document.getElementById('iframe-title');
   title.textContent = (app.name || 'App') + ' (draft)';
-  iframe.removeAttribute('src');
-  iframe.srcdoc = blobToHtml(detailDraftBlob);
-  setIframeUrl('');
   delete iframe.dataset.appId;
+  openPreview(blobToHtml(detailDraftBlob), previewTarget(detailServerOwner(app), app.publishedFilename));
+  setIframeUrl('');
   view.hidden = false;
 }
 

@@ -11,6 +11,8 @@
  * @usage import { inIsolatedFrame, askFrameHost } from './app-frame.js';
  * @version-history
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
+ *   v1.1.0 — 2026-09-26 — The page's origin comes from window.__AIMEAT_FRAME__ when the page named it,
+ *     so the App Catalog's srcdoc preview can ask its page too.
  */
 
 /**
@@ -41,7 +43,10 @@ var sequence = 0;
 export function askFrameHost(op, payload, timeoutMs) {
   return new Promise(function (resolve) {
     var id = 'f' + (++sequence) + '-' + Math.random().toString(36).slice(2);
-    var host = location.protocol + '//' + location.host;
+    // The page names its origin in the boot data (the frame support script keeps it); a preview
+    // written in as srcdoc has no address of its own to fall back to.
+    var named = /** @type {any} */ (window).__AIMEAT_FRAME__;
+    var host = (named && typeof named.origin === 'string' && named.origin) || (location.protocol + '//' + location.host);
     var timer = null;
     function done(value) {
       window.removeEventListener('message', onMessage);
