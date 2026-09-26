@@ -25,6 +25,9 @@
  * @usage
  *   const overview = await buildHooksOverview(config, storage);
  * @version-history
+ *   v1.2.0 — 2026-09-26 — SECURITY (audit A8-3): a bare id one provider publishes is stored as its
+ *     id#provider when it is bound. Left bare, another owner publishing the same id later made the
+ *     binding name nothing, and a gate bound to it refused everything it guards.
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-3): references resolve through indexActionRefs() in
  *     hooks.ts, the one the executor uses. A bare id two providers publish is refused at binding,
  *     named back with both provider-qualified references, before anything is written; a binding made
@@ -197,7 +200,8 @@ export type SetHookOutcome =
  *
  * A bare id that two or more providers publish is REFUSED, before anything is written, and the
  * answer names the `id#provider` of each: it names no one action, and binding it would leave the
- * choice to whichever row a scan returns last (security audit A8-3).
+ * choice to whichever row a scan returns last (security audit A8-3). A bare id that one provider
+ * publishes is stored as that `id#provider`, so a later publication cannot change what it names.
  */
 export async function setHookActions(
   config: AimeatConfig,
@@ -212,7 +216,7 @@ export async function setHookActions(
     return { ok: false, code: 'INVALID_INPUT', message: 'actions must be an array of action reference strings' };
   }
   const name = hookName as HookName;
-  const list = (actions as string[]).map((a) => a.trim());
+  const typed = (actions as string[]).map((a) => a.trim());
 
   // Read what is published BEFORE writing, so an ambiguous reference is refused rather than stored.
   // An unreadable actions table means we cannot say whether a reference is ambiguous, so nothing is
@@ -222,7 +226,7 @@ export async function setHookActions(
     return [];
   });
   const { byRef, ambiguous } = indexActionRefs(published);
-  const clashes = list.filter((ref) => ambiguous.has(ref));
+  const clashes = typed.filter((ref) => ambiguous.has(ref));
   if (clashes.length > 0) {
     const named = clashes.map((ref) => `"${ref}" is published by ${ambiguous.get(ref)!.length} providers (${ambiguous.get(ref)!.join(', ')})`);
     return {
@@ -230,6 +234,15 @@ export async function setHookActions(
       message: `${named.join('; ')}. Bind the one you mean with its provider, as id#provider. Nothing was changed.`,
     };
   }
+
+  // A bare id that names one action now is stored as that action's id#provider. The operator
+  // chooses what the binding names, here, and another owner who publishes the same id later cannot
+  // change it: left bare, that publication made the id name nothing, and a gate bound to it refused
+  // everything it guards. A reference nothing publishes yet stays as typed and is named back below.
+  const list = typed.map((ref) => {
+    const found = byRef.get(ref);
+    return found && ref === found.id ? `${found.id}#${found.providerGaii}` : ref;
+  });
 
   config.extensionHooks[name] = list;
   if (list.length === 0) {

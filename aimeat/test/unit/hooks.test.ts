@@ -24,6 +24,8 @@
  *      that the page does not show the squatter's host.
  *
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A bare id one provider publishes is bound with its provider, so another
+ *     owner publishing the same id later cannot change what the binding names (A8-3).
  *   v1.1.0 — 2026-09-24 — A bare id two providers publish: never resolved by scan order (A8-3).
  *   v1.0.0 — 2026-09-12 — Initial.
  */
@@ -214,6 +216,30 @@ describe('a bare id two providers publish', () => {
     const out = await setHookActions(config, storage, 'pre_owner_registration', ['gate#bot#opr@node']);
     expect(out).toMatchObject({ ok: true, actions: ['gate#bot#opr@node'], unknown: [] });
     expect(written).toEqual(['hooks.pre_owner_registration']);
+  });
+
+  it('a bare id only one provider publishes is bound with its provider, so publishing it later changes nothing', async () => {
+    const { storage } = fakeStorage([operatorsOwn]);
+    const stored: Record<string, string> = {};
+    Object.assign(storage, {
+      setConfigValue: async (key: string, value: string) => { stored[key] = value; },
+      deleteConfigValue: async (key: string) => { delete stored[key]; },
+    });
+    const config = cfg();
+    const out = await setHookActions(config, storage, 'pre_owner_registration', ['gate']);
+    expect(out).toMatchObject({ ok: true, actions: ['gate#bot#opr@node'], unknown: [] });
+    expect(config.extensionHooks.pre_owner_registration).toEqual(['gate#bot#opr@node']);
+    expect(JSON.parse(stored['hooks.pre_owner_registration'])).toEqual(['gate#bot#opr@node']);
+
+    // A second owner publishes the same id afterwards. The gate still calls the action the operator
+    // bound, whichever row the scan returns first, and lets the thing through.
+    for (const order of [[operatorsOwn, squatter], [squatter, operatorsOwn]]) {
+      fetched.length = 0;
+      const { storage: later } = fakeStorage(order);
+      const r = await executeHooks(config, later, 'pre_owner_registration', { name: 'eve' });
+      expect(fetched).toEqual(['https://operator-legit.example/gate']);
+      expect(r.allowed).toBe(true);
+    }
   });
 
   it('the page shows a binding made before the second owner published as naming nothing, never the squatter', async () => {

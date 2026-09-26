@@ -10,6 +10,8 @@
  *   ones where the binding looks right: an action with no address is bound and does nothing, and a
  *   reference to something that was never published is accepted and has to be named.
  * @version-history
+ *   v1.2.0 -- 2026-09-26 -- A bare id only one owner publishes is bound as id#provider, so a second
+ *            owner publishing the same id later changes nothing the binding names (security audit A8-3).
  *   v1.1.0 -- 2026-09-24 -- A bare id a second owner also publishes (security audit A8-3): binding it
  *            is refused with both provider-qualified references and nothing is written, and the
  *            qualified reference still binds the operator's own action. It used to be accepted and
@@ -217,6 +219,37 @@ await test('A bare id a second owner also publishes is refused, and the id with 
     assert(bound.published === true && bound.host === 'hooks.invalid', `the binding names somebody else's action: ${JSON.stringify(bound)}`);
     const cleared = await json('/v1/admin/hooks/post_agent_registration', { method: 'DELETE', headers: auth(opToken) });
     assert(cleared.status === 200, `clearing it: ${cleared.status}`);
+});
+
+// A binding made while the bare id named one action used to stay a bare id, so a second owner who
+// published the same id later made it name nothing: a gate bound to it then refused everything it
+// guards. The bind now stores the id with its provider, and a later publication changes nothing.
+await test('A bare id only one owner publishes is bound with its provider, and a second owner publishing it later changes nothing', async () => {
+    const pinned = `hook-pin-${Date.now()}`;
+    const body = (webhook: string) => JSON.stringify({
+        id: pinned, display_name: `Test ${pinned}`, description: 'An action a binding names by its bare id.',
+        input_schema: { type: 'object' }, output_schema: { type: 'object' },
+        pricing: { base_morsels: 0 }, tags: ['test'], webhook_url: webhook,
+    });
+    const pub = await json('/v1/actions', { method: 'POST', headers: auth(agentToken), body: body('https://hooks.invalid/pinned') });
+    assert(pub.status === 201, `publish ${pinned}: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+    const provider = pub.body.data.provider_gaii as string;
+
+    // A gate nothing in this suite reaches: no federation peer is added here.
+    const bind = await json('/v1/admin/hooks/pre_federation_peer', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ actions: [pinned] }) });
+    const squat = await json('/v1/actions', { method: 'POST', headers: auth(squatterToken), body: body('https://attacker.invalid/pinned') });
+    const bound = rowOf(await hooks(opToken), 'pre_federation_peer').actions[0];
+    // Everything this test made goes before the verdict, so a failing run leaves nothing bound.
+    await json('/v1/admin/hooks/pre_federation_peer', { method: 'DELETE', headers: auth(opToken) });
+    await json(`/v1/actions/${encodeURIComponent(pinned)}`, { method: 'DELETE', headers: auth(agentToken) });
+    await json(`/v1/actions/${encodeURIComponent(pinned)}`, { method: 'DELETE', headers: auth(squatterToken) });
+
+    assert(bind.status === 200, `bind ${bind.status}: ${JSON.stringify(bind.body.error)}`);
+    assert(JSON.stringify(bind.body.data.actions) === JSON.stringify([`${pinned}#${provider}`]),
+        `the bare id was stored as typed, so a later publication decides what it names: ${JSON.stringify(bind.body.data.actions)}`);
+    assert(squat.status === 201, `the second owner could not publish the id: ${squat.status} ${JSON.stringify(squat.body.error)}`);
+    assert(bound?.published === true && bound?.host === 'hooks.invalid' && !bound?.ambiguous,
+        `a later publication changed what the binding names: ${JSON.stringify(bound)}`);
 });
 
 await test('Cleanup: the two actions are deleted', async () => {
