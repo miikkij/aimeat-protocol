@@ -48,6 +48,8 @@
  *     isSafeNotifActionEndpoint had no caller; it now also asks for /v1/ as the browser resolves it,
  *     and servableNotifActions applies it: notify() stores and pushes only such buttons, and
  *     GET /v1/notifications serves only such buttons from whatever is stored.
+ *   v1.8.0 -- 2026-09-26 -- A `navigate` button may carry `i18n` too, such as the workflow refusal's
+ *     "Approve again".
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
@@ -73,7 +75,7 @@ export type NotifActionStyle = 'primary' | 'default' | 'danger';
  * frontend uses to localize the button label; `label` is the English fallback.
  */
 export type NotifAction =
-  | { id: string; label: string; kind: 'navigate'; link: string; style?: NotifActionStyle }
+  | { id: string; label: string; kind: 'navigate'; link: string; style?: NotifActionStyle; i18n?: NotifText }
   | { id: string; label: string; kind: 'reply'; to: string; conversationId?: string; subject?: string; replyTo?: string; style?: NotifActionStyle }
   | { id: string; label: string; kind: 'api'; method: 'POST' | 'PATCH' | 'DELETE'; endpoint: string; body?: Record<string, unknown>; confirm?: boolean; style?: NotifActionStyle; i18n?: NotifText };
 

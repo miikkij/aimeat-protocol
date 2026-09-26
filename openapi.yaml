@@ -34922,6 +34922,9 @@ paths:
         `{ id, label, kind }` where kind is `reply` (opens a reply box → POST /v1/messages),
         `api` (calls `endpoint` with the caller's own session, e.g. approve/deny a request), or
         `navigate` (a deep link). Actions are set only by trusted node emit code — see the POST note.
+        An `api` or `navigate` action may carry `i18n` ({ key, vars }), a key under `notiftext.`, so a
+        client can say the button in the reader's language; `label` stays the English fallback and
+        what a push shows.
         No memory door writes a notification record (a `notif.` key): each refuses it with 403
         RESERVED_KEY to every principal, the owner included. An `api` action is served only when its
         `endpoint` is a door of this node's own API: a path of this node under `/v1/`, still under

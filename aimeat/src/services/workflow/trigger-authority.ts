@@ -25,6 +25,8 @@
  *   const refused = await refuseTriggerStart({ storage, config }, ownerGhii, def);
  *   if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
  * @version-history
+ *   v1.1.0 — 2026-09-26 — "Run as me" and "Approve again" carry their own locale keys, so the bell and
+ *     the Notifications page say them in the reader's language.
  *   v1.0.0 — 2026-09-25 — Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -215,8 +217,9 @@ async function tellOwner(storage: Storage, ownerGhii: string, def: WorkflowDef, 
     {
       id: 'run-as-me', label: 'Run as me', kind: 'api', method: 'POST', style: 'primary',
       endpoint: `/v1/workflows/${encodeURIComponent(def.id)}/runs/${encodeURIComponent(runId)}/run-as-owner`,
+      i18n: { key: 'workflow_run_refused.run_as_me' },
     },
-    { id: 'approve-again', label: 'Approve again', kind: 'navigate', link: now.approveLink },
+    { id: 'approve-again', label: 'Approve again', kind: 'navigate', link: now.approveLink, i18n: { key: 'workflow_run_refused.approve_again' } },
   ];
   await notify(storage, ownerGhii, {
     type: 'workflow_run_refused',
