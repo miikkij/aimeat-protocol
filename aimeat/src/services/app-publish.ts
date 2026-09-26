@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-09-26 — A declared ai_provenance that names no model earns the `provenance-without-model`
+ *     hint: a GPT-6 build of material-lab published a record that read only "Served by openai".
  *   2026-09-24 — A new app's missing description is refused above the dry-run return
  *     (bbfbeca149de), so a dry run answers what the real publish answers.
  *   2026-09-19 — A build that left the Atelier track is named in the publish hints
@@ -95,7 +97,7 @@ import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
-import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, declarationLacksModel, type DeclaredProvenance } from './ai-provenance.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
@@ -657,12 +659,28 @@ export async function publishApp(
     artifactWarnings: [...artifact.warnings, ...(isHtml ? trackDriftFindings({
       isUpdate, track, loadsAtelier: loadsAtelierKit(html),
       carriedAtelierToken: typeof input.specToken === 'string' && input.specToken.trim() === buildAtelierSpecToken(config),
-    }) : []), ...(isHtml ? oneLanguageFindings({ isUpdate, html }) : []), ...(isHtml ? genreForkFindings(html) : []), ...(isHtml ? handRolledFindings(html) : []), ...(isHtml ? levelFindings(html) : [])],
+    }) : []), ...(isHtml ? oneLanguageFindings({ isUpdate, html }) : []), ...(isHtml ? genreForkFindings(html) : []), ...(isHtml ? handRolledFindings(html) : []), ...(isHtml ? levelFindings(html) : []),
+      // Only a record minted from THIS declaration; an attached record was written elsewhere.
+      ...(aiProvenanceId && !input.declaredProvenanceId ? provenanceModelFindings(input.declaredProvenance) : [])],
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.
     nextSteps: bookParts ? { ...(steps ?? {}), design_book_parts: bookParts } : steps,
   };
+}
+
+/** The hint a declaration earns when it says a model made the app and not which model. */
+function provenanceModelFindings(declared: DeclaredProvenance | undefined): AppArtifactFinding[] {
+  if (!declarationLacksModel(declared)) return [];
+  const served = declared?.provider ? `, only who served it ("${declared.provider}")` : '';
+  return [{
+    pitfall: 'provenance-without-model',
+    severity: 'warn',
+    message: `The ai_provenance you declared says a model made this app and does not name the model. The public record shows no model${served}. `
+      + 'On the next publish, set ai_provenance.model to your own model id as your provider names it, for example "openai/gpt-6" or "anthropic/claude-opus-5". '
+      + 'Take it from your own configuration; do not ask the person.',
+    url: '/v1/appdev/pitfalls/provenance-without-model',
+  }];
 }
 
 /** Drop blank entries and cap each at 2000 characters; `undefined` when nothing survives. */

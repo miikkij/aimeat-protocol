@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-09-26 — provenance-without-model: a declaration that names no model, and the publish hint.
  *   2026-09-25 — isolated-frame-on-shared-nodes: what an app meets on a node several people share
  *     with no app origin, where it runs in an opaque-origin frame (audit A7-1).
  *   2026-09-19 — track-drift: a new app that ended up on Classic, and what the publish says about
@@ -260,6 +261,18 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     updatedAt: '2026-09-13',
     ...CHECKED,
+  }),
+  E({
+    id: 'provenance-without-model',
+    title: 'The AI label says who served the model and not which model',
+    symptom: 'The app was published with an `ai_provenance` block that gives `level` (and often `provider`) but no `model`. The public "How this was made" page then shows "Served by openai" and no model row, and nobody can tell from the record which model wrote the app. The node cannot fill the gap: it did not watch the generation, and a publish with the owner\'s own token has no agent record to read a model from. Publishing warns (`app_hints`, pitfall `provenance-without-model`).',
+    fix: 'Name your own model in every declaration: `ai_provenance: { level: "ai-generated", model: "openai/gpt-6", provider: "openai" }`, with the id as your provider names it. Take it from your own configuration; do not ask the person. The record is bound to one version, so the next publish is where the model appears.',
+    appliesTo: ['app', 'ai', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-09-26',
+    verifiedAt: '2026-09-26',
+    verifiedVersion: '3.19.0',
   }),
   E({
     id: 'biometric-inference-needs-your-own-notice',

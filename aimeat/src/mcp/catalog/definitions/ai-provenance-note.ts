@@ -21,6 +21,7 @@
  *   { name: 'aimeat_memory_write', description: 'Write a memory entry…' + AI_PROVENANCE_TOOL_NOTE,
  *     input: { key: {…}, ...aiProvenanceCatalogInput } }
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The catalog entry names `provider` and asks for the declarer's own model.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4.
  */
 import type { ToolInputField } from './types.js';
@@ -41,9 +42,10 @@ export const aiProvenanceCatalogInput: Record<string, ToolInputField> = {
   ai_provenance: {
     type: 'object',
     description:
-      'How this content was made: { level, method?, human_involvement?, model?, sources?, notes? }. '
-      + '`level` is required when the block is present: original | assisted | synthesized | '
-      + 'ai-generated. `human_involvement` (none | light-review | editorial-control | full-human) '
+      'How this content was made: { level, method?, human_involvement?, model?, provider?, sources?, '
+      + 'notes? }. `level` is required when the block is present: original | assisted | synthesized | '
+      + 'ai-generated. `model` is YOUR OWN model id as your provider names it (self-identify, never '
+      + 'ask the person); without it the record cannot say which model made this. `human_involvement` (none | light-review | editorial-control | full-human) '
       + 'counts only a step where a person read the SUBSTANCE and could reject it; omitted means '
       + 'none. The node fills in who you are, which node, when, and a hash of the exact bytes — '
       + 'those are never taken from the caller.',

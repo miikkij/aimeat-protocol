@@ -22,6 +22,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=app-publish-provenance-doors
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A declaration that says a model made the app and names no model is
+ *     published with the `provenance-without-model` hint; one with a model, or level original, is not.
  *   v1.1.0 — 2026-08-16 — E2E quality, provenance-doors:284: the agent half of the silent door. That a
  *     machine's undeclared publish gets a record was covered; its SHAPE was not, anywhere in the tree.
  *     The stamp is now read for stampedBy 'node', observed false, level, humanInvolvement and the
@@ -214,6 +216,49 @@ async function main() {
         assert(r.status === 200 || r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body?.error)}`);
         const { prov } = await storedRecord(inlineFile);
         assertDeclarationSurvived(prov, 'inline');
+        // A declaration that names its model earns no hint about the model.
+        const hints = ((r.body.data?.app_hints ?? []) as any[]).filter(h => h.pitfall === 'provenance-without-model');
+        assert(hints.length === 0, `a declaration with a model must not be told it lacks one: ${JSON.stringify(hints)}`);
+    });
+
+    await test('a declaration that names a provider and no model is published, with a hint to name the model', async () => {
+        // Measured on aimeat.io 2026-09-26: a GPT-6 build declared { level, provider: "openai" } and
+        // its public record read "Served by openai" with no model row. The node cannot fill it in.
+        const file = 'door-no-model.html';
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: auth(ownerToken),
+            body: JSON.stringify({
+                filename: file, mime_type: 'text/html',
+                content: Buffer.from(APP_HTML, 'utf-8').toString('base64'),
+                name: 'No model door', description: 'Declared without a model.',
+                ai_provenance: { level: 'ai-generated', provider: 'openai' },
+            }),
+        });
+        assert(r.status === 200 || r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const hints = ((r.body.data?.app_hints ?? []) as any[]).filter(h => h.pitfall === 'provenance-without-model');
+        assert(hints.length === 1, `expected one provenance-without-model hint, got ${JSON.stringify(r.body.data?.app_hints)}`);
+        assert(hints[0].message.includes('"openai"') && hints[0].message.includes('ai_provenance.model'),
+            `the hint names who served it and the field to set: ${hints[0].message}`);
+        const entry = await json(hints[0].url);
+        assert(entry.status === 200, `the hint's pitfall entry resolves: ${hints[0].url} → ${entry.status}`);
+        const { prov } = await storedRecord(file);
+        assert(prov?.record?.generator?.provider === 'openai' && !prov.record.generator.model,
+            `the record keeps what was declared and invents no model: ${JSON.stringify(prov?.record?.generator)}`);
+    });
+
+    await test('an app declared as a person\'s own work (original) gets no model hint', async () => {
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: auth(ownerToken),
+            body: JSON.stringify({
+                filename: 'door-original.html', mime_type: 'text/html',
+                content: Buffer.from(APP_HTML, 'utf-8').toString('base64'),
+                name: 'Original door', description: 'Written by a person.',
+                ai_provenance: { level: 'original' },
+            }),
+        });
+        assert(r.status === 200 || r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const hints = ((r.body.data?.app_hints ?? []) as any[]).filter(h => h.pitfall === 'provenance-without-model');
+        assert(hints.length === 0, `no model was involved, so no model is asked for: ${JSON.stringify(hints)}`);
     });
 
     console.log('\nDoor 3: publish-draft');
