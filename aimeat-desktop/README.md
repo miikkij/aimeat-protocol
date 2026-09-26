@@ -93,6 +93,9 @@ validates them while cargo compiles: the Node sidecar (`node scripts/stage-node.
 one placeholder file in each is enough, and `pnpm stage` empties both before writing the real thing.
 [.github/workflows/desktop-check.yml](../.github/workflows/desktop-check.yml) does exactly this on every
 push that touches this folder, which is what keeps the app from drifting away from the server again.
+Its second job does the same on Linux, so the crate's Unix-only code and tests run too. The DLL is
+Windows-only, so on Linux a placeholder file, `WebView2Loader.placeholder`, matches the `WebView2Loader.*`
+resource glob instead.
 
 > `pnpm stage` stages the Node sidecar under **both** Windows triples (`-gnu` and `-msvc`) because the Tauri
 > compiler and the Tauri CLI bundler can each resolve a different one. Whichever your toolchain uses, it's covered.
