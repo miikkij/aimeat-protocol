@@ -20,6 +20,8 @@
  *   if (body === null) return refuse(413, 'SIZE_EXCEEDED', 'That is over the limit.');
  *   const capped = capResponseBody(await safeFetch(url), 16 * 1024 * 1024);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — capResponseBody refuses a status outside 200 to 599 and cancels its body
+ *     unread: fetch hands back 600 or 999, and rebuilding the Response threw with the body half piped.
  *   v1.1.0 — 2026-09-26 — capResponseBody and ResponseTooLargeError: a body handed on to a library
  *     errors at the ceiling, counted per event on an event stream (secaudit 2026-09, A2-2).
  *   v1.0.0 — 2026-09-24 — Initial: promoted from services/connections/read.ts (secaudit 2026-09, A6-13).
@@ -76,6 +78,13 @@ const CR = 0x0d;
  */
 export function capResponseBody(resp: Response, maxBytes: number): Response {
     if (!resp.body || NULL_BODY_STATUSES.has(resp.status)) return resp;
+    // fetch hands back a status such as 600 or 999, which the Response constructor refuses and HTTP
+    // gives no meaning. There is nothing to hand on: the body is cancelled unread, and the request
+    // fails the way a dropped connection does.
+    if (resp.status < 200 || resp.status > 599) {
+        resp.body.cancel().catch(err => logger.warn('capResponseBody: cancelling an unusable answer failed', { error: String(err) }));
+        throw new TypeError(`The far side answered with status ${resp.status}, which is outside HTTP's 200 to 599.`);
+    }
     const perEvent = (resp.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream');
     let run = 0;
     // A line ended with the byte before (so a second line end makes a blank line), and whether that

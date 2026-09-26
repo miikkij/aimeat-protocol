@@ -102,4 +102,12 @@ describe('capResponseBody, the ceiling a body handed on to a library carries', (
     const empty = new Response(null, { status: 204 });
     expect(capResponseBody(empty, 10)).toBe(empty);
   });
+
+  it('refuses a status outside 200 to 599, which fetch hands back and a Response cannot carry, and cancels its body unread', async () => {
+    const odd = farStream(4);
+    const answer = { status: 999, body: odd.stream, headers: new Headers() } as unknown as Response;
+    expect(() => capResponseBody(answer, 10)).toThrow(/status 999/);
+    await vi.waitFor(() => expect(odd.state.cancelled).toBe(true));
+    expect(odd.state.pulled).toBe(0);
+  });
 });
