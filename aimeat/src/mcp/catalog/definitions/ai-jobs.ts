@@ -14,6 +14,8 @@
  * @structure aiJobTools -- AimeatToolDefinition[]
  * @usage imported by mcp/catalog/definitions.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — input_keys and result_key say a record the node keeps for itself is
+ *     refused with RESERVED_KEY (services/ai-job-keys.ts).
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import { type AimeatToolDefinition, agentEverywhere } from './types.js';
@@ -27,8 +29,8 @@ export const aiJobTools: AimeatToolDefinition[] = [
         input: {
             prompt: { type: 'string', description: 'The prompt. Required unless prompt_key names a record holding it.' },
             prompt_key: { type: 'string', description: 'An owner memory key holding the prompt text (a string, or an object with a `prompt` field), so changing the prompt is a memory write rather than a code change.' },
-            input_keys: { type: 'array', description: 'Memory keys read and appended to the prompt, labelled by key. This is the ONLY way the model sees stored data — it has no tools.' },
-            result_key: { type: 'string', required: true, description: 'Where the answer is written, in the owner\'s own namespace. A key naming another namespace, or one the server reads and trusts for behaviour, is refused.' },
+            input_keys: { type: 'array', description: 'Memory keys read and appended to the prompt, labelled by key. This is the ONLY way the model sees stored data — it has no tools. A key naming a record this node keeps for itself (an AI key, a payout setting, a spend limit) is refused with RESERVED_KEY, because everything read goes to the model provider.' },
+            result_key: { type: 'string', required: true, description: 'Where the answer is written, in the owner\'s own namespace. A key naming another namespace is refused, and so is a record this node keeps for itself (RESERVED_KEY).' },
             result_visibility: { type: 'string', description: 'Visibility of the record written at result_key. Default private.', enum: ['private', 'owner', 'public'] },
             model: { type: 'string', description: 'Explicit model id. Omit to use the owner\'s configured model.' },
             system_prompt: { type: 'string', description: 'Optional system prompt.' },

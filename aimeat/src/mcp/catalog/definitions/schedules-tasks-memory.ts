@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.7.2 — 2026-09-26 — aimeat_schedule_create's input_keys and output_key say a record the node
+ *     keeps for itself is refused with RESERVED_KEY (services/ai-job-keys.ts).
  *   v1.7.1 — 2026-09-26 — aimeat_workflow_save says costCapMorsels is removed in 4.0.0.
  *   v1.7.0 — 2026-09-25 — aimeat_workflow_save names work:request, the word an agent step costs.
  *   v1.6.0 — 2026-09-25 — aimeat_workflow_save says a trigger's run answers to whoever saved the
@@ -48,8 +50,8 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             timezone: { type: 'string', description: 'IANA timezone, e.g. "Europe/Helsinki".' },
             purpose: { type: 'string', description: 'Why this runs (shown to the owner).' },
             prompt: { type: 'string', description: 'ai: instruction applied to the input memory values.' },
-            input_keys: { type: 'array', description: 'ai: owner memory keys fed in as context.' },
-            output_key: { type: 'string', description: 'ai: memory key for the result (auto-generated if omitted).' },
+            input_keys: { type: 'array', description: 'ai: owner memory keys fed in as context. Each one goes to the model provider, so a key naming a record this node keeps for itself (an AI key, a payout setting, a spend limit) is refused with RESERVED_KEY.' },
+            output_key: { type: 'string', description: 'ai: memory key for the result (auto-generated if omitted). A record this node keeps for itself is refused with RESERVED_KEY.' },
             task_title: { type: 'string', description: 'agent_task: title of the task created each fire.' },
             extension_name: { type: 'string', description: 'extension: installed extension name.' },
             action_id: { type: 'string', description: 'extension: action id to run.' },

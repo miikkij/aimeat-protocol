@@ -14,6 +14,10 @@
  *     a skip with the reason, not a write naming the other run as if this job had started it.
  *   v1.3.0 — 2026-09-25 — A workflow job whose start was refused (the saver no longer holds what the
  *     steps need) records a skip with the refusal's reason.
+ *   v1.4.0 — 2026-09-26 — An `ai` job whose input or output key names a record the node keeps for
+ *     itself fails before anything is read, sent or written (services/ai-job-keys.ts). The create
+ *     and edit doors refuse it; this covers schedules stored before they did (secaudit 2026-09: A6-1,
+ *     573704db10ed).
  */
 import type { AimeatConfig } from '../config.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -23,6 +27,7 @@ import { completeForOwner } from './ai-completion.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI, isSameOwner } from '../utils/gaii.js';
+import { aiJobKeyRefusal } from './ai-job-keys.js';
 
 /**
  * `ai` kind: gather predefined input memory keys, compose the prompt, run a
@@ -40,6 +45,11 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
   if (!cfg.prompt || typeof cfg.prompt !== 'string') {
     throw new Error(`AI job "${job.id}" missing prompt`);
   }
+  // Before the first read: every input goes to the provider and the answer lands at the output key,
+  // so neither may name a record the node keeps for itself. The doors refuse it at create and edit;
+  // this holds a schedule stored before they did to the same rule.
+  const kept = aiJobKeyRefusal({ inputKeys: cfg.inputKeys, outputKey: cfg.outputKey });
+  if (kept) throw new Error(`AI job "${job.id}": ${kept.message}`);
 
   const inputKeys = Array.isArray(cfg.inputKeys) ? cfg.inputKeys : [];
   const reads: string[] = [];

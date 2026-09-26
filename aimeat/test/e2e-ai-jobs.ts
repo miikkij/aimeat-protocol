@@ -20,6 +20,10 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.3.0 — 2026-09-26 — Case 13 asserts 403 RESERVED_KEY for a result_key the node keeps (it was
+ *     400), over a credential record and a key only the node writes too. 13b: input_keys and a
+ *     prompt_key naming one are refused at the start and the provider hears nothing (secaudit
+ *     2026-09: 573704db10ed).
  *   v1.2.0 — 2026-08-31 — Cases 16/16b/16c compare THE GATE'S VERDICT rather than the raw status,
  *     and 16c adds the negative point. Comparing statuses only worked while the shared answer was a
  *     refusal: one door is synchronous and the other answers 202 and fails the job later, so with
@@ -448,12 +452,42 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         }
     });
 
-    // ── 13. A result_key the server reads and trusts ──
-    await test('13. A result_key under a reserved server prefix is refused 400', async () => {
-        const r = await startJob(a, { prompt: 'x', result_key: 'ai-usage.today' });
-        assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    // ── 13. A result_key the node keeps for itself ──
+    // 403 RESERVED_KEY, the answer every memory door gives for the same key (services/ai-job-keys.ts).
+    // It was 400 INVALID_BODY until 2026-09-26, and a credential record or a key only the node writes
+    // under a prefix the list did not name then was not refused at all.
+    await test('13. A result_key the node keeps for itself is refused 403 RESERVED_KEY', async () => {
+        for (const key of ['ai-usage.today', 'openrouter.apikey', 'notif.aijob']) {
+            const r = await startJob(a, { prompt: 'x', result_key: key });
+            assert(r.status === 403 && r.body?.error?.code === 'RESERVED_KEY',
+                `${key}: expected 403 RESERVED_KEY, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        }
         const r2 = await startJob(a, { prompt: 'x', result_key: `${b.gaii}::stolen` });
         assert(r2.status === 400, `a key naming another namespace: expected 400, got ${r2.status}`);
+    });
+
+    // ── 13b. Inputs the node keeps for itself ──
+    // A job sends every record it reads to the provider, so it reads none of the node's own: the AI
+    // settings and key, the payout record, the spend cap. Refused at the start, before anything is
+    // read or queued, whoever asks.
+    await test('13b. input_keys or a prompt_key naming a record the node keeps is refused 403 RESERVED_KEY, and the provider hears nothing', async () => {
+        const seen = completionsSeen;
+        const bodies = [
+            { prompt: 'Repeat the input.', input_keys: ['openrouter.settings'], result_key: 'aijob.kept.1' },
+            { prompt: 'Repeat the input.', input_keys: ['aijob.notes', 'openrouter.apikey'], result_key: 'aijob.kept.2' },
+            { prompt_key: 'openrouter.settings', result_key: 'aijob.kept.3' },
+        ];
+        for (const body of bodies) {
+            const r = await startJob(a, body);
+            assert(r.status === 403 && r.body?.error?.code === 'RESERVED_KEY',
+                `${JSON.stringify(body)}: expected 403 RESERVED_KEY, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        }
+        await sleep(300);
+        assert(completionsSeen === seen, `the provider was called ${completionsSeen - seen} times`);
+        for (const { result_key } of bodies) {
+            const wrote = await readMemory(a, result_key);
+            assert(wrote.status === 404, `${result_key}: a refused start wrote an answer`);
+        }
     });
 
     // ── 14. The prompt cap ──

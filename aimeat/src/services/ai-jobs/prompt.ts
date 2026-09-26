@@ -16,14 +16,22 @@
  *   THE SIZE CAP IS THE REAL BRAKE. One memory value may be 1024 kB, so an unbounded assembly is
  *   megabytes of live heap held for the whole call, multiplied by however many jobs are running. The
  *   socket is nothing next to it.
- * @structure assembleJobPrompt(deps, ownerGhii, spec) → string (throws AI_JOB_PROMPT_TOO_LARGE)
+ *
+ *   NOTHING THE NODE KEEPS FOR ITSELF IS READ. Everything read here goes to the provider, so a
+ *   `prompt_key` or an `input_keys` entry naming a credential record or a key the node acts on is
+ *   refused before the first read (services/ai-job-keys.ts). The start refuses it too; this is the
+ *   read itself, which a restart reaches without passing the start.
+ * @structure assembleJobPrompt(deps, ownerGhii, spec) → string (throws RESERVED_KEY, AI_JOB_PROMPT_TOO_LARGE)
  * @usage const prompt = await assembleJobPrompt({ storage, config }, ownerGhii, job);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — Refuses, before the first read, a prompt_key or input key naming a record
+ *     the node keeps for itself (secaudit 2026-09: 573704db10ed).
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { getOwnerScopeMemory } from '../owner-memory.js';
+import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { parseGAII } from '../../utils/gaii.js';
 import { AiJobError } from './types.js';
 
@@ -61,6 +69,9 @@ export async function assembleJobPrompt(
     spec: PromptSpec,
 ): Promise<string> {
     const { storage, config } = deps;
+
+    const kept = aiJobKeyRefusal({ promptKey: spec.prompt_key, inputKeys: spec.input_keys });
+    if (kept) throw new AiJobError(kept.code, kept.status, kept.message);
 
     let prompt = typeof spec.prompt === 'string' ? spec.prompt : '';
 
