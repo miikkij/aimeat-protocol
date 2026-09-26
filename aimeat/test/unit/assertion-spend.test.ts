@@ -15,6 +15,7 @@
  *   is about THIS assertion and not wider.
  * @usage cd aimeat && pnpm exec vitest run test/unit/assertion-spend.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The store stands in for revokeTokenIfAbsent, the one call the spender makes.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -27,12 +28,18 @@ import type { Storage } from '../../src/storage/interface.js';
 const NODE = 'aimeat-unit-001-test';
 const B64U = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
-/** The two storage calls the spender makes, over a Map: the revoked-token table in miniature. */
+/**
+ * The storage call the spender makes, over a Map: the revoked-token table in miniature. The claim
+ * against the real providers, requests at once included, is in storage-conformance.test.ts.
+ */
 function spendStore(): Storage {
     const spent = new Map<string, number>();
     return {
-        isTokenRevoked: async (hash: string) => spent.has(hash),
-        revokeToken: async (hash: string, expiresAt: number) => { spent.set(hash, expiresAt); },
+        revokeTokenIfAbsent: async (hash: string, expiresAt: number) => {
+            if (spent.has(hash)) return false;
+            spent.set(hash, expiresAt);
+            return true;
+        },
     } as unknown as Storage;
 }
 

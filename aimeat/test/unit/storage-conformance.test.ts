@@ -17,9 +17,13 @@
  * @structure
  *   - provs: SQLite, plus mandatory Postgres when configured or explicitly required
  *   - seedOwner(): one owner with data in several owner-scoped tables
- *   - the cases: delete cascade, transaction lookup, memory listing order, push subscriptions
+ *   - the cases: delete cascade, transaction lookup, memory listing order, push subscriptions,
+ *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.6.0 -- 2026-09-26 -- One assertion sent by eight requests at once is spent by exactly one, on
+ *     every provider: the spend is one insert that does nothing when the key is there (secaudit
+ *     2026-09, N5).
  *   v1.5.0 -- 2026-09-26 -- deleteOwner leaves nothing a new account under the same name inherits:
  *     an action published under the bare name goes, and a kept AI provenance record names the
  *     erasure's pseudonym instead of the person (secaudit 2026-09: A8-4, N6).
@@ -41,6 +45,7 @@ import { randomUUID } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { spendAssertionIdentity } from '../../src/services/assertion-spend.js';
 
 const SQLITE_PATH = `./test/.conformance-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
@@ -607,6 +612,31 @@ describe('storage providers agree on what they do, not just on their signatures'
                 .toBe(body.toString('utf8'));
 
             await storage.deleteOwner(owner);
+        }
+    }, 60_000);
+
+    it('one assertion sent by eight requests at once is spent by exactly one, on every provider', async () => {
+        // A signed assertion is worth one call (services/assertion-spend.ts), and requests carrying
+        // the same one can arrive together. The spend is one statement on each provider, an insert
+        // that does nothing when the key is already there, so exactly one of them is told it spent
+        // it (secaudit 2026-09, N5).
+        for (const { name, storage } of provs) {
+            const identity = { issuer: 'bot#confspend@aimeat-conformance-001', audience: 'aimeat-conformance-001', jti: randomUUID() };
+            // Filed as already expired, so the sweep below takes the rows away again: the spend reads
+            // only whether the key is there, never its expiry.
+            const exp = Math.floor(Date.now() / 1000) - 60;
+            // Eight connections open first, as a busy node's pool has them, so the eight requests
+            // below run side by side rather than queueing behind one connection's setup.
+            await Promise.all(Array.from({ length: 8 }, () => storage.isTokenRevoked(randomUUID())));
+            const results = await Promise.all(Array.from({ length: 8 }, () => spendAssertionIdentity(storage, identity, exp)));
+            // Soft, so a failure on one provider still reports what the other one does.
+            expect.soft(results.filter(r => r.ok).length, `${name}: how many of eight concurrent spends of one assertion passed`).toBe(1);
+            expect((await spendAssertionIdentity(storage, identity, exp)).ok, `${name}: a spend after them`).toBe(false);
+
+            // A different assertion of the same signer is its own spend.
+            const next = { ...identity, jti: randomUUID() };
+            expect((await spendAssertionIdentity(storage, next, exp)).ok, `${name}: another assertion`).toBe(true);
+            await storage.cleanExpiredRevocations();
         }
     }, 60_000);
 });

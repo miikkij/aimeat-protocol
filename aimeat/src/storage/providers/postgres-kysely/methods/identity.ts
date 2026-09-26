@@ -7,6 +7,8 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-09-26 — revokeTokenIfAbsent: an insert that does nothing on conflict, true when it filed the
+ *     row (the one-time assertion spend, secaudit 2026-09 N5).
  *   2026-09-09 — getAgentByName, getGHIIsByGhiis and getGHIIByGoogleSub deleted: no caller.
  *   2026-08-31 — Agent v2 identity on create and read: runMode, identityVersion, cardJws,
  *     cardIssuedAt, enrolledAt (migration 0058). updateAgent needs nothing — it passes unknown keys
@@ -320,6 +322,12 @@ export const identityMethods = {
   async revokeToken(this: PostgresKyselyStorage, tokenHash: string, expiresAt: number): Promise<void> {
     await this.db.insertInto('RevokedToken').values({ tokenHash, expiresAt })
       .onConflict(oc => oc.column('tokenHash').doUpdateSet({ expiresAt })).execute();
+  },
+  /** One statement: the insert does nothing on the unique tokenHash, and RETURNING says whether it filed a row. */
+  async revokeTokenIfAbsent(this: PostgresKyselyStorage, tokenHash: string, expiresAt: number): Promise<boolean> {
+    const row = await this.db.insertInto('RevokedToken').values({ tokenHash, expiresAt })
+      .onConflict(oc => oc.column('tokenHash').doNothing()).returning('id').executeTakeFirst();
+    return !!row;
   },
   async isTokenRevoked(this: PostgresKyselyStorage, tokenHash: string): Promise<boolean> {
     const r = await this.db.selectFrom('RevokedToken').select('id').where('tokenHash', '=', tokenHash).executeTakeFirst();

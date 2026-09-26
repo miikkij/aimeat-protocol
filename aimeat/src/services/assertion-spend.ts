@@ -41,6 +41,8 @@
  *   const spend = await spendAssertion(storage, assertion, claims.exp);
  *   if (!spend.ok) return refuse(401, 'ASSERTION_REPLAYED', spend.message);
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The spend is one statement, storage.revokeTokenIfAbsent, so of requests
+ *     carrying one assertion at the same time exactly one spends it (secaudit 2026-09, N5).
  *   v1.1.0 — 2026-09-24 — The spend is keyed on the assertion's identity (sub, aud and jti; the
  *     relay door's relay, aud and jti) instead of its raw bytes, so a re-spelled copy is the same
  *     spend (audit A4-3). spendAssertionIdentity for a claim that is not a JWS.
@@ -122,14 +124,18 @@ export async function spendAssertion(storage: Storage, assertion: string, expire
   return spendAssertionIdentity(storage, identity, expiresAt);
 }
 
-/** Claim an assertion by its identity, or say it was already claimed. The one place that files. */
+/**
+ * Claim an assertion by its identity, or say it was already claimed. The one place that files.
+ *
+ * ONE STATEMENT. The claim is storage.revokeTokenIfAbsent, an insert that does nothing when the
+ * hash is already filed and says whether this call filed it. Requests carrying one assertion can
+ * arrive together, and of them exactly one is told it spent it (secaudit 2026-09, N5).
+ */
 export async function spendAssertionIdentity(
   storage: Storage, identity: AssertionIdentity, expiresAt: number,
 ): Promise<SpendResult> {
-  const hash = assertionSpendHash(identity);
-  if (await storage.isTokenRevoked(hash)) {
+  if (!(await storage.revokeTokenIfAbsent(assertionSpendHash(identity), expiresAt))) {
     return { ok: false, message: 'That assertion has already been used. Sign a new one.' };
   }
-  await storage.revokeToken(hash, expiresAt);
   return { ok: true };
 }

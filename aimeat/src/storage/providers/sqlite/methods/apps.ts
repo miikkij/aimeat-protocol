@@ -16,6 +16,8 @@
  *   v1.5.0 — 2026-08-29 — updateAppMeta merges `legal` per kind (mergeLegal).
  *   v1.6.0 — 2026-09-09 — deleteAppGrant and getConfigValue deleted: no caller.
  *   v1.7.0 — 2026-09-26 — app_grants.ownerAddedScopes: the words the owner added by hand, a JSON list.
+ *   v1.8.0 — 2026-09-26 — revokeTokenIfAbsent: INSERT OR IGNORE, true when this call filed the hash
+ *     (the one-time assertion spend, secaudit 2026-09 N5).
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
@@ -34,6 +36,13 @@ export const appsMethods = {
     this.db.prepare(
       'INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at) VALUES (?, ?)'
     ).run(tokenHash, expiresAt);
+  },
+
+  /** One statement: INSERT OR IGNORE files the hash only when it is absent, and `changes` says whether it did. */
+  async revokeTokenIfAbsent(this: SqliteStorage, tokenHash: string, expiresAt: number): Promise<boolean> {
+    return this.db.prepare(
+      'INSERT OR IGNORE INTO revoked_tokens (token_hash, expires_at) VALUES (?, ?)'
+    ).run(tokenHash, expiresAt).changes === 1;
   },
 
   async isTokenRevoked(this: SqliteStorage, tokenHash: string): Promise<boolean> {
