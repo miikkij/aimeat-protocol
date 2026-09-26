@@ -21,6 +21,9 @@
  *   made appeared under "asking to join" with Approve and Refuse beside it, naming this node as the
  *   asker. Found by driving the browser on 2026-09-12.
  * @version-history
+ *   v1.4.0 — 2026-09-25 — Relay claims peer by peer: a peer kept on its own setting through the REST
+ *     door, the peer door and aimeat_admin_federation_relay_claim_set, an unclaimed relay written
+ *     down on the peer it names, and the answer naming who is not ready.
  *   v1.3.0 — 2026-09-24 — The operator's agent is created holding operator:admin. Its setup no
  *     longer matched the node: an operator's agent is offered the admin tools only with that word
  *     ticked (security audit A8-1), and this agent had the default scopes.
@@ -304,6 +307,64 @@ await test("The operator's agent reads the same federation over MCP", async () =
     assert(payload.peers.total > 0, 'and it is not an empty federation, which would prove nothing');
     assert(payload.standing === overHttp.standing, `the same standing: ${payload.standing} vs ${overHttp.standing}`);
     assert(payload.roster.length === overHttp.roster.length, 'and the same roster');
+});
+
+/* ── Relay claims, peer by peer ──
+ *
+ * The node-wide default turns `required` in 3.20.0 and `optional` goes in 4.0.0. Until then one peer
+ * can be kept on its own answer, and the operator's AI can ask which peers are not ready yet.
+ */
+const rosterRow = (d: any, nodeId: string) => d.roster.find((r: any) => r.node_id === nodeId);
+
+await test('A peer can be kept on its own relay-claim setting on the REST door, and the answer shows it', async () => {
+    const kept = await json('/v1/federation/peers/peer-waiting-001/relay-claim', {
+        method: 'PUT', headers: { Authorization: `Bearer ${opToken}` }, body: JSON.stringify({ relay_claim: 'optional' }),
+    });
+    assert(kept.status === 200, `keep on optional: ${kept.status} ${JSON.stringify(kept.body.error ?? '')}`);
+    const d = (await overview()).body.data;
+    assert(rosterRow(d, 'peer-waiting-001').relay_claim.setting === 'optional', `the row says so: ${JSON.stringify(rosterRow(d, 'peer-waiting-001'))}`);
+    assert(d.relay_claims.kept_optional.includes('peer-waiting-001'), `and the summary: ${JSON.stringify(d.relay_claims)}`);
+    assert(d.relay_claims.default_becomes_required_in === '3.20.0' && d.relay_claims.optional_removed_in === '4.0.0',
+        `the two versions are named: ${JSON.stringify(d.relay_claims)}`);
+});
+
+await test('...and in chat: the operator\'s agent sets another peer, and both doors read it', async () => {
+    const set = await mcpRpc('tools/call', { name: 'aimeat_admin_federation_relay_claim_set', arguments: { node_id: 'peer-old-001', relay_claim: 'required' } }, 3);
+    assert(set?.result?.isError !== true, `the tool refused: ${JSON.stringify(set?.result ?? set).slice(0, 300)}`);
+    assert(JSON.parse(set.result.content[0].text).relay_claim.setting === 'required', `the tool answers what now applies: ${set.result.content[0].text}`);
+
+    const read = await mcpRpc('tools/call', { name: 'aimeat_admin_federation', arguments: {} }, 4);
+    assert(rosterRow(JSON.parse(read.result.content[0].text), 'peer-old-001').relay_claim.setting === 'required', 'the chat read sees it');
+    assert(rosterRow((await overview()).body.data, 'peer-old-001').relay_claim.setting === 'required', 'and so does the page\'s read');
+
+    // The existing peer door takes the same setting, and "node" hands the peer back to the node's answer.
+    const back = await json('/v1/federation/peers/peer-old-001', {
+        method: 'PUT', headers: { Authorization: `Bearer ${opToken}` }, body: JSON.stringify({ relay_claim: 'node' }),
+    });
+    assert(back.status === 200 && back.body.data.relay_claim === null, `the peer door: ${back.status} ${JSON.stringify(back.body)}`);
+    assert(rosterRow((await overview()).body.data, 'peer-old-001').relay_claim.setting === null, 'following the node again');
+});
+
+await test('A relay that names a peer and carries no claim is written down on that peer', async () => {
+    const relayed = await fetch(`${BASE}/v1/health`, { headers: { 'X-Forwarded-From': 'peer-waiting-001' } });
+    assert(relayed.status === 200, `kept on optional, it relays: ${relayed.status}`);
+    const d = (await overview()).body.data;
+    const row = rosterRow(d, 'peer-waiting-001');
+    assert(row.relay_claim.state === 'sends_none' && typeof row.relay_claim.last_unclaimed_at === 'string',
+        `the peer is not ready, and the answer says since when: ${JSON.stringify(row.relay_claim)}`);
+    assert(d.relay_claims.not_ready.includes('peer-waiting-001'), `the summary names it: ${JSON.stringify(d.relay_claims.not_ready)}`);
+});
+
+await test('The relay-claim door is operator-only, and refuses a word it does not know', async () => {
+    const other = await json('/v1/federation/peers/peer-waiting-001/relay-claim', {
+        method: 'PUT', headers: { Authorization: `Bearer ${otherToken}` }, body: JSON.stringify({ relay_claim: 'required' }),
+    });
+    assert(other.status === 403, `a non-operator: expected 403, got ${other.status}`);
+    const bad = await json('/v1/federation/peers/peer-waiting-001/relay-claim', {
+        method: 'PUT', headers: { Authorization: `Bearer ${opToken}` }, body: JSON.stringify({ relay_claim: 'always' }),
+    });
+    assert(bad.status === 400, `an unknown word: expected 400, got ${bad.status}`);
+    assert(rosterRow((await overview()).body.data, 'peer-waiting-001').relay_claim.setting === 'optional', 'and nothing changed');
 });
 
 await test('The door is operator-only', async () => {

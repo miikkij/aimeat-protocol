@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.16.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set (PUT /v1/federation/peers/:nodeId/
+ *     relay-claim), node_id and relay_claim both forwarded.
  *   v1.15.1 -- 2026-09-24 -- aimeat_memory_restore sends owner_scope. It declared the flag and dropped
  *     it, so an owner-scoped restore reached only the caller's own bin, where the node's tool and the
  *     CLI reached the owner's other principals too.
@@ -675,6 +677,15 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_federation'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/federation/overview'));
+  });
+
+  mcp.tool('aimeat_admin_federation_relay_claim_set', descriptionFor('aimeat_admin_federation_relay_claim_set'), {
+    agent_name: agentNameSchema,
+    node_id: z.string().describe('The peer, by its node id as aimeat_admin_federation lists it.'),
+    relay_claim: z.enum(['optional', 'required', 'node']).describe('"optional" or "required" for this peer alone, or "node" to follow this node\'s setting again.'),
+  }, annotationsFor('aimeat_admin_federation_relay_claim_set'), async ({ agent_name, node_id, relay_claim }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.put(`/v1/federation/peers/${encodeURIComponent(node_id)}/relay-claim`, { relay_claim }));
   });
 
   mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'), {

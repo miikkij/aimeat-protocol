@@ -1429,6 +1429,9 @@ export interface FederationPeer {
   nodeId: string;
   peerMode: Generated<string>;
   relayClaimAt: Timestamp | null;
+  relayClaim: string | null;
+  lastClaimedRelayAt: Timestamp | null;
+  lastUnclaimedRelayAt: Timestamp | null;
   publicKey: Generated<string>;
   replicateMemory: Generated<boolean>;
   shareCatalogue: Generated<boolean>;

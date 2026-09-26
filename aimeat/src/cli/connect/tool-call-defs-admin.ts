@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set (PUT /v1/federation/peers/:nodeId/
+ *     relay-claim), node_id and relay_claim both forwarded.
  *   v1.4.0 -- 2026-09-12 -- aimeat_admin_federation (GET /v1/admin/federation/overview), the third
  *     surface of the Federation page's one read. It takes no parameters: the whole page is the answer.
  *   v1.3.0 -- 2026-09-12 -- aimeat_admin_knowledge (GET /v1/admin/knowledge), the third surface of
@@ -35,6 +37,14 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_admin_federation',
         handler: ({ client }) => client.get('/v1/admin/federation/overview'),
+    },
+    {
+        // THE THIRD SURFACE forwards both: `node_id` picks the peer in the path, `relay_claim` is the
+        // body, and the route refuses any word but optional, required and node.
+        name: 'aimeat_admin_federation_relay_claim_set',
+        handler: ({ client }, input) =>
+            client.put(`/v1/federation/peers/${encodeURIComponent(requiredString(input, 'node_id'))}/relay-claim`,
+                { relay_claim: requiredString(input, 'relay_claim') }),
     },
     {
         // THE THIRD SURFACE forwards all three, and forwards each date WHETHER OR NOT its partner

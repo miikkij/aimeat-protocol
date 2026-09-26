@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-25 — aimeat_admin_federation_relay_claim_set (idempotent, nothing destroyed).
  *   2026-09-25 — aimeat_package_install_requests (a write that installs on approval; idempotent).
  *   2026-09-24 — aimeat_theme_policy_set (idempotent, nothing destroyed).
  *   2026-09-24 — aimeat_theme_style_save and aimeat_theme_component_css_set (writes, nothing destroyed).
@@ -538,6 +539,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_statistics: { title: 'Admin: Statistics', readOnlyHint: true },
     aimeat_admin_knowledge: { title: 'Admin: Knowledge', readOnlyHint: true },
     aimeat_admin_federation: { title: 'Admin: Federation', readOnlyHint: true },
+    // Setting the same word twice leaves the same peer; the previous word was a setting, not data.
+    aimeat_admin_federation_relay_claim_set: { title: 'Admin: Keep a Peer on Its Own Relay-Claim Setting', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Read-only about this node, but `ask_provider` reaches a third party, so it is not closed-world.
     aimeat_admin_usage: { title: 'Admin: Usage', readOnlyHint: true, openWorldHint: true },
     // Not destructive: binding replaces a list the operator can read first and set back.

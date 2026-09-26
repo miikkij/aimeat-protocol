@@ -5,6 +5,8 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-25 — A peer's own relay-claim setting: `relay_claim` on PUT /peers/:nodeId, and
+ *     PUT /peers/:nodeId/relay-claim, the door the operator's AI reaches it through.
  *   v1.4.0 — 2026-09-01 — The THIRD door closed: `PUT /peers/:nodeId` refuses `status: 'active'`
  *     when the resulting peer would still have no key. v1.3.0 left it on the argument that closing
  *     creation left none to activate, which is true only of peers created after that change — a row
@@ -42,6 +44,7 @@ import { presence, presenceSignString, type PresenceUpdate } from '../../service
 import { deriveTierFlags, coerceTier, clampFlagsToTier } from '../../services/federation-tiers.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { getActivePolicy, evaluatePromotion } from '../../services/network-policy.js';
+import { parsePeerRelayClaim, setPeerRelayClaim, peerRelayClaimView } from '../../services/relay-claim-policy.js';
 import { promotionMetrics } from './promotion.js';
 
 export function registerPeersRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
@@ -414,7 +417,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
-        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, support_upstream, peer_mode, allow_federated_auth, federation_auth_scopes, tier } = req.body ?? {};
+        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, support_upstream, peer_mode, allow_federated_auth, federation_auth_scopes, tier, relay_claim } = req.body ?? {};
 
         // Every change is staged on a COPY and the live peers-Map object is only touched after the
         // last refusal has passed (invariant 14 — refuse before you write; audit AI-triage
@@ -491,6 +494,17 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
+        // This peer's own answer to federation.relay_claim, read by the relay gate before the node's.
+        // The same three words as PUT /peers/:nodeId/relay-claim; a stray one refuses the whole call.
+        if (relay_claim !== undefined) {
+            const parsed = parsePeerRelayClaim(relay_claim);
+            if (!parsed.ok) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.message));
+                return;
+            }
+            next.relayClaim = parsed.value;
+        }
+
         // All refusals are behind us: commit to the live object and persist the same state.
         Object.assign(peer, next);
         await storage.saveFederationPeer(peer);
@@ -510,8 +524,24 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             peer_mode: peer.peerMode,
             allow_federated_auth: peer.allowFederatedAuth,
             federation_auth_scopes: peer.federationAuthScopes,
+            relay_claim: peer.relayClaim ?? null,
             updated: true,
         }));
+        emitChange('federation');
+    });
+
+    // PUT /v1/federation/peers/:nodeId/relay-claim — keep one peer on its own answer to
+    // federation.relay_claim (operator only). The door aimeat_admin_federation_relay_claim_set calls,
+    // so an operator's AI can do it too; services/relay-claim-policy.ts does the work for both.
+    router.put('/v1/federation/peers/:nodeId/relay-claim', requireAuth(), requireRole('operator'), async (req, res) => {
+        const out = await setPeerRelayClaim(storage, peers, req.params.nodeId as string, req.body?.relay_claim);
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
+            return;
+        }
+        res.json(success(config.nodeId, { node_id: out.peer.nodeId, relay_claim: peerRelayClaimView(config, out.peer) }, [
+            { description: 'Which peers still relay without a claim', method: 'GET', url: '/v1/admin/federation/overview' },
+        ]));
         emitChange('federation');
     });
 

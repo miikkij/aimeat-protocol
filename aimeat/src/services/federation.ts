@@ -11,6 +11,8 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.3.0 — 2026-09-25 — PeerInfo carries the peer's own relay-claim setting and its last claimed and
+ *     unclaimed relay times.
  *   v1.2.0 — 2026-09-03 — `allowRouting` on PeerInfo says which way it points (see federation-tiers).
  *   v1.1.0 — 2026-08-10 — Security audit H-13/H-14: LIVENESS_RECOVERABLE and OPERATOR_PARKED, the peer
  *     statuses a liveness signal may lift and the ones only an operator may leave.
@@ -108,6 +110,13 @@ export interface PeerInfo {
      *  so a peer cannot set it; it is what stops an updated peer going back to unclaimed relays.
      *  See src/middleware/relay-gate.ts. */
     relayClaimAt?: string | null;
+    /** This peer's own answer to `federation.relay_claim`; null follows the node's. Read by the
+     *  relay gate for an unclaimed relay naming this peer (services/relay-claim-policy.ts). */
+    relayClaim?: 'optional' | 'required' | null;
+    /** When a relayed request from this peer last arrived with a verified claim, and when one last
+     *  arrived without a claim naming it. Each written at most every ten minutes. */
+    lastClaimedRelayAt?: string | null;
+    lastUnclaimedRelayAt?: string | null;
 }
 
 /**

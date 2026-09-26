@@ -10,6 +10,8 @@
  *   v1.2.0 — 2026-09-09 — listAllReviews and seven OAuth methods (client delete/list, refresh-token
  *     delete by client, approval delete / delete-by-client / delete-by-gaii / list-by-owner)
  *     deleted: no caller.
+ *   v1.3.0 — 2026-09-25 — federation_peers: the peer's own relay-claim setting and its last claimed
+ *     and unclaimed relay times.
  */
 import type {
   EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, OperatorReviewRecord, ScheduledJobRecord, ExtensionInstanceRecord,
@@ -342,8 +344,8 @@ export const federationOauthMethods = {
 
   async saveFederationPeer(this: SqliteStorage, peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, allowMessaging, allowBroadcast, allowSettlement, supportUpstream, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash, relayClaimAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, allowMessaging, allowBroadcast, allowSettlement, supportUpstream, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash, relayClaimAt, relayClaim, lastClaimedRelayAt, lastUnclaimedRelayAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
       peer.allowMessaging ? 1 : 0, peer.allowBroadcast ? 1 : 0, peer.allowSettlement ? 1 : 0,
@@ -352,7 +354,8 @@ export const federationOauthMethods = {
       (peer.federationAuthScopes ?? []).join(','),
       peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null,
       peer.heartbeatOk ?? 0, peer.heartbeatTotal ?? 0, peer.availabilityWindow ?? null, peer.availabilityPct ?? null,
-      peer.softwareVersion ?? null, peer.nodeCardHash ?? null, peer.relayClaimAt ?? null);
+      peer.softwareVersion ?? null, peer.nodeCardHash ?? null, peer.relayClaimAt ?? null,
+      peer.relayClaim ?? null, peer.lastClaimedRelayAt ?? null, peer.lastUnclaimedRelayAt ?? null);
   },
 
   async listFederationPeers(this: SqliteStorage): Promise<FederationPeerRecord[]> {
@@ -386,6 +389,10 @@ export const federationOauthMethods = {
       softwareVersion: (r.softwareVersion as string) ?? null,
       nodeCardHash: (r.nodeCardHash as string) ?? null,
       relayClaimAt: (r.relayClaimAt as string) ?? null,
+      // Only the two words the gate knows; anything else follows the node, like a row without one.
+      relayClaim: r.relayClaim === 'optional' || r.relayClaim === 'required' ? r.relayClaim : null,
+      lastClaimedRelayAt: (r.lastClaimedRelayAt as string) ?? null,
+      lastUnclaimedRelayAt: (r.lastUnclaimedRelayAt as string) ?? null,
     }));
   },
 

@@ -22,6 +22,8 @@
  *     it — which for a living document's hooks means the feature did not exist on a fresh node.
  *   v1.4.0 — 2026-09-16 — sealStoredPspRecords(): encrypts the Stripe secrets of seller records
  *     written before they were stored sealed (commerce/psp-secrets.ts).
+ *   v1.5.0 — 2026-09-25 — A persisted peer comes back with its own relay-claim setting and its last
+ *     claimed and unclaimed relay times.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -285,6 +287,9 @@ export async function initializeServices(
         softwareVersion: sp.softwareVersion ?? null,
         nodeCardHash: sp.nodeCardHash ?? null,
         relayClaimAt: sp.relayClaimAt ?? null,
+        relayClaim: sp.relayClaim ?? null,
+        lastClaimedRelayAt: sp.lastClaimedRelayAt ?? null,
+        lastUnclaimedRelayAt: sp.lastUnclaimedRelayAt ?? null,
       });
     }
     if (savedPeers.length > 0) {

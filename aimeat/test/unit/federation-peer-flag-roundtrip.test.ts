@@ -19,6 +19,8 @@
  * @structure One round-trip per tier, plus the legacy-row defaults.
  * @usage pnpm exec vitest run test/unit/federation-peer-flag-roundtrip.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-25 — A peer's own relay-claim setting and its last claimed and unclaimed relay
+ *     times round-trip on both providers.
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -138,6 +140,37 @@ describe('a peer\'s flags survive the round trip', () => {
             const back = (await readBack(storage, seen)).relayClaimAt;
             expect(back, `${name}: has signed`).toBeTruthy();
             expect(new Date(back!).toISOString(), `${name}: the same instant came back`).toBe(when);
+        }
+    }, 30_000);
+
+    it('a peer\'s own relay-claim setting and its two relay times persist, and read back null when never written', async () => {
+        // The setting decides whether an UNCLAIMED relay naming this peer is let through once the
+        // node's default turns `required` (3.20.0). A setting that reads back null when it was
+        // written quietly moves the peer onto the node's answer, in whichever direction that is.
+        for (const { name, storage } of provs) {
+            const plain = `aimeat-test-relaypolicy-plain-${name}`;
+            const kept = `aimeat-test-relaypolicy-kept-${name}`;
+            const claimedAt = '2026-09-25T10:00:00.000Z';
+            const unclaimedAt = '2026-09-25T11:30:00.000Z';
+            await storage.saveFederationPeer(peerAt('member', plain));
+            await storage.saveFederationPeer(peerAt('member', kept, {
+                relayClaim: 'optional', lastClaimedRelayAt: claimedAt, lastUnclaimedRelayAt: unclaimedAt,
+            }));
+
+            const p = await readBack(storage, plain);
+            expect(p.relayClaim ?? null, `${name}: no setting of its own`).toBe(null);
+            expect(p.lastClaimedRelayAt ?? null, `${name}: never relayed with a claim`).toBe(null);
+            expect(p.lastUnclaimedRelayAt ?? null, `${name}: never relayed without one`).toBe(null);
+
+            const k = await readBack(storage, kept);
+            expect(k.relayClaim, `${name}: kept on optional`).toBe('optional');
+            expect(new Date(k.lastClaimedRelayAt!).toISOString(), `${name}: the claimed time came back`).toBe(claimedAt);
+            expect(new Date(k.lastUnclaimedRelayAt!).toISOString(), `${name}: the unclaimed time came back`).toBe(unclaimedAt);
+
+            await storage.saveFederationPeer({ ...k, relayClaim: 'required' });
+            expect((await readBack(storage, kept)).relayClaim, `${name}: required reads back`).toBe('required');
+            await storage.saveFederationPeer({ ...k, relayClaim: null });
+            expect((await readBack(storage, kept)).relayClaim ?? null, `${name}: cleared back to the node's`).toBe(null);
         }
     }, 30_000);
 

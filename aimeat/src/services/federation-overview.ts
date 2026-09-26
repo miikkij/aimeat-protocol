@@ -31,6 +31,11 @@
  *   which is a decision rather than a fault — but it was written `0a · 0g · 0b · 0c` in a column
  *   called Resources, so nobody could tell it from a broken counter. The totals ride along, so the
  *   page can say nought of fifty-seven rather than nought.
+ *
+ *   WHO IS NOT READY FOR REQUIRED RELAY CLAIMS. The default becomes `required` in 3.20.0, so an
+ *   operator needs to know which peers still relay without a claim before then. Each roster row
+ *   carries the peer's own setting and when it last relayed with and without one, and
+ *   `relay_claims` sorts the peers by it (services/relay-claim-policy.ts).
  * @structure
  *   - FederationOverview and its parts
  *   - compareVersions(a, b) / versionsBehind(a, b) — the semver-ish comparison, exported for tests
@@ -38,6 +43,8 @@
  * @usage
  *   import { buildFederationOverview } from '../services/federation-overview.js';
  * @version-history
+ *   v1.1.0 — 2026-09-25 — Relay claims: each roster row carries the peer's own setting and its last
+ *     claimed and unclaimed relay, and `relay_claims` names who is not ready and the two versions.
  *   v1.0.0 — 2026-09-12 — Initial, with the Federation page's rebuild.
  */
 import type { AimeatConfig } from '../config.js';
@@ -47,6 +54,7 @@ import { getActiveBook, buildNodeCard } from './federation-book.js';
 import type { NodeCard } from './federation-book.js';
 import { computeServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
+import { peerRelayClaimView, relayClaimSummary, type PeerRelayClaimView, type RelayClaimSummary } from './relay-claim-policy.js';
 
 export type FederationStanding = 'alone' | 'waiting' | 'degraded' | 'linked';
 
@@ -143,6 +151,8 @@ export interface FederationRosterRow {
   last_seen: string;
   added_at: string;
   allow_federated_auth: boolean;
+  /** Its own relay-claim setting, what the gate applies, and when it last relayed with and without. */
+  relay_claim: PeerRelayClaimView;
 }
 
 export interface FederationOverview {
@@ -161,6 +171,8 @@ export interface FederationOverview {
     sent: Array<Record<string, unknown>>;
     history: number;
   };
+  /** Who must sign a relay claim, the two versions that change it, and which peers are not ready. */
+  relay_claims: RelayClaimSummary;
   /** The highest version anywhere in the federation, this node included. The badge's baseline. */
   newest_version: string | null;
   this_node: { node_id: string; software_version: string | null; is_primary: boolean };
@@ -393,6 +405,7 @@ export async function buildFederationOverview(
     last_seen: p.lastSeen,
     added_at: p.addedAt,
     allow_federated_auth: p.allowFederatedAuth === true,
+    relay_claim: peerRelayClaimView(config, p),
   }));
 
   return {
@@ -416,6 +429,7 @@ export async function buildFederationOverview(
       sent: sent.map(asRequestRow),
       history: requests.length - allPending.length,
     },
+    relay_claims: relayClaimSummary(config, all),
     newest_version: newest,
     this_node: { node_id: config.nodeId, software_version: ownVersion, is_primary: isPrimary },
   };

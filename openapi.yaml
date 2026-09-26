@@ -23168,7 +23168,13 @@ paths:
         covered before. `signin.reaches` is how many peers a person could actually arrive from,
         because the node-wide policy and a per-peer switch must both say yes. `offer` counts only
         what somebody ticked Federate on. `versions_behind` is measured against `newest_version`,
-        which spans the peers, the federation book and this node.
+        which spans the peers, the federation book and this node. `relay_claims` says which peers
+        are not ready for signed relay claims before the default becomes `required` (3.20.0;
+        `optional` is removed in 4.0.0): `not_ready`, `ready`, `unseen`, the peers kept on their own
+        setting, and `node_setting`. Each `roster` row carries `relay_claim`: the peer's own
+        `setting` (or null), the `effective` one, `first_signed_at`, `last_claimed_at` and
+        `last_unclaimed_at` (each written at most every ten minutes), and `state`. An unclaimed relay
+        is named by its sender, so `last_unclaimed_at` is a sign and not proof.
       tags: [Admin, Federation]
       security:
         - BearerAuth: []
@@ -23309,9 +23315,20 @@ paths:
                     flag in this body is then held to what the tier permits, so an edit may always
                     turn a capability OFF and may only turn one ON where the tier already allows it.
                     At 'contact' nothing is editable upward, peer_mode included.
+                relay_claim:
+                  type: string
+                  nullable: true
+                  enum: [optional, required, node, null]
+                  description: >-
+                    This peer's own answer to `federation.relay_claim`, read by the relay gate before
+                    the node's; `node` or null follows the node's setting again. The same as
+                    PUT /v1/federation/peers/{nodeId}/relay-claim. 400 INVALID_INPUT for any other
+                    word, before anything is written.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: INVALID_INPUT, a `relay_claim` that is not optional, required, node or null. Nothing is written.
         '404':
           description: No peer with that node id
         '409':
@@ -23344,6 +23361,57 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/federation/peers/{nodeId}/relay-claim:
+    put:
+      operationId: setPeerRelayClaim
+      summary: Keep one peer on its own relay-claim setting (operator)
+      description: |
+        Whether a relayed request that NAMES this peer and carries no signed relay claim is let
+        through, decided for this peer alone. `federation.relay_claim` is the node's answer: its
+        default becomes `required` in 3.20.0, and `optional` is removed in 4.0.0. Until then
+        `optional` here keeps a peer that has not updated relaying after the node turns `required`,
+        `required` holds one peer to signing before the node does, and `node` follows the node's
+        setting again. The name on an unclaimed relay is the sender's own word, so keeping a peer on
+        `optional` admits any unclaimed relay naming it. A peer that has ever presented a valid claim
+        is refused without one whatever this says. The same write as
+        `aimeat_admin_federation_relay_claim_set`; GET /v1/admin/federation/overview (`relay_claims`)
+        says which peers still relay without a claim.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [relay_claim]
+              properties:
+                relay_claim:
+                  type: string
+                  enum: [optional, required, node]
+      responses:
+        '200':
+          description: >-
+            The peer's relay picture after the change: `node_id` and `relay_claim` (`setting`,
+            `effective`, `first_signed_at`, `last_claimed_at`, `last_unclaimed_at`, `state`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: INVALID_INPUT, a missing value or any word but optional, required and node. Nothing is written.
+        '403':
+          description: Not an operator
+        '404':
+          description: NOT_FOUND, no peer with that node id
 
   /v1/federation/peers/{nodeId}/promote:
     post:

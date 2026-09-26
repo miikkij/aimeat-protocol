@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-25 — FederationPeerRecord: the peer's own relay-claim setting, and when it last
+ *     relayed with a verified claim and without one.
  *   v1.4.0 — 2026-09-03 — `allowRouting` on the peer record says which way it points: this node
  *     forwards TO the peer; it does not decide what the peer may send here.
  *   v1.3.0 — 2026-08-29 — OrganismRecord.type is a string: the owner's own word, with five presets the
@@ -281,6 +283,17 @@ export interface FederationPeerRecord {
    *  permissive setting, which is what stops an updated peer downgrading itself back out of the
    *  gate. Legacy rows and peers that have never relayed are null. */
   relayClaimAt?: string | null;
+  /** This peer's own answer to `federation.relay_claim`, set by the operator; null follows the
+   *  node's. `optional` keeps an unclaimed relay naming this peer admitted after the node's default
+   *  turns `required` (3.20.0), and goes with the node-wide `optional` in 4.0.0. */
+  relayClaim?: 'optional' | 'required' | null;
+  /** When a relayed request from this peer last arrived with a claim this node verified. Written
+   *  at most every ten minutes (services/relay-claim-policy.ts). */
+  lastClaimedRelayAt?: string | null;
+  /** When a relayed request last arrived WITHOUT a claim, naming this peer. That name is typed by
+   *  the sender, so this says a peer has not updated rather than proving it. At most every ten
+   *  minutes, like the one above. */
+  lastUnclaimedRelayAt?: string | null;
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

@@ -18,6 +18,8 @@
  *
  *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
+ *   v1.3.0 — 2026-09-25 — One peer on its own setting, both ways round; the words the setting takes;
+ *     and the federation answer naming who relays with a claim and who without, and when.
  *   v1.2.0 — 2026-09-24 — A re-spelled copy of a spent claim is refused as the same claim
  *     (audit A4-3).
  *   v1.1.0 — 2026-09-17 — A multi-hop hop is admitted to POST /v1/federation/route on its verified
@@ -382,6 +384,97 @@ await test('on the strict setting, an unclaimed relay from ANY peer is refused',
         body: JSON.stringify({ changes: [{ path: 'federation.relay_claim', value: 'optional' }] }),
     });
     assert(off.status === 200, `back to optional: ${off.status}`);
+});
+
+// ── One peer on its own setting ──────────────────────────────────────────────
+//
+// The node-wide default turns `required` in 3.20.0 and `optional` goes in 4.0.0. Until then an
+// operator can keep one peer on its own answer, and the gate reads that peer's answer first.
+
+const THIRD_NODE = 'aimeat-test-001-relaythird';
+const setNode = (value: 'optional' | 'required') => json('/v1/admin/config', {
+    method: 'PUT', headers: auth(), body: JSON.stringify({ changes: [{ path: 'federation.relay_claim', value }] }),
+});
+const setPeer = (nodeId: string, relay_claim: unknown) => json(`/v1/federation/peers/${nodeId}/relay-claim`, {
+    method: 'PUT', headers: auth(), body: JSON.stringify({ relay_claim }),
+});
+const unclaimedFrom = (nodeId: string) => fetch(`${BASE}/v1/health`, { headers: { 'X-Forwarded-From': nodeId } });
+
+await test('the node on required and one peer kept on optional: an unclaimed relay naming that peer passes, others are refused', async () => {
+    assert((await setNode('required')).status === 200, 'node set to required');
+    const kept = await setPeer(DEMOTED_NODE, 'optional');
+    assert(kept.status === 200, `keep the peer on optional: ${kept.status} ${JSON.stringify(kept.body)}`);
+    assert(kept.body.data.relay_claim.setting === 'optional' && kept.body.data.relay_claim.effective === 'optional',
+        `the answer says what now applies: ${JSON.stringify(kept.body.data)}`);
+
+    const through = await unclaimedFrom(DEMOTED_NODE);
+    assert(through.status === 200, `the kept peer relays without a claim: ${through.status}`);
+    const other = await unclaimedFrom('aimeat-test-001-nobody');
+    assert(other.status === 403, `a name with no setting of its own follows the node: ${other.status}`);
+    const signer = await unclaimedFrom(OK_NODE);
+    assert(signer.status === 403, `a peer that has signed before may not stop: ${signer.status}`);
+
+    assert((await setPeer(DEMOTED_NODE, 'node')).status === 200, 'back to the node\'s answer');
+    const followed = await unclaimedFrom(DEMOTED_NODE);
+    assert(followed.status === 403, `following the node again, it is refused: ${followed.status}`);
+    assert((await setNode('optional')).status === 200, 'node back to optional');
+});
+
+await test('the node on optional and one peer kept on required: an unclaimed relay naming that peer is refused', async () => {
+    const keys = await generateKeyPair();
+    const add = await json('/v1/federation/peers', {
+        method: 'POST', headers: auth(),
+        body: JSON.stringify({ node_id: THIRD_NODE, url: `https://${THIRD_NODE}.example`, public_key: keys.publicKey }),
+    });
+    assert(add.status === 201, `add ${THIRD_NODE}: ${add.status}`);
+    // The existing peer door takes the setting too, beside the other flags.
+    const up = await json(`/v1/federation/peers/${THIRD_NODE}`, {
+        method: 'PUT', headers: auth(), body: JSON.stringify({ status: 'active', relay_claim: 'required' }),
+    });
+    assert(up.status === 200 && up.body.data.relay_claim === 'required', `peer door: ${up.status} ${JSON.stringify(up.body)}`);
+
+    const refused = await unclaimedFrom(THIRD_NODE);
+    assert(refused.status === 403, `required for this peer alone: ${refused.status}`);
+    assert(((await refused.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
+    const others = await unclaimedFrom(DEMOTED_NODE);
+    assert(others.status === 200, `another peer still follows the node's optional: ${others.status}`);
+});
+
+await test('a setting that is not one of the three words is refused, and nothing changes', async () => {
+    const bad = await setPeer(THIRD_NODE, 'sometimes');
+    assert(bad.status === 400 && bad.body.error.code === 'INVALID_INPUT', `a stray word: ${bad.status} ${JSON.stringify(bad.body)}`);
+    const none = await json(`/v1/federation/peers/${THIRD_NODE}/relay-claim`, { method: 'PUT', headers: auth(), body: '{}' });
+    assert(none.status === 400, `no value is not "follow the node": ${none.status}`);
+    const onDoor = await json(`/v1/federation/peers/${THIRD_NODE}`, {
+        method: 'PUT', headers: auth(), body: JSON.stringify({ relay_claim: 'maybe', allow_messaging: false }),
+    });
+    assert(onDoor.status === 400, `the peer door refuses it before writing anything: ${onDoor.status}`);
+    const ov = await json('/v1/admin/federation/overview', { headers: auth() });
+    const row = ov.body.data.roster.find((r: any) => r.node_id === THIRD_NODE);
+    assert(row.relay_claim.setting === 'required', `still required: ${JSON.stringify(row.relay_claim)}`);
+    const unknown = await setPeer('aimeat-test-001-notapeer', 'optional');
+    assert(unknown.status === 404, `a node that is not a peer: ${unknown.status}`);
+});
+
+await test('the federation answer says which peers relay with a claim, which without, and when', async () => {
+    const ov = await json('/v1/admin/federation/overview', { headers: auth() });
+    assert(ov.status === 200, `overview: ${ov.status}`);
+    const d = ov.body.data;
+    const ok = d.roster.find((r: any) => r.node_id === OK_NODE);
+    assert(ok.relay_claim.state === 'signs', `the signing peer: ${JSON.stringify(ok.relay_claim)}`);
+    assert(typeof ok.relay_claim.first_signed_at === 'string' && typeof ok.relay_claim.last_claimed_at === 'string',
+        `with when it first and last signed: ${JSON.stringify(ok.relay_claim)}`);
+    const demoted = d.roster.find((r: any) => r.node_id === DEMOTED_NODE);
+    assert(demoted.relay_claim.state === 'sends_none', `the peer that sends none: ${JSON.stringify(demoted.relay_claim)}`);
+    assert(typeof demoted.relay_claim.last_unclaimed_at === 'string' && demoted.relay_claim.first_signed_at === null,
+        `with when it last relayed without one: ${JSON.stringify(demoted.relay_claim)}`);
+    assert(d.relay_claims.not_ready.includes(DEMOTED_NODE) && !d.relay_claims.not_ready.includes(OK_NODE),
+        `not ready names the right peer: ${JSON.stringify(d.relay_claims)}`);
+    assert(d.relay_claims.ready.includes(OK_NODE), `ready names the signer: ${JSON.stringify(d.relay_claims.ready)}`);
+    assert(d.relay_claims.kept_required.includes(THIRD_NODE), `and the kept one: ${JSON.stringify(d.relay_claims)}`);
+    assert(d.relay_claims.node_setting === 'optional', `the node's own answer: ${d.relay_claims.node_setting}`);
+    assert(d.relay_claims.default_becomes_required_in === '3.20.0' && d.relay_claims.optional_removed_in === '4.0.0',
+        `the two versions are named: ${JSON.stringify(d.relay_claims)}`);
 });
 
 // ── The sender's own policy is unchanged ─────────────────────────────────────
