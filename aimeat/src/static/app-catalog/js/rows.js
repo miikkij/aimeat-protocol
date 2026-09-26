@@ -18,9 +18,10 @@
  *   v2.0.0 — 2026-08-28 — The poster face (design canvas "App Catalog Poster"): the row is a
  *     numbered index line and opens a panel in place; the doors are an ink slab and underlined
  *     words; the column heads are gone.
+ *   v2.0.1 — 2026-09-26 — fmtDate follows the page language, not the browser's.
  */
 import { escapeHtml, filterAttr } from './util.js';
-import { t } from './i18n.js';
+import { t, dateLocale } from './i18n.js';
 
 /** "260 kB" from a byte count; empty when unknown. */
 export function fmtKb(bytes) {
@@ -31,11 +32,11 @@ export function fmtKb(bytes) {
   return (Math.round(kb / 102.4) / 10) + ' MB';
 }
 
-/** The viewer's own short date, as everywhere else in the catalog; empty when unknown. */
+/** A short date in the page language, as everywhere else in the catalog; empty when unknown. */
 export function fmtDate(iso) {
   if (!iso) return '';
   var d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString(dateLocale());
 }
 
 /**

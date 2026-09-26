@@ -5,8 +5,9 @@
  *   toggle highlight). The translation TABLES live in i18n-data.js; this module is the behaviour
  *   over them. Carved out of main.js so any feature module can import t() directly, with no import
  *   cycle back through the entry module.
- * @usage import { t, getLang, setLang, applyI18n } from './i18n.js'
+ * @usage import { t, getLang, setLang, applyI18n, dateLocale } from './i18n.js'
  * @version-history
+ *   v1.1.0 — 2026-09-26 — dateLocale(): dates follow the page language, not the browser's.
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 4).
  */
 import { I18N } from './i18n-data.js';
@@ -17,6 +18,13 @@ import { I18N } from './i18n-data.js';
 let currentLang = 'en';
 
 export function getLang() { return currentLang; }
+
+/**
+ * The locale every date, time and count in the catalogue is formatted with: the PAGE language, not
+ * the browser's. A Finnish page on an English browser showed "9/26/2026" inside Finnish sentences.
+ * English keeps the browser's own format (undefined), which is what it had before.
+ */
+export function dateLocale() { return currentLang === 'fi' ? 'fi-FI' : undefined; }
 
 /** Set the active language (normalised to 'fi' or 'en'). Does NOT persist or re-render — caller's job. */
 export function setLang(lang) { currentLang = (lang === 'fi') ? 'fi' : 'en'; }

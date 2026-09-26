@@ -9,6 +9,7 @@
  *   Carved from main.js.
  * @usage import { initRender, renderApps, renderTags, serverStateByFilename, setServerManifests } from './render.js'; initRender({...})
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The opens count follows the page language (dateLocale).
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 12).
  *   v1.1.0 — 2026-07-16 — Card badges now reflect PUBLICATION state only (retire the
  *     "Server only" concept: a published no-local-copy app is "Listed vN", not "server").
@@ -32,7 +33,7 @@ import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './u
 import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
-import { t, getLang } from './i18n.js';
+import { t, getLang, dateLocale } from './i18n.js';
 import { favStarHtml } from './favorites.js';
 import { setEditingAppId, switchTab } from './apps-io.js';
 import { openPromptBuilder } from './cortex.js';
@@ -170,7 +171,7 @@ function renderStateBar(entries) {
     setN('cat-band-apps', String(entries.length));
     setN('cat-band-listed', String(listed));
     setN('cat-band-drafts', String(drafts));
-    setN('cat-band-opens', opensTotal.toLocaleString());
+    setN('cat-band-opens', opensTotal.toLocaleString(dateLocale()));
     band.hidden = !(listingLoaded && entries.length > 0);
   }
   var mast = document.getElementById('cat-mastline');
