@@ -50193,7 +50193,9 @@ paths:
             The name is not one this node accepts, or the address is missing. SELF_ADDRESS: the
             address is this node's own MCP endpoint, or the peer named is this node; nothing is
             stored. LOOP_DETECTED: the first look came back to this node by another spelling of its
-            address; the row is removed again.
+            address; the row is removed again. TOOL_LIST_TOO_LARGE: the server answered with a tool
+            list larger than this node keeps of one server (2 MB), or larger than it reads of one
+            answer (16 MB); the row stays, parked with that reason, and holds no tools.
         '409':
           description: This owner already has a server with that name.
         '502':
@@ -50252,7 +50254,10 @@ paths:
         '201':
           description: Attached to the group
         '400':
-          description: A name this node will not accept, or the caller may not attach here.
+          description: >
+            A name this node will not accept, or the caller may not attach here.
+            TOOL_LIST_TOO_LARGE: the server's tool list is larger than this node keeps of one
+            server (2 MB), or than it reads of one answer (16 MB); the row stays, parked, with no tools.
         '409':
           description: That name is already taken in this group.
   /v1/mcp-servers/node:
@@ -50362,7 +50367,10 @@ paths:
         '201':
           description: Attached, with a note when nobody may use it yet
         '400':
-          description: A bad name, or a local process this node does not run.
+          description: >
+            A bad name, or a local process this node does not run. TOOL_LIST_TOO_LARGE: the
+            server's tool list is larger than this node keeps of one server (2 MB), or than it reads
+            of one answer (16 MB); the row stays, parked, with no tools.
         '403':
           description: Not the operator.
         '409':
@@ -50681,7 +50689,11 @@ paths:
         '404':
           description: No such server.
         '502':
-          description: The server could not be reached, or its credential is dead.
+          description: >
+            The server could not be reached, or its credential is dead. TOOL_LIST_TOO_LARGE: its
+            tool list is larger than this node keeps of one server (2 MB), or than it reads of one
+            answer (16 MB); the server is parked with that reason, and the list stored before it
+            grew is dropped, so no door answers from an older copy.
         '508':
           description: LOOP_DETECTED. Asking the server would bring the call back to a node it already passed through.
   /v1/mcp-servers/{id}/call:
@@ -50724,7 +50736,10 @@ paths:
         '404':
           description: No such server.
         '502':
-          description: The server could not be reached, or its credential is dead.
+          description: >
+            The server could not be reached, or its credential is dead. RESPONSE_TOO_LARGE: the
+            server answered with more than this node reads of one answer (16 MB), so the answer was
+            cut off; the server stays in service for other calls.
         '508':
           description: >
             LOOP_DETECTED. The server is an AIMEAT this call has already passed through, or the call

@@ -12,6 +12,10 @@
  *   The upstream server is built with the SDK's own server half, so the protocol on the wire is the
  *   protocol, and the test moves when the SDK does.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The tool-list ceiling is 2 MB: a list refused past it drops the list stored
+ *     before, a 600 KB list (past the old 512 KB) is kept, and an answer past the 16 MB read ceiling
+ *     is cut and refused by the same name (secaudit 2026-09 A2-2). The three failed on the old code
+ *     first; the oversized server now lists 2.2 MB.
  *   v1.3.0 — 2026-09-24 — Alice's calls say she is the owner in person (`ownerInPerson`), as the door
  *     now tells the chokepoint; a name that matches the server's owner no longer passes alone. Setup
  *     only: every assertion is unchanged.
@@ -358,24 +362,31 @@ describe('a capability over a remote tool, through the real chokepoint', () => {
 });
 
 describe('a tool list larger than this node keeps', () => {
-  // Its own server, because the size is the whole point: one tool whose description alone is past
-  // the ceiling. Real servers list a hundred tools in 100 to 200 KB.
+  // Servers of their own, because the size is the whole point: one tool whose description alone
+  // sets the size of the list. Real servers list a hundred tools in 100 to 200 KB, and this node's
+  // own list for an agent holding every word measured 436,530 bytes on 2026-09-26.
   const BIG_PORT = 40695;
-  let big: http.Server;
-  const bigTransports = new Map<string, StreamableHTTPServerTransport>();
+  const MID_PORT = 40696;
+  const HUGE_PORT = 40697;
+  const servers: http.Server[] = [];
+  const transports: StreamableHTTPServerTransport[] = [];
 
-  beforeAll(async () => {
-    big = http.createServer(async (req, res) => {
+  /** A server listing one tool with a description of `bytes` bytes; `json` answers without a stream. */
+  async function serveOneTool(port: number, bytes: number, json = false): Promise<void> {
+    const sessions = new Map<string, StreamableHTTPServerTransport>();
+    const server = http.createServer(async (req, res) => {
       const sid = req.headers['mcp-session-id'] as string | undefined;
-      let transport = sid ? bigTransports.get(sid) : undefined;
+      let transport = sid ? sessions.get(sid) : undefined;
       if (!transport) {
         const srv = new McpServer({ name: 'oversized', version: '1.0.0' });
-        srv.tool('huge', 'x'.repeat(600 * 1024), {}, async () => ({ content: [{ type: 'text', text: 'ok' }] }));
+        srv.tool('huge', 'x'.repeat(bytes), {}, async () => ({ content: [{ type: 'text', text: 'ok' }] }));
         const created = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
-          onsessioninitialized: (id: string) => bigTransports.set(id, created),
+          onsessioninitialized: (id: string) => sessions.set(id, created),
+          enableJsonResponse: json,
         });
         transport = created;
+        transports.push(created);
         await srv.connect(created);
       }
       let body: unknown;
@@ -386,13 +397,22 @@ describe('a tool list larger than this node keeps', () => {
       }
       await transport.handleRequest(req, res, body);
     });
-    await new Promise<void>((r) => big.listen(BIG_PORT, '127.0.0.1', () => r()));
+    servers.push(server);
+    await new Promise<void>((r) => server.listen(port, '127.0.0.1', () => r()));
+  }
+
+  beforeAll(async () => {
+    await serveOneTool(BIG_PORT, 2200 * 1024);
+    await serveOneTool(MID_PORT, 600 * 1024);
+    // Past what this node reads of one answer at all, and answered as plain JSON, which the SDK
+    // reads with response.json().
+    await serveOneTool(HUGE_PORT, 17 * 1024 * 1024, true);
   });
 
   afterAll(async () => {
     await mcpClientPool.closeAll();
-    for (const t of bigTransports.values()) await t.close();
-    await new Promise<void>((r) => big.close(() => r()));
+    for (const t of transports) await t.close();
+    for (const s of servers) await new Promise<void>((r) => s.close(() => r()));
   });
 
   it('is refused by name, parks the server with the reason, and stores nothing', async () => {
@@ -426,6 +446,46 @@ describe('a tool list larger than this node keeps', () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.code).toBe('TOOL_LIST_TOO_LARGE');
+  });
+
+  // A server whose list grew past the ceiling was refused, and its list from before went on being
+  // served from the cache until somebody detached it (secaudit 2026-09 A2-2).
+  it('drops the list it stored before, so no door serves an older copy of it', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow({ slug: 'grew', transport: { kind: 'http', url: `http://127.0.0.1:${BIG_PORT}/mcp` } });
+    await storage.createMcpServer(row);
+    await storage.setMcpServerToolCache(row.id, [{ name: 'old', description: 'From before it grew.', inputSchema: {} }], 'h-old');
+
+    const listed = await listRemoteTools(storage, config, row);
+    expect(listed.ok ? 'ok' : listed.code).toBe('TOOL_LIST_TOO_LARGE');
+    const stored = await storage.getMcpServer(row.id);
+    expect(stored?.toolCache).toEqual([]);
+    expect(stored?.toolCacheHash).toBe('');
+  });
+
+  // A peer AIMEAT node is a server this node attaches, and its list for an agent holding every word
+  // was 83% of the 512 KB ceiling this replaced; about 60 more tools would have refused it.
+  it('keeps a list the size of this node\'s own and well past it', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow({ slug: 'peerlike', transport: { kind: 'http', url: `http://127.0.0.1:${MID_PORT}/mcp` } });
+    await storage.createMcpServer(row);
+    const listed = await listRemoteTools(storage, config, row);
+    expect(listed.ok ? 'ok' : listed.code).toBe('ok');
+    expect((await storage.getMcpServer(row.id))?.toolCache.map((t) => t.name)).toEqual(['huge']);
+  });
+
+  // The read itself has a ceiling: an answer past it is cut while it arrives, and the list is
+  // refused by the same name, whatever the server sent.
+  it('stops reading an answer past what this node reads at once, and refuses the list by the same name', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow({ slug: 'endless', transport: { kind: 'http', url: `http://127.0.0.1:${HUGE_PORT}/mcp` } });
+    await storage.createMcpServer(row);
+    const listed = await listRemoteTools(storage, config, row);
+    expect(listed.ok).toBe(false);
+    if (listed.ok) return;
+    expect(listed.code).toBe('TOOL_LIST_TOO_LARGE');
+    expect(listed.message).toMatch(/16 MB/);
+    expect((await storage.getMcpServer(row.id))?.toolCache).toEqual([]);
   });
 });
 
