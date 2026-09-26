@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.61.0 -- 2026-09-26 -- 41 suites that carry the September 2026 security fixes join
+ *            GUARD_SUITES (97 → 138), each measured alone on a fresh database, three identical green
+ *            runs on both backends.
  *   v1.60.0 -- 2026-09-26 -- Add e2e-federated-visitor-names.ts to ALL_SUITES: a visitor from another
  *            node keeps its own name wherever code turns an identity into an account name (secaudit
  *            2026-09, F-1 as a class and a0ecb62eafb3).
@@ -1047,6 +1050,56 @@ const GUARD_SUITES = [
     'test/e2e-prompt-doors.ts',             // the prompt doors: what is public, what needs a token, what is refused
     'test/e2e-publish-upstreams.ts',        // the publish recipes against fake upstreams on an own node
     'test/e2e-setup-and-verification.ts',   // the setup wizard on fresh nodes, and the verification doors
+    // The suites that carry the September 2026 security fixes, promoted 2026-09-26 the way the rule
+    // says: each alone, on a freshly deleted database, three consecutive green runs on BOTH backends,
+    // per-suite counts identical between them (41 suites, 1055 assertions a run, 252 runs). Each holds
+    // a refusal or an isolation boundary those fixes added (secaudit 2026-09); until now only the
+    // nightly sweep ran them. e2e-federated-namesake failed one run in six on its GET sweep, which read
+    // /v1/health's own uptime tick as a difference between callers; the sweep leaves those figures out
+    // now, and the suite then earned its three runs on each backend. The own-node ones (ai-decide
+    // 40436, app-frame 40266, app-silent 40264, connect-serve-loopback 40412, mail-connections 40286,
+    // operator-admin-migration 40447, personal-tunnel 40299, sealed-config 40291) sit in lane 0.
+    'test/e2e-admin-federation-page.ts',    // the operator's federation read, and every non-operator refused at it
+    'test/e2e-admin-hooks-page.ts',         // what a gate is bound to; a bare action id is bound as the one it names
+    'test/e2e-admin-knowledge-page.ts',     // the operator's knowledge read, and a door held to its own schema
+    'test/e2e-admin-memory-page.ts',        // the operator's doors into anybody's memory, and the owner told of each read
+    'test/e2e-admin-security-page.ts',      // the Security page's read and incident actions, the operator's alone
+    'test/e2e-ai-decide.ts',                // the decision provider: which records a run may read, and who reviews
+    'test/e2e-ai-provenance-connector.ts',  // a declaration through the connector reaches the node, or the caller is told
+    'test/e2e-app-access-code.ts',          // a code-protected app: who gets in without the code, and who never does
+    'test/e2e-app-dev-grant.ts',            // who besides the owner may build an app, and every refusal around it
+    'test/e2e-app-frame.ts',                // an app on a shared node without an app origin runs in an isolated frame
+    'test/e2e-app-grants-tasks.ts',         // an app grant drives its own owner's agents, and nothing more
+    'test/e2e-app-legal.ts',                // an app's legal pages run sandboxed, and only its owner writes them
+    'test/e2e-app-marks.ts',                // an owner's marks and reviewer, and what the served bytes carry
+    'test/e2e-app-publish-provenance-doors.ts', // one provenance answer, whichever door publishes
+    'test/e2e-app-roadmap.ts',              // the roadmap and its publish gate; the owner's views stay the owner's
+    'test/e2e-app-rows.ts',                 // an app reaching an organism row space needs both hands
+    'test/e2e-app-silent.ts',               // the silent app sign-in: only the owner's own app gets a grant
+    'test/e2e-app-visitors.ts',             // an app's visitors as counts, never names
+    'test/e2e-apps.ts',                     // the app version lifecycle, and publishing into another owner's bucket
+    'test/e2e-broadcast.ts',                // one sender's messages and broadcasts share one limit
+    'test/e2e-component-versions.ts',       // a kept version is an address; other code under it is refused
+    'test/e2e-connect-serve-loopback.ts',   // the connector's loopback daemon admits only who holds its secret
+    'test/e2e-cortex-upload-ownership.ts',  // a cortex upload writes only its uploader's own libs
+    'test/e2e-data-map.ts',                 // an app's data map; the owner's own findings stay the owner's
+    'test/e2e-federated-namesake.ts',       // a visitor named like a local account reaches nothing of hers
+    'test/e2e-mail-connections.ts',         // a connected mailbox: its tokens, its aliases and the two send doors
+    'test/e2e-mail-read-consent.ts',        // reading a connected mailbox takes its own word, which the owner gives
+    'test/e2e-memory-federation-remote.ts', // the home user's remote list and pull, and nobody else's
+    'test/e2e-notifications.ts',            // a notification reaches only its own owner; the node writes its buttons
+    'test/e2e-operator-admin-migration.ts', // operator:admin goes to the operator's full-access agents alone, once
+    'test/e2e-organism-workspace-access.ts', // a workspace's content only after its creator approves, on every door
+    'test/e2e-outbound.ts',                 // the outbound door: contacts, the policied send, no account link to an app
+    'test/e2e-package-install-requests.ts', // an agent's package install becomes a request its owner answers
+    'test/e2e-passkeys.ts',                 // a passkey is the account holder's own, and every refusal on the way
+    'test/e2e-personal-tunnel.ts',          // the personal tunnel: which token may upgrade, and whose node it serves
+    'test/e2e-sealed-config.ts',            // the settings the node's starter sealed stay read-only to every operator
+    'test/e2e-themes.ts',                   // a theme and its CSS: who may change them, and what they reach
+    'test/e2e-upsert.ts',                   // a redeploy in place keeps the version it deploys
+    'test/e2e-workflows.ts',                // a run's spending limit, and the local session the workflow doors take
+    'test/e2e-workspace-member-changes.ts', // a plain member changes a workspace only under its rule
+    'test/e2e-workspace-rows.ts',           // row spaces: the manifest gate, and who may append and read
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

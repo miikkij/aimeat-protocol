@@ -18,6 +18,10 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The GET sweep leaves out the two figures GET /v1/health moves on its own
+ *     (uptime_seconds, memory_mb). The three asks run at once, and when they straddled a second the
+ *     sweep read the tick as the visitor getting the namesake's answer: one run in six failed so,
+ *     on a door that reads no caller at all. Measured while the suite earned the guard tier.
  *   v1.5.0 — 2026-09-24 — The ROOT, not the gates: verifyJWT reads the visitor as role 'federated'
  *     named by its home GHII, and the suite asks EVERY GET door in openapi.yaml whether a visitor
  *     named like the local account gets anything a visitor with a fresh name does not. Plus the four
@@ -316,8 +320,11 @@ async function run() {
         const spec = parseYaml(readFileSync(new URL('../../openapi.yaml', import.meta.url), 'utf8')) as { paths: Record<string, Record<string, unknown>> };
         const skip = /logout|revoke|signout|stream|events|sse|\/ws\b|download|callback|authorize|verify|confirm|unsubscribe/i;
         const names: Array<[string, string]> = [[`${namesake}@${homeNodeId}`, '<visitor>'], [`${strangerName}@${homeNodeId}`, '<visitor>'], [namesake, '<name>'], [strangerName, '<name>']];
+        // What moves between two asks by itself is no answer to who asked: the envelope's timestamp and
+        // request id, any datetime, and the process figures /v1/health reports.
         const norm = (s: string) => names.reduce((t, [from, to]) => t.split(from).join(to), s)
-            .replace(/"timestamp":"[^"]*"|"request_id":"[^"]*"/g, '').replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, 'T');
+            .replace(/"timestamp":"[^"]*"|"request_id":"[^"]*"/g, '').replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, 'T')
+            .replace(/"(uptime_seconds|memory_mb)":\d+/g, '');
         const get = async (path: string, token: string): Promise<{ status: number; body: string }> => {
             const r = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` }, redirect: 'manual', signal: AbortSignal.timeout(10_000) })
                 .catch((err: unknown) => ({ status: 0, text: async () => String(err) }));
