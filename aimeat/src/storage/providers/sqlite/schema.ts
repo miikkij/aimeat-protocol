@@ -12,6 +12,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-09-25 — federation_peers.relayClaim/.lastClaimedRelayAt/.lastUnclaimedRelayAt (migration
+ *     0083): a peer's own relay-claim setting, and when it last relayed with a claim and without.
  *   2026-09-23 — ai_decisions.provider/.providerKind and their index (decision providers)
  *   2026-09-20 — ai_decisions.rule/.ruleVersion/.outcome/.keyScope and their two indexes
  *     (migration 0080): the decision rule that ran and whose key paid.
@@ -227,6 +229,11 @@ export function initializeSchema(db: Database.Database): void {
   // NULL, deliberately, for every existing row: it means "this peer has never proved it can sign a
   // relay claim", which is exactly true of a peer that predates the column.
   safeAddColumn('federation_peers', 'relayClaimAt', 'TEXT');
+  // The peer's own answer to federation.relay_claim (NULL follows the node), and when it last relayed
+  // here with a verified claim and without one. Mirrors Postgres 0083.
+  safeAddColumn('federation_peers', 'relayClaim', 'TEXT');
+  safeAddColumn('federation_peers', 'lastClaimedRelayAt', 'TEXT');
+  safeAddColumn('federation_peers', 'lastUnclaimedRelayAt', 'TEXT');
 
   // The `contact` tier (federation's floor: messages and nothing else) needs words for three doors
   // that had none, so they could be refused. DEFAULT 1 is deliberate: every peer that exists today

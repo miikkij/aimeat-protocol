@@ -483,7 +483,7 @@ A node can run alone, peer with others, or anchor a personal node. aimeat.io is 
 
 | Feature | What you get | Reach |
 |---|---|---|
-| <a id="g-18-peering"></a> **Peering** | Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. | `/v1/federation/*`, `aimeat_admin_federation` |
+| <a id="g-18-peering"></a> **Peering** | Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. A relayed request carries a signed relay claim; the operator sees which peers still relay without one and can keep a single peer on its own setting until `optional` is removed in 4.0.0 (the default becomes `required` in 3.20.0). | `/v1/federation/*`, `aimeat_admin_federation`, `aimeat_admin_federation_relay_claim_set` |
 | <a id="g-18-catalogue-sync-and-memory-replication"></a> **Catalogue sync and memory replication** | Peers sync the catalogue by delta and replicate public memory that has federation consent. | federation sync |
 | <a id="g-18-cross-node-sign-in"></a> **Cross-node sign-in** | Sign in on another node with your home identity. | `/v1/federation/auth/*` |
 | <a id="g-18-cross-node-work-and-settlement"></a> **Cross-node work and settlement** | Work crosses nodes and morsel settlements are signed. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current [relay-payment limitation](https://github.com/miikkij/aimeat-protocol/blob/main/docs/known_gaps.md#gap-001-relay-fee-shares-on-a-multi-hop-settlement-are-computed-and-paid-to-nobody). | `/v1/federation/settle` |

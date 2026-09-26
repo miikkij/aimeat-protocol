@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.8.0 -- 2026-09-25 -- The federation paragraph names relay_claims.not_ready and
+ *     aimeat_admin_federation_relay_claim_set, before the default turns required in 3.20.0.
  *   v1.7.0 -- 2026-09-24 -- The operator tools are offered only to an agent the operator ticked
  *     operator:admin for (security audit A8-1), and the opening paragraph says so, and says to ask the
  *     operator for the tick, instead of promising an "Operator role required" answer.
@@ -60,6 +62,9 @@ half-finished state is the commonest thing waiting here. Two more to say out lou
 true: \`signin.reaches_nobody\` means the sign-in policy is on and admits nobody, and
 \`offer.gives_nothing\` means this node reads the federation and puts nothing into it, which is
 usually nobody's decision. \`book.age_days\` says whether the directory is worth mirroring again.
+\`relay_claims.not_ready\` names the peers still relaying here without a signed claim: the default
+turns required in 3.20.0, so tell the operator before then. \`aimeat_admin_federation_relay_claim_set\`
+keeps one such peer on optional until it updates, or holds one to required early.
 
 **Moderation.** \`aimeat_admin_knowledge\` (EVERY knowledge package on the node, not just the
 catalogued ones — the public knowledge catalogue is a subset. Lead with

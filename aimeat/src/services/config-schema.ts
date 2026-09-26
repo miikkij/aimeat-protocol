@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.13.2 — 2026-09-25 — federation.relay_claim names its two versions: the default becomes
+ *     'required' in 3.20.0 and 'optional' is removed in 4.0.0; one peer can keep its own answer.
  *   v1.13.1 — 2026-09-24 — decide.jeff_key, decide.laya_key, decide.von_key: the built-in local
  *     models' bearer keys, shown as whether each is set.
  *   v1.13.0 — 2026-09-24 — The `themes.` group (Themes & Styles): whether people choose, which themes
@@ -206,7 +208,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Federation (mutable) ──
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
-  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', validate: v => v === 'optional' || v === 'required', immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' (default) lets an older peer through and is a migration position rather than protection", range: 'optional | required' },
+  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', validate: v => v === 'optional' || v === 'required', immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' lets an older peer through and is a migration position rather than protection. The default is 'optional' until 3.20.0, when it becomes 'required', and 'optional' is removed in 4.0.0. Until then one peer can keep its own answer (relay_claim on the peer), and the federation overview names the peers that still relay without a claim", range: 'optional | required' },
 
   // ── Rate Limits (mutable, per-endpoint with global fallback) ──
   { key: 'rlGlobal', dotPath: 'rate_limits.global', envVar: 'AIMEAT_RL_GLOBAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Global rate limit (requests/second)', range: '1-10000' },

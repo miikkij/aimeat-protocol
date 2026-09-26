@@ -27,9 +27,13 @@
  *   thing `optional` CAN promise honestly — a peer that has ever presented a valid claim is
  *   remembered as able to sign one, and an unclaimed relay from that peer is refused from then on.
  *   So the downgrade is closed for every peer that has updated, and only genuinely old peers pass.
+ *   The default becomes `required` in 3.20.0 and `optional` goes in 4.0.0; until then a peer can
+ *   carry its own answer, read here before the node's (services/relay-claim-policy.ts).
  * @structure relayGate(config, storage, peers) -> express.RequestHandler
  * @usage app.use(relayGate(config, storage, services.peers));
  * @version-history
+ *   v1.2.0 — 2026-09-25 — An unclaimed relay is judged by the named peer's own relay-claim setting
+ *     when it has one, and both kinds of relay are written down on the peer they name.
  *   v1.1.0 — 2026-09-17 — A claim that verifies is left on the request as `req.relay` (peer and
  *     caller), for POST /v1/federation/route to authenticate a multi-hop hop with. adf8aa1e5 stopped
  *     forwarding the caller's token to the next hop, rightly, since the peer could replay it against
@@ -46,6 +50,7 @@ import { logger } from '../utils/logger.js';
 import {
   RELAY_HEADERS, claimsToBeRelayed, hasRelayClaim, verifyRelayClaim,
 } from '../services/relay-claim.js';
+import { effectiveRelayClaim, noteRelay } from '../services/relay-claim-policy.js';
 
 /**
  * What this gate proved about a relayed request, for the one route that may act on it.
@@ -90,10 +95,6 @@ export function relayGate(
   peers: Map<string, PeerInfo>,
 ): RequestHandler {
   return (req, res, next) => {
-    // Read per request, not once at construction: `federation.relay_claim` is a MUTABLE setting, and
-    // PUT /v1/admin/config writes it straight into this object. An operator who turns the gate up
-    // means now, not after the next restart.
-    const required = config.federationRelayClaim === 'required';
     const headers = req.headers as Record<string, string | string[] | undefined>;
     const claimed = hasRelayClaim(headers);
     if (!claimed && !claimsToBeRelayed(headers)) { next(); return; }
@@ -102,14 +103,22 @@ export function relayGate(
     if (!claimed) {
       const from = req.headers[RELAY_HEADERS.forwardedFrom];
       const fromNode = (Array.isArray(from) ? from[0] : from) ?? '';
-      // The name is unauthenticated, so it decides nothing on its own. It is used for exactly two
-      // things: telling the operator who still has to update, and looking up whether that peer has
-      // ALREADY proved it can sign — which it cannot have faked, because the pin was written from a
-      // verified claim.
-      const knownSigner = [...peers.values()].some(p => p.nodeId === fromNode && !!p.relayClaimAt);
+      // The name is unauthenticated, so it decides nothing on its own. It is used for four things:
+      // telling the operator who still has to update, writing that down on the peer it names (at most
+      // every ten minutes, see services/relay-claim-policy.ts), reading that peer's own setting, and
+      // looking up whether that peer has ALREADY proved it can sign — which it cannot have faked,
+      // because the pin was written from a verified claim.
+      const named = [...peers.values()].find(p => p.nodeId === fromNode);
+      if (named) noteRelay(storage, named, false);
+      const knownSigner = !!named?.relayClaimAt;
+      // Read per request, not once at construction: `federation.relay_claim` is a MUTABLE setting,
+      // and PUT /v1/admin/config writes it straight into this object; a peer's own answer is read
+      // from the live peer the same way. An operator who turns the gate up means now.
+      const mode = effectiveRelayClaim(config, named);
+      const required = mode === 'required';
       if (required || knownSigner) {
         logger.warn('relay: refused a relayed request that carried no claim', {
-          from: fromNode || '(unnamed)', path: req.originalUrl, mode: config.federationRelayClaim, knownSigner,
+          from: fromNode || '(unnamed)', path: req.originalUrl, mode, peerSetting: named?.relayClaim ?? null, knownSigner,
         });
         res.status(403).json(error(config.nodeId, 'RELAY_CLAIM_REQUIRED',
           knownSigner && !required
@@ -120,7 +129,8 @@ export function relayGate(
       // Let through, and say so once per request, so an operator can see who still needs to update
       // before they turn the setting up.
       logger.warn('relay: a relayed request carried no claim and was allowed by policy', {
-        from: fromNode || '(unnamed)', path: req.originalUrl, setting: 'federation.relay_claim=optional',
+        from: fromNode || '(unnamed)', path: req.originalUrl,
+        setting: named?.relayClaim === 'optional' ? 'peer relay_claim=optional' : 'federation.relay_claim=optional',
       });
       next();
       return;
@@ -141,15 +151,10 @@ export function relayGate(
         }
         // What was proved, handed to the one route that may act on it (see VerifiedRelay above).
         req.relay = { peer: check.peer.nodeId, caller: typeof check.claim.caller === 'string' ? check.claim.caller : '' };
-        // Remember that this peer can sign, once. Fire and forget: measuring a peer's capability
-        // must never fail the request it was measured on, and the next valid claim writes it again
-        // if this one did not land.
-        if (!check.peer.relayClaimAt) {
-          check.peer.relayClaimAt = new Date().toISOString();
-          storage.saveFederationPeer(check.peer).catch(err => {
-            logger.warn('relay: could not record that a peer signs relay claims', { peer: check.peer.nodeId, error: String(err) });
-          });
-        }
+        // Remember that this peer can sign (once) and when it last did (at most every ten minutes).
+        // Fire and forget: measuring a peer's capability must never fail the request it was measured
+        // on, and the next valid claim writes it again if this one did not land.
+        noteRelay(storage, check.peer, true);
         next();
       } catch (err) {
         // A gate that throws must refuse, not fall open. This is the one path where "something went

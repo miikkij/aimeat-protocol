@@ -8,6 +8,8 @@
  *   queue (with best-effort mailboxUsedBytes accounting), and the genesis-peer registry. Translated
  *   1:1 from the Prisma (Mongo) provider against the same tables.
  * @version-history
+ *   v1.1.0 — 2026-09-25 — A peer's own relay-claim setting and its last claimed and unclaimed relay
+ *     times (migration 0083).
  *   v1.0.0 — 2026-07-15 — Phase 5: federation on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -46,6 +48,11 @@ function toFederationPeer(r: Selectable<FederationPeer>): FederationPeerRecord {
     softwareVersion: r.softwareVersion ?? null,
     nodeCardHash: r.nodeCardHash ?? null,
     relayClaimAt: r.relayClaimAt ? iso(r.relayClaimAt) : null,
+    // Only the two words the gate knows. Anything else in the column follows the node, which is
+    // what a row with no setting of its own does.
+    relayClaim: r.relayClaim === 'optional' || r.relayClaim === 'required' ? r.relayClaim : null,
+    lastClaimedRelayAt: r.lastClaimedRelayAt ? iso(r.lastClaimedRelayAt) : null,
+    lastUnclaimedRelayAt: r.lastUnclaimedRelayAt ? iso(r.lastUnclaimedRelayAt) : null,
   };
 }
 function toPeeringRequest(r: Selectable<PeeringRequest>): PeeringRequestRecord {
@@ -96,6 +103,9 @@ export const federationMethods = {
       availabilityWindow: peer.availabilityWindow ?? null, availabilityPct: peer.availabilityPct ?? null,
       softwareVersion: peer.softwareVersion ?? null, nodeCardHash: peer.nodeCardHash ?? null,
       relayClaimAt: peer.relayClaimAt ? new Date(peer.relayClaimAt) : null,
+      relayClaim: peer.relayClaim ?? null,
+      lastClaimedRelayAt: peer.lastClaimedRelayAt ? new Date(peer.lastClaimedRelayAt) : null,
+      lastUnclaimedRelayAt: peer.lastUnclaimedRelayAt ? new Date(peer.lastUnclaimedRelayAt) : null,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.insertInto('FederationPeer').values({ nodeId: peer.nodeId, addedAt: new Date(peer.addedAt), ...shared } as any)

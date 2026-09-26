@@ -2604,10 +2604,10 @@
      "slug": "g-18-peering",
      "cells": [
       "<strong>Peering</strong>",
-      "Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default.",
-      "<code>/v1/federation/*</code>, <code>aimeat_admin_federation</code>"
+      "Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. A relayed request carries a signed relay claim; the operator sees which peers still relay without one and can keep a single peer on its own setting until <code>optional</code> is removed in 4.0.0 (the default becomes <code>required</code> in 3.20.0).",
+      "<code>/v1/federation/*</code>, <code>aimeat_admin_federation</code>, <code>aimeat_admin_federation_relay_claim_set</code>"
      ],
-     "plain": "Peering Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. /v1/federation/*, aimeat_admin_federation"
+     "plain": "Peering Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. A relayed request carries a signed relay claim; the operator sees which peers still relay without one and can keep a single peer on its own setting until optional is removed in 4.0.0 (the default becomes required in 3.20.0). /v1/federation/*, aimeat_admin_federation, aimeat_admin_federation_relay_claim_set"
     },
     {
      "slug": "g-18-catalogue-sync-and-memory-replication",

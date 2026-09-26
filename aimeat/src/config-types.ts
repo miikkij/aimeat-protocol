@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.8.1 — 2026-09-25 — federationRelayClaim names 3.20.0 (default required) and 4.0.0 (optional gone).
  *   v1.8.0 — 2026-09-24 — ThemesConfig mixed in (config-themes.ts); the capability fields moved to
  *     config-types-capabilities.ts unchanged, to stay under the line ceiling.
  *   v1.7.0 — 2026-09-05 — mcpSessionSweepMs: the MCP idle sweep's interval, read at boot.
@@ -317,6 +318,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    * a peer that does not want to be refused can simply omit the header. In BOTH modes a claim that
    * is present is fully checked, and a peer that has ever presented a valid one may not go back to
    * sending none. See src/middleware/relay-gate.ts.
+   * The default becomes `required` in 3.20.0 and `optional` is removed in 4.0.0; until then one peer
+   * can keep its own answer (`relay_claim`, services/relay-claim-policy.ts).
    */
   federationRelayClaim: 'optional' | 'required';
   depeeringGracePeriodHours: number;
