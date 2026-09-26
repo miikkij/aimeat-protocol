@@ -15,9 +15,11 @@
  *   owner: no owner role, and a name (its home GHII) that no local account can have.
  * @usage cd aimeat && pnpm exec vitest run test/unit/federated-principal.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — localAccountName: this node's identities, another node's, and a visitor
+ *     a route composed with this node's id (secaudit 2026-09, F-1 as a class).
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09, root cause F-1).
  */
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { Request, Response } from 'express';
 
 vi.mock('../../src/services/stats.js', () => ({ getStats: () => null }));
@@ -29,7 +31,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 import { initNodeKeys, issueJWT, verifyJWT, type VerifiedToken } from '../../src/auth/jwt.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { isOwnerPrincipal, requireRole, requireScope } from '../../src/auth/middleware.js';
-import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../src/utils/gaii.js';
+import { homeIdentityOf, isForeignPrincipal, localAccountName, resolveIdentity, setThisNodeId } from '../../src/utils/gaii.js';
 
 const NODE = 'aimeat-local-001-dev';
 const HOME = 'aimeat-peer-home-001';
@@ -143,5 +145,29 @@ describe('homeIdentityOf', () => {
     });
     it('names nobody, rather than a local account, when the home node is missing', () => {
         expect(homeIdentityOf({ owner: 'alice' })).toBe('alice@unknown-home-node');
+    });
+});
+
+describe('localAccountName', () => {
+    beforeAll(() => setThisNodeId(NODE));
+    afterAll(() => setThisNodeId(null));
+
+    it('names the account of an identity on this node, whatever acts in it', () => {
+        expect(localAccountName('alice')).toBe('alice');
+        expect(localAccountName(`alice@${NODE}`)).toBe('alice');
+        expect(localAccountName(`bot#alice@${NODE}`)).toBe('alice');
+        expect(localAccountName(`eco:drum#alice@${NODE}`)).toBe('alice');
+    });
+
+    it('keeps an identity of another node whole, so it names nobody here', () => {
+        expect(localAccountName(`alice@${HOME}`)).toBe(`alice@${HOME}`);
+        expect(localAccountName(`bot#alice@${HOME}`)).toBe(`bot#alice@${HOME}`);
+    });
+
+    it('keeps a visitor whole when a route composed it with this node', () => {
+        // Routes compose the caller as `${req.auth.owner}@${config.nodeId}`, and a visitor's owner is its
+        // home GHII, so the composed name ends in this node. Cut at the first '@' it was the namesake.
+        expect(localAccountName(`alice@${HOME}@${NODE}`)).toBe(`alice@${HOME}`);
+        expect(localAccountName(`bot#alice@${HOME}@${NODE}`)).toBe(`alice@${HOME}`);
     });
 });
