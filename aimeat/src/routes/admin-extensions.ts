@@ -13,6 +13,9 @@
  *   - /scaffold, /:name/actions, GET|PUT /:name/scripts/:actionId: authoring endpoints
  *
  * @version-history
+ *   v1.3.0 -- 2026-09-26 -- The bundled install and the reinstall keep the version they deploy
+ *     (services/component-versions.ts), and the reinstall refuses other code under a version already
+ *     kept with 409 VERSION_EXISTS before it writes (secaudit 2026-09, A6-7).
  *   v1.2.0 -- 2026-09-06 -- Review item 4.6: a schedule that fails to register reaches the answer.
  *     The route used to warn and report status: active with no jobs registered.
  *   v1.1.0 — 2026-08-16 — Bundled install registers its schedules through
@@ -33,6 +36,8 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { registerExtensionSchedules } from '../services/extension-schedules.js';
+import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -294,6 +299,9 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
       };
 
       const created = await storage.createExtension(record);
+      // Kept like every other install (services/component-versions.ts): `name@version` is an address
+      // an app pins, and it has to answer with the code deployed here.
+      await snapshotExtensionVersion(storage, created, resolveIdentity(req.auth!, config.nodeId));
 
       // Register the schedules the manifest declares. Through the same builder every other install
       // door uses: this route had its own copy, which produced a second id shape (`ext.name.id`) for
@@ -724,6 +732,17 @@ return { ok: true };
         activatedAt: new Date().toISOString(),
       };
 
+      // A kept version is immutable: other code under a version already kept is refused before
+      // anything is written, the way every other deploy door refuses it, and the operator gives the
+      // change a new version in extension.yaml. The same code again is no conflict. It is asked of
+      // the extension this deploy writes: the installed one by this name, else a new one.
+      const target = existingExt ? name : record.name;
+      const kept = await keptVersionRefusal(storage, 'extension', target, record.version, extensionCodeOf(record));
+      if (kept) {
+        res.status(kept.status).json(error(config.nodeId, kept.code, kept.message));
+        return;
+      }
+
       if (existingExt) {
         // Update existing — preserve instances
         await storage.updateExtension(name, {
@@ -742,6 +761,8 @@ return { ok: true };
         await storage.createExtension(record);
         logger.info(`Extension installed from disk: ${name}`, { by: req.auth!.sub });
       }
+      // The version just deployed joins the kept ones; a version kept already stays as it was.
+      await snapshotExtensionVersion(storage, { ...record, name: target }, resolveIdentity(req.auth!, config.nodeId));
 
       res.json(success(config.nodeId, {
         extension: { name, version: record.version, status: 'active', actionsCount: record.actions.length },
