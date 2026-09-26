@@ -9,6 +9,7 @@
  * @structure c · rel · Switch · inboxRows · inboxHead · senderRows · crumb · pageLinks
  * @usage import { c, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   2026-09-26 -- A button that carries its own words is said in the reader's language (actionTextOf).
  *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
@@ -18,7 +19,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { titleOf, bodyOf, sourceName, kindWord, groupWord } from '/js/services/notifications.js';
+import { titleOf, bodyOf, sourceName, kindWord, groupWord, actionTextOf } from '/js/services/notifications.js';
 
 export const c = (key, vars) => t('notifpage.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -35,7 +36,7 @@ export function Switch({ on, label, disabled, onToggle }) {
 }
 
 const ACTION_WORD = { reply: 'action.reply', approve: 'action.approve', deny: 'action.deny', accept: 'action.accept', decline: 'action.decline', reject: 'action.reject' };
-export const actionWord = (a) => (ACTION_WORD[a.id] ? c(ACTION_WORD[a.id]) : a.label || a.id);
+export const actionWord = (a) => actionTextOf(a) || (ACTION_WORD[a.id] ? c(ACTION_WORD[a.id]) : a.label || a.id);
 
 /** Rows of the inbox: when, who, what, and the door. An api action (approve, accept) is a coral door. */
 export function inboxRows(ctx, rows) {

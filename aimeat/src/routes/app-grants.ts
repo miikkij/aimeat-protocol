@@ -20,6 +20,10 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.15.0 — 2026-09-26 — A word the owner added to a grant by hand (ownerAddedScopes) stays through
+ *     every rewrite: the refresh and the silent sign-in that follow the app's declaration down, and a
+ *     consent that did not list it. A consent screen that listed it and left it unticked takes it
+ *     away. The token answers say the scopes that were written.
  *   v1.14.0 — 2026-09-13 — The silent bridge's invalid_scope answer names the app (`app`, `app_name`)
  *     and the words the node cannot grant (`unknown`, space-separated), and it is given before the
  *     session is read, because one unknown word refuses the sign-in for everybody. It was a bare
@@ -99,6 +103,8 @@ import { issueJWT } from '../auth/jwt.js';
 import { readRefreshCookie } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget } from '../services/app-origin-target.js';
 import { parseAppScopes } from '../services/protected-resource.js';
+import { afterApproval, heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
+import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
@@ -219,6 +225,7 @@ interface AuthCode {
   owner: string;        // bare owner name
   gaii: string;         // owner GHII the token resolves to
   scopes: string[];
+  shown: string[];      // what the consent screen listed: an owner-added word listed and left unticked goes
   redirectUri: string;
   state: string;
   codeChallenge: string;
@@ -257,12 +264,14 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
    * The stored scopes, trimmed to what the app declares now — or null when nothing changes.
    *
    * Only ever removes. An app that gained a permission in its manifest has to go through the consent
-   * screen for it, and a refresh is not consent. An app that declares nothing is left as it is.
+   * screen for it, and a refresh is not consent. An app that declares nothing is left as it is. A word
+   * the OWNER added by hand (`ownerAdded`) is not the app's to drop: it stays until the owner takes it
+   * away (services/app-grant-scopes.ts).
    */
-  async function narrowToDeclaration(target: string, stored: string[]): Promise<string[] | null> {
+  async function narrowToDeclaration(target: string, stored: string[], ownerAdded: string[] = []): Promise<string[] | null> {
     const declared = await declaredScopesOf(storage, target);
     if (!declared) return null;
-    const kept = stored.filter(s => declared.includes(s));
+    const kept = narrowToDeclared(stored, declared, ownerAdded);
     return kept.length === stored.length ? null : kept;
   }
 
@@ -459,7 +468,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const code = `agc-${randomBytes(24).toString('hex')}`;
     authCodes.set(code, {
       code, app: pending.app, appName: pending.appName, appOrigin: pending.appOrigin,
-      owner, gaii, scopes: grantedScopes, redirectUri: pending.redirectUri,
+      owner, gaii, scopes: grantedScopes, shown: pending.scopes, redirectUri: pending.redirectUri,
       state: pending.state, codeChallenge: pending.codeChallenge, codeChallengeMethod: pending.codeChallengeMethod,
       own, expiresAt: Date.now() + CODE_TTL_MS,
     });
@@ -477,36 +486,43 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
    * their own policy decision — no second query on the hot silent path.
    *
    * Scopes are replaced by what was just approved, never unioned: the consent screen's Advanced
-   * subset must be able to take access away, not only add it.
+   * subset must be able to take access away, not only add it. The one exception is a word the OWNER
+   * added by hand: it stays unless the consent screen listed it (`spec.shown`) and the owner left it
+   * unticked (services/app-grant-scopes.ts afterApproval). The answer carries the scopes written.
    *
    * The partial unique index on (owner, app) WHERE NOT revoked makes the invariant a DB guarantee,
    * so two simultaneous first-time consents surface as a constraint violation instead of a duplicate
    * row. Rather than failing the exchange, adopt the row that won the race.
    */
   async function upsertGrant(
-    spec: { app: string; appName: string; appOrigin: string; owner: string; gaii: string; scopes: string[] },
-    existing: { grantId: string } | null,
-  ): Promise<{ grantId: string; rawRefresh: string }> {
+    spec: { app: string; appName: string; appOrigin: string; owner: string; gaii: string; scopes: string[]; shown?: string[] },
+    existing: AppGrantRecord | null,
+  ): Promise<{ grantId: string; rawRefresh: string; scopes: string[] }> {
     const rawRefresh = randomBytes(32).toString('hex');
     const now = new Date().toISOString();
-    const patch = { refreshTokenHash: hashToken(rawRefresh), lastUsedAt: now, scopes: spec.scopes };
+    const patchFor = (row: AppGrantRecord | null) => {
+      const next = afterApproval(spec.scopes, row, spec.shown ?? []);
+      return { refreshTokenHash: hashToken(rawRefresh), lastUsedAt: now, scopes: next.scopes, ownerAddedScopes: next.ownerAddedScopes };
+    };
     if (existing) {
+      const patch = patchFor(existing);
       await storage.updateAppGrant(existing.grantId, patch);
-      return { grantId: existing.grantId, rawRefresh };
+      return { grantId: existing.grantId, rawRefresh, scopes: patch.scopes };
     }
     const grantId = `appgrant-${randomBytes(16).toString('hex')}`;
     try {
       await storage.createAppGrant({
         grantId, app: spec.app, appName: spec.appName, appOrigin: spec.appOrigin,
         owner: spec.owner, gaii: spec.gaii, scopes: spec.scopes,
-        refreshTokenHash: patch.refreshTokenHash, createdAt: now, lastUsedAt: now, revoked: false,
+        refreshTokenHash: hashToken(rawRefresh), createdAt: now, lastUsedAt: now, revoked: false,
       });
-      return { grantId, rawRefresh };
+      return { grantId, rawRefresh, scopes: spec.scopes };
     } catch (err) {
       const raced = await storage.getAppGrantByOwnerAndApp(spec.owner, spec.app);
       if (!raced) throw err; // a genuine storage failure, not the unique-index race
+      const patch = patchFor(raced);
       await storage.updateAppGrant(raced.grantId, patch);
-      return { grantId: raced.grantId, rawRefresh };
+      return { grantId: raced.grantId, rawRefresh, scopes: patch.scopes };
     }
   }
 
@@ -635,12 +651,15 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       });
     }
 
-    // Mint: reuse this owner's live grant for the app, else create one (one live grant per app).
+    // Mint: reuse this owner's live grant for the app, else create one (one live grant per app). A
+    // word the owner added by hand stays on the grant through this, whatever the app declares.
     const ownerGhii = `${owner}@${config.nodeId}`;
-    const { grantId, rawRefresh } = await upsertGrant(
+    const minted = await upsertGrant(
       { app: grantTarget, appName: grantName, appOrigin: `https://${grantOriginHost}`, owner, gaii: ownerGhii, scopes },
       existing,
     );
+    const { grantId, rawRefresh } = minted;
+    scopes = minted.scopes;
     const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId, app: grantTarget });
     // The owner's display name (if set) so the app's login pill can show a human label instead of the
     // raw GHII. Non-sensitive (it's the public profile name); falls back to '' → the SDK shows the GHII.
@@ -676,16 +695,16 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       // account reached 86 grants that way, and because only the newest row keeps a live refresh
       // hash, the leftovers stayed revoked=false and the Access tab showed dead grants as live
       // access. One live grant per (owner, app) — a partial unique index enforces it in the DB too.
-      const { grantId, rawRefresh } = await upsertGrant(
-        { app: ac.app, appName: ac.appName, appOrigin: ac.appOrigin, owner: ac.owner, gaii: ac.gaii, scopes: ac.scopes },
+      const { grantId, rawRefresh, scopes } = await upsertGrant(
+        { app: ac.app, appName: ac.appName, appOrigin: ac.appOrigin, owner: ac.owner, gaii: ac.gaii, scopes: ac.scopes, shown: ac.shown },
         await storage.getAppGrantByOwnerAndApp(ac.owner, ac.app),
       );
-      const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes: ac.scopes, grantId, app: ac.app });
+      const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes, grantId, app: ac.app });
       // app + own: same metadata the silent bridge returns, so the SDK keeps the login pill's
       // grant-gear state correct when the session came through the visible consent flow instead.
       return res.json(success(config.nodeId, {
         access_token: token, token_type: 'Bearer', expires_in: expiresIn,
-        refresh_token: rawRefresh, scope: ac.scopes.join(' '), grant_id: grantId,
+        refresh_token: rawRefresh, scope: scopes.join(' '), grant_id: grantId,
         app: ac.app, own: ac.own,
       }));
     }
@@ -706,7 +725,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       // NARROWING ONLY. Widening is the consent screen's business, never a side effect of a refresh.
       // And an app that declares NOTHING is left alone rather than shrunk to the default set: a
       // publish that drops the meta tag by accident must not quietly cut an app's reach.
-      const narrowed = await narrowToDeclaration(grant.app, grant.scopes);
+      const narrowed = await narrowToDeclaration(grant.app, grant.scopes, heldOwnerAdded(grant));
       await storage.updateAppGrant(grant.grantId, {
         refreshTokenHash: hashToken(newRaw), lastUsedAt: new Date().toISOString(),
         ...(narrowed ? { scopes: narrowed } : {}),

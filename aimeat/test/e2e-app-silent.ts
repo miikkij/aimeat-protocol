@@ -16,6 +16,9 @@
  *     request, and the code exchange reports own=true only for the app's own origin-bound owner.
  *   v1.3.0 — 2026-09-13 — invalid_scope names the app and the ungrantable words, is answered before
  *     the session is read, and a plain-object property name (`constructor`) is not a scope word.
+ *   v1.4.0 — 2026-09-26 — Phase 5: connections:read-through added by the owner's own hand survives a
+ *     silent sign-in and a refresh that follow the app's declaration down, goes when the owner takes
+ *     it away on the grants page, and an app that declares the word is sent to the consent window.
  *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
  *     (helpers/host-request.ts). `x-app-origin` on its own stopped being an app origin when
  *     subdomain.ts v1.5.0 began requiring the Host to belong to the family it claims.
@@ -449,6 +452,73 @@ async function main() {
             assert(det.body.data.origin_bound === false, `origin_bound must be false, got ${det.body.data.origin_bound}`);
             const tok = await consentAndExchange(r.requestId!, r.verifier, `https://${APP_HOST}/apps/a/callback`, A.token);
             assert(tok.own === false, `unbound request never earns own even for the owner, got ${JSON.stringify(tok.own)}`);
+        });
+
+        // Reading a connected mailbox took its own word on 2026-09-24, and an app granted before
+        // then holds connections:use without it. The owner can add connections:read-through to one
+        // such grant by hand. The grant follows the app's declaration down on every sign-in and
+        // refresh, so a word the owner added by hand has to be kept there, and go only when the
+        // owner takes it away.
+        console.log('\nPhase 5: A word the owner adds by hand holds until the owner takes it away');
+        const READ_WORD = 'connections:read-through';
+        await publish(B.token, 'app-mail.html', 'memory:read connections:use');
+        await assignSub(A.token, 'mmm', `${bn}/app-mail.html`);
+        await publish(B.token, 'app-mail2.html', `memory:read connections:use ${READ_WORD}`);
+        await assignSub(A.token, 'mm2', `${bn}/app-mail2.html`);
+        const ORIGIN_M = `https://mmm.${APP_HOST}`;
+        const ORIGIN_M2 = `https://mm2.${APP_HOST}`;
+        const scopesOf = (s: string | undefined) => String(s ?? '').split(' ').filter(Boolean);
+        const refresh = (rt: string | undefined) => json('/v1/app-grants/token', {
+            method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: rt }),
+        });
+        let mailGrant = '';
+
+        await test('the owner adds connections:read-through by hand, and a silent sign-in and a refresh keep it', async () => {
+            const r0 = await authorize(`${bn}/app-mail.html`, 'memory:read connections:use', `${ORIGIN_M}/callback`);
+            assert(r0.status === 302 && !!r0.requestId, `authorize: ${r0.status}`);
+            const granted = await consentAndExchange(r0.requestId!, r0.verifier, `${ORIGIN_M}/callback`, A.token) as any;
+            mailGrant = granted.grant_id;
+            assert(!!mailGrant, `grant id from the exchange: ${JSON.stringify(granted)}`);
+
+            const add = await json(`/v1/app-grants/${encodeURIComponent(mailGrant)}/read-through`, { method: 'POST', headers: { Authorization: `Bearer ${A.token}` } });
+            assert(add.status === 200 && add.body.data.added === true, `add by hand: ${add.status} ${JSON.stringify(add.body.error ?? add.body.data)}`);
+
+            // The app declares memory:read connections:use and nothing more, so a sign-in that
+            // follows the declaration would take the word away again.
+            const s = await silent(ORIGIN_M, 'memory:read connections:use', A.rt);
+            assert(s.ok === true, `silent sign-in: ${JSON.stringify(s)}`);
+            assert(scopesOf(s.scope).includes(READ_WORD), `the silent sign-in dropped the owner's word: ${s.scope}`);
+            const ref = await refresh(s.refresh_token);
+            assert(ref.status === 200, `refresh: ${ref.status} ${JSON.stringify(ref.body.error)}`);
+            assert(scopesOf(ref.body.data.scope).includes(READ_WORD), `the refresh dropped the owner's word: ${ref.body.data.scope}`);
+        });
+
+        await test('the owner takes it away on the grants page, and neither a sign-in nor a refresh brings it back', async () => {
+            const list = await json('/v1/app-grants', { headers: { Authorization: `Bearer ${A.token}` } });
+            const row = (list.body.data.grants as any[]).find(g => g.grant_id === mailGrant);
+            assert(row && row.scopes.includes(READ_WORD), `the grant holds the word: ${JSON.stringify(row?.scopes)}`);
+            const keep = (row.scopes as string[]).filter(w => w !== READ_WORD);
+            const narrow = await json(`/v1/app-grants/${encodeURIComponent(mailGrant)}`, {
+                method: 'PATCH', headers: { Authorization: `Bearer ${A.token}` }, body: JSON.stringify({ scopes: keep }),
+            });
+            assert(narrow.status === 200, `take away: ${narrow.status} ${JSON.stringify(narrow.body.error)}`);
+            const s = await silent(ORIGIN_M, 'memory:read connections:use', A.rt);
+            assert(s.ok === true && !scopesOf(s.scope).includes(READ_WORD), `the sign-in brought the word back: ${JSON.stringify(s)}`);
+            const ref = await refresh(s.refresh_token);
+            assert(ref.status === 200 && !scopesOf(ref.body.data.scope).includes(READ_WORD), `the refresh brought the word back: ${ref.body.data?.scope}`);
+        });
+
+        await test('an app that declares connections:read-through is sent to the consent window for it, and approving it there works', async () => {
+            const r0 = await authorize(`${bn}/app-mail2.html`, 'memory:read connections:use', `${ORIGIN_M2}/callback`);
+            assert(r0.status === 302 && !!r0.requestId, `authorize: ${r0.status}`);
+            await consentAndExchange(r0.requestId!, r0.verifier, `${ORIGIN_M2}/callback`, A.token);
+            const s = await silent(ORIGIN_M2, `memory:read connections:use ${READ_WORD}`, A.rt) as any;
+            assert(s.ok === false && s.error === 'consent_required' && s.reason === 'app_updated', `expected consent_required app_updated: ${JSON.stringify(s)}`);
+            assert(s.added === READ_WORD, `the word the app asks for is named: ${JSON.stringify(s.added)}`);
+            const r1 = await authorize(`${bn}/app-mail2.html`, `memory:read connections:use ${READ_WORD}`, `${ORIGIN_M2}/callback`);
+            assert(r1.status === 302 && !!r1.requestId, `the consent window takes the word: ${r1.status} ${JSON.stringify(r1.body)}`);
+            const tok = await consentAndExchange(r1.requestId!, r1.verifier, `${ORIGIN_M2}/callback`, A.token);
+            assert(scopesOf(tok.scope).includes(READ_WORD), `approved in the consent window: ${tok.scope}`);
         });
 
         console.log('\n─────────────────────────────────────');

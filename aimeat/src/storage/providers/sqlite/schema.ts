@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-09-26 — app_grants.ownerAddedScopes (migration 0084): the words the owner added by hand.
  *   2026-09-25 — federation_peers.relayClaim/.lastClaimedRelayAt/.lastUnclaimedRelayAt (migration
  *     0083): a peer's own relay-claim setting, and when it last relayed with a claim and without.
  *   2026-09-23 — ai_decisions.provider/.providerKind and their index (decision providers)
@@ -105,6 +106,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('app_grants', 'spentMorsels', 'INTEGER NOT NULL DEFAULT 0');
   // The owner narrowed this grant by hand; the boot-time vocabulary migration leaves it alone (0069).
   safeAddColumn('app_grants', 'scopesFixedAt', 'TEXT');
+  // The words the owner added to this grant by hand (a JSON list), which the narrowing to the app's
+  // own declaration keeps until the owner takes them away (0084).
+  safeAddColumn('app_grants', 'ownerAddedScopes', 'TEXT');
 
   // Owner session refresh tokens — add columns to existing sessions tables, then
   // index the lookup columns (must run AFTER the ALTERs so the columns exist).

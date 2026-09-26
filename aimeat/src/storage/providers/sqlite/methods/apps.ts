@@ -15,6 +15,7 @@
  *     writes `authorshipLog` (the owner's chrome switches and the named reviewer).
  *   v1.5.0 — 2026-08-29 — updateAppMeta merges `legal` per kind (mergeLegal).
  *   v1.6.0 — 2026-09-09 — deleteAppGrant and getConfigValue deleted: no caller.
+ *   v1.7.0 — 2026-09-26 — app_grants.ownerAddedScopes: the words the owner added by hand, a JSON list.
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
@@ -374,11 +375,12 @@ export const appsMethods = {
 
   async createAppGrant(this: SqliteStorage, grant: AppGrantRecord): Promise<AppGrantRecord> {
     this.db.prepare(
-      `INSERT INTO app_grants (grantId, app, appName, appOrigin, owner, gaii, scopes, spendCapMorsels, spentMorsels, refreshTokenHash, createdAt, lastUsedAt, revoked)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO app_grants (grantId, app, appName, appOrigin, owner, gaii, scopes, spendCapMorsels, spentMorsels, ownerAddedScopes, refreshTokenHash, createdAt, lastUsedAt, revoked)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       grant.grantId, grant.app, grant.appName, grant.appOrigin, grant.owner, grant.gaii,
       JSON.stringify(grant.scopes), grant.spendCapMorsels ?? null, grant.spentMorsels ?? 0,
+      JSON.stringify(grant.ownerAddedScopes ?? []),
       grant.refreshTokenHash, grant.createdAt, grant.lastUsedAt,
       grant.revoked ? 1 : 0,
     );
@@ -421,10 +423,11 @@ export const appsMethods = {
 
   async updateAppGrant(this: SqliteStorage, 
     grantId: string,
-    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt'>>,
+    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt' | 'ownerAddedScopes'>>,
   ): Promise<AppGrantRecord | null> {
     const sets: string[] = [];
     const params: unknown[] = [];
+    if (updates.ownerAddedScopes !== undefined) { sets.push('ownerAddedScopes = ?'); params.push(JSON.stringify(updates.ownerAddedScopes)); }
     if (updates.refreshTokenHash !== undefined) { sets.push('refreshTokenHash = ?'); params.push(updates.refreshTokenHash); }
     if (updates.lastUsedAt !== undefined) { sets.push('lastUsedAt = ?'); params.push(updates.lastUsedAt); }
     if (updates.revoked !== undefined) { sets.push('revoked = ?'); params.push(updates.revoked ? 1 : 0); }
@@ -446,6 +449,7 @@ export const appsMethods = {
       spendCapMorsels: (row.spendCapMorsels as number | null) ?? null,
       spentMorsels: (row.spentMorsels as number | null) ?? 0,
       scopesFixedAt: (row.scopesFixedAt as string | null) ?? null,
+      ownerAddedScopes: row.ownerAddedScopes ? JSON.parse(row.ownerAddedScopes as string) as string[] : [],
       app: row.app as string,
       appName: row.appName as string,
       appOrigin: row.appOrigin as string,

@@ -22,6 +22,9 @@
  *     it — which for a living document's hooks means the feature did not exist on a fresh node.
  *   v1.4.0 — 2026-09-16 — sealStoredPspRecords(): encrypts the Stripe secrets of seller records
  *     written before they were stored sealed (commerce/psp-secrets.ts).
+ *   v1.6.0 — 2026-09-26 — migrateMailReadConsent(): once per node, the owners whose apps held
+ *     connections:use beside a mailbox this node can read get one notice with a button per app
+ *     (services/mail-read-consent.ts).
  *   v1.5.0 — 2026-09-25 — A persisted peer comes back with its own relay-claim setting and its last
  *     claimed and unclaimed relay times.
  */
@@ -49,6 +52,7 @@ import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
+import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
 import { seedBuiltinSkills } from '../services/skill-seeds.js';
 import { DirectoryService } from '../services/directory.js';
@@ -221,6 +225,13 @@ export async function initializeServices(
       }
     })
     .catch(err => logger.error('Failed to migrate scope vocabulary', { error: String(err) }));
+
+  // Reading a connected mailbox took its own word on 2026-09-24, and no existing grant was given it.
+  // Once per node, each owner whose apps held connections:use beside a mailbox this node can read is
+  // told so in one notice, with a button per app that lets it read again. The marker it leaves keeps
+  // it from repeating.
+  migrateMailReadConsent(storage, config)
+    .catch(err => logger.error('Failed to send the mail read notice', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.
   // Until this runs, a plain Stripe key is readable through the generic memory doors

@@ -8,6 +8,7 @@
  *   the owner's grant list, and revoke. Translated 1:1 from the SQLite/Prisma implementations — `scopes`
  *   is a native Postgres text[] column; timestamps are ISO on the record, Date in the column.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — ownerAddedScopes (migration 0084): the words the owner added by hand.
  *   v1.0.0 — 2026-07-16 — Phase 5: app-grant tokens on Postgres+Kysely.
  *   v1.3.0 — 2026-09-09 — deleteAppGrant deleted: no caller (a grant is revoked, never removed).
  *   v1.2.0 — 2026-09-05 — scopesFixedAt (migration 0069): the owner narrowed the grant by hand.
@@ -27,7 +28,7 @@ function toGrant(r: Selectable<AppGrant>): AppGrantRecord {
     grantId: r.grantId, app: r.app, appName: r.appName, appOrigin: r.appOrigin, owner: r.owner, gaii: r.gaii,
     scopes: r.scopes ?? [], refreshTokenHash: r.refreshTokenHash ?? null,
     spendCapMorsels: r.spendCapMorsels ?? null, spentMorsels: r.spentMorsels ?? 0,
-    scopesFixedAt: isoN(r.scopesFixedAt),
+    scopesFixedAt: isoN(r.scopesFixedAt), ownerAddedScopes: r.ownerAddedScopes ?? [],
     createdAt: iso(r.createdAt), lastUsedAt: isoN(r.lastUsedAt), revoked: r.revoked,
   };
 }
@@ -38,6 +39,7 @@ export const appGrantMethods = {
       grantId: grant.grantId, app: grant.app, appName: grant.appName, appOrigin: grant.appOrigin,
       owner: grant.owner, gaii: grant.gaii, scopes: grant.scopes ?? [], refreshTokenHash: grant.refreshTokenHash ?? null,
       spendCapMorsels: grant.spendCapMorsels ?? null, spentMorsels: grant.spentMorsels ?? 0,
+      ownerAddedScopes: grant.ownerAddedScopes ?? [],
       createdAt: new Date(grant.createdAt), lastUsedAt: grant.lastUsedAt ? new Date(grant.lastUsedAt) : null,
       revoked: grant.revoked ?? false,
     }).execute();
@@ -70,9 +72,10 @@ export const appGrantMethods = {
   async updateAppGrant(
     this: PostgresKyselyStorage,
     grantId: string,
-    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt'>>,
+    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt' | 'ownerAddedScopes'>>,
   ): Promise<AppGrantRecord | null> {
     const data: Record<string, unknown> = {};
+    if (updates.ownerAddedScopes !== undefined) data.ownerAddedScopes = updates.ownerAddedScopes;
     if (updates.refreshTokenHash !== undefined) data.refreshTokenHash = updates.refreshTokenHash;
     if (updates.lastUsedAt !== undefined) data.lastUsedAt = updates.lastUsedAt ? new Date(updates.lastUsedAt) : null;
     if (updates.revoked !== undefined) data.revoked = updates.revoked;

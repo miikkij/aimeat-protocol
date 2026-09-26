@@ -42,6 +42,8 @@
  *     lingering in the header bell. Called from POST /v1/messages/conversations/:id/read.
  *   v1.5.0 -- 2026-09-24 -- isSafeNotifActionEndpoint asks isSameOriginPath, so `/\host`, which a
  *     browser reads as `//host`, is not a path of this node here either.
+ *   v1.7.0 -- 2026-09-26 -- An `api` button may carry `i18n` (NotifText), so a button that names
+ *     something, such as the app it allows, is said in the reader's language like the title.
  *   v1.6.0 -- 2026-09-25 -- An `api` button calls a door of this node's own API or it is not kept.
  *     isSafeNotifActionEndpoint had no caller; it now also asks for /v1/ as the browser resolves it,
  *     and servableNotifActions applies it: notify() stores and pushes only such buttons, and
@@ -73,7 +75,13 @@ export type NotifActionStyle = 'primary' | 'default' | 'danger';
 export type NotifAction =
   | { id: string; label: string; kind: 'navigate'; link: string; style?: NotifActionStyle }
   | { id: string; label: string; kind: 'reply'; to: string; conversationId?: string; subject?: string; replyTo?: string; style?: NotifActionStyle }
-  | { id: string; label: string; kind: 'api'; method: 'POST' | 'PATCH' | 'DELETE'; endpoint: string; body?: Record<string, unknown>; confirm?: boolean; style?: NotifActionStyle };
+  | { id: string; label: string; kind: 'api'; method: 'POST' | 'PATCH' | 'DELETE'; endpoint: string; body?: Record<string, unknown>; confirm?: boolean; style?: NotifActionStyle; i18n?: NotifText };
+
+/**
+ * Words the page says in the reader's language: a locale key under `notiftext.` and its variables.
+ * `label`, `title` and `body` stay the English fallback and what a push carries.
+ */
+export interface NotifText { key: string; vars?: Record<string, string | number> }
 
 /** Where the node's own API lives. Every `api` button the node emits calls a door under it. */
 const NODE_API_ROOT = '/v1/';
@@ -173,7 +181,7 @@ export interface NotifyInput {
   /** For the node's own kinds: the locale key (under `notiftext.`) and its variables, so the page
    *  and the bell can say the title and body in the reader's language. `title`/`body` stay as the
    *  English fallback and as what the push carries. */
-  i18n?: { key: string; vars?: Record<string, string | number> };
+  i18n?: NotifText;
 }
 
 export interface NotifyResult { stored: boolean; pushed: boolean; held: boolean; muted: boolean }

@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — app_grants.ownerAddedScopes for a fresh database (schema.ts adds it to an
+ *     existing one).
  *   v1.4.0 — 2026-08-31 — agent_enrolment_grants: the single-use grant one basic-agents button
  *     press produces (Agent v2 V1).
  *   v1.3.0 — 2026-08-13 — idx_ghii_emailHash moves to schema.ts, after safeAddColumn('ghiis',
@@ -300,6 +302,7 @@ export function applySchemaTables2(db: Database.Database): void {
       spendCapMorsels  INTEGER,
       spentMorsels     INTEGER NOT NULL DEFAULT 0,
       scopesFixedAt    TEXT,
+      ownerAddedScopes TEXT,
       refreshTokenHash TEXT,
       createdAt        TEXT NOT NULL,
       lastUsedAt       TEXT,

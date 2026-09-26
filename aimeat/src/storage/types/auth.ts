@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Auth, OAuth, device/eco authorization, consent, and identity-verification record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — AppGrantRecord.ownerAddedScopes: the words the owner added to a grant by
+ *     hand, which the narrowing to the app's declaration keeps.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 import type { EcoDataAreaGrant } from './identity.js';
@@ -70,6 +72,13 @@ export interface AppGrantRecord {
    * a right the person took away must not come back at the next restart.
    */
   scopesFixedAt?: string | null;
+  /**
+   * Words the owner added to this grant by hand, beside what the app itself declares (the first is
+   * `connections:read-through`, through POST /v1/app-grants/:grantId/read-through). A refresh and a
+   * silent sign-in bring a grant down to the app's declaration; these words stay through that until
+   * the owner takes them away. Always a subset of `scopes`.
+   */
+  ownerAddedScopes?: string[];
   refreshTokenHash: string | null;  // SHA-256 of current refresh token; null once revoked
   createdAt: string;          // ISO
   lastUsedAt: string | null;  // ISO

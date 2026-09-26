@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.56.0 -- 2026-09-26 -- Add e2e-mail-read-consent.ts to ALL_SUITES: reading mail for the apps
+ *            granted before connections:read-through, with the owner's one-tap door. Not in the
+ *            guard tier.
  *   v1.55.0 -- 2026-09-25 -- Add e2e-package-install-requests.ts to ALL_SUITES: an agent's install
  *            that needs words it lacks becomes a request the owner answers. Not in the guard tier.
  *   v1.54.1 -- 2026-09-25 -- The port STOP message no longer says nothing is written down above
@@ -299,6 +302,10 @@ const ALL_SUITES = [
     // LinkedIn, X and Bluesky inside the process: the mail providers address their upstreams with
     // module constants, so replacing globalThis.fetch is the only seam there is.
     'test/e2e-mail-connections.ts',
+    // The one-time notice to owners whose apps held connections:use beside a readable mailbox, the
+    // owner's own door that adds connections:read-through to one grant, and the word surviving a
+    // refresh until the owner takes it away. Reaches the runner's database to run the migration.
+    'test/e2e-mail-read-consent.ts',
     // A node of its own on 40312 with real VAPID keys, an SMTP sink on 40313 and an HTTPS push
     // receiver: services/push.ts, services/mailbox-notification.ts and both notification sweeps are
     // dead code on the shared server, which pins the VAPID pair empty. Lane 0, two fixed ports.

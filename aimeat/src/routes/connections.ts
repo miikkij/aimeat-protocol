@@ -28,6 +28,9 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-09-26 — An app refused the read door is told the word it lacks and how an app gets
+ *     it: connections:read-through in its <meta name="aimeat-scopes">, approved by the owner in the
+ *     consent window. Still SCOPE_DENIED, with the word in the WWW-Authenticate challenge.
  *   v1.3.0 — 2026-09-24 — SECURITY (audit A5-1): reading THROUGH a connection takes its own word,
  *     connections:read-through. It rode connections:use, which the owner is told publishes and
  *     sends, so an app granted publishing could search the owner's mailbox and fetch attachments.
@@ -41,12 +44,15 @@
  */
 
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, RequestHandler } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
+import { denyScope403 } from '../auth/deny.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { READ_THROUGH_SCOPE } from '../services/app-grant-scopes.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -71,6 +77,24 @@ import type { ConnectionMode, ModerationMode } from '../models/connection-schema
 const toPublic = toPublicConnection;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/**
+ * An APP that may not read through a connection is told what it lacks and how an app gets it, where
+ * requireScope would only name the word. The way is the same for every app: it adds the word to its
+ * `<meta name="aimeat-scopes">`, and its owner approves it in the consent window (routes/app-grants.ts,
+ * consent_required with reason app_updated). Anything that is not an app, or an app that holds the
+ * word, goes on to requireScope, which stays the door's gate.
+ */
+const explainReadThroughToApp: RequestHandler = (req, res, next) => {
+  const auth = req.auth;
+  if (auth?.roles.includes('app') && !scopeIsCovered(auth.scopes ?? [], READ_THROUGH_SCOPE)) {
+    denyScope403(req, res, [READ_THROUGH_SCOPE],
+      'This app may not read what is in the accounts its owner connected: that takes the "connections:read-through" permission, which the owner has not given it. '
+      + 'The app asks for it by adding connections:read-through to its <meta name="aimeat-scopes">, and the owner approves it in the consent window that opens the next time the app signs in.');
+    return;
+  }
+  next();
+};
 
 export function connectionsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -713,7 +737,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
    * with its own sentence on the consent screen. It rode `use` until 2026-09-24, so an app the owner
    * allowed to publish could search their mail (security audit A5-1).
    */
-  router.post('/v1/connections/:id/read/:resource', requireAuth(), requireScope('connections:read-through'), async (req: Request, res: Response) => {
+  router.post('/v1/connections/:id/read/:resource', requireAuth(), explainReadThroughToApp, requireScope('connections:read-through'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
     // Absent and not-yours answer alike, as everywhere else in this file.
