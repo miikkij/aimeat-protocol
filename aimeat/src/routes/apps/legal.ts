@@ -19,6 +19,9 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The page is served with the app frame's sandboxed CSP (sandboxedCsp,
+ *     utils/app-csp.ts APP_FRAME_SANDBOX), so it runs in an opaque origin and never as the node's
+ *     (secaudit 2026-09, A7-1).
  *   v1.2.0 — 2026-09-02 — `?playtest=true` on the audit read: the same service the MCP door calls
  *     opens the app in a headless browser and answers with the eight things a game gets wrong. The
  *     flag is read once, normalized, so `?playtest=false` never counts as yes.
@@ -37,7 +40,7 @@ import type { Storage, AppRecord } from '../../storage/interface.js';
 import { optionalAuth, requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { detectLocale } from '../../i18n.js';
-import { appCsp } from '../../utils/app-csp.js';
+import { sandboxedCsp } from './inline-frame.js';
 import {
   appLegalState, legalReadiness, renderLegalPage, isLegalKind, LEGAL_KIND_INFO, legalLinksFor, apexLegalBase,
   appSellsForMoney,
@@ -161,10 +164,13 @@ export function registerLegalRoutes(
     const body = applyServeMarks(page.html, {
       provenance: prov, visibleLabel: { config, locale }, reviewedBy: appReviewedBy(app.manifest),
     });
-    // The same CSP the app's own inline serve gets on the apex: a legal page written as HTML is the
-    // owner's document on the owner's app, and gets no more reach than the app has.
+    // The CSP the app's own bytes get in the isolated frame, `sandbox` directive included, on every
+    // node and for every format. A page written as HTML is the owner's document with the owner's
+    // script in it, served on the node's own address from a link alone: without the sandbox it would
+    // run as the node's origin, beside the session and the stored data of whoever opened the link.
+    // The copy of this page on the app's own origin (subdomain-origin-docs.ts) is already apart.
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Security-Policy', appCsp());
+    res.setHeader('Content-Security-Policy', sandboxedCsp(config));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     res.send(body);
