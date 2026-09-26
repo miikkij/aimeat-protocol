@@ -10,6 +10,8 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-09-26 — pdfjs aiDoc: ctx.fetch reads at most 4 MB of one answer and throws
+ *     RESPONSE_TOO_LARGE past that (secaudit 2026-09, N3).
  *   2026-09-13 — realtime aiDoc: what the lib now replays ('joined') and queues (a broadcast sent
  *     while the socket opens), and what it still does not (other frames before a handler exists).
  *     Styling changelog: bridge 1.4.0, the [hidden] rule.
@@ -207,7 +209,8 @@ export const VENDORED_PACKS: LibraryPack[] = [
       'send CORS headers: Finnish tender attachments on cdn.hankintailmoitukset.fi answer with',
       'Access-Control-Allow-Origin: *, so the browser fetches them directly and no extension is',
       'involved. Where an origin genuinely refuses, fetch server-side in an extension with',
-      'ctx.fetch and hand the bytes over. A same-origin file (your own storage, /v1/pub/...) is',
+      'ctx.fetch and hand the bytes over; ctx.fetch reads at most 4 MB of one answer and throws',
+      'RESPONSE_TOO_LARGE past that. A same-origin file (your own storage, /v1/pub/...) is',
       'always fetchable:',
       '  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());',
       '',

@@ -6,6 +6,8 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.0.2 — 2026-09-26 — tier-1-appdev says ctx.fetch reads at most 4 MB of one answer and throws
+ *     RESPONSE_TOO_LARGE past that (secaudit 2026-09, N3). Additive.
  *   v1.0.1 — 2026-09-18 — tier-1-mcp names the OAuth routes that exist (/v1/mcp/register, /authorize,
  *     /token). It listed /v1/oauth/*, which never did. Instruction review; check:prompt-refs holds it.
  *   v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
@@ -429,7 +431,7 @@ How to build one:
 5. Invoke: POST /v1/ext/{name}/{action}
 
 Extension capabilities (available inside the default function via ctx):
-- ctx.fetch(url) -- make external HTTP requests (sandboxed)
+- ctx.fetch(url) -- make external HTTP requests (sandboxed); reads at most 4 MB of one answer and throws RESPONSE_TOO_LARGE past that
 - ctx.memory.set/get/search/delete -- extension-scoped memory (ext:{name}/*)
 - ctx.memory.getPublic(gaii, key) -- read any namespace's public memory
 - ctx.wallet.consume(amount, reason) -- charge morsels

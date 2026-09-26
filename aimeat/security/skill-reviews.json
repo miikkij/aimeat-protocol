@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:419637142e14deb6ba0452d4"
+      "digest": "sha256:9acaa15b2faeb3d83f3afab3"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-26",
@@ -312,13 +312,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:026f7267a11d9c115f0301c6"
+      "digest": "sha256:ae50412b4ef6167421743bf5"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -503,7 +503,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "043098bf1614d12a",
       ".githooks/pre-commit": "e8840eb33aa805c0",
-      "aimeat/src/services/build-extension-prompt.ts": "fead7de034bc589e"
+      "aimeat/src/services/build-extension-prompt.ts": "8dfa2fdb49193780"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
@@ -521,7 +521,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "ce7328b35b4223c6",
-      "aimeat/src/services/decide/service.ts": "ea087a33c2ec1784",
+      "aimeat/src/services/decide/service.ts": "926f3d56fd0e2399",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "bb5b771bd7739ac0",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"

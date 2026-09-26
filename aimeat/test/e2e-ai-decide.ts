@@ -24,6 +24,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.8.0 — 2026-09-26 — 4e2: a provider's answer past 4 MB is PROVIDER_ERROR on REST and on MCP
+ *     with one sentence naming the limit, and is neither recorded nor metered (secaudit 2026-09, N3).
  *   v1.7.0 — 2026-09-25 — 9f: the agent the gate stopped is refused a review of its own decision on
  *     REST and on MCP, and the owner's item waits; another agent of the owner and the owner in person
  *     review, the review names who did, and the list says an agent's close was the AI's.
@@ -90,6 +92,8 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 interface Seen { auth: string; body: any }
 const seen: Seen[] = [];
 let stubStatus = 200;
+/** When set, a valid answer followed by spaces to ten times the node's 4 MB read ceiling. */
+let stubOversize = false;
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
@@ -140,6 +144,23 @@ async function startStub(): Promise<{ server: Server; url: string }> {
     const stateText = JSON.stringify(body.state ?? '');
     const answers = Object.fromEntries(Object.entries(body.questions ?? {}).map(([id, q]) => [id, answerFor(q, stateText)]));
     res.writeHead(200, { 'content-type': 'application/json', 'x-typesafe-request-id': `req-${seen.length}` });
+    if (stubOversize) {
+      // No Content-Length. The node stops reading at its ceiling and closes the connection, which
+      // is what ends this loop early; the padding keeps the whole answer valid JSON.
+      res.on('error', () => { /* the node closed the connection at its ceiling */ });
+      res.write(JSON.stringify({ model: body.model, answers, usage: { input_tokens: 1200, output_tokens: 40 } }));
+      const pad = Buffer.alloc(64 * 1024, 0x20);
+      let left = 640;
+      const pump = (): void => {
+        while (left > 0 && !res.destroyed) {
+          left--;
+          if (!res.write(pad)) { res.once('drain', pump); return; }
+        }
+        if (!res.destroyed) res.end();
+      };
+      pump();
+      return;
+    }
     res.end(JSON.stringify({ model: body.model, answers, usage: { input_tokens: 1200, output_tokens: 40 } }));
   });
   server.listen(0, '127.0.0.1');
@@ -517,6 +538,26 @@ const QUESTIONS = {
     assert(t.status === 200 && t.body.data.ok === false && t.body.data.code === 'INVALID_API_KEY', `key test on a refused key, got ${JSON.stringify(t.body.data)}`);
     const d = await json('/v1/ai/decide/settings/key', { method: 'DELETE', headers: auth(A.token) });
     assert(d.status === 200 && d.body.data.has_own_key === false, 'the key is forgotten');
+  });
+
+  // secaudit 2026-09, N3: the node reads a provider's answer up to 4 MB, the same way on every road.
+  await test('4e2. an answer past 4 MB is PROVIDER_ERROR on REST and on MCP with one sentence naming the limit, and nothing is recorded or metered', async () => {
+    const calls = async () => (await json('/v1/ai/usage', { headers: auth(A.token) })).body.data?.total_calls ?? 0;
+    const recorded = async () => (await json('/v1/ai/decisions', { headers: auth(A.token) })).body.data?.total ?? 0;
+    const callsBefore = await calls();
+    const recordedBefore = await recorded();
+    stubOversize = true;
+    const r = await json('/v1/ai/decide', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ state: 'Oversized.', questions: { q: QUESTIONS.urgent }, cache: false }) });
+    const viaTool = await mcpCall(agentAi, 'aimeat_decide', { state: 'Oversized, asked by a tool.', questions: { q: QUESTIONS.urgent }, cache: false });
+    stubOversize = false;
+    assert(r.status === 502 && r.body.error?.code === 'PROVIDER_ERROR', `REST: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.decision_id)}`);
+    const sentence = String(r.body.error?.message ?? '');
+    assert(sentence.includes('4 MB'), `the sentence names the limit: ${sentence}`);
+    const toolText = String(viaTool.result?.content?.[0]?.text ?? '');
+    assert(viaTool.result?.isError === true && toolText.startsWith('PROVIDER_ERROR: ') && toolText.includes(sentence),
+      `MCP: ${toolText.slice(0, 300)}`);
+    assert(await calls() === callsBefore, 'nothing was metered');
+    assert(await recorded() === recordedBefore, 'nothing was recorded');
   });
 
   // 273435328c90: the door stored the key and the provider choice, and only THEN read the policy,
