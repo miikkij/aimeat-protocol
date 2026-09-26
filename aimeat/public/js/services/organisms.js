@@ -8,6 +8,10 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.9.0 — 2026-09-25 — addSpace and saveSections move to organisms.member-changes.js, which calls the
+ *     node's member change doors instead of writing the workspace's meta records itself; re-exported
+ *     here with the rule and the suggestions. getAllSections is kept for a caller without the
+ *     workspace read, which now carries the sections.
  *   v1.8.0 — 2026-07-16 — Name-invites carry role + workspace grants; addMemberDirect (direct add),
  *     updateInvitation/cancelInvitation (pending name-invites), updateEmailInvitation.
  *   v1.7.0 — 2026-07-13 — Split for max-file-lines: extracted the workspace generator/validation
@@ -55,6 +59,11 @@ export {
   blobToDataUrl, uploadImage, uploadFile, fetchStorageObjectUrl, listStorageVisibilities,
   setImageVisibility, extractStorageImages, applyImageVisibilityUrls,
 } from './organisms.images.js';
+// A member's change to a workspace goes through the node's member change doors (a space, the
+// sections, the rule, the suggestions); addSpace and saveSections moved there on 2026-09-25.
+export {
+  addSpace, addWorkspaceSpaces, saveSections, setMemberChangeRule, listSuggestions, decideSuggestion, changeOutcome,
+} from './organisms.member-changes.js';
 
 /** List organisms. */
 export async function listOrganisms(opts = {}) {
@@ -540,11 +549,6 @@ export async function createWorkspace(orgId, name) {
   return entry;
 }
 
-/** kebab-case a free-typed name into a safe namespace segment / type name. */
-function slug(name) {
-  return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
-}
-
 /** Chart 1 — organism dependency overview: who/what uses this organism. Async (aggregates members,
  *  agents, workspaces + their structure, and knowledge packages). Returns Mermaid source text. */
 export async function buildOrganismOverviewMermaid(orgId) {
@@ -614,24 +618,6 @@ export async function buildOrganismOverviewMermaid(orgId) {
     edges.push('  EMPTY["No members, agents or workspaces yet"] --> ORG');
   }
   return ['graph LR', ...nodes, ...edges].join('\n');
-}
-
-/** Manually add an object type to the manifest (no AI). mode 'document' needs no schema;
- *  'records' gets a starter {id,title} schema that can be refined later via Restructure. */
-export async function addSpace(orgId, wsId, manifest, name, mode) {
-  const base = slug(name);
-  const plural = base.endsWith('s') ? base : base + 's';
-  const existing = new Set((manifest.objectTypes || []).map(o => o.namespace));
-  let namespace = `shared.${plural}`;
-  for (let i = 2; existing.has(namespace); i++) namespace = `shared.${plural}-${i}`;
-  const ot = { name: base, schemaRef: `schema:${base}@1`, namespace, backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode };
-  if (mode === 'records') {
-    await apiPut(`/v1/memory/${encodeURIComponent(`${wsRoot(orgId, wsId)}.${namespace}`)}/schema`, {
-      schema: { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } },
-      apply_to: 'prefix', schema_mode: 'open',   // tolerate extra fields; enforce required/types only (see applyGeneratedWorkspace)
-    });
-  }
-  return saveManifest(orgId, wsId, { ...manifest, objectTypes: [...(manifest.objectTypes || []), ot] });
 }
 
 /** Remove an object type from the manifest by name. Its data is left in memory (orphaned, not
@@ -718,11 +704,6 @@ export async function getAllSections(orgId, wsId) {
     }
   } catch (err) { swallowed('organisms: getAllSections', err); }
   return out;
-}
-
-/** Persist the section index for one document-space (…w.{wsId}.meta.sections.{typeName}). */
-export async function saveSections(orgId, wsId, typeName, sections) {
-  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.sections.${typeName}`, value: { sections }, visibility: 'private' });
 }
 
 /** Read the optional per-item color tags for every space → { typeName: { instanceId: colorKey } }.

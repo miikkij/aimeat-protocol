@@ -10,6 +10,8 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   2026-09-25 -- Settings: "Members' changes", the workspace's rule for a change from a member who is
+ *     neither its creator nor an admin (made at once, or waits for approval).
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v2.0.0 — 2026-08-29 — renderTabsNav removed: the cover (cover.js) replaced the 21-tab block with
  *     tables and a rail, and a panel is a page of its own.
@@ -48,7 +50,7 @@ export function renderSettingsPanel(ctx) {
     ws, sName, setSName, sSummary, setSSummary, sAutonomy, setSAutonomy, saveSettings, busy, wsDirty,
     resetSettingsForm, setShowSettings, isDocSpace, removeSpaceHandler, newSpaceName, setNewSpaceName,
     addSpaceHandler, gateOn, showFlow, setShowFlow, showRegenerate, setShowRegenerate, delConfirm,
-    setDelConfirm, delWorkspace, orgId, wsId, showToast, load, genBusy, setGenBusy,
+    setDelConfirm, delWorkspace, orgId, wsId, showToast, load, genBusy, setGenBusy, setMemberChanges,
   } = ctx;
   return html`
     <div class="pj-inbox">
@@ -90,6 +92,16 @@ export function renderSettingsPanel(ctx) {
         <input type="text" class="input-field input-sm" placeholder=${t('organisms.docSpaceNamePlaceholder') || 'New document space name'} value=${newSpaceName} onInput=${e => setNewSpaceName(e.target.value)} />
         <button class="btn-outline btn-sm" onClick=${addSpaceHandler} disabled=${busy || !newSpaceName.trim()}>${t('organisms.addSpace') || '+ Add'}</button>
       </div>
+
+      <div class="pj-divider"></div>
+      <div class="pj-form-group">${t('organisms.memberChanges.title') || "Members' changes"}</div>
+      <div class="pj-form-hint">${t('organisms.memberChanges.hint') || 'When a member who is neither the creator nor an admin adds a space or changes sections:'}</div>
+      <label class="pj-field"><span>${t('organisms.memberChanges.label') || 'Their change'}</span>
+        <select class="input-field input-sm" value=${ws.rules?.member_changes || 'suggest'} disabled=${busy}
+          onChange=${e => setMemberChanges(e.target.value)}>
+          <option value="suggest">${t('organisms.memberChanges.suggest') || 'waits until the creator or an admin approves it'}</option>
+          <option value="direct">${t('organisms.memberChanges.direct') || 'is made at once, with their name on it'}</option>
+        </select></label>
 
       <div class="pj-divider"></div>
       <div class="pj-form-group">${t('organisms.formProcess') || 'Process'}</div>
