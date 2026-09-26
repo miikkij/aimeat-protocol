@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-25 — A contributor's change to a workspace: aimeat_workspace_space_add,
+ *     aimeat_workspace_sections_set and aimeat_workspace_suggestions, under the workspace's rule.
  *   2026-09-25 — The package line says what an install without the memory words answers, and names
  *     aimeat_package_install_requests.
  *   2026-09-19 — The build flow names the track first: a new app goes on Atelier, from a genre, and
@@ -108,13 +110,17 @@ request — to ONE or MANY workspaces at once as viewer/contributor; grantee may
 GAII, applied to the owner so all their agents inherit) · \`aimeat_workspace_member_revoke\` (remove; to
 downgrade, re-grant the lower role) · \`aimeat_workspace_members\` (roles + grant source per workspace) ·
 \`aimeat_workspace_transfer\` (export/import). Grant/revoke are creator-or-org-admin; each is an auditable
-creator-owned consent.
+creator-owned consent. A **contributor** who is neither the creator nor an admin adds a space with
+\`aimeat_workspace_space_add\` and changes a document space's sections with \`aimeat_workspace_sections_set\`;
+the workspace's rule (\`member_changes\`, set with \`aimeat_workspace_update\`) decides whether that lands at
+once or waits as a suggestion, which the creator or an admin decides with \`aimeat_workspace_suggestions\`.
 
 **Building a workspace-PROCESSING agent (one that reads requests + writes results)?** It owns a
 **contract**: the spaces it READS (inputs) + WRITES (outputs) + the status lifecycle. Attaching it =
 **provision** the contract's spaces with \`aimeat_workspace_update\` **\`add_spaces\`** (the server UNIONS
 them into the manifest, skips any that already exist, fills defaults — no need to resend the whole
-manifest; creator-only, so a *same-owner* agent self-provisions, otherwise the creator does it)
+manifest; creator-only, so a *same-owner* agent self-provisions, otherwise the creator does it, or the
+agent's owner, as a contributor, adds them with \`aimeat_workspace_space_add\` under the workspace's rule)
 + **grant** the agent the \`contributor\` role. Writes are attributed to the agent (it appears in
 "Who works here" + the activity heatmap) and are visible to the whole workspace. **Advertise the
 contract** with owner-managed tags (the owner sets them on the agent's profile, or the agent sets

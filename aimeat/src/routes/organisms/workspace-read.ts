@@ -28,6 +28,9 @@
  *   v1.7.0 — 2026-09-24 — The workspace read gates on, and answers with, the copies of the manifest,
  *     readme and apps records that count (services/workspace-meta.ts workspaceMetaReader) instead of
  *     the first copy the scan returned for the gate and the last one for the answer.
+ *   v1.8.0 — 2026-09-25 — The workspace read carries `rules` (how the workspace takes a member's
+ *     change) and `sections` (each document space's section index, the copy that counts) to a caller
+ *     who can read the workspace.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -37,7 +40,8 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
-import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader } from '../../services/workspace-meta.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from '../../services/workspace-meta.js';
+import { readStoredSections } from '../../services/workspace-sections.js';
 import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js';
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
@@ -166,6 +170,20 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // Apps pinned to this workspace (meta.apps binding record) — presentation/launch-context only.
     const appsRec = reader ? await metaOf('meta.apps', readable) : byKey.get(`${nsRoot}meta.apps`);
     const apps = ((appsRec?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
+    // How the workspace takes a member's change (services/workspace-meta.ts `member_changes`), and each
+    // document space's section index: the copies that count. The page reads the sections here, where
+    // its own memory read saw only the caller's copies and so showed a member an empty tree.
+    const rules = reader && canReadWorkspace
+      ? { member_changes: normalizeMemberChangeRule(((await metaOf('meta.rules', readable))?.value as { member_changes?: unknown } | undefined)?.member_changes) ?? DEFAULT_MEMBER_CHANGE_RULE }
+      : null;
+    const sections: Record<string, unknown[]> = {};
+    if (reader) {
+      for (const ot of (manifest?.objectTypes as Array<Record<string, unknown>> | undefined) ?? []) {
+        if (typeof ot.name !== 'string' || !(ot.mode === 'document' || (!ot.mode && ot.kind === 'document'))) continue;
+        const rec = await metaOf(`meta.sections.${ot.name}`, readable);
+        if (rec) sections[ot.name] = readStoredSections(rec.value);
+      }
+    }
 
     // Build the generic objects map from whatever objectTypes the manifest declares.
     // Versioning convention: each instance is one key, optionally suffixed `.draft` (working
@@ -261,6 +279,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
 
     res.json(success(config.nodeId, {
       manifest, readme, apps, objects, drafts, decisions, resources, todos,
+      ...(rules ? { rules, sections } : {}),
       ...(Object.keys(schemas).length ? { schemas } : {}),
       ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
     }, [

@@ -6,6 +6,10 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-25 — A member's suggested workspace change (services/workspace-suggestions.ts) is
+ *     an approval of its own kind: this route refuses to create one, the inbox lists one only to
+ *     someone who may read its workspace or made it, and resolving one runs the suggestion's own
+ *     decision (the workspace's creator or an admin, never the member who made it; 'edit' refused).
  *   v1.2.0 — 2026-09-13 — The developer decided: a space the workspace manifest does not declare is
  *     REFUSED with 422 UNDECLARED_SPACE on the single publish (before a publish-gate approval is filed,
  *     too), the batch publish, an approval that would publish, and a revert, which writes a draft.
@@ -15,7 +19,7 @@
  *     Those records were stored and answered as published, and the workspace read never listed them.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
-import type { Router, Response } from 'express';
+import type { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, PendingApprovalRecord } from '../../storage/interface.js';
@@ -30,10 +34,15 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { canReadWorkspace } from '../../services/workspace-access.js';
 import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
+import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace-suggestions.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft } = H;
+  /** The session as the suggestion service takes it: its full identity, owner and roles. */
+  const suggestionCaller = (req: Request) => ({
+    principal: resolveIdentity(req.auth!, config.nodeId), owner: (req.auth!.owner as string) ?? '', roles: req.auth!.roles ?? [],
+  });
   /** The shared UNDECLARED_SPACE refusal (services/workspace-write-items.ts), sent as it comes. */
   const sendRefusal = (res: Response, r: UndeclaredSpaceRefusal): void => {
     res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details));
@@ -56,6 +65,13 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const { action, arguments: actionArgs, risk, rule, stageId, flowGateId, approverRole, prompt, deadline } = req.body ?? {};
     if (!action || typeof action !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'action is required'));
+      return;
+    }
+    // A member's suggested workspace change is filed by the member change doors and nowhere else:
+    // approving one RUNS the change it carries, so one filed here with arguments of the caller's
+    // choosing would be a change nobody's rule allowed.
+    if (isMemberChangeAction(action)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `${action} is filed by the workspace's member change doors: POST /v1/organisms/${id}/workspace/spaces or PUT /v1/organisms/${id}/workspace/sections/{space}.`));
       return;
     }
     const riskVal: Risk = ['low', 'medium', 'high'].includes(risk) ? risk : 'medium';
@@ -111,7 +127,10 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     // Durable pause: lazily abort any overdue pending approvals before listing.
     await expireOverdueApprovals(storage, new Date().toISOString());
     const status = req.query.status as string | undefined;
-    const approvals = await storage.listPendingApprovals(id, status ? { status } : undefined);
+    // A member's suggestion carries the structure it would add to a workspace, so it is listed only
+    // to someone who may read that workspace, or who made it (services/workspace-suggestions.ts).
+    const approvals = await visibleApprovals({ storage, config }, suggestionCaller(req), id,
+      await storage.listPendingApprovals(id, status ? { status } : undefined));
     res.json(success(config.nodeId, { approvals, total: approvals.length }));
   });
 
@@ -369,6 +388,25 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const approval = await storage.getPendingApproval(aid);
     if (!approval || approval.organismId !== id) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Approval not found'));
+      return;
+    }
+    // A member's suggested workspace change is decided by its own rules, whatever the record's
+    // approverRole says: the workspace's creator or an organism admin, never the member who made it,
+    // and approving it runs the change again against the workspace as it is now.
+    if (isMemberChangeAction(approval.action)) {
+      const { decision: sd, note: snote } = req.body ?? {};
+      if (sd === 'edit') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "A member's suggestion is approved or declined as it was sent. To change it, decline it and make the change yourself."));
+        return;
+      }
+      const decided = await decideSuggestion({ storage, config }, suggestionCaller(req), { orgId: id, id: aid, decision: sd, note: snote });
+      if ('ok' in decided && decided.ok === false) {
+        res.status(decided.status).json(error(config.nodeId, decided.code, decided.message, decided.status, decided.details));
+        return;
+      }
+      res.json(success(config.nodeId, { approval: await storage.getPendingApproval(aid), decision: sd, ...decided }, [
+        { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
+      ]));
       return;
     }
     if (approval.status !== 'pending') {

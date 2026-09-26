@@ -69,6 +69,10 @@ everywhere at once, and say so in the Changes section.
 | sandboxed outside-calling code | holds no key of theirs | extension | laajennus | extensión |
 | a shared group | people and AIs sharing work | organism | organismi | organismo |
 | a shared container | documents and records inside an organism | workspace | työtila | espacio de trabajo |
+| one part of a workspace | a list of records or a set of document pages, declared in the workspace's structure | space | tila | espacio |
+| a heading pages are filed under | one entry of a document space's tree of sections; a page sits in one section or in none | section | osio | sección |
+| a member's change that waits | a change a member who is neither the workspace's creator nor an admin made to its structure (a space, the sections), waiting until the creator or an admin approves or declines it | suggestion / suggest | ehdotus / ehdottaa | sugerencia / sugerir |
+| how a workspace takes its members' changes | the workspace's own rule: members change it at once, or members suggest and an admin approves | member changes | jäsenten muutokset | cambios de los miembros |
 | a space for what a group piles up | a workspace space for rows that keep arriving (messages, events, readings): appended, never edited, read with their own tools | row space | rivitila | espacio de filas |
 | an operating guide | instructions for one named capability | skill | taito | habilidad |
 | the write pacer | not money, not credit, never buys anything | morsel | murunen | morsel |
@@ -227,6 +231,11 @@ service, the directory, the token, the identifier and the username: the test nam
   label already said *tarkistanut* for the act; both stay as they ship, and the row says which is
   which so the next writer does not pick a third. *Merkintä* in *tekoälymerkintä* is the label and
   not the stored entry of the row above; the compound keeps the two apart.
+- **2026-09-25** — space, section, suggestion and member changes, with the doors through which a
+  workspace member adds a space or files sections. *Tila* / *espacio* and *osio* / *sección* are what
+  the workspace page already shipped; *ehdotus* is the word the decision rules' page already uses for
+  what an agent proposes, and *sugerencia* matches the developer's own word, "members suggest". The
+  decline button keeps the bell's *Kieltäydy* / *Rechazar*.
 - **2026-09-18** — open, visitor, visitor measurement and not signed in, with the App Catalog's
   Visitors section (en and fi; the Spanish column is decided here and not yet on a screen).
   *Kävijämittaus* is the word Finnish web analytics already uses. *Kirjautumaton* was chosen over

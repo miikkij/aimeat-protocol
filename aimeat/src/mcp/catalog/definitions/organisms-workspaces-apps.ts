@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.8.0 — 2026-09-25 — aimeat_workspace_update takes `member_changes`; the three member change
+ *     tools (./workspace-member-changes.ts) are spread in right after it.
  *   v1.7.3 — 2026-09-26 — aimeat_app_legal_set says what the named reviewer does to the label on a
  *     strict node (it stays and names the reviewer) instead of promising it is lifted everywhere.
  *   v1.7.2 — 2026-09-18 — Two descriptions sent an agent to aimeat_workspace_write_draft, which is
@@ -41,6 +43,7 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 // Documents and rows: the two surfaces that edit PART of a workspace object rather than replace
 // one. Spread in place below, so the catalog order is exactly what it was before the extraction.
 import { workspaceSpaceTools } from './workspace-spaces.js';
+import { workspaceMemberChangeTools } from './workspace-member-changes.js';
 
 export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     {
@@ -355,7 +358,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     ...workspaceSpaceTools,
     {
         name: 'aimeat_workspace_update',
-        description: "Update a workspace IN PLACE — its name, readme, and/or its STRUCTURE — without changing its id (so nothing referencing it gets orphaned). To ADD spaces, pass `add_spaces` (an ARRAY of objectTypes): the server UNIONS them into the manifest, skips any whose name/namespace already exists, and fills sensible defaults — the safe, deterministic way to provision (no need to resend the whole manifest). To rename/remove a space, toggle the publish gate (policy.alwaysGate), or change settings, pass a full replacement `manifest`. Pass `schemas` to lock a records space's JSON Schema. Creator-only (or an org admin). The single tool for evolving a workspace's shape — no separate add-space/remove-space/set-gate tool.",
+        description: "Update a workspace IN PLACE — its name, readme, and/or its STRUCTURE — without changing its id (so nothing referencing it gets orphaned). To ADD spaces, pass `add_spaces` (an ARRAY of objectTypes): the server UNIONS them into the manifest, skips any whose name/namespace already exists, and fills sensible defaults — the safe, deterministic way to provision (no need to resend the whole manifest). To rename/remove a space, toggle the publish gate (policy.alwaysGate), or change settings, pass a full replacement `manifest`. Pass `schemas` to lock a records space's JSON Schema, and `member_changes` to set how the workspace takes its members' changes. Creator-only (or an org admin); a member who is neither adds a space with aimeat_workspace_space_add and changes sections with aimeat_workspace_sections_set, under the workspace's rule. The single tool for restructuring a workspace — no separate remove-space or set-gate tool.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -366,8 +369,10 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             add_spaces: { type: 'array', required: false, description: 'ADDITIVE: objectTypes to UNION into the manifest (skip-if-exists). Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. A ROW space is { name, namespace, backing:"rows", indexOn:[…] } and takes no mode: rows keep no version history and are neither records nor documents, and those defaults are filled for you too. Preferred over `manifest` for adding spaces. Returns { added, skipped }. Cannot remove/rename.' },
             manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings) — for restructuring (rename/remove a space, change the gate). The id is preserved and the manifest is schema-validated. To only ADD spaces, prefer add_spaces. May also carry an optional top-level objectives[] (the measurability convention: why the organism exists + KPIs with kind value/cost/roi/outcome/quality and a source that can sum/count the organism\'s own records) and an objectType servesObjective linking a space to an objective; both optional — see "Recording purpose & value" in docs/agent-workspace-contracts.md.' },
             schemas: { type: 'object', required: false, description: "Map of namespace → JSON Schema (object) to lock (strict) for a records space. READ THE CURRENT SCHEMAS FIRST: this REPLACES the locked schema, it does not merge into it, so a schema you write without having read drops whatever else the old one said. aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. And do not invent a maxLength: the real ceiling is the memory value budget the node enforces on the whole record (1024 kB by default), and a field cap smaller than that is a number somebody guessed, which is how a notes field filled up at 4000 characters for no reason anyone could name." },
+            member_changes: { type: 'string', required: false, enum: ['direct', 'suggest'], description: "How this workspace takes a change from a member who is neither its creator nor an organism admin (aimeat_workspace_space_add, aimeat_workspace_sections_set): 'direct' = it lands at once with their name on it; 'suggest' = it waits until the creator or an admin approves it (the default)." },
         },
     },
+    ...workspaceMemberChangeTools,
     {
         name: 'aimeat_organism_create',
         description: 'Create a new ORGANISM (a shared, governed container for people + agents). You become its creator/admin/member, and it gets a discussion board. After creating, add workspaces with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',

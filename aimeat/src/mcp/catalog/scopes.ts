@@ -16,11 +16,16 @@
  * @structure
  *   - TOOL_SCOPES — tool name -> required scope (mirrors REST requireScope gates)
  *   - scopeAllowsTool() — wildcard-aware check (exact / domain:* / global *), mirroring middleware
- *   - MCP_SCOPE_PROFILES / scopesForProfile() — role-based scope bundles for agent provisioning
+ *   - MCP_SCOPE_PROFILES / scopesForProfile() — role-based scope bundles for agent provisioning,
+ *     re-exported from ./scope-profiles.ts
  * @usage
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.30.1 -- 2026-09-26 -- MCP_SCOPE_PROFILES and scopesForProfile() move unchanged to
+ *     ./scope-profiles.ts and are re-exported here: the file had passed the 800-line limit.
+ *   v1.30.0 -- 2026-09-25 -- aimeat_workspace_space_add, aimeat_workspace_sections_set and
+ *     aimeat_workspace_suggestions → organism:write, the word their REST doors ask.
  *   v1.29.1 -- 2026-09-25 -- The operator:admin note says the operator's full-access agents got the
  *     word once per node (services/operator-admin-migration.ts). No entry changed.
  *   v1.29.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set: operator:admin, like its read.
@@ -106,7 +111,6 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { logger } from '../../utils/logger.js';
 
 /**
  * Tool -> required scope, mirroring the REST requireScope() gate for the SAME operation.
@@ -362,6 +366,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_workspace_create:                  'organism:write',
     aimeat_workspace_transfer:                'organism:write',
     aimeat_workspace_update:                  'organism:write',
+    // A member's change to a workspace and the decision on a member's suggestion: the word their
+    // REST doors ask (POST …/workspace/spaces, PUT …/workspace/sections/:space, POST …/suggestions/:sid).
+    aimeat_workspace_space_add:               'organism:write',
+    aimeat_workspace_sections_set:            'organism:write',
+    aimeat_workspace_suggestions:             'organism:write',
 
     // The node operator's break-glass over an organism this account does not own. The handler also
     // resolves the caller's OWNER and refuses a non-operator, so the word alone gets nobody in; it is
@@ -759,40 +768,5 @@ export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
     return scopeIsCovered(scopes, required);
 }
 
-/**
- * Role-based scope bundles for provisioning agents (e.g. at device-auth approval). Maps the
- * existing AgentRecord.mode values to sensible defaults drawn from the scope vocabulary the node
- * actually enforces today (memory / social / wallet / work / consent). As new scope domains are
- * added (e.g. task:*, app:*), extend these bundles. 'interactive'/'autonomous'/'workstation' are
- * broad because they front owner-attached, human-in-the-loop use (e.g. Claude Desktop, VSCode);
- * 'task-runner' is minimal.
- */
-export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
-    'task-runner': ['memory:read', 'memory:write', 'work:read', 'work:accept'],
-    coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'messages:send', 'messages:read', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
-    appdev: ['memory:read', 'memory:write'],
-    'organism-knowledge': ['memory:read', 'memory:write', 'social:read'],
-    interactive: ['*'],
-    autonomous: ['*'],
-    workstation: ['*'],
-};
-
-/**
- * Scope bundle for an agent mode/profile; falls back to a conservative read+write memory set.
- *
- * A NAME THAT IS NOT IN THE TABLE IS SAID OUT LOUD. The fallback is right for a caller that has no
- * mode to offer, and it is a defect for a caller that names one: the built-in chat agent asked for
- * a profile called `agent`, got the fallback, and shipped able to read and write memory and to do
- * nothing else on the person's own node for six days. Nothing failed, nothing logged, and the
- * missing capability looked like a design decision. The return value is unchanged — a warning, not
- * a refusal, because the fallback is still the safe answer to a question nobody can parse.
- */
-export function scopesForProfile(mode: string | undefined): string[] {
-    const known = mode ? MCP_SCOPE_PROFILES[mode] : undefined;
-    if (mode && !known) {
-        logger.warn('scopesForProfile: unknown profile, falling back to memory read+write', {
-            profile: mode, known: Object.keys(MCP_SCOPE_PROFILES).join(', '),
-        });
-    }
-    return known || ['memory:read', 'memory:write'];
-}
+// The role-based scope bundles for provisioning agents live in ./scope-profiles.ts.
+export { MCP_SCOPE_PROFILES, scopesForProfile } from './scope-profiles.js';

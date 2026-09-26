@@ -32793,6 +32793,31 @@ paths:
                               map is in the shape PUT .../workspace and aimeat_workspace_update take
                               back, and that write REPLACES a namespace's schema rather than merging
                               into it.
+                          rules:
+                            type: object
+                            description: >
+                              How the workspace takes a change from a member who is neither its creator
+                              nor an organism admin (a space added, a document space's sections changed):
+                              `member_changes` is `direct` (it lands at once, with the member's name on it)
+                              or `suggest` (it waits until the creator or an admin approves it; the
+                              default). Present when the caller can read the workspace.
+                            properties:
+                              member_changes: { type: string, enum: [direct, suggest] }
+                          sections:
+                            type: object
+                            additionalProperties:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id: { type: string }
+                                  name: { type: string }
+                                  parentId: { type: string, nullable: true }
+                                  documents: { type: array, items: { type: string } }
+                                  color: { type: string }
+                            description: >
+                              Each document space's section index, keyed by the space's name: the copy
+                              that counts. Present when the caller can read the workspace.
                           decisions:
                             type: array
                             items: {}
@@ -32916,6 +32941,15 @@ paths:
                     FULL replacement list of apps pinned to this workspace (`[]` clears; max 50).
                     Each entry references a published app (/v1/apps/{owner}/{filename}). Pinning is
                     presentation/launch-context only — workspace data access stays gated per call.
+                member_changes:
+                  type: string
+                  enum: [direct, suggest]
+                  description: >
+                    How the workspace takes a change from a member who is neither its creator nor an
+                    organism admin (POST .../workspace/spaces, PUT .../workspace/sections/{space}):
+                    `direct` writes it at once with the member's name on it; `suggest` files it as a
+                    suggestion the creator or an admin approves (the default). Stored as the
+                    workspace's own `…meta.rules` record, so a manifest replace never resets it.
       responses:
         '200':
           description: Updated. Returns the list of meta records changed.
@@ -32929,15 +32963,172 @@ paths:
                       data:
                         type: object
                         properties:
-                          updated: { type: array, items: { type: string }, description: "Which records changed: manifest / registry / readme / schemas / apps" }
+                          updated: { type: array, items: { type: string }, description: "Which records changed: manifest / registry / readme / schemas / apps / rules" }
                           creator: { type: string }
                           name: { type: string }
+                          member_changes: { type: string, enum: [direct, suggest], description: The rule now in force, when this call set it }
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
-          description: Not the workspace creator (or an org admin)
+          description: >
+            Not the workspace creator (or an org admin). A member adds a space with
+            POST .../workspace/spaces and changes sections with PUT .../workspace/sections/{space}.
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/workspace/spaces:
+    post:
+      operationId: addWorkspaceSpaces
+      summary: Add spaces to a workspace as a member, under the workspace's rule
+      description: |
+        Adds one or more spaces — `{ name, namespace, mode }`, defaults filled, the shape
+        `add_spaces` takes — as any member who may change the workspace: its creator, an organism
+        admin, or a member holding the contributor role. A space whose name or namespace already
+        exists is skipped. The creator's and an admin's change is written at once. A member's change
+        follows the workspace's rule (`member_changes`): `direct` writes it at once, `suggest` (the
+        default) files it as a suggestion that the creator or an admin approves, and they are told
+        with Approve and Decline on a notification. Either way the space lands in the workspace's own
+        manifest with the member's full identity and the time on it (`addedBy`, `addedAt`, and
+        `approvedBy` when it came through a suggestion), never in a copy of the member's own.
+        The same member asking again for the same spaces gets the suggestion already waiting.
+        Mirrors the `aimeat_workspace_space_add` MCP tool.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [spaces]
+              properties:
+                spaces:
+                  description: One space `{ name, namespace, mode }` or an array of up to 20.
+                  oneOf:
+                    - { type: object }
+                    - { type: array, items: { type: object } }
+                schemas:
+                  type: object
+                  additionalProperties: { type: object }
+                  description: Namespace → JSON Schema, only for records spaces added in this same call.
+      responses:
+        '200': { description: "Written at once (`status: applied`, with `added` and `skipped`), or nothing to add (`status: unchanged`)." }
+        '202': { description: "Filed as a suggestion (`status: pending_approval`, with `suggestion`); `duplicate: true` when the same one was already waiting." }
+        '400': { description: No `ws`, or a space without a valid name and namespace, or a schema for a space this call does not add }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not an active member, or a member without the contributor role }
+        '404': { description: No such organism or workspace }
+        '409': { description: The workspace is archived, or it has no structure yet }
+        '429': { description: The member already has 20 space suggestions waiting in this workspace }
+
+  /v1/organisms/{id}/workspace/sections/{space}:
+    put:
+      operationId: setWorkspaceSections
+      summary: Set a document space's section index as a member, under the workspace's rule
+      description: |
+        Replaces the section index of one document space — `[{ id, name, parentId, documents,
+        color? }]`, what the workspace page saves — as any member who may change the workspace.
+        Who may, and whether it lands at once or waits for an approval, is as for
+        POST .../workspace/spaces. Written at once, the index is written as sent into the index that
+        counts, with `changedBy` and `changedAt`. Filed as a suggestion, it is the steps from the
+        index as it stands to the one sent, which an approval applies to the index as it stands then,
+        so a change the creator made in the meantime is kept; a member's further changes to the same
+        space join the suggestion already waiting. Taking a document that no longer exists out of the
+        index is written at once under any rule. A parent must be another section in the list, and a
+        cycle is refused. Mirrors the `aimeat_workspace_sections_set` MCP tool.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The document space, by name or namespace }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sections]
+              properties:
+                sections:
+                  type: array
+                  items:
+                    type: object
+                    required: [id]
+                    properties:
+                      id: { type: string }
+                      name: { type: string }
+                      parentId: { type: string, nullable: true }
+                      documents: { type: array, items: { type: string } }
+                      color: { type: string, enum: [red, orange, yellow, green, blue, purple, gray] }
+      responses:
+        '200': { description: "Written at once (`status: applied`, with the `sections` as they stand), or no change (`status: unchanged`)." }
+        '202': { description: "Filed as a suggestion (`status: pending_approval`, with `suggestion`); `merged: true` when it joined one already waiting." }
+        '400': { description: No `ws`, or the list is not a valid section index }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not an active member, or a member without the contributor role }
+        '404': { description: No such organism or workspace }
+        '409': { description: The workspace is archived }
+        '422': { description: The space is not a document space of this workspace }
+        '429': { description: The member's suggestion for this space already holds 1000 steps }
+
+  /v1/organisms/{id}/workspace/suggestions:
+    get:
+      operationId: listWorkspaceSuggestions
+      summary: The member suggestions a caller may see
+      description: |
+        The changes members suggested (a space to add, changes to a document space's sections) in the
+        workspaces the caller can read, and the caller's own, newest first, each with `can_decide`.
+        Overdue ones are expired first. Mirrors `aimeat_workspace_suggestions` action `list`.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: false, schema: { type: string }, description: Only this workspace }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [pending, approved, declined, expired, all] }, description: Which ones (default pending) }
+      responses:
+        '200': { description: '{ suggestions: [{ id, ws, ws_name, kind, label, summary, spaces?, space?, ops?, requested_by, requested_at, status, decided_by?, note?, expires_at, can_decide }], total }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not an active member of this organism }
+        '404': { description: No such organism }
+
+  /v1/organisms/{id}/workspace/suggestions/{sid}:
+    post:
+      operationId: decideWorkspaceSuggestion
+      summary: Approve or decline a member's suggestion
+      description: |
+        Decided by the workspace's creator or an organism admin, never by the member who made it; an
+        agent decides for its owner when the owner is one of them and it holds the permission to write
+        what the change changes. Approving applies exactly the stored change to the workspace as it is
+        now, re-validated, with the member's name on it and the decider's as the approver; when that is
+        refused the suggestion stays pending. Declining changes nothing. The member is told either way,
+        with the `note`. A suggestion past its deadline (30 days) expires and does nothing.
+        Mirrors `aimeat_workspace_suggestions` action `decide`.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: sid, in: path, required: true, schema: { type: string }, description: Suggestion id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline] }
+                note: { type: string, description: What the member reads with the outcome (at most 1000 characters) }
+      responses:
+        '200': { description: '{ suggestion, added?, skipped?, sections? }' }
+        '400': { description: No valid `decision` }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not the workspace's creator or an organism admin, or the member who made the suggestion }
+        '404': { description: No such suggestion in this organism }
+        '409': { description: 'Already decided, expired, or the change no longer applies (the member lost the contributor role, the suggestion no longer describes a valid change)' }
 
   /v1/organisms/{id}/instruction-block:
     get:
@@ -34980,6 +35171,9 @@ paths:
         Generic gate primitive. Evaluates the manifest's gate policy (`policy.agentAutonomy` +
         `policy.alwaysGate`, via gate-policy): a consequential action becomes a `pending` approval;
         everything else auto-runs and is recorded as a decision. Members (incl. agents) may create.
+        The two actions of a member's suggested workspace change (`workspace.space.add`,
+        `workspace.sections.change`) are refused here with 400: they are filed by
+        POST .../workspace/spaces and PUT .../workspace/sections/{space}, because approving one runs it.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -35010,6 +35204,9 @@ paths:
     get:
       operationId: listOrganismApprovals
       summary: Approval inbox — pending approvals for an organism
+      description: |
+        Every approval of the organism, except a member's suggested workspace change in a workspace
+        the caller cannot read and did not suggest: it carries the structure it would add.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -35028,6 +35225,9 @@ paths:
       description: |
         Human-only (owner-role session), gated by the approval's `approverRole`. On approve/edit of a
         `publish` action, the draft is published. Every resolution appends a decision-log entry.
+        A member's suggested workspace change is decided as POST .../workspace/suggestions/{sid}
+        decides it (the workspace's creator or an organism admin, never the member who made it;
+        `reject` declines it; `edit` is refused with 400).
       tags: [Organisms]
       security:
         - BearerAuth: []

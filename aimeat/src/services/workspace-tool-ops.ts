@@ -28,6 +28,11 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.5.0 — 2026-09-25 — A draft written with `section` is filed through the member change door
+ *     (services/workspace-member-changes.ts fileDocumentInSection): into the section index that counts,
+ *     or as a suggestion when the workspace asks its members to suggest. Each item says how its filing
+ *     ended in `section_filing`. The index read carries the workspace's rule as `rules` and each
+ *     document space's section index as `sections`.
  *   v1.4.0 — 2026-09-24 — readWorkspaceOp gates on, and answers with, the copies of the manifest and
  *     apps records that count (services/workspace-meta.ts), not the first copy the scan returned.
  *   v1.3.2 — 2026-09-24 — A draft's provenance record is stored only once the draft lands: built and
@@ -67,12 +72,14 @@ import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { authorizeRead } from './access-guard.js';
 import { entryTitle } from './structure-overview.js';
-import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader } from './workspace-meta.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from './workspace-meta.js';
+import { readStoredSections } from './workspace-sections.js';
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
 import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem } from './workspace-write-items.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
+import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
 import { provenanceForWrite, stampAutonomousOutput, type DeclaredProvenance } from './ai-provenance.js';
 import type { AiProvenanceLevel, AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
@@ -271,6 +278,16 @@ export async function readWorkspaceOp(
     }
 
     const apps = (((await metaReader.pick(ws, 'meta.apps', items))?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
+    // How this workspace takes a member's change, and each document space's section index: the
+    // copies that count, so an agent sees the tree it would be changing and knows whether its change
+    // lands at once or waits for an approval.
+    const rules = { member_changes: normalizeMemberChangeRule(((await metaReader.pick(ws, 'meta.rules', items))?.value as { member_changes?: unknown } | undefined)?.member_changes) ?? DEFAULT_MEMBER_CHANGE_RULE };
+    const sections: Record<string, unknown[]> = {};
+    for (const ot of manifest.objectTypes ?? []) {
+        if (!(ot.mode === 'document' || (!ot.mode && ot.kind === 'document'))) continue;
+        const rec = await metaReader.pick(ws, `meta.sections.${ot.name}`, items);
+        if (rec) sections[ot.name] = readStoredSections(rec.value);
+    }
     const index: Record<string, unknown[]> = {};
     const counts: Record<string, number> = {};
     for (const [name, s] of spaces) {
@@ -288,7 +305,8 @@ export async function readWorkspaceOp(
     for (const [name, s] of Object.entries(rowSpaces)) counts[name] = s.rows;
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
-    return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, counts, index,
+    return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, rules, counts, index,
+        ...(Object.keys(sections).length ? { sections } : {}),
         ...(Object.keys(schemas).length ? { schemas } : {}),
         ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
         hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
@@ -423,17 +441,20 @@ export async function writeWorkspaceDraftsOp(
         }
         // The draft landed, so its embedded files may now be opened to the workspace's members.
         if (item.isDoc) await scopeDocImagesToWorkspace(storage, config, v, caller.ownerName, `${organismId}/${ws}`);
+        // Filing under a section changes the space's section index, which is the workspace's own
+        // record: the member change door writes it into the copy that counts, or files it as a
+        // suggestion when the workspace's rule asks members to suggest. It wrote a copy under the
+        // caller before, which a plain member's write was then refused (2026-09-24) and never read.
+        let filing: Record<string, unknown> | undefined;
         if (item.isDoc && item.section) {
-            const secKey = `${root}.meta.sections.${item.space}`;
-            const secRec = await findWorkspaceRecord(storage, secKey);
-            const sections = ((secRec?.value as { sections?: { id: string; name?: string; documents?: string[] }[] } | undefined)?.sections) ?? [];
-            const target = sections.find(s => s.id === item.section || s.name === item.section);
-            if (target) {
-                target.documents = [...(target.documents ?? []).filter(d => d !== item.instanceId), item.instanceId];
-                await writeWorkspaceRecord({ storage, config }, { key: secKey, value: { sections }, owner: caller.ownerGhii, prev: secRec, principal: caller.principal });
-            }
+            const r = await fileDocumentInSection({ storage, config },
+                { principal: caller.writerGaii, owner: caller.ownerName, roles: caller.roles },
+                { orgId: organismId, ws, space: item.space, docId: item.instanceId, section: item.section });
+            filing = isRefusal(r)
+                ? { status: 'refused', code: r.code, message: r.message }
+                : { status: r.status, ...(r.suggestion ? { suggestion_id: r.suggestion.id } : {}) };
         }
-        written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null, version: outcome.version });
+        written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null, ...(filing ? { section_filing: filing } : {}), version: outcome.version });
     }
     emitChange('organisms');
     const echo = await writeProvenanceEcho(storage, config, lastProvenanceId);

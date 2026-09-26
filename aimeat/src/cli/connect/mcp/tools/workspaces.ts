@@ -34,6 +34,12 @@
  *     create supplying just objectTypes validates first try over the connector too.
  *   v1.6.0 -- 2026-09-14 -- _update's `add_spaces` says how a ROW space is declared, matching the
  *     server MCP surface: backing:'rows' + indexOn, and no mode.
+ *   v1.8.0 -- 2026-09-25 -- A member's change to a workspace: _space_add, _sections_set and
+ *     _suggestions call the node's member change doors; _update takes `member_changes`; _write files a
+ *     document under a section, and _object_delete takes a deleted one out, through the section door
+ *     (../../workspace-section-filing.ts) and says how it ended, where both wrote the index with
+ *     POST /v1/memory, which a plain member is refused, and read no answer. _read carries `rules`
+ *     and `sections`.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -45,6 +51,7 @@ import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from '../../../../services/workspace-meta.js';
 import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem, type WriteObjectType } from '../../../../services/workspace-write-items.js';
 import { entryTitle } from '../../../../services/structure-overview.js';
+import { fileThroughDoor, unfileThroughDoor, sectionsFromRead } from '../../workspace-section-filing.js';
 
 export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -93,7 +100,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       // server's src/mcp/workspaces.ts). Version history (.version.N) never reaches this path (REST omits it).
       const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}${include_archived ? '&archived=include' : ''}`);
       if (resp.ok === false) return text(resp.error ?? resp, true);
-      const data = (resp.data ?? resp) as { manifest?: { objectTypes?: { name: string; namespace?: string }[] }; objects?: Record<string, Record<string, unknown>[]>; drafts?: Record<string, Record<string, unknown>[]>; apps?: unknown[]; schemas?: Record<string, unknown> };
+      const data = (resp.data ?? resp) as { manifest?: { objectTypes?: { name: string; namespace?: string }[] }; objects?: Record<string, Record<string, unknown>[]>; drafts?: Record<string, Record<string, unknown>[]>; apps?: unknown[]; schemas?: Record<string, unknown>; rules?: unknown; sections?: Record<string, unknown> };
       const manifest = data.manifest ?? null;
       const objects = data.objects ?? {};
       const drafts = data.drafts ?? {};
@@ -151,7 +158,9 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       // rather than forwarding it, so a field the shaping does not name is a field the agent on this
       // door never sees — which is how the same tool comes to mean two different things.
       const schemas = data.schemas ?? {};
-      return text({ organism_id, ws, mode: 'index', manifest, apps: data.apps ?? [], counts, index,
+      const sections = data.sections ?? {};
+      return text({ organism_id, ws, mode: 'index', manifest, apps: data.apps ?? [], ...(data.rules ? { rules: data.rules } : {}), counts, index,
+        ...(Object.keys(sections).length ? { sections } : {}),
         ...(Object.keys(schemas).length ? { schemas } : {}),
         hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
           + (Object.keys(schemas).length ? ' `schemas` is what is locked on each records space now — edit that map and send it back through aimeat_workspace_update, which REPLACES it.' : '') });
@@ -193,17 +202,16 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         planned.push({ key, v: coerceValue(parseObj(item.value), item.instanceId), item });
       }
       const written: Record<string, unknown>[] = [];
+      const sectionsCache = sectionsFromRead(wsResp.data);
       for (const { key, v, item } of planned) {
         const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
         if (wr.ok === false) return text({ error: wr.error ?? wr, written_before_failure: written }, true);
-        if (item.isDoc && item.section) {
-          const secKey = `${root(organism_id, ws)}.meta.sections.${item.space}`;
-          const secResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(secKey)}`);
-          const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
-          const target = sections.find(s => s.id === item.section || s.name === item.section);
-          if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== item.instanceId), item.instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
-        }
-        written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
+        // Filed through the node's section door, which applies the workspace's rule for members'
+        // changes; the answer says whether it landed, waits for an approval, or was refused.
+        const filing = item.isDoc && item.section
+          ? await fileThroughDoor(client, { orgId: organism_id, ws, space: item.space, doc: item.instanceId, section: item.section }, sectionsCache)
+          : undefined;
+        written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null, ...(filing ? { section_filing: filing } : {}) });
       }
       // Not carried, and the reason is the batch: one declaration cannot honestly describe N
       // separately-authored records, and per-item declaration was never designed. The echo says so
@@ -237,16 +245,18 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. A ROW space is { name, namespace, backing:"rows", indexOn:[…] } and takes no mode. Prefer this over `manifest` to add spaces. Cannot remove/rename.'),
       manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved.'),
       schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current ones first: aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
+      member_changes: z.enum(['direct', 'suggest']).optional().describe("How this workspace takes a change from a member who is neither its creator nor an organism admin: 'direct' = at once, with their name on it; 'suggest' = it waits for the creator or an admin to approve it (the default)."),
     },
     annotationsFor('aimeat_workspace_update'),
-    async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas }) => {
-      const body: { name?: string; readme?: string; add_spaces?: unknown; manifest?: unknown; schemas?: unknown } = {};
+    async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, member_changes }) => {
+      const body: { name?: string; readme?: string; add_spaces?: unknown; manifest?: unknown; schemas?: unknown; member_changes?: string } = {};
       if (typeof name === 'string') body.name = name;
       if (typeof readme === 'string') body.readme = readme;
       const add = parseObj(add_spaces); if (Array.isArray(add)) body.add_spaces = add;
       const man = parseObj(manifest); if (man !== undefined) body.manifest = man;
       const sch = parseObj(schemas); if (sch !== undefined) body.schemas = sch;
-      if (body.name === undefined && body.readme === undefined && body.add_spaces === undefined && body.manifest === undefined && body.schemas === undefined) return text({ error: 'Provide a name, readme, add_spaces, manifest and/or schemas.' }, true);
+      if (member_changes) body.member_changes = member_changes;
+      if (body.name === undefined && body.readme === undefined && body.add_spaces === undefined && body.manifest === undefined && body.schemas === undefined && body.member_changes === undefined) return text({ error: 'Provide a name, readme, add_spaces, manifest, schemas and/or member_changes.' }, true);
       const r = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`, body);
       if (r.ok === false) return text({ error: (r.error as { message?: string } | undefined)?.message || 'Update failed' }, true);
       return text(r.data);
@@ -277,20 +287,13 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         }
       }
       if (deleted === 0) return text({ error: `Nothing to delete at ${base} (no record/draft/latest/version).` }, true);
-      // Best-effort: unfile the id from the document section tree (find the type by namespace).
+      // Take the id out of the document space's section index through the node's section door,
+      // which writes the index that counts; a document that no longer exists is housekeeping, done
+      // at once under any rule.
       const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
       const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.namespace === namespace);
-      if (ot) {
-        const secKey = `${root(organism_id, ws)}.meta.sections.${ot.name}`;
-        const secResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(secKey)}`);
-        const sections = (secResp.data as { items?: { key: string; value?: { sections?: { documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections;
-        if (sections) {
-          let changed = false;
-          for (const s of sections) { if ((s.documents ?? []).includes(id)) { s.documents = (s.documents ?? []).filter(d => d !== id); changed = true; } }
-          if (changed) await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' });
-        }
-      }
-      return text({ deleted: base, keys: deleted });
+      const unfiled = ot ? await unfileThroughDoor(client, { orgId: organism_id, ws, space: ot.name, doc: id }, sectionsFromRead(wsResp.data)) : null;
+      return text({ deleted: base, keys: deleted, ...(unfiled ? { section_unfiling: unfiled } : {}) });
     });
 
   mcp.tool('aimeat_workspace_create', descriptionFor('aimeat_workspace_create'),
@@ -438,6 +441,58 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       if (resp.ok === false) return text(resp.error ?? resp, true);
       const members = (resp.data as { members?: unknown[] } | undefined)?.members ?? [];
       return text({ ws, members });
+    });
+
+  // ── A member's change to a workspace, and the decision on a member's suggestion: the node's REST
+  //    doors, which apply the workspace's rule and decide who may decide. ──
+  mcp.tool('aimeat_workspace_space_add', descriptionFor('aimeat_workspace_space_add'),
+    {
+      organism_id: z.string(), ws: z.string(),
+      spaces: z.any().describe('The space to add, { name, namespace, mode }, or an ARRAY of them. Defaults are filled.'),
+      schemas: z.any().optional().describe('Map of namespace → JSON Schema, only for records spaces added in this same call.'),
+    },
+    annotationsFor('aimeat_workspace_space_add'),
+    async ({ organism_id, ws, spaces, schemas }) => {
+      const body: Record<string, unknown> = { spaces: parseObj(spaces) };
+      if (schemas !== undefined) body.schemas = parseObj(schemas);
+      const r = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/spaces?ws=${encodeURIComponent(ws)}`, body);
+      return text(r.ok === false ? (r.error ?? r) : (r.data ?? r), r.ok === false);
+    });
+
+  mcp.tool('aimeat_workspace_sections_set', descriptionFor('aimeat_workspace_sections_set'),
+    {
+      organism_id: z.string(), ws: z.string(),
+      space: z.string().describe('The document space, by name or namespace.'),
+      sections: z.any().describe('The WHOLE section index for that space: [{ id, name, parentId, documents:[docId], color? }].'),
+    },
+    annotationsFor('aimeat_workspace_sections_set'),
+    async ({ organism_id, ws, space, sections }) => {
+      const r = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/sections/${encodeURIComponent(space)}?ws=${encodeURIComponent(ws)}`, { sections: parseObj(sections) });
+      return text(r.ok === false ? (r.error ?? r) : (r.data ?? r), r.ok === false);
+    });
+
+  mcp.tool('aimeat_workspace_suggestions', descriptionFor('aimeat_workspace_suggestions'),
+    {
+      organism_id: z.string(),
+      action: z.enum(['list', 'decide']).describe("'list' = the suggestions you may see · 'decide' = approve or decline one"),
+      ws: z.string().optional().describe("action='list': only this workspace."),
+      status: z.enum(['pending', 'approved', 'declined', 'expired', 'all']).optional().describe("action='list': which ones. Default 'pending'."),
+      suggestion_id: z.string().optional().describe("action='decide': the suggestion's id."),
+      decision: z.enum(['approve', 'decline']).optional().describe("action='decide': 'approve' or 'decline'."),
+      note: z.string().optional().describe("action='decide': an optional note the member reads."),
+    },
+    annotationsFor('aimeat_workspace_suggestions'),
+    async ({ organism_id, action, ws, status, suggestion_id, decision, note }) => {
+      const base = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/suggestions`;
+      let r;
+      if (action === 'list') {
+        const qs = new URLSearchParams({ ...(ws ? { ws } : {}), ...(status ? { status } : {}) }).toString();
+        r = await client.get(qs ? `${base}?${qs}` : base);
+      } else {
+        if (!suggestion_id) return text({ error: "action='decide' needs a suggestion_id: list them with action='list'." }, true);
+        r = await client.post(`${base}/${encodeURIComponent(suggestion_id)}`, { decision, ...(note !== undefined ? { note } : {}) });
+      }
+      return text(r.ok === false ? (r.error ?? r) : (r.data ?? r), r.ok === false);
     });
 
   mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),

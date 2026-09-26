@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 -- 2026-09-25 -- PUT /workspace takes `member_changes`, the workspace's rule for a plain
+ *     member's change ('direct' | 'suggest'), which updateWorkspaceMeta writes as `…meta.rules`.
  *   v1.7.0 -- 2026-09-24 -- The activity feeds read the workspace manifest, and the share write the
  *     share record, through services/workspace-meta.ts: the copy that counts, not the first the scan
  *     returned. The share write updates that copy, so what it writes is what the readers take.
@@ -292,8 +294,10 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   });
 
   /* ── PUT /v1/organisms/:id/workspace?ws= — update a workspace's name and/or readme IN PLACE (no new
-   * id, no touch to objectTypes/schemas/content), keeping the name synced across manifest + registry.
-   * Creator-only (or an org admin). ── */
+   * id, no touch to objectTypes/schemas/content), keeping the name synced across manifest + registry,
+   * and its rule for members' changes (`member_changes`: 'direct' | 'suggest').
+   * Creator-only (or an org admin). A member adds a space or changes sections through the member
+   * change doors (./workspace-member-changes.ts). ── */
   router.put('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : (req.body?.ws as string | undefined);
@@ -313,6 +317,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         addObjectTypes: Array.isArray(req.body?.add_object_types) ? req.body.add_object_types : (Array.isArray(req.body?.add_spaces) ? req.body.add_spaces : undefined),
         manifest: req.body?.manifest, schemas: req.body?.schemas,
         apps: Array.isArray(req.body?.apps) ? req.body.apps : undefined,
+        memberChanges: req.body?.member_changes,
       });
       emitChange('organisms');
       res.json(success(config.nodeId, result));

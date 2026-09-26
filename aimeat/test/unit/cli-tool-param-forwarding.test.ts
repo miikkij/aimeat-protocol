@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   v1.5.0 — 2026-09-25 — aimeat_workspace_suggestions: the decide branch is probed with a suggestion,
+ *     and `ws` / `status` ride only on the list branch.
  *   v1.4.0 — 2026-09-25 — aimeat_package_install_requests holds a request id constant, so `decision`
  *     is measured on the decision door instead of being filed as unmeasurable.
  *   v1.3.0 — 2026-09-24 — The connector's aimeat_memory_restore sends owner_scope on the route, as the
@@ -102,6 +104,8 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     aimeat_workspace_transfer: { always: { direction: 'export', zip_base64: 'cHJvYmU=' } },
     // action='decide' needs a requester; the other two actions ignore it.
     aimeat_workspace_access: { always: { requester: 'probe-owner' } },
+    // action='decide' (the enum sentinel) needs a suggestion to decide; 'list' ignores it.
+    aimeat_workspace_suggestions: { always: { suggestion_id: 'probe-suggestion' } },
     // `ws` narrows a GROUP server to one workspace inside that group, so it means nothing without
     // `organism_id`, and the owner's own attach door does not read it. Holding organism_id constant
     // sends every probe to the group door, where the whole body is still read, so nothing else
@@ -165,6 +169,12 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
             + "`action` at its enum sentinel 'decide' so that `decision` and `role` are measurable at all. "
             + 'The three are mutually exclusive branches of one tool and one probe run cannot exercise two '
             + "of them; the request branch is covered end to end by test/e2e-organism-workspace-access.ts.",
+    },
+    aimeat_workspace_suggestions: {
+        ws: "Conditional, not dropped: `ws` narrows action='list', and the probe holds `action` at its enum "
+            + "sentinel 'decide' so that `decision` and `note` are measurable at all. The list branch sends it "
+            + 'as a query parameter, covered end to end by test/e2e-workspace-member-changes.ts.',
+        status: 'Same condition: it picks which suggestions action=\'list\' returns.',
     },
     aimeat_knowledge_contribute: {
         package_id: 'This tool is deliberately unreachable from the connector — see knowledgeContributeUnreachable().',

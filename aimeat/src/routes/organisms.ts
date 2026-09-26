@@ -95,6 +95,9 @@
  *   v1.21.0 -- 2026-07-11 -- publishDraft normalizes embedded document image URLs (raw /v1/storage →
  *     owner-addressed /v1/pub) and scopes those files to the workspace (members-only) via
  *     services/doc-images, so a published doc's images load for members without going public.
+ *   v1.22.0 -- 2026-09-25 -- Mounts the member change doors (organisms/workspace-member-changes.ts):
+ *     POST /:id/workspace/spaces, PUT /:id/workspace/sections/:space, GET /:id/workspace/suggestions
+ *     and POST /:id/workspace/suggestions/:sid.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -109,6 +112,7 @@ import { registerOrganismWorkspaceOpsRoutes } from './organisms/workspace-ops.js
 import { registerOrganismWorkspaceTransferRoutes } from './organisms/workspace-transfer.js';
 import { registerOrganismWorkspaceRowRoutes } from './organisms/workspace-rows.js';
 import { registerOrganismWorkspaceDocumentRoutes } from './organisms/workspace-documents.js';
+import { registerOrganismWorkspaceMemberChangeRoutes } from './organisms/workspace-member-changes.js';
 import { registerOrganismGateRoutes } from './organisms/gates.js';
 import { registerOrganismIntakeRoutes } from './organisms/intake.js';
 
@@ -132,6 +136,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   registerOrganismWorkspaceRowRoutes(router, config, storage);
   // In-place document edits, for the same reason and in the same place in the order.
   registerOrganismWorkspaceDocumentRoutes(router, config, storage);
+  // A member's change to a workspace (a space, the sections) and the decision on a member's suggestion.
+  registerOrganismWorkspaceMemberChangeRoutes(router, config, storage);
   registerOrganismGateRoutes(router, config, storage, H);
   registerOrganismIntakeRoutes(router, config, storage, H);
 
