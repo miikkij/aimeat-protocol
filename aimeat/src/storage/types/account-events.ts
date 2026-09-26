@@ -15,6 +15,9 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.6.0 — 2026-09-25 — operator_admin_granted: the one-time migration gave the operator's
+ *     full-access agents the permission to administer the node (services/operator-admin-migration.ts),
+ *     and the operator reads which ones here.
  *   v1.5.0 — 2026-09-25 — package_installed: an install or update an agent or an app asked for, done
  *     because it was approved.
  *   v1.4.0 — 2026-09-24 — memory_accessed_by_operator: the operator opened, searched, deleted or
@@ -125,6 +128,11 @@ export type AccountEventKind =
   // act is the operator's own UsageCall row, which names you as the account inspected.
   | 'memory_accessed_by_operator'
   // Permissions and limits
+  //
+  // `operator_admin_granted` is written once per node, by the migration that gave the operator's
+  // full-access agents operator:admin. `data.names` lists the agents and `data.count` how many, so
+  // the operator can take the permission back from any of them.
+  | 'operator_admin_granted'
   | 'consent_granted'
   | 'consent_revoked'
   | 'app_granted'

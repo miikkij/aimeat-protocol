@@ -22,6 +22,8 @@
  *     it — which for a living document's hooks means the feature did not exist on a fresh node.
  *   v1.4.0 — 2026-09-16 — sealStoredPspRecords(): encrypts the Stripe secrets of seller records
  *     written before they were stored sealed (commerce/psp-secrets.ts).
+ *   v1.7.0 — 2026-09-25 — migrateOperatorAdminOnce(), chained after the scope vocabulary: once per
+ *     node, the operator's full-access agents get operator:admin (services/operator-admin-migration.ts).
  *   v1.6.0 — 2026-09-26 — migrateMailReadConsent(): once per node, the owners whose apps held
  *     connections:use beside a mailbox this node can read get one notice with a button per app
  *     (services/mail-read-consent.ts).
@@ -53,6 +55,7 @@ import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
+import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
 import { seedBuiltinSkills } from '../services/skill-seeds.js';
 import { DirectoryService } from '../services/directory.js';
@@ -218,13 +221,24 @@ export async function initializeServices(
   // without this every agent connected before today would silently lose them. BOTH families: an app
   // grant is the principal requireScope actually stops, so a word that reaches only agents leaves
   // the tightening that bites live apps exactly as dangerous as it was. Idempotent.
+  //
+  // Then, once per node, the operator's full-access agents get operator:admin and keep the admin
+  // tools (services/operator-admin-migration.ts). Chained AFTER the vocabulary, never beside it: both
+  // rewrite an agent's whole scope list, and side by side one could write over the other.
   migrateScopeVocabulary(storage)
     .then(({ agents, appGrants }) => {
       if (agents > 0 || appGrants > 0) {
         logger.info(`Scope vocabulary: grandfathered ${agents} agent(s) and ${appGrants} app grant(s)`);
       }
     })
-    .catch(err => logger.error('Failed to migrate scope vocabulary', { error: String(err) }));
+    .catch(err => logger.error('Failed to migrate scope vocabulary', { error: String(err) }))
+    .then(() => migrateOperatorAdminOnce(storage, config))
+    .then(({ ran, granted }) => {
+      if (ran && granted.length > 0) {
+        logger.info(`operator:admin: given to ${granted.reduce((n, g) => n + g.agents.length, 0)} full-access agent(s) of ${granted.length} operator account(s)`);
+      }
+    })
+    .catch(err => logger.error('Failed to give operator:admin to the operator\'s full-access agents; the next boot tries again', { error: String(err) }));
 
   // Reading a connected mailbox took its own word on 2026-09-24, and no existing grant was given it.
   // Once per node, each owner whose apps held connections:use beside a mailbox this node can read is

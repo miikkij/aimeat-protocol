@@ -11757,6 +11757,8 @@
       "operatorSearchedEntries": "Operaattorin haussa näkyi otteita {count} merkinnästäsi.",
       "operatorDeletedEntry": "Operaattori poisti merkintäsi {key}.",
       "operatorRestoredEntry": "Operaattori palautti merkintäsi {key}.",
+      "operatorAdminGrantedOne": "{name} sai oikeuden ylläpitää tätä asennusta, koska sillä oli täysi pääsy. Voit poistaa oikeuden agentin asetuksista.",
+      "operatorAdminGrantedMany": "{names} saivat oikeuden ylläpitää tätä asennusta, koska niillä oli täysi pääsy. Voit poistaa oikeuden kunkin agentin asetuksista.",
       "appPublished": "Julkaisit applikaation {name}.",
       "appUpdated": "Päivitit applikaation {name}.",
       "recordPublished": "Julkaisit tietueen {name}.",

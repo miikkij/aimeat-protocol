@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.11.1 — 2026-09-25 — The OPERATOR_ADMIN_SCOPE note says the operator's full-access agents got
+ *     the word once per node (services/operator-admin-migration.ts). Nothing executable changed.
  *   v1.11.0 — 2026-09-24 — OPERATOR_ADMIN_SCOPE, node administration through an agent (security audit
  *     A8-1). The administration tools asked only whether the ACCOUNT runs the node, so every agent
  *     an operator connected could administer it, whatever the operator had granted that agent.
@@ -128,9 +130,12 @@ export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
  * stand in for them.
  *
  * Out of every wildcard for the reason the repair word is: "Full access" is one click, and nobody
- * clicking it is deciding that an agent may administer the node. Nobody is grandfathered onto it
- * (services/scope-vocabulary-migration.ts has no entry), the same as every other operator word here:
- * an operator's agent that used these tools needs the tick in the agent editor.
+ * clicking it is deciding that an agent may administer the node. The boot-time grandfathering in
+ * services/scope-vocabulary-migration.ts has no entry for it. Once per node,
+ * services/operator-admin-migration.ts gave it to the operator's agents that held `*` on the day it
+ * ran (the developer's ruling of 2026-09-25), because until the day before every agent of an
+ * operator reached these tools; every other agent, and every agent made later, needs the tick in the
+ * agent editor.
  */
 export const OPERATOR_ADMIN_SCOPE = 'operator:admin';
 

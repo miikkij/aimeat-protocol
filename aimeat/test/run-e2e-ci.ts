@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.57.0 -- 2026-09-25 -- Add e2e-operator-admin-migration.ts to ALL_SUITES: the once-per-node
+ *            migration that gives the operator's full-access agents operator:admin, across three
+ *            boots of its own node on 40447. Not in the guard tier.
  *   v1.56.0 -- 2026-09-26 -- Add e2e-mail-read-consent.ts to ALL_SUITES: reading mail for the apps
  *            granted before connections:read-through, with the owner's one-tap door. Not in the
  *            guard tier.
@@ -541,6 +544,9 @@ const ALL_SUITES = [
     'test/e2e-appdev-flow.ts',
     'test/e2e-mcp.ts',
     'test/e2e-mcp-scopes.ts',
+    // Owns its server on 40447 and boots it three times on one database: the operator:admin
+    // migration runs at boot and records that it ran, so only a restart proves it runs once.
+    'test/e2e-operator-admin-migration.ts',
     'test/e2e-mcp-v2.ts',
     // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
     // way e2e-app-origin does: an app's public address only exists when that flag is set.

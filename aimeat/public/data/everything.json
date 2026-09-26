@@ -2697,7 +2697,7 @@
    "title": "Operating a node",
    "slug": "g-19",
    "lead": [
-    "The operator dashboard is the one place with server-built screens. Everything on it is also reachable by an operator's own agent, because agents must be able to run a whole node without a person present. An agent gets these tools only when the operator ticks the <code>operator:admin</code> permission for it; &quot;Full access&quot; does not include it."
+    "The operator dashboard is the one place with server-built screens. Everything on it is also reachable by an operator's own agent, because agents must be able to run a whole node without a person present. An agent gets these tools only when the operator ticks the <code>operator:admin</code> permission for it; &quot;Full access&quot; does not include it. When the permission arrived, each node gave it once to the operator's agents that already held &quot;Full access&quot;, listed them on the operator's feed, and left the operator's other agents as they were."
    ],
    "columns": [
     "Feature",

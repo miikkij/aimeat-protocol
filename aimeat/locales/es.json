@@ -10057,6 +10057,8 @@
       "operatorSearchedEntries": "La búsqueda de un operador mostró fragmentos de {count} de tus entradas.",
       "operatorDeletedEntry": "Un operador eliminó tu entrada {key}.",
       "operatorRestoredEntry": "Un operador restauró tu entrada {key}.",
+      "operatorAdminGrantedOne": "{name} recibió el permiso para administrar esta instalación porque tenía acceso total. Puedes quitárselo en la configuración del agente.",
+      "operatorAdminGrantedMany": "{names} recibieron el permiso para administrar esta instalación porque tenían acceso total. Puedes quitárselo en la configuración de cada agente.",
       "appPublished": "Publicaste {name}.",
       "appUpdated": "Actualizaste {name}.",
       "recordPublished": "Publicaste {name}.",

@@ -21,6 +21,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.29.1 -- 2026-09-25 -- The operator:admin note says the operator's full-access agents got the
+ *     word once per node (services/operator-admin-migration.ts). No entry changed.
  *   v1.29.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set: operator:admin, like its read.
  *   v1.28.0 -- 2026-09-25 -- aimeat_package_install_requests -> packages:write, the word the three
  *     /v1/package-install-requests doors ask.
@@ -370,8 +372,8 @@ export const TOOL_SCOPES: Record<string, string> = {
 
     // Node administration through an agent (security audit A8-1). Each handler asks the account role
     // first and this word second, through services/owner-lifecycle.ts resolveOperatorAgentName(). No
-    // wildcard carries it and nobody was grandfathered onto it, so an operator's agent holds it only
-    // by an explicit tick. The operator in person uses the HTTP admin doors, which are unchanged.
+    // wildcard carries it. The operator's agents that held `*` got it once per node, from
+    // services/operator-admin-migration.ts; any other agent holds it only by an explicit tick.
     aimeat_admin_stats:                       'operator:admin',
     aimeat_admin_agents:                      'operator:admin',
     aimeat_admin_config:                      'operator:admin',
