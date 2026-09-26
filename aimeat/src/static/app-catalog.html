@@ -4988,6 +4988,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "wc.confirmDelete": "Delete this checkpoint permanently?",
       "wc.restored": "Restored into your working copy. The published app is unchanged.",
       "wc.gone": "That checkpoint is no longer stored.",
+      "preview.popupBlocked": "Your browser blocked the sign-in window. Allow pop-ups for this page and press the app's sign-in button again.",
       "wc.loginNeeded": "Sign in to save a working copy.",
       "wc.noteManual": "manual source edit",
       "wc.noteRestore": "restored an earlier checkpoint",
@@ -6087,6 +6088,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "wc.confirmDelete": "Poistetaanko tämä tarkistuspiste pysyvästi?",
       "wc.restored": "Palautettu työkopioon. Julkaistu sovellus on ennallaan.",
       "wc.gone": "Tätä tarkistuspistettä ei ole enää tallessa.",
+      "preview.popupBlocked": "Selaimesi esti kirjautumisikkunan. Salli ponnahdusikkunat tälle sivulle ja paina sovelluksen kirjautumispainiketta uudelleen.",
       "wc.loginNeeded": "Kirjaudu sisään tallentaaksesi työkopion.",
       "wc.noteManual": "käsin muokattu lähdekoodi",
       "wc.noteRestore": "palautettu aiempi tarkistuspiste",
@@ -10370,6 +10372,175 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     markCurrent(bodyEl);
   }
 
+  // src/static/app-frame-core.js
+  function b64url(buf) {
+    var bytes = new Uint8Array(buf), s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function pkce() {
+    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
+    if (crypto.subtle && crypto.subtle.digest) {
+      return crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)).then(function(d) {
+        return { verifier, challenge: b64url(d), method: "S256" };
+      });
+    }
+    return Promise.resolve({ verifier, challenge: verifier, method: "plain" });
+  }
+  function forFrame(data) {
+    var out = {};
+    Object.keys(data || {}).forEach(function(k) {
+      if (k !== "refresh_token") out[k] = data[k];
+    });
+    return out;
+  }
+  function silentGrant(app, scope) {
+    return fetch(
+      "/v1/auth/app-grant-silent?app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope || ""),
+      { credentials: "include", cache: "no-store" }
+    ).then(function(r) {
+      return r.json();
+    }).then(function(j) {
+      return j && j.data ? forFrame(j.data) : { ok: false, error: "failed" };
+    }).catch(function() {
+      return { ok: false, error: "failed" };
+    });
+  }
+  function openWindow(url) {
+    var w = 460, h = 660;
+    var left = window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0;
+    var top = window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0;
+    return window.open(url, "aimeat_consent", "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top);
+  }
+  function consentWindow(app, scope, manage, redirectUri, onBlocked) {
+    return pkce().then(function(p) {
+      var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+      var url = "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope || "") + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
+      return new Promise(function(resolve) {
+        var popup = openWindow(url);
+        if (popup) {
+          waitFor(popup);
+          return;
+        }
+        onBlocked(function() {
+          var again = openWindow(url);
+          if (again) waitFor(again);
+          else resolve(null);
+        }, function() {
+          resolve(null);
+        });
+        function waitFor(win) {
+          var done = false, timer = null;
+          function finish(v) {
+            done = true;
+            window.removeEventListener("message", onGrant);
+            if (timer) clearInterval(timer);
+            resolve(v);
+          }
+          function onGrant(e) {
+            if (e.origin !== location.origin || e.source !== win) return;
+            var d = e.data || {};
+            if (d.type !== "aimeat_app_grant" || d.state !== state) return;
+            if (d.revoked) {
+              finish({ revoked: true });
+              return;
+            }
+            if (!d.code) {
+              finish(null);
+              return;
+            }
+            fetch("/v1/app-grants/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ grant_type: "authorization_code", code: d.code, code_verifier: p.verifier, redirect_uri: redirectUri })
+            }).then(function(r) {
+              return r.json();
+            }).then(function(j) {
+              finish(j && j.ok && j.data && j.data.access_token ? forFrame(j.data) : null);
+            }).catch(function() {
+              finish(null);
+            });
+          }
+          window.addEventListener("message", onGrant);
+          timer = setInterval(function() {
+            if (!done && win.closed) finish(null);
+          }, 500);
+        }
+      });
+    });
+  }
+
+  // src/static/app-catalog/js/preview-host.js
+  var currentTarget = "";
+  var shimSource = null;
+  function previewTarget(owner, filename) {
+    return owner && filename ? String(owner) + "/" + String(filename) : "";
+  }
+  async function answerPreview(data, target, deps) {
+    if (!data || typeof data !== "object") return null;
+    if (data.type === "aimeat-request-auth") {
+      var r = target ? await deps.grant(target, "") : null;
+      return { type: "aimeat-auth", jwt: r && r.ok && r.access_token ? r.access_token : null, nodeUrl: deps.origin };
+    }
+    if (data.type !== "aimeat_frame_req" || typeof data.id !== "string") return null;
+    var reply = function(result) {
+      return { type: "aimeat_frame_res", id: data.id, op: data.op, result: result === void 0 ? null : result };
+    };
+    var scope = String(data.scope || "");
+    if (data.op === "login") return reply(target ? await deps.grant(target, scope) : { ok: false, error: "unknown_app" });
+    if (data.op === "consent") return reply(target ? await deps.consent(target, scope, !!data.manage) : null);
+    if (data.op === "logout") return reply({ ok: false, error: "preview" });
+    return reply(null);
+  }
+  function consentForPreview(app, scope, manage) {
+    var slash = app.indexOf("/");
+    var redirectUri = location.origin + "/v1/apps/" + encodeURIComponent(app.slice(0, slash)) + "/" + encodeURIComponent(app.slice(slash + 1));
+    return consentWindow(app, scope, manage, redirectUri, function(_retry, cancel) {
+      showNotice(t("preview.popupBlocked"));
+      cancel();
+    });
+  }
+  function withSupport(html) {
+    if (!shimSource) return html;
+    var tag = "<script data-aimeat-frame-support>" + shimSource + "<\/script>";
+    var at = /<head\b[^>]*>/i.exec(html) || /<html\b[^>]*>/i.exec(html) || /^\s*<!doctype[^>]*>/i.exec(html);
+    var cut = at ? at.index + at[0].length : 0;
+    return html.slice(0, cut) + tag + html.slice(cut);
+  }
+  function openPreview(html, target) {
+    var iframe = document.getElementById("app-iframe");
+    currentTarget = target || "";
+    var fresh = (
+      /** @type {HTMLIFrameElement} */
+      iframe.cloneNode(false)
+    );
+    fresh.removeAttribute("src");
+    fresh.name = "aimeat-frame:" + JSON.stringify({ v: 1, origin: location.origin, ls: {}, ss: {} });
+    fresh.srcdoc = withSupport(html);
+    iframe.replaceWith(fresh);
+  }
+  function initPreviewHost() {
+    fetch("/app-frame-shim.js", { cache: "no-cache" }).then(function(r) {
+      return r.ok ? r.text() : "";
+    }).then(function(text) {
+      shimSource = text ? text.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, "") : null;
+    }).catch(function() {
+      shimSource = null;
+    });
+    var deps = { grant: silentGrant, consent: consentForPreview, origin: location.origin };
+    window.addEventListener("message", function(e) {
+      var iframe = document.getElementById("app-iframe");
+      if (!iframe || !iframe.contentWindow || e.source !== iframe.contentWindow || e.origin !== "null") return;
+      var target = currentTarget;
+      answerPreview(e.data, target, deps).then(function(answer) {
+        if (answer && currentTarget === target && iframe.contentWindow) iframe.contentWindow.postMessage(answer, "*");
+      });
+    });
+  }
+  function clearPreview() {
+    currentTarget = "";
+  }
+
   // src/static/app-catalog/js/detail.js
   var refreshAll;
   var loadPublishedApps;
@@ -10804,10 +10975,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       var view2 = document.getElementById("iframe-view");
       var iframe = document.getElementById("app-iframe");
       document.getElementById("iframe-title").textContent = (app.name || "App") + " — " + t("wc.previewTitle");
-      iframe.removeAttribute("src");
-      iframe.srcdoc = blobToHtml(b64);
-      setIframeUrl("");
       delete iframe.dataset.appId;
+      openPreview(blobToHtml(b64), previewTarget(detailServerOwner(app), app.publishedFilename));
+      setIframeUrl("");
       view2.hidden = false;
     });
   }
@@ -11707,10 +11877,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var iframe = document.getElementById("app-iframe");
     var title = document.getElementById("iframe-title");
     title.textContent = (app.name || "App") + " (draft)";
-    iframe.removeAttribute("src");
-    iframe.srcdoc = blobToHtml(detailDraftBlob);
-    setIframeUrl("");
     delete iframe.dataset.appId;
+    openPreview(blobToHtml(detailDraftBlob), previewTarget(detailServerOwner(app), app.publishedFilename));
+    setIframeUrl("");
     view2.hidden = false;
   }
   function detailAiKeep() {
@@ -14041,9 +14210,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       window.open(app.url, "_blank", "noopener");
       return;
     } else if (app.blob) {
-      var html = decodeURIComponent(escape(atob(app.blob)));
-      iframe.removeAttribute("src");
-      iframe.srcdoc = html;
+      openPreview(
+        decodeURIComponent(escape(atob(app.blob))),
+        previewTarget(app.aimeatOwner || currentOwnerName(), app.publishedFilename)
+      );
       currentIframeUrl = "";
     }
     updateOpenExternalBtn();
@@ -14321,6 +14491,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     iframe.removeAttribute("srcdoc");
     delete iframe.dataset.appId;
     currentIframeUrl = "";
+    clearPreview();
   }
   function openExternal() {
     if (currentIframeUrl && !isSameOriginUrl(currentIframeUrl)) {
@@ -15068,36 +15239,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         handleContextAction(btn.getAttribute("data-action"));
       });
     });
-    window.addEventListener("message", function(e) {
-      var iframe = document.getElementById("app-iframe");
-      if (!iframe || !iframe.contentWindow) return;
-      if (e.source !== iframe.contentWindow) return;
-      if (!e.data || e.data.type !== "aimeat-request-auth") return;
-      if (currentIframeUrl && !isSameOriginUrl(currentIframeUrl)) return;
-      var jwt = null;
-      var nodeUrl = "";
-      try {
-        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-          var session = window.AIMEAT.auth.getSession();
-          jwt = session.jwt;
-          nodeUrl = session.nodeUrl || "";
-        } else {
-          var stored = localStorage.getItem("aimeat_session");
-          if (stored) {
-            var parsed = JSON.parse(stored);
-            jwt = parsed.jwt || null;
-          }
-          var config = loadConfig();
-          nodeUrl = config.aimeatUrl || "";
-        }
-      } catch (err) {
-      }
-      iframe.contentWindow.postMessage({
-        type: "aimeat-auth",
-        jwt,
-        nodeUrl
-      }, "*");
-    });
+    initPreviewHost();
     document.addEventListener("click", function() {
       hideContextMenu();
     });

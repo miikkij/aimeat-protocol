@@ -2244,7 +2244,11 @@
   function askFrameHost(op, payload, timeoutMs) {
     return new Promise(function(resolve) {
       var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
-      var host = location.protocol + "//" + location.host;
+      var named = (
+        /** @type {any} */
+        window.__AIMEAT_FRAME__
+      );
+      var host = named && typeof named.origin === "string" && named.origin || location.protocol + "//" + location.host;
       var timer = null;
       function done(value) {
         window.removeEventListener("message", onMessage);

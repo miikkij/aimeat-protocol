@@ -15,6 +15,8 @@
  *       app's address is refused.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-frame.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — Phase 1: the grant door answers a page of the node by name on a one-owner
+ *     node too, with the app's own grant, which the App Catalog's preview now asks for.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -167,9 +169,13 @@ async function main() {
             assert(sandboxOf(r.headers.get('content-security-policy') ?? '') === null,
                 `no sandbox on a node only one person uses, got ${r.headers.get('content-security-policy')}`);
         });
-        await test('one owner: the frame grant door hands out nothing', async () => {
+        await test('one owner: a page of the node asking by name gets the app its own grant, not the session', async () => {
+            // The App Catalog's preview asks this way on every node (2026-09-26); before it, this node
+            // answered nothing here and the catalog handed its preview the owner's session instead.
             const r = await frameGrant(`${a}/${SOLO}`, 'memory:read', A.rt);
-            assert(r.ok === false && !r.access_token, `expected no grant, got ${JSON.stringify(r)}`);
+            assert(r.ok === true && !!r.access_token && r.own === true && r.app === `${a}/${SOLO}`, `expected the app's grant, got ${JSON.stringify(r)}`);
+            const claims = JSON.parse(Buffer.from(r.access_token!.split('.')[1], 'base64url').toString('utf8'));
+            assert(JSON.stringify(claims.roles) === '["app"]' && claims.app === `${a}/${SOLO}`, `an app grant, got ${JSON.stringify(claims)}`);
         });
 
         console.log('\nPhase 2: a second person joins — every app moves into the isolated frame');

@@ -1496,10 +1496,10 @@
      "slug": "g-10-edit-with-ai",
      "cells": [
       "<strong>Edit with AI</strong>",
-      "Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action.",
+      "Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. A preview (a proposal, a working copy, a checkpoint) runs in a sandboxed frame and signs in with the app's own grant, never with your session; the code of an app that is not yours gets nothing until you agree in the consent window.",
       "App Catalog &gt; app details &gt; Edit with AI"
      ],
-     "plain": "Edit with AI Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. App Catalog > app details > Edit with AI"
+     "plain": "Edit with AI Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. A preview (a proposal, a working copy, a checkpoint) runs in a sandboxed frame and signs in with the app's own grant, never with your session; the code of an app that is not yours gets nothing until you agree in the consent window. App Catalog > app details > Edit with AI"
     },
     {
      "slug": "g-10-saved-working-copy-and-checkpoints",

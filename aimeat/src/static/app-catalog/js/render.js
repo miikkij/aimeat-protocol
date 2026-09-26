@@ -9,6 +9,8 @@
  *   Carved from main.js.
  * @usage import { initRender, renderApps, renderTags, serverStateByFilename, setServerManifests } from './render.js'; initRender({...})
  * @version-history
+ *   v1.0.2 — 2026-09-26 — A preview opens through preview-host.js as the app it is, so it gets that
+ *     app's own grant and never the owner's session; closing the frame forgets it.
  *   v1.0.1 — 2026-09-26 — The opens count follows the page language (dateLocale).
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 12).
  *   v1.1.0 — 2026-07-16 — Card badges now reflect PUBLICATION state only (retire the
@@ -29,7 +31,8 @@
  *     (plus the opens total) and the masthead's mono line, and the foot carries the count.
  *   v3.2.0 — 2026-09-13 — The source editor opens through dialogs.js (the site's one dialog).
  */
-import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
+import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl, currentOwnerName } from './util.js';
+import { openPreview, previewTarget, clearPreview } from './preview-host.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
@@ -302,9 +305,10 @@ function launchInIframe(app) {
     window.open(app.url, '_blank', 'noopener');
     return;
   } else if (app.blob) {
-    var html = decodeURIComponent(escape(atob(app.blob)));
-    iframe.removeAttribute('src');
-    iframe.srcdoc = html;
+    // The preview gets the app's own grant when the app has a name on the node, never the owner's
+    // session (preview-host.js).
+    openPreview(decodeURIComponent(escape(atob(app.blob))),
+      previewTarget(app.aimeatOwner || currentOwnerName(), app.publishedFilename));
     currentIframeUrl = '';
   }
 
@@ -698,6 +702,7 @@ function closeIframe() {
   iframe.removeAttribute('srcdoc');
   delete iframe.dataset.appId;
   currentIframeUrl = '';
+  clearPreview();
 }
 
 function openExternal() {

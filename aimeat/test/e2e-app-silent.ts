@@ -19,6 +19,9 @@
  *   v1.4.0 — 2026-09-26 — Phase 5: connections:read-through added by the owner's own hand survives a
  *     silent sign-in and a refresh that follow the app's declaration down, goes when the owner takes
  *     it away on the grants page, and an app that declares the word is sent to the consent window.
+ *   v1.5.0 — 2026-09-26 — Phase 6: a page of the node asks by name (`?app=`), as the App Catalog's
+ *     preview now does on every node: the owner's own app gets a grant scoped to it, another
+ *     person's app nothing, an app origin is refused, and the app's own path is a bound redirect.
  *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
  *     (helpers/host-request.ts). `x-app-origin` on its own stopped being an app origin when
  *     subdomain.ts v1.5.0 began requiring the Host to belong to the family it claims.
@@ -519,6 +522,40 @@ async function main() {
             assert(r1.status === 302 && !!r1.requestId, `the consent window takes the word: ${r1.status} ${JSON.stringify(r1.body)}`);
             const tok = await consentAndExchange(r1.requestId!, r1.verifier, `${ORIGIN_M2}/callback`, A.token);
             assert(scopesOf(tok.scope).includes(READ_WORD), `approved in the consent window: ${tok.scope}`);
+        });
+
+        /**
+         * The App Catalog previews code nobody has published yet in a frame of its own, on this node
+         * too, and asks for the app's own grant by name. Until 2026-09-26 it handed that code the
+         * owner's session token instead.
+         */
+        console.log('\nPhase 6: a page of the node asking by name (the App Catalog\'s preview)');
+        const byName = async (app: string, cookie: string, headers: Record<string, string> = { 'Sec-Fetch-Site': 'same-origin' }) => {
+            const res = await fetch(`${BASE}/v1/auth/app-grant-silent?app=${encodeURIComponent(app)}&scope=memory:read`,
+                { headers: { ...headers, Cookie: `aimeat_rt=${encodeURIComponent(cookie)}` } });
+            return ((await res.json()) as any).data as { ok: boolean; error?: string; access_token?: string; own?: boolean; app?: string };
+        };
+        await test('the owner\'s own app gets its own grant, scoped to that app', async () => {
+            const r = await byName(`${a}/app-a.html`, A.rt);
+            assert(r.ok === true && r.own === true && r.app === `${a}/app-a.html`, `expected the app's grant, got ${JSON.stringify(r)}`);
+            const claims = JSON.parse(Buffer.from(r.access_token!.split('.')[1], 'base64url').toString('utf8'));
+            assert(JSON.stringify(claims.roles) === '["app"]', `an app grant, not the session, got ${JSON.stringify(claims.roles)}`);
+        });
+        await test('another person\'s app gets nothing until they agree', async () => {
+            const r = await byName(`${bn}/app-b.html`, A.rt);
+            assert(r.ok === false && r.error === 'consent_required' && !r.access_token, `expected consent_required, got ${JSON.stringify(r)}`);
+        });
+        await test('an app origin cannot ask by name (bad_caller)', async () => {
+            const r = await byName(`${a}/app-a.html`, A.rt, { 'Sec-Fetch-Site': 'same-site', Origin: ORIGIN_B });
+            assert(r.ok === false && r.error === 'bad_caller', `expected bad_caller, got ${JSON.stringify(r)}`);
+        });
+        await test('the app\'s own path on the node is a redirect bound to that app, and to no other', async () => {
+            const own = await authorize(`${a}/app-a.html`, 'memory:read', `${BASE}/v1/apps/${a}/app-a.html`);
+            assert(own.status === 302 && !!own.requestId, `authorize own path: ${own.status} ${JSON.stringify(own.body)}`);
+            const det = await json(`/v1/app-grants/request/${own.requestId}`);
+            assert(det.body.data.origin_bound === true, `bound, got ${det.body.data.origin_bound}`);
+            const other = await authorize(`${bn}/app-b.html`, 'memory:read', `${BASE}/v1/apps/${a}/app-a.html`);
+            assert(other.status === 400 && other.body?.error?.code === 'INVALID_REDIRECT_URI', `another app's path: ${other.status}`);
         });
 
         console.log('\n─────────────────────────────────────');

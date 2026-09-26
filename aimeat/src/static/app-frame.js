@@ -15,11 +15,18 @@
  *     - the page title.
  *   The node's session never leaves this page. The frame gets the app's grant and the app's own data.
  * @structure appFromPath · the storage areas · the frame · onMessage → login / consent / logout /
- *   store / title / the legacy aimeat-request-auth · the bar shown when a browser blocks the window
- * @usage Served at /app-frame.js; referenced by app-frame.html.
+ *   store / title / the legacy aimeat-request-auth · the bar shown when a browser blocks the window.
+ *   The grant, the consent window and the refresh-token rule are app-frame-core.js, shared with the
+ *   App Catalog's preview.
+ * @usage Served at /app-frame.js as a module; referenced by app-frame.html.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — A module: the grant, the consent window and forFrame moved unchanged to
+ *     app-frame-core.js, which the App Catalog's preview now uses too. The page tells the frame its
+ *     own origin in the boot data.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
+import { silentGrant, consentWindow } from './app-frame-core.js';
+
 (function () {
   'use strict';
 
@@ -77,7 +84,7 @@
       if (k in ls || !store) return;
       try { var v = store.getItem(k); if (typeof v === 'string') ls[k] = v; } catch (e) { /* nothing to follow */ }
     });
-    return NAME_PREFIX + JSON.stringify({ v: 1, ls: ls, ss: areas.ss });
+    return NAME_PREFIX + JSON.stringify({ v: 1, origin: location.origin, ls: ls, ss: areas.ss });
   }
 
   // ── The frame ──
@@ -138,91 +145,13 @@
   }
   function reply(id, op, result) { send({ type: 'aimeat_frame_res', id: id, op: op, result: result === undefined ? null : result }); }
 
-  /** The frame gets the access token and what describes it; the refresh token stays with this page. */
-  function forFrame(data) {
-    var out = {};
-    Object.keys(data || {}).forEach(function (k) { if (k !== 'refresh_token') out[k] = data[k]; });
-    return out;
-  }
-
-  function silentGrant(scope) {
-    return fetch('/v1/auth/app-grant-silent?app=' + encodeURIComponent(app) + '&scope=' + encodeURIComponent(scope || ''),
-      { credentials: 'include', cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (j) { return (j && j.data) ? forFrame(j.data) : { ok: false, error: 'failed' }; })
-      .catch(function () { return { ok: false, error: 'failed' }; });
-  }
-
-  function b64url(buf) {
-    var bytes = new Uint8Array(buf), s = '';
-    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function pkce() {
-    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
-    if (crypto.subtle && crypto.subtle.digest) {
-      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
-        .then(function (d) { return { verifier: verifier, challenge: b64url(d), method: 'S256' }; });
-    }
-    // Plain http on a name other than localhost has no crypto.subtle; the SDK falls back the same way.
-    return Promise.resolve({ verifier: verifier, challenge: verifier, method: 'plain' });
-  }
-
-  function openWindow(url) {
-    var w = 460, h = 660;
-    var left = window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0;
-    var top = window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0;
-    return window.open(url, 'aimeat_consent', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
-  }
-
   /**
-   * The visible grant flow for this page's app. The consent page posts the code back to this page
-   * (its opener, on the node's own origin), this page exchanges it with the PKCE verifier it kept,
-   * and the frame gets the access token.
+   * The visible grant flow for this page's app (app-frame-core.js). The redirect is this page's own
+   * address, which the node binds to this app. When the browser stops the window, a click on the bar
+   * opens it.
    */
   function consent(scope, manage) {
-    return pkce().then(function (p) {
-      var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
-      var redirectUri = location.origin + location.pathname;
-      var url = '/v1/app-grants/authorize?response_type=code&response_mode=web_message'
-        + (manage ? '&manage=1' : '')
-        + '&app=' + encodeURIComponent(app)
-        + '&scope=' + encodeURIComponent(scope || '')
-        + '&redirect_uri=' + encodeURIComponent(redirectUri)
-        + '&code_challenge=' + encodeURIComponent(p.challenge)
-        + '&code_challenge_method=' + encodeURIComponent(p.method)
-        + '&state=' + encodeURIComponent(state);
-      return new Promise(function (resolve) {
-        var popup = openWindow(url);
-        if (popup) { waitFor(popup); return; }
-        // The browser stopped the window. A click on this page opens it; so does a second try.
-        showBar(function () {
-          var again = openWindow(url);
-          if (again) waitFor(again); else resolve(null);
-        }, function () { resolve(null); });
-
-        function waitFor(win) {
-          var done = false, timer = null;
-          function finish(v) { done = true; window.removeEventListener('message', onGrant); if (timer) clearInterval(timer); resolve(v); }
-          function onGrant(e) {
-            if (e.origin !== location.origin || e.source !== win) return;
-            var d = e.data || {};
-            if (d.type !== 'aimeat_app_grant' || d.state !== state) return;
-            if (d.revoked) { finish({ revoked: true }); return; }
-            if (!d.code) { finish(null); return; }
-            fetch('/v1/app-grants/token', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ grant_type: 'authorization_code', code: d.code, code_verifier: p.verifier, redirect_uri: redirectUri }),
-            })
-              .then(function (r) { return r.json(); })
-              .then(function (j) { finish(j && j.ok && j.data && j.data.access_token ? forFrame(j.data) : null); })
-              .catch(function () { finish(null); });
-          }
-          window.addEventListener('message', onGrant);
-          timer = setInterval(function () { if (!done && win.closed) finish(null); }, 500);
-        }
-      });
-    });
+    return consentWindow(app, scope, manage, location.origin + location.pathname, showBar);
   }
 
   function signOut() {
@@ -284,13 +213,13 @@
     if (d.type === 'aimeat_frame_title') { document.title = String(d.title || '').slice(0, 200) || file; return; }
     if (d.type === 'aimeat-request-auth') {
       // The older sandbox road (AIMEAT.auth.requestParentAuth): the app's own grant, never a session.
-      silentGrant('').then(function (r) {
+      silentGrant(app, '').then(function (r) {
         send({ type: 'aimeat-auth', jwt: r && r.ok ? r.access_token : null, nodeUrl: location.origin });
       });
       return;
     }
     if (d.type !== 'aimeat_frame_req' || typeof d.id !== 'string') return;
-    if (d.op === 'login') silentGrant(String(d.scope || '')).then(function (r) { reply(d.id, d.op, r); });
+    if (d.op === 'login') silentGrant(app, String(d.scope || '')).then(function (r) { reply(d.id, d.op, r); });
     else if (d.op === 'consent') consent(String(d.scope || ''), !!d.manage).then(function (r) { reply(d.id, d.op, r); });
     else if (d.op === 'logout') signOut().then(function (r) { reply(d.id, d.op, r); });
     else reply(d.id, d.op, null);

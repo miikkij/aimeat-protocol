@@ -7355,21 +7355,24 @@ paths:
         Auto-approves only the owner's **own** app (or one the owner already granted); anyone else →
         `consent_required`. Returns the same scoped, revocable grant token as the code flow — never
         the session. Response `data.error` ∈ {login_required, consent_required, bad_origin,
-        unknown_app, invalid_scope, app_origin_disabled, frame_off}.
+        unknown_app, invalid_scope, app_origin_disabled}.
         `invalid_scope` is answered before the session is read (one word outside GET
         /v1/app-grants/scopes refuses the whole list, whoever is signed in) and carries `app`
         (owner/filename), `app_name` and `unknown` (the ungrantable words, space-separated).
 
-        **Isolated frame.** On a node several people share with no app origin, an app runs in an
-        opaque-origin frame on the node's own address (see `GET /v1/apps/{owner}/{filename}`), and
-        the node's page holding that frame asks with `app=owner/filename` instead of `origin`: the
-        app has no address of its own to be bound by. The same caller check applies, so only a page
-        of the node itself is answered, and the answer is the same scoped grant. On any other node
-        `app` is answered `frame_off`.
+        **By name (`app`).** A page of the node that holds app code in an opaque-origin frame asks
+        with `app=owner/filename` instead of `origin`, because the frame has no address of its own
+        to be bound by: the isolated frame's page on a node several people share with no app origin
+        (see `GET /v1/apps/{owner}/{filename}`), and the App Catalog's preview of unpublished code,
+        on every node. The same caller check applies, so only a page of the node itself is answered,
+        and the answer is the same scoped grant: silently for the signed-in person's own app,
+        `consent_required` for anybody else's until they agree. The page hands the frame the access
+        token and keeps the refresh token. `GET /v1/app-grants/authorize` accepts that app's own
+        path on the node (`/v1/apps/{owner}/{filename}`, no query) as a redirect bound to it.
       tags: [Auth]
       parameters:
         - { in: query, name: origin, required: false, schema: { type: string }, description: "The embedding app's origin (a <sub>.apps.<host> origin). Required unless `app` is given." }
-        - { in: query, name: app, required: false, schema: { type: string }, description: "owner/filename, from the node's isolated-frame page on a node that runs apps in that frame" }
+        - { in: query, name: app, required: false, schema: { type: string }, description: "owner/filename, from a page of the node that holds the app in a frame (the isolated frame, the App Catalog's preview)" }
         - { in: query, name: scope, required: false, schema: { type: string }, description: Space-separated grantable scopes }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }

@@ -8,6 +8,8 @@
  * @structure apexOrigin(config) · isNodeItself(config, url) · frameRedirect(config, storage, uri, app)
  * @usage const frame = await frameRedirect(config, storage, redirectUri, app);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The app's own path is a bound redirect on every node, for the App Catalog's
+ *     preview; a node that runs apps in the isolated frame still refuses every other address of its own.
  *   v1.0.0 — 2026-09-26 — Extracted from routes/app-grants.ts (max-file-lines), apexOrigin with it.
  */
 import type { AimeatConfig } from '../config.js';
@@ -30,13 +32,15 @@ export function isNodeItself(config: AimeatConfig, u: URL): boolean {
 }
 
 /**
- * THE ISOLATED FRAME'S PAGE AS A REDIRECT (audit A7-1). On a node several people share with no app
- * origin, an app runs in an opaque-origin frame, and the page holding it (src/static/app-frame.js)
- * runs the visible flow for it; that page's address is the app's own path on the node. `onNode`
- * says the redirect is the node itself at all; `bound` says it is exactly the page of exactly the
- * requested app. Such a node refuses every other address of its own, whatever the loopback rule
- * in validRedirect allows, because a code sent to one of its pages is a code any page there could
- * be sent.
+ * A PAGE OF THE NODE THAT HOLDS THE APP, AS A REDIRECT (audit A7-1). Two pages hold app code in an
+ * opaque-origin frame and run the visible flow for it: the isolated frame's page
+ * (src/static/app-frame.js), and the App Catalog's preview. Both name the app's own path on the node
+ * as the redirect, and the consent page posts the code to its opener on that origin, never into the
+ * frame. `bound` says the redirect is exactly that path of exactly the requested app, and is accepted
+ * on every node. `onNode` says the node must refuse any OTHER address of its own: a node that runs
+ * apps in the isolated frame does, whatever the loopback rule in validRedirect allows, because a code
+ * sent to one of its pages is a code any page there could be sent. Elsewhere validRedirect decides as
+ * before.
  */
 export async function frameRedirect(
   config: AimeatConfig, storage: Storage, uri: string, app: string,
@@ -44,12 +48,12 @@ export async function frameRedirect(
   // A redirect that does not parse is no address of the node; validRedirect refuses it on its own.
   if (!URL.canParse(uri)) return { onNode: false, bound: false, origin: '' };
   const u = new URL(uri);
-  if (!isNodeItself(config, u) || (await appIsolationMode(config, storage)) !== 'isolated-frame') {
-    return { onNode: false, bound: false, origin: '' };
-  }
+  if (!isNodeItself(config, u)) return { onNode: false, bound: false, origin: '' };
   const m = /^\/v1\/apps\/([^/]+)\/([^/]+)$/.exec(u.pathname);
   let named: string;
   // eslint-disable-next-line aimeat/no-silent-catch -- a path that does not decode names no app
   try { named = m ? `${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}` : ''; } catch { named = ''; }
-  return { onNode: true, bound: !!named && named === app && !u.search && !u.hash, origin: u.origin };
+  const bound = !!named && named === app && !u.search && !u.hash;
+  const isolated = (await appIsolationMode(config, storage)) === 'isolated-frame';
+  return { onNode: bound || isolated, bound, origin: u.origin };
 }

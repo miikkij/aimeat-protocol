@@ -17,6 +17,8 @@
  *   resolveFrameAppTarget
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   v1.3.0 — 2026-09-26 — resolveFrameAppTarget answers on every node: the App Catalog's preview
+ *     asks by name too, and it handed the owner's session to the code it previewed instead.
  *   v1.2.0 — 2026-09-25 — resolveFrameAppTarget: the app the isolated frame's page asks for, by its
  *     `owner/filename`, on a node several people share with no app origin (audit A7-1). There an app
  *     has no address of its own to be bound by, and the page asking is the node's own.
@@ -33,7 +35,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { resolvePublishedPortfolio } from '../routes/portfolio.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../routes/subdomains.js';
-import { appIsolationMode } from './app-isolation.js';
 
 /**
  * A grant target for a portfolio origin reads `portfolio:<username>`. An app target reads
@@ -48,7 +49,7 @@ export function isPortfolioTarget(target: string): boolean {
 
 export type AppOriginTarget =
   | { ok: true; family: 'app' | 'portfolio'; target: string; name: string; owner: string }
-  | { ok: false; error: 'app_origin_disabled' | 'bad_origin' | 'unknown_app' | 'frame_off' };
+  | { ok: false; error: 'app_origin_disabled' | 'bad_origin' | 'unknown_app' };
 
 /**
  * Resolve a caller-supplied origin to the app (or portfolio) it serves.
@@ -133,22 +134,22 @@ export async function resolveAppOriginTarget(
 }
 
 /**
- * Resolve the app the isolated frame's page asks for, `owner/filename`, to its grant target.
+ * Resolve the app a page of the node asks for by name, `owner/filename`, to its grant target.
  *
- * Only on a node that runs apps in the isolated frame (services/app-isolation.ts). There an app has
- * no address of its own for a token to be bound by: it runs at the node's own address, in a frame
- * whose origin is opaque, and the page holding the frame asks for it by name. That page is the node's
- * own (routes/app-grants.ts lets only a same-origin caller in), and it names the app whose address it
- * was served at. Everywhere else a grant is bound by the app's address and this answers 'frame_off'.
+ * Two pages hold app code in an opaque-origin frame of their own and ask for it this way: the
+ * isolated frame's page on a node several people share with no app origin, and the App Catalog's
+ * preview of code not yet published, on every node. Neither frame has an address a token could be
+ * bound by, so the page names the app. The page is the node's own: routes/app-grants.ts lets only a
+ * same-origin caller in, and on every node the only code on the node's own origin is the node's pages
+ * or, on a node one person uses, that person's own apps, which already hold that person's session.
  *
  * The target is the same `owner/filename` the app origin resolves to, so one app carries one grant
- * however it is reached, and a node that gains an app origin later keeps the grants it made.
- * An app its operator hid resolves to nothing, as its address answers nothing.
+ * however it is reached. An app its operator hid resolves to nothing, as its address answers nothing.
+ * `config` is unused and kept for the shape resolveAppOriginTarget has, which callers pass alike.
  */
 export async function resolveFrameAppTarget(
-  config: AimeatConfig, storage: Storage, app: string,
+  _config: AimeatConfig, storage: Storage, app: string,
 ): Promise<AppOriginTarget> {
-  if ((await appIsolationMode(config, storage)) !== 'isolated-frame') return { ok: false, error: 'frame_off' };
   const slash = app.indexOf('/');
   if (slash <= 0 || slash === app.length - 1 || app.indexOf('/', slash + 1) >= 0) return { ok: false, error: 'unknown_app' };
   const record = await storage.getAppByOwnerName(app.slice(0, slash), app.slice(slash + 1));

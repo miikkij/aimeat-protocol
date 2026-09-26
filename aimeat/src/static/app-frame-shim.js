@@ -16,6 +16,9 @@
  *   The leading comment block is removed before the script is served (utils/app-frame-assets.ts).
  * @version-history
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
+ *   v1.1.0 — 2026-09-26 — The page around the frame names its origin in the boot data, and the SDK
+ *     reads it from window.__AIMEAT_FRAME__: the App Catalog's preview is written into its frame as
+ *     srcdoc, which has no address of its own to take the origin from.
  */
 (function () {
   'use strict';
@@ -29,11 +32,14 @@
     if (typeof window.name === 'string' && window.name.indexOf(PREFIX) === 0) boot = JSON.parse(window.name.slice(PREFIX.length));
   } catch (e) { boot = null; }
   var hasHost = !!(boot && boot.v === 1) && window.parent !== window;
-  // The frame page and this document share the address they were served from; that address, not
-  // this document's opaque origin, is the one the page listens on.
-  var hostOrigin = location.protocol + '//' + location.host;
+  // The origin of the page around the frame, where it listens. It says so in the boot data; an older
+  // page did not, and then it is the address this document was served from (a preview written into
+  // the frame as srcdoc has no such address, which is why the page says it).
+  var hostOrigin = boot && typeof boot.origin === 'string' && /^https?:\/\/[^/?#\s]+$/.test(boot.origin)
+    ? boot.origin
+    : location.protocol + '//' + location.host;
   try {
-    Object.defineProperty(window, '__AIMEAT_FRAME__', { value: Object.freeze({ v: 1, host: hasHost }) });
+    Object.defineProperty(window, '__AIMEAT_FRAME__', { value: Object.freeze({ v: 1, host: hasHost, origin: hostOrigin }) });
   } catch (e) { /* defined already */ }
 
   function post(message) {
