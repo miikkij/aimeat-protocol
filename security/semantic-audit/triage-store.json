@@ -3394,7 +3394,8 @@
       "id": "a0ecb62eafb3",
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
       "date": "2026-09-24",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 6feace3f3, 27999bc24"
     },
     {
       "invariant": 13,
@@ -3414,7 +3415,7 @@
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
       "date": "2026-09-24",
       "status": "closed",
-      "resolution": "Korjattu: 810ae39b1"
+      "resolution": "Korjattu: 810ae39b1, e6929958a"
     },
     {
       "invariant": 13,
@@ -3434,7 +3435,7 @@
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
       "date": "2026-09-24",
       "status": "closed",
-      "resolution": "Korjattu: 5b697d746"
+      "resolution": "Korjattu: 5b697d746, 7bd083dcc"
     },
     {
       "invariant": 13,
@@ -3444,7 +3445,7 @@
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
       "date": "2026-09-24",
       "status": "closed",
-      "resolution": "Korjattu: 107daa4c1"
+      "resolution": "Korjattu: 107daa4c1, 05b11fc1e"
     },
     {
       "invariant": 13,
@@ -3454,7 +3455,7 @@
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
       "date": "2026-09-24",
       "status": "closed",
-      "resolution": "Korjattu: 107daa4c1"
+      "resolution": "Korjattu: 107daa4c1, 9db4fa937"
     },
     {
       "invariant": 13,
