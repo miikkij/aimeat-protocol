@@ -23,6 +23,8 @@
  *   has not run it yet.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mail-read-consent
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The marker is read under system@<node>, key migrations.mail-read-consent,
+ *     where services/mail-read-consent.ts now records it beside the operator:admin migration.
  *   v1.0.0 — 2026-09-25 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -39,10 +41,11 @@ const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const REDIRECT = 'http://localhost:9911/callback';
 const READ_WORD = 'connections:read-through';
-// Where the node keeps its marker. Spelled out rather than imported, so this suite reports a missing
-// migration as a failed assertion instead of failing to load.
-const MARKER_NS = '__node_migrations__';
-const MARKER_KEY = 'mail-read-consent';
+// Where the node keeps its marker: under its own system identity, where every run-once boot migration
+// records that it ran. Spelled out rather than imported, so this suite reports a missing migration as
+// a failed assertion instead of failing to load.
+const MARKER_NS = `system@${NODE_ID}`;
+const MARKER_KEY = 'migrations.mail-read-consent';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {

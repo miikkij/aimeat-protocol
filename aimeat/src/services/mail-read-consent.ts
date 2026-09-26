@@ -20,14 +20,19 @@
  *   message list needs). Each of those apps COULD read that owner's mail before, and the text says
  *   exactly that; the owner decides per app.
  *
- *   ONCE. A marker record under a namespace no principal can address (`__node_migrations__`) says the run
- *   happened; it is claimed before the first notice, so two processes booting together do not both
- *   send. A claim left by a run that stopped half way is taken over after STALE_CLAIM_MS, and an
- *   owner who already holds this notice is not sent it again.
- * @structure MAIL_READ_CONSENT_NS · MAIL_READ_CONSENT_KEY · MAIL_READ_CONSENT_TYPE · isReadableMailbox ·
+ *   ONCE. A marker record under the node's own system identity (`system@<node>`, a reserved name no
+ *   account can take), key MAIL_READ_CONSENT_KEY, says the run happened: the place every run-once boot
+ *   migration records itself (services/operator-admin-migration.ts does the same). It is claimed
+ *   before the first notice, so two processes booting together do not both send. A claim left by a
+ *   run that stopped half way is taken over after STALE_CLAIM_MS, and an owner who already holds this
+ *   notice is not sent it again.
+ * @structure MAIL_READ_CONSENT_KEY · MAIL_READ_CONSENT_TYPE · isReadableMailbox ·
  *   isEligibleGrant · mailReadNotice · migrateMailReadConsent
  * @usage migrateMailReadConsent(storage, config).catch(err => logger.error(…));   // once at boot
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The marker lives under system@<node>, key migrations.mail-read-consent,
+ *     beside the operator:admin migration's, instead of under `__node_migrations__`. Nothing had
+ *     run on a deployed node, so no old marker is read.
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -39,9 +44,10 @@ import { READ_THROUGH_SCOPE } from './app-grant-scopes.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 
-/** Where the node keeps its run-once markers: a synthetic owner with no `@`, so no principal writes it. */
-export const MAIL_READ_CONSENT_NS = '__node_migrations__';
-export const MAIL_READ_CONSENT_KEY = 'mail-read-consent';
+/** The run-once marker, under `system@<node>` (markerOwner) where every boot migration records itself. */
+export const MAIL_READ_CONSENT_KEY = 'migrations.mail-read-consent';
+/** The node's own system identity: a reserved owner name (utils/gaii.ts RESERVED_NAMES), so no account writes it. */
+const markerOwner = (nodeId: string): string => `system@${nodeId}`;
 /** Starts with `app_`, so the notice sits in the owner's Apps group (notification-settings.ts). */
 export const MAIL_READ_CONSENT_TYPE = 'app_mail_read_consent';
 /** A claim older than this belongs to a run that stopped; the next boot takes it over. */
@@ -90,10 +96,10 @@ export function mailReadNotice(grants: AppGrantRecord[]): NotifyInput {
 }
 
 /** Claim the run. False when it has run, or when another process is running it right now. */
-async function claim(storage: Storage): Promise<boolean> {
+async function claim(storage: Storage, nodeId: string): Promise<boolean> {
   const now = new Date().toISOString();
   const value = { status: 'running', startedAt: now };
-  const existing = await storage.getMemory(MAIL_READ_CONSENT_NS, MAIL_READ_CONSENT_KEY);
+  const existing = await storage.getMemory(markerOwner(nodeId), MAIL_READ_CONSENT_KEY);
   if (existing) {
     const v = (existing.value ?? {}) as { status?: string; startedAt?: string };
     const age = Date.now() - Date.parse(v.startedAt ?? '');
@@ -102,7 +108,7 @@ async function claim(storage: Storage): Promise<boolean> {
     return true;
   }
   const record: MemoryRecord = {
-    key: MAIL_READ_CONSENT_KEY, ownerGaii: MAIL_READ_CONSENT_NS, value, visibility: 'private',
+    key: MAIL_READ_CONSENT_KEY, ownerGaii: markerOwner(nodeId), value, visibility: 'private',
     tags: ['migration'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
   };
   if (storage.createMemoryIfAbsent) return (await storage.createMemoryIfAbsent(record)) !== null;
@@ -123,7 +129,7 @@ async function alreadyTold(storage: Storage, ownerGhii: string): Promise<boolean
 export async function migrateMailReadConsent(
   storage: Storage, config: AimeatConfig,
 ): Promise<{ ran: boolean; owners: number; grants: number }> {
-  if (!(await claim(storage))) return { ran: false, owners: 0, grants: 0 };
+  if (!(await claim(storage, config.nodeId))) return { ran: false, owners: 0, grants: 0 };
   const providers = buildOutboundProviders(config);
   const byOwner = new Map<string, AppGrantRecord[]>();
   for (const grant of await storage.listAppGrants()) {
@@ -145,9 +151,9 @@ export async function migrateMailReadConsent(
     if (sent.stored) { owners++; grants += list.length; }
   }
   const now = new Date().toISOString();
-  const marker = await storage.getMemory(MAIL_READ_CONSENT_NS, MAIL_READ_CONSENT_KEY);
+  const marker = await storage.getMemory(markerOwner(config.nodeId), MAIL_READ_CONSENT_KEY);
   await storage.setMemory({
-    key: MAIL_READ_CONSENT_KEY, ownerGaii: MAIL_READ_CONSENT_NS,
+    key: MAIL_READ_CONSENT_KEY, ownerGaii: markerOwner(config.nodeId),
     value: { status: 'done', finishedAt: now, owners, grants }, visibility: 'private', tags: ['migration'],
     ttlHours: null, version: (marker?.version ?? 0) + 1, createdAt: marker?.createdAt ?? now, updatedAt: now,
   });
