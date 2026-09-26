@@ -17,6 +17,9 @@
  *     alone — agent-produced keys live in agent keyspaces, so cross-agent signals falsely counted 0.
  *   v1.2.0 — 2026-09-24 — A signal reads a record as the memory doors show it (shownMemoryValue), so
  *     a credential record reads as { configured: true } and neither the run nor the llm judge holds it.
+ *   v1.3.0 — 2026-09-26 — The llm judge answers to the run's cost cap: what a call cost is kept on
+ *     the run (`signalCostUsd`), and past maxCostUsd the judge is not asked and the leaf passes
+ *     (secaudit 2026-09, A6-11).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -25,17 +28,26 @@ import { validateValueAgainstSchema } from '../schema-validator.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { shownMemoryValue } from '../secret-records.js';
 import { globToRegExp, type SignalEvalCtx } from './signal-eval.js';
+import { costCapReached, recordSignalCost } from './run-cost.js';
 import type { WorkflowRun } from '../../models/workflow-schemas.js';
 
-/** The node-OpenRouter judge for `llm` leaves. Any failure degrades to a pass (never breaks a run). */
-function makeLlmJudge(storage: Storage, config: AimeatConfig, ownerGhii: string, workflowId: string) {
+/**
+ * The node-OpenRouter judge for `llm` leaves. Any failure degrades to a pass (never breaks a run).
+ * It spends the owner's AI the way an ai step does, so it answers to the run's cap (run-cost.ts): what
+ * a call cost is kept on the run, and once the run has spent maxCostUsd the judge is not asked and
+ * the leaf passes, as it does when the judge is unavailable. The engine saves the run after it
+ * evaluates, so the cost is kept with everything else the evaluation changed.
+ */
+function makeLlmJudge(storage: Storage, config: AimeatConfig, ownerGhii: string, run: WorkflowRun) {
   return async ({ content, ask }: { key: string; content: unknown; ask: string }): Promise<{ ok: boolean; reason: string }> => {
+    if (costCapReached(run)) return { ok: true, reason: 'llm not asked: this run has spent its maxCostUsd — degraded to pass' };
     try {
       const text = typeof content === 'string' ? content : JSON.stringify(content);
       const result = await completeForOwner(storage, config, ownerGhii, {
         prompt: `Answer strictly as JSON {"ok":boolean,"reason":string}. Question: ${ask}\n\nContent:\n${text.slice(0, 20_000)}`,
-        appId: `workflow:${workflowId}`,
+        appId: `workflow:${run.workflowId}`,
       });
+      recordSignalCost(run, result.usage?.costUsd);
       const m = /\{[\s\S]*\}/.exec(result.content);
       if (!m) return { ok: true, reason: 'llm response unparseable — degraded to pass' };
       const parsed = JSON.parse(m[0]) as { ok?: boolean; reason?: string };
@@ -76,7 +88,7 @@ export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: 
       return recs.filter(r => re.test(r.key)).map(r => ({ key: r.key.slice(prefix.length), value: shownMemoryValue(r.key, r.value) }));
     },
     vars: run.vars,
-    llm: llmEnabled ? makeLlmJudge(storage, config, ownerGhii, run.workflowId) : null,
+    llm: llmEnabled ? makeLlmJudge(storage, config, ownerGhii, run) : null,
     // Real ajv validation for the json_schema leaf — a step must NOT report success while producing
     // schema-invalid output (previously this degraded to json_valid → a false GREEN).
     validateJsonSchema: (value, schema) => validateValueAgainstSchema(value, schema),

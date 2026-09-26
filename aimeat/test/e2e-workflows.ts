@@ -35,6 +35,9 @@
  *     at save, at a run and at the trigger; one saved before keeps running without it.
  *   v1.12.0 — 2026-09-26 — The refusal's two buttons carry their own locale keys, so the bell and the
  *     Notifications page say them in the reader's language.
+ *   v1.13.0 — 2026-09-26 — A6-11: what the node's model spends judging an llm signal counts toward
+ *     maxCostUsd, and past the cap the judge is not asked. Failed on the code before the fix: the
+ *     judged run ended `done` with both ai steps run.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -1346,6 +1349,58 @@ async function run() {
     } finally {
       await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
       for (const id of ['cost-capped', 'cost-open']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+      await provider.close();
+    }
+  });
+
+  // A6-11. The node's model judging an `llm` signal spends the owner's AI as well. What it spends
+  // counts toward the run's cap, and once the run has reached the cap the judge is not asked: the
+  // leaf passes, the way it does when the judge is unavailable.
+  await test('maxCostUsd counts what the node\'s model spends judging an llm signal, and asks it nothing once the cap is reached', async () => {
+    const provider = await startFakeAiProvider(0);
+    try {
+      provider.setDefault('chat', chatJson('the answer', { usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost: 0.02 } }));
+      const aim = await json('/v1/memory', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: provider.baseUrl, model: 'stub/test-model', daily_budget_usd: 5 } }),
+      });
+      assert(aim.body?.ok === true, `point the owner at the stub: ${aim.status} ${JSON.stringify(aim.body.error)}`);
+      const wf = (cap: number) => ({
+        title: { en_US: 'Judged answer' }, description: { en_US: 'an answer the node judges, then another' },
+        trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', llm: { approved: true }, maxCostUsd: cap,
+        steps: [
+          { id: 'first', description: { en_US: 'First' }, required_to_function: 'none',
+            action: { kind: 'ai', prompt: 'Say one thing.', result_to_key: 'wfjudge.first' },
+            success_signal: { kind: 'llm', key: 'wfjudge.first', ask: 'Is this an answer?' } },
+          { id: 'second', after: ['first'], description: { en_US: 'Second' }, required_to_function: 'none', action: { kind: 'ai', prompt: 'Say another thing.', result_to_key: 'wfjudge.second' } },
+        ],
+      });
+      const runOnce = async (id: string, cap: number) => {
+        const put = await json(`/v1/workflows/${id}`, { method: 'PUT', headers: auth, body: JSON.stringify(wf(cap)) });
+        assert(put.status === 200, `save ${id}: ${put.status} ${JSON.stringify(put.body.error)}`);
+        const start = await json(`/v1/workflows/${id}/run`, { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+        assert(start.status === 200, `run ${id}: ${start.status} ${JSON.stringify(start.body.error)}`);
+        return waitForRunEnd(id, start.body.data.runId);
+      };
+
+      // The first step's own call (two cents) is under a cap of three; the judge's call takes the run
+      // past it, so the second step does not start.
+      const judged = await runOnce('judge-counted', 0.03);
+      assert(judged.status === 'stopped', `the judge's spend counts toward the cap: ${judged.status} ${JSON.stringify(judged.steps)}`);
+      assert(Math.abs((judged.signalCostUsd ?? 0) - 0.02) < 1e-9, `the run keeps what the judge cost: ${JSON.stringify(judged.signalCostUsd)}`);
+      assert(Math.abs((judged.costCap?.spentUsd ?? 0) - 0.04) < 1e-9, `the stop names both calls: ${JSON.stringify(judged.costCap)}`);
+      assert(judged.steps.second.state === 'skipped', `the next ai step did not start: ${judged.steps.second.state}`);
+      assert(provider.requestsFor('chat').length === 2, `the step and the judge asked the model, nothing more: ${provider.requestsFor('chat').length}`);
+
+      // With a cap under one call, the first step's own call reaches it, and the judge is not asked.
+      provider.reset();
+      const pastCap = await runOnce('judge-past-cap', 0.01);
+      assert(pastCap.status === 'stopped', `the run stops at its cap: ${pastCap.status}`);
+      assert(pastCap.steps.first.state === 'green', `the leaf the judge was not asked about passes: ${JSON.stringify(pastCap.steps.first)}`);
+      assert(provider.requestsFor('chat').length === 1, `past the cap the judge is not asked: ${provider.requestsFor('chat').length}`);
+    } finally {
+      await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+      for (const id of ['judge-counted', 'judge-past-cap']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
       await provider.close();
     }
   });
