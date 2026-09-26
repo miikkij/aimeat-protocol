@@ -256,6 +256,15 @@
         "logOff": "Registro de rechazos: apagado",
         "logWhy": "{path}, {bytes} de {max}; rota al pasar de ahí y conserva una generación anterior.",
         "logOffWhy": "No se escribe nada cuando se rechaza a alguien. Define una ruta de archivo para conservar la historia.",
+        "apps": {
+          "appOrigin": "Cada aplicación tiene su propia dirección",
+          "appOriginWhy": "Las aplicaciones funcionan bajo {host}. Ahí no existe la sesión de quien abre una aplicación.",
+          "sharedOrigin": "Las aplicaciones funcionan en la dirección de este servidor",
+          "sharedOriginWhy": "Aquí solo una persona tiene cuenta, así que cada aplicación es suya y funciona con su sesión. Cuando otra persona obtiene una cuenta, cada aplicación pasa sola a un marco aislado.",
+          "isolatedFrame": "Las aplicaciones funcionan en un marco aislado",
+          "isolatedFrameWhy": "Este servidor tiene {people} cuentas y las aplicaciones no tienen dirección propia. El marco no puede leer la sesión ni los datos guardados de nadie aquí, y una aplicación llega a este servidor solo con los permisos que se le dieron. En el marco, una aplicación no puede usar una base de datos del navegador ni enviar notificaciones, y no se puede instalar.",
+          "isolatedFrameFix": "Para darle a cada aplicación su propia dirección: apunta *.{host} a este servidor con un certificado TLS que lo cubra, define AIMEAT_APP_HOST={host} y AIMEAT_APP_ORIGIN_ENABLED=true, y reinicia el servidor."
+        },
         "doors": {
           "security": "Ajustes · Seguridad",
           "totp": "Ajustes · TOTP"

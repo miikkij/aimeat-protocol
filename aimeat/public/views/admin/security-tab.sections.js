@@ -8,6 +8,10 @@
  *   with a door to Settings), and the paste for the operator's own AI.
  * @structure IncidentsSection · AccountsSection · SettingsSection · AskAiSection
  * @version-history
+ *   v1.2.0 — 2026-09-25 — The first row of section 05 says how apps are kept apart (audit A7-1): on
+ *     their own addresses, in the isolated frame (with what to set to give them addresses), or on this
+ *     server's address while one person has an account. A row may have no door, since that setting
+ *     lives in the environment rather than on the Config page.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-05 — Initial (the Security page in the poster face).
@@ -24,13 +28,27 @@ import { buildSecurityPrompt } from './security-tab.prompt.js';
 const html = htm.bind(h);
 const S = (key, params) => t('admin.security.' + key, params);
 
-/** A row in words with a quiet door on the right (sections 04 and 05). */
+/** A row in words with a quiet door on the right (sections 04 and 05). No `door`, no button. */
 function DoorRow({ title, why, door, onClick, last }) {
   return html`
     <div class="adm-mrow adm-mrow--two ${last ? 'adm-mrow--last' : ''}">
       <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <button type="button" class="og-door og-door--quiet" onClick=${onClick}>${door}</button>
+      ${door ? html`<button type="button" class="og-door og-door--quiet" onClick=${onClick}>${door}</button>` : null}
     </div>`;
+}
+
+/** The overview's `isolation` word, as the key of its sentence. */
+const APPS_KEY = { 'app-origin': 'appOrigin', 'isolated-frame': 'isolatedFrame', 'shared-origin': 'sharedOrigin' };
+
+/** How apps are kept apart here, and on a shared node without app addresses what to set. */
+function appsLine(apps) {
+  const key = APPS_KEY[apps.isolation] || 'sharedOrigin';
+  const host = (apps.settings && apps.settings.AIMEAT_APP_HOST) || apps.app_origin?.host || '';
+  const why = S('settings.apps.' + key + 'Why', { host, people: num(apps.people) });
+  return {
+    title: S('settings.apps.' + key),
+    why: apps.isolation === 'isolated-frame' ? why + ' ' + S('settings.apps.isolatedFrameFix', { host }) : why,
+  };
 }
 
 export function IncidentsSection({ ov, onResolve, onDelete, onPayload }) {
@@ -97,11 +115,13 @@ export function SettingsSection({ ov, switchPage }) {
   const log = ov.now.log;
   const windowWord = (ms) => ms === 60000 ? S('settings.aMinute') : S('settings.perSeconds', { s: Math.round(ms / 1000) });
   const toConfig = () => switchPage('config');
+  const apps = ov.apps ? appsLine(ov.apps) : null;
   return html`
     <section class="og-sec" id="adm-sec-05">
       <div class="og-sec-h"><h2 class="poster-section-title">${S('settings.title')}<small>05</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${toConfig}>${t('dashboard.config')}</button></div></div>
       <p class="adm-sec-lead">${S('settings.lead')}</p>
+      ${apps ? html`<${DoorRow} title=${apps.title} why=${apps.why} />` : null}
       <${DoorRow}
         title=${S('settings.login', { max: num(s.login_rate_limit.max), window: windowWord(s.login_rate_limit.window_ms) })}
         why=${S('settings.loginWhy')} door=${S('settings.doors.security')} onClick=${toConfig} />

@@ -1162,6 +1162,15 @@
         "logOff": "Refusal log: off",
         "logWhy": "{path}, {bytes} of {max}; rotates past that and keeps one older generation.",
         "logOffWhy": "Nothing is written when somebody is turned away. Set a file path to keep the story.",
+        "apps": {
+          "appOrigin": "Every app runs on an address of its own",
+          "appOriginWhy": "Apps run under {host}. There the sign-in of the person who opens an app does not exist.",
+          "sharedOrigin": "Apps run on this server's own address",
+          "sharedOriginWhy": "Only one person has an account here, so every app is that person's own and runs with their sign-in. When a second person gets an account, every app moves into an isolated frame by itself.",
+          "isolatedFrame": "Apps run in an isolated frame",
+          "isolatedFrameWhy": "This server has {people} accounts, and apps have no address of their own. The frame cannot read anybody's sign-in or stored data here, and an app reaches this server only with the permissions it was given. In the frame an app cannot use a browser database, a service worker or notifications, and it cannot be installed.",
+          "isolatedFrameFix": "To give every app an address of its own: point *.{host} at this server with a TLS certificate that covers it, set AIMEAT_APP_HOST={host} and AIMEAT_APP_ORIGIN_ENABLED=true, and restart."
+        },
         "doors": {
           "security": "Settings · Security",
           "totp": "Settings · TOTP"
