@@ -12,6 +12,10 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.2.2 -- 2026-09-26 -- A cross-node copy reads the peer's download up to the size the
+ *     attachment declares, and its grant answer up to 64 KB, with the ceiling holding while the bytes
+ *     arrive (utils/read-capped.ts). The download was read whole with arrayBuffer() after the quota
+ *     had been checked against the declared size (secaudit 2026-09, N3).
  *   v1.2.1 -- 2026-09-08 -- A same-node file the named principal does not have is looked for under
  *     that account's own agents, so messages written before the send-side fix heal on the next sweep
  *     rather than expiring unread.
@@ -35,6 +39,10 @@ import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { readBodyCapped } from '../utils/read-capped.js';
+
+/** The most a peer's grant answer may be: a few hundred bytes of JSON that name one download URL. */
+const MAX_GRANT_ANSWER_BYTES = 64 * 1024;
 
 export interface AttachmentCtx {
   config: AimeatConfig;
@@ -144,12 +152,27 @@ export async function requestStorageGrant(ctx: AttachmentCtx, message: DirectMes
       signal: AbortSignal.timeout(ctx.config.federationTimeoutMs),
     });
     if (!resp.ok) return null;
-    const data = await resp.json() as { data?: { download_url?: string } };
+    // Both answers are the PEER's, so both are read with a ceiling that holds while they arrive
+    // (utils/read-capped.ts): a peer's Content-Length is its own word, and may be missing or false.
+    const grant = await readBodyCapped(resp, MAX_GRANT_ANSWER_BYTES);
+    if (!grant) return null;
+    const data = JSON.parse(grant.toString('utf8')) as { data?: { download_url?: string } };
     const url = data?.data?.download_url;
     if (!url) return null;
     const dl = await safeFetch(url, { signal: AbortSignal.timeout(ctx.config.federationTimeoutMs) });
     if (!dl.ok) return null;
-    return Buffer.from(await dl.arrayBuffer());
+    // The bytes are read up to the size the attachment declares, which is the size the recipient's
+    // quota was checked against, and not one chunk further. A size the descriptor does not state as
+    // a number reads nothing.
+    const declared = typeof att.size === 'number' && Number.isFinite(att.size) && att.size >= 0 ? att.size : 0;
+    const bytes = await readBodyCapped(dl, declared);
+    if (!bytes) {
+      logger.warn('attachment duplication: the peer sent more than the attachment declares, nothing copied', {
+        node: att.originNodeId, attachmentId: att.id, declared,
+      });
+      return null;
+    }
+    return bytes;
   } catch (err) {
     logger.warn('storage grant/download failed', { error: err instanceof Error ? err.message : String(err), node: att.originNodeId });
     return null;
