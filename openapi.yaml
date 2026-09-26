@@ -47578,9 +47578,13 @@ paths:
       summary: Look up a local owner by email (exact match)
       description: >-
         EXACT-match email → local owner, via the same privacy-preserving hash the invite flow
-        uses (no enumeration or substring search). Authenticated + rate-limited. Found → the
-        owner's GHII + display name; not found → can_invite signals whether an email invitation
-        could be sent instead.
+        uses (no enumeration or substring search). Found → the owner's GHII + display name;
+        not found → can_invite signals whether an email invitation could be sent instead.
+        The owner in person, or their agent holding `messages:read` (the permission the
+        `aimeat_contact_resolve_email` tool declares, which asks this door); an app grant, an
+        ecosystem app and a session from another node are refused. One account has 20 lookups
+        in 10 minutes, counted per owner: the owner and all their agents share them, and a
+        refusal answers 429 with Retry-After.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -47614,7 +47618,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '429': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/contacts/{contactId}/together:
     get:

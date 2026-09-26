@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-25 — aimeat_contact_resolve_email answers an agent holding messages:read, and says one
+ *     account has 20 lookups in 10 minutes, the owner and all their agents together.
  *   2026-09-24 — aimeat_contact_resolve_email says the lookup is the account holder's own and
  *     throttled, as POST /v1/contacts/resolve is, so an agent session is refused (audit A5-2).
  *   2026-09-19 — aimeat_handbook_get: the `tier` description names the Atelier specification first.
@@ -467,7 +469,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_contact_resolve_email',
-        description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email). The lookup is the account holder\'s own and limited to 20 per 10 minutes, the same door as POST /v1/contacts/resolve: an agent session is refused with ACCESS_DENIED, so save a person by name and email with aimeat_contact_add instead.',
+        description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email). The same door as POST /v1/contacts/resolve, on the messages:read permission. One account has 20 lookups in 10 minutes, the owner and all their agents together; past that the answer is RATE_LIMITED with the seconds to wait.',
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {

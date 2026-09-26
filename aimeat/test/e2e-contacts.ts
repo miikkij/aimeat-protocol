@@ -5,6 +5,10 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.4.0 — 2026-09-25 — Tests 28–30: an agent holding messages:read looks an address up on the REST
+ *     door and the tool and gets the owner's answer; an agent without the word is refused on both;
+ *     one account has 20 lookups in 10 minutes, the owner and its agents together, and another
+ *     account is not slowed. Test 28 asserted the refusal the developer ruled against on 2026-09-25.
  *   v1.3.0 — 2026-09-24 — Test 28 (security audit A5-2): the email lookup over MCP answers an agent
  *     the way POST /v1/contacts/resolve does, refused, where it used to answer any agent holding
  *     messages:read with no owner gate and no limit.
@@ -533,26 +537,76 @@ async function mcpCallAs(gaii: string, key: string, name: string, args: Record<s
     return rpc('tools/call', { name, arguments: args }, 2);
 }
 
-await test('28. The email lookup over MCP answers an agent the way the REST door does: refused', async () => {
-    // The REST door is the account holder's, and throttled: whether an address has an account here
-    // is an oracle. The tool gave an agent holding messages:read the same answer with neither.
+/** An agent of `owner` holding exactly `scopes`, with a REST token and its key for an MCP session. */
+async function agentOf(owner: { name: string; token: string }, name: string, scopes: string[]) {
     const made = await json('/v1/agents', {
-        method: 'POST', headers: auth(A.token),
-        body: JSON.stringify({ name: 'resolvebot', owner: A.name, capabilities: ['messages'], model: 'gpt-4o', scopes: ['messages:read'] }),
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ name, owner: owner.name, capabilities: ['messages'], model: 'gpt-4o', scopes }),
     });
-    assert(made.status === 201, `agent ${made.status}: ${JSON.stringify(made.body.error)}`);
+    assert(made.status === 201, `agent ${name} ${made.status}: ${JSON.stringify(made.body.error)}`);
     const gaii = made.body.data.agent.gaii as string;
     const key = made.body.data.private_key as string;
-
     const ts = new Date().toISOString();
-    const agentTok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(key, gaii + ts) }) });
-    const rest = await json('/v1/contacts/resolve', { method: 'POST', headers: auth(agentTok.body.data.token), body: JSON.stringify({ email: 'probe@example.com' }) });
-    assert(rest.status === 403 && rest.body.error?.code === 'ACCESS_DENIED', `the REST door, as the control: ${rest.status} ${rest.body.error?.code}`);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(key, gaii + ts) }) });
+    assert(tok.body.ok === true, `agent token ${name}: ${JSON.stringify(tok.body.error)}`);
+    return { gaii, key, token: tok.body.data.token as string };
+}
+const lookup = (token: string, email: string) =>
+    json('/v1/contacts/resolve', { method: 'POST', headers: auth(token), body: JSON.stringify({ email }) });
 
-    const over = await mcpCallAs(gaii, key, 'aimeat_contact_resolve_email', { email: 'probe@example.com' });
-    const text = String(over.result?.content?.[0]?.text ?? '');
-    assert(over.result?.isError === true && text.startsWith('ACCESS_DENIED'),
-        `the tool answered the agent: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+await test('28. An agent holding messages:read looks an address up on both doors, and gets the answer the owner gets', async () => {
+    // The permission the tool has always declared. The REST door took the owner in person only, so
+    // the tool, which asks that door, refused every agent.
+    const bot = await agentOf(A, 'resolvebot', ['messages:read']);
+    const probe = `probe-${Date.now()}@example.com`;
+    const rest = await lookup(bot.token, probe);
+    assert(rest.status === 200 && rest.body.data.found === false && typeof rest.body.data.can_invite === 'boolean',
+        `the REST door answered the agent ${rest.status} ${JSON.stringify(rest.body.error ?? rest.body.data)}`);
+
+    const over = await mcpCallAs(bot.gaii, bot.key, 'aimeat_contact_resolve_email', { email: probe });
+    const answer = over.result?.isError === true ? null : JSON.parse(String(over.result?.content?.[0]?.text ?? 'null'));
+    assert(answer?.found === false && typeof answer?.can_invite === 'boolean',
+        `the tool answered the agent with ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+});
+
+await test('29. An agent without messages:read is refused on both doors', async () => {
+    const reader = await agentOf(A, 'noresolvebot', ['memory:read']);
+    const rest = await lookup(reader.token, 'probe@example.com');
+    assert(rest.status === 403, `the REST door answered an agent without the word: ${rest.status} ${JSON.stringify(rest.body.data ?? rest.body.error)}`);
+    // The tool is not registered for a session without the word, and the SDK answers "not found".
+    const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_resolve_email', { email: 'probe@example.com' });
+    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).includes('not found'),
+        `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+});
+
+await test('30. One account has 20 lookups in 10 minutes, the owner and its agents together; another account is not slowed', async () => {
+    // A fresh account, so the lookups above do not count against it.
+    const D = await setupOwner('d');
+    const bot = await agentOf(D, 'lookupbot', ['messages:read']);
+    for (let i = 0; i < 10; i++) {
+        const r = await lookup(D.token, `owner-${i}-${Date.now()}@example.com`);
+        assert(r.status === 200, `the owner's lookup ${i + 1}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    for (let i = 0; i < 9; i++) {
+        const r = await lookup(bot.token, `agent-${i}-${Date.now()}@example.com`);
+        assert(r.status === 200, `the agent's lookup ${i + 11}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    const twentieth = await mcpCallAs(bot.gaii, bot.key, 'aimeat_contact_resolve_email', { email: `mcp-${Date.now()}@example.com` });
+    assert(twentieth.result?.isError !== true && twentieth.result?.content?.[0]?.text?.includes('"found"'),
+        `the twentieth, over MCP: ${JSON.stringify(twentieth.result ?? twentieth.error).slice(0, 200)}`);
+
+    const res21 = await fetch(`${BASE}/v1/contacts/resolve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(D.token) }, body: JSON.stringify({ email: 'one-too-many@example.com' }),
+    });
+    const body21 = await res21.json() as any;
+    assert(res21.status === 429 && body21.error?.code === 'RATE_LIMITED', `the 21st: ${res21.status} ${JSON.stringify(body21.error)}`);
+    assert(Number(res21.headers.get('retry-after')) > 0, `the 21st says when to try again: ${res21.headers.get('retry-after')}`);
+    const viaTool = await mcpCallAs(bot.gaii, bot.key, 'aimeat_contact_resolve_email', { email: 'still-too-many@example.com' });
+    assert(viaTool.result?.isError === true && String(viaTool.result?.content?.[0]?.text).startsWith('RATE_LIMITED'),
+        `the agent's next one over MCP: ${JSON.stringify(viaTool.result ?? viaTool.error).slice(0, 200)}`);
+
+    const other = await lookup(B.token, `b-${Date.now()}@example.com`);
+    assert(other.status === 200, `another account was slowed by this one: ${other.status} ${JSON.stringify(other.body.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
