@@ -5,6 +5,9 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — An attribute value is read as a browser uses it (1a0a15eb7b20): a character
+ *     reference other than &amp;, and a backslash, are refused, each of which made fill a url() the
+ *     preview fetched. Failed on the old code first.
  *   v1.2.0 — 2026-09-24 — Every selector is read to its end: `.wkgrid ~ p` and `.wkgrid + *` reach the
  *     page beside the component and are refused, as are a :has() looking sideways, an :is() looking
  *     up and a rule naming the page; what stays inside the component still passes. The two new
@@ -95,6 +98,25 @@ describe('the component bench', () => {
     expect(tagsOf('<div></ div title="><script>x</script>">').tags[1]).toMatchObject({ closing: true, odd: true });
     // What a browser and the bench agree on still passes: a self-closing SVG path, a bare attribute.
     expect(() => validateComponentBody({ ...WEEK_GRID, html: '<div class="wkgrid" hidden><svg class="wkgrid-i" viewBox="0 0 8 8"><path class="wkgrid-p" d="M0 0L8 8"/></svg><br/></div >' })).not.toThrow();
+  });
+
+  // 1a0a15eb7b20, the value: a browser decodes a character reference in an attribute value before
+  // anything uses it, and reads an SVG presentation attribute (fill, stroke) as a style value, where
+  // an escape resolves. Each of these put a url() the bench read past into the preview, and the
+  // browser fetched it.
+  it('reads an attribute value as a browser uses it: no character reference but &amp;, and no escape', () => {
+    const svg = (attr: string) => ({ html: `<svg class="wkgrid-i" viewBox="0 0 8 8"><rect class="wkgrid-r" width="8" height="8" ${attr}></rect></svg>` });
+    expect(bad(svg('fill="u&#114;l(https://e.example/p.svg#g)"'))).toThrow(/character reference/);
+    expect(bad(svg('fill="&#x75;rl(https://e.example/p.svg#g)"'))).toThrow(/character reference/);
+    expect(bad(svg('fill="url&lpar;https://e.example/p.svg#g)"'))).toThrow(/character reference/);
+    expect(bad(svg('fill=u&#114;l(https://e.example/p.svg#g)'))).toThrow(/character reference/);
+    expect(bad(svg('fill="u\\72 l(https://e.example/p.svg#g)"'))).toThrow(/backslash/);
+    expect(bad(svg('stroke="u\\rl(https://e.example/p.svg#g)"'))).toThrow(/backslash/);
+    // The reader says so itself.
+    expect(attributesOf(' fill="u&#114;l(x)"')[0]).toMatchObject({ key: 'fill', odd: true });
+    // &amp; stays: it decodes to a plain "&", which nothing decodes again.
+    expect(attributesOf(' aria-label="Read &amp; write"')[0]).toMatchObject({ value: 'Read &amp; write', odd: false });
+    expect(() => validateComponentBody({ ...WEEK_GRID, html: WEEK_GRID.html.replace('aria-label="This week"', 'aria-label="Read &amp; write"') })).not.toThrow();
   });
 
   // e82c9f26d729: a browser resolves CSS escapes, so each of these is url(), @import, fixed or

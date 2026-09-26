@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.5.2 — 2026-09-26 — A component whose SVG fill carries a character reference (`u&#114;l(`) is
+ *     refused at propose (1a0a15eb7b20). Failed on the old code first (201).
  *   v1.5.1 — 2026-09-24 — A component whose stylesheet reaches beside it (`.wkgrid ~ p`) is refused at
  *     propose. Failed on the old code first (201).
  *   v1.5.0 — 2026-09-24 — A component with an "=" where a name belongs, or an escaped url(, is
@@ -460,6 +462,10 @@ const GOOD_BODY = {
         // nonce, on this node's origin. And e82c9f26d729: an escaped url( the browser loads.
         const unnamed = await propose(`comp-bad-${stamp}`, body({ html: '<div class="wkgrid" ="><script>document.title=1</script>"></div>' }));
         assert(unnamed.status === 422 && /"=" stands where a browser expects/.test(unnamed.body.error?.message ?? ''), `an "=" with no name is refused: ${unnamed.status} ${JSON.stringify(unnamed.body?.error)}`);
+        // A character reference a browser decodes before the value is used: `u&#114;l(` is url() in
+        // fill, and the preview fetched the address from this node's origin (1a0a15eb7b20).
+        const referenced = await propose(`comp-bad-${stamp}`, body({ html: '<div class="wkgrid"><svg class="wkgrid-i" viewBox="0 0 8 8"><rect class="wkgrid-r" width="8" height="8" fill="u&#114;l(https://evil.example/p.svg#g)"></rect></svg></div>' }));
+        assert(referenced.status === 422 && /character reference/.test(referenced.body.error?.message ?? ''), `a character reference in a value is refused: ${referenced.status} ${JSON.stringify(referenced.body?.error)}`);
         const escaped = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); background: u\\rl(https://evil.example/x.png); }' }));
         assert(escaped.status === 422 && /no url\(\)/.test(escaped.body.error?.message ?? ''), `an escaped url( is refused: ${escaped.status} ${JSON.stringify(escaped.body?.error)}`);
         // A selector is read to its end: `.wkgrid ~ p` starts at the component and styles the page after it.

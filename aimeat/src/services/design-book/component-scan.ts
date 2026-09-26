@@ -28,6 +28,8 @@
  *   complexSelectorOf · withoutVarFallbacks
  * @usage for (const tag of tagsOf(html)) { … }
  * @version-history
+ *   v1.2.1 — 2026-09-26 — attributesOf marks a value holding a character reference odd, `&amp;` apart
+ *     (1a0a15eb7b20): a browser decodes it before the value is used, and the value was read as written.
  *   v1.2.0 — 2026-09-24 — selectorListOf and complexSelectorOf: a selector list split where a browser
  *     splits it, and each selector read to its end, compound by compound, with its combinators and
  *     the arguments of its pseudo-classes. The bench read only a selector's first class, and a rule
@@ -96,15 +98,21 @@ const WHITESPACE = new Set([' ', '\t', '\n', '\r', '\f']);
 /**
  * The attributes of one tag's text: name, and value with its quotes taken off (empty when bare).
  * `odd` marks an attribute a browser and this reader could disagree about: a quote or an angle
- * bracket in a name or in an unquoted value, a quoted value that never closes, or an "=" where a
+ * bracket in a name or in an unquoted value, a quoted value that never closes, an "=" where a
  * browser expects a name (it reads the "=" and what follows as the NAME, quotes and all, and ends
- * the tag at the first ">"). The bench refuses those outright, because an allowlist is only as
- * good as the agreement on where a tag ends. Nothing is dropped: an attribute with no name is
- * returned with `key: ''`, odd, so the one who reads the list sees it.
+ * the tag at the first ">"), or a character reference in a value. The bench refuses those
+ * outright, because an allowlist is only as good as the agreement on where a tag ends and on what
+ * a value says. Nothing is dropped: an attribute with no name is returned with `key: ''`, odd, so
+ * the one who reads the list sees it.
+ *
+ * A VALUE IS RETURNED AS WRITTEN, and a browser decodes its character references before anything
+ * uses it: `u&#114;l(` is `url(` to a browser. So a value holding any reference is odd, except
+ * `&amp;`, which decodes to a plain "&" that nothing decodes again.
  */
 export function attributesOf(text: string): Array<{ key: string; value: string; odd: boolean }> {
   const out: Array<{ key: string; value: string; odd: boolean }> = [];
   const risky = (s: string) => s.includes('"') || s.includes('\'') || s.includes('`') || s.includes('<') || s.includes('>');
+  const decodes = (s: string) => s.replaceAll('&amp;', '').includes('&');
   let i = 0;
   const skip = (set: Set<string>) => { while (i < text.length && set.has(text[i])) i++; };
   while (i < text.length) {
@@ -125,12 +133,12 @@ export function attributesOf(text: string): Array<{ key: string; value: string; 
         if (close === -1) odd = true;
         value = text.slice(i + 1, close === -1 ? text.length : close);
         i = close === -1 ? text.length : close + 1;
-        if (value.includes('<') || value.includes('>')) odd = true;
+        if (value.includes('<') || value.includes('>') || decodes(value)) odd = true;
       } else {
         const from = i;
         while (i < text.length && !WHITESPACE.has(text[i])) i++;
         value = text.slice(from, i);
-        if (risky(value)) odd = true;
+        if (risky(value) || decodes(value)) odd = true;
       }
     }
     // An empty name is always an "=" (the loop above stops only at one or at a separator, and
