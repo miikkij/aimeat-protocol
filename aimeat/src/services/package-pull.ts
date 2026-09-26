@@ -24,6 +24,8 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The node card (64 KB) and the upstream statement (256 KB) are read through
+ *     utils/read-capped.ts too; both were read whole with json() (secaudit 2026-09, N3).
  *   v1.2.0 — 2026-09-24 — The package body is read through utils/read-capped.ts, which stops at
  *     packageMaxSizeMb while the stream arrives (secaudit 2026-09, A6-13). A source that sent no
  *     Content-Length passed the declared-size check, and arrayBuffer() then held its whole answer
@@ -84,14 +86,23 @@ interface ResolvedSource {
     publicKey: string;
 }
 
+/** The most a node card may be: a few hundred bytes of identity and key in the standard envelope. */
+const MAX_NODE_CARD_BYTES = 64 * 1024;
+/** The most a signed statement about one package may be: a descriptor and its signature. */
+const MAX_ATTESTATION_BYTES = 256 * 1024;
+
 /** A node's own public key, from the address every AIMEAT node publishes it at. */
 async function tofuKeyOf(baseUrl: string, timeoutMs: number): Promise<ResolvedSource | null> {
     const res = await safeFetch(`${stripTrailingSlashes(baseUrl)}/.well-known/aimeat`, {
         signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
+    // Read with its cap while it arrives, like the package itself: the address is the one a caller
+    // named, and json() would hold whatever it sent before anything measured it.
+    const raw = await readBodyCapped(res, MAX_NODE_CARD_BYTES);
+    if (!raw) return null;
     // The node card is inside the standard envelope, like every other answer this protocol gives.
-    const body = await res.json() as { data?: { node_id?: string; public_key?: string | null } };
+    const body = JSON.parse(raw.toString('utf8')) as { data?: { node_id?: string; public_key?: string | null } };
     const card = body?.data;
     if (!card?.node_id || !card?.public_key) return null;
     return { nodeId: card.node_id, baseUrl, publicKey: card.public_key };
@@ -350,7 +361,12 @@ export async function checkUpstream(
         if (!res.ok) {
             return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${up.node} answered ${res.status}.` };
         }
-        const body = await res.json() as { data?: AttestationDoc };
+        // Read with its cap while it arrives: a statement is small, and json() held all of it first.
+        const raw = await readBodyCapped(res, MAX_ATTESTATION_BYTES);
+        if (!raw) {
+            return { ok: false, status: 502, code: 'MISSING_ATTESTATION', message: `${up.node} answered with more than a signed statement can be, so none of it was read.` };
+        }
+        const body = JSON.parse(raw.toString('utf8')) as { data?: AttestationDoc };
         const found = body?.data;
         if (!found?.descriptor) {
             return { ok: false, status: 502, code: 'MISSING_ATTESTATION', message: `${up.node} did not answer with a signed statement.` };

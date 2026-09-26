@@ -9,15 +9,19 @@
  *   the cap with no Content-Length, and the test counts how much of it the pull read.
  * @structure
  *   - pullPackage against a peer whose export has no Content-Length: refused 413, read stops at the cap
+ *   - the node card an operator's pull reads (64 KB) and the upstream statement (256 KB): each read
+ *     stops at its cap
  *   - readBodyCapped: under the cap, at the cap, over the cap, and no body at all
  * @usage cd aimeat && pnpm exec vitest run test/unit/package-pull-size-cap.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The node card and the upstream statement stop at their own caps (secaudit
+ *     2026-09, N3). Both failed on the old code first.
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09, A6-13).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import type { Storage } from '../../src/storage/interface.js';
+import type { Storage, PackageRecord } from '../../src/storage/interface.js';
 import type { PeerInfo } from '../../src/services/federation.js';
 
 const CHUNK = 64 * 1024;
@@ -51,7 +55,7 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     };
 });
 
-const { pullPackage } = await import('../../src/services/package-pull.js');
+const { pullPackage, checkUpstream } = await import('../../src/services/package-pull.js');
 const { readBodyCapped } = await import('../../src/utils/read-capped.js');
 
 const config = { packageFederationEnabled: true, packageMaxSizeMb: CAP_MB, federationTimeoutMs: 5000 } as unknown as AimeatConfig;
@@ -76,6 +80,34 @@ describe('pulling a package from a peer that sends no Content-Length', () => {
         await pullPackage({ storage, config, peers }, { owner: 'alice', isOperator: false },
             { groupId: 'bundle::bob', nodeId: 'peer-node' });
         expect(served.state.pulled, `read ${served.state.pulled} of ${CHUNKS_TO_CROSS * 10} chunks`).toBeLessThanOrEqual(CHUNKS_TO_CROSS + 1);
+        expect(served.state.cancelled).toBe(true);
+    });
+});
+
+// The two small answers a pull reads besides the package are capped the same way (secaudit 2026-09,
+// N3): the node card at the address an operator names, and the signed statement an upstream check
+// asks for. Both were read with json(), whole, before anything looked at them.
+describe('the node card and the upstream statement, read with their own caps', () => {
+    beforeEach(() => { served = hugeStream(CHUNKS_TO_CROSS * 10); });
+
+    it('stops reading a node card past 64 KB and cancels the rest', async () => {
+        const out = await pullPackage({ storage, config, peers }, { owner: 'alice', isOperator: true },
+            { groupId: 'bundle::bob', sourceUrl: 'https://source.example', trust: 'tofu' });
+        expect(out.ok).toBe(false);
+        expect(served.state.pulled, `read ${served.state.pulled} chunks`).toBeLessThanOrEqual(2);
+        expect(served.state.cancelled).toBe(true);
+    });
+
+    it('stops reading an upstream statement past 256 KB, cancels the rest, and says it read none', async () => {
+        const pkg = { upstream: {
+            node: 'up-node', url: 'https://up.example', groupId: 'bundle::bob', publicKey: '',
+            version: '1.0.0', publishedAt: '2026-09-01T00:00:00.000Z',
+        } } as unknown as PackageRecord;
+        const out = await checkUpstream({ storage, config, peers }, pkg);
+        expect(out.ok).toBe(false);
+        if (out.ok) return;
+        expect(out.code).toBe('MISSING_ATTESTATION');
+        expect(served.state.pulled, `read ${served.state.pulled} chunks`).toBeLessThanOrEqual(5);
         expect(served.state.cancelled).toBe(true);
     });
 });
