@@ -9,6 +9,24 @@
  * @structure loadToastUI (internal), DocumentView, DocumentEditor
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
+ *   v1.10.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.9.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.7.0 — 2026-09-26 — A document's files under "File visibility" are the Listing (css/components/listing.css, name-doors, columns kept on a phone), a unification: the look most tabs use.
+ *   v1.6.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
+ *   v1.3.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-07-05 — DocumentView private-image resolution now also covers /v1/memory/files/<key>
  *     and /v1/pub/<owner>/<key> refs (not just /v1/storage), so images DROP files into a doc render via
@@ -19,6 +37,7 @@
  *     (pdf etc.) keep their raw URL and are fetched ON CLICK (onDocClick) — fetch-with-token → open the
  *     blob in a new tab — so a private/workspace file opens without a big eager download and without a
  *     token-less navigation 401'ing.
+ *   v1.3.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -113,13 +132,13 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
     <div class="pj-doc-toolbar">
       <span class="pj-doc-vtitle">${shown.title || shown.id || page.id}</span>
       ${hasBoth ? html`
-        <div class="seg" role="tablist">
-          <button class="seg-btn ${tab === 'draft' ? 'active' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>
-          <button class="seg-btn ${tab === 'published' ? 'active' : ''}" onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}</button>
+        <div class="pf-tabs" role="tablist">
+          <button class="poster-tab ${tab === 'draft' ? 'is-on' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>
+          <button class="poster-tab ${tab === 'published' ? 'is-on' : ''}" onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}</button>
         </div>` : null}
-      <button class="btn-ghost btn-sm" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}</button>
-      ${page._draft ? html`<button class="btn-primary btn-sm" onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
-      ${onPopOut ? html`<button class="btn-ghost btn-sm pj-doc-popout" title=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}</button>` : null}
+      <button class="poster-action poster-action--small" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}</button>
+      ${page._draft ? html`<button class="poster-slab poster-slab--control" onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
+      ${onPopOut ? html`<button class="poster-icon poster-icon--small pj-doc-popout" title=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}</button>` : null}
     </div>
     ${(created || savedAt || publishedAt) ? html`
       <div class="pj-doc-meta">
@@ -127,7 +146,7 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
         ${savedAt ? html`<${KeyValueRow} label=${t('organisms.lastSaved') || 'Last saved'} value=${dt(savedAt)} />` : null}
         ${publishedAt ? html`<${KeyValueRow} label=${t('organisms.publishedAt') || 'Published'} value=${dt(publishedAt)} />` : null}
       </div>` : null}
-    <div class="pj-doc-view" onClick=${onDocClick}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
+    <div class="pj-doc-view poster-box poster-box--raised" onClick=${onDocClick}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
 }
 
 /* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
@@ -274,40 +293,42 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
 
   return html`
     <div class="pj-doc-editor">
-      <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Document title'}
+      <input type="text" class="og-input" placeholder=${t('organisms.pageTitle') || 'Document title'}
         value=${title} onInput=${e => setTitle(e.target.value)} />
       <div class="pj-doc-imgbar">
-        <label class="btn-outline btn-sm pj-file-btn">
+        <label class="poster-action poster-action--small pj-file-btn">
           <span class="pj-file-btn-icon">📷</span> ${t('organisms.insertImage') || 'Upload image from file'}
           <input type="file" accept="image/*" hidden onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
         </label>
-        <span class="pj-imgbar-hint">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}</span>
+        <span class="poster-hint">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}</span>
       </div>
       ${images.length ? html`
-        <div class="pj-img-vis">
+        <div class="pj-img-vis poster-box">
           <div class="pj-img-vis-head">
-            <span class="pj-img-vis-title">${t('organisms.fileVisibility') || 'File visibility'}</span>
-            <span class="pj-img-vis-note">${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}</span>
-            ${images.some(i => i.visibility !== 'public') ? html`<button class="btn-ghost btn-sm" disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}</button>` : null}
+            <span class="pj-img-vis-title sub-heading">${t('organisms.fileVisibility') || 'File visibility'}</span>
+            <span class="poster-hint">${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}</span>
+            ${images.some(i => i.visibility !== 'public') ? html`<button class="poster-action poster-action--small" disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}</button>` : null}
           </div>
+          <div class="listing listing--name-doors listing--cols">
           ${images.map(i => html`
-            <div class="pj-img-vis-row" key=${i.key}>
-              <span class="pj-img-vis-name" title=${i.key}>${(i.alt)}</span>
-              <${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} />
+            <div class="listing-row" key=${i.key}>
+              <div class="listing-name" title=${i.key}>${(i.alt)}</div>
+              <div class="listing-doors"><${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} /></div>
             </div>`)}
+          </div>
         </div>` : null}
       ${mode === 'rich'
         ? html`<div ref=${containerRef} class="pj-tui"></div>`
         : html`<div class="pj-doc-grid">
-            <textarea class="input-field pj-doc-md" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
+            <textarea class="og-textarea" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
               value=${md} onInput=${e => setMd(e.target.value)}></textarea>
-            <div class="pj-doc-preview"><${Markdown} text=${md} /></div>
+            <div class="pj-doc-preview poster-box"><${Markdown} text=${md} /></div>
           </div>`}
       <div class="form-actions">
-        <button class="btn-primary btn-sm" onClick=${save} disabled=${busy || saving || !title.trim()}>
+        <button class="poster-slab poster-slab--control" onClick=${save} disabled=${busy || saving || !title.trim()}>
           ${saving ? html`<span class="spinner"></span> ${t('organisms.saving') || 'Saving…'}` : (t('organisms.saveDraft') || 'Save draft')}
         </button>
-        <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
+        <button class="poster-action poster-action--small" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
       </div>
     </div>
   `;

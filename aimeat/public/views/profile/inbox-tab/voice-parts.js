@@ -12,6 +12,8 @@
  * @structure fmtClock · stopOtherAudio · AudioAttachment · TranscriptPanel
  * @usage import { AudioAttachment } from './voice-parts.js';
  * @version-history
+ *   v1.2.0 — 2026-09-25 — The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.1.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
  *   v1.0.0 — 2026-08-01 — Extracted from components.js (voice messages).
  */
 import { h } from 'preact';
@@ -83,12 +85,12 @@ export function TranscriptPanel({ att, msgId, onTranscribe, canTranscribe }) {
   return html`
     <div class="inbox-transcript">
       ${canTranscribe === false
-        ? html`<span class="inbox-transcript-hint">${t('inbox.transcribeNoModel')}</span>`
+        ? html`<span class="poster-hint">${t('inbox.transcribeNoModel')}</span>`
         : html`
           <button class="inbox-transcript-btn" onClick=${run} disabled=${busy}>
             ${busy ? t('inbox.transcribing') : t('inbox.transcribe')}
           </button>`}
-      ${error ? html`<span class="inbox-transcript-err">${error}</span>` : null}
+      ${error ? html`<span class="form-message form-message--error">${error}</span>` : null}
     </div>`;
 }
 

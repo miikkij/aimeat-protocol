@@ -15,6 +15,17 @@
  * @structure ConnectionsSection — GET /v1/connections + /providers + /clients, connect via a
  *   pop-up, revoke · OwnApp — one service's own-app credentials.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.5.0 — 2026-09-25 — The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — The connected accounts are the Listing (css/components/listing.css), a unification: the look most tabs use. The empty line stands on its own after the heading.
+ *   v1.3.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.2.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.1.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.0.0 — 2026-08-02 — Initial (TARGET-057 phase 3).
  *   v1.1.0 — 2026-08-02 — Bring your own app, per service. Closed by default: it is the
  *     advanced door, and a pair of secret fields in front of everybody teaches the wrong habit.
@@ -26,6 +37,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
+import { QuietNote } from '/components/QuietNote.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -274,37 +286,42 @@ export function ConnectionsSection({ showToast }) {
     <div class="access-section">
       <${ConfirmUI} />
       <h3 class="access-h3">${t('profile.access.cxTitle') || 'Connected accounts'}</h3>
-      <p class="text-meta-sm">${t('profile.access.cxIntro')
+      <p class="poster-hint">${t('profile.access.cxIntro')
         || 'Accounts you have connected at other services. The credential stays on this node — an app is only ever told which account it may use, never the account itself.'}</p>
 
       ${connections.length === 0 && html`
-        <div class="mem-item"><span class="adm-text-dim">${t('profile.access.cxEmpty') || 'No connected accounts yet.'}</span></div>
+        <${QuietNote}>${t('profile.access.cxEmpty') || 'No connected accounts yet.'}<//>
       `}
 
-      ${connections.map(c => html`
-        <div class="mem-item" key=${c.id}>
-          <span class="mem-key">${escHtml(c.accountLabel)}</span>
-          <span class="text-meta-sm">
-            ${escHtml(c.provider)}${c.status === 'needs_reauth'
-              ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting')
-              : ''}
-          </span>
-          ${c.status === 'needs_reauth' && html`
-            <button class="btn-outline" onClick=${() => connect({ id: c.provider })}>
-              ${t('profile.access.cxReconnect') || 'Reconnect'}
-            </button>
-          `}
-          <button class="btn-ghost btn-danger" onClick=${() => revoke(c)}>
-            ${t('profile.access.cxDisconnect') || 'Disconnect'}
-          </button>
+      ${connections.length > 0 && html`
+        <div class="listing listing--cols listing--name-state">
+          ${connections.map(c => html`
+            <div class="listing-row" key=${c.id}>
+              <div class="listing-name">${escHtml(c.accountLabel)}<small>
+                ${escHtml(c.provider)}${c.status === 'needs_reauth'
+                  ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting')
+                  : ''}
+              </small></div>
+              <div class="listing-doors">
+                ${c.status === 'needs_reauth' && html`
+                  <button class="poster-action poster-action--small poster-action--row" onClick=${() => connect({ id: c.provider })}>
+                    ${t('profile.access.cxReconnect') || 'Reconnect'}
+                  </button>
+                `}
+                <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => revoke(c)}>
+                  ${t('profile.access.cxDisconnect') || 'Disconnect'}
+                </button>
+              </div>
+            </div>
+          `)}
         </div>
-      `)}
+      `}
 
       ${providers.map(p => html`
         <div class="access-cx-add" key=${p.id}>
           <div class="mem-item access-fed-add">
             ${p.instanceScoped && html`
-              <input type="text" class="input-field input-sm"
+              <input type="text" class="og-input"
                 placeholder=${t('profile.access.cxInstance') || 'instance address, e.g. mastodon.social'}
                 value=${instances[p.id] || ''}
                 onInput=${e => setInstances({ ...instances, [p.id]: e.target.value })} />
@@ -312,7 +329,7 @@ export function ConnectionsSection({ showToast }) {
             ${(p.attachFields || []).map(f => html`
               <input key=${f.name}
                 type=${f.secret ? 'password' : 'text'}
-                class="input-field input-sm"
+                class="og-input"
                 autocomplete=${f.secret ? 'new-password' : 'off'}
                 placeholder=${f.placeholder || f.label}
                 aria-label=${f.label}
@@ -321,7 +338,7 @@ export function ConnectionsSection({ showToast }) {
                   ...prev, [p.id]: { ...(prev[p.id] || {}), [f.name]: e.target.value },
                 }))} />
             `)}
-            <button class="btn-outline" disabled=${busy === p.id}
+            <button class="poster-action poster-action--small" disabled=${busy === p.id}
               onClick=${() => (p.attachFields ? attach(p) : connect(p))}>
               ${busy === p.id
                 ? (t('profile.access.cxConnecting') || 'Connecting…')
@@ -343,7 +360,7 @@ export function ConnectionsSection({ showToast }) {
               onRemove=${(count) => removeOwnClient(p.id, count)} />
           `}
           ${(NOTES[p.id] || []).map(key => html`
-            <p class="text-meta-sm" key=${key}>${t('profile.access.' + key)}</p>
+            <p class="poster-hint" key=${key}>${t('profile.access.' + key)}</p>
           `)}
 
         </div>
@@ -372,12 +389,12 @@ function OwnApp({ provider, client, open, busy, draft, onToggle, onDraft, onSave
   if (client) {
     return html`
       <div class="access-cx-own">
-        <p class="text-meta-sm">
+        <p class="poster-hint">
           ${t('profile.access.cxOwnActive') || 'Using your own app'} · ${escHtml(client.clientId)}
           ${client.connectionCount > 0 ? ' · ' + (t('profile.access.cxOwnCount')
             || '{n} account(s) connected with it').replace('{n}', String(client.connectionCount)) : ''}
         </p>
-        <button class="btn-ghost" onClick=${() => onRemove(client.connectionCount)}>
+        <button class="poster-action poster-action--small" onClick=${() => onRemove(client.connectionCount)}>
           ${t('profile.access.cxOwnRemove') || 'Remove app'}
         </button>
       </div>
@@ -387,32 +404,32 @@ function OwnApp({ provider, client, open, busy, draft, onToggle, onDraft, onSave
   return html`
     <div class="access-cx-own">
       ${nodeless && html`
-        <p class="text-meta-sm">${t('profile.access.cxOwnRequired')
+        <p class="poster-hint">${t('profile.access.cxOwnRequired')
           || 'This node has no app registered at this service. Bring your own and it works anyway.'}</p>
       `}
-      <button class="btn-ghost" onClick=${onToggle} aria-expanded=${open}>
+      <button class="poster-action poster-action--small" onClick=${onToggle} aria-expanded=${open}>
         ${open
           ? (t('profile.access.cxOwnHide') || 'Cancel')
           : (t('profile.access.cxOwnUse') || 'Use your own app')}
       </button>
       ${open && html`
         <div class="access-cx-own-form">
-          <p class="text-meta-sm">${t('profile.access.cxOwnWhy')
+          <p class="poster-hint">${t('profile.access.cxOwnWhy')
             || 'Register an app at the service and paste its credentials here. Yours then carries its own rate limit, its own reputation and, where posting costs money, its own bill.'}</p>
-          <input type="text" class="input-field input-sm" autocomplete="off"
+          <input type="text" class="og-input" autocomplete="off"
             placeholder=${t('profile.access.cxOwnClientId') || 'Client ID'}
             aria-label=${t('profile.access.cxOwnClientId') || 'Client ID'}
             value=${draft.clientId || ''}
             onInput=${e => onDraft('clientId', e.target.value)} />
-          <input type="password" class="input-field input-sm" autocomplete="new-password"
+          <input type="password" class="og-input" autocomplete="new-password"
             placeholder=${t('profile.access.cxOwnClientSecret') || 'Client secret'}
             aria-label=${t('profile.access.cxOwnClientSecret') || 'Client secret'}
             value=${draft.clientSecret || ''}
             onInput=${e => onDraft('clientSecret', e.target.value)} />
-          <button class="btn-outline" disabled=${busy} onClick=${onSave}>
+          <button class="poster-action poster-action--small" disabled=${busy} onClick=${onSave}>
             ${busy ? (t('profile.access.cxOwnSaving') || 'Saving…') : (t('profile.access.cxOwnSave') || 'Save app')}
           </button>
-          <p class="text-meta-sm">${t('profile.access.cxOwnKeepsExisting')
+          <p class="poster-hint">${t('profile.access.cxOwnKeepsExisting')
             || 'Accounts you already connected keep the app that connected them: a token can only be renewed by the app that issued it. Reconnect one to move it.'}</p>
         </div>
       `}

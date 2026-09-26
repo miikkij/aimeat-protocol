@@ -10,6 +10,11 @@
  *   the pair renders and validates exactly as before, and it never touched the composer's state.
  * @usage import { InteractiveForm, InteractiveAnswered } from './interactive-form.js';
  * @version-history
+ *   v1.3.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.2.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   v1.0.0 — 2026-08-18 — Extracted verbatim from components.js (max-file-lines).
  */
 import { h } from 'preact';
@@ -75,18 +80,18 @@ export function InteractiveForm({ spec, submitting, onSubmit }) {
     <div class="inbox-iform">
       ${questions.map(q => html`
         <div class="inbox-iform-q" key=${q.id}>
-          ${q.header ? html`<span class="inbox-iform-chip">${escHtml(q.header)}</span>` : null}
+          ${q.header ? html`<span class="poster-chip">${escHtml(q.header)}</span>` : null}
           <div class="inbox-iform-prompt">${escHtml(q.prompt)}${q.required ? html`<span class="inbox-iform-req"> *</span>` : null}</div>
           <div class="inbox-iform-opts" role=${q.multiSelect ? 'group' : 'radiogroup'}>
             ${(q.options || []).map(o => renderOpt(q, o.id, o.label))}
             ${q.allowOther !== false ? html`
               ${renderOpt(q, IFORM_OTHER, t('inbox.answer.other'))}
               ${sel[q.id]?.picks.has(IFORM_OTHER) ? html`
-                <input class="inbox-iform-other" type="text" value=${sel[q.id]?.other || ''}
+                <input class="og-input inbox-iform-other" type="text" value=${sel[q.id]?.other || ''}
                   placeholder=${t('inbox.answer.otherPlaceholder')} onInput=${e => setOther(q.id, e.target.value)} />` : null}` : null}
           </div>
         </div>`)}
-      <button class="btn-primary btn-sm inbox-iform-submit" disabled=${!canSubmit || submitting} onClick=${submit}>
+      <button class="poster-slab poster-slab--control inbox-iform-submit" disabled=${!canSubmit || submitting} onClick=${submit}>
         ${submitting ? t('inbox.sending') : (spec?.submitLabel || t('inbox.answer.send'))}
       </button>
     </div>`;
@@ -102,7 +107,7 @@ export function InteractiveAnswered({ spec, answers }) {
         if (a.other) labels.push(`${t('inbox.answer.other')}: ${a.other}`);
         return html`
           <div class="inbox-iform-q" key=${q.id}>
-            <span class="inbox-iform-chip">${escHtml(q.header || q.prompt)}</span>
+            <span class="poster-chip">${escHtml(q.header || q.prompt)}</span>
             <div class="inbox-iform-answered">✓ ${labels.length ? escHtml(labels.join(', ')) : '—'}</div>
           </div>`;
       })}

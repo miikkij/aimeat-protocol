@@ -5,11 +5,12 @@
  * @description Shared "human-readable value" renderer. Renders a JSON object/array as an indented
  *   key/value TREE (type-coloured primitives) — far easier to scan than raw JSON — and renders a
  *   non-JSON string as safe Markdown. Mirrors the agent-tasks memory renderer so structured data
- *   looks the SAME everywhere. Reuses the global `pf-agd-json-*` / `pf-agd-task-memory-md` styles
- *   (loaded via css/views/agents-detail.css in spa.html), so no extra CSS is needed.
+ *   looks the SAME everywhere. The tree's look is css/components/json-view.css (the `pf-agd-json-*`
+ *   classes); the Markdown wrapper `pf-agd-task-memory-md` is styled in css/views/agents-detail.css.
  * @structure parseValue · JsonNode · JsonValue
  * @usage import { JsonValue } from '/components/JsonView.js';  html`<${JsonValue} value=${v} />`
  * @version-history
+ *   v1.0.1 — 2026-09-25 — The tree's rules live in css/components/json-view.css (UI consolidation phase 5, a move).
  *   v1.0.0 — 2026-06-15 — extracted the agents-tasks structured JSON/markdown renderer into a shared
  *     component so the Ecosystem-apps "Data this app wrote" view (and others) render values the same way.
  */

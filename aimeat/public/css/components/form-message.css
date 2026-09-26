@@ -1,0 +1,15 @@
+/**
+ * @file form-message.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The line a form says after it acted: done in green, refused in coral, under the form's
+ *   actions. The look most Settings & Controls tabs already draw (access, calibrator, data wallet,
+ *   wallet, ai: identical copies), taken as the one look for this kind (UI consolidation phase 5).
+ *   Drawn as markup: <span class="form-message">Saved.</span> · <span class="form-message form-message--error">…</span>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial, with the values of the copies in the Settings tabs (xx-msg, is-err).
+ */
+
+.form-message { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
+.form-message--error { color: var(--accent); }

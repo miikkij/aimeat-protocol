@@ -15,7 +15,7 @@
  *   spans (code, bold, italic, links). This is presentation-only — never use
  *   rendered content for any trust or routing decision.
  * @structure
- *   - Markdown ({ text }) -> vnode tree wrapped in a div.md-body
+ *   - Markdown ({ text, onWikiLink, small }) -> vnode tree wrapped in a div.md-body (.md-body--small when small)
  *   - sanitizeHref(url) -> safe href or null
  *   - sanitizeImgSrc(url) -> safe <img> src or null (also permits blob: object URLs)
  * @usage
@@ -39,6 +39,8 @@
  *   v1.5.0 -- 2026-07-12 -- Bare http(s) URLs autolink (GFM extended autolink): a raw https://… in the
  *     source becomes a clickable link (target=_blank, scheme-sanitized), so a pasted URL in a message /
  *     document is clickable without [label](url) syntax. Trailing sentence punctuation is trimmed.
+ *   v1.7.0 -- 2026-09-26 -- `small`: the reader's small cut (.md-body--small) for a small place in
+ *     Settings, the headings a step larger than the words (Jouni's decision "Small reader").
  */
 import { h } from 'preact';
 import { Mermaid } from './Mermaid.js';
@@ -405,9 +407,13 @@ function parseBlocks(src, onWikiLink) {
   return blocks;
 }
 
-export function Markdown({ text, onWikiLink }) {
+/**
+ * @param {{ text: string, onWikiLink?: Function, small?: boolean }} props `small` draws the small cut
+ *   (.md-body--small): a small place in Settings, where the headings are only a step larger than the words.
+ */
+export function Markdown({ text, onWikiLink, small = false }) {
   const src = typeof text === 'string' ? text : '';
-  return h('div', { class: 'md-body' }, parseBlocks(src, onWikiLink));
+  return h('div', { class: small ? 'md-body md-body--small' : 'md-body' }, parseBlocks(src, onWikiLink));
 }
 
 export default Markdown;

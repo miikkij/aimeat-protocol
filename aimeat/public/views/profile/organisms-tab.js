@@ -19,6 +19,38 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.31.0 -- 2026-09-26 -- The line under an organism's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v2.30.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v2.29.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v2.28.0 -- 2026-09-26 -- The archived organisms open under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
+ *   v2.27.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v2.26.0 -- 2026-09-25 -- A discovered organism's details are the Facts (css/components/facts.css), a unification: the look most tabs use. The tiles go; each name stands left of its value.
+ *   v2.25.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v2.25.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v2.25.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v2.24.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v2.24.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v2.23.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v2.22.0 -- 2026-09-25 -- The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
+ *   v2.21.0 -- 2026-09-25 -- A picture of a person or a thing is the Object box's avatar cut (.poster-box--avatar), the look most Settings tabs draw (UI consolidation phase 5, a unification).
+ *   v2.20.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
+ *   v2.19.0 -- 2026-09-25 -- A section is the kit's section (PageSection in an .og page) and the line under its title is the lead (.og-lead), the look most tabs use (a unification).
+ *   v2.18.0 -- 2026-09-25 -- The page head is the kit's crumb trail and page head (.og-crumb, .og-mast, .og-title, .og-desc), the look most tabs use (a unification).
+ *   v2.17.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v2.16.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v2.15.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v2.14.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v2.13.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v2.12.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v2.11.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v2.10.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.9.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v2.8.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -57,9 +89,11 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
-import { Spinner, KebabMenu } from './shared.js';
+import { LoadingLine, KebabMenu } from './shared.js';
 import { SearchBar } from '/components/SearchBar.js';
-import { EmptyState } from '/components/EmptyState.js';
+import { QuietNote } from '/components/QuietNote.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
@@ -381,29 +415,21 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     }[org.joinPolicy] || org.joinPolicy;
     return html`
       <div class="pj-org-detail" onClick=${(e) => e.stopPropagation()}>
-        <div class="detail-grid">
-          <div class="detail-item">
-            <span class="detail-label">${t('organisms.creator') || 'Creator'}</span>
-            <span class="detail-value">${(org.creatorGhii)}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">${t('organisms.memberCount') || 'Members'}</span>
-            <span class="detail-value">${(org.members || []).length} / ${org.maxMembers || 500}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">${t('organisms.policyLabel') || 'Join policy'}</span>
-            <span class="detail-value">${policyLabel}</span>
-          </div>
+        <div class="facts">
+          <span class="facts-k poster-label">${t('organisms.creator') || 'Creator'}</span>
+          <span class="facts-v">${(org.creatorGhii)}</span>
+          <span class="facts-k poster-label">${t('organisms.memberCount') || 'Members'}</span>
+          <span class="facts-v">${(org.members || []).length} / ${org.maxMembers || 500}</span>
+          <span class="facts-k poster-label">${t('organisms.policyLabel') || 'Join policy'}</span>
+          <span class="facts-v">${policyLabel}</span>
           ${org.createdAt ? html`
-            <div class="detail-item">
-              <span class="detail-label">${t('organisms.createdAt') || 'Created'}</span>
-              <span class="detail-value">${fmtDate(org.createdAt)}</span>
-            </div>
+            <span class="facts-k poster-label">${t('organisms.createdAt') || 'Created'}</span>
+            <span class="facts-v">${fmtDate(org.createdAt)}</span>
           ` : null}
         </div>
         ${(org.interests || []).length > 0 ? html`
           <div class="flex-row-wrap">
-            ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${(tag)}</span>`)}
+            ${org.interests.map(tag => html`<span class="poster-chip" key=${tag}>${(tag)}</span>`)}
           </div>` : null}
       </div>`;
   };
@@ -440,18 +466,18 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         onDragLeave=${isMine ? (() => setDragOverId(d => (d === org.id ? null : d))) : undefined}
         onDrop=${isMine ? (() => onDropRow(org.id)) : undefined}
         onDragEnd=${isMine ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
-        <div class="pj-org-avatar" aria-hidden="true">${orgInitials(org.name)}</div>
+        <div class="pj-org-avatar poster-box poster-box--avatar poster-box--small" aria-hidden="true">${orgInitials(org.name)}</div>
         <div class="pj-org-main" role="button" tabindex="0" onClick=${activate}
           onKeyDown=${(e) => { if (e.key === 'Enter') activate(); }}>
           <div class="pj-org-titlerow">
             <span class="pj-org-name">${(org.name)}</span>
           </div>
-          ${org.description ? html`<div class="pj-org-desc">${(org.description)}</div>` : null}
+          ${org.description ? html`<div class="pj-org-desc listing-meta">${(org.description)}</div>` : null}
         </div>
         <div class="pj-org-marks">
-          <span class="badge badge-info pj-org-type" title=${typeLabel}>${typeLabel}</span>
+          <span class="poster-chip pj-org-type" title=${typeLabel}>${typeLabel}</span>
           ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${LockMark}</span>` : null}
-          ${org.archived ? html`<span class="badge badge-warn pj-org-arch" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}</span>` : null}
+          ${org.archived ? html`<span class="poster-status poster-status--off pj-org-arch" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}</span>` : null}
         </div>
         ${/* Four cells, always four: the grid's tracks are what hold the row still, and a cell left
               out would slide the ones after it into the wrong track. An absent count shows nothing
@@ -463,7 +489,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
           <span class="pj-org-stat" title=${t('organisms.members') || 'Members'}>${'👥'} ${org.member_count ?? (org.members || []).length}</span>
           <span class="pj-org-stat" title=${t('organisms.attachedAgents') || 'Attached agents'}>${'🤖'} ${(org.agentGaiis || []).length}</span>
           ${org.createdAt
-            ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>`
+            ? html`<span class="pj-org-stat pj-org-date poster-time" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>`
             : html`<span class="pj-org-stat pj-org-date"></span>`}
         </div>
         ${/* The door sits in a cell of its own so that Open on one row and Join on the next, or
@@ -471,8 +497,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               width, and with it the rule under exactly as many letters as the word has. */ ''}
         <span class="pj-org-door">
           ${(isMine || isMember)
-            ? html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.open') || 'Open'}</button>`
-            : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}</button>`}
+            ? html`<button class="poster-action poster-action--small pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.open') || 'Open'}</button>`
+            : html`<button class="poster-action poster-action--small pj-org-openbtn" onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}</button>`}
         </span>
         ${isMine ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
         ${isExpanded ? renderDiscoverDetail(org) : null}
@@ -491,14 +517,14 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     }
     return html`
       ${justJoinedOrg === openId ? html`
-        <div class="pj-joined-banner">
+        <div class="pj-joined-banner poster-aside poster-aside--small">
           <div>
             <strong>${(tOr('organisms.joinedBanner.title', 'You are now a member of {name}.')).replace('{name}', org.name || '')}</strong>
             <div class="text-meta-sm">${tOr('organisms.joinedBanner.body', 'Connect your own AI to this team and you can use everything here straight from the chat you already use.')}</div>
           </div>
           <div class="pj-joined-actions">
-            <a class="btn-primary btn-sm pf-no-underline" href="/v1/profile?tab=mcp">${tOr('organisms.joinedBanner.connect', 'Connect your AI')}</a>
-            <button class="btn-ghost btn-sm" onClick=${() => setJustJoinedOrg(null)}>${tOr('organisms.joinedBanner.dismiss', 'Browse first')}</button>
+            <a class="poster-slab poster-slab--control pf-no-underline" href="/v1/profile?tab=mcp">${tOr('organisms.joinedBanner.connect', 'Connect your AI')}</a>
+            <button class="poster-action poster-action--text" onClick=${() => setJustJoinedOrg(null)}>${tOr('organisms.joinedBanner.dismiss', 'Browse first')}</button>
           </div>
         </div>` : null}
       <${OrganismHome} org=${org} ghii=${ghii} showToast=${showToast}
@@ -510,7 +536,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       <${ConfirmUI} />`;
   }
 
-  if (!myOrganisms) return html`<${Spinner} text=${t('organisms.loading') || 'Loading organisms...'} />`;
+  if (!myOrganisms) return html`<${LoadingLine} text=${t('organisms.loading') || 'Loading organisms...'} />`;
 
   // Open a cross-organism search hit: jump to its organism + workspace, pre-filling the in-workspace
   // search with the query so you land on the filtered result list (reuses Kerros 1).
@@ -528,21 +554,27 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   for (const hh of (gHits || [])) { if (!hh.organismId) continue; (gGroups[hh.organismId] = gGroups[hh.organismId] || []).push(hh); }
 
   return html`
-    <div class="poster-page-title">${t('organisms.title') || 'Organisms'}</div>
-    <div class="section-desc">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}</div>
+    <div class="og">
+    <div class="mb-1">
+      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuInformation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.organisms')}</span></div>
+      <div class="og-mast"><div class="og-mast-words">
+        <div class="og-title poster-page-title">${t('organisms.title') || 'Organisms'}</div>
+        <div class="og-desc">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}</div>
+      </div></div>
+    </div>
 
     <!-- Create form (opened from the topbar button) -->
     <div class="mb-1">
       ${!showCreate ? null : html`
         <div class="create-form poster-row--thing">
-          <h4 class="card-h3 mb-half">${t('organisms.createTitle') || 'Create New Organism'}</h4>
+          <h4 class="card-h3 sub-heading mb-half">${t('organisms.createTitle') || 'Create New Organism'}</h4>
           <div class="flex-col">
             <input type="text" placeholder=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${(e) => setFormName(e.target.value)}
-              class="input-field input-sm" />
+              class="og-input" />
             <textarea placeholder=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${(e) => setFormDesc(e.target.value)} rows="2"
-              class="input-field input-sm" />
+              class="og-textarea" />
             <input type="text" placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${(e) => setFormInterests(e.target.value)}
-              class="input-field input-sm" />
+              class="og-input" />
             <div class="flex-row-wrap">
               <select value=${formType} onChange=${(e) => {
                 // The type sets SAFE defaults (UX-remake v3, P12): a team's internal space must
@@ -558,7 +590,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                   setFormVisibility('public');
                 }
               }}
-                class="input-field input-sm">
+                class="select-field">
                 <option value="community">${t('organisms.types.community') || 'Community'}</option>
                 <option value="team">${t('organisms.types.team') || 'Team'}</option>
                 <option value="club">${t('organisms.types.club') || 'Club'}</option>
@@ -567,17 +599,17 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 <option value="__custom">${t('organisms.typeCustom') || 'Other'}</option>
               </select>
               ${formType === '__custom' ? html`
-                <input type="text" maxlength="40" class="input-field input-sm" value=${formTypeCustom}
+                <input type="text" maxlength="40" class="og-input" value=${formTypeCustom}
                   placeholder=${t('organisms.typeCustomPlaceholder') || 'Type, in your own words'}
                   onInput=${(e) => setFormTypeCustom(e.target.value)} />` : null}
               <select value=${formPolicy} onChange=${(e) => setFormPolicy(e.target.value)}
-                class="input-field input-sm">
+                class="select-field">
                 <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
                 <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
                 <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
               </select>
               <select value=${formVisibility} onChange=${(e) => setFormVisibility(e.target.value)}
-                class="input-field input-sm">
+                class="select-field">
                 <option value="public">${t('organisms.visPublic') || 'Public'}</option>
                 <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
                 <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
@@ -588,10 +620,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               ${tOr('organisms.visHint.' + formVisibility, '')}
             </div>
             <div class="form-actions">
-              <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating}>
+              <button class="poster-slab poster-slab--control" onClick=${handleCreate} disabled=${creating}>
                 ${creating ? '...' : (t('organisms.create') || 'Create')}
               </button>
-              <button class="btn-ghost btn-sm" onClick=${() => setShowCreate(false)}>
+              <button class="poster-action poster-action--small" onClick=${() => setShowCreate(false)}>
                 ${t('organisms.cancel') || 'Cancel'}
               </button>
             </div>
@@ -604,16 +636,16 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <div class="pj-org-globalsearch">
       <${SearchBar} value=${gQuery} onInput=${e => setGQuery(e.target.value)}
         placeholder=${t('search.allOrgsPlaceholder') || 'Search across all organisms…'} ariaLabel=${t('search.allOrgsPlaceholder') || 'Search across all organisms'} />
-      ${gHits !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => setGQuery('')}>${t('search.clear') || 'Clear'}</button>` : null}
+      ${gHits !== null ? html`<button class="poster-action poster-action--small" onClick=${() => setGQuery('')}>${t('search.clear') || 'Clear'}</button>` : null}
     </div>
 
     ${gHits !== null ? html`
       <div class="pj-search-results">
-        ${gBusy && !gHits.length ? html`<${Spinner} text=${t('search.searching') || 'Searching…'} />` : null}
-        ${!gHits.length && !gBusy ? html`<${EmptyState} text=${t('search.noMatches') || 'No matches'} />` : null}
+        ${gBusy && !gHits.length ? html`<${LoadingLine} text=${t('search.searching') || 'Searching…'} />` : null}
+        ${!gHits.length && !gBusy ? html`<${QuietNote}>${t('search.noMatches') || 'No matches'}<//>` : null}
         ${Object.entries(gGroups).map(([orgId, hits]) => html`
           <div class="pj-search-group" key=${orgId}>
-            <div class="pj-search-group-head">${orgNameOf(orgId)}<span class="pj-org-tab-count">${hits.length}</span></div>
+            <div class="pj-search-group-head poster-day-title">${orgNameOf(orgId)}<span class="poster-count poster-count--tally">${hits.length}</span></div>
             ${hits.map(hh => html`
               <button class="pj-search-hit" key=${hh.key} onClick=${() => openGHit(hh)}>
                 <span class="pj-search-hit-title">${hh.title || hh.key}${hh.workspaceId ? html` <span class="pj-mini">· ${hh.workspaceId}</span>` : null}</span>
@@ -627,20 +659,18 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
     <!-- My Organisms -->
     <input type="file" accept=".zip,application/zip" ref=${orgFileRef} class="pj-hidden-input" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
-    <div class="pj-ws-topbar">
-      <div class="poster-section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
+    <${PageSection} title=${t('organisms.myOrganisms') || 'My Organisms'} doors=${html`
       <div class="pj-org-topbar-actions">
         ${myOrganisms.length > 1 ? html`
-          <select class="input-field input-sm pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
+          <select class="select-field pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
             onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }}>
             <option value="custom">${t('organisms.sortCustom') || 'My order'}</option>
             <option value="name">${t('organisms.sortName') || 'Name A–Z'}</option>
             <option value="newest">${t('organisms.sortNewest') || 'Newest first'}</option>
           </select>` : null}
-        <button class="btn-outline btn-sm" disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${'⬆ '}${t('organisms.importOrg') || 'Import'}</button>
-        <button class="btn-primary btn-sm" onClick=${() => setShowCreate(true)}>${'+ '}${t('organisms.createNew') || 'Create Organism'}</button>
-      </div>
-    </div>
+        <button class="poster-action poster-action--small" disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${'⬆ '}${t('organisms.importOrg') || 'Import'}</button>
+        <button class="poster-slab poster-slab--control" onClick=${() => setShowCreate(true)}>${'+ '}${t('organisms.createNew') || 'Create Organism'}</button>
+      </div>`}>
     ${(() => {
       // Active organisms drive the working list; archived ones move into a collapsed "Archived"
       // section below (read-only/retired — out of the way, but restorable from there).
@@ -648,30 +678,31 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       const archivedMine = sortedMine.filter(o => o.archived);
       return html`
         ${activeMine.length === 0 && archivedMine.length === 0
-          ? html`<div class="empty">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
+          ? html`<div class="poster-quiet">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
           : html`
             ${activeMine.length === 0
-              ? html`<div class="empty">${t('organisms.allArchived') || 'All your organisms are archived.'}</div>`
+              ? html`<div class="poster-quiet">${t('organisms.allArchived') || 'All your organisms are archived.'}</div>`
               : html`
                 <div class="pj-org-list poster-row--thing">${activeMine.map(org => renderOrgRow(org, true))}</div>
                 ${sortMode === 'custom' && activeMine.length > 1 ? html`
-                  <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}`}
+                  <div class="poster-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}`}
             ${archivedMine.length > 0 ? html`
-              <button class="pj-struct-toggle section-title-spaced" aria-expanded=${archivedOpen} onClick=${() => setArchivedOpen(o => !o)}>
-                <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
-                <span>${'🗄️ '}${(t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))}</span>
-              </button>
-              ${archivedOpen ? html`<div class="pj-org-list poster-row--thing">${archivedMine.map(org => renderOrgRow(org, true))}</div>` : null}` : null}
+              <${FoldSection} num="" title=${'🗄️ ' + (t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
+                <div class="pj-org-list poster-row--thing">${archivedMine.map(org => renderOrgRow(org, true))}</div>
+              <//>` : null}
           `}
       `;
     })()}
+    <//>
 
     <!-- Discover -->
     ${publicOrganisms.length > 0 && html`
-      <div class="poster-section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
+      <${PageSection} title=${t('organisms.discover') || 'Discover'}>
       <div class="pj-org-list poster-row--thing">${publicOrganisms.map(org => renderOrgRow(org, false))}</div>
+      <//>
     `}
     `}
+    </div>
     <${ConfirmUI} />
   `;
 }

@@ -19,6 +19,21 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   v1.16.0 — 2026-09-26 — A decision's line beside its subject is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.15.0 — 2026-09-26 — The decision classes and policies beside their check boxes are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.14.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.13.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.12.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.10.0 — 2026-09-25 — A section that is one row until it is opened is the FoldSection (the folded row with its lead): the AI tab's decide, transparency and compliance cards and the classic AI settings; their own heads, chevrons and body rules go (a unification: the look most tabs use).
+ *   v1.9.0 — 2026-09-25 — The last lines that say nothing is there are the quiet sentence (.poster-quiet); the ecosystem's empty frame goes, its second line is the Hint (Jouni's decision "Empty line", a unification).
+ *   v1.8.0 — 2026-09-25 — The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.7.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
+ *   v1.6.0 — 2026-09-25 — The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.5.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   v1.4.1 — 2026-09-23 — The header speaks of the chosen provider: its name and model, and for a
  *     local one that no key is needed, instead of the key fields alone.
  *   v1.4.0 — 2026-09-23 — Decision providers: the providers part (decide-providers.js) between the
@@ -43,6 +58,8 @@ import { swallowed } from '/js/swallowed.js';
 import { reviewDecision } from '/js/services/decide.js';
 import { DecideRules } from './decide-rules.js';
 import { DecideProviders, providerTitle } from './decide-providers.js';
+import { Hint } from '/components/Hint.js';
+import { FoldSection } from '/components/FoldSection.js';
 
 const shortTime = (iso) => String(iso ?? '').slice(0, 16).replace('T', ' ');
 
@@ -191,64 +208,58 @@ export function DecideCard() {
 
   return html`
     <div class="pf-card pf-aitr" id="decide-card">
-      <button type="button" class="pf-aitr-head" onClick=${() => setCollapsed(c => !c)} aria-expanded=${!collapsed}>
-        <span class="poster-section-title">${t('decideCard.title')}</span>
-        <span class="pf-aitr-chevron">${collapsed ? '+' : '−'}</span>
-      </button>
-      <p class="section-desc">${t('decideCard.desc')}</p>
-
-      ${!collapsed && html`
+      <${FoldSection} num="" title=${t('decideCard.title')} lead=${t('decideCard.desc')} open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
         <div class="pf-aitr-body">
-          ${msg && html`<p class=${msg.error ? 'pf-aitr-error' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`}
-          ${!settings && !msg && html`<p class="pf-aitr-muted">${t('decideCard.loading')}</p>`}
+          ${msg && html`<p class=${msg.error ? 'form-message form-message--error' : 'form-message'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`}
+          ${!settings && !msg && html`<p class="poster-quiet loading-mark">${t('decideCard.loading')}</p>`}
 
           ${settings && html`
-            <p class="pf-aitr-note">
+            <p class="poster-hint">
               ${statusLine}
               ${payer ? ` ${payer}` : ''}
             </p>
 
-            <h4 class="pf-aitr-sub">${t('decideCard.keyTitle')}</h4>
-            <p class="pf-aitr-note">${settings.has_own_key ? t('decideCard.keySet') : t('decideCard.keyNotSet')}</p>
+            <h4 class="pf-aitr-sub sub-heading">${t('decideCard.keyTitle')}</h4>
+            <p class="poster-hint">${settings.has_own_key ? t('decideCard.keySet') : t('decideCard.keyNotSet')}</p>
             <div class="ai-field">
               <input class="og-input" type="password" autocomplete="off" data-1p-ignore data-lpignore="true"
                      aria-label=${t('decideCard.keyLabel')} placeholder=${t('decideCard.keyLabel')}
                      value=${keyInput} onInput=${e => setKeyInput(e.currentTarget.value)} disabled=${busy} />
-              <button type="button" class="og-door" onClick=${saveKey} disabled=${busy || !keyInput.trim()}>
+              <button type="button" class="poster-action poster-action--small" onClick=${saveKey} disabled=${busy || !keyInput.trim()}>
                 ${t('decideCard.keySave')}
               </button>
             </div>
             <div class="og-doors">
               ${(settings.has_own_key || settings.node_key_available) && html`
-                <button type="button" class="og-door og-door--quiet" onClick=${testKey} disabled=${busy}>
+                <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${testKey} disabled=${busy}>
                   ${busy === 'test' ? t('decideCard.keyTesting') : t('decideCard.keyTest')}
                 </button>`}
               ${settings.has_own_key && html`
-                <button type="button" class="og-door og-door--quiet" onClick=${removeKey} disabled=${busy}>
+                <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${removeKey} disabled=${busy}>
                   ${t('decideCard.keyRemove')}
                 </button>`}
             </div>
 
-            <h4 class="pf-aitr-sub">${t('decideCard.policyTitle')}</h4>
-            <p class="pf-aitr-note">${t('decideCard.policyDesc')}</p>
+            <h4 class="pf-aitr-sub sub-heading">${t('decideCard.policyTitle')}</h4>
+            <${Hint}>${t('decideCard.policyDesc')}<//>
             <ul class="pf-aitr-list">
               ${settings.pii_classes.map(cls => html`
-                <li key=${cls} class="pf-aitr-row">
-                  <label class="pf-aitr-row-main">
+                <li key=${cls} class="pf-aitr-row poster-box">
+                  <label class="pf-aitr-row-main check-line">
                     <input type="checkbox" class="checkbox checkbox-sm" checked=${settings.policy.allow.includes(cls)}
                            disabled=${busy} onChange=${() => toggleClass(cls)} />
                     ${' '}${t(`decideCard.class.${cls}`)}
                   </label>
                 </li>`)}
-              <li class="pf-aitr-row">
-                <label class="pf-aitr-row-main">
+              <li class="pf-aitr-row poster-box">
+                <label class="pf-aitr-row-main check-line">
                   <input type="checkbox" class="checkbox checkbox-sm" checked=${settings.policy.storeState} disabled=${busy}
                          onChange=${() => save({ policy: { store_state: !settings.policy.storeState } }, 'decideCard.policySaved')} />
                   ${' '}${t('decideCard.storeState')}
                 </label>
               </li>
-              <li class="pf-aitr-row">
-                <label class="pf-aitr-row-main">
+              <li class="pf-aitr-row poster-box">
+                <label class="pf-aitr-row-main check-line">
                   <input type="checkbox" class="checkbox checkbox-sm" checked=${settings.policy.allowPublicOptOut} disabled=${busy}
                          onChange=${() => save({ policy: { allow_public_opt_out: !settings.policy.allowPublicOptOut } }, 'decideCard.policySaved')} />
                   ${' '}${t('decideCard.publicOptOut')}
@@ -262,17 +273,17 @@ export function DecideCard() {
           ${settings && html`<${DecideRules} available=${!!settings.available} providers=${settings.providers || null} />`}
 
           ${recent && html`
-            <h4 class="pf-aitr-sub">${t('decideCard.recentTitle')}</h4>
+            <h4 class="pf-aitr-sub sub-heading">${t('decideCard.recentTitle')}</h4>
             ${recent.decisions.length === 0
-              ? html`<p class="pf-aitr-muted">${t('decideCard.recentNone')}</p>`
+              ? html`<p class="poster-quiet">${t('decideCard.recentNone')}</p>`
               : html`<ul class="pf-aitr-list">
                   ${recent.decisions.map(d => html`
-                    <li key=${d.id} class="pf-aitr-row">
+                    <li key=${d.id} class="pf-aitr-row poster-box">
                       <span class="pf-aitr-row-main">${d.record.gates || d.subject || t('decideCard.noSubject')}</span>
-                      <span class="pf-aitr-row-meta">
+                      <span class="pf-aitr-row-meta listing-meta">
                         ${Object.entries(d.record.answers).slice(0, 3).map(([id, a]) => `${id}: ${answerText(a)}`).join(' · ')}
                       </span>
-                      <span class="pf-aitr-row-meta">
+                      <span class="pf-aitr-row-meta listing-meta">
                         ${d.rule ? `${d.rule} · ${t(`decideRules.outcome.${d.outcome}`)} · ` : ''}${shortTime(d.createdAt)} · ${d.provider ? `${providerTitle(settings?.providers, d.provider)} · ` : ''}${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
                         ${d.record.review ? ` · ${t(`decideCard.review.${d.record.review.outcome}`)}` : ''}
                       </span>
@@ -284,20 +295,20 @@ export function DecideCard() {
                            from a mis-tap, which is why the answered one stays on screen, greyed and
                            unpressable, with the opposite still live. */''}
                       <span class="pf-aitr-row-verdict">
-                        <button type="button" class="btn-outline btn-sm"
+                        <button type="button" class="poster-action poster-action--small"
                           disabled=${!!busy || d.record.review?.outcome === 'confirmed'}
                           title=${d.record.review?.outcome === 'confirmed' ? t('decideCard.review.already') : ''}
                           onClick=${() => review(d.id, 'confirmed')}>${t('decideCard.review.confirmAction')}</button>
-                        <button type="button" class="btn-outline btn-sm"
+                        <button type="button" class="poster-action poster-action--small"
                           disabled=${!!busy || d.record.review?.outcome === 'overridden'}
                           title=${d.record.review?.outcome === 'overridden' ? t('decideCard.review.already') : ''}
                           onClick=${() => review(d.id, 'overridden')}>${t('decideCard.review.overrideAction')}</button>
                       </span>
                     </li>`)}
                 </ul>`}
-            <p class="pf-aitr-muted">${t('decideCard.recentTotal', { total: String(recent.total) })}</p>
+            <p class="poster-hint">${t('decideCard.recentTotal', { total: String(recent.total) })}</p>
           `}
-        </div>`}
+        </div><//>
     </div>`;
 }
 

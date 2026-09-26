@@ -5,10 +5,13 @@
  * @description The small state badges an agent card wears: how work reaches it, the platform it
  *   runs on, the model it reports and how far its onboarding got. Pure extraction from
  *   ../agent-card.js (max-file-lines); the bodies are unchanged and their history stays below.
- * @structure deliveryLabel(delivery) · renderDeliveryIndicator(agent) ·
- *   renderPlatformBadge(onboarding) · renderModelBadge(agent) · renderReadinessBadge(state, onboarding)
- * @usage import { renderDeliveryIndicator, renderReadinessBadge } from './agent-card-badges.js';
+ * @structure deliveryLabel(delivery) · renderPlatformBadge(onboarding) · renderModelBadge(agent) ·
+ *   stepStatusClass(status) · renderReadinessBadge(state, onboarding)
+ * @usage import { deliveryLabel, renderReadinessBadge } from './agent-card-badges.js';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — renderDeliveryIndicator goes: nothing called it (Jouni: "saat poistaa jos ne on oikeasti käyttämättömiä").
+ *   v1.2.0 — 2026-09-25 — Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.1.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
  *   v1.0.0 — 2026-09-06 — Extracted from agent-card.js, which reached 801 lines when the GAII
  *     control landed on the row. Carried over from that file's history: the delivery word reads the
  *     server's channel (2026-09-06), the model badge (2026-07), and the 2026-08-09 round that
@@ -32,65 +35,60 @@ export function deliveryLabel(delivery) {
   return t('profile.agents.detail.deliveryPolling');
 }
 
-/**
- * How this agent is reached, from the server's verdict.
- *
- * Was computed here from `agent.webhookUrl` (not in the response), `agent.mcpEnabled` (not a field
- * on any record) and a fail threshold of 5 that disagreed with the server's 10. So the warning icon
- * could never appear, and the MCP labels could never be chosen. The MCP branch is gone rather than
- * rewired: there is nothing to rewire it to.
- */
-export function renderDeliveryIndicator(agent) {
-  const delivery = agent?.health?.delivery;
-  if (!delivery) return null;
-  const label = deliveryLabel(delivery);
-  const icon = delivery.webhook_configured ? (delivery.channel === 'webhook-failing' ? '⚠' : '✓') : '';
-
-  return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} · </span>`;
-}
-
 export function renderPlatformBadge(onboarding) {
   const platform = onboarding?.platformName || onboarding?.detectedPlatform;
   if (!platform) return null;
   const version = onboarding?.platformVersion;
-  return html`<span class="pf-agd-badge pf-agd-badge--platform">${platform}${version ? ` v${version}` : ''}</span>`;
+  return html`<span class="poster-chip">${platform}${version ? ` v${version}` : ''}</span>`;
 }
 
 // Self-reported primary LLM (indicative — coding platforms delegate to subagents on other
 // models mid-session). Comes from the owner agent list projection (agent.model).
 export function renderModelBadge(agent) {
   if (!agent?.model) return null;
-  return html`<span class="pf-agd-badge pf-agd-badge--model" title=${t('profile.agents.modelBadgeTitle')}>${agent.model}</span>`;
+  return html`<span class="poster-chip" title=${t('profile.agents.modelBadgeTitle')}>${agent.model}</span>`;
 }
+
+/** The Status an onboarding step wears: passed is fine, failed is danger, a warning needs a look,
+ *  a step not taken yet is off. */
+export function stepStatusClass(status) {
+  if (status === 'passed') return 'poster-status poster-status--fine';
+  if (status === 'failed') return 'poster-status poster-status--danger';
+  if (status === 'warn') return 'poster-status poster-status--attention';
+  return 'poster-status poster-status--off';
+}
+
+/** The Status a readiness level wears: a ready agent is fine, a basic one needs a look, none is off. */
+const readinessClass = (level) => `poster-status ${['expert', 'full', 'advanced', 'standard'].includes(level) ? 'poster-status--fine' : level === 'basic' ? 'poster-status--attention' : 'poster-status--off'}`;
 
 export function renderReadinessBadge(state, onboarding) {
   if (state === 'system') {
     // Internal (auto-provisioned) agent — no device-auth onboarding / readiness.
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">${t('profile.agents.detail.state.internal')}</span>`;
+    return html`<span class="poster-status poster-status--off">${t('profile.agents.detail.state.internal')}</span>`;
   }
   if (state === 'new') {
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
+    return html`<span class="poster-status poster-status--off">--</span>`;
   }
   if (state === 'onboarding') {
     const passed = onboarding?.steps?.filter(s => s.status === 'passed').length ?? 0;
     const total = onboarding?.steps?.length ?? 11;
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-onboarding">${t('profile.agents.detail.state.onboarding')}: ${passed}/${total}</span>`;
+    return html`<span class="poster-status poster-status--attention">${t('profile.agents.detail.state.onboarding')}: ${passed}/${total}</span>`;
   }
   if (state === 'problem') {
     const level = onboarding?.readinessLevel || 'none';
     const score = onboarding?.readinessScore;
-    if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
+    if (!score && score !== 0) return html`<span class="poster-status poster-status--off">--</span>`;
     const label = t(`agentOnboarding.readiness.${level}`);
     // No "degraded ↓" marker: it was driven by onboarding.previousReadinessLevel, which is not a
     // field on the record, has no column in either backend and is written nowhere — so the arrow
     // could never appear. Reintroducing it needs a stored previous level first, not a rank table.
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}">${label} (${score})</span>`;
+    return html`<span class=${readinessClass(level)}>${label} (${score})</span>`;
   }
   // idle and production both show level + score
   const level = onboarding?.readinessLevel || 'none';
   const score = onboarding?.readinessScore;
-  if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
+  if (!score && score !== 0) return html`<span class="poster-status poster-status--off">--</span>`;
   const label = t(`agentOnboarding.readiness.${level}`);
-  return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}"
+  return html`<span class=${readinessClass(level)}
     title=${t('profile.agents.detail.readinessTooltip') || 'Readiness score 0–100 from onboarding checks. Levels: none → basic → standard → advanced → full.'}>${label} (${score})</span>`;
 }

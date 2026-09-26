@@ -1,0 +1,16 @@
+/**
+ * @file code-block.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Code as a block and code in a sentence: the typewriter face on the grey ground, the block
+ *   wrapping its long lines, the inline cut a small grey patch. The look most Settings & Controls tabs
+ *   already draw for a block of code or a prompt (skills, extensions, capabilities, libraries, apps,
+ *   boards, portfolio), taken as the one look for this kind (UI consolidation phase 5).
+ *   Drawn as markup: <pre class="code-block">…</pre> · <code class="code-inline">…</code>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial, with the values of sk-pre and the inline code of the opened panels.
+ */
+
+.code-block { margin: .5rem 0 .7rem; padding: .6rem .8rem; background: var(--bg-dim); font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.code-inline { display: inline-block; max-width: 100%; margin: .1rem 0; padding: .1rem .35rem; background: var(--bg-dim); font-family: var(--font-mono); font-size: .74rem; overflow-wrap: anywhere; }

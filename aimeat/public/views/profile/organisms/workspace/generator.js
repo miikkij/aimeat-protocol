@@ -10,6 +10,19 @@
  * @structure WorkspaceGenerator
  * @usage import { WorkspaceGenerator } from '/views/profile/organisms/workspace/generator.js';
  * @version-history
+ *   v1.8.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.6.0 -- 2026-09-25 -- A failed generation's note: its heading is the row label (.poster-label) and each reason the Form message's refused cut (.form-message--error), as the attention notes and forms of the other tabs say it (a unification: the look most tabs use).
+ *   v1.5.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.4.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
@@ -85,12 +98,12 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
 
   return html`
     <div class="pj-section poster-row--thing">
-      <div class="pj-section-title">${showRegenerate ? (t('organisms.restructureTitle') || 'Restructure / add types with AI') : (t('organisms.generateTitle') || 'Or generate a custom workspace with AI')}</div>
+      <div class="pj-section-title sub-heading">${showRegenerate ? (t('organisms.restructureTitle') || 'Restructure / add types with AI') : (t('organisms.generateTitle') || 'Or generate a custom workspace with AI')}</div>
       <div class="section-desc">${showRegenerate
         ? (t('organisms.restructureDesc') || 'Describe what to add or change. Existing types and their data are kept — the AI extends the current structure. (To start completely fresh, delete the workspace below first.)')
         : (t('organisms.generateDesc') || 'Describe what you want to track — the AI designs the object types. Use your OpenRouter key for one-click generation, or copy the prompt into any AI chat (free) and paste the result back.')}</div>
 
-      <textarea class="input-field input-sm" rows="3"
+      <textarea class="og-textarea" rows="3"
         placeholder=${t('organisms.generatePlaceholder') || 'e.g. A research study tracking hypotheses, experiments and validated findings'}
         value=${genDesc} onInput=${e => setGenDesc(e.target.value)}></textarea>
 
@@ -98,37 +111,37 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
 
       <div class="form-actions">
         ${hasAiKey ? html`
-          <button class="btn-primary btn-sm" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
+          <button class="poster-slab poster-slab--control" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
             ${genBusy ? html`<span class="spinner"></span> ${t('organisms.generating') || 'Generating…'}` : (t('organisms.generate') || 'Generate with AI')}
           </button>
         ` : null}
-        <button class="btn-outline btn-sm" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}</button>
+        <button class="poster-action poster-action--small" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}</button>
       </div>
 
       <div class="section-desc">${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}</div>
-      <textarea class="input-field input-sm" rows="4"
+      <textarea class="og-textarea" rows="4"
         placeholder=${t('organisms.pastePlaceholder') || 'Paste the AI JSON response here'}
         value=${pasteText} onInput=${e => setPasteText(e.target.value)}></textarea>
 
       ${genFail && html`
-        <div class="pj-errors">
-          <div class="pj-errors-title">${t('organisms.genFailed') || 'Generation failed — try again'}</div>
-          <div class="pj-error-line">${(genFail)}</div>
+        <div class="pj-errors poster-aside poster-aside--small">
+          <div class="poster-label">${t('organisms.genFailed') || 'Generation failed — try again'}</div>
+          <div class="form-message form-message--error">${(genFail)}</div>
         </div>
       `}
 
       ${genErrors.length > 0 && html`
-        <div class="pj-errors">
-          <div class="pj-errors-title">${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}</div>
-          ${genErrors.map((e, i) => html`<div class="pj-error-line" key=${i}>${(e)}</div>`)}
+        <div class="pj-errors poster-aside poster-aside--small">
+          <div class="poster-label">${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}</div>
+          ${genErrors.map((e, i) => html`<div class="form-message form-message--error" key=${i}>${(e)}</div>`)}
           <div class="form-actions">
-            <button class="btn-outline btn-sm" onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}</button>
+            <button class="poster-action poster-action--small" onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}</button>
           </div>
         </div>
       `}
 
       <div class="form-actions">
-        <button class="btn-primary btn-sm" onClick=${applyPasted} disabled=${applyBusy || !pasteText.trim()}>
+        <button class="poster-slab poster-slab--control" onClick=${applyPasted} disabled=${applyBusy || !pasteText.trim()}>
           ${applyBusy ? html`<span class="spinner"></span> ` : ''}${t('organisms.applyPasted') || 'Validate & apply'}
         </button>
       </div>

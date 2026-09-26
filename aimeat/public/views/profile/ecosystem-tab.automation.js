@@ -7,6 +7,35 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.23.0 -- 2026-09-26 -- An advisory's dates and source are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.22.0 -- 2026-09-26 -- The recipe's agents, schedule, delivery and e-mail choices are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.21.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.20.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.19.0 -- 2026-09-26 -- A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
+ *   v1.18.0 -- 2026-09-26 -- A control that opens a panel below it is the Tab's fold tone (.poster-tab--fold, is-on while open), and the parameters section that is one row until opened is the FoldSection; their own toggles, carets and arrows go (a unification: Jouni's decision Tabs and filters, and the look most tabs use).
+ *   v1.17.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.16.0 -- 2026-09-25 -- The ecosystem card's help lines are the Hint (.poster-hint); their own sizes go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.15.0 -- 2026-09-25 -- A node's agents, the CORS chain, the ecosystem's identifiers and its pairing code are inline code (.code-inline); their own mono looks go (a unification: the look most tabs use).
+ *   v1.14.0 -- 2026-09-25 -- The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
+ *   v1.13.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.10.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.9.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.8.0 -- 2026-09-25 -- A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
+ *   v1.7.0 -- 2026-09-25 -- A lead or a paragraph that opens or explains a section is the og-lead; a grey one that explains is the Hint (UI consolidation phase 5, a unification).
+ *   v1.6.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.4.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   v1.1.1 — 2026-09-13 — The reject-advisory dialog's actions sit in its footer.
  *   v1.1.0 — 2026-07-16 — Card mount folds schedules + recipe + organisms + advisories into GET
@@ -22,7 +51,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
 import { JsonValue } from '/components/JsonView.js';
-import { Spinner } from './shared.js';
+import { LoadingLine } from './shared.js';
 import { getAutomationRecipe, getAutomationOverview, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
 import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, triggerSchedule, getScheduleDetail, setScheduleCron } from '/js/services/schedules.js';
@@ -30,6 +59,8 @@ import { listAgents } from '/js/services/agents.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { CADENCES, CRON_TO_CADENCE, defaultTriggerGlob, primarySchedulable, allowedCadencesFor, recommendationFor } from './ecosystem-tab.helpers.js';
 import { swallowed } from '/js/swallowed.js';
+import { Hint } from '/components/Hint.js';
+import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 
 /**
  * The per-schedule run-history log: lazy-fetches GET /v1/schedules/:id on first
@@ -51,17 +82,17 @@ function EcoScheduleLog({ jobId, refreshKey }) {
   }, [jobId, refreshKey]);
 
   if (runs === undefined) {
-    return html`<div class="pf-eco-dim pf-eco-auto-log-loading"><${Spinner} /> ${t('profile.ecosystem.automationLogLoading')}</div>`;
+    return html`<${LoadingLine} text=${t('profile.ecosystem.automationLogLoading')} />`;
   }
   if (runs.length === 0) {
-    return html`<div class="pf-eco-dim pf-eco-auto-log-empty">${t('profile.ecosystem.automationLogEmpty')}</div>`;
+    return html`<div class="poster-quiet pf-eco-auto-log-empty">${t('profile.ecosystem.automationLogEmpty')}</div>`;
   }
   return html`
     <div class="pf-eco-auto-log">
       ${runs.map(r => html`
         <div class="pf-eco-auto-log-row" key=${r.id || r.createdAt}>
-          <span class="pf-eco-dim pf-eco-auto-log-time">${r.createdAt ? timeAgo(r.createdAt) : ''}</span>
-          <span class="pf-eco-chip pf-eco-auto-result-${r.result}">${t(`profile.ecosystem.automationRunResult_${r.result}`)}</span>
+          <span class="pf-eco-auto-log-time poster-time">${r.createdAt ? timeAgo(r.createdAt) : ''}</span>
+          <span class=${runResultClass(r.result)}>${t(`profile.ecosystem.automationRunResult_${r.result}`)}</span>
           ${r.trigger && html`<span class="pf-eco-dim pf-eco-auto-log-trigger">${r.trigger}</span>`}
           ${typeof r.durationMs === 'number' && html`<span class="pf-eco-dim pf-eco-auto-log-dur">${t('profile.ecosystem.automationDuration', { ms: r.durationMs })}</span>`}
           ${r.errorMessage && html`<span class="pf-eco-dim pf-eco-auto-log-reason">${r.errorMessage}</span>`}
@@ -69,12 +100,22 @@ function EcoScheduleLog({ jobId, refreshKey }) {
     </div>`;
 }
 
+/** How a run went, as a Status: ok is fine, an error is danger, a skipped run (or anything else) is off. */
+function runResultClass(result) {
+  return `poster-status poster-status--${result === 'ok' || result === 'success' ? 'fine' : result === 'error' ? 'danger' : 'off'}`;
+}
+
+/** An advisory's severity as a Status: high or critical is danger, medium needs a look, the rest is off. */
+function severityClass(sev) {
+  return `poster-status poster-status--${sev === 'high' || sev === 'critical' ? 'danger' : sev === 'medium' ? 'attention' : 'off'}`;
+}
+
 /**
- * The status-timeline chip for one chain step. `state` is one of:
- * 'ok' (green), 'wait' (neutral/dimmed), 'off' (paused/dimmed), 'error' (danger).
+ * The status-timeline Status for one chain step. `state` is one of:
+ * 'ok' (fine), 'wait' and 'off' (off: neutral), 'error' (danger).
  */
 function EcoStatusChip({ state, label }) {
-  return html`<span class="pf-eco-chip pf-eco-auto-status-chip pf-eco-auto-status-${state}">${label}</span>`;
+  return html`<span class=${`poster-status poster-status--${state === 'ok' ? 'fine' : state === 'error' ? 'danger' : 'off'}`}>${label}</span>`;
 }
 
 /**
@@ -99,7 +140,7 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
   const declaresRecommendations = Array.isArray(recommendedAgents) && recommendedAgents.length > 0;
 
   if (agents.length === 0) {
-    return html`<div class="pf-eco-dim">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`;
+    return html`<div class="poster-quiet">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`;
   }
 
   // Partition the owner's agents into recommended (with why) and the rest.
@@ -112,7 +153,7 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
   }
 
   const agentLabel = (a) => html`
-    <label class="pf-eco-recipe-agent" key=${a.name}>
+    <label class="pf-eco-recipe-agent check-line" key=${a.name}>
       <input type="checkbox" checked=${selAgents.includes(a.name)} onChange=${() => onToggle(a.name)} />
       <span>${a.name}</span>
     </label>`;
@@ -122,12 +163,12 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
       ${recommended.length > 0 && html`
         <div class="pf-eco-rec-list">
           ${recommended.map(({ agent, why }) => html`
-            <label class="pf-eco-rec-agent" key=${agent.name}>
+            <label class="pf-eco-rec-agent poster-box" key=${agent.name}>
               <input type="checkbox" checked=${selAgents.includes(agent.name)} onChange=${() => onToggle(agent.name)} />
               <span class="pf-eco-rec-agent-body">
                 <span class="pf-eco-rec-agent-head">
                   <span class="pf-eco-rec-agent-name">${agent.name}</span>
-                  <span class="pf-eco-chip pf-eco-rec-chip">${t('profile.ecosystem.recommendedChip')}</span>
+                  <span class="poster-chip poster-chip--coral">${t('profile.ecosystem.recommendedChip')}</span>
                 </span>
                 ${why && html`<span class="pf-eco-dim pf-eco-rec-why">${why}</span>`}
               </span>
@@ -137,7 +178,7 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
       ${declaresRecommendations && recommended.length === 0 && html`
         <div class="pf-eco-rec-missing">
           ${recommendedAgents.filter(d => d?.name || d?.why).map((d, i) => html`
-            <p class="pf-eco-dim pf-eco-rec-missing-line" key=${d.name || i}>
+            <p class="poster-hint pf-eco-rec-missing-line" key=${d.name || i}>
               ${t('profile.ecosystem.recommendedMissing', {
                 name: d.name || '—',
                 why: (d.why && (d.why[locale] || d.why.en || d.why.fi)) || '',
@@ -148,8 +189,7 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
       ${rest.length > 0 && (recommended.length > 0 || declaresRecommendations
         ? html`
           <div class="pf-eco-rec-rest">
-            <button class="pf-eco-auto-how-toggle" aria-expanded=${showAll} onClick=${() => setShowAll(o => !o)}>
-              <span class="pf-eco-caret">${showAll ? '▼' : '▶'}</span>
+            <button type="button" class=${`poster-tab poster-tab--fold ${showAll ? 'is-on' : ''}`} aria-expanded=${showAll} onClick=${() => setShowAll(o => !o)}>
               ${showAll ? t('profile.ecosystem.hideAllAgents') : t('profile.ecosystem.showAllAgents', { n: rest.length })}
             </button>
             ${showAll && html`<div class="pf-eco-recipe-agents pf-eco-rec-rest-list">${rest.map(agentLabel)}</div>`}
@@ -396,8 +436,8 @@ export function EcoAutomationSection({ app, showToast }) {
     return html`
       <div class="pf-eco-section poster-row--thing">
         <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
-        <div class="pf-eco-dim">${t('profile.ecosystem.autoRevoked')}</div>
-        <p class="pf-eco-dim pf-eco-reconnect-hint">${t('profile.ecosystem.revokeReconnectHint')}</p>
+        <div class="poster-hint">${t('profile.ecosystem.autoRevoked')}</div>
+        <${Hint}>${t('profile.ecosystem.revokeReconnectHint')}<//>
       </div>`;
   }
 
@@ -405,7 +445,7 @@ export function EcoAutomationSection({ app, showToast }) {
     return html`
       <div class="pf-eco-section poster-row--thing">
         <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
-        <div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.automationLoading')}</div>
+        <${LoadingLine} text=${t('profile.ecosystem.automationLoading')} />
       </div>`;
   }
 
@@ -423,22 +463,18 @@ export function EcoAutomationSection({ app, showToast }) {
   return html`
     <div class="pf-eco-section poster-row--thing pf-eco-auto-flow" data-eco-auto=${app.app}>
       <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
-      <p class="pf-eco-dim pf-eco-auto-flow-intro">${t('profile.ecosystem.autoIntro')}</p>
+      <${Hint}>${t('profile.ecosystem.autoIntro')}<//>
 
-      <button class="pf-eco-auto-how-toggle" aria-expanded=${showHow} onClick=${() => setShowHow(o => !o)}>
-        <span class="pf-eco-caret">${showHow ? '▼' : '▶'}</span>
+      <button type="button" class=${`poster-tab poster-tab--fold ${showHow ? 'is-on' : ''}`} aria-expanded=${showHow} onClick=${() => setShowHow(o => !o)}>
         ${t('profile.ecosystem.autoHowTitle')}
       </button>
       ${showHow && html`
         <div class="pf-eco-auto-how">
-          <p class="pf-eco-dim pf-eco-auto-how-lead">${t('profile.ecosystem.autoHowLead')}</p>
-          <ol class="pf-eco-auto-how-steps">
-            <li>${t('profile.ecosystem.autoHowStep1')}</li>
-            <li>${t('profile.ecosystem.autoHowStep2')}</li>
-            <li>${t('profile.ecosystem.autoHowStep3')}</li>
-            <li>${t('profile.ecosystem.autoHowStep4')}</li>
-          </ol>
-          <p class="pf-eco-dim pf-eco-auto-how-doc">${t('profile.ecosystem.autoHowDoc')}</p>
+          <${Hint}>${t('profile.ecosystem.autoHowLead')}<//>
+          <${IndexList} steps className="pf-eco-auto-how-steps">
+            ${[1, 2, 3, 4].map((n) => html`<${IndexStep} key=${n}>${t(`profile.ecosystem.autoHowStep${n}`)}<//>`)}
+          <//>
+          <p class="poster-hint pf-eco-auto-how-doc">${t('profile.ecosystem.autoHowDoc')}</p>
         </div>`}
 
       <!-- ── the ONE config card, read top-to-bottom ── -->
@@ -449,9 +485,9 @@ export function EcoAutomationSection({ app, showToast }) {
           ${primary
             ? html`
               <div class="pf-eco-auto-produces">
-                <span class="pf-eco-mono pf-eco-auto-produces-cap">${primary.id}</span>
-                ${primary.produces && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoProduces')}: <span class="pf-eco-mono">${primary.produces}</span></span>`}
-                ${producesKey && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoDepositKey')}: <span class="pf-eco-mono">${defaultTriggerGlob(app)}</span></span>`}
+                <span class="code-inline pf-eco-auto-produces-cap">${primary.id}</span>
+                ${primary.produces && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoProduces')}: <span class="code-inline">${primary.produces}</span></span>`}
+                ${producesKey && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoDepositKey')}: <span class="code-inline">${defaultTriggerGlob(app)}</span></span>`}
               </div>`
             : html`<div class="pf-eco-dim">${t('profile.ecosystem.automationNoCaps')}</div>`}
         </div>
@@ -460,11 +496,11 @@ export function EcoAutomationSection({ app, showToast }) {
         <div class="pf-eco-auto-flow-step ${primary ? '' : 'pf-eco-auto-flow-step-disabled'}">
           <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep2')}</div>
           <div class="pf-eco-auto-flow-controls">
-            <select class="pf-eco-select" value=${cadence} disabled=${!primary}
+            <select class="select-field" value=${cadence} disabled=${!primary}
               onChange=${e => setCadence(e.target.value)}>
               ${allowedCadences.map(c => html`<option value=${c.key} key=${c.key}>${t(`profile.ecosystem.automationCadence_${c.key}`)}</option>`)}
             </select>
-            <label class="pf-eco-recipe-toggle">
+            <label class="pf-eco-recipe-toggle check-line">
               <input type="checkbox" checked=${scheduleOn} disabled=${!primary} onChange=${e => setScheduleOn(e.target.checked)} />
               <span>${t('profile.ecosystem.autoScheduleOn')}</span>
             </label>
@@ -480,7 +516,7 @@ export function EcoAutomationSection({ app, showToast }) {
         <!-- ④ Store results in organism -->
         <div class="pf-eco-auto-flow-step">
           <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep4')}</div>
-          <select class="pf-eco-select" value=${organism} onChange=${e => setOrganism(e.target.value)}>
+          <select class="select-field" value=${organism} onChange=${e => setOrganism(e.target.value)}>
             <option value="">${t('profile.ecosystem.recipeOrganismNone')}</option>
             ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
           </select>
@@ -490,22 +526,22 @@ export function EcoAutomationSection({ app, showToast }) {
         <div class="pf-eco-auto-flow-step">
           <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep5')}</div>
           <div class="pf-eco-recipe-radios">
-            <label class="pf-eco-recipe-radio">
+            <label class="pf-eco-recipe-radio check-line">
               <input type="radio" name=${`eco-delivery-${app.app}`} checked=${requireApproval} onChange=${() => setRequireApproval(true)} />
               <span>
                 <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryApprove')}</span>
-                <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryApproveHint')}</span>
+                <span class="poster-hint">${t('profile.ecosystem.recipeDeliveryApproveHint')}</span>
               </span>
             </label>
-            <label class="pf-eco-recipe-radio">
+            <label class="pf-eco-recipe-radio check-line">
               <input type="radio" name=${`eco-delivery-${app.app}`} checked=${!requireApproval} onChange=${() => setRequireApproval(false)} />
               <span>
                 <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryPush')}</span>
-                <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryPushHint')}</span>
+                <span class="poster-hint">${t('profile.ecosystem.recipeDeliveryPushHint')}</span>
               </span>
             </label>
           </div>
-          <label class="pf-eco-recipe-toggle pf-eco-auto-flow-email">
+          <label class="pf-eco-recipe-toggle pf-eco-auto-flow-email check-line">
             <input type="checkbox" checked=${email} onChange=${e => setEmail(e.target.checked)} />
             <span>${t('profile.ecosystem.recipeEmail')}</span>
           </label>
@@ -513,23 +549,22 @@ export function EcoAutomationSection({ app, showToast }) {
 
         <!-- Advanced: trigger key -->
         <div class="pf-eco-auto-flow-step pf-eco-auto-flow-advanced">
-          <button class="pf-eco-auto-how-toggle" aria-expanded=${showAdvanced} onClick=${() => setShowAdvanced(o => !o)}>
-            <span class="pf-eco-caret">${showAdvanced ? '▼' : '▶'}</span>
+          <button type="button" class=${`poster-tab poster-tab--fold ${showAdvanced ? 'is-on' : ''}`} aria-expanded=${showAdvanced} onClick=${() => setShowAdvanced(o => !o)}>
             ${t('profile.ecosystem.autoAdvanced')}
           </button>
           ${showAdvanced && html`
             <div class="pf-eco-auto-flow-advanced-body">
-              <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeTriggerLabel')}</label>
-              <input type="text" class="pf-eco-recipe-trigger-input pf-eco-mono"
+              <label class="poster-label">${t('profile.ecosystem.recipeTriggerLabel')}</label>
+              <input type="text" class="og-input"
                 value=${triggerGlob} placeholder=${defaultTriggerGlob(app)}
                 onInput=${e => setTriggerGlob(e.target.value)} />
-              <p class="pf-eco-dim pf-eco-recipe-trigger-help">${t('profile.ecosystem.recipeTriggerHelp')}</p>
+              <${Hint}>${t('profile.ecosystem.recipeTriggerHelp')}<//>
             </div>`}
         </div>
 
         <!-- ONE Save -->
         <div class="pf-eco-auto-flow-save">
-          <button class="btn-primary btn-sm" disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.autoSave')}</button>
+          <button class="poster-slab poster-slab--control" disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.autoSave')}</button>
         </div>
       </div>
 
@@ -553,25 +588,25 @@ export function EcoAutomationSection({ app, showToast }) {
                   <div class="pf-eco-auto-job-meta">
                     <span class="pf-eco-dim">
                       ${t('profile.ecosystem.automationLastRun')}: ${primaryJob.lastRunAt
-                        ? html`${timeAgo(primaryJob.lastRunAt)}${primaryJob.lastRunResult ? html` · <span class="pf-eco-auto-result-${primaryJob.lastRunResult}">${primaryJob.lastRunResult}</span>` : ''}`
+                        ? html`${timeAgo(primaryJob.lastRunAt)}${primaryJob.lastRunResult ? html` · <span class=${runResultClass(primaryJob.lastRunResult)}>${primaryJob.lastRunResult}</span>` : ''}`
                         : '—'}
                     </span>
                     <span class="pf-eco-dim">${t('profile.ecosystem.automationNextRun')}: ${primaryJob.enabled ? formatUntil(primaryJob.nextRunAt) : '—'}</span>
                   </div>
                   ${lastAttempt && lastAttempt.outcome === 'busy' && html`
-                    <div class="pf-eco-dim pf-eco-auto-lastattempt">
+                    <div class="poster-hint">
                       ${/offline|unavailable/i.test(lastAttempt.reason)
                         ? t('profile.ecosystem.automationRunSkippedOffline')
                         : t('profile.ecosystem.automationRunSkipped', { reason: lastAttempt.reason })}
                     </div>`}
                   <div class="pf-eco-auto-job-actions">
-                    <button class="btn-ghost btn-sm" disabled=${running} onClick=${onRunNow}>${t('profile.ecosystem.automationRunNow')}</button>
-                    <button class="btn-ghost btn-sm" aria-expanded=${openLog} onClick=${() => setOpenLog(o => !o)}>
+                    <button class="poster-action poster-action--small" disabled=${running} onClick=${onRunNow}>${t('profile.ecosystem.automationRunNow')}</button>
+                    <button class="poster-action poster-action--small" aria-expanded=${openLog} onClick=${() => setOpenLog(o => !o)}>
                       ${openLog ? t('profile.ecosystem.automationHideLog') : t('profile.ecosystem.automationShowLog')}
                     </button>
                   </div>
                   ${openLog && html`<${EcoScheduleLog} jobId=${primaryJob.id} refreshKey=${logRefresh} />`}`
-                : html`<div class="pf-eco-dim">${t('profile.ecosystem.autoStatusPublishedHint')}</div>`}
+                : html`<div class="poster-hint">${t('profile.ecosystem.autoStatusPublishedHint')}</div>`}
             </div>
           </div>
 
@@ -583,12 +618,12 @@ export function EcoAutomationSection({ app, showToast }) {
             </div>
             <div class="pf-eco-auto-status-body">
               ${selAgents.length === 0
-                ? html`<div class="pf-eco-dim">${t('profile.ecosystem.autoStatusNoAgents')}</div>`
+                ? html`<div class="poster-hint">${t('profile.ecosystem.autoStatusNoAgents')}</div>`
                 : html`
                   <div class="pf-eco-auto-status-agents">
-                    ${selAgents.map(name => html`<span class="pf-eco-chip" key=${name}>${name}</span>`)}
+                    ${selAgents.map(name => html`<span class="poster-chip" key=${name}>${name}</span>`)}
                   </div>
-                  <div class="pf-eco-dim pf-eco-auto-status-note">${t('profile.ecosystem.autoStatusProcessedHint')}</div>`}
+                  <div class="poster-hint">${t('profile.ecosystem.autoStatusProcessedHint')}</div>`}
             </div>
           </div>
 
@@ -597,14 +632,14 @@ export function EcoAutomationSection({ app, showToast }) {
             <div class="pf-eco-auto-status-head">
               <span class="pf-eco-auto-status-dot pf-eco-auto-status-dot-${deliverState}"></span>
               <strong class="pf-eco-auto-status-label">${t('profile.ecosystem.autoStatusDelivered')}</strong>
-              ${pendingCount > 0 && html`<span class="pf-eco-chip pf-eco-auto-status-pending-count">${pendingCount}</span>`}
+              ${pendingCount > 0 && html`<span class="poster-count poster-count--waiting">${pendingCount}</span>`}
             </div>
             <div class="pf-eco-auto-status-body">
-              <p class="pf-eco-dim pf-eco-auto-status-note">${t('profile.ecosystem.autoStatusDeliveredHint')}</p>
+              <${Hint}>${t('profile.ecosystem.autoStatusDeliveredHint')}<//>
               ${advisories === undefined
-                ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.advLoading')}</div>`
+                ? html`<${LoadingLine} text=${t('profile.ecosystem.advLoading')} />`
                 : advisories.length === 0
-                  ? html`<div class="pf-eco-dim">${t('profile.ecosystem.advPendingEmpty')}</div>`
+                  ? html`<div class="poster-quiet">${t('profile.ecosystem.advPendingEmpty')}</div>`
                   : html`
                     <div class="pf-eco-adv-list">
                       ${advisories.map(p => {
@@ -613,28 +648,28 @@ export function EcoAutomationSection({ app, showToast }) {
                           <div class="pf-eco-adv-item" key=${p.id}>
                             <div class="pf-eco-adv-head">
                               <strong class="pf-eco-adv-title">${a.title || p.id}</strong>
-                              ${a.kind && html`<span class="pf-eco-chip pf-eco-adv-kind">${t('profile.ecosystem.advKind')}: ${a.kind}</span>`}
-                              ${a.severity && html`<span class="pf-eco-chip pf-eco-adv-sev pf-eco-adv-sev-${a.severity}">${t('profile.ecosystem.advSeverity')}: ${a.severity}</span>`}
-                              ${a.status && html`<span class="pf-eco-chip">${a.status}</span>`}
+                              ${a.kind && html`<span class="poster-chip">${t('profile.ecosystem.advKind')}: ${a.kind}</span>`}
+                              ${a.severity && html`<span class=${severityClass(a.severity)}>${t('profile.ecosystem.advSeverity')}: ${a.severity}</span>`}
+                              ${a.status && html`<span class="poster-chip">${a.status}</span>`}
                             </div>
                             ${(a.effective_from || a.effective_until) && html`
-                              <div class="pf-eco-dim pf-eco-adv-meta">
+                              <div class="pf-eco-dim pf-eco-adv-meta listing-meta">
                                 ${t('profile.ecosystem.advEffective')}: ${a.effective_from || '…'} → ${a.effective_until || '…'}
                               </div>`}
                             <div class="pf-eco-adv-body">
                               <${JsonValue} value=${a.body !== undefined ? a.body : a} />
                             </div>
-                            ${a.source && html`<div class="pf-eco-dim pf-eco-adv-meta">${t('profile.ecosystem.advSource')}: ${a.source}</div>`}
+                            ${a.source && html`<div class="pf-eco-dim pf-eco-adv-meta listing-meta">${t('profile.ecosystem.advSource')}: ${a.source}</div>`}
                             ${a.rationale && html`
                               <div class="pf-eco-adv-rationale">
                                 <span class="pf-eco-dim">${t('profile.ecosystem.advRationale')}:</span>
                                 <${JsonValue} value=${a.rationale} />
                               </div>`}
                             <div class="pf-eco-adv-actions">
-                              <button class="btn-success btn-sm" disabled=${!!advBusy[p.id]} onClick=${() => onApproveAdv(p.id)}>
+                              <button class="poster-action poster-action--small" disabled=${!!advBusy[p.id]} onClick=${() => onApproveAdv(p.id)}>
                                 ${t('profile.ecosystem.advApprove')}
                               </button>
-                              <button class="btn-ghost btn-sm pf-eco-adv-reject" disabled=${!!advBusy[p.id]} onClick=${() => setConfirmId(p.id)}>
+                              <button class="poster-action poster-action--small poster-action--danger" disabled=${!!advBusy[p.id]} onClick=${() => setConfirmId(p.id)}>
                                 ${t('profile.ecosystem.advReject')}
                               </button>
                             </div>

@@ -12,7 +12,8 @@
  *   "No CSS values in the visible part"). The technical half, shown only in the folded Details, is
  *   `proposal.text`, a tone's `from`, and an option's `code` and `look`.
  *
- *   PLAIN DATA, NO IMPORTS. The lab reads it in the browser, and scripts/design-lab-crops.ts reads
+ *   PLAIN DATA; its one import is the rest of the list, the conflicts round of Settings & Controls
+ *   (decisions-conflicts.js), spread in at the end, so DECISIONS stays one list. The lab reads it in the browser, and scripts/design-lab-crops.ts reads
  *   it in Node to shoot each option's crop from its page. An option's live picture is in
  *   decision-samples.js under the same id, and a proposal that is a new composition (`variant:
  *   'proposal'`) has its picture there too; `pnpm check:ui-library` holds the files together.
@@ -27,10 +28,26 @@
  * @structure DECISIONS — [{ id, counted, title, question, proposal: { variant, name, summary, text,
  *   tones?: [{ name, meaning, from }] }, variants: [{ id, name, code, look, where, becomes, files,
  *   keptAsIs, crop }], changes: [{ page, what }], choice }]
- *   BUILT — { [decisionId]: { commit, onMain, date, what, sets: [{ name, total, changed, noise }], note? } }
- *   BUILT_WITHOUT_DECISION — { [id]: the same, with a title }: built work Jouni looks at that no decision holds
- * @usage import { DECISIONS, BUILT } from './decisions-data.js';
+ *   What was built from them is in built-data.js (BUILT, BUILT_WITHOUT_DECISION).
+ * @usage import { DECISIONS } from './decisions-data.js';
  * @version-history
+ *   v3.13.0 — 2026-09-26 — The last round of Settings (decisions-final.js) spread in after the
+ *     conflicts round; a decision may carry `look` (also drawn in a theme) and `textOnly`.
+ *   v3.12.0 — 2026-09-25 — The conflicts round moved to decisions-conflicts.js unchanged and spread
+ *     in here (the file neared the 800-line limit; a move).
+ *   v3.11.0 — 2026-09-25 — The conflicts round, seventh: the code block, four looks and the
+ *     library's .code-block to take the answer (waiting for Jouni).
+ *   v3.10.0 — 2026-09-25 — The conflicts round, sixth: the Settings door against the home's action
+ *     link (waiting for Jouni). After a first-time review of the round: plain words for every
+ *     option and tone, the width each picture shows where it matters, tighter crops, person head and
+ *     numbered list as new compositions with their tones drawn, the readable marks on the sun, and
+ *     what each proposal keeps, moves and drops listed.
+ *   v3.9.0 — 2026-09-25 — BUILT and BUILT_WITHOUT_DECISION moved to built-data.js unchanged (the file
+ *     neared the 800-line limit; a move).
+ *   v3.8.0 — 2026-09-25 — The conflicts round of Settings & Controls: person head, numbered list,
+ *     conversation list, message and typing box, each drawn one way on the home or the chat and
+ *     another in Settings (waiting for Jouni).
+ *   v3.7.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v3.6.0 — 2026-09-24 — Themes & Styles, shape values: the move and the remade Pebble, measured,
  *     with Pebble's values and how much of its component CSS was left.
  *   v3.5.0 — 2026-09-24 — Themes & Styles: the example theme Pebble, and `reach`, what it reached on
@@ -45,6 +62,9 @@
  *   v2.0.0 — 2026-09-23 — Split by job; proposals as one component with named tones.
  *   v1.0.0 — 2026-09-23 — Initial: the decisions view (UI consolidation phase 2).
  */
+
+import { CONFLICT_DECISIONS } from './decisions-conflicts.js';
+import { FINAL_DECISIONS } from './decisions-final.js';
 
 const home = (selector, extra = {}) => ({ url: '/v1/home', selector, ...extra });
 const chatThread = (n, selector) => ({ url: '/v1/chat', eval: `document.querySelectorAll('.poster-thread-open')[${n}].click();`, selector });
@@ -131,7 +151,7 @@ export const DECISIONS = [
       text: 'One Count, two tones. The bell count (14) is waiting, smaller because it sits on an icon. The morsel count (15) is a balance with its heart, the product\'s own mark in the top bar, and stays as it is.',
     },
     variants: [
-      { id: 'count-coral', name: 'The coral count in the profile menu and on open items', code: '.pf-side-badge, .open-items-count', becomes: 'waiting', look: 'mono .7rem, coral fill, paper words', where: 'the profile menu, the open items button', files: 3, crop: { url: '/v1/profile', selector: '.pf-side-badge' } },
+      { id: 'count-coral', name: 'The coral count in the profile menu and on open items', code: '.side-menu-count, .open-items-count', becomes: 'waiting', look: 'mono .7rem, coral fill, paper words', where: 'the profile menu, the open items button', files: 3, crop: { url: '/v1/profile', selector: '.side-menu-count' } },
       { id: 'count-bell', name: 'The count on the bell', code: '.notif-badge (theme.css)', becomes: 'waiting, at the bell\'s small size', look: 'mono .6rem 700, coral fill, white words, 15px high', where: 'the top bar on every signed-in page', files: 1, crop: home('.notif-badge') },
       { id: 'count-morsels', name: 'The morsel badge with its heart', code: '.brand-morsels (theme.css)', becomes: 'stays as it is', look: 'mono .76rem 500, sun fill, a coral heart before it; hidden below 1180px', where: 'the top bar on every signed-in page', files: 1, keptAsIs: true, crop: home('.brand-morsels') },
       { id: 'count-admin-nav', name: 'The count in the admin menu', code: '.adm-nav-item .cnt (admin.css)', becomes: 'tally, a little larger', look: 'mono .66rem 500, no fill, the menu\'s dim colour', where: 'the admin menu', files: 1, crop: { url: '/v1/admin', selector: '.adm-nav-item .cnt' } },
@@ -530,104 +550,6 @@ export const DECISIONS = [
     ],
     choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: Cancel the underlined action link, Confirm the slab, Delete the slab's danger tone. \"I was thinking that hopefully the save button is the action button in general way that all the action buttons then looks like that.\" Save and Confirm are the loud action, the dark block.","decidedAt":"2026-09-24","decidedBy":"Jouni"},
   },
+  ...CONFLICT_DECISIONS,
+  ...FINAL_DECISIONS,
 ];
-
-/**
- * What was built from each decision (the plan's 06-design-lab.md item 4, "The built results"): the
- * commit, whether it is on main, what changed in words, and every compared set of pictures: how many
- * were taken and how many changed. A set's other pictures are unchanged (0.00 %), and each changed
- * picture was checked to change only where the decided part is. `noise` counts the pictures of
- * Access, Statistics and Overview that move under 0.2 % between two runs of the same code (their
- * data is live). The before/after pictures themselves are files on the node that built them
- * (/img/design-lab/built.json, outside the repo like the crops).
- */
-const set = (name, total, changed, noise = 0) => ({ name, total, changed, noise });
-const HOME_CHAT = 'The home and the chat, every state, three widths, both modes';
-const OTHER = 'Other pages: settings & controls, admin, catalog, help, legal, front';
-const FORCED = 'Forced states: the install banner, a failed answer, a review waiting, menus opened, first steps';
-const LAB = 'The lab\'s own pictures';
-export const BUILT = {
-  'agent-step-wrapper': { commit: 'bb57e3bc0', onMain: true, date: '2026-09-24',
-    what: 'The agent step\'s name label and hint read in the body letters, and the name field is full width.',
-    sets: [set(HOME_CHAT, 150, 0), set(FORCED, 72, 6), set(OTHER, 126, 0, 14), set(LAB, 68, 0)] },
-  'panel-action': { commit: 'db8d69d95', onMain: true, date: '2026-09-24',
-    what: 'Every panel button is the underlined action link: open items\' copy and review buttons, Install, the playbook\'s copy, the setup guide\'s copies, Try again.',
-    sets: [set(HOME_CHAT, 150, 75), set(FORCED, 72, 54), set(OTHER, 126, 13, 18), set(LAB, 68, 2)] },
-  'step-state': { commit: '43e5d7c60', onMain: true, date: '2026-09-24',
-    what: 'In the first steps, a button that is not the next thing to do is the underlined action link, dimmed while it cannot be pressed.',
-    sets: [set(HOME_CHAT, 150, 0), set(FORCED, 72, 30), set(OTHER, 126, 0, 18), set(LAB, 68, 0)] },
-  dismiss: { commit: '69221fdf9', onMain: true, date: '2026-09-24',
-    what: '"Not now" on the phone suggestion and the install banner is a plain grey word.',
-    sets: [set(HOME_CHAT, 150, 64), set(FORCED, 72, 24), set(OTHER, 126, 0, 14), set(LAB, 68, 2)] },
-  'icon-button': { commit: '5e9ae299a', onMain: true, date: '2026-09-24',
-    what: 'Delete (✗), the card menu\'s dots and attach are the framed square; attach is dimmed while it cannot be used, as the microphone was.',
-    sets: [set(HOME_CHAT, 150, 120), set(FORCED, 72, 42), set(OTHER, 126, 6, 14), set(LAB, 68, 8)] },
-  choice: { commit: '66652c9bb', onMain: true, date: '2026-09-24',
-    what: 'The setup guide\'s tools and the start page switch are tabs; the background pattern tiles keep their look as the tile tone.',
-    sets: [set(HOME_CHAT, 150, 8), set(FORCED, 72, 24), set(OTHER, 126, 8, 14), set(LAB, 68, 4)] },
-  suggestion: { commit: '0a800370d', onMain: true, date: '2026-09-24',
-    what: 'The welcome\'s suggestions read as sentences, as the ones after an answer do.',
-    sets: [set(HOME_CHAT, 150, 10), set(FORCED, 72, 6), set(OTHER, 126, 0, 16), set(LAB, 68, 2)] },
-  'menu-row': { commit: 'b31c94c74', onMain: true, date: '2026-09-24',
-    what: 'A card\'s menu rows and the bell\'s actions read as the prompt card\'s menu rows.',
-    sets: [set(HOME_CHAT, 150, 0), set(FORCED, 72, 12), set(OTHER, 126, 0, 14), set(LAB, 68, 6)] },
-  'small-link': { commit: '5a287a9a3', onMain: true, date: '2026-09-24',
-    what: '"Use your own key", "Powered by goose", "Official instructions" and "Show older" are small coral underlined words; "What does that mean?" and the jump keep their looks as tones.',
-    sets: [set(HOME_CHAT, 150, 42), set(FORCED, 72, 36), set(OTHER, 126, 6, 14), set(LAB, 68, 10)] },
-  'dialog-actions': { commit: '350d5c91e and 203bd4ba9', onMain: true, date: '2026-09-24',
-    what: 'In every dialog, the app catalog\'s too, a way out or a side door is the underlined action link, the one "do it" the dark block, and a delete the dark block\'s coral tone. The footers drew 10 different looks before and 3 after. "Change password…" at the start of the Edit profile footer became the action link too (your answer).',
-    sets: [set('Ten dialogs opened on their pages, whole and footer, two widths, both modes', 88, 88),
-      set('"Change password…": the Edit profile dialog, whole and footer, two widths, both modes', 8, 8),
-      set(HOME_CHAT, 150, 0), set(FORCED, 72, 0), set(OTHER, 126, 1, 13)],
-    note: 'Every dialog picture changed in its footer row only. On a phone the Edit profile dialog\'s dark block is a little narrower after the "Change password…" change, because the longer link takes more of the row. The one other page picture that changed is the settings landing on a phone, which differs by the same amount between two runs of the same code: it sometimes draws before its data arrives.' },
-};
-
-/**
- * Built work that no decision holds, shown under the decisions' summary with the same Built part.
- * Themes & Styles (07-themes-and-styles.md): what the move measured against the old code, what the
- * public pages did before and after, and the interactions with a theme's CSS worn.
- */
-export const BUILT_WITHOUT_DECISION = {
-  'themes-and-styles': { title: 'Themes & Styles', commit: 'f8ccbbab2, 75b6c808b, 10d4c2467 and edcd6f9da', onMain: true, date: '2026-09-24',
-    what: 'The admin view Themes & Styles (Design group): a theme holds styles, component CSS and theme CSS; the look picker offers the themes and their styles; the six built-in looks are now the AIMEAT theme. Measured against the old code (origin/main) on the same data.',
-    sets: [
-      set('The move: the home, the account record and the chat in the six built-in styles, three widths, both modes', 108, 0),
-      set('Public pages and the front page, signed out, with four looks kept in the browser', 96, 0),
-      set('Public pages signed in (help, members, change log), with four looks kept in the browser', 72, 0),
-      set('Signed in, "/" (it opens the home, which themes reach), with four looks kept in the browser', 24, 6),
-    ],
-    note: 'The 6 changed pictures are "/" with Harbour Day kept: the home wears the theme chosen, as intended; the old code does not know that style. With a theme\'s component CSS worn, the 21 driven steps of the home and the chat did the same as in the AIMEAT look (0 differences). The example theme Pebble was made from chat with the MCP tools only: one style for light and dark, the faces Fraunces and DM Sans, CSS for 39 components and a few lines of theme CSS. Its pictures come first below: AIMEAT on the left of the red line, Pebble on the right, same node, data and account.',
-    // What the example theme reached on each page, and what it did not, with the reason.
-    reach: [
-      { page: 'Home', reached: 'All of it: the name and the picture, the section titles, the task tabs, the panels, the prompt card, the action links, the loud action, the notes, the settings dialog.', not: '' },
-      { page: 'Chat', reached: 'All of it: the conversation list, the messages, the tool and result cards, the notes, the text field and Send, the side column.', not: '' },
-      { page: 'Settings & Controls', reached: 'The top bar, the section titles, the labels, the loud actions, the action links, the open items, the boxes and notes drawn with the library.', not: 'The side menu, the step rows, the MCP and standalone badges and the avatar frame still use the page\'s own CSS (pf-*). Phases 5 to 7 move them to the library; then the theme reaches them.' },
-      { page: 'Admin', reached: 'The top bar, the page and section titles, the labels, the buttons, the action links, the choices.', not: 'The dark side bar (only its chosen row follows the highlight colour), the metrics grid with its rules, the health table and the other tables still use admin\'s own CSS. Phases 5 to 7.' },
-      { page: 'The app catalog', reached: 'Nothing yet.', not: 'Its screens are a separate build with their own CSS. Phase 9 (07, "Left").' },
-    ] },
-  'themes-shapes': { title: 'Themes & Styles, shape values', commit: '82af1acc4 (and the two states shown in Pebble)', onMain: true, date: '2026-09-24',
-    what: 'A theme\'s corners, frames, shadows and letter case are now its shape values (theme.css --shape-*), and the component sheets read them instead of writing their own. A theme sets them once, in the Shapes tab or with aimeat_theme_save, and a component added later follows them. Pebble was remade on them from chat with the MCP tools only. Jouni: "katsoo että pebble syntyy myös niille uusille tehdyille komponenteille mitä tullaan tekemään kun tehdään settings & controls kirjastoon."',
-    sets: [
-      set('The move, AIMEAT: the home and the chat, every state, three widths, both modes', 150, 0),
-      set('The move in the six built-in styles (A3): the home, the account record, the chat', 108, 0),
-      set('The move on Settings & Controls and admin, AIMEAT', 42, 0),
-      set('Pebble remade on the shape values, against the Pebble of 131096f2a: the home and the chat', 150, 0),
-      set('Pebble remade, Settings & Controls and admin', 42, 0, 6),
-    ],
-    note: 'Of Pebble\'s 39 entries of component CSS, 36 are left, and they are smaller: 222 declarations became 151, and 23 shape values carry the rest. Three went whole (the rule over a row, the text field, the open items). Seven of the 36 are the classic shell\'s older parts (button, card, badge, form field, tags, the card menu, the install card), which read no shape value yet; the rest keep only what is one component\'s own: the fill of the main button and its danger tone, the action link\'s underline, the tabs\' pill ground, a section title\'s side bar, the panels\' ground, a few corners that differ (a record 20px, a step 18px, a choice 14px). Theme CSS went from 6 declarations to 3 (the selection and the focus ring). The shape literals still written in the component sheets fell from 181 to 117; check:shape-tokens holds that number and lets it only fall. The 6 not at 0.00 % on admin are its uptime line, which changes between any two runs. The old Pebble hid two states by accident, the card menu\'s state frame (open, working) and a result card\'s coloured kind edge. On Jouni\'s word ("they are information, and hiding them changes what the page does") the remade Pebble shows them: those are the only pictures that differ from the old Pebble (the home\'s "…" buttons, 0.01-0.02 %; the chat\'s result card, 0.09-0.32 %), and the numbers above were measured before that.',
-    values: { title: 'Pebble\'s shape values (the built-in value in the grey line)', rows: [
-      ['Corner of a box, a panel or a card', '16px', 'built-in 0'], ['Corner of a field or a small control', '12px', 'built-in 0'],
-      ['Corner of the main button, a tab and a count', '999px', 'built-in 0'], ['Corner of a dialog and an open menu', '22px', 'built-in 0'],
-      ['Frame of a box or a control', '1px', 'built-in 2px'], ['Heavy frame and line', '1px', 'built-in 3px'],
-      ['Colour of a box\'s frame', 'var(--card-border)', 'built-in var(--text)'], ['Colour of a line and a control\'s frame', 'var(--border)', 'built-in var(--text)'],
-      ['Colour of a field\'s frame', 'var(--control-border)', 'built-in var(--text)'],
-      ['Shadow of a box', 'two soft shadows in 6 % and 8 % of the text colour', 'built-in none'],
-      ['Shadow of a record and an open menu', '0 12px 32px, 10 % of the text colour', 'built-in 8px 8px 0 sun'],
-      ['Shadow of a dialog', '0 24px 64px, 28 % of the text colour', 'built-in 12px 12px 0 sun'],
-      ['Shadow of the main button, and under the pointer', '0 6px 16px, 35 % and 45 % of the accent', 'built-in 4px 4px 0 and 2px 2px 0 sun'],
-      ['Shadow of a chosen choice', '0 6px 16px, 30 % of the accent', 'built-in 4px 4px 0 ink'],
-      ['Letter case of headings, actions and tabs, labels', 'none', 'built-in uppercase'],
-      ['Weight, letter spacing and line height of headings', '600, -0.01em, 1.1', 'built-in 400, .01em, 1'],
-      ['Letter spacing of actions and tabs, and of labels', '0 and 0', 'built-in .04em and .1em'],
-    ] } },
-};

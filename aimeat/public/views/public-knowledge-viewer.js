@@ -10,6 +10,7 @@
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
  * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
  * @version-history
+ *   v2.4.0 -- 2026-09-26 -- The figure's "of how many" is the Figure strip's own cut (.og-strip-of), moved unchanged from .kp-of (a move).
  *   v2.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v2.2.0 -- 2026-09-13 -- V2: compose public reader section headlines with poster-section-title.
  *   v2.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the public search row.
@@ -308,7 +309,7 @@ function DetailView({ packageId, onBack }) {
     <${AiLabel} variant="block" record=${provenance?.record} recordUrl=${provenance?.recordUrl} />
     <div class="og-strip">
       <div><b>${publicEntries.length}</b><span>${c('pubEntries')}</span><small>${c('pubEntriesSub')}</small></div>
-      <div><b>${verified}<span class="kp-of">/${refs}</span></b><span>${c('stripRefs')}</span><small>${refs ? (refs - verified ? c('stripRefsSub', { n: refs - verified }) : c('stripRefsAll')) : c('noRefs')}</small></div>
+      <div><b>${verified}<span class="og-strip-of">/${refs}</span></b><span>${c('stripRefs')}</span><small>${refs ? (refs - verified ? c('stripRefsSub', { n: refs - verified }) : c('stripRefsAll')) : c('noRefs')}</small></div>
       <div><b>${day(manifest.created) || '·'}</b><span>${c('pubPublished')}</span><small>${manifest.updated ? `${t('pkv.updated').toLowerCase()} ${day(manifest.updated)}` : ''}${manifest.version ? ` · v${manifest.version}` : ''}</small></div>
       <div><b class="og-strip-coral">${clones ?? '·'}</b><span>${c('pubClones')}</span><small>${clones ? c('pubClonesSub', { n: clones }) : c('pubNoClones')}</small></div>
     </div>

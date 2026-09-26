@@ -7,7 +7,7 @@
  *   stacked on a desktop and in one row on a phone. Its look is css/components/masthead.css; the
  *   catalogue entry is `masthead`. MastheadButton is a door that does something here (it wears the
  *   underlined action shape); MastheadCog is the drawn cog such a door can carry.
- * @structure Masthead({ avatarSvg, name, identity, identityTitle, children }) ·
+ * @structure Masthead({ avatarSvg, name, identity, identityTitle, plate, onAvatar, avatarTitle, children }) ·
  *   MastheadButton({ onClick, children }) · MastheadCog
  * @usage
  *   html`<${Masthead} avatarSvg=${svg} name=${name} identity=${ghii} identityTitle=${t('…')}>
@@ -15,6 +15,9 @@
  *     <${MastheadButton} onClick=${open}>${MastheadCog}<span>…</span><//>
  *   <//>`
  * @version-history
+ *   v1.1.0 — 2026-09-26 — `plate`: the page's own lines under the address; `onAvatar` and
+ *     `avatarTitle`: a picture that opens something. The Settings overview's head is this head
+ *     (Jouni's decision "Person head", a unification).
  *   v1.0.0 — 2026-09-23 — Moved out of views/home/header.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -32,12 +35,19 @@ export const MastheadCog = html`
   </svg>`;
 
 /**
- * @param {{ avatarSvg: string, name: any, identity?: string|null, identityTitle?: string, children?: any }} props
+ * `plate` is what a page adds under the address (the Settings overview: this AIMEAT's address and
+ * its marks). `onAvatar` makes the picture a control that opens something (the overview opens the
+ * profile), with `avatarTitle` as its name.
+ * @param {{ avatarSvg: string, name: any, identity?: string|null, identityTitle?: string, plate?: any,
+ *   onAvatar?: () => void, avatarTitle?: string, children?: any }} props
  */
-export function Masthead({ avatarSvg, name, identity, identityTitle, children }) {
+export function Masthead({ avatarSvg, name, identity, identityTitle, plate, onAvatar, avatarTitle, children }) {
   return html`
     <div class="poster-masthead">
-      <span class="poster-masthead-avatar poster-frame" aria-hidden="true" dangerouslySetInnerHTML=${{ __html: avatarSvg }}></span>
+      ${onAvatar
+        ? html`<span class="poster-masthead-avatar poster-frame" role="button" tabindex="0" title=${avatarTitle}
+            onClick=${onAvatar} dangerouslySetInnerHTML=${{ __html: avatarSvg }}></span>`
+        : html`<span class="poster-masthead-avatar poster-frame" aria-hidden="true" dangerouslySetInnerHTML=${{ __html: avatarSvg }}></span>`}
       <span class="poster-masthead-plate">
         <span class="poster-masthead-name">${name}</span>
         ${identity && html`
@@ -45,6 +55,7 @@ export function Masthead({ avatarSvg, name, identity, identityTitle, children })
             title=${identityTitle}>
             ${identity}
           </span>`}
+        ${plate}
       </span>
       <span class="poster-masthead-actions">
         ${children}

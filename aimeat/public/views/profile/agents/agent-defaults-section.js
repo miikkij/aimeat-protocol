@@ -5,6 +5,21 @@
  * @description Agent Defaults section — owner-level default rules and token
  *   budget for agents. Mounted at the foot of the Your agents page.
  * @version-history
+ *   v1.10.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.8.0 -- 2026-09-26 -- A rule's name and the token budget's name wear the Key's face (.key-name, css/components/key-name.css); .mem-key keeps only its place (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- The last lines that say nothing is there are the quiet sentence (.poster-quiet); the ecosystem's empty frame goes, its second line is the Hint (Jouni's decision "Empty line", a unification).
+ *   v1.6.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.5.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.4.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 — 2026-09-05 — Moved from access-tab/agent-defaults.js to the agents' own folder and
@@ -100,29 +115,29 @@ export function AgentDefaultsSection({ showToast, initial }) {
   const budget = defaults?.default_token_budget;
 
   return html`
-    <h3 class="card-h3 access-h3 mt-section">${t('profile.access.adTitle') || 'Agent Defaults'}</h3>
+    <h3 class="card-h3 sub-heading access-h3 mt-section">${t('profile.access.adTitle') || 'Agent Defaults'}</h3>
     <div class="section-desc">${t('profile.access.adDesc') || 'Owner-level defaults that apply to all your agents unless overridden by per-agent directives.'}</div>
 
     ${!editing ? html`
       <div class="card poster-row--thing">
         <div class="flex-between mb-half">
-          <div class="card-title">${t('profile.access.adRules') || 'Default Rules'}</div>
-          <button class="btn-outline btn-sm" onClick=${startEdit}>
+          <div class="sub-heading">${t('profile.access.adRules') || 'Default Rules'}</div>
+          <button class="poster-action poster-action--small" onClick=${startEdit}>
             ${t('profile.access.adEdit') || 'Edit'}
           </button>
         </div>
 
         ${rules.length === 0
-          ? html`<div class="text-meta-sm mb-half">${t('profile.access.adNoRules') || 'No default rules set.'} ${t('profile.access.adRuleExample') || 'Example: "Always answer in Finnish" or "Never spend morsels without asking".'}</div>`
+          ? html`<div class="poster-quiet mb-half">${t('profile.access.adNoRules') || 'No default rules set.'} ${t('profile.access.adRuleExample') || 'Example: "Always answer in Finnish" or "Never spend morsels without asking".'}</div>`
           : rules.map((rule, i) => html`
               <div class="mem-item" key=${i}>
-                <span class="mem-key">${escHtml(rule)}</span>
+                <span class="mem-key key-name">${escHtml(rule)}</span>
               </div>
             `)
         }
 
         <div class="mem-item">
-          <span class="mem-key">${t('profile.access.adTokenBudget') || 'Token Budget'}</span>
+          <span class="mem-key key-name">${t('profile.access.adTokenBudget') || 'Token Budget'}</span>
           <button class="pj-linklike" title=${t('profile.access.adEdit') || 'Edit'} onClick=${startEdit}>
             ${budget != null ? num(budget) : (t('profile.access.adUnlimited') || 'Unlimited')} ✎
           </button>
@@ -130,41 +145,41 @@ export function AgentDefaultsSection({ showToast, initial }) {
       </div>
     ` : html`
       <div class="create-form poster-row--thing">
-        <h4 class="card-h3 mb-half">${t('profile.access.adEditTitle') || 'Edit Agent Defaults'}</h4>
+        <h4 class="card-h3 sub-heading mb-half">${t('profile.access.adEditTitle') || 'Edit Agent Defaults'}</h4>
         <div class="flex-col">
           <div class="form-row">
-            <label>${t('profile.access.adRules') || 'Rules'}</label>
+            <label class="poster-label">${t('profile.access.adRules') || 'Rules'}</label>
             ${editRules.map((rule, i) => html`
               <div class="mem-item" key=${i}>
-                <span class="mem-key">${escHtml(rule)}</span>
-                <button class="btn-ghost btn-danger btn-sm" onClick=${() => removeRule(i)}>
+                <span class="mem-key key-name">${escHtml(rule)}</span>
+                <button class="poster-action poster-action--small poster-action--danger" onClick=${() => removeRule(i)}>
                   ${t('profile.access.adRemoveRule') || 'Remove'}
                 </button>
               </div>
             `)}
             <div class="flex-row">
-              <input type="text" class="input-field input-sm"
+              <input type="text" class="og-input"
                 placeholder=${t('profile.access.adRulePlaceholder') || 'Add a rule...'}
                 value=${newRule} onInput=${e => setNewRule(e.target.value)}
                 onKeyDown=${e => e.key === 'Enter' && addRule()} />
-              <button class="btn-outline btn-sm" onClick=${addRule}>
+              <button class="poster-action poster-action--small" onClick=${addRule}>
                 ${t('profile.access.adAddRule') || 'Add'}
               </button>
             </div>
           </div>
 
           <div class="form-row">
-            <label>${t('profile.access.adTokenBudget') || 'Token Budget'}</label>
-            <input type="number" class="input-field input-sm" min="0"
+            <label class="poster-label">${t('profile.access.adTokenBudget') || 'Token Budget'}</label>
+            <input type="number" class="og-input" min="0"
               placeholder=${t('profile.access.adBudgetPlaceholder') || 'Leave empty for unlimited'}
               value=${editBudget} onInput=${e => setEditBudget(e.target.value)} />
           </div>
 
           <div class="form-actions">
-            <button class="btn-primary btn-sm" onClick=${handleSave} disabled=${saving}>
+            <button class="poster-slab poster-slab--control" onClick=${handleSave} disabled=${saving}>
               ${saving ? '...' : (t('profile.access.adSave') || 'Save')}
             </button>
-            <button class="btn-ghost btn-sm" onClick=${() => setEditing(false)}>
+            <button class="poster-action poster-action--small" onClick=${() => setEditing(false)}>
               ${t('profile.access.adCancel') || 'Cancel'}
             </button>
           </div>

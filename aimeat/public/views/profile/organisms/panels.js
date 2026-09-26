@@ -9,6 +9,25 @@
  * @structure OrgSearch, IncomingInvitations, BoardPreview
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 -- 2026-09-26 -- The board preview's messages are the Board notices (css/components/board-notices.css): the category or a grey dot, the words, who wrote it in typewriter, the time at the right; a rule under each (a unification: the library part that carries the kind).
+ *   v1.10.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- The incoming invitations are the Listing (css/components/listing.css), a unification: the look most tabs use. The search hits stay: the line under a title is in the body face, an open conflict.
+ *   v1.8.0 -- 2026-09-25 -- A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-25 -- A section is the kit's section (PageSection in an .og page) and the line under its title is the lead (.og-lead), the look most tabs use (a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.4.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.3.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.2.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
+ *   v1.1.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
@@ -24,8 +43,9 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from '/views/profile/shared.js';
-import { EmptyState } from '/components/EmptyState.js';
+import { LoadingLine } from '/views/profile/shared.js';
+import { QuietNote } from '/components/QuietNote.js';
+import { PageSection } from '/components/PageSection.js';
 import * as orgService from '/js/services/organisms.js';
 import { listPosts, createPost } from '/js/services/boards.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -69,16 +89,16 @@ export function OrgSearch({ orgId, onOpenWorkspace }) {
 
   return html`
     <div class="pj-orgsearch">
-      <div class="flex-row-wrap">
-        <input class="input-field input-sm pj-orgsearch-input" placeholder=${t('organisms.searchPlaceholder') || 'Find records & documents…'} value=${q}
+      <div class="search-line">
+        <input class="og-input" placeholder=${t('organisms.searchPlaceholder') || 'Find records & documents…'} value=${q}
           onInput=${(e) => setQ(e.target.value)} />
-        ${busy ? html`<${Spinner} />` : null}
-        ${results !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => setQ('')}>${t('search.clear') || 'Clear'}</button>` : null}
+        ${busy ? html`<span class="poster-quiet loading-mark">${t('profile.loading')}</span>` : null}
+        ${results !== null ? html`<button class="poster-action poster-action--small" onClick=${() => setQ('')}>${t('search.clear') || 'Clear'}</button>` : null}
       </div>
       ${results !== null && results.length === 0 && !busy ? html`<div class="section-desc">${t('search.noMatches') || 'No matches.'}</div>` : null}
       ${Object.entries(byWs).map(([ws, grp]) => html`
         <div class="pj-search-group" key=${ws}>
-          <div class="pj-search-group-head">${(grp.name)}<span class="pj-org-tab-count">${grp.hits.length}</span></div>
+          <div class="pj-search-group-head poster-day-title">${(grp.name)}<span class="poster-count poster-count--tally">${grp.hits.length}</span></div>
           ${grp.hits.map(r => html`
             <button class="pj-search-hit" key=${r.space + '/' + r.id} onClick=${() => openHit(r)}>
               <span class="pj-search-hit-title">${(r.title)} <span class="pj-mini">· ${(r.space)}</span></span>
@@ -116,18 +136,19 @@ export function IncomingInvitations({ showToast, onChanged }) {
   };
   if (!invites.length) return null;
   return html`
-    <div class="card poster-row--thing">
-      <div class="poster-section-title">${t('organisms.youAreInvited') || 'You’re invited'}</div>
-      ${invites.map(({ membership, organism }) => html`
-        <div class="pj-access-row" key=${organism.id}>
-          <span><b>${(organism.name)}</b>${membership.invitedBy ? html` <span class="pj-mini">— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', (membership.invitedBy))}</span>` : null}</span>
-          <span class="flex-row-wrap">
-            <button class="btn-success btn-sm" disabled=${busy} onClick=${() => act(organism.id, true)}>${t('organisms.acceptInvite') || 'Accept'}</button>
-            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => act(organism.id, false)}>${t('organisms.declineInvite') || 'Decline'}</button>
-          </span>
-        </div>
-      `)}
-    </div>
+    <${PageSection} title=${t('organisms.youAreInvited') || 'You’re invited'}>
+      <div class="listing listing--name-doors listing--cols">
+        ${invites.map(({ membership, organism }) => html`
+          <div class="listing-row" key=${organism.id}>
+            <div class="listing-name"><b>${(organism.name)}</b>${membership.invitedBy ? html` <span class="pj-mini">— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', (membership.invitedBy))}</span>` : null}</div>
+            <div class="listing-doors">
+              <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => act(organism.id, true)}>${t('organisms.acceptInvite') || 'Accept'}</button>
+              <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => act(organism.id, false)}>${t('organisms.declineInvite') || 'Decline'}</button>
+            </div>
+          </div>
+        `)}
+      </div>
+    <//>
   `;
 }
 
@@ -168,24 +189,25 @@ export function BoardPreview({ boardId, showToast }) {
     <div class="card-detail">
       <div class="pj-tabhead">
         <div class="section-desc pj-tabhead-desc">${t('organisms.boardPreviewDesc') || 'Latest messages on this organism’s board.'}</div>
-        <button class="pj-icon-btn" title=${(t('organisms.copyId') || 'Copy ID') + ': ' + boardId} onClick=${copyId}>${'📋'}</button>
-        <button class="btn-outline btn-sm" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'boards' } }))}>
+        <button class="poster-icon poster-icon--small" title=${(t('organisms.copyId') || 'Copy ID') + ': ' + boardId} onClick=${copyId}>${'📋'}</button>
+        <button class="poster-action poster-action--small" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'boards' } }))}>
           ${t('organisms.openBoardsTab') || 'Open in Boards'}</button>
       </div>
-      ${posts === null ? html`<${Spinner} />`
-        : latest.length === 0 ? html`<${EmptyState} icon="💬" text=${t('organisms.boardEmpty') || 'No messages yet — write the first one.'} />`
+      ${posts === null ? html`<${LoadingLine} />`
+        : latest.length === 0 ? html`<${QuietNote}>${t('organisms.boardEmpty') || 'No messages yet — write the first one.'}<//>`
         : latest.map(p => html`
-          <div class="pj-board-post" key=${p.id || ts(p)}>
-            <div class="pj-board-post-head">
-              <span class="pj-board-author">${(p.author_gaii || p.author || '?')}</span>
-              ${ts(p) ? html`<span class="pj-board-time">${relTime(ts(p))}</span>` : null}
+          <div class="bp-notice" key=${p.id || ts(p)}>
+            <div class=${`bp-cat ${p.category ? '' : 'bp-cat--q'}`}>${p.category ? html`<span class="poster-chip">${p.category}</span>` : '·'}</div>
+            <div class="bp-notice-body">
+              <p>${(String(p.body || p.content || '').slice(0, 400))}</p>
+              <div class="bp-who"><b>${(p.author_gaii || p.author || '?')}</b></div>
             </div>
-            <div class="pj-board-body">${(String(p.body || p.content || '').slice(0, 400))}</div>
+            <div class="bp-r">${ts(p) ? html`<b class="poster-time">${relTime(ts(p))}</b>` : null}</div>
           </div>`)}
       <div class="flex-row-wrap pj-board-composer">
-        <input class="input-field input-sm pj-board-input" placeholder=${t('organisms.writePost') || 'Write a message…'} value=${text}
+        <input class="og-input pj-board-input" placeholder=${t('organisms.writePost') || 'Write a message…'} value=${text}
           onInput=${(e) => setText(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') send(); }} />
-        <button class="btn-outline btn-sm" disabled=${busy || !text.trim()} onClick=${send}>${t('organisms.send') || 'Send'}</button>
+        <button class="poster-action poster-action--small" disabled=${busy || !text.trim()} onClick=${send}>${t('organisms.send') || 'Send'}</button>
       </div>
     </div>`;
 }

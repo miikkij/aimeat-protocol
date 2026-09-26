@@ -13,6 +13,11 @@
  *   · threadParagraphs (thread → speakable paragraphs, each message prefixed by its sender).
  * @usage import { BubbleSpeakButton, ThreadReadAloud } from './inbox-tab/read-aloud.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A message's read-aloud control is the chat's Listen: the word, in the text
+ *     tone of the action link, in the line under the message (Jouni's decision "Message").
+ *   v1.1.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
  *   v1.0.0 — 2026-07-31 — Initial version: per-message and whole-thread read-aloud in the Inbox tab.
  */
 import { h } from 'preact';
@@ -38,7 +43,8 @@ export function useSpeechPhase(id) {
   return phase;
 }
 
-/** 🔊 on a message bubble: reads that one message. Clicking it while it reads stops it. Rendered only
+/** Listen, in the line under a message (the text tone of the action link, as the chat's turn has it):
+ *  reads that one message. Clicking it while it reads stops it. Rendered only
  *  when the browser can speak AND the message has something speakable (an attachment-only message has
  *  no body to read — we hide the button instead of offering one that does nothing). */
 export function BubbleSpeakButton({ msgId, body }) {
@@ -49,10 +55,10 @@ export function BubbleSpeakButton({ msgId, body }) {
   if (!paragraphs.length) return null;
   const on = phase === 'speaking' || phase === 'paused';
   return html`
-    <button class=${`inbox-bubble-act${on ? ' inbox-bubble-act--on' : ''}`}
+    <button type="button" class="poster-action poster-action--text"
       title=${on ? t('inbox.speak.stop') : t('inbox.speak.message')}
       aria-label=${on ? t('inbox.speak.stop') : t('inbox.speak.message')} aria-pressed=${on}
-      onClick=${() => (on ? stop() : speak(id, paragraphs))}>${on ? '⏹' : '🔊'}</button>`;
+      onClick=${() => (on ? stop() : speak(id, paragraphs))}>${on ? t('chat.stopListening') : t('inbox.speak.listen')}</button>`;
 }
 
 /** The open thread as speakable paragraphs: each message announces its sender, then its body. Messages
@@ -92,7 +98,7 @@ export function ThreadReadAloud({ thread, peerLabelText, convId }) {
         <span class="inbox-speak-ico">${phase === 'speaking' ? '⏸' : '🔊'}</span>
         <span class="inbox-ai-btn-label">${label}</span>
       </button>
-      ${phase ? html`<button class="btn-ghost btn-sm inbox-speak-stop" onClick=${() => stop()}
+      ${phase ? html`<button class="poster-icon poster-icon--small inbox-speak-stop" onClick=${() => stop()}
         title=${t('inbox.speak.stop')} aria-label=${t('inbox.speak.stop')}>✕</button>` : null}
     </span>`;
 }

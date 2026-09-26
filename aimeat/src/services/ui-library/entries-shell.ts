@@ -10,6 +10,8 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — JsonView is every stored value opened under its row in Settings & Controls (a unification).
+ *   v1.2.0 — 2026-09-25 — JsonView's look is its own sheet, css/components/json-view.css (UI consolidation phase 5, a move).
  *   v1.1.0 — 2026-09-24 — FormField is active: Themes & Styles draws it.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation: theme.css to tokens only; every module catalogued).
  */
@@ -307,10 +309,10 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     {
         id: 'json-view', name: 'JsonView', kind: 'component', status: 'active',
         summary: 'A stored value shown as readable, coloured JSON.',
-        module: '/components/JsonView.js', sheet: '/css/views/agents-detail.css', classes: ['pf-agd-json-block'],
+        module: '/components/JsonView.js', sheet: '/css/components/json-view.css', classes: ['pf-agd-json-block'],
         data: { shape: 'JsonValue({ value }) · JsonNode({ value })', fields: { value: 'any stored value' } },
-        useFor: ['A record\'s raw value in the profile.'],
-        variants: [], example: {}, note: PAGE_SHEET_NOTE,
+        useFor: ['A record\'s raw value in the profile.', 'A stored value opened under its row, as the library draws it: a task\'s memory value, an ecosystem app\'s data value and a guidance body; the box around it keeps only its place.'],
+        variants: [], example: {},
     },
     {
         id: 'link-preview', name: 'LinkPreview', kind: 'component', status: 'active',

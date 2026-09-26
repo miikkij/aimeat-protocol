@@ -10,6 +10,28 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- The line under a workspace's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.15.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.13.0 -- 2026-09-26 -- The archived workspaces open under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
+ *   v1.12.0 -- 2026-09-26 -- The "who works here" counter shows the people panel and stays pressed while it shows: the Tab's fold tone (.poster-tab--fold, .is-on, aria-pressed), a unification: Jouni's decision "Tabs and filters".
+ *   v1.11.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- "Map" (it shows the workspaces' map) is the action link (.poster-action); aria-expanded says it is open (a unification: Jouni's decision "Action link").
+ *   v1.9.0 -- 2026-09-25 -- A workspace's "archived" and "N to review", and an approved join request, are the Status (.poster-status: off, attention, fine), a unification: Jouni's decision "Status".
+ *   v1.8.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-25 -- A picture of a person or a thing is the Object box's avatar cut (.poster-box--avatar), the look most Settings tabs draw (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.4.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.1.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v1.0.1 — 2026-08-29 — The description line above the bar is gone: the organism home's Workspaces
  *     section carries it under the list, where it reads as a note rather than a preface.
@@ -24,6 +46,7 @@
  *     reorder + a sort control (My order / Name / Newest), mirroring the organisms list. The order
  *     is a private per-user preference stored in owner memory (organisms.ws.{orgId}); no server
  *     change. Archived workspaces are not reorderable.
+ *   v1.4.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -31,9 +54,10 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner, KebabMenu } from '/views/profile/shared.js';
+import { LoadingLine, KebabMenu } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { EmptyState } from '/components/EmptyState.js';
+import { QuietNote } from '/components/QuietNote.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { Mermaid } from '/components/Mermaid.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
@@ -278,16 +302,16 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
 
       <div class="pj-ws-bar">
         ${creating ? html`
-          <input class="input-field input-sm pj-ws-name-input" autofocus placeholder=${t('organisms.workspaceName') || 'Workspace name'}
+          <input class="og-input pj-ws-name-input" autofocus placeholder=${t('organisms.workspaceName') || 'Workspace name'}
             value=${newName} onInput=${e => setNewName(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') create(); }} />
-          <button class="btn-primary btn-sm" onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}</button>
-          <button class="btn-ghost btn-sm" onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}</button>
+          <button class="poster-slab poster-slab--control" onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}</button>
+          <button class="poster-action poster-action--small" onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}</button>
         ` : html`
-          <button class="btn-primary btn-sm" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>
-          <button class="btn-outline btn-sm" disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}</button>
-          ${overview ? html`<button class="btn-outline btn-sm ${showOverview ? 'pj-org-btn-active' : ''}" onClick=${() => setShowOverview(s => !s)}>${'🗺 '}${t('organisms.showMap') || 'Map'}</button>` : null}
+          <button class="poster-slab poster-slab--control" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>
+          <button class="poster-action poster-action--small" disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}</button>
+          ${overview ? html`<button type="button" class="poster-action poster-action--small" aria-expanded=${showOverview ? 'true' : 'false'} onClick=${() => setShowOverview(s => !s)}>${'🗺 '}${t('organisms.showMap') || 'Map'}</button>` : null}
           ${activeSorted.length > 1 ? html`
-            <select class="input-field input-sm pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
+            <select class="select-field pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
               onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }}>
               <option value="custom">${t('organisms.sortCustom') || 'My order'}</option>
               <option value="name">${t('organisms.sortName') || 'Name A–Z'}</option>
@@ -297,8 +321,8 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
 
       <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />
 
-      ${list === null ? html`<${Spinner} />`
-        : list.length === 0 ? html`<${EmptyState} icon="🗂️" text=${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'} />`
+      ${list === null ? html`<${LoadingLine} />`
+        : list.length === 0 ? html`<${QuietNote}>${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'}<//>`
         : (() => {
           const renderWsRow = (w, canDrag) => {
             const locked = w.access === 'none';
@@ -319,50 +343,50 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
               onDragLeave=${canDrag ? (() => setDragOverId(d => (d === w.id ? null : d))) : undefined}
               onDrop=${canDrag ? (() => onDropRow(w.id)) : undefined}
               onDragEnd=${canDrag ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
-              <div class="pj-org-avatar" aria-hidden="true">${'🗂'}</div>
+              <div class="pj-org-avatar poster-box poster-box--avatar poster-box--small" aria-hidden="true">${'🗂'}</div>
               <div class="pj-org-main ${locked ? 'pj-org-main-static' : ''}" role=${locked ? undefined : 'button'} tabindex=${locked ? undefined : '0'}
                 onClick=${locked ? undefined : (() => onOpen(w.id))}
                 onKeyDown=${locked ? undefined : ((e) => { if (e.key === 'Enter') onOpen(w.id); })}>
                 <div class="pj-org-titlerow">
                   ${locked ? html`<span class="pj-org-lock">${'🔒'}</span>` : null}
                   <span class="pj-org-name">${(w.name || w.id)}</span>
-                  ${w.archived ? html`<span class="pj-tab-pill" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${'🗄️ '}${t('organisms.archived') || 'archived'}</span>` : null}
-                  ${reviews > 0 ? html`<span class="pj-tab-pill">${'📨 '}${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}</span>` : null}
+                  ${w.archived ? html`<span class="poster-status poster-status--off pj-ws-state" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${'🗄️ '}${t('organisms.archived') || 'archived'}</span>` : null}
+                  ${reviews > 0 ? html`<span class="poster-status poster-status--attention pj-ws-state">${'📨 '}${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}</span>` : null}
                 </div>
-                <div class="pj-org-desc">${locked
+                <div class="pj-org-desc listing-meta">${locked
                   ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?')
                   : metaLine(w)}</div>
               </div>
               <div class="pj-org-stats">
                 ${(wsStats[w.id]?.owners || []).length > 0 ? html`
-                  <button class="pj-org-stat pj-stat-btn ${openPeopleWs === w.id ? 'active' : ''}" title=${t('organisms.participants') || 'Who works here'}
+                  <button class="pj-org-stat poster-tab poster-tab--fold ${openPeopleWs === w.id ? 'is-on' : ''}" aria-pressed=${openPeopleWs === w.id ? 'true' : 'false'} title=${t('organisms.participants') || 'Who works here'}
                     onClick=${(e) => { e.stopPropagation(); setOpenPeopleWs(p => (p === w.id ? null : w.id)); }}>${'👥'} ${wsStats[w.id].owners.length}</button>` : null}
-                ${w.created_at ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(w.created_at)}</span>` : null}
+                ${w.created_at ? html`<span class="pj-org-stat pj-org-date poster-time" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(w.created_at)}</span>` : null}
               </div>
               ${locked
-                ? html`<button class="btn-outline btn-sm pj-org-openbtn" disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}</button>`
-                : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => onOpen(w.id)}>${t('organisms.open') || 'Open'}</button>`}
+                ? html`<button class="poster-action poster-action--small pj-org-openbtn" disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}</button>`
+                : html`<button class="poster-action poster-action--small pj-org-openbtn" onClick=${() => onOpen(w.id)}>${t('organisms.open') || 'Open'}</button>`}
               ${menuItems.length ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
               ${openPeopleWs === w.id ? html`
                 <div class="pj-org-detail">
                   ${(wsStats[w.id]?.owners || []).map(o => html`
                     <div class="pj-ws-person" key=${'p-' + o.owner}>
                       <span>${'👤 '}<strong>${(o.owner)}</strong></span>
-                      ${o.isCreator ? html`<span class="badge badge-success pj-mini">${t('organisms.creatorTag') || 'creator'}</span>` : null}
-                      ${o.isSelf ? html`<span class="badge badge-info pj-mini">${t('organisms.you') || 'you'}</span>` : null}
+                      ${o.isCreator ? html`<span class="poster-chip">${t('organisms.creatorTag') || 'creator'}</span>` : null}
+                      ${o.isSelf ? html`<span class="poster-chip poster-chip--sun">${t('organisms.you') || 'you'}</span>` : null}
                       ${!o.isLocalNode ? html`<span class="pj-mini">${'🌐 '}${(o.node)}</span>` : null}
                       ${(o.agents || []).length > 0 ? html`<span class="pj-ws-person-agents">${'🤖'} ${(o.agents || []).length}</span>` : null}
                     </div>`)}
                 </div>` : null}
               ${openReqWs === w.id ? html`
                 <div class="pj-org-detail">
-                  ${reqInbox.length === 0 ? html`<div class="pj-ws-inbox-empty">${t('organisms.noRequests') || 'No access requests.'}</div>`
+                  ${reqInbox.length === 0 ? html`<div class="poster-quiet pj-ws-inbox-empty">${t('organisms.noRequests') || 'No access requests.'}</div>`
                     : reqInbox.map(r => html`
                       <div class="pj-ws-req" key=${r.requester}>
                         <span class="pj-ws-req-who">${(r.requester)}${r.message ? html` <span class="pj-ws-req-msg">— ${(r.message)}</span>` : null}</span>
                         ${r.status === 'approved'
-                          ? html`<span class="pj-ws-req-ok">✓ ${t('organisms.approved') || 'approved'}</span><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}</button>`
-                          : html`<button class="btn-success btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}</button><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>`}
+                          ? html`<span class="poster-status poster-status--fine">✓ ${t('organisms.approved') || 'approved'}</span><button class="poster-action poster-action--small" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}</button>`
+                          : html`<button class="poster-action poster-action--small" disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}</button><button class="poster-action poster-action--small" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>`}
                       </div>`)}
                 </div>` : null}
             </div>`;
@@ -373,21 +397,19 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
           return html`
             <div class="pj-org-list poster-row--thing">${activeSorted.map(w => renderWsRow(w, true))}</div>
             ${sortMode === 'custom' && activeSorted.length > 1 ? html`
-              <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}
+              <div class="poster-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}
             ${archived.length > 0 ? html`
-              <button class="pj-struct-toggle section-title-spaced" aria-expanded=${archivedOpen} onClick=${() => setArchivedOpen(o => !o)}>
-                <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
-                <span>${'🗄️ '}${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archived.length))}</span>
-              </button>
-              ${archivedOpen ? html`<div class="pj-org-list poster-row--thing">${archived.map(w => renderWsRow(w, false))}</div>` : null}` : null}
+              <${FoldSection} num="" title=${'🗄️ ' + (t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archived.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
+                <div class="pj-org-list poster-row--thing">${archived.map(w => renderWsRow(w, false))}</div>
+              <//>` : null}
           `;
         })()}
 
       ${overview && showOverview ? html`
-        <div class="pj-chart">
+        <div class="pj-chart poster-box">
           <div class="pj-chart-head">
             <span class="pj-chart-title">${'🔗 '}${t('organisms.overview') || 'Overview — who & what uses this organism'}</span>
-            <button class="btn-ghost btn-sm" onClick=${() => setShowOverview(false)}>${t('organisms.hide') || 'Hide'}</button>
+            <button class="poster-action poster-action--small" onClick=${() => setShowOverview(false)}>${t('organisms.hide') || 'Hide'}</button>
           </div>
           <${Mermaid} chart=${overview} />
         </div>` : null}

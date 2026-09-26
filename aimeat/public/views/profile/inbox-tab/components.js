@@ -8,6 +8,30 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.29.0 -- 2026-09-26 -- The typing box is the chat's one row (.poster-composer, its stacked cut): the thin field with the thick line under it, attach, voice and the bigger editor as three framed squares, and the dark block that sends with its own word; on a phone the field keeps the whole width and the rest goes under it (a unification: Jouni's decision "Typing box").
+ *   v1.28.0 -- 2026-09-26 -- MessageBubble and AttachmentItem moved to ./message-turn.js, where a message is the chat's turn (a unification: Jouni's decision "Message"); re-exported from here.
+ *   v1.27.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.27.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.27.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.26.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.26.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.25.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.24.0 -- 2026-09-25 -- A picture of a person or a thing is the Object box's avatar cut (.poster-box--avatar), the look most Settings tabs draw (UI consolidation phase 5, a unification).
+ *   v1.23.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.22.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.21.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.20.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.19.0 -- 2026-09-25 -- A button that is a mark, not a word (a delete or close mark, a menu's
+ *     dots, an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's
+ *     decision "Icon button").
+ *   v1.18.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.17.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control
+ *     cut where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.16.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v1.15.0 — 2026-09-13 — The markdown viewer and the two AI popovers open in the site's one dialog
  *     (components/Modal.js) instead of overlays of their own; their modes are poster tabs, and what
@@ -73,75 +97,24 @@ import { escHtml } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
-import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { AiInteractionNotice } from '/components/ai-label.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
-import { InteractiveForm, InteractiveAnswered } from './interactive-form.js';
-import { bigEditorHeight, loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind } from './helpers.js';
-import { BubbleSpeakButton } from './read-aloud.js';
-import { AudioAttachment, fmtClock, stopOtherAudio } from './voice-parts.js';
+import { bigEditorHeight, loadToastUI } from './helpers.js';
+import { fmtClock, stopOtherAudio } from './voice-parts.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { swallowed } from '/js/swallowed.js';
+// A message and its attachments are the chat's turn now, in their own module; the names stay
+// reachable from here for the pages that take them from this file.
+export { MessageBubble, AttachmentItem } from './message-turn.js';
 
 export function Avatar({ seed, size = 36 }) {
   const svg = minidenticon(typeof seed === 'string' && seed ? seed : 'user');
-  return html`<span class=${`inbox-avatar inbox-avatar--${size}`}
+  return html`<span class=${`inbox-avatar inbox-avatar--${size} poster-box poster-box--avatar`}
     dangerouslySetInnerHTML=${{ __html: svg }}></span>`;
 }
 
-
-/** One received/sent attachment. Images render as a thumbnail (click → full-size in a new tab);
- *  audio plays in place; PDF/video/file open natively in a new tab; markdown opens the in-app
- *  rendered viewer. Every ready attachment gets a download button. Not-yet-duplicated / expired
- *  attachments show their state. */
-export function AttachmentItem({ a, url, onOpenMarkdown, msgId, onTranscribe, canTranscribe }) {
-  const kind = attachKind(a);
-  const name = a.name || a.storageKey;
-  const ready = !!url && !a.expired;
-
-  if (!ready) {
-    // What the reader needs is not the machine's word for the state ("pending") but what happened to
-    // them and whose move it is next. The chip carries the short form and the title the whole
-    // sentence, because a chip is four words wide and the answer is longer than that.
-    const status = a.expired ? t('inbox.attachmentExpired') : (a.mode !== 'duplicate' ? t('inbox.attachmentPending') : null);
-    const help = a.expired ? t('inbox.attachmentExpiredHelp') : (a.mode !== 'duplicate' ? t('inbox.attachmentPendingHelp') : null);
-    return html`<div class="inbox-attach-chip inbox-attach-chip--pending" title=${help || undefined}>
-      <span class="inbox-attach-ico">${ATTACH_ICO[kind]}</span>
-      <span class="inbox-attach-name">${escHtml(name)}</span>
-      ${status ? html`<span class="inbox-attach-pending">${status}</span>` : null}
-    </div>`;
-  }
-
-  const download = html`<a class="inbox-attach-dl" href=${url} download=${name} title=${t('inbox.attachmentDownload')}>⬇</a>`;
-
-  if (kind === 'image') {
-    return html`<div class="inbox-attach-item">
-      <a class="inbox-attach-thumb-link" href=${url} target="_blank" rel="noopener" title=${t('inbox.attachmentOpen')}>
-        <img class="inbox-attach-thumb" src=${url} alt=${escHtml(name)} loading="lazy" />
-      </a>
-      <div class="inbox-attach-cap"><span class="inbox-attach-name">${escHtml(name)}</span>${download}</div>
-    </div>`;
-  }
-  if (kind === 'markdown') {
-    return html`<div class="inbox-attach-chip">
-      <button class="inbox-attach-open" onClick=${() => onOpenMarkdown?.(url, name)} title=${t('inbox.attachmentView')}>
-        <span class="inbox-attach-ico">📄</span><span class="inbox-attach-name">${escHtml(name)}</span>
-      </button>${download}
-    </div>`;
-  }
-  if (kind === 'audio') {
-    return html`<${AudioAttachment} a=${a} url=${url} name=${name} download=${download}
-      msgId=${msgId} onTranscribe=${onTranscribe} canTranscribe=${canTranscribe} />`;
-  }
-  // pdf / video / file — let the browser open it in a new tab.
-  return html`<div class="inbox-attach-chip">
-    <a class="inbox-attach-open" href=${url} target="_blank" rel="noopener" title=${t('inbox.attachmentOpen')}>
-      <span class="inbox-attach-ico">${ATTACH_ICO[kind]}</span><span class="inbox-attach-name">${escHtml(name)}</span>
-    </a>${download}
-  </div>`;
-}
 
 /** In-app viewer for a markdown attachment — browsers don't render .md, so we fetch the (same-origin,
  *  presigned) file and render it with the shared safe Markdown component. Offers open-raw + download. */
@@ -158,8 +131,8 @@ export function MarkdownViewer({ url, name, onClose }) {
       footer=${html`
         <a class="poster-action" href=${url} target="_blank" rel="noopener">${t('inbox.attachmentOpenRaw')}</a>
         <a class="poster-action" href=${url} download=${name}>${t('inbox.attachmentDownload')}</a>`}>
-      ${failed ? html`<div class="inbox-empty-sm">${t('inbox.attachmentLoadError')}</div>`
-        : text === null ? html`<div class="inbox-empty-sm">…</div>`
+      ${failed ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.attachmentLoadError')}</div>`
+        : text === null ? html`<div class="poster-quiet inbox-empty-sm">…</div>`
         : html`<${Markdown} text=${text} />`}
     <//>`;
 }
@@ -186,16 +159,16 @@ export function PollBuilder({ questions, setQuestions }) {
         <div class="inbox-poll-q" key=${q.id}>
           <div class="inbox-poll-q-head">
             <span class="inbox-poll-q-n">${qi + 1}.</span>
-            <input class="inbox-input" placeholder=${t('inbox.pollHeader')} value=${q.header} onInput=${(e) => update(qi, { header: e.target.value })} />
+            <input class="og-input" placeholder=${t('inbox.pollHeader')} value=${q.header} onInput=${(e) => update(qi, { header: e.target.value })} />
             <button class="inbox-bc-chip-x" title=${t('inbox.pollRemoveQ')} onClick=${() => removeQ(qi)}>✕</button>
           </div>
-          <input class="inbox-input" placeholder=${t('inbox.pollPrompt')} value=${q.prompt} onInput=${(e) => update(qi, { prompt: e.target.value })} />
+          <input class="og-input" placeholder=${t('inbox.pollPrompt')} value=${q.prompt} onInput=${(e) => update(qi, { prompt: e.target.value })} />
           <div class="inbox-poll-opts">
             ${q.options.map((o, oi) => html`<div class="inbox-poll-opt" key=${o.id}>
-              <input class="inbox-input" placeholder=${`${t('inbox.pollOption')} ${oi + 1}`} value=${o.label} onInput=${(e) => updateOpt(qi, oi, e.target.value)} />
+              <input class="og-input" placeholder=${`${t('inbox.pollOption')} ${oi + 1}`} value=${o.label} onInput=${(e) => updateOpt(qi, oi, e.target.value)} />
               ${q.options.length > 1 ? html`<button class="inbox-bc-chip-x" onClick=${() => removeOpt(qi, oi)}>✕</button>` : null}
             </div>`)}
-            <button class="btn-ghost btn-sm" onClick=${() => addOpt(qi)}>+ ${t('inbox.pollAddOption')}</button>
+            <button class="poster-action" onClick=${() => addOpt(qi)}>+ ${t('inbox.pollAddOption')}</button>
           </div>
           <div class="inbox-poll-flags">
             <label><input type="checkbox" checked=${q.multiSelect} onChange=${(e) => update(qi, { multiSelect: e.target.checked })} /> ${t('inbox.pollMulti')}</label>
@@ -203,95 +176,7 @@ export function PollBuilder({ questions, setQuestions }) {
             <label><input type="checkbox" checked=${q.required} onChange=${(e) => update(qi, { required: e.target.checked })} /> ${t('inbox.pollRequired')}</label>
           </div>
         </div>`)}
-      <button class="btn-outline btn-sm" onClick=${addQ}>+ ${t('inbox.pollAddQuestion')}</button>
-    </div>`;
-}
-
-/** The bin, as an inline SVG: the interface carries no emoji, and ✗ reads as "cancel", not "remove". */
-const TRASH_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" '
-  + 'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-  + '<path d="M2.5 4h11M6 4V2.6h4V4M4 4l.6 9.4h6.8L12 4M6.6 6.6v4.4M9.4 6.6v4.4"/></svg>';
-
-export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, onDelete, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
-  const nonInline = (msg.attachments || []).filter(a => !a.inline);
-  const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
-  // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
-  // aren't unique across messages. Build THIS message's flat { attId → url } view so prepareBody's cid
-  // resolution and the thumbnails only ever see their own message's attachments.
-  const urls = {};
-  for (const a of (msg.attachments || [])) {
-    const u = urlMap[`${msg.id}::${a.id}`];
-    if (u) urls[a.id] = u;
-  }
-  const trk = tracked ? trackStateLabel(tracked.state) : null;
-  return html`
-    <div id=${domId} class=${`inbox-row ${mine ? 'inbox-row--mine' : 'inbox-row--theirs'}`}>
-      ${!mine ? html`<${Avatar} seed=${msg.senderGhii} size=${28} />` : null}
-      <div class=${`inbox-bubble ${mine ? 'inbox-bubble--mine' : 'inbox-bubble--theirs'}`}>
-        <div class="inbox-bubble-actions">
-          ${onQuote ? html`<button class="inbox-bubble-act" title=${t('inbox.quoteReply')}
-            onClick=${() => onQuote(msg)}>↩</button>` : null}
-          <${BubbleSpeakButton} msgId=${msg.id} body=${msg.body} />
-          <!-- Copies the raw markdown the sender wrote — that is what pastes usefully into an AI
-               chat or a document; the rendered body's presigned image URLs are transient. -->
-          <${CopyButton} text=${String(msg.body || '')} className="inbox-bubble-act"
-            label="⧉" copiedLabel="✓"
-            title=${t('inbox.copyMessage')} copiedTitle=${t('common.copied')}
-            ariaLabel=${t('inbox.copyMessage')} />
-          <button class=${`inbox-bubble-act${starred ? ' inbox-bubble-act--on' : ''}`} title=${t('inbox.markImportant')}
-            onClick=${() => onStar?.(msg)}>${starred ? '⭐' : '☆'}</button>
-          <button class=${`inbox-bubble-act${tracked ? ' inbox-bubble-act--on' : ''}`}
-            title=${tracked ? `${t('inbox.trackResponse')} — ${trk.text}` : t('inbox.trackResponse')}
-            onClick=${() => onTrack?.(msg)}>🔗</button>
-          <button class="inbox-bubble-act" title=${t('inbox.parkToNotebook')}
-            onClick=${() => onPark?.(msg)}>📓</button>
-          <button class="inbox-bubble-act" title=${t('inbox.ai.replyToMessage')}
-            onClick=${() => onReplyAi?.(msg)}>✨</button>
-          <!-- LAST in the row on purpose: it is the only action here that cannot be undone, and it
-               asks before it acts. Until now the only way to remove a message was curl. -->
-          ${onDelete ? html`<button class="inbox-bubble-act inbox-bubble-act--danger"
-            title=${t('inbox.deleteMessage')} aria-label=${t('inbox.deleteMessage')}
-            onClick=${() => onDelete(msg)}
-            dangerouslySetInnerHTML=${{ __html: TRASH_SVG }}></button>` : null}
-        </div>
-        ${quoted ? html`<button class="inbox-bubble-quote" onClick=${() => onJumpTo?.(quoted.id)} title=${t('inbox.quoteJump')}>
-          <span class="inbox-quote-name">${escHtml(quotedName || '')}</span>
-          <span class="inbox-quote-text">${escHtml(quoteSnippet(quoted.body))}</span>
-        </button>` : null}
-        ${who ? html`<span class="inbox-bubble-who">${escHtml(who)}</span>` : null}
-        <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urls, expiredIds)} /></div>
-        ${showLinkPreviews ? html`<${MessageLinkPreviews} msg=${msg} />` : null}
-        ${msg.interactive?.role === 'questions' ? (
-          answeredWith
-            ? html`<${InteractiveAnswered} spec=${msg.interactive} answers=${answeredWith.answers || {}} />`
-            : html`<${InteractiveForm} spec=${msg.interactive} submitting=${submitting}
-                onSubmit=${(answers) => onAnswer?.(msg, answers)} />`
-        ) : null}
-        ${nonInline.length > 0 && html`
-          <div class="inbox-attach-row">
-            ${nonInline.map(a => html`<${AttachmentItem} key=${a.id} a=${a} url=${urls[a.id]}
-              onOpenMarkdown=${onOpenMarkdown} msgId=${msg.id}
-              onTranscribe=${onTranscribe} canTranscribe=${canTranscribe} />`)}
-          </div>`}
-        <div class="inbox-bubble-meta">
-          ${trk ? html`<span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`} title=${t('inbox.trackResponse')}>🔗 ${trk.text}</span>` : null}
-          <!-- That a model wrote this at all, which is a different fact from WHICH model and arrives
-               far more often: an agent's message is stamped whether or not it names one, and until
-               now a stamped message with no model name looked exactly like a message a person typed.
-               Absence stays silent on purpose — no record means nothing was claimed, and "a human
-               wrote this" is not something the node is in a position to say. -->
-          ${msg.ai ? html`<span class="inbox-ai-badge" title=${t('inbox.aiRecorded')}>${
-            msg.ai.level === 'ai-generated' ? t('inbox.aiWrote') : t('inbox.aiAssisted')
-          }</span>` : null}
-          <!-- Which model wrote this, when an AI wrote it and named one. The name is the agent's own
-               claim (the node cannot verify it), so the tooltip says so rather than the badge
-               implying a measurement. -->
-          ${msg.ai?.model ? html`<span class="inbox-model-badge"
-            title=${t('inbox.modelClaimed', { model: msg.ai.model })}>${escHtml(msg.ai.model)}</span>` : null}
-          <span>${timeShort(msg.createdAt)}</span>
-          ${mine && msg.status ? html`<span class=${`inbox-tick${msg.status === 'read' ? ' inbox-tick--read' : ''}${(msg.status === 'failed' || msg.status === 'undeliverable') ? ' inbox-tick--err' : ''}`}>${statusTick(msg.status)}</span>` : null}
-        </div>
-      </div>
+      <button class="poster-action" onClick=${addQ}>+ ${t('inbox.pollAddQuestion')}</button>
     </div>`;
 }
 
@@ -512,7 +397,7 @@ export function Composer({
   });
 
   return html`
-    <div class="inbox-composer poster-row--thing ${expanded ? 'inbox-composer--tall' : ''}">
+    <div class="poster-composer poster-composer--stack poster-row--thing inbox-composer ${expanded ? 'inbox-composer--tall' : ''}">
       ${files.length > 0 ? html`<div class="inbox-file-chips">
         ${files.map((f, i) => {
           // A recording gets its own chip with a player: a bad take should be caught here, not in
@@ -536,26 +421,30 @@ export function Composer({
         // half the pane while the textarea inside it was 40px.
         ? html`<div key="rich" class="inbox-editor" ref=${containerRef}></div>`
         : mode === 'simple'
-        ? html`<textarea key="thin" class="inbox-textarea inbox-textarea--chat" rows="1" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
-            value=${md} onPaste=${handleImagePaste}
-            onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); autoGrow(e.target); }}></textarea>`
+        ? null
         : html`<div key="fallback" class="inbox-md-fallback">
             <textarea class="inbox-textarea" rows="3" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
               value=${md} onPaste=${handleImagePaste}
               onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); }}></textarea>
             <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
           </div>`}
-      <div key="bar" class="inbox-composer-bar">
-        <div class="inbox-bar-left">
-          <label class="inbox-attach-btn" title=${t('inbox.attach')}>
-            📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
-          </label>
-          <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} className="inbox-attach-btn"
-            onRecorded=${addRecording} />
-          <button type="button" class="inbox-attach-btn" title=${mode === 'rich' ? t('inbox.collapse') : t('inbox.expand')}
-            aria-pressed=${mode === 'rich'} onClick=${toggleBigEditor}>${mode === 'rich' ? '⤡' : '⤢'}</button>
-        </div>
-        <button class="btn-primary btn-sm" disabled=${sending || !recipient} onClick=${submit}>
+      <!-- The chat's one row (Jouni's decision "Typing box"): the thin field, then attach, voice and
+           the bigger editor as three squares, and the dark block that sends with this page's word.
+           With the bigger editor open, the editor stands above the row and the row keeps the rest. -->
+      <div key="bar" class="poster-composer-row">
+        ${mode === 'simple'
+          ? html`<textarea key="thin" class="poster-composer-input" rows="1" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
+              value=${md} onPaste=${handleImagePaste}
+              onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); autoGrow(e.target); }}></textarea>`
+          : null}
+        <label class="poster-icon poster-composer-tool" title=${t('inbox.attach')}>
+          📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
+        </label>
+        <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} className="poster-icon poster-composer-tool" plain=${true}
+          onRecorded=${addRecording} />
+        <button type="button" class=${`poster-icon poster-composer-tool${mode === 'rich' ? ' is-on' : ''}`} title=${mode === 'rich' ? t('inbox.collapse') : t('inbox.expand')}
+          aria-pressed=${mode === 'rich'} onClick=${toggleBigEditor}>${mode === 'rich' ? '⤡' : '⤢'}</button>
+        <button type="button" class="poster-slab poster-slab--control poster-composer-send" disabled=${sending || !recipient} onClick=${submit}>
           ${sending ? t('inbox.sending') : sendLabel}
         </button>
       </div>
@@ -581,19 +470,19 @@ export function CommandFill({ command, onInsert, onCancel }) {
   const missing = params.some(p => p.required && !valOf(p).trim());
   return html`<div class="inbox-cmdfill">
     <div class="inbox-cmdfill-head">⚡ ${escHtml(command.label || command.id)}
-      <button class="btn-ghost btn-sm" onClick=${onCancel} title=${t('inbox.close')}>✕</button></div>
+      <button class="poster-icon poster-icon--small" onClick=${onCancel} title=${t('inbox.close')}>✕</button></div>
     ${command.description ? html`<div class="inbox-cmdfill-desc">${escHtml(command.description)}</div>` : null}
     ${params.map(p => html`<label class="inbox-cmdfill-field" key=${p.name}>
       <span class="inbox-cmdfill-pname">${escHtml(p.name)}${p.required ? ' *' : ''}</span>
       ${p.type === 'select' && Array.isArray(p.options)
-        ? html`<select class="inbox-input" value=${valOf(p)}
+        ? html`<select class="select-field" value=${valOf(p)}
             onChange=${e => setValues(v => ({ ...v, [p.name]: e.target.value }))}>
             ${p.options.map(o => html`<option key=${o} value=${o}>${escHtml(String(o))}</option>`)}</select>`
-        : html`<input class="inbox-input" type=${p.type === 'number' ? 'number' : 'text'}
+        : html`<input class="og-input" type=${p.type === 'number' ? 'number' : 'text'}
             placeholder=${p.placeholder || ''} value=${valOf(p)}
             onInput=${e => setValues(v => ({ ...v, [p.name]: e.target.value }))} />`}
     </label>`)}
-    <button class="btn-primary btn-sm inbox-cmdfill-go" disabled=${missing}
+    <button class="poster-slab poster-slab--control inbox-cmdfill-go" disabled=${missing}
       onClick=${() => onInsert(command, values)}>${t('inbox.cmdInsert')}</button>
   </div>`;
 }
@@ -627,18 +516,18 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
   };
   return html`<div class="inbox-sched">
     <div class="inbox-sched-head">📅 ${t('inbox.schedTitle')}
-      <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button></div>
-    ${jobs == null ? html`<div class="inbox-empty-sm">${t('inbox.loading')}</div>`
-      : jobs.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.schedNone')}</div>`
+      <button class="poster-icon poster-icon--small" onClick=${onClose} title=${t('inbox.close')}>✕</button></div>
+    ${jobs == null ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.loading')}</div>`
+      : jobs.length === 0 ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.schedNone')}</div>`
       : html`<ul class="inbox-sched-list">${jobs.map(j => html`<li class="inbox-sched-item" key=${j.id}>
           <span class="inbox-sched-name">${escHtml(j.displayName || j.input?.taskTemplate?.title || j.id)}</span>
           <span class="inbox-sched-cron">${escHtml(j.cron)}${j.enabled === false ? ' · ' + t('inbox.schedOff') : ''}</span>
         </li>`)}</ul>`}
     <div class="inbox-sched-new">
-      <input class="inbox-input" placeholder=${t('inbox.schedTaskPh')} value=${title} onInput=${e => setTitle(e.target.value)} />
-      <input class="inbox-input" placeholder="0 9 * * *" value=${cron} onInput=${e => setCron(e.target.value)} />
-      <textarea class="inbox-input inbox-sched-desc" placeholder=${t('inbox.schedDescPh')} value=${desc} onInput=${e => setDesc(e.target.value)}></textarea>
-      <button class="btn-primary btn-sm" disabled=${busy || !title.trim() || !cron.trim()} onClick=${create}>${t('inbox.schedCreate')}</button>
+      <input class="og-input" placeholder=${t('inbox.schedTaskPh')} value=${title} onInput=${e => setTitle(e.target.value)} />
+      <input class="og-input" placeholder="0 9 * * *" value=${cron} onInput=${e => setCron(e.target.value)} />
+      <textarea class="og-textarea inbox-sched-desc" placeholder=${t('inbox.schedDescPh')} value=${desc} onInput=${e => setDesc(e.target.value)}></textarea>
+      <button class="poster-slab poster-slab--control" disabled=${busy || !title.trim() || !cron.trim()} onClick=${create}>${t('inbox.schedCreate')}</button>
     </div>
   </div>`;
 }
@@ -666,8 +555,8 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
         </button>
       </div>
       <div class="poster-panel">
-        <div class="inbox-ai-hint">${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}</div>
-        <textarea class="inbox-ai-text" readOnly rows="14" value=${text}></textarea>
+        <div class="poster-hint">${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}</div>
+        <textarea class="og-textarea" readOnly rows="14" value=${text}></textarea>
       </div>
     <//>`;
 }
@@ -721,36 +610,36 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
         </div>
         <div class="poster-panel">
         ${mode === 'ai' ? html`
-          <div class="inbox-ai-hint">${t('inbox.notebook.hintAi')}</div>
+          <div class="poster-hint">${t('inbox.notebook.hintAi')}</div>
           ${!aiSummary ? html`
             <div class="inbox-ai-actions">
-              <button class="btn-primary btn-sm" disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}</button>
+              <button class="poster-slab poster-slab--control" disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}</button>
             </div>`
           : html`
             <${AiInteractionNotice} titleKey="aiLabel.draftTitle" bodyKey="aiLabel.draftBody"
               recordUrl=${aiProvenance?.recordUrl} />
-            <textarea class="inbox-ai-text" rows="12" value=${aiSummary} onInput=${(e) => setAiSummary(e.target.value)}></textarea>
+            <textarea class="og-textarea" rows="12" value=${aiSummary} onInput=${(e) => setAiSummary(e.target.value)}></textarea>
             <div class="inbox-ai-actions">
-              <button class="btn-ghost btn-sm" disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}</button>
-              <button class="btn-primary btn-sm" disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
+              <button class="poster-action" disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}</button>
+              <button class="poster-slab poster-slab--control" disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
             </div>`}
         ` : mode === 'copy' ? html`
-          <div class="inbox-ai-hint">${t('inbox.notebook.hintCopy')}</div>
-          <textarea class="inbox-ai-text" readOnly rows="8" value=${promptText}></textarea>
+          <div class="poster-hint">${t('inbox.notebook.hintCopy')}</div>
+          <textarea class="og-textarea" readOnly rows="8" value=${promptText}></textarea>
           <div class="inbox-ai-actions">
-            <${CopyButton} text=${promptText} className="btn-primary btn-sm"
+            <${CopyButton} text=${promptText} className="poster-slab poster-slab--control"
               label=${'📋 ' + t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
               onCopied=${() => showToast?.(t('inbox.ai.copied'))} />
           </div>
-          <div class="inbox-ai-hint">${t('inbox.notebook.pasteHint')}</div>
-          <textarea class="inbox-ai-text" rows="8" placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${(e) => setPasted(e.target.value)}></textarea>
+          <div class="poster-hint">${t('inbox.notebook.pasteHint')}</div>
+          <textarea class="og-textarea" rows="8" placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${(e) => setPasted(e.target.value)}></textarea>
           <div class="inbox-ai-actions">
-            <button class="btn-primary btn-sm" disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
+            <button class="poster-slab poster-slab--control" disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
           </div>
         ` : html`
-          <div class="inbox-ai-hint">${t('inbox.notebook.hintRaw')}</div>
+          <div class="poster-hint">${t('inbox.notebook.hintRaw')}</div>
           <div class="inbox-ai-actions">
-            <button class="btn-primary btn-sm" disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}</button>
+            <button class="poster-slab poster-slab--control" disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}</button>
           </div>
         `}
         </div>

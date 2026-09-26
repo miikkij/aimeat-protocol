@@ -1,0 +1,25 @@
+/**
+ * @file file-preview.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The preview of a stored file in a dialog: the file on a grey ground in a thin frame, an image,
+ *   a PDF in a frame, a video or a sound, or text in the typewriter face, and a line that says it is
+ *   loading or cannot be shown. Drawn by FilePreviewModal (views/profile/memory-tab/components.js)
+ *   inside the Settings scope root (.pf).
+ *   Moved unchanged out of views/profile.css; the class names stay. The corners of the ground, an
+ *   image, a frame and a video read --shape-corner, a box's corner.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The ground's 8px corner and the 6px corners of an image, a frame and a video read --shape-corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
+ */
+
+/* In-browser file preview lightbox (image/pdf/video/audio/text) */
+.pf .pf-file-preview-modal{max-width:920px;width:92vw}
+.pf .pf-file-preview-body{display:flex;justify-content:center;align-items:center;min-height:200px;max-height:72vh;overflow:auto;background:var(--bg-dim,#F3F4F6);border:1px solid var(--border,#E5E7EB);border-radius:var(--shape-corner);padding:.5rem}
+.pf .pf-file-preview-img{max-width:100%;max-height:70vh;object-fit:contain;border-radius:var(--shape-corner)}
+.pf .pf-file-preview-frame{width:100%;height:70vh;border:none;border-radius:var(--shape-corner)}
+.pf video.pf-file-preview-media{max-width:100%;max-height:70vh;border-radius:var(--shape-corner)}
+.pf audio.pf-file-preview-media{width:100%}
+.pf .pf-file-preview-text{width:100%;max-height:70vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family: var(--font-mono);font-size:.8rem;line-height:1.5;margin:0;padding:.75rem;text-align:left;color:var(--text,#1F2937)}
+.pf .pf-file-preview-status{color:var(--text-dim,#6B7280);font-size:.9rem;padding:2rem;text-align:center}

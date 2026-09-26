@@ -1,0 +1,16 @@
+/**
+ * @file check-line.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The words beside a check box or a radio dot: the size and colour of the page's own
+ *   text, so a choice reads as easily as the sentence around it. The box and the dot are the
+ *   browser's, as they are everywhere. Jouni's decision "Check line" (2026-09-26): the look the
+ *   Settings tabs drew at the body's size (Packages' app list, Companies, the account dialog).
+ *   Drawn as markup: <label class="check-line"><input type="checkbox" /> Words</label>. The label
+ *   keeps its own layout (a row, a gap); this part sets only the words.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial, with the values of the body-size check lines (Archivo 16px 400, ink).
+ */
+
+.check-line { font-size: var(--text-md); font-weight: var(--weight-regular); color: var(--text); }

@@ -10,6 +10,10 @@
  * @structure TimelinePanel({ orgId })
  * @usage import { TimelinePanel } from '/views/profile/organisms/timeline-panel.js';
  * @version-history
+ *   v1.6.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.5.0 — 2026-09-26 — Not opened by its parent, the timeline opens under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
+ *   v1.4.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.3.0 — 2026-09-25 — Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
  *   v1.0.0 — 2026-06-22 — Initial: structure timeline view over trackable-memory history (Osa D3).
  *   v1.1.0 — 2026-06-22 — Add a Mermaid `timeline` diagram of the changes; the selected-snapshot map
  *     honours the chart type the user picked for this organism's mindmap (localStorage).
@@ -22,8 +26,9 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from '/views/profile/shared.js';
+import { LoadingLine } from '/views/profile/shared.js';
 import { Mermaid } from '/components/Mermaid.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { getStructureHistory } from '/js/services/organisms.js';
 import { buildOrganismMindmap } from '/views/profile/organisms/mindmap.js';
 
@@ -125,15 +130,9 @@ export function TimelinePanel({ orgId, defaultOpen = false }) {
     if (next && !loaded && !busy) await load();
   };
 
-  return html`
-    <div class="pj-timeline">
-      ${defaultOpen ? null : html`<button class="pj-struct-toggle" aria-expanded=${open} onClick=${toggle}>
-        <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
-        <span>${t('timeline.title') || 'Development timeline'}</span>
-      </button>`}
-      ${open ? html`
-        <div class="pj-timeline-body card-detail">
-          ${busy ? html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`
+  const body = html`
+        <div class="pj-timeline-body poster-box">
+          ${busy ? html`<${LoadingLine} text=${t('organisms.loading') || 'Loading...'} />`
             : (!rows.length
               ? html`<div class="section-desc">${t('timeline.empty') || 'No structural history yet.'}</div>`
               : html`
@@ -147,7 +146,7 @@ export function TimelinePanel({ orgId, defaultOpen = false }) {
                       return html`
                         <li class=${'pj-timeline-item' + (selected === r.fingerprint ? ' is-active' : '')}>
                           <button class="pj-timeline-entry" onClick=${() => setSelected(r.fingerprint)}>
-                            <span class="pj-timeline-date">${String(r.at).slice(0, 10) || '—'}${r.isCurrent ? ` · ${t('timeline.now') || 'now'}` : ''}</span>
+                            <span class="pj-timeline-date poster-time">${String(r.at).slice(0, 10) || '—'}${r.isCurrent ? ` · ${t('timeline.now') || 'now'}` : ''}</span>
                             <span class="pj-timeline-event">${r.event}</span>
                             ${tt ? html`<span class="pj-timeline-counts section-desc">${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}👤</span>` : null}
                           </button>
@@ -160,6 +159,13 @@ export function TimelinePanel({ orgId, defaultOpen = false }) {
                       : html`<div class="section-desc">${t('timeline.pick') || 'Pick a point to see the structure then.'}</div>`}
                   </div>
                 </div>`)}
-        </div>` : null}
+        </div>`;
+
+  // Opened by its parent, the panel is the body alone; otherwise it is a section that opens.
+  return html`
+    <div class="pj-timeline">
+      ${defaultOpen
+        ? (open ? body : null)
+        : html`<${FoldSection} num="" title=${t('timeline.title') || 'Development timeline'} open=${open} onToggle=${toggle}>${body}<//>`}
     </div>`;
 }

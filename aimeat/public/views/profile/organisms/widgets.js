@@ -8,6 +8,10 @@
  * @structure StructureOverview
  * @usage import { StructureOverview } from '/views/profile/organisms/widgets.js';
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The structure map is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
+ *   v1.4.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.3.0 — 2026-09-26 — The structure overview opens under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
+ *   v1.2.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.1.0 — 2026-08-29 — `defaultOpen`: the organism home puts this inside a fold of its own, and a
  *     fold inside a fold is two clicks for one thing, so the home opens it (and loads) on mount.
  *     The toggle names the table of contents without an emoji in front of it.
@@ -18,8 +22,9 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from '/views/profile/shared.js';
+import { LoadingLine } from '/views/profile/shared.js';
 import { Markdown } from '/components/Markdown.js';
+import { FoldSection } from '/components/FoldSection.js';
 
 /** Collapsible OKF-style structure-overview panel. A button that, on first expand, lazy-loads a
  *  deterministic Markdown structure map (server projection — never persisted) and renders it via the
@@ -52,17 +57,14 @@ export function StructureOverview({ load, label, defaultOpen }) {
   };
   return html`
     <div class="pj-struct-overview">
-      <button class="pj-struct-toggle" aria-expanded=${open} onClick=${toggle}>
-        <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
-        <span>${label}</span>
-      </button>
-      ${open ? html`
-        <div class="pj-struct-body card-detail">
+      <${FoldSection} num="" title=${label} open=${open} onToggle=${toggle}>
+        <div class="pj-struct-body poster-box">
           ${busy
-            ? html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`
+            ? html`<${LoadingLine} text=${t('organisms.loading') || 'Loading...'} />`
             : (md
-              ? html`<${Markdown} text=${md} />`
+              ? html`<${Markdown} text=${md} small />`
               : html`<div class="section-desc">${t('organisms.structEmpty') || 'No structure to show yet.'}</div>`)}
-        </div>` : null}
+        </div>
+      <//>
     </div>`;
 }

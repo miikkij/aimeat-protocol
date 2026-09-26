@@ -20,6 +20,7 @@
  *   2026-09-13 — Fix: a ?tab= in the address beats the tab remembered in sessionStorage, so the home
  *     settings' link to access opens access even after Scheduler was open earlier in the same tab.
  *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
+ *   v3.18.0 -- 2026-09-25 -- The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v3.17.0 -- 2026-09-13 -- V2: select the shared poster crumb in the tab header.
  *   v3.16.0 — 2026-09-03 — The AI page's route id is 'ai'; 'generator' (its old name, which an
  *     app or a bookmark may still carry) resolves to it from the URL, from a remembered session,
@@ -123,6 +124,8 @@ import { syncTabHistory } from "./landing-page.helpers.js";
 import { EditProfileModal, ChangePasswordModal } from "./landing-page.modals.js";
 import { swallowed } from '/js/swallowed.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
+import { SettingsFrame, SettingsFrameHead, SettingsFrameBody } from '/components/SettingsFrame.js';
+import { SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuMore } from '/components/SideMenu.js';
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
   CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
@@ -364,9 +367,76 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
 
   const isOpen = (tabId) => openView?.tabId === tabId;
 
-  return html`
-    <div class="pf-shell${drawerOpen ? ' pf-shell--open' : ''}">
+  const menu = html`
+        ${/* The way back to the front room. The header's brand goes there too, but a person in the
+              sidebar is looking at the sidebar, and until 2026-08-27 the only way from here to the
+              home was a control that also changed the account's landing page. */''}
+        <${SideMenuHome} href="/v1/home">← ${t('nav.home')}<//>
+        ${/* The Agents v2 section used to hang here as a LINK to /v1/fleet, above the menu rather
+              than in it, so a person had to be told the address. It is a section of Settings &
+              Controls now — "Your agents", first in Automation — and comes through the same menu as
+              everything else. The old Agents tab still sits below it, unchanged. /v1/fleet still
+              resolves for anyone who bookmarked it. */''}
+        ${/* No nameplate here: the pill in the top bar already says who is signed in and the
+              overview's masthead is the name at full size, so a third copy in the index was the
+              one Jouni counted out loud (2026-08-29). */''}
 
+        <${SideMenuItem} active=${!openView} onClick=${() => { close(); setDrawerOpen(false); }}>
+          ${t('profile.landing.home')}
+        <//>
+
+        <${InboxNavButton}
+          active=${isOpen('messages')}
+          onClick=${() => { open('messages', 'main'); setDrawerOpen(false); }}
+        />
+
+        ${(() => {
+          const renderItem = (it, pinned) => html`
+            <${SideMenuItem} active=${isOpen(it.id)} key=${(pinned ? 'pin-' : '') + it.id}
+              onClick=${() => { open(it.id, 'main'); setDrawerOpen(false); }}
+              count=${it.badgeStat && typeof stats?.[it.badgeStat] === 'number' ? stats[it.badgeStat] : null}
+              pin=${{ on: pins.includes(it.id),
+                title: pins.includes(it.id) ? (t('profile.landing.pinRemove') || 'Unpin') : (t('profile.landing.pinAdd') || 'Pin'),
+                onToggle: () => togglePin(it.id) }}>
+              ${t(it.labelKey)}
+            <//>`;
+          const pinnedItems = pins.map(id => SIDEBAR_ITEM_BY_ID[id]).filter(Boolean)
+            .filter(it => !(INFRA_TAB_IDS.has(it.id) && !isOperator));
+          return html`
+            ${pinnedItems.length > 0 && html`
+              <${SideMenuGroup} title=${t('profile.landing.menuPinned') || 'Pinned'}>
+                ${pinnedItems.map(it => renderItem(it, true))}
+              <//>
+            `}
+            ${SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => {
+              const collapsed = collapsedGroups.has(g.titleKey);
+              // Basic view: only the everyday items. The rest are one toggle away, never gone.
+              const items = showAllTools ? g.items : g.items.filter(it => BASIC_TAB_IDS.has(it.id));
+              if (items.length === 0) return null;
+              return html`
+                <${SideMenuGroup} key=${g.titleKey} title=${t(g.titleKey)} collapsed=${collapsed}
+                  onToggle=${() => toggleGroup(g.titleKey)}>
+                  ${items.map(it => renderItem(it, false))}
+                <//>
+              `;
+            })}
+            <${SideMenuMore} onClick=${() => setShowAllTools(v => {
+              const next = !v;
+              // eslint-disable-next-line aimeat/no-silent-catch -- a blocked store only costs the remembered choice
+              try { localStorage.setItem('aimeat.sidebar.allTools', next ? '1' : '0'); } catch { /* not persisted */ }
+              return next;
+            })}>
+              ${showAllTools
+                ? tOr('profile.landing.showBasicTools', 'Show fewer tools')
+                : tOr('profile.landing.showAllTools', 'Show all tools')}
+            <//>
+          `;
+        })()}`;
+
+  return html`
+    <${SettingsFrame} open=${drawerOpen} onToggle=${() => setDrawerOpen(o => !o)} onClose=${() => setDrawerOpen(false)}
+      menuLabel=${t('profile.landing.menu')} menu=${menu} overview=${!openView}
+      dialogs=${html`
       ${editOpen && html`<${EditProfileModal}
         session=${session}
         onClose=${() => setEditOpen(false)}
@@ -377,92 +447,12 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       ${pwOpen && html`<${ChangePasswordModal}
         onClose=${() => setPwOpen(false)}
         onChanged=${() => { setPwOpen(false); showToast?.(t('profile.landing.passwordChanged')); }}
-      />`}
-
-      <button class="pf-mnav-toggle" onClick=${() => setDrawerOpen(o => !o)}>☰ ${t('profile.landing.menu')}</button>
-      <div class="pf-scrim" onClick=${() => setDrawerOpen(false)}></div>
-
-      <aside class="pf-sidebar">
-        ${/* The way back to the front room. The header's brand goes there too, but a person in the
-              sidebar is looking at the sidebar, and until 2026-08-27 the only way from here to the
-              home was a control that also changed the account's landing page. */''}
-        <a class="pf-side-item pf-side-home" href="/v1/home">
-          <span class="pf-side-label">← ${t('nav.home')}</span>
-        </a>
-        ${/* The Agents v2 section used to hang here as a LINK to /v1/fleet, above the menu rather
-              than in it, so a person had to be told the address. It is a section of Settings &
-              Controls now — "Your agents", first in Automation — and comes through the same menu as
-              everything else. The old Agents tab still sits below it, unchanged. /v1/fleet still
-              resolves for anyone who bookmarked it. */''}
-        ${/* No nameplate here: the pill in the top bar already says who is signed in and the
-              overview's masthead is the name at full size, so a third copy in the index was the
-              one Jouni counted out loud (2026-08-29). */''}
-
-        <button class="pf-side-item${!openView ? ' pf-side-item--active' : ''}"
-          onClick=${() => { close(); setDrawerOpen(false); }}>
-          <span class="pf-side-label">${t('profile.landing.home')}</span>
-        </button>
-
-        <${InboxNavButton}
-          active=${isOpen('messages')}
-          onClick=${() => { open('messages', 'main'); setDrawerOpen(false); }}
-        />
-
-        ${(() => {
-          const renderItem = (it, pinned) => html`
-            <button class="pf-side-item${isOpen(it.id) ? ' pf-side-item--active' : ''}" key=${(pinned ? 'pin-' : '') + it.id}
-              onClick=${() => { open(it.id, 'main'); setDrawerOpen(false); }}>
-              <span class="pf-side-label">${t(it.labelKey)}</span>
-              ${it.badgeStat && typeof stats?.[it.badgeStat] === 'number' && stats[it.badgeStat] > 0
-                ? html`<span class="pf-side-badge">${stats[it.badgeStat]}</span>` : null}
-              <span class="pf-side-pin${pins.includes(it.id) ? ' pf-side-pin--on' : ''}"
-                role="button" tabindex="-1"
-                title=${pins.includes(it.id) ? (t('profile.landing.pinRemove') || 'Unpin') : (t('profile.landing.pinAdd') || 'Pin')}
-                onClick=${(e) => { e.stopPropagation(); togglePin(it.id); }}>📌</span>
-            </button>`;
-          const pinnedItems = pins.map(id => SIDEBAR_ITEM_BY_ID[id]).filter(Boolean)
-            .filter(it => !(INFRA_TAB_IDS.has(it.id) && !isOperator));
-          return html`
-            ${pinnedItems.length > 0 && html`
-              <div class="pf-side-group">
-                <div class="pf-side-group-title">${t('profile.landing.menuPinned') || 'Pinned'}</div>
-                ${pinnedItems.map(it => renderItem(it, true))}
-              </div>
-            `}
-            ${SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => {
-              const collapsed = collapsedGroups.has(g.titleKey);
-              // Basic view: only the everyday items. The rest are one toggle away, never gone.
-              const items = showAllTools ? g.items : g.items.filter(it => BASIC_TAB_IDS.has(it.id));
-              if (items.length === 0) return null;
-              return html`
-                <div class="pf-side-group" key=${g.titleKey}>
-                  <button class="pf-side-group-title pf-side-group-toggle" onClick=${() => toggleGroup(g.titleKey)}>
-                    <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span> ${t(g.titleKey)}
-                  </button>
-                  ${!collapsed && items.map(it => renderItem(it, false))}
-                </div>
-              `;
-            })}
-            <button class="pf-side-item pf-side-more" onClick=${() => setShowAllTools(v => {
-              const next = !v;
-              // eslint-disable-next-line aimeat/no-silent-catch -- a blocked store only costs the remembered choice
-              try { localStorage.setItem('aimeat.sidebar.allTools', next ? '1' : '0'); } catch { /* not persisted */ }
-              return next;
-            })}>
-              <span class="pf-side-label">${showAllTools
-                ? tOr('profile.landing.showBasicTools', 'Show fewer tools')
-                : tOr('profile.landing.showAllTools', 'Show all tools')}</span>
-            </button>
-          `;
-        })()}
-      </aside>
-
-      <main class=${`pf-content ${openView ? '' : 'pf-overview'}`}>
+      />`}`}>
         ${openView ? html`
-          <div class="pf-content-head">
+          <${SettingsFrameHead}>
             <span class="poster-crumb">${getTabLabel(openView.tabId)}</span>
-          </div>
-          <div class="pf-content-body">${renderTab(openView.tabId)}</div>
+          <//>
+          <${SettingsFrameBody}>${renderTab(openView.tabId)}<//>
         ` : html`
           <${ProfileCard} tier=${tier} stats=${stats} session=${session}
             onEditProfile=${() => setEditOpen(true)}
@@ -489,7 +479,6 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
                 header and the top of the sidebar; this only decides the start page. */''}
           <${StartPageSetting} className="pf-start-page poster-row--thing" />
         `}
-      </main>
-    </div>
+    <//>
   `;
 }

@@ -1,0 +1,26 @@
+/**
+ * @file item-grid.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The item grid: a few things side by side in three columns, each its name in bold over
+ *   a grey typewriter line, a rule under each; one column on a phone. Moved unchanged out of
+ *   css/views/data-wallet-poster.css (Data wallet, "Take it with you": what the export holds), where
+ *   it was drawn as .dw-contents (UI consolidation phase 5, a move; the class takes the part's name).
+ *   Drawn as markup (.item-grid--2 for two columns): <div class="item-grid"><div><b>…</b><small>…</small></div>…</div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-25 — The two-column cut (.item-grid--2): Email's last letters take it (a unification).
+ *   v1.0.0 — 2026-09-25 — Initial: the rules of .dw-contents, moved unchanged from
+ *     data-wallet-poster.css under the name .item-grid.
+ */
+
+.item-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem 1.2rem; margin-top: .2rem; font-size: .84rem; line-height: 1.5; }
+/* The two-column cut, for a place with fewer or longer things. */
+.item-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.item-grid > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.item-grid b { display: block; font-weight: 800; color: var(--text); }
+.item-grid small { display: block; margin-top: .1rem; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); overflow-wrap: anywhere; }
+
+@media (max-width: 860px) {
+  .item-grid { grid-template-columns: minmax(0, 1fr); }
+}

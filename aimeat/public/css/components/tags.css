@@ -9,6 +9,8 @@
  *   overflow modifiers) · .tag-editor (+pills/input) — the editable variant.
  * @usage Loaded via useViewCSS / view <link>; rendered by /components/TagList.js.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — A removable tag's x is the Tag's remove mark (.poster-chip-x): grey, coral while the pointer is on the tag, where it turned dark (a unification: Jouni's decision "Remove mark").
+ *   v1.2.0 — 2026-09-26 — A removable tag in the editor and its x (.pf .tag-removable, .tag-x), moved here unchanged out of views/profile.css (UI consolidation phase 5, a move).
  *   v1.1.0 — 2026-06-02 — Component unification (#16): add layout-only
  *     .tag-pill--clickable / .tag-pill--overflow flags for TagList; add file
  *     header. No color changes.
@@ -91,3 +93,8 @@
   font-size: var(--text-small);
   padding: 3px 8px;
 }
+
+/* A tag that takes itself off when pressed: its x is the Tag's remove mark (.poster-chip-x,
+   poster.css), and since the whole tag is the control, the pointer anywhere on it turns the x coral. */
+.pf .tag-removable{cursor:pointer}
+.pf .tag-removable:hover .poster-chip-x{color:var(--accent)}

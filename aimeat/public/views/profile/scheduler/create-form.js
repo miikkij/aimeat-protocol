@@ -10,6 +10,23 @@
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
+ *   v2.12.0 -- 2026-09-26 -- The run limits beside their check boxes are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v2.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v2.10.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
+ *   v2.9.0 -- 2026-09-25 -- A road or an option you choose is the Choice tile (.poster-choice), a unification: the look most tabs use.
+ *   v2.8.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v2.7.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v2.6.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v2.5.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v2.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v2.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.2.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v2.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the form action row.
  *   v2.0.0 — 2026-08-30 — Moved out of scheduler-tab.js and laid out on the poster face; three new
  *     cadences (weekdays, Mondays, the 1st of the month), a time field that rewrites the cron, and
@@ -102,65 +119,65 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
     finally { setSaving(false); }
   };
 
-  const row = (label, sub, body) => html`<div class="sc-form-k">${label}${sub ? html`<small>${sub}</small>` : null}</div><div class="sc-form-v">${body}</div>`;
+  const row = (label, sub, body) => html`<div class="sc-form-k"><span class="poster-label">${label}</span>${sub ? html`<small class="poster-hint">${sub}</small>` : null}</div><div class="sc-form-v">${body}</div>`;
 
   return html`
     <div class="sc-form sch-form-fields">
       ${row(c('kWho'), null, html`<div class="sc-choices">
-        ${KINDS.map(k => html`<button type="button" key=${k} class=${`sc-choice ${kind === k ? 'on' : ''}`} onClick=${() => setKind(k)}>
+        ${KINDS.map(k => html`<button type="button" key=${k} class=${`poster-choice ${kind === k ? 'on' : ''}`} onClick=${() => setKind(k)}>
           <b>${t('profile.scheduler.kind.' + k)}</b>${t('profile.scheduler.kindHint.' + k)}</button>`)}
       </div>`)}
 
-      ${row(t('profile.scheduler.field.displayName'), null, html`<input type="text" value=${form.display_name} onInput=${e => set('display_name', e.target.value)} placeholder=${t('profile.scheduler.ph.displayName')} />`)}
+      ${row(t('profile.scheduler.field.displayName'), null, html`<input class="og-input" type="text" value=${form.display_name} onInput=${e => set('display_name', e.target.value)} placeholder=${t('profile.scheduler.ph.displayName')} />`)}
 
       ${row(c('kWhen'), c('kWhenSub'), html`
         <div class="og-chips sc-cad">
-          ${CRON_PRESETS.map(p => html`<button type="button" key=${p.key} class=${`og-chip sc-cad-chip ${preset === p.key ? 'og-chip--sun' : ''}`} onClick=${() => onPreset(p.key)}>${t('profile.scheduler.preset.' + p.key)}</button>`)}
+          ${CRON_PRESETS.map(p => html`<button type="button" key=${p.key} class=${`poster-tab poster-tab--filter ${preset === p.key ? 'is-on' : ''}`} onClick=${() => onPreset(p.key)}>${t('profile.scheduler.preset.' + p.key)}</button>`)}
         </div>
         <div class="sc-when">
-          <label><span class="sc-label">${c('kTime')}</span><input type="time" value=${time} disabled=${!time} onInput=${e => onTime(e.target.value)} /></label>
-          <label><span class="sc-label">${c('kZone')}</span><input type="text" value=${form.timezone} onInput=${e => set('timezone', e.target.value)} placeholder=${t('profile.scheduler.ph.timezone')} /></label>
-          <label><span class="sc-label">${c('kCron')}</span><input type="text" class="sch-cron-input" value=${form.cron} onInput=${e => { set('cron', e.target.value); setPreset('custom'); }} placeholder="0 7 * * *" /></label>
+          <label><span class="poster-label">${c('kTime')}</span><input class="og-input" type="time" value=${time} disabled=${!time} onInput=${e => onTime(e.target.value)} /></label>
+          <label><span class="poster-label">${c('kZone')}</span><input class="og-input" type="text" value=${form.timezone} onInput=${e => set('timezone', e.target.value)} placeholder=${t('profile.scheduler.ph.timezone')} /></label>
+          <label><span class="poster-label">${c('kCron')}</span><input type="text" class="og-input" value=${form.cron} onInput=${e => { set('cron', e.target.value); setPreset('custom'); }} placeholder="0 7 * * *" /></label>
         </div>
-        ${words && words !== form.cron ? html`<div class="sc-hint">${words}${form.timezone ? ` · ${form.timezone}` : ''}</div>` : null}`)}
+        ${words && words !== form.cron ? html`<div class="poster-hint">${words}${form.timezone ? ` · ${form.timezone}` : ''}</div>` : null}`)}
 
       ${kind === 'ai' && html`
-        ${row(t('profile.scheduler.field.prompt'), null, html`<textarea rows="4" value=${form.prompt} onInput=${e => set('prompt', e.target.value)} placeholder=${t('profile.scheduler.ph.prompt')}></textarea>`)}
-        ${row(t('profile.scheduler.reads'), t('profile.scheduler.field.inputKeys'), html`<input type="text" class="sch-cron-input" value=${form.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} />`)}
-        ${row(t('profile.scheduler.writes'), t('profile.scheduler.field.outputKey'), html`<input type="text" class="sch-cron-input" value=${form.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} />`)}`}
+        ${row(t('profile.scheduler.field.prompt'), null, html`<textarea class="og-textarea" rows="4" value=${form.prompt} onInput=${e => set('prompt', e.target.value)} placeholder=${t('profile.scheduler.ph.prompt')}></textarea>`)}
+        ${row(t('profile.scheduler.reads'), t('profile.scheduler.field.inputKeys'), html`<input type="text" class="og-input" value=${form.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} />`)}
+        ${row(t('profile.scheduler.writes'), t('profile.scheduler.field.outputKey'), html`<input type="text" class="og-input" value=${form.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} />`)}`}
 
       ${kind === 'agent_task' && html`
         ${row(t('profile.scheduler.field.agent'), null, lockedAgent
-          ? html`<input type="text" value=${lockedAgent} disabled />`
-          : html`<select value=${form.agent_name} onChange=${e => set('agent_name', e.target.value)}>
+          ? html`<input class="og-input" type="text" value=${lockedAgent} disabled />`
+          : html`<select class="select-field" value=${form.agent_name} onChange=${e => set('agent_name', e.target.value)}>
               <option value="">${t('profile.scheduler.ph.agent')}</option>
               ${agents.map(a => html`<option value=${a.name} key=${a.name}>${a.name}</option>`)}
             </select>`)}
-        ${row(t('profile.scheduler.field.taskTitle'), null, html`<input type="text" value=${form.task_title} onInput=${e => set('task_title', e.target.value)} />`)}
-        ${row(t('profile.scheduler.field.taskDescription'), null, html`<textarea rows="4" value=${form.task_description} onInput=${e => set('task_description', e.target.value)}></textarea>`)}`}
+        ${row(t('profile.scheduler.field.taskTitle'), null, html`<input class="og-input" type="text" value=${form.task_title} onInput=${e => set('task_title', e.target.value)} />`)}
+        ${row(t('profile.scheduler.field.taskDescription'), null, html`<textarea class="og-textarea" rows="4" value=${form.task_description} onInput=${e => set('task_description', e.target.value)}></textarea>`)}`}
 
       ${kind === 'extension' && html`
-        ${row(t('profile.scheduler.field.extensionName'), null, html`<input type="text" value=${form.extension_name} onInput=${e => set('extension_name', e.target.value)} />`)}
-        ${row(t('profile.scheduler.field.actionId'), null, html`<input type="text" value=${form.action_id} onInput=${e => set('action_id', e.target.value)} />`)}`}
+        ${row(t('profile.scheduler.field.extensionName'), null, html`<input class="og-input" type="text" value=${form.extension_name} onInput=${e => set('extension_name', e.target.value)} />`)}
+        ${row(t('profile.scheduler.field.actionId'), null, html`<input class="og-input" type="text" value=${form.action_id} onInput=${e => set('action_id', e.target.value)} />`)}`}
 
-      ${row(t('profile.scheduler.field.purpose'), null, html`<input type="text" value=${form.purpose} onInput=${e => set('purpose', e.target.value)} placeholder=${t('profile.scheduler.ph.purpose')} />`)}
+      ${row(t('profile.scheduler.field.purpose'), null, html`<input class="og-input" type="text" value=${form.purpose} onInput=${e => set('purpose', e.target.value)} placeholder=${t('profile.scheduler.ph.purpose')} />`)}
 
       ${row(t('profile.scheduler.constraints'), null, html`<div class="sc-limits">
-        <label class="sch-check">
+        <label class="sch-check check-line">
           <input type="checkbox" checked=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
           ${t('profile.scheduler.maxRuns')}
-          <input type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled} onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+          <input type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled} onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="og-input sch-num" />
         </label>
-        <label class="sch-check">
+        <label class="sch-check check-line">
           <input type="checkbox" checked=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
           ${t('profile.scheduler.dailyLimit')}
-          <input type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+          <input type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="og-input sch-num" />
         </label>
       </div>`)}
 
       <div class="sc-form-actions poster-row--thing">
-        <button type="button" class="og-slab" disabled=${saving} onClick=${submit}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.create')}</button>
-        ${onCancel ? html`<button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${t('profile.scheduler.close')}</button>` : null}
+        <button type="button" class="poster-slab poster-slab--control" disabled=${saving} onClick=${submit}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.create')}</button>
+        ${onCancel ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${onCancel}>${t('profile.scheduler.close')}</button>` : null}
       </div>
     </div>`;
 }

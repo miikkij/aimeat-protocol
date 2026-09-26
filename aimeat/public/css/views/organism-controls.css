@@ -1,0 +1,31 @@
+/**
+ * @file organism-controls.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The og- page kit's controls that Jouni's decisions give library looks: the chip (Tag),
+ *   the door (action link), the slab (loud action) and the choice (tabs). Settings & Controls moves onto
+ *   the library looks; the organism pages and the admin still write these classes until their phases.
+ *   Linked before the kit's component sheets, where these rules stood inside organism.css, so the kit's
+ *   own cuts (a door inside a fold row, a table) keep winning their ties.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css unchanged (UI consolidation phase 5, a move).
+ */
+
+.og-chip { font-family: var(--font-mono); font-weight: 500; font-size: .68rem; line-height: 1.5; padding: 1px 7px; border: 2px solid var(--text); color: var(--text); text-transform: lowercase; }
+.og-chip--dim { border-color: var(--border); color: var(--text-dim); }
+.og-chip--sun { background: var(--sun); color: var(--on-sun); }
+.og-door { background: none; border: 0; border-bottom: 2px solid var(--text); padding: 0 0 1px; cursor: pointer; font-family: var(--font-showroom-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text); text-decoration: none; }
+.og-door:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.og-door--quiet { text-transform: none; letter-spacing: 0; font-size: .88rem; }
+.og-door--danger { color: var(--accent); border-bottom-color: var(--accent); }
+.og-slab { display: inline-block; background: var(--text); color: var(--bg); border: 0; cursor: pointer; box-shadow: 4px 4px 0 var(--sun); padding: .7rem 1rem; font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; transition: transform 120ms ease, box-shadow 120ms ease; }
+.og-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
+.og-slab:disabled { opacity: .5; cursor: default; transform: none; box-shadow: 4px 4px 0 var(--sun); }
+.og-slab--danger { background: var(--accent); color: #FFFFFF; box-shadow: 4px 4px 0 var(--text); }
+.og-choice { display: inline-flex; flex-wrap: wrap; border: 2px solid var(--text); }
+.og-choice-btn { background: transparent; border: 0; border-right: 2px solid var(--text); padding: .45rem .8rem; cursor: pointer; font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 700; color: var(--text-dim); }
+.og-choice-btn:last-child { border-right: 0; }
+.og-choice-btn:hover { color: var(--text); }
+.og-choice-btn.on { background: var(--sun); color: var(--on-sun); }
+.og-chip--xs { font-size: .6rem; padding: 0 5px; }

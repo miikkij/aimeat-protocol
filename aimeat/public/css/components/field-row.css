@@ -1,0 +1,24 @@
+/**
+ * @file field-row.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A field with its button in one row, on the page's ground inside a thin dashed ink frame:
+ *   the field takes the room, the button keeps its words on one line; the row wraps on a phone. Where
+ *   a secret or an address is typed in place (a provider's key and base address on the AI page, a
+ *   payment rail's key in the wallet, a name for an installed package). Drawn one way in two tabs (ai-field, wal-field); moved here
+ *   unchanged under one name (UI consolidation phase 5, a move).
+ *   Drawn as markup: <div class="field-row"><input class="og-input"><button class="poster-action">…</button></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.2.0 — 2026-09-26 — The dashed frame's colour reads --shape-field-colour (a move: the AIMEAT value is the text colour).
+ *   v1.1.0 — 2026-09-26 — On the page's ground instead of the grey (Jouni's decision "Dashed field box"); Packages' install row wears it.
+ *   v1.0.0 — 2026-09-25 — Moved out of ai-poster.css and wallet-poster.css (UI consolidation phase 5, a move).
+ */
+
+.field-row { display: flex; align-items: center; gap: .8rem; padding: .5rem .7rem; border: 1px dashed var(--shape-field-colour); background: var(--bg); margin-top: .4rem; }
+.field-row .og-input { flex: 1 1 auto; min-width: 0; }
+.field-row .poster-action { flex: none; white-space: nowrap; }
+
+@media (max-width: 860px) {
+  .field-row { flex-wrap: wrap; }
+}

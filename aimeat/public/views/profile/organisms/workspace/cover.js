@@ -15,9 +15,24 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 -- 2026-09-25 -- The tables of spaces, the spaces with something new and the publishes waiting for a decision are the Listing (css/components/listing.css), a unification: the look most tabs use. A table's head row now sits in the same grid as its rows.
+ *   v1.10.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.9.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.8.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.7.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.6.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.4.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   2026-09-14 -- An opened space says what it is: a row space and a task space are named as such
  *     instead of "record type", and the count they never had is a dash rather than a 0.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
+ *   v1.3.0 -- 2026-09-25 -- The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-29 — Initial. Replaces the tab block (21 tabs in three rows), the overview
@@ -36,12 +51,15 @@ import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
 import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
 import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
 import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
-import { Section, Fold, tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
+import { tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { gotoEvent, ovAddNew, renderWsSearchResults, renderObjectives } from './overview.js';
 import { renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab } from './panels.js';
 import { renderSpaceNotice, shortActor } from './helpers.js';
 import { renderDocSpace } from './doc-space.js';
 import { renderRecordSpace } from './record-space.js';
+import { Hint } from '/components/Hint.js';
 
 /* The panels that are pages of their own: id, label, and the count shown after the label. */
 const PANELS = (ctx) => [
@@ -58,7 +76,7 @@ const unseenTotal = (ctx) => ctx.allTypes.reduce((n, ot) => n + ctx.unseenOf('sp
 const latestFor = (ctx, ot) => ctx.wsEvents.find(e => e.type === ot.name || e.type === ot.namespace) || null;
 const spaceLabel = (ctx, ot) => ctx.wsT('type.' + ot.name) || ot.name;
 const openSpace = (ctx, ot) => ctx.pickTab('space:' + ot.name);
-const newChip = (n) => n > 0 ? html`<span class="og-chip og-chip--sun">${(tr('organisms.ws.newChip', '{n} new for you')).replace('{n}', String(n))}</span>` : null;
+const newChip = (n) => n > 0 ? html`<span class="poster-chip poster-chip--sun">${(tr('organisms.ws.newChip', '{n} new for you')).replace('{n}', String(n))}</span>` : null;
 
 /* ── The rail (numbered contents + the panel doors) and its tree form ───────────────────────── */
 function panelDoors(ctx, current) {
@@ -107,7 +125,7 @@ function renderTree(ctx, current) {
                 ${docs ? docs.slice(0, MAX).map(d => html`
                   <button type="button" class=${`og-tree-doc ${ctx.activeDoc?.type === ot.name && ctx.activeDoc.page?.id === d.id ? 'on' : ''}`} key=${d.id}
                     onClick=${() => { setActiveDoc({ type: ot.name, mode: 'view', page: { id: d.id } }); openSpace(ctx, ot); }}>
-                    ${d._draft ? html`<span class="og-chip og-chip--sun og-chip--xs">${tr('organisms.draft', 'draft')}</span>` : null}${d.title || d.id}
+                    ${d._draft ? html`<span class="poster-status poster-status--attention">${tr('organisms.draft', 'draft')}</span>` : null}${d.title || d.id}
                   </button>`) : null}
                 ${docs && docs.length > MAX ? html`<button type="button" class="og-tree-doc og-tree-more" onClick=${() => openSpace(ctx, ot)}>${(tr('organisms.ws.more', '… {n} more')).replace('{n}', String(docs.length - MAX))}</button>` : null}
               </div>`;
@@ -144,21 +162,23 @@ function crumb(ctx, last) {
 function spaceTable(ctx, spaces) {
   const { isDocSpace, unseenOf, instanceTitle } = ctx;
   return html`
-    <div class="og-tbl og-tbl--head"><div></div><div>${tr('organisms.ws.colType', 'Type')}</div><div></div><div>${tr('organisms.ws.colLatest', 'Latest')}</div><div></div></div>
-    <div class="og-tbl">
+    <div class="listing listing--n-name-meta-latest-doors listing--cols">
+      <div class="listing-row listing-row--head"><div class="poster-label"></div><div class="poster-label">${tr('organisms.ws.colType', 'Type')}</div><div class="poster-label"></div><div class="poster-label">${tr('organisms.ws.colLatest', 'Latest')}</div><div class="poster-label"></div></div>
       ${spaces.map(ot => {
         const memory = orgService.isMemorySpace(ot);
         const n = memory ? new Set([...ctx.draftsFor(ot.name), ...ctx.objectsFor(ot.name)].map(d => d.id)).size : null;
         const u = memory ? unseenOf('space:' + ot.name) : 0;
         const last = memory ? latestFor(ctx, ot) : null;
         return html`
-          <div class="og-tbl-n poster-stat-number poster-stat-number--small" key=${'n' + ot.name}>${n ?? '·'}</div>
-          <div class="og-tbl-nm" key=${'m' + ot.name}><button type="button" class="og-tbl-name" onClick=${() => openSpace(ctx, ot)}>${spaceLabel(ctx, ot)}</button>${newChip(u)}${!memory ? html`<span class="og-chip og-chip--dim">${String(ot.backing)}</span>` : null}</div>
-          <div class="og-tbl-last" key=${'w' + ot.name}>${last ? tr('organisms.ws.latest', 'latest') : ''}</div>
-          <div class="og-tbl-last" key=${'l' + ot.name}>${last ? html`<button type="button" class="og-tbl-go" onClick=${() => gotoEvent(ctx, last)}>${instanceTitle(last.type, last.instance)}</button>` : html`<span class="og-tbl-dot">·</span>`}</div>
-          <div class="og-tbl-door" key=${'d' + ot.name}>${n ? html`<button type="button" class="og-door" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button>`
-            : (memory && !ot.append ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ovAddNew(ctx, ot, isDocSpace(ot))}>${tr('organisms.ws.addFirst', '+ Add')}</button>`
-              : html`<button type="button" class="og-door og-door--quiet" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button>`)}</div>`;
+          <div class="listing-row" key=${ot.name}>
+            <div class="og-tbl-n poster-stat-number poster-stat-number--small">${n ?? '·'}</div>
+            <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => openSpace(ctx, ot)}>${spaceLabel(ctx, ot)}</button>${newChip(u)}${!memory ? html`<span class="poster-chip">${String(ot.backing)}</span>` : null}</div>
+            <div class="og-ws-fig">${last ? tr('organisms.ws.latest', 'latest') : ''}</div>
+            <div class="og-ws-fig">${last ? html`<button type="button" class="og-tbl-go" onClick=${() => gotoEvent(ctx, last)}>${instanceTitle(last.type, last.instance)}</button>` : html`<span class="og-tbl-dot">·</span>`}</div>
+            <div class="listing-doors">${n ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button>`
+              : (memory && !ot.append ? html`<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ovAddNew(ctx, ot, isDocSpace(ot))}>${tr('organisms.ws.addFirst', '+ Add')}</button>`
+                : html`<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button>`)}</div>
+          </div>`;
       })}
     </div>`;
 }
@@ -202,16 +222,17 @@ function renderCover(ctx) {
     const n = next();
     rail.push(['ws-new', n, tr('organisms.ws.newForYou', 'New for you'), unseen + approvals.length]);
     sections.push(html`
-      <${Section} key="ws-new" id="ws-new" num=${n} first=${true} title=${tr('organisms.ws.newForYou', 'New for you')} count=${unseen || null}
-        doors=${approvals.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => pickTab('review')}>${tr('organisms.ws.reviewDoor', 'Review →')}</button>` : null}>
-        ${newSpaces.length ? html`<div class="og-folds">${newSpaces.map(({ ot, n: u }) => html`
-          <div class="og-fold" key=${ot.name}><span class="og-fold-name">${spaceLabel(ctx, ot)}</span><span class="og-fold-r">${newChip(u)}</span><button type="button" class="og-door og-fold-door" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button></div>`)}</div>` : null}
+      <${PageSection} key="ws-new" id="ws-new" num=${n} first=${true} title=${tr('organisms.ws.newForYou', 'New for you')} count=${unseen || null}
+        doors=${approvals.length ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => pickTab('review')}>${tr('organisms.ws.reviewDoor', 'Review →')}</button>` : null}>
+        ${newSpaces.length ? html`<div class="listing listing--name-tags-doors listing--cols">${newSpaces.map(({ ot, n: u }) => html`
+          <div class="listing-row" key=${ot.name}><div class="listing-name">${spaceLabel(ctx, ot)}</div><div>${newChip(u)}</div><div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button></div></div>`)}</div>` : null}
         ${approvals.length ? html`
-          <p class="og-hint og-hint--label">${tr('organisms.ws.waiting', 'Waiting for your decision')} <small>${approvals.length}</small></p>
-          <div class="og-folds">${approvals.map(a => html`
-            <div class="og-fold" key=${a.id}><span class="og-fold-name">${a.prompt || a.action}</span>
-              <button type="button" class="og-door og-fold-door" disabled=${busy} onClick=${() => resolve(a.id, 'approve')}>${tr('organisms.approve', 'Approve')}</button>
-              <button type="button" class="og-door og-door--quiet og-fold-door" disabled=${busy} onClick=${() => resolve(a.id, 'reject')}>${tr('organisms.reject', 'Reject')}</button></div>`)}</div>` : null}
+          <p class="og-hint--label poster-day-title">${tr('organisms.ws.waiting', 'Waiting for your decision')} <small>${approvals.length}</small></p>
+          <div class="listing listing--name-state listing--cols">${approvals.map(a => html`
+            <div class="listing-row" key=${a.id}><div class="listing-name">${a.prompt || a.action}</div>
+              <div class="listing-doors">
+                <button type="button" class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => resolve(a.id, 'approve')}>${tr('organisms.approve', 'Approve')}</button>
+                <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${busy} onClick=${() => resolve(a.id, 'reject')}>${tr('organisms.reject', 'Reject')}</button></div></div>`)}</div>` : null}
       <//>`);
   }
 
@@ -220,13 +241,13 @@ function renderCover(ctx) {
     const isDocs = g.id === 'group:documents';
     rail.push(['ws-' + g.id, n, isDocs ? tr('organisms.ws.docsTitle', 'Documents') : g.label, g.count ?? 0]);
     sections.push(html`
-      <${Section} key=${g.id} id=${'ws-' + g.id} num=${n} first=${!hasNew && gi === 0} title=${isDocs ? tr('organisms.ws.docsTitle', 'Documents') : g.label} count=${g.count ?? 0}
+      <${PageSection} key=${g.id} id=${'ws-' + g.id} num=${n} first=${!hasNew && gi === 0} title=${isDocs ? tr('organisms.ws.docsTitle', 'Documents') : g.label} count=${g.count ?? 0}
         doors=${html`
-          ${gi === 0 && !showSearch ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setShowSearch(true)}>${tr('organisms.ws.searchDoor', 'Search this workspace')}</button>` : null}
-          ${isDocs ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>${'+ '}${tr('organisms.addDocSpaceTitle', 'Add a document space')}</button>` : null}`}>
+          ${gi === 0 && !showSearch ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setShowSearch(true)}>${tr('organisms.ws.searchDoor', 'Search this workspace')}</button>` : null}
+          ${isDocs ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>${'+ '}${tr('organisms.addDocSpaceTitle', 'Add a document space')}</button>` : null}`}>
         ${isDocs && showSpaces ? renderSpacesAdd(ctx) : null}
         ${spaceTable(ctx, g.spaces)}
-        ${g.desc ? html`<p class="og-hint">${g.desc}</p>` : null}
+        ${g.desc ? html`<${Hint}>${g.desc}<//>` : null}
       <//>`);
   });
 
@@ -234,8 +255,8 @@ function renderCover(ctx) {
     const n = next();
     rail.push(['ws-history', n, tr('organisms.happened', 'What has happened'), wsEvents.length]);
     sections.push(html`
-      <${Section} key="ws-history" id="ws-history" num=${n} title=${tr('organisms.happened', 'What has happened')} count=${wsEvents.length || null}
-        doors=${html`<button type="button" class="og-door og-door--quiet" onClick=${() => pickTab('activity')}>${(tr('organisms.ws.fullActivity', 'Full activity {n} →')).replace('{n}', String(wsEvents.length))}</button>`}>
+      <${PageSection} key="ws-history" id="ws-history" num=${n} title=${tr('organisms.happened', 'What has happened')} count=${wsEvents.length || null}
+        doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => pickTab('activity')}>${(tr('organisms.ws.fullActivity', 'Full activity {n} →')).replace('{n}', String(wsEvents.length))}</button>`}>
         ${wsEvents.length ? html`<div class="og-folds">${wsEvents.slice(0, 5).map(eventRow)}</div>` : html`<p class="og-hint">${tr('organisms.noneYet', 'none yet')}</p>`}
       <//>`);
   }
@@ -254,21 +275,21 @@ function renderCover(ctx) {
       <div class="og-mast">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title">${ws.manifest?.name || ctx.wsName || ctx.org.name}</h1>
-          <div class="og-chips">
-            <span class="og-chip">${ws.manifest?.status || 'active'}</span>
+          <div class="poster-chips">
+            <span class=${`poster-status ${(ws.manifest?.status || 'active') === 'active' ? 'poster-status--fine' : 'poster-status--off'}`}>${ws.manifest?.status || 'active'}</span>
             ${newChip(unseen)}
-            ${ws.manifest?.kind ? html`<span class="og-chip og-chip--dim">${ws.manifest.kind}</span>` : null}
-            ${ws.manifest?.updatedAt ? html`<span class="og-chip og-chip--dim">${tr('organisms.lastSaved', 'Last saved')} ${fmtDate(ws.manifest.updatedAt)}</span>` : null}
-            ${showArchived ? html`<span class="og-chip og-chip--sun">${tr('organisms.archivedView', 'Archived view')}</span>` : null}
+            ${ws.manifest?.kind ? html`<span class="poster-chip">${ws.manifest.kind}</span>` : null}
+            ${ws.manifest?.updatedAt ? html`<span class="poster-chip">${tr('organisms.lastSaved', 'Last saved')} ${fmtDate(ws.manifest.updatedAt)}</span>` : null}
+            ${showArchived ? html`<span class="poster-chip poster-chip--sun">${tr('organisms.archivedView', 'Archived view')}</span>` : null}
           </div>
           ${ws.manifest?.summary ? html`<p class="og-desc">${ws.manifest.summary}</p>` : null}
         </div>
         <div class="og-mast-actions">
-          <button type="button" class="og-slab" onClick=${openAiFold}>${tr('organisms.forAi', 'For your AI')}</button>
+          <button type="button" class="poster-slab" onClick=${openAiFold}>${tr('organisms.forAi', 'For your AI')}</button>
           <div class="og-doors">
-            <button type="button" class="og-door" onClick=${() => pickTab('share')}>${tr('organisms.share', 'Share')}</button>
-            <button type="button" class="og-door" onClick=${() => guardWsDirty(() => setShowSettings(true))}>${tr('organisms.settings', 'Settings')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setShowArchived(s => !s)}>${showArchived ? tr('organisms.viewActive', 'Active') : tr('organisms.viewArchived', 'Archived')}</button>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => pickTab('share')}>${tr('organisms.share', 'Share')}</button>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => guardWsDirty(() => setShowSettings(true))}>${tr('organisms.settings', 'Settings')}</button>
+            <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setShowArchived(s => !s)}>${showArchived ? tr('organisms.viewActive', 'Active') : tr('organisms.viewArchived', 'Archived')}</button>
           </div>
         </div>
       </div>
@@ -286,7 +307,7 @@ function renderCover(ctx) {
         <div class="og-search">
           <${SearchBar} value=${wsQuery} onInput=${e => setWsQuery(e.target.value)} autofocus=${true}
             placeholder=${tr('search.wsPlaceholder', 'Search this workspace…')} ariaLabel=${tr('search.wsPlaceholder', 'Search this workspace')} />
-          <button type="button" class="og-door og-door--quiet" onClick=${() => { setWsQuery(''); setWsHits(null); setShowSearch(false); }}>${tr('search.clear', 'Clear')}</button>
+          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => { setWsQuery(''); setWsHits(null); setShowSearch(false); }}>${tr('search.clear', 'Clear')}</button>
         </div>` : null}
 
       <div class="og-grid">
@@ -294,19 +315,19 @@ function renderCover(ctx) {
           ${wsHits !== null ? renderWsSearchResults(ctx) : html`
             ${sections}
             ${(ws.apps || []).length || wsCanEdit ? html`<div class="og-apps"><${WorkspaceApps} orgId=${orgId} wsId=${wsId} apps=${ws.apps || []} canEdit=${wsCanEdit} showToast=${showToast} onChanged=${load} /></div>` : null}
-            <${Fold} id="ws-readme" num=${nReadme} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
+            <${FoldSection} id="ws-readme" num=${nReadme} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
               ${readme || wsCanEdit
                 ? html`<${ReadmePanel} markdown=${readme} canEdit=${wsCanEdit} kind="workspace" name=${ws.manifest?.name || 'Workspace'} aiPromptSeed=${wsTocSeed} onSave=${saveWsReadme} />`
                 : html`<p class="og-hint">${tr('organisms.readmeEmpty', 'No README yet.')}</p>`}
             <//>
-            <${Fold} id="ws-map" num=${nMap} title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
-              <p class="og-hint">${tr('organisms.mapAndTocHint', 'The same structure two ways.')}</p>
+            <${FoldSection} id="ws-map" num=${nMap} title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
+              <${Hint}>${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
               <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} storageKey=${'ws.' + orgId + '.' + wsId} defaultOpen />
               <${StructureOverview} label=${tr('organisms.structureOverviewWs', 'Workspace structure — table of contents')} load=${() => orgService.getWorkspaceOverview(orgId, wsId)} defaultOpen />
             <//>
-            <${Fold} id="ws-ai" num=${nAi} title=${tr('organisms.forAiTitle', 'Bring your AI here')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
+            <${FoldSection} id="ws-ai" num=${nAi} title=${tr('organisms.forAiTitle', 'Bring your AI here')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
               <p class="og-lead">${tr('organisms.ws.forAiLead', 'One instruction that brings your AI into this workspace with its real ids and structure. Paste it into a chat, hand it to a coding agent, or make a contract agent from it.')}</p>
-              <div class="og-doors">${agentMenuItems.filter(m => !m.divider).map((m, i) => html`<button type="button" class=${`og-door ${i === 2 ? 'og-door--quiet' : ''}`} key=${i} onClick=${m.onClick}>${m.label}</button>`)}</div>
+              <div class="og-doors">${agentMenuItems.filter(m => !m.divider).map((m, i) => html`<button type="button" class=${`poster-action poster-action--small${i === 2 ? ' poster-action--lower' : ''}`} key=${i} onClick=${m.onClick}>${m.label}</button>`)}</div>
             <//>`}
         </div>
         ${railTree ? renderTree(ctx, 'overview') : renderRail(ctx, railItems, 'overview')}
@@ -371,9 +392,9 @@ export function renderWorkspaceView(ctx) {
       : String(ot.backing);
     const sub = html`<span>${kind}</span><span>${memory ? n : '·'}</span>${u > 0 ? newChip(u) : null}`;
     const doors = !memory ? null : docMode ? html`
-        <button type="button" class="og-door og-door--quiet" onClick=${() => addSection(ot.name, null)}>${'+ '}${tr('organisms.section', 'Section')}</button>
-        <button type="button" class="og-door" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${tr('organisms.newPage', 'New document')}</button>`
-      : (ot.append ? null : html`<button type="button" class="og-door" onClick=${() => startAdd(ot)}>${'+ '}${tr('organisms.addDraft', 'Add draft')}</button>`);
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => addSection(ot.name, null)}>${'+ '}${tr('organisms.section', 'Section')}</button>
+        <button type="button" class="poster-action poster-action--small" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${tr('organisms.newPage', 'New document')}</button>`
+      : (ot.append ? null : html`<button type="button" class="poster-action poster-action--small" onClick=${() => startAdd(ot)}>${'+ '}${tr('organisms.addDraft', 'Add draft')}</button>`);
     return renderPage(ctx, { id: activeTab, last: spaceLabel(ctx, ot), title: spaceLabel(ctx, ot), sub, doors,
       children: html`${ctx.spaceDesc(ot) ? html`<p class="og-desc og-desc--page">${ctx.spaceDesc(ot)}</p>` : null}
         ${!memory ? renderSpaceNotice(ot) : (docMode ? renderDocSpace(ctx, ot) : renderRecordSpace(ctx, ot))}` });

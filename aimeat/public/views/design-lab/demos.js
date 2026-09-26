@@ -8,6 +8,7 @@
  * @structure DEMOS · demoFor(id) · isLabOnly(id)
  * @usage import { demoFor } from './demos.js';
  * @version-history
+ *   v1.5.0 — 2026-09-25 — The demos of Settings & Controls (demos-settings.js).
  *   v1.4.0 — 2026-09-24 — `theme:sampler`, the parts a theme changes most (Themes & Styles' preview).
  *   v1.3.0 — 2026-09-23 — `after:<id>`, each variant as it would look after the proposal; `solo`.
  *   v1.2.0 — 2026-09-23 — Proposal pictures (`proposal:<id>`); the extras went into the decisions.
@@ -19,10 +20,11 @@ import { PAGE_DEMOS } from './demos-page.js';
 import { CONVERSATION_DEMOS } from './demos-conversation.js';
 import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
 import { SHELL_DEMOS } from './demos-shell.js';
+import { SETTINGS_DEMOS } from './demos-settings.js';
 import { SAMPLES, PROPOSALS } from './decision-samples.js';
 import { THEME_SAMPLER } from './theme-sampler.js';
 
-export const DEMOS = { ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHELL_DEMOS, ...SHAPE_DEMOS };
+export const DEMOS = { ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHELL_DEMOS, ...SETTINGS_DEMOS, ...SHAPE_DEMOS };
 
 /**
  * A decision's variants as a demo: `decision:<id>`, one variant per sample, each measured. `solo`

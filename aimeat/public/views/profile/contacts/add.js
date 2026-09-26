@@ -11,6 +11,21 @@
  * @structure addBody · roads · roadName · personForm · roadChat
  * @usage import { addBody, personForm } from './add.js';
  * @version-history
+ *   v1.9.0 — 2026-09-26 — A tag that takes itself off is the removable tag (.tag-removable) and its ✗ the Tag's remove mark (.poster-chip-x): grey, coral while the pointer is on the tag (a unification: Jouni's decision "Remove mark").
+ *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.7.0 — 2026-09-25 — The name field is the Text field as it is (.og-input), a unification: the look most tabs use.
+ *   v1.6.0 — 2026-09-25 — The paragraph that opens the chat road is the lead (.og-lead), a unification: the look most tabs use.
+ *   v1.5.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.4.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.3.0 — 2026-09-25 — The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Kontaktien sivu", direction A).
  */
 import { h } from 'preact';
@@ -19,6 +34,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { c } from './frame.js';
+import { Hint } from '/components/Hint.js';
 
 export const RELATIONS = ['colleague', 'toInvite', 'customer', 'following'];
 
@@ -29,23 +45,23 @@ export function addBody(ctx) {
     </div>`;
   return html`
     <div class="ct-roads">
-      ${road('name', c('roadNameK'), c('roadNameTitle'), c('roadNameBody'), html`<button type="button" class="og-door" onClick=${e => { e.stopPropagation(); ctx.setRoad('name'); }}>${c('roadNameDoor')}</button>`)}
-      ${road('person', c('roadPersonK'), c('roadPersonTitle'), c('roadPersonBody'), html`<button type="button" class="og-door" onClick=${e => { e.stopPropagation(); ctx.setRoad('person'); }}>${c('roadPersonDoor')}</button>`)}
-      ${road('chat', c('roadChatK'), c('roadChatTitle'), c('roadChatBody'), html`<button type="button" class="og-door" onClick=${e => { e.stopPropagation(); ctx.copyPrompt(); }}>${c('copyPrompt')}</button>`)}
+      ${road('name', c('roadNameK'), c('roadNameTitle'), c('roadNameBody'), html`<button type="button" class="poster-action poster-action--small" onClick=${e => { e.stopPropagation(); ctx.setRoad('name'); }}>${c('roadNameDoor')}</button>`)}
+      ${road('person', c('roadPersonK'), c('roadPersonTitle'), c('roadPersonBody'), html`<button type="button" class="poster-action poster-action--small" onClick=${e => { e.stopPropagation(); ctx.setRoad('person'); }}>${c('roadPersonDoor')}</button>`)}
+      ${road('chat', c('roadChatK'), c('roadChatTitle'), c('roadChatBody'), html`<button type="button" class="poster-action poster-action--small" onClick=${e => { e.stopPropagation(); ctx.copyPrompt(); }}>${c('copyPrompt')}</button>`)}
     </div>
-    ${ctx.road === 'name' ? roadName(ctx) : ctx.road === 'person' ? html`<div class="ct-form-wrap"><div class="og-label">${c('writeDown')}</div>${personForm(ctx, { withInvite: true })}</div>` : roadChat(ctx)}`;
+    ${ctx.road === 'name' ? roadName(ctx) : ctx.road === 'person' ? html`<div class="ct-form-wrap"><div class="poster-label">${c('writeDown')}</div>${personForm(ctx, { withInvite: true })}</div>` : roadChat(ctx)}`;
 }
 
 function roadName(ctx) {
   return html`
     <div class="ct-form-wrap">
-      <div class="og-label">${c('roadNameTitle')}</div>
+      <div class="poster-label">${c('roadNameTitle')}</div>
       <div class="ct-addrow">
         <${ContactPicker} value=${ctx.who} onChange=${ctx.setWho} onSubmit=${() => ctx.add()} valueMode="full"
           onEmailUnresolved=${ctx.emailUnresolved} placeholder=${t('contacts.addPlaceholder')} disabled=${ctx.busy} />
-        <button type="button" class="og-slab" disabled=${ctx.busy || !ctx.who.trim()} onClick=${() => ctx.add()}>${c('add')}</button>
+        <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy || !ctx.who.trim()} onClick=${() => ctx.add()}>${c('add')}</button>
       </div>
-      <p class="ct-hint">${c('roadNameHint')}</p>
+      <${Hint}>${c('roadNameHint')}<//>
     </div>`;
 }
 
@@ -64,44 +80,44 @@ export function personForm(ctx, { withInvite = false, editing = false } = {}) {
   const editRow = editing && ctx.view.id ? ctx.rowOf(ctx.view.id) : null;
   return html`
     <div class="ct-kv ct-form">
-      <div class="k">${c('fName')}</div><div class="v"><input class="og-input ct-in--name" value=${f.name} placeholder=${t('contacts.personName')} onInput=${e => set({ name: e.target.value })} /></div>
-      <div class="k">${c('fEmail')}</div><div class="v">
+      <div class="k poster-label">${c('fName')}</div><div class="v"><input class="og-input" value=${f.name} placeholder=${t('contacts.personName')} onInput=${e => set({ name: e.target.value })} /></div>
+      <div class="k poster-label">${c('fEmail')}</div><div class="v">
         <input class="og-input" type="email" value=${f.email} disabled=${editing && !!editRow?.email} placeholder=${t('contacts.personEmail')} onInput=${e => set({ email: e.target.value })} onBlur=${() => (editing ? null : ctx.resolveForm())} />
-        ${editing && editRow?.kind === 'ghii' && !editRow.email ? html`<small class="ct-hint">${c('emailForCardHint')}</small>` : null}
-        ${editing || found === null ? null : found?.found ? html`<small class="ct-hint">${c('emailFound', { name: found.display_name || found.owner })}</small>` : found ? html`<small class="ct-hint">${c('emailNotFound')}</small>` : null}
+        ${editing && editRow?.kind === 'ghii' && !editRow.email ? html`<small class="poster-hint">${c('emailForCardHint')}</small>` : null}
+        ${editing || found === null ? null : found?.found ? html`<small class="poster-hint">${c('emailFound', { name: found.display_name || found.owner })}</small>` : found ? html`<small class="poster-hint">${c('emailNotFound')}</small>` : null}
       </div>
-      <div class="k">${c('fRelation')}</div><div class="v">
-        <div class="og-choice ct-choice">${RELATIONS.map(k => html`<button type="button" key=${k} class=${`og-choice-btn ${f.relation === relWord(k) ? 'on' : ''}`} onClick=${() => set({ relation: f.relation === relWord(k) ? '' : relWord(k) })}>${relWord(k)}</button>`)}<button type="button" class=${`og-choice-btn ${relOther || f.relationOther ? 'on' : ''}`} onClick=${() => set({ relationOther: true, relation: relOther ? f.relation : '' })}>${c('rel.other')}</button></div>
+      <div class="k poster-label">${c('fRelation')}</div><div class="v">
+        <div class="pf-tabs ct-choice">${RELATIONS.map(k => html`<button type="button" key=${k} class=${`poster-tab ${f.relation === relWord(k) ? 'is-on' : ''}`} onClick=${() => set({ relation: f.relation === relWord(k) ? '' : relWord(k) })}>${relWord(k)}</button>`)}<button type="button" class=${`poster-tab ${relOther || f.relationOther ? 'is-on' : ''}`} onClick=${() => set({ relationOther: true, relation: relOther ? f.relation : '' })}>${c('rel.other')}</button></div>
         ${relOther || f.relationOther ? html`<input class="og-input ct-in--short" value=${f.relation} placeholder=${t('contacts.relationPlaceholder')} onInput=${e => set({ relation: e.target.value })} />` : null}
       </div>
-      <div class="k">${c('fTags')}</div><div class="v">
-        <span class="ct-tags">${(f.tags || []).map(x => html`<button type="button" class="ct-tag ct-tag--x" key=${x} title=${c('remove')} onClick=${() => set({ tags: f.tags.filter(y => y !== x) })}>${x} ✗</button>`)}</span>
+      <div class="k poster-label">${c('fTags')}</div><div class="v">
+        <span class="poster-chips">${(f.tags || []).map(x => html`<button type="button" class="poster-chip tag-removable" key=${x} title=${c('remove')} onClick=${() => set({ tags: f.tags.filter(y => y !== x) })}>${x} <span class="poster-chip-x">✗</span></button>`)}</span>
         <input class="og-input ct-in--short" value=${f.tagInput || ''} placeholder=${c('tagPlaceholder')} onInput=${e => set({ tagInput: e.target.value })} onKeyDown=${e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }} onBlur=${addTag} />
       </div>
-      <div class="k">${c('fLinks')}</div><div class="v">
-        ${links.map((l, i) => html`<div class="ct-linkrow" key=${i}><input class="og-input ct-in--short" value=${l.label || ''} placeholder=${c('linkLabel')} onInput=${e => setLink(i, { label: e.target.value })} /><input class="og-input" value=${l.url || ''} placeholder="https://" onInput=${e => setLink(i, { url: e.target.value })} /><button type="button" class="og-door og-door--quiet" onClick=${() => set({ links: links.filter((_, j) => j !== i) })}>${c('remove')}</button></div>`)}
-        ${links.length < 12 ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => set({ links: [...links, { label: '', url: '' }] })}>${c('addLink')}</button>` : null}
-        <small class="ct-hint">${c('linksHint')}</small>
+      <div class="k poster-label">${c('fLinks')}</div><div class="v">
+        ${links.map((l, i) => html`<div class="ct-linkrow" key=${i}><input class="og-input ct-in--short" value=${l.label || ''} placeholder=${c('linkLabel')} onInput=${e => setLink(i, { label: e.target.value })} /><input class="og-input" value=${l.url || ''} placeholder="https://" onInput=${e => setLink(i, { url: e.target.value })} /><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => set({ links: links.filter((_, j) => j !== i) })}>${c('remove')}</button></div>`)}
+        ${links.length < 12 ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => set({ links: [...links, { label: '', url: '' }] })}>${c('addLink')}</button>` : null}
+        <small class="poster-hint">${c('linksHint')}</small>
       </div>
-      <div class="k">${c('fNote')}</div><div class="v"><textarea class="og-textarea" rows="2" value=${f.note} placeholder=${t('contacts.notePlaceholder')} onInput=${e => set({ note: e.target.value })}></textarea></div>
+      <div class="k poster-label">${c('fNote')}</div><div class="v"><textarea class="og-textarea" rows="2" value=${f.note} placeholder=${t('contacts.notePlaceholder')} onInput=${e => set({ note: e.target.value })}></textarea></div>
       ${withInvite ? html`
-        <div class="k">${c('fInvite')}</div><div class="v">
-          <div class="og-choice ct-choice"><button type="button" class=${`og-choice-btn ${!f.invite ? 'on' : ''}`} onClick=${() => set({ invite: false })}>${c('inviteNo')}</button><button type="button" class=${`og-choice-btn ${f.invite ? 'on' : ''}`} disabled=${!!found?.found} onClick=${() => set({ invite: true })}>${c('inviteHere')}</button></div>
+        <div class="k poster-label">${c('fInvite')}</div><div class="v">
+          <div class="pf-tabs ct-choice"><button type="button" class=${`poster-tab ${!f.invite ? 'is-on' : ''}`} onClick=${() => set({ invite: false })}>${c('inviteNo')}</button><button type="button" class=${`poster-tab ${f.invite ? 'is-on' : ''}`} disabled=${!!found?.found} onClick=${() => set({ invite: true })}>${c('inviteHere')}</button></div>
           ${f.invite ? html`<input class="og-input" value=${f.inviteMessage || ''} placeholder=${c('inviteMessagePlaceholder')} onInput=${e => set({ inviteMessage: e.target.value })} />` : null}
-          <small class="ct-hint">${found?.found ? c('inviteHintFound') : c('inviteHint')}</small>
+          <small class="poster-hint">${found?.found ? c('inviteHintFound') : c('inviteHint')}</small>
         </div>` : null}
     </div>
     <div class="og-doors ct-form-doors">
-      <button type="button" class="og-slab" disabled=${ctx.busy || !f.name.trim() || !f.email.trim()} onClick=${() => (editing ? ctx.saveEdit() : ctx.savePerson())}>${editing ? c('save') : f.invite ? c('saveAndInvite') : c('save')}</button>
-      <button type="button" class="og-door og-door--quiet" onClick=${() => (editing ? ctx.setEditing(false) : ctx.resetForm())}>${t('common.cancel')}</button>
+      <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy || !f.name.trim() || !f.email.trim()} onClick=${() => (editing ? ctx.saveEdit() : ctx.savePerson())}>${editing ? c('save') : f.invite ? c('saveAndInvite') : c('save')}</button>
+      <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => (editing ? ctx.setEditing(false) : ctx.resetForm())}>${t('common.cancel')}</button>
     </div>`;
 }
 
 function roadChat(ctx) {
   return html`
     <div class="ct-form-wrap">
-      <div class="og-label">${c('roadChatTitle')}</div>
-      <p class="ct-prose">${c('chatBody')}</p>
-      <div class="og-doors"><button type="button" class="og-slab" onClick=${() => ctx.copyPrompt()}>${c('copyPrompt')}</button></div>
+      <div class="poster-label">${c('roadChatTitle')}</div>
+      <p class="og-lead ct-prose">${c('chatBody')}</p>
+      <div class="og-doors"><button type="button" class="poster-slab" onClick=${() => ctx.copyPrompt()}>${c('copyPrompt')}</button></div>
     </div>`;
 }

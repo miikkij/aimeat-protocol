@@ -16,6 +16,33 @@
  * @version-history
  *   2026-09-25 -- Filing into a workspace whose new document space waits for an approval says so and
  *     keeps the note (one note, or the chunks of a distributed one); nothing is filed in between.
+ *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.15.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.14.0 -- 2026-09-25 -- The labels over a note's fields and over its preview are the row label (.poster-label) (Jouni's decision "Row label", a unification).
+ *   v1.13.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
+ *   v1.9.0 -- 2026-09-25 -- A framed box around one thing is the Object box (.poster-box; on a grey ground its copy tone), in the tone its look already was (Jouni's decision "Object box", a unification).
+ *   v1.8.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.6.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.5.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.4.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
+ *   v1.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.1 — 2026-06-23 — Fix: Skip on an enrichment step was disabled whenever ANY step was running
  *     (so during an auto-run batch every Skip was dead). Skip is now only disabled for the step actually
@@ -31,7 +58,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Spinner } from './shared.js';
+import { LoadingLine } from './shared.js';
 import { createMemory, deleteMemory } from '/js/services/memory.js';
 import { classifyNote, materializeDocument, distributeNote, distributeChunks } from '/js/services/notebook.js';
 import { TrackResponseModal } from './track-response-modal.js';
@@ -328,7 +355,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       <div class="pf-nb-enrich poster-row--thing">
         <div class="text-meta-sm pf-nb-enrich-summary">${plan?.summary || ''}${conf !== null ? ` · ${conf}%` : ''}</div>
         ${steps.length === 0
-          ? html`<div class="empty">${t('profile.notebook.planNoSteps')}</div>`
+          ? html`<div class="poster-quiet">${t('profile.notebook.planNoSteps')}</div>`
           : html`
             <ol class="pf-nb-plan-steps">
               ${steps.map(step => {
@@ -338,37 +365,37 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
                 return html`
                   <li key=${step.id} class="pf-nb-plan-step ${done ? 'done' : skipped ? 'skipped' : ''} poster-row--thing">
                     <div class="pf-nb-plan-step-head">
-                      <span class="badge ${step.kind === 'librarian_assess' ? 'badge-info' : step.kind === 'delegate' ? 'badge-success' : ''}">${t('profile.notebook.kind_' + step.kind)}</span>
+                      <span class="poster-chip">${t('profile.notebook.kind_' + step.kind)}</span>
                       <span class="pf-nb-plan-step-title">${step.title}</span>
                       ${step.kind === 'delegate' && step.agent && html`<span class="text-meta-sm">→ ${step.agent}</span>`}
-                      ${done && html`<span class="pf-nb-plan-tag">✓</span>`}
-                      ${skipped && html`<span class="pf-nb-plan-tag">${t('profile.notebook.skipped')}</span>`}
+                      ${done && html`<span class="poster-status poster-status--fine">✓</span>`}
+                      ${skipped && html`<span class="poster-status poster-status--off">${t('profile.notebook.skipped')}</span>`}
                     </div>
                     ${step.description && html`<div class="text-meta-sm">${step.description}</div>`}
                     ${step.rationale && html`<div class="text-meta-sm pf-nb-plan-why">${step.rationale}</div>`}
                     ${running && step.kind === 'delegate' && html`<div class="text-meta-sm pf-nb-plan-why">${t('profile.notebook.delegateWaiting').replace('{agent}', step.agent || '')}${stepStatus[step.id] ? ` (${escHtml(stepStatus[step.id])})` : ''}</div>`}
                     ${!done && !skipped && html`
                       <div class="pf-nb-plan-step-btns">
-                        <button class="btn-primary btn-sm" disabled=${!!runningStepId} onClick=${() => runOneStep(step)}>${running ? '…' : t('profile.notebook.runStep')}</button>
-                        <button class="btn-ghost btn-sm" disabled=${runningStepId === step.id} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}</button>
+                        <button class="poster-slab poster-slab--control" disabled=${!!runningStepId} onClick=${() => runOneStep(step)}>${running ? '…' : t('profile.notebook.runStep')}</button>
+                        <button class="poster-action poster-action--small" disabled=${runningStepId === step.id} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}</button>
                       </div>`}
                   </li>`;
               })}
             </ol>
             ${!allHandled && html`
-              <button class="btn-outline btn-sm" disabled=${!!runningStepId} onClick=${handleRunAll}>
+              <button class="poster-action poster-action--small" disabled=${!!runningStepId} onClick=${handleRunAll}>
                 ${runningStepId ? t('profile.notebook.running') : t('profile.notebook.runAll')}
               </button>`}
           `}
         ${anyDone && html`
           <div class="pf-nb-enrich-preview">
-            <div class="pf-nb-suggest-label">${t('profile.notebook.enrichedPreview')}</div>
-            <div class="pf-nb-enrich-preview-body"><${Markdown} text=${preview} /></div>
+            <div class="pf-nb-suggest-label poster-label">${t('profile.notebook.enrichedPreview')}</div>
+            <div class="pf-nb-enrich-preview-body poster-box poster-box--copy"><${Markdown} text=${preview} /></div>
           </div>`}
         <div class="pf-nb-suggest-actions">
-          <button class="btn-primary" disabled=${!!runningStepId} onClick=${handleFileEnriched}>${t('profile.notebook.fileEnriched')}</button>
-          <button class="btn-outline btn-sm" disabled=${!!runningStepId} onClick=${handleSplitEnriched}>${t('profile.notebook.splitEnriched')}</button>
-          <button class="btn-ghost btn-sm" onClick=${() => setEnrich(null)}>${t('profile.notebook.cancelBtn')}</button>
+          <button class="poster-slab poster-slab--control" disabled=${!!runningStepId} onClick=${handleFileEnriched}>${t('profile.notebook.fileEnriched')}</button>
+          <button class="poster-action poster-action--small" disabled=${!!runningStepId} onClick=${handleSplitEnriched}>${t('profile.notebook.splitEnriched')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setEnrich(null)}>${t('profile.notebook.cancelBtn')}</button>
         </div>
       </div>
     `;
@@ -388,16 +415,16 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
                   <input type="checkbox" checked=${c.include} disabled=${busy} onChange=${() => toggleChunk(i)} />
                   <span class="pf-nb-plan-step-title">${c.title}</span>
                 </label>
-                <span class="badge badge-info">${orgLabelFor(c)}${c.workspaceName ? ` ▸ ${c.workspaceName}` : ''}</span>
+                <span class="poster-chip">${orgLabelFor(c)}${c.workspaceName ? ` ▸ ${c.workspaceName}` : ''}</span>
               </div>
-              <div class="pf-nb-enrich-preview-body pf-nb-chunk-body"><${Markdown} text=${c.markdown} /></div>
+              <div class="pf-nb-enrich-preview-body poster-box poster-box--copy pf-nb-chunk-body"><${Markdown} text=${c.markdown} /></div>
             </li>`)}
         </ol>
         <div class="pf-nb-suggest-actions">
-          <button class="btn-primary" disabled=${busy || selectedCount === 0} onClick=${handleDistributeCommit}>
+          <button class="poster-slab poster-slab--control" disabled=${busy || selectedCount === 0} onClick=${handleDistributeCommit}>
             ${busy ? `… ${filedCount}/${selectedCount}` : (t('profile.notebook.distributeCommit') || 'Distribute {n}').replace('{n}', String(selectedCount))}
           </button>
-          <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => setDistrib(null)}>${t('profile.notebook.cancelBtn')}</button>
+          <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => setDistrib(null)}>${t('profile.notebook.cancelBtn')}</button>
         </div>
       </div>
     `;
@@ -414,44 +441,44 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     return html`
       <div class="pf-nb-suggest poster-row--thing">
         ${result.suggestion?.reason && html`<div class="text-meta-sm pf-nb-suggest-reason">${escHtml(result.suggestion.reason)}${conf !== null ? ` · ${conf}%` : ''}</div>`}
-        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldOrganism')}</label>
-        <select class="input-field" value=${edit.organismId} onChange=${e => onOrganismChange(e.target.value)}>
+        <label class="pf-nb-suggest-label poster-label">${t('profile.notebook.fieldOrganism')}</label>
+        <select class="select-field" value=${edit.organismId} onChange=${e => onOrganismChange(e.target.value)}>
           ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name)}</option>`)}
           <option value=${NEW}>➕ ${t('profile.notebook.newOrganism')}</option>
         </select>
         ${edit.organismId === NEW && html`
-          <input type="text" class="input-field" placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
+          <input type="text" class="og-input" placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
             value=${edit.organismName} onInput=${e => patchEdit({ organismName: e.target.value })} />`}
         ${edit.organismId !== NEW && html`
-          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldWorkspace')}</label>
-          <select class="input-field" value=${edit.workspaceId} onChange=${e => onWorkspaceChange(e.target.value)}>
+          <label class="pf-nb-suggest-label poster-label">${t('profile.notebook.fieldWorkspace')}</label>
+          <select class="select-field" value=${edit.workspaceId} onChange=${e => onWorkspaceChange(e.target.value)}>
             ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name)}</option>`)}
             <option value=${NEW}>➕ ${t('profile.notebook.newWorkspace')}</option>
           </select>`}
         ${(edit.organismId === NEW || edit.workspaceId === NEW) && html`
-          <input type="text" class="input-field" placeholder=${t('profile.notebook.newWsNamePlaceholder')}
+          <input type="text" class="og-input" placeholder=${t('profile.notebook.newWsNamePlaceholder')}
             value=${edit.workspaceName} onInput=${e => patchEdit({ workspaceName: e.target.value })} />`}
         ${edit.organismId !== NEW && edit.workspaceId !== NEW && docSpaces.length > 0 && html`
-          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldSpace')}</label>
-          <select class="input-field" value=${edit.space} onChange=${e => patchEdit({ space: e.target.value })}>
+          <label class="pf-nb-suggest-label poster-label">${t('profile.notebook.fieldSpace')}</label>
+          <select class="select-field" value=${edit.space} onChange=${e => patchEdit({ space: e.target.value })}>
             ${docSpaces.map(s => html`<option key=${s.namespace} value=${s.namespace}>${escHtml(s.name)}</option>`)}
           </select>`}
         ${result.alternatives?.length > 0 && html`
           <div class="pf-nb-suggest-alts">
             <span class="text-meta-sm">${t('profile.notebook.alternatives')}</span>
             ${result.alternatives.map((alt, i) => html`
-              <button key=${i} class="btn-ghost btn-sm" onClick=${() => applyAlternative(alt)}>
+              <button key=${i} class="poster-action poster-action--small" onClick=${() => applyAlternative(alt)}>
                 ${escHtml(alt.organismName || '?')}${alt.workspaceName ? ` ▸ ${escHtml(alt.workspaceName)}` : ''}
               </button>`)}
           </div>`}
-        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldTitle')}</label>
-        <input type="text" class="input-field" value=${edit.title} onInput=${e => patchEdit({ title: e.target.value })} />
-        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldBody')}</label>
-        <textarea class="input-field pf-nb-suggest-body" rows="6" value=${edit.markdown}
+        <label class="pf-nb-suggest-label poster-label">${t('profile.notebook.fieldTitle')}</label>
+        <input type="text" class="og-input" value=${edit.title} onInput=${e => patchEdit({ title: e.target.value })} />
+        <label class="pf-nb-suggest-label poster-label">${t('profile.notebook.fieldBody')}</label>
+        <textarea class="og-textarea" rows="6" value=${edit.markdown}
           onInput=${e => patchEdit({ markdown: e.target.value })}></textarea>
         <div class="pf-nb-suggest-actions">
-          <button class="btn-primary" disabled=${materializing} onClick=${handleMaterialize}>${materializing ? '…' : t('profile.notebook.materializeBtn')}</button>
-          <button class="btn-ghost btn-sm" onClick=${() => setSuggest(null)}>${t('profile.notebook.cancelBtn')}</button>
+          <button class="poster-slab poster-slab--control" disabled=${materializing} onClick=${handleMaterialize}>${materializing ? '…' : t('profile.notebook.materializeBtn')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setSuggest(null)}>${t('profile.notebook.cancelBtn')}</button>
         </div>
       </div>
     `;
@@ -460,10 +487,10 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   return html`
     <div class="pf-nb-note">
       ${trackMsg && html`
-        <div class="inbox-track-banner">
+        <div class="inbox-track-banner poster-aside poster-aside--small">
           <span class="inbox-track-banner-ico">🔗</span>
           <span class="inbox-track-banner-txt">${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', escHtml(trackPeer))}</span>
-          <button class="btn-primary btn-sm" onClick=${() => setTrackOpen(true)}>${t('inbox.trackResponse')}</button>
+          <button class="poster-slab poster-slab--control" onClick=${() => setTrackOpen(true)}>${t('inbox.trackResponse')}</button>
         </div>`}
       <div class="pf-nb-note-text pf-nb-note-text--${view}">
         ${view === 'line'
@@ -472,27 +499,27 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       </div>
       <div class="pf-nb-note-foot">
         <div class="pf-nb-note-meta">
-          <button class="btn-ghost btn-sm pf-nb-view-btn" title=${t('profile.notebook.toggleView')}
+          <button class="poster-icon poster-icon--small" title=${t('profile.notebook.toggleView')}
             onClick=${cycleView}>${view === 'full' ? '⌃' : '⌄'}</button>
-          <span class="text-meta-sm">${relTime(note.updated_at || note.created_at)}</span>
+          <span class="poster-time">${relTime(note.updated_at || note.created_at)}</span>
         </div>
         <div class="pf-nb-note-btns">
-          <button class="btn-outline btn-sm" disabled=${planning} onClick=${() => handleEnrich()}>
+          <button class="poster-action poster-action--small" disabled=${planning} onClick=${() => handleEnrich()}>
             ${planning ? t('profile.notebook.planning') : t('profile.notebook.enrichBtn')}
           </button>
-          <button class="btn-primary btn-sm" disabled=${sorting} onClick=${() => handleSuggest()}>
+          <button class="poster-slab poster-slab--control" disabled=${sorting} onClick=${() => handleSuggest()}>
             ${sorting ? t('profile.notebook.sorting') : t('profile.notebook.suggestBtn')}
           </button>
-          <button class="btn-outline btn-sm" disabled=${distributing} onClick=${() => handleDistribute()}>
+          <button class="poster-action poster-action--small" disabled=${distributing} onClick=${() => handleDistribute()}>
             ${distributing ? t('profile.notebook.splitting') : t('profile.notebook.splitBtn')}
           </button>
-          <button class="btn-danger btn-sm" onClick=${() => onDelete(note.key)}>${t('profile.notebook.deleteBtn')}</button>
+          <button class="poster-action poster-action--small poster-action--danger" onClick=${() => onDelete(note.key)}>${t('profile.notebook.deleteBtn')}</button>
         </div>
       </div>
 
       ${sorting && html`
         <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
-          <${Spinner} text=${t(NB_STEPS[sortStep])} />
+          <${LoadingLine} text=${t(NB_STEPS[sortStep])} />
           <ol class="pf-nb-steps">
             ${NB_STEPS.map((s, i) => html`
               <li key=${i} class="pf-nb-step ${i < sortStep ? 'done' : i === sortStep ? 'active' : ''}">
@@ -507,13 +534,13 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
             <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
             <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
           <div class="pf-nb-suggest-actions">
-            <button class="btn-primary btn-sm" onClick=${() => handleSuggest()}>${t('profile.notebook.tryAgain')}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => setSortError(null)}>${t('profile.notebook.dismiss')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => handleSuggest()}>${t('profile.notebook.tryAgain')}</button>
+            <button class="poster-action poster-action--text" onClick=${() => setSortError(null)}>${t('profile.notebook.dismiss')}</button>
           </div>
         </div>`}
       ${suggest && renderSuggestPanel()}
 
-      ${planning && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${Spinner} text=${t('profile.notebook.planning')} /></div>`}
+      ${planning && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${LoadingLine} text=${t('profile.notebook.planning')} /></div>`}
       ${enrichError && html`
         <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
           <div class="alert alert-warning"><span class="alert-msg">${t('profile.notebook.planErrorTitle')}: ${escHtml(enrichError.message)}</span></div>
@@ -521,13 +548,13 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
             <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
             <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
           <div class="pf-nb-suggest-actions">
-            <button class="btn-primary btn-sm" onClick=${() => handleEnrich()}>${t('profile.notebook.tryAgain')}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => setEnrichError(null)}>${t('profile.notebook.dismiss')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => handleEnrich()}>${t('profile.notebook.tryAgain')}</button>
+            <button class="poster-action poster-action--text" onClick=${() => setEnrichError(null)}>${t('profile.notebook.dismiss')}</button>
           </div>
         </div>`}
       ${enrich && !distrib && renderEnrichPanel()}
 
-      ${distributing && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${Spinner} text=${t('profile.notebook.splitting')} /></div>`}
+      ${distributing && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${LoadingLine} text=${t('profile.notebook.splitting')} /></div>`}
       ${distrib && renderDistributePanel()}
 
       ${trackOpen && trackMsg && html`<${TrackResponseModal} open=${true} msg=${trackMsg}

@@ -1,0 +1,31 @@
+/**
+ * @file page-head.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The head of a tab page: the headline with its small mono aside, the row of chips under it, the
+ *   grey description, and the doors on the right (stacked on a phone); the page cut sits lower.
+ *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
+ *   the organism pages and the admin), under its own name; the class names stay, because every page
+ *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
+ */
+
+/* ── Masthead ──────────────────────────────────────────────────────────────────────────────── */
+.og-mast { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; margin-top: .6rem; }
+.og-mast-words { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+.og-title { margin: 0; overflow-wrap: anywhere; }
+.og-title small { display: inline-flex; flex-wrap: wrap; gap: .8rem; margin-left: .8rem; font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); vertical-align: middle; }
+.og-chips { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.og-desc { margin: 0; font-size: .95rem; line-height: 1.6; font-weight: 600; color: var(--text-dim); max-width: 64ch; }
+.og-mast-actions { display: flex; flex-direction: column; align-items: flex-end; gap: .75rem; flex: none; padding-top: .5rem; }
+.og-doors { display: flex; gap: 1.4rem; align-items: center; flex-wrap: wrap; }
+.og-mast--page { align-items: flex-end; }
+.og-mast--page .og-mast-actions { padding-top: 0; }
+.og-desc--page { margin-top: .6rem; }
+
+@media (max-width: 1100px) {
+  .og-mast { flex-direction: column; }
+  .og-mast-actions { align-items: flex-start; }
+}

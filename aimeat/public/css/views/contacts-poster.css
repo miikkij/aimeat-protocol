@@ -9,58 +9,55 @@
  *   last message; the three roads; the person form and the facts list; the together list; a
  *   message; the organism chooser box. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- "Where" and what you share with a person are the Listing (css/components/listing.css, cut name-name), a unification: the look most tabs use. The grid, cells, name and phone column of ct-where go; the line's leading stays.
+ *   v1.15.0 -- 2026-09-26 -- The line under each place in "Where" is the Listing's (.listing-meta): its body face, size and colour go, its leading stays (a unification: Jouni's decision "Meta line").
+ *   v1.14.0 -- 2026-09-26 -- The dashed avatar is the avatar's agent tone in css/poster.css (.poster-box--agent); its rule here goes.
+ *   v1.13.0 -- 2026-09-25 -- The pressed door's rule (.og-door.on) goes: a button that shows a panel and stays pressed is the Tab's fold tone (.poster-tab--fold.is-on), a unification: Jouni's decision "Tabs and filters".
+ *   v1.12.0 -- 2026-09-25 -- The person form's name field is the Text field as it is, a unification: the look most tabs use. The rule of .ct-in--name (a larger, heavier name) goes.
+ *   v1.11.0 -- 2026-09-25 -- The chat road's paragraph is the lead (.og-lead, css/components/page-section.css), a unification: the look most tabs use. .ct-prose keeps only its margin.
+ *   v1.11.0 -- 2026-09-25 -- A person's links are the small link (.poster-action--more), a unification: Jouni's decision "Small link". The look of .ct-link goes, its gap stays.
+ *   v1.10.0 -- 2026-09-25 -- The blinking loading mark is a library part, css/components/loading-mark.css (a move): its rules go from here unchanged.
+ *   v1.9.0 -- 2026-09-25 -- A person's facts and permissions are the Facts (css/components/facts.css), a unification: the look most tabs use. ct-kv stays for the forms (the person form, the email address form, quiet hours); the doors under a value keep their place on the Facts value.
+ *   v1.8.0 -- 2026-09-25 -- The three tables are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of ct-rows, ct-nm, ct-w, ct-note, ct-doors and their phone layout go; the mark keeps its box size and dashed edge, a name button still wraps, the typewriter line and the last message keep their faces.
+ *   v1.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.6.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.4.0 -- 2026-09-25 -- The rules that leave the row labels out keep their old weight, with :where (a correction to the "Row label" unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.2.0 -- 2026-09-25 -- The quiet ways on are the library's action link (Jouni's decision "Action
+ *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
+ *     place's layout value moves to the new class.
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
+ *   2026-09-25 -- The choice buttons lose their rule: the tab (.poster-tab) now draws them (a unification: Jouni's decision "Tabs and filters").
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-ct .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
-.og-ct .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
-.og-ct .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-ct .ct-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
-.og-ct .ct-kv .ct-hint, .og-ct .ct-form .ct-hint { margin-top: .2rem; }
-.og-ct .ct-prose { margin: 0 0 .6rem; font-size: .92rem; line-height: 1.55; color: var(--text); }
+.og-ct .poster-quiet { margin: 0; }
+.og-ct .poster-hint { display: block; }
+.og-ct .ct-kv .poster-hint, .og-ct .ct-form .poster-hint { margin-top: .2rem; }
+.og-ct .ct-prose { margin: 0 0 .6rem; }
 .og-ct .ct-bad { color: var(--accent); }
 .og-ct .ct-dim { color: var(--text-dim); }
-.og-ct .ct-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
-.og-ct .ct-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: ctBlink 1s steps(2, start) infinite; }
-@keyframes ctBlink { to { visibility: hidden; } }
+/* The blinking mark before "Loading" is the Loading mark (css/components/loading-mark.css). */
 .og-ct.og-page { --poster-page-size: 2.1rem; }
-.og-ct .og-label { display: block; }
-.og-ct .og-chip.ct-chip--case { text-transform: none; }
+.og-ct .poster-label:where(:not(div)) { display: block; }
 .og-ct .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-ct .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-ct .ct-search { margin: 0 0 .8rem; max-width: 26rem; }
 .og-ct .ct-more { margin-top: .8rem; }
 
-/* ── The tables ─────────────────────────────────────────────────────────────────────────────── */
-.ct-rows { display: grid; grid-template-columns: 2.2rem minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; gap: 0 .9rem; align-items: center; }
-.ct-rows--mail { grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1.3fr) minmax(0, 8rem) auto; }
-.ct-rows--agents { grid-template-columns: 2.2rem minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; }
-.ct-rows > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.ct-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-/* The mark is a whole box: the row rule above would otherwise take its bottom edge (the row's 1px
-   line wins on specificity), which is how the boxes shipped open at the bottom on 2026-08-30. */
-.ct-rows > .ct-av { width: 2.2rem; height: 2.2rem; }
-.ct-rows > .ct-av--agent { border-style: dashed; color: var(--text-dim); }
-.ct-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.ct-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-.ct-nm .ct-nm-plain { font-weight: 800; }
-.ct-nm small { display: block; font-size: .74rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; font-family: var(--font-mono); overflow-wrap: anywhere; }
-.ct-rows--agents .ct-nm small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ct-w { font-size: .82rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
-.ct-w .ct-kind { display: block; font-size: .72rem; color: var(--text-dim); }
-.ct-m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-.ct-note { font-size: .78rem; color: var(--text-dim); }
-.ct-last b { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 500; color: var(--text); }
-.ct-last small { display: block; font-size: .76rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ct-doors { white-space: nowrap; }
-.ct-doors .og-door { margin-left: .8rem; }
-.ct-tags { display: inline-flex; flex-wrap: wrap; gap: .3rem; }
-.ct-tag { display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); font-size: .68rem; font-weight: 700; letter-spacing: .04em; color: var(--text); background: transparent; font-family: inherit; }
-.ct-tag--rel { background: var(--text); color: var(--card-bg); }
-.ct-tag--x { cursor: pointer; }
-.ct-tag--x:hover { color: var(--accent); border-color: var(--accent); }
+/* ── The tables: the Listing (css/components/listing.css) ──────────────────────────────────── */
+/* The mark is a whole box of its own; an agent's or an app's is the avatar's agent tone
+   (.poster-box--agent, css/poster.css). */
+.og-ct .ct-av { width: 2.2rem; height: 2.2rem; }
+.og-ct .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+/* The shared organisms and the invitation: a typewriter line. */
+.og-ct .ct-m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+/* The last message: when, and its first words cut to one line. */
+.og-ct .ct-last b { font-weight: 500; }
+.og-ct .ct-last small { font-size: .76rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── The roads and the form ─────────────────────────────────────────────────────────────────── */
 .ct-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
@@ -74,48 +71,33 @@
 .ct-addrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6rem; margin-top: .5rem; }
 .ct-addrow > :first-child { flex: 1 1 18rem; min-width: 0; }
 .ct-kv { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: .55rem 1rem; align-items: start; margin-top: .6rem; }
-.ct-kv .k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .35rem; }
+.ct-kv .k { padding-top: .35rem; }
 .ct-kv .v { font-size: .92rem; line-height: 1.5; color: var(--text); min-width: 0; }
-.ct-kv .v .og-doors { margin-top: .3rem; }
+.og-ct .facts-v .og-doors { margin-top: .3rem; }
 .ct-form .og-input, .ct-form .og-textarea { width: 100%; box-sizing: border-box; }
-.ct-form .ct-in--name { font-weight: 800; font-size: 1.05rem; }
 .ct-form .ct-in--short { max-width: 16rem; margin-top: .35rem; }
-.ct-form .ct-tags { margin-bottom: .2rem; }
+.ct-form .poster-chips { margin-bottom: .2rem; }
+.ct-form .poster-chip { cursor: pointer; }
 .ct-linkrow { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) auto; gap: .5rem; align-items: center; margin-bottom: .4rem; }
 .ct-form-doors { margin-top: 1rem; }
 .ct-choice { margin-bottom: .2rem; }
-.ct-link { display: inline-block; margin-right: .8rem; color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); }
-.ct-link:hover { color: var(--text); border-bottom-color: var(--text); }
+/* A person's links are the small link (.poster-action--more); here they keep their gap. */
+.og-ct .ct-link { margin-right: .8rem; }
 
 /* ── Together, messages, the box ────────────────────────────────────────────────────────────── */
-.ct-where { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem 1.4rem; }
-.ct-where > div { padding: .5rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.ct-where b { display: block; font-weight: 800; font-size: .92rem; color: var(--text); }
-.ct-where small { display: block; font-size: .78rem; line-height: 1.45; color: var(--text-dim); }
+/* "Where" and what you share with a person are the Listing (css/components/listing.css, two names
+   to a line); the line under a name is the Listing's (.listing-meta), its leading only. */
+.ct-where small { line-height: 1.45; }
 .ct-msg { padding: .6rem 0; border-bottom: 1px solid var(--border); font-size: .92rem; line-height: 1.5; color: var(--text); }
 .ct-msg small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-.ct-box { margin: 0 0 1.2rem; padding: .9rem 1rem; border: 2px solid var(--accent); }
-.ct-box .og-box-label { display: block; margin-bottom: .4rem; }
+.ct-box { margin: 0 0 1.2rem; padding: .9rem 1rem; }
+.ct-box .poster-label { display: block; margin-bottom: .4rem; }
 .ct-box .og-doors { flex-wrap: wrap; }
 
 /* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  /* Three columns and two rows per contact: the mark spans both rows, the name and the doors share
-     the first, the last message (or the invitation) takes the second. Every cell names its column
-     and the flow is dense, so the doors land beside the name rather than after the second row. */
-  .ct-rows, .ct-rows--mail, .ct-rows--agents { grid-template-columns: 2.2rem minmax(0, 1fr) auto; grid-auto-flow: dense; }
-  .ct-rows--head { display: none; }
-  .ct-rows > .ct-av { grid-column: 1; grid-row: span 2; align-self: start; margin-top: .55rem; }
-  .ct-rows > .ct-nm { grid-column: 2; border-bottom: 0; padding-bottom: 0; }
-  .ct-rows > .ct-doors { grid-column: 3; border-bottom: 0; padding-bottom: 0; }
-  .ct-rows > .ct-w:not(.ct-last) { display: none; }
-  .ct-rows > .ct-last { grid-column: 2 / 4; padding-top: .2rem; }
-  .ct-rows--mail > .ct-w.ct-m { display: block; grid-column: 2 / 4; padding-top: .2rem; }
-  .ct-nm small { white-space: normal; }
   .ct-roads { grid-template-columns: 1fr; }
   .ct-kv { grid-template-columns: 1fr; gap: .25rem 0; }
   .ct-kv .k { padding-top: .5rem; }
-  .ct-where { grid-template-columns: 1fr; }
   .ct-linkrow { grid-template-columns: 1fr; }
-  .ct-doors .og-door { margin-left: .5rem; }
 }

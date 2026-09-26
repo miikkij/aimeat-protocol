@@ -13,6 +13,25 @@
  *   - TaskItem + its helpers (status labels, JSON tree, memory entry, RequestChangesModal,
  *     blur preference) now live in ./agents/task-item.js (extracted for max-file-lines)
  * @version-history
+ *   v5.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v5.11.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v5.10.0 -- 2026-09-25 -- "Find a task", which shows the search line and stays pressed while it is shown, is the Tab's fold tone (.poster-tab--fold, is-on while shown; its aria-pressed stays), a unification: Jouni's decision "Tabs and filters".
+ *   v5.9.0 -- 2026-09-25 -- Every quiet way on is the action link (.poster-action, its quiet tone where it sits among controls), and the one loud action is the dark block (.poster-slab, its control cut), a unification: Jouni's decisions Action link and Loud action.
+ *   v5.8.0 -- 2026-09-25 -- Every small number is the Count (.poster-count tally, waiting at the limit), a unification: Jouni's decision Count.
+ *   v5.7.0 -- 2026-09-25 -- The task rows are the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v5.6.0 -- 2026-09-25 -- A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v5.5.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v5.4.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v5.3.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v5.2.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v5.1.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v5.0.0 -- 2026-09-14 -- The Tasks tab wears the poster face: agt- markup against
  *     css/views/agent-tasks-poster.css. The header is a coral label plus one slab, the
  *     concurrency setting reads as one sentence with the number inline, the buckets and the
@@ -158,21 +177,21 @@ function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
   return html`
     <div class="agt-form poster-row--thing">
       <div class="og-field">
-        <span class="og-label">${t('profile.agents.tasks.descLabel')}</span>
+        <span class="poster-label">${t('profile.agents.tasks.descLabel')}</span>
         <textarea
-          class="poster-box agt-ta"
+          class="og-textarea agt-ta"
           placeholder=${t('profile.agents.tasks.builder.placeholder')}
           value=${description}
           maxlength=${DESC_MAX}
           onInput=${e => setDescription(e.target.value)}
           rows="6"
         ></textarea>
-        <div class=${`agt-count ${description.length >= DESC_MAX ? 'is-max' : ''}`}>
+        <div class="agt-count"><span class=${`poster-count ${description.length >= DESC_MAX ? 'poster-count--waiting' : 'poster-count--tally'}`}>
           ${description.length} / ${DESC_MAX}
-        </div>
+        </span></div>
       </div>
       <div class="og-field">
-        <span class="og-label">${t('profile.agents.tasks.titleLabel')}</span>
+        <span class="poster-label">${t('profile.agents.tasks.titleLabel')}</span>
         <input
           class="og-input"
           type="text"
@@ -183,10 +202,10 @@ function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
         />
       </div>
       <div class="agt-form-actions">
-        <button type="button" class="og-slab" onClick=${handleCreate} disabled=${creating || !description.trim()}>
+        <button type="button" class="poster-slab poster-slab--control" onClick=${handleCreate} disabled=${creating || !description.trim()}>
           ${creating ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.createTask')}
         </button>
-        <button type="button" class="og-door og-door--quiet" onClick=${onCancel} disabled=${creating}>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${onCancel} disabled=${creating}>
           ${t('profile.agents.tasks.cancel')}
         </button>
       </div>
@@ -270,7 +289,7 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
   }
 
   if (tasks === null) {
-    return html`<div class="agt-tab"><div class="agt-empty">${t('profile.loading')}</div></div>`;
+    return html`<div class="agt-tab"><div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div></div>`;
   }
 
   const totalTasks = counts.recent + counts.keep + counts.archive;
@@ -278,10 +297,10 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
   return html`
     <div class="agt-tab">
       <div class="agt-head">
-        <span class="og-label">
+        <span class="poster-label">
           ${t('profile.agents.tasks.title')}${totalTasks > 0 ? ` · ${totalTasks}` : ''}
         </span>
-        <button type="button" class="og-slab" onClick=${() => setShowCreate(!showCreate)} aria-expanded=${showCreate}>
+        <button type="button" class="poster-slab" onClick=${() => setShowCreate(!showCreate)} aria-expanded=${showCreate}>
           ${t('profile.agents.tasks.newTask')}
         </button>
       </div>
@@ -299,25 +318,25 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
           onChange=${e => handleSaveConcurrency(e.target.value)}
         />
         <span>${tOr('profile.agents.tasks.concurrency.runsAfter', 'task at a time.')}</span>
-        <span class="agt-hint">${t('profile.agents.tasks.concurrency.hint')}</span>
+        <span class="poster-hint">${t('profile.agents.tasks.concurrency.hint')}</span>
       </div>
 
       ${showCreate && html`
         <${TaskCreateForm} agentName=${agentName} showToast=${showToast} onCreated=${handleCreated} onCancel=${() => setShowCreate(false)} />
       `}
 
-      ${error && html`<div class="agt-empty">${error}</div>`}
+      ${error && html`<div class="poster-quiet agt-empty">${error}</div>`}
 
       <div class="agt-filters">
         ${BUCKETS.map(b => html`
           <button type="button" key=${b}
-                  class=${`og-door ${bucket === b ? 'on' : ''}`}
+                  class=${`poster-tab ${bucket === b ? 'is-on' : ''}`}
                   onClick=${() => setBucket(b)}>
-            ${t(`profile.agents.tasks.bucket.${b}`)}<em>${counts[b] ?? 0}</em>
+            ${t(`profile.agents.tasks.bucket.${b}`)}<span class="poster-count poster-count--tally">${counts[b] ?? 0}</span>
           </button>
         `)}
         <button type="button"
-                class=${`og-door og-door--quiet agt-find ${searchOpen ? 'on' : ''}`}
+                class=${`poster-tab poster-tab--fold agt-find ${searchOpen ? 'is-on' : ''}`}
                 onClick=${() => setSearchOpen(o => !o)}
                 aria-pressed=${searchOpen}>
           ${tOr('profile.agents.tasks.search.toggle', 'Find a task by its name or id')}
@@ -325,14 +344,14 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
       </div>
 
       ${searchOpen && html`
-        <div class="agt-search">
-          <input class="og-input agt-search-input" type="search"
+        <div class="search-line agt-search">
+          <input class="og-input" type="search"
                  placeholder=${t('profile.agents.tasks.search.placeholder')}
                  value=${q} onInput=${e => setQ(e.target.value)} />
           <div class="agt-chips">
             ${TIME_CHIPS.map(c => html`
               <button type="button" key=${c}
-                      class=${`og-chip ${timeChip === c ? 'og-chip--sun' : ''}`}
+                      class=${`poster-tab poster-tab--filter ${timeChip === c ? 'is-on' : ''}`}
                       onClick=${() => setTimeChip(c)}>
                 ${t(`profile.agents.tasks.search.time.${c}`)}
               </button>
@@ -341,11 +360,15 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
         </div>
       `}
 
-      ${tasks.length > 0 ? tasks.map(task => html`
-        <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks}
-          autoOpen=${task.id === openTaskId ? openTaskNonce : 0} />
-      `) : html`
-        <div class="agt-empty">${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}</div>
+      ${tasks.length > 0 ? html`
+        <div class="listing listing--name-count-when-state listing--cols">
+          ${tasks.map(task => html`
+            <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks}
+              autoOpen=${task.id === openTaskId ? openTaskNonce : 0} />
+          `)}
+        </div>
+      ` : html`
+        <div class="poster-quiet agt-empty">${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}</div>
       `}
     </div>
   `;

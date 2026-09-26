@@ -5,6 +5,36 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   v1.35.0 -- 2026-09-26 -- A stored value is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v1.34.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.33.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.32.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.31.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.30.0 -- 2026-09-26 -- The shared tags, memory areas, knowledge packages and skills are the Listing, a stored key the folded row (og-fold--event), a unification: the look most tabs use.
+ *   v1.29.0 -- 2026-09-26 -- A crew member's and a task's place (agents[0], tasks[0]), a tool's id and a tag's memory prefix are the inline code (.code-inline), a unification: the look most tabs use for an identifier.
+ *   v1.28.0 -- 2026-09-25 -- The pictures a stored value points at are the image thumbnails (css/components/image-deliverable.css), a unification: the look most tabs use.
+ *   v1.27.0 -- 2026-09-25 -- Every row label is the Row label (.poster-label), a unification: Jouni's decision Row label.
+ *   v1.26.0 -- 2026-09-25 -- Every mark button is the icon button (.poster-icon, its small cut), a unification: Jouni's decision Icon button.
+ *   v1.25.0 -- 2026-09-25 -- Every small number is the Count (.poster-count tally, waiting at the limit), a unification: Jouni's decision Count.
+ *   v1.24.0 -- 2026-09-25 -- Every time a thing happened or runs out is the Timestamp (.poster-time); a place keeps only its layout (a unification: Jouni's decision Timestamp).
+ *   v1.23.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip), a unification: Jouni's decision Tag.
+ *   v1.22.0 -- 2026-09-25 -- A line that says there is nothing (none, and the more under the running tasks) is the quiet sentence (.poster-quiet); a place keeps only its margin (a unification: Jouni's decision Empty line).
+ *   v1.21.0 -- 2026-09-25 -- A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
+ *   v1.20.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.19.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.18.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.17.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.16.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.15.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.14.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.13.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.12.0 — 2026-08-25 — The shared data map was added here and removed again the same day: it
  *     describes an app, and this panel already has the control the owner needs.
@@ -430,7 +460,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   }
 
   if (loading) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
   }
 
   const hasTags = tags.length > 0;
@@ -450,12 +480,12 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   if (!hasTags && !hasAreas && !hasResources && !hasKeys && !addingTag && !addingArea && !addingPackage && !addingKey) {
     return html`
       <div>
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
+        <div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
         <div class="pf-agd-form-actions">
-          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingKey(true)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setAddingKey(true)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
         </div>
         <${ConfirmUI} />
       </div>
@@ -467,229 +497,228 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       <!-- SHARED TAGS -->
       <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
-          ${tags.length === 0 && !addingTag && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
+          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
+          ${tags.length === 0 && !addingTag && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
+          <button class="poster-action poster-action--small" onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
         </div>
         ${addingTag && html`
           <div class="pf-agd-form-field pf-agd-tag-input-row">
-            <input type="text" value=${newTag} onInput=${(e) => setNewTag(e.target.value)}
+            <input class="og-input" type="text" value=${newTag} onInput=${(e) => setNewTag(e.target.value)}
                    placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
                    onKeyDown=${(e) => e.key === 'Enter' && handleAddTag()} />
-            <button class="btn-primary btn-sm" onClick=${handleAddTag}>${t('common.add')}</button>
+            <button class="poster-slab poster-slab--control" onClick=${handleAddTag}>${t('common.add')}</button>
           </div>
         `}
-        ${tags.map(tag => {
+        ${tags.length > 0 && html`<div class="listing listing--cols listing--name-desc-doors">${tags.map(tag => {
           const shared = getSharedWith(tag);
           return html`
-            <div key=${tag} class="pf-agd-tag-row">
-              <span class="pf-agd-tag-name">[${tag}]</span>
-              <span class="pf-agd-tag-prefix">agents.tag.${tag}.*</span>
-              <span class="pf-agd-tag-sharing">
+            <div key=${tag} class="listing-row">
+              <div class="listing-name"><span class="poster-chip">[${tag}]</span></div>
+              <div class="listing-desc"><code class="code-inline pf-agd-tag-prefix">agents.tag.${tag}.*</code>
                 ${shared.length > 0
                   ? `${t('profile.agents.detail.data_access.with')}: ${shared.map(a => a.name).join(', ')}`
                   : t('profile.agents.detail.data_access.onlyYou')}
-              </span>
-              <button class="pf-agd-remove-btn" onClick=${() => handleRemoveTag(tag)}>x</button>
+              </div>
+              <div class="listing-doors"><button class="poster-icon poster-icon--small" onClick=${() => handleRemoveTag(tag)}>x</button></div>
             </div>
           `;
-        })}
-        ${(tags.length > 0 || addingTag) && html`<div class="pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>`}
+        })}</div>`}
+        ${(tags.length > 0 || addingTag) && html`<div class="poster-hint pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>`}
       </div>
 
 
       <!-- MEMORY AREAS -->
       <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
-          ${!hasAreas && !addingArea && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
+          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
+          ${!hasAreas && !addingArea && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
+          <button class="poster-action poster-action--small" onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
         </div>
         ${addingArea && html`
           <div class="pf-agd-area-form">
-            <input type="text" value=${newAreaKey} onInput=${(e) => setNewAreaKey(e.target.value)}
+            <input class="og-input" type="text" value=${newAreaKey} onInput=${(e) => setNewAreaKey(e.target.value)}
                    placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
-            <input type="text" value=${newAreaDesc} onInput=${(e) => setNewAreaDesc(e.target.value)}
+            <input class="og-input" type="text" value=${newAreaDesc} onInput=${(e) => setNewAreaDesc(e.target.value)}
                    placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
-            <select value=${newAreaPerm} onChange=${(e) => setNewAreaPerm(e.target.value)}>
+            <select class="select-field" value=${newAreaPerm} onChange=${(e) => setNewAreaPerm(e.target.value)}>
               <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
               <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
             </select>
-            <button class="btn-primary btn-sm" onClick=${handleAddArea}>${t('profile.agents.detail.data_access.addArea')}</button>
-            <button class="btn-outline btn-sm" onClick=${() => setAddingArea(false)}>${t('common.cancel')}</button>
+            <button class="poster-slab poster-slab--control" onClick=${handleAddArea}>${t('profile.agents.detail.data_access.addArea')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => setAddingArea(false)}>${t('common.cancel')}</button>
           </div>
         `}
-        ${hasAreas ? memoryAreas.map((area, idx) => (
+        ${hasAreas ? html`<div class="listing listing--cols listing--name-desc-state-doors">${memoryAreas.map((area, idx) => (
           editingAreaIdx === idx ? html`
-            <div key=${'edit-' + idx} class="pf-agd-area-form">
-              <input type="text" value=${editAreaKey} onInput=${(e) => setEditAreaKey(e.target.value)}
+            <div key=${'edit-' + idx} class="listing-row is-open"><div class="listing-open poster-box poster-box--raised"><div class="pf-agd-area-form">
+              <input class="og-input" type="text" value=${editAreaKey} onInput=${(e) => setEditAreaKey(e.target.value)}
                      placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
-              <input type="text" value=${editAreaDesc} onInput=${(e) => setEditAreaDesc(e.target.value)}
+              <input class="og-input" type="text" value=${editAreaDesc} onInput=${(e) => setEditAreaDesc(e.target.value)}
                      placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
-              <select value=${editAreaPerm} onChange=${(e) => setEditAreaPerm(e.target.value)}>
+              <select class="select-field" value=${editAreaPerm} onChange=${(e) => setEditAreaPerm(e.target.value)}>
                 <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
                 <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
               </select>
-              <button class="btn-primary btn-sm" onClick=${() => handleSaveArea(idx)}>${t('common.save')}</button>
-              <button class="btn-outline btn-sm" onClick=${cancelEditArea}>${t('common.cancel')}</button>
-            </div>
+              <button class="poster-slab poster-slab--control" onClick=${() => handleSaveArea(idx)}>${t('common.save')}</button>
+              <button class="poster-action poster-action--small" onClick=${cancelEditArea}>${t('common.cancel')}</button>
+            </div></div></div>
           ` : html`
-            <div key=${area.key_prefix || area.key || idx} class="pf-agd-area-row">
-              <span class="pf-agd-area-key">${area.key_prefix || area.key || area}</span>
-              <span class="pf-agd-area-desc">${area.description || ''}</span>
-              <span class="pf-agd-area-perm ${area.access === 'read' ? 'pf-agd-area-perm--ro' : 'pf-agd-area-perm--rw'}">
+            <div key=${area.key_prefix || area.key || idx} class="listing-row">
+              <div class="listing-name">${area.key_prefix || area.key || area}</div>
+              <div class="listing-desc">${area.description || ''}</div>
+              <div><span class="poster-chip">
                 ${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}
-              </span>
-              <span class="pf-agd-area-actions">
-                <button class="btn-ghost btn-sm" onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}</button>
-                <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}</button>
-              </span>
+              </span></div>
+              <div class="listing-doors">
+                <button class="poster-action poster-action--small poster-action--row" onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}</button>
+                <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}</button>
+              </div>
             </div>
           `
-        )) : null}
+        ))}</div>` : null}
       </div>
 
       <!-- KNOWLEDGE PACKAGES -->
       <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
-          ${!hasResources && !addingPackage && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
+          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
+          ${!hasResources && !addingPackage && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
+          <button class="poster-action poster-action--small" onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
         </div>
         ${addingPackage && html`
           <div class="pf-agd-area-form">
-            <input type="text" value=${newPkgName} onInput=${(e) => setNewPkgName(e.target.value)}
+            <input class="og-input" type="text" value=${newPkgName} onInput=${(e) => setNewPkgName(e.target.value)}
                    placeholder=${t('profile.agents.detail.data_access.packageNamePlaceholder')} />
-            <input type="text" value=${newPkgDesc} onInput=${(e) => setNewPkgDesc(e.target.value)}
+            <input class="og-input" type="text" value=${newPkgDesc} onInput=${(e) => setNewPkgDesc(e.target.value)}
                    placeholder=${t('profile.agents.detail.data_access.packageDescPlaceholder')} />
-            <button class="btn-primary btn-sm" onClick=${handleLinkPackage}>${t('profile.agents.detail.data_access.linkPackage')}</button>
-            <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(false)}>${t('common.cancel')}</button>
+            <button class="poster-slab poster-slab--control" onClick=${handleLinkPackage}>${t('profile.agents.detail.data_access.linkPackage')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => setAddingPackage(false)}>${t('common.cancel')}</button>
           </div>
         `}
-        ${hasResources ? resources.map(res => html`
-          <div key=${res.url || res.name || res} class="pf-agd-area-row">
-            <span class="pf-agd-area-key">${res.name || res.url || res}</span>
-            <span class="pf-agd-area-desc">${res.description || ''}</span>
-            ${(res.documentCount || res.count) ? html`<span class="pf-agd-package-count">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}</span>` : ''}
+        ${hasResources ? html`<div class="listing listing--cols listing--name-desc-doors">${resources.map(res => html`
+          <div key=${res.url || res.name || res} class="listing-row">
+            <div class="listing-name">${res.name || res.url || res}</div>
+            <div class="listing-desc">${res.description || ''}</div>
+            <div class="listing-doors">${(res.documentCount || res.count) ? html`<span class="poster-count poster-count--tally">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}</span>` : ''}</div>
           </div>
-        `) : null}
+        `)}</div>` : null}
       </div>
 
       <!-- SKILLS (registry refs — distinct from knowledge packages) -->
       <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.skillsTitle')}</span>
-          ${skillLinks.length === 0 && !addingSkill && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${openSkillPicker}>+ ${t('profile.agents.detail.data_access.linkSkill')}</button>
+          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.skillsTitle')}</span>
+          ${skillLinks.length === 0 && !addingSkill && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
+          <button class="poster-action poster-action--small" onClick=${openSkillPicker}>+ ${t('profile.agents.detail.data_access.linkSkill')}</button>
         </div>
         ${addingSkill && html`
           <div class="pf-agd-area-form">
-            ${skillLibrary === null ? html`<span>${t('common.loading') || '...'}</span>` : html`
-              <select value=${selectedSkillRef} onChange=${(e) => setSelectedSkillRef(e.target.value)}>
+            ${skillLibrary === null ? html`<span class="poster-quiet loading-mark">${t('common.loading') || '...'}</span>` : html`
+              <select class="select-field" value=${selectedSkillRef} onChange=${(e) => setSelectedSkillRef(e.target.value)}>
                 ${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? []), ...(skillLibrary.workspace ?? [])]
                   .filter(s => !skillLinks.some(l => l.ref === s.ref))
                   .map(s => html`<option key=${s.ref} value=${s.ref}>${s.name} (${s.scope}) — ${s.description.slice(0, 60)}</option>`)}
               </select>
-              <button class="btn-primary btn-sm" disabled=${!selectedSkillRef} onClick=${handleLinkSkill}>${t('profile.agents.detail.data_access.linkSkill')}</button>
+              <button class="poster-slab poster-slab--control" disabled=${!selectedSkillRef} onClick=${handleLinkSkill}>${t('profile.agents.detail.data_access.linkSkill')}</button>
             `}
-            <button class="btn-outline btn-sm" onClick=${() => setAddingSkill(false)}>${t('common.cancel')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => setAddingSkill(false)}>${t('common.cancel')}</button>
           </div>
         `}
-        ${skillLinks.map(link => html`
-          <div key=${link.ref} class="pf-agd-area-row">
-            <span class="pf-agd-area-key">${link.name}</span>
-            <span class="pf-agd-area-desc">${link.description || link.ref}</span>
-            <span class="pf-agd-area-actions">
-              <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}</button>
-            </span>
+        ${skillLinks.length > 0 && html`<div class="listing listing--cols listing--name-desc-doors">${skillLinks.map(link => html`
+          <div key=${link.ref} class="listing-row">
+            <div class="listing-name">${link.name}</div>
+            <div class="listing-desc">${link.description || link.ref}</div>
+            <div class="listing-doors">
+              <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}</button>
+            </div>
           </div>
-        `)}
-        ${skillLinks.length > 0 && html`<div class="pf-agd-help-text">${t('profile.agents.detail.data_access.skillsHelp')}</div>`}
+        `)}</div>`}
+        ${skillLinks.length > 0 && html`<div class="poster-hint pf-agd-help-text">${t('profile.agents.detail.data_access.skillsHelp')}</div>`}
       </div>
 
       <!-- STORED MEMORY KEYS -->
       <div class="pf-agd-data-section pf-agd-card pf-agd-card--full poster-row--thing">
           <div class="pf-agd-section-header">
-            <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
-            ${!hasKeys && !addingKey && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
+            <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
+            ${!hasKeys && !addingKey && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
             <div class="pf-agd-keys-controls">
               ${hasKeys && html`
-                <label class="pf-agd-sort-label">${t('profile.agents.detail.data_access.sortBy')}</label>
-                <select class="pf-agd-sort-select" value=${keySortField} onChange=${(e) => setKeySortField(e.target.value)}>
+                <label class="poster-label">${t('profile.agents.detail.data_access.sortBy')}</label>
+                <select class="select-field" value=${keySortField} onChange=${(e) => setKeySortField(e.target.value)}>
                   <option value="updated">${t('profile.agents.detail.data_access.sortUpdated')}</option>
                   <option value="created">${t('profile.agents.detail.data_access.sortCreated')}</option>
                 </select>
-                <button class="pf-agd-sort-dir" title=${keySortDir === 'desc' ? t('profile.agents.detail.data_access.sortNewestFirst') : t('profile.agents.detail.data_access.sortOldestFirst')}
+                <button class="poster-icon poster-icon--small" title=${keySortDir === 'desc' ? t('profile.agents.detail.data_access.sortNewestFirst') : t('profile.agents.detail.data_access.sortOldestFirst')}
                         onClick=${() => setKeySortDir(keySortDir === 'desc' ? 'asc' : 'desc')}>
                   ${keySortDir === 'desc' ? '↓' : '↑'}
                 </button>
               `}
-              <button class="btn-outline btn-sm" onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
+              <button class="poster-action poster-action--small" onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
             </div>
           </div>
           ${addingKey && html`
             <div class="pf-agd-area-form pf-agd-keyadd-form">
-              <input type="text" value=${newKeyName} onInput=${(e) => setNewKeyName(e.target.value)}
+              <input class="og-input" type="text" value=${newKeyName} onInput=${(e) => setNewKeyName(e.target.value)}
                      placeholder=${t('profile.agents.detail.data_access.keyNamePlaceholder')} />
-              <select value=${newKeyVis} onChange=${(e) => setNewKeyVis(e.target.value)}>
+              <select class="select-field" value=${newKeyVis} onChange=${(e) => setNewKeyVis(e.target.value)}>
                 <option value="private">private</option>
                 <option value="owner">owner</option>
                 <option value="public">public</option>
               </select>
-              <textarea class="pf-agd-memory-edit" value=${newKeyValue}
+              <textarea class="og-textarea pf-agd-memory-edit" value=${newKeyValue}
                         onInput=${(e) => setNewKeyValue(e.target.value)}
                         placeholder=${t('profile.agents.detail.data_access.keyValuePlaceholder')}
                         disabled=${creatingKey}></textarea>
               <div class="pf-agd-memory-actions">
-                <button class="btn-primary btn-sm" disabled=${creatingKey || !newKeyName.trim()} onClick=${handleCreateKey}>
+                <button class="poster-slab poster-slab--control" disabled=${creatingKey || !newKeyName.trim()} onClick=${handleCreateKey}>
                   ${creatingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
                 </button>
-                <button class="btn-outline btn-sm" disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}</button>
+                <button class="poster-action poster-action--small" disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}</button>
               </div>
             </div>
           `}
           ${sortedKeys.map(mk => html`
             <div key=${mk.key}>
-              <div class="pf-agd-area-row pf-agd-area-row--clickable" onClick=${() => toggleExpandKey(mk)}>
-                <span class="pf-agd-expand-icon">${expandedKey === mk.key ? '▼' : '▶'}</span>
-                <span class="pf-agd-area-key">${mk.key}</span>
-                <span class="pf-agd-key-meta">
+              <button type="button" class="og-fold og-fold--event" aria-expanded=${expandedKey === mk.key} onClick=${() => toggleExpandKey(mk)}>
+                <b class="pf-agd-key-name">${mk.key}</b>
+                <span class="poster-time pf-agd-key-meta">
                   ${mk.createdAt ? html`<span title=${fmtDateTime(mk.createdAt)}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}</span>` : ''}
                   ${mk.updatedAt ? html`<span title=${fmtDateTime(mk.updatedAt)}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}</span>` : ''}
                 </span>
-                <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
-              </div>
+                <span class="poster-chip">${mk.visibility}</span>
+                <span class="og-fold-arrow">${expandedKey === mk.key ? '↓' : '→'}</span>
+              </button>
               ${expandedKey === mk.key && html`
                 <div class="pf-agd-memory-detail">
                   ${editingKey === mk.key ? html`
-                    <textarea class="pf-agd-memory-edit" value=${editValue}
+                    <textarea class="og-textarea pf-agd-memory-edit" value=${editValue}
                               onInput=${(e) => setEditValue(e.target.value)}
                               disabled=${savingKey}></textarea>
                     <div class="pf-agd-memory-actions">
-                      <button class="btn-primary btn-sm" disabled=${savingKey} onClick=${() => handleSaveKey(mk)}>
+                      <button class="poster-slab poster-slab--control" disabled=${savingKey} onClick=${() => handleSaveKey(mk)}>
                         ${savingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
                       </button>
-                      <button class="btn-outline btn-sm" disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}</button>
+                      <button class="poster-action poster-action--small" disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}</button>
                     </div>
                   ` : html`
                     ${(() => {
                       const imgs = extractImageUrls(expandedValue);
                       return imgs.length ? html`
-                        <div class="pf-agd-memory-imgs">
+                        <div class="imgd-strip">
                           ${imgs.map(u => html`
                             <a key=${u} href=${u} target="_blank" rel="noopener noreferrer"
-                               class="pf-agd-memory-img-link" title=${t('profile.agents.detail.data_access.openImageFull')}>
-                              <img class="pf-agd-memory-img" src=${u} loading="lazy"
+                               class="imgd" title=${t('profile.agents.detail.data_access.openImageFull')}>
+                              <img class="imgd-thumb" src=${u} loading="lazy"
                                    alt=${t('profile.agents.detail.data_access.imagePreviewAlt')} />
                             </a>
                           `)}
                         </div>
                       ` : null;
                     })()}
-                    <pre class="pf-agd-memory-preview">${expandedValue}</pre>
+                    <pre class="code-block pf-agd-memory-preview">${expandedValue}</pre>
                     <div class="pf-agd-memory-actions">
-                      <button class="btn-ghost btn-sm" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}</button>
-                      <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}</button>
+                      <button class="poster-action poster-action--small" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}</button>
+                      <button class="poster-action poster-action--small poster-action--danger" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}</button>
                     </div>
                   `}
                 </div>
@@ -699,11 +728,11 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- EFFECTIVE SCOPE SUMMARY -->
-      <div class="pf-agd-scope-summary pf-agd-card--full">
+      <div class="pf-agd-scope-summary poster-box pf-agd-card--full">
         ${t('profile.agents.detail.data_access.effectiveScope')}:\n${
           [...memoryAreas.map(a => a.key_prefix || a.key || a), ...tags.map(tag => `agents.tag.${tag}.*`), 'agents.shared.index'].join(', ')
         }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
-        <div class="pf-agd-scope-footer">${t('profile.agents.detail.data_access.scopeFooter')}</div>
+        <div class="poster-hint pf-agd-scope-footer">${t('profile.agents.detail.data_access.scopeFooter')}</div>
       </div>
 
       <${ConfirmUI} />

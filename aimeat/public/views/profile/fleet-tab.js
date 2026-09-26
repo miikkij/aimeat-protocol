@@ -23,6 +23,8 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   v1.2.0 — 2026-09-25 — The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
+ *   2026-09-25 — The page head is the kit's crumb trail and page head (.og-crumb, .og-mast), the look most tabs use (a unification).
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-09-05 — The agent defaults (the rules every agent carries, the token budget) sit
  *     at the foot of this page. They lived on the Access page, which is about who holds a key to
@@ -41,8 +43,13 @@ import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
 export default function FleetTab({ session, showToast }) {
   return html`
     <div class="pf-fleet-tab">
-      <h2 class="poster-page-title">${t('profile.tabs.fleet')}</h2>
-      <p class="section-desc">${t('fleet.desc')}</p>
+      <div class="og mb-1">
+        <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAutomation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.fleet')}</span></div>
+        <div class="og-mast"><div class="og-mast-words">
+          <h2 class="og-title poster-page-title">${t('profile.tabs.fleet')}</h2>
+          <p class="og-desc">${t('fleet.desc')}</p>
+        </div></div>
+      </div>
 
       ${/* THE STARTER CARD IS A SLOT, NOT A HEADER. It sat above the fleet at first, and on a
             1280x460 screen the whole first view was an invitation to create MORE agents while

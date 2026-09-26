@@ -16,6 +16,23 @@
  * @structure PasskeysSection({ passkeysAvailable, showToast, onChanged })
  * @usage html`<${PasskeysSection} passkeysAvailable=${true} ... />`
  * @version-history
+ *   v1.10.0 -- 2026-09-26 -- The line under a passkey's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.9.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.8.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.6.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.5.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
@@ -30,6 +47,7 @@ import * as securityService from '/js/services/security.js';
 import { passkeySupported, addPasskey } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { Hint } from '/components/Hint.js';
 
 /** What the device is, in the person's words rather than the protocol's. */
 function whereItLives(p) {
@@ -101,26 +119,26 @@ export function PasskeysSection({ showToast }) {
   }
 
   return html`
-    <h3 class="card-h3 mt-section">${t('profile.security.passkeys.title')}</h3>
-    <p class="text-caption mb-1">${t('profile.security.passkeys.desc')}</p>
+    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.passkeys.title')}</h3>
+    <p class="poster-hint mb-1">${t('profile.security.passkeys.desc')}</p>
     <div class="card poster-row--thing">
       ${state.count === 0
-        ? html`<p class="text-caption mb-half">${t('profile.security.passkeys.none')}</p>`
+        ? html`<p class="poster-quiet mb-half">${t('profile.security.passkeys.none')}</p>`
         : html`
           <div class="pf-2fa-devices mb-1">
             ${state.passkeys.map(p => html`
-              <div class="pf-2fa-device" key=${p.id}>
+              <div class="pf-2fa-device poster-box" key=${p.id}>
                 <div class="pf-flex-fill">
                   ${renaming === p.id
                     ? html`<div class="flex-row">
-                        <input class="input-field" maxlength="80" value=${renameValue}
+                        <input class="og-input" maxlength="80" value=${renameValue}
                           onInput=${e => setRenameValue(e.target.value)}
                           onKeyDown=${e => { if (e.key === 'Enter') saveName(p.id); }} />
-                        <button class="btn-primary btn-sm" onClick=${() => saveName(p.id)}>${t('profile.security.save')}</button>
-                        <button class="btn-ghost btn-sm" onClick=${() => setRenaming(null)}>${t('profile.cancel')}</button>
+                        <button class="poster-slab poster-slab--control" onClick=${() => saveName(p.id)}>${t('profile.security.save')}</button>
+                        <button class="poster-action poster-action--small" onClick=${() => setRenaming(null)}>${t('profile.cancel')}</button>
                       </div>`
                     : html`<span class="pf-bold">${escHtml(p.label)}</span>`}
-                  <div class="text-caption">
+                  <div class="listing-meta">
                     ${whereItLives(p)}
                     ${' · '}
                     ${p.last_used_at
@@ -130,10 +148,10 @@ export function PasskeysSection({ showToast }) {
                 </div>
                 ${renaming !== p.id && html`
                   <div class="flex-row">
-                    <button class="btn-ghost btn-sm" onClick=${() => { setRenaming(p.id); setRenameValue(p.label); }}>
+                    <button class="poster-action poster-action--small" onClick=${() => { setRenaming(p.id); setRenameValue(p.label); }}>
                       ${t('profile.security.passkeys.rename')}
                     </button>
-                    <button class="btn-danger-solid btn-sm" onClick=${() => removeDevice(p)}>
+                    <button class="poster-action poster-action--small poster-action--danger" onClick=${() => removeDevice(p)}>
                       ${t('profile.security.passkeys.remove')}
                     </button>
                   </div>
@@ -145,12 +163,12 @@ export function PasskeysSection({ showToast }) {
 
       ${supported
         ? html`
-          <button class="btn-primary" disabled=${busy} onClick=${addThisDevice}>
+          <button class="poster-slab poster-slab--control" disabled=${busy} onClick=${addThisDevice}>
             ${busy ? t('profile.security.twoFactor.working') : t('profile.security.passkeys.addThisDevice')}
           </button>
-          <p class="text-caption mt-xs">${t('profile.security.passkeys.stillHavePassword')}</p>
+          <p class="poster-hint mt-xs">${t('profile.security.passkeys.stillHavePassword')}</p>
         `
-        : html`<p class="text-caption">${t('profile.security.passkeys.unsupported')}</p>`}
+        : html`<${Hint}>${t('profile.security.passkeys.unsupported')}<//>`}
     </div>
     <${ConfirmUI} />
   `;

@@ -10,6 +10,31 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.21.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v3.20.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v3.19.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v3.18.0 -- 2026-09-26 -- A sentence that says what the part below is for is the lead (.og-lead): the ecosystem app's value line, the AI transparency's unlabelled line, the compliance card's undocumented note; their own rules go (a unification: the look most tabs use).
+ *   v3.17.0 -- 2026-09-26 -- The connected apps and the waiting requests are the Listing (css/components/listing.css): an app's name, who it acts for, its state, last seen and the open mark in a row, an opened app the Listing's open panel; the card, its head, caret, name and body rules go (a unification: the look most tabs use).
+ *   v3.16.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v3.15.0 -- 2026-09-25 -- A node's agents, the CORS chain, the ecosystem's identifiers and its pairing code are inline code (.code-inline); their own mono looks go (a unification: the look most tabs use).
+ *   v3.14.0 -- 2026-09-25 -- The last lines that say nothing is there are the quiet sentence (.poster-quiet); the ecosystem's empty frame goes, its second line is the Hint (Jouni's decision "Empty line", a unification).
+ *   v3.13.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v3.13.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v3.12.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v3.11.0 -- 2026-09-25 -- The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
+ *   v3.10.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
+ *   v3.9.0 -- 2026-09-25 -- The page head is the kit's crumb trail and page head (.og-crumb, .og-mast, .og-title, .og-desc), the look most tabs use (a unification).
+ *   v3.8.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v3.7.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v3.6.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v3.5.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v3.4.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v3.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   2026-09-13 — The revoke dialog's actions sit in its footer.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -124,13 +149,18 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
-import { Spinner } from './shared.js';
+import { LoadingLine } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
 import { ECO_PRESETS } from './ecosystem-tab.helpers.js';
 import { EcoAutomationSection } from './ecosystem-tab.automation.js';
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
 import { swallowed } from '/js/swallowed.js';
+import { Hint } from '/components/Hint.js';
 
+/** An app's state as a Status: approved is fine, waiting needs a look, revoked is danger. */
+const appStatusClass = (s) => `poster-status poster-status--${['active', 'approved'].includes(s) ? 'fine' : ['pending', 'validating'].includes(s) ? 'attention' : s === 'revoked' ? 'danger' : 'off'}`;
+/** A validation's result as a Status: passed is fine, failed is danger, the rest is off. */
+const validationClass = (v) => `poster-status poster-status--${v === 'validated' ? 'fine' : v === 'failed' ? 'danger' : 'off'}`;
 
 export default function EcosystemTab({ onStats, showToast }) {
   const [apps, setApps] = useState([]);
@@ -229,71 +259,72 @@ export default function EcosystemTab({ onStats, showToast }) {
     catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.subError'), 'error'); }
   }
 
-  if (loading) return html`<div class="pf-eco"><${Spinner} /></div>`;
+  if (loading) return html`<div class="pf-eco"><${LoadingLine} /></div>`;
 
   return html`
     <div class="pf-eco">
-      <div class="pf-eco-head">
-        <h3 class="poster-page-title">
-          ${t('profile.ecosystem.title')} <span class="pf-eco-count-badge">${apps.length}</span>
-        </h3>
+      <div class="og mb-1">
+        <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAutomation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.ecosystem')}</span></div>
+        <div class="og-mast"><div class="og-mast-words">
+          <h3 class="og-title poster-page-title">
+            ${t('profile.ecosystem.title')}<small><span class="poster-count poster-count--tally">${apps.length}</span></small>
+          </h3>
+          <p class="og-desc">${t('profile.ecosystem.desc')}</p>
+        </div></div>
       </div>
-      <p class="section-desc">${t('profile.ecosystem.desc')}</p>
 
       ${pending.length > 0 && html`
-        <div class="pf-eco-pending">
-          <div class="pf-eco-pending-title">${t('profile.ecosystem.pendingTitle')}</div>
-          <p class="pf-eco-dim pf-eco-pending-hint">${t('profile.ecosystem.pendingHint')}</p>
-          ${pending.map(r => html`
-            <div class="pf-eco-pending-row" key=${r.user_code}>
-              <div class="pf-eco-pending-info">
-                <strong>${r.display_name || r.app}</strong>
-                ${r.user_code && html`<span class="pf-eco-pending-code">${t('profile.ecosystem.pendingCode')} <strong>${r.user_code}</strong></span>`}
-                <span class="pf-eco-mono">eco:${r.app}</span>
-                <span class="pf-eco-pill">${t('profile.ecosystem.waiting')}</span>
+        <div class="pf-eco-pending poster-aside poster-aside--small">
+          <div class="pf-eco-pending-title sub-heading">${t('profile.ecosystem.pendingTitle')}</div>
+          <${Hint}>${t('profile.ecosystem.pendingHint')}<//>
+          <div class="listing listing--name-desc-doors">${pending.map(r => html`
+            <div class="listing-row" key=${r.user_code}>
+              <div class="listing-name">${r.display_name || r.app}</div>
+              <div class="listing-desc">
+                ${r.user_code && html`<span>${t('profile.ecosystem.pendingCode')} <strong class="code-inline">${r.user_code}</strong></span>`}
+                <span class="code-inline">eco:${r.app}</span>
+                <span class="poster-status poster-status--attention">${t('profile.ecosystem.waiting')}</span>
                 ${r.validation && r.validation !== 'none' && html`
-                  <span class="pf-eco-valid pf-eco-valid-${r.validation}"
+                  <span class=${`${validationClass(r.validation)} pf-eco-valid`}
                     title=${(r.validation_checks || []).filter(c => !c.ok).map(c => `${c.name}: ${c.detail || ''}`).join('; ')}>
                     ${t(`profile.ecosystem.validation.${r.validation}`)}
                   </span>`}
                 <span class="pf-eco-dim">${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}</span>
               </div>
-              <div class="pf-eco-pending-grant">
-                <label class="pf-eco-dim">${t('profile.ecosystem.grantLevel')}</label>
-                <select class="pf-eco-select" onChange=${e => setPresetByCode(p => ({ ...p, [r.user_code]: e.target.value }))}>
+              <div class="listing-doors">
+                <label class="poster-label">${t('profile.ecosystem.grantLevel')}</label>
+                <select class="select-field" onChange=${e => setPresetByCode(p => ({ ...p, [r.user_code]: e.target.value }))}>
                   <option value="standard" selected>${t('profile.ecosystem.presetStandard')}</option>
                   <option value="readonly">${t('profile.ecosystem.presetReadonly')}</option>
                   <option value="full">${t('profile.ecosystem.presetFull')}</option>
                 </select>
-                <button class="btn-success btn-sm" disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}</button>
-                <button class="btn-ghost btn-sm" onClick=${() => onDeny(r.user_code)}>${t('profile.ecosystem.deny')}</button>
+                <button class="poster-action poster-action--small poster-action--row" disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}</button>
+                <button class="poster-action poster-action--small poster-action--row" onClick=${() => onDeny(r.user_code)}>${t('profile.ecosystem.deny')}</button>
               </div>
-            </div>`)}
+            </div>`)}</div>
         </div>`}
 
       ${apps.length === 0
         ? html`<div class="pf-eco-empty">
-            <p>${t('profile.ecosystem.empty')}</p>
-            <p class="pf-eco-empty-note">${t('profile.ecosystem.connectNote')}</p>
+            <p class="poster-quiet">${t('profile.ecosystem.empty')}</p>
+            <p class="poster-hint">${t('profile.ecosystem.connectNote')}</p>
           </div>`
-        : apps.map(app => {
+        : html`<div class="listing listing--name-desc-doors">${apps.map(app => {
           const isOpen = expanded === app.geai;
           const appSubs = subs.filter(s => s.geai === app.geai);
           return html`
-            <div class="pf-eco-card ${app.status === 'revoked' ? 'pf-eco-card-revoked' : ''}" key=${app.geai}>
-              <div class="pf-eco-card-head" onClick=${() => toggleCard(app)}>
-                <span class="pf-eco-caret">${isOpen ? '▼' : '▶'}</span>
-                <span class="pf-eco-icon">🔌</span>
-                <span class="pf-eco-head-title">
-                  <strong class="pf-eco-name">${app.display_name || app.app}</strong>
-                  ${app.owner && html`<span class="pf-eco-dim pf-eco-head-owner">${t('profile.ecosystem.connectedAsYou', { owner: app.owner })}</span>`}
-                </span>
-                <span class="pf-eco-status pf-eco-status-${app.status}">${t(`profile.ecosystem.status.${app.status}`)}</span>
-                <span class="pf-eco-dim pf-eco-lastseen">${app.last_seen ? timeAgo(app.last_seen) : ''}</span>
+            <div class=${`listing-row pf-eco-row ${isOpen ? 'is-open' : ''} ${app.status === 'revoked' ? 'pf-eco-card-revoked' : ''}`} key=${app.geai}
+              onClick=${(e) => { if (!e.target.closest?.('.listing-open')) toggleCard(app); }}>
+              <div class="listing-name"><span class="pf-eco-icon">🔌</span> ${app.display_name || app.app}</div>
+              <div class="listing-desc">${app.owner ? t('profile.ecosystem.connectedAsYou', { owner: app.owner }) : ''}</div>
+              <div class="listing-doors">
+                <span class=${appStatusClass(app.status)}>${t(`profile.ecosystem.status.${app.status}`)}</span>
+                <span class="poster-time">${app.last_seen ? timeAgo(app.last_seen) : ''}</span>
+                <button type="button" class="poster-icon poster-icon--small">${isOpen ? '▼' : '▶'}</button>
               </div>
               ${isOpen && html`
-                <div class="pf-eco-card-body">
-                  <p class="pf-eco-value-line">${t('profile.ecosystem.appValueLine')}</p>
+                <div class="listing-open poster-box poster-box--raised">
+                  <p class="og-lead">${t('profile.ecosystem.appValueLine')}</p>
 
                   ${app.status !== 'revoked' && html`<${EcoSetupGuide} app=${app} />`}
 
@@ -307,9 +338,9 @@ export default function EcosystemTab({ onStats, showToast }) {
                   <div class="pf-eco-section poster-row--thing">
                     <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>
                     ${appData[app.geai] === undefined
-                      ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.dataLoading')}</div>`
+                      ? html`<${LoadingLine} text=${t('profile.ecosystem.dataLoading')} />`
                       : appData[app.geai].length === 0
-                        ? html`<div class="pf-eco-dim">${t('profile.ecosystem.dataEmpty')}</div>`
+                        ? html`<div class="poster-quiet">${t('profile.ecosystem.dataEmpty')}</div>`
                         : html`
                           <div class="pf-eco-data">
                             ${appData[app.geai].map(entry => html`
@@ -320,8 +351,8 @@ export default function EcosystemTab({ onStats, showToast }) {
                   ${app.status !== 'revoked' && html`
                     <div class="pf-eco-section poster-row--thing pf-eco-disconnect">
                       <div class="pf-eco-section-title">${t('profile.ecosystem.disconnectTitle')}</div>
-                      <p class="pf-eco-dim pf-eco-disconnect-hint">${t('profile.ecosystem.disconnectHint')}</p>
-                      <button class="btn-danger-solid btn-sm" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>
+                      <${Hint}>${t('profile.ecosystem.disconnectHint')}<//>
+                      <button class="poster-action poster-action--small poster-action--danger" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>
                         ${t('profile.ecosystem.disconnect')}
                       </button>
                     </div>`}
@@ -331,7 +362,7 @@ export default function EcosystemTab({ onStats, showToast }) {
                     subForm=${subForm} setSubForm=${setSubForm} />
                 </div>`}
             </div>`;
-        })}
+        })}</div>`}
 
       <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
         footer=${html`
@@ -340,7 +371,7 @@ export default function EcosystemTab({ onStats, showToast }) {
             ${t('profile.ecosystem.revoke')}
           </button>`}>
         <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
-        <input class="pf-eco-revoke-input" type="text" value=${revokeInput}
+        <input class="og-input pf-eco-revoke-input" type="text" value=${revokeInput}
           placeholder=${revokeApp || ''} onInput=${e => setRevokeInput(e.target.value)} />
       <//>
     </div>`;

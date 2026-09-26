@@ -6,9 +6,12 @@
  *   phone): a way back, a New button, one row per conversation with a delete, and whatever the page
  *   puts under the list. Its look is css/components/thread-list.css; the catalogue entry is
  *   `thread-list`.
- * @structure ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children })
+ * @structure ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children }) · ThreadPerson({ expanded, onClick, children })
  * @usage html`<${ThreadList} threads=${threads} activeId=${id} onOpen=${…} onNew=${…} onDelete=${…} onClose=${…}>…<//>`
  * @version-history
+ *   v1.2.0 — 2026-09-26 — ThreadPerson, the person tone: a heading over one person's conversations
+ *     that opens and closes them. Messages draws its list as these rows (Jouni's decision
+ *     "Conversation list").
  *   v1.1.0 — 2026-09-24 — Delete (✗) is the small icon button (Jouni's decision "Icon button").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
@@ -55,6 +58,19 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
             ${children}
         </aside>
     `;
+}
+
+/**
+ * The heading over one person's conversations (the person tone): it opens and closes them. The page
+ * gives its words: the arrow, the picture, the name (.poster-thread-person-name), the presence word
+ * and the counts, named.
+ * @param {{ expanded: boolean, onClick: () => void, children?: any }} props
+ */
+export function ThreadPerson({ expanded, onClick, children }) {
+    return html`
+        <button type="button" class="poster-thread-person" aria-expanded=${expanded ? 'true' : 'false'} onClick=${onClick}>
+            ${children}
+        </button>`;
 }
 
 export default ThreadList;

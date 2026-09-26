@@ -1,0 +1,31 @@
+/**
+ * @file search-hits.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One hit in an organism's content search: a row button with the thing's title in bold
+ *   (its workspace or space small beside it) and a grey snippet under it; a rule under each row, the
+ *   words coral under the pointer. Drawn by the organism pages' three searches (across every
+ *   organism, inside one organism, inside one workspace); moved here unchanged with its class names
+ *   (UI consolidation phase 5, a move). The first four rules came from profile.css (the classic
+ *   card), the last three from profile-poster.css (the poster face that sets the card back to a
+ *   ruled row); they keep that order. Both corners read --shape-corner, a box's corner.
+ *   Drawn as markup by views/profile/organisms-tab.js, organisms/panels.js and
+ *   organisms/workspace/overview.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The classic card's 8px corner reads --shape-corner; the poster face's square corner overrides it on the Settings pages (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.0.0 -- 2026-09-25 -- Moved out of profile.css and profile-poster.css (UI consolidation phase 5, a move).
+ */
+
+.pj-search-hit { display: flex; flex-direction: column; gap: 0.15rem; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: var(--shape-corner); padding: 0.5rem 0.7rem; margin: 0.35rem 0; cursor: pointer; }
+.pj-search-hit:hover { border-color: var(--accent); background: var(--bg-dim); }
+.pj-search-hit-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.pj-search-hit-snippet { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* The poster face: one rule per row, the row's own words in bold. */
+.pj-search-hit {
+  background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: var(--shape-corner); box-shadow: none;
+  padding: 0.75rem 0; font-weight: var(--font-poster-text-weight);
+}
+.pj-search-hit:hover { background: none; color: var(--accent); }
+.pj-search-hit-title { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }

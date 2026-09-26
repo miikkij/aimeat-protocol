@@ -7,6 +7,7 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-25 — Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
  *   v1.x — 2026-08-18 — stampShort/stampFull: the list-row stamp that answers WHEN, not just what
  *     time of day. timeShort stays for rows inside an open thread, under their day separators.
  *   v1.6.0 — 2026-08-04 — resolveThreadAttachmentUrls(): cache entries carry a mint timestamp and are
@@ -289,6 +290,10 @@ export function trackStateLabel(state) {
     default: return { text: state || '', tone: 'watch' };
   }
 }
+
+/** A tracked state's tone as a Status: waiting for your approval needs a look, replied is fine, an
+ *  error is danger, still watching is off. */
+export const trackStatusClass = (tone) => `poster-status poster-status--${tone === 'ready' ? 'attention' : tone === 'done' ? 'fine' : tone === 'err' ? 'danger' : 'off'}`;
 
 /** Classify an attachment for rendering: how to view it (thumbnail / native tab / markdown viewer). */
 export const ATTACH_ICO = { image: '🖼', pdf: '📄', markdown: '📄', audio: '🎵', video: '🎬', file: '📎' };

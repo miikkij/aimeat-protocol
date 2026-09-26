@@ -5,6 +5,30 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.20.0 -- 2026-09-26 -- A tag's ✗ is the Tag's remove mark (.poster-chip-x, poster.css), the look it already had (a unification: Jouni's decision "Remove mark").
+ *   v2.19.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v2.18.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v2.17.0 -- 2026-09-26 -- A comment that pointed at the removed renderDeliveryIndicator now carries its reason itself.
+ *   v2.16.0 -- 2026-09-26 -- How it runs is the row (.poster-row, its two hairlines); its own size and weight go (a unification).
+ *   v2.15.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside) in its own words; a working agent's line of figures is the Hint, a unification: Jouni's decision Attention note.
+ *   v2.14.0 -- 2026-09-25 -- How far an agent got through Hello Integration is the meter (poster.css .poster-box--meter), a unification: the look most tabs use.
+ *   v2.13.0 -- 2026-09-25 -- A dot that says a state (active, inactive, running, something unseen) is the status dot (css/components/status-dot.css), a unification: the look most tabs use.
+ *   v2.12.0 -- 2026-09-25 -- A setting that is on or off (the agent's federation) is the Switch (components/Switch.js), a unification: the look most tabs use.
+ *   v2.11.0 -- 2026-09-25 -- Every quiet way on is the action link (.poster-action, its quiet tone where it sits among controls), and the one loud action is the dark block (.poster-slab, its control cut), a unification: Jouni's decisions Action link and Loud action.
+ *   v2.10.0 -- 2026-09-25 -- The closed row is the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v2.9.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v2.8.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
+ *   v2.7.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v2.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v2.5.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v2.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v2.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.2.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   v2.1.0 -- 2026-09-14 -- The name is a full-width slab and the access sticker sits under it on the
  *     right; the open card ends in a 2px ink rule so the next row starts on its own.
  *   v2.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents", header B). Closed, the card
@@ -103,7 +127,7 @@ import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { agentState, getDefaultTab } from './state-detector.js';
 import { GaiiChip } from './gaii-chip.js';
-import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge } from './agent-card-badges.js';
+import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge, stepStatusClass } from './agent-card-badges.js';
 import { RunModeSwitch } from './agent-card-run-mode.js';
 import { templateLabel } from './scope-config.js';
 import { detectTemplate } from './scope-model.js';
@@ -125,6 +149,7 @@ import TabServices from './tab-services.js';
 import TabCrew from './tab-crew.js';
 import { swallowed } from '/js/swallowed.js';
 import { num } from '/js/format.js';
+import { Switch } from '/components/Switch.js';
 
 const html = htm.bind(h);
 
@@ -274,20 +299,24 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     // ONE ROW OF THE TABLE. The columns are the same six the head names (groups-render.js) and the
     // GAII rides under the name, because it is what a person carries away from this row: the name
     // is for the eye, the GAII is what a chat, a config file or another agent is given.
+    // The Listing (css/components/listing.css) with one row: the drag wrapper around each row
+    // (groups-render.js) sits between the rows, so each row carries its own grid of the same cut.
     return html`
-      <div class=${`agp-row ${state === 'problem' ? 'agp-row--problem' : ''}`} onClick=${() => onToggle(agent.name)}>
-        <div class="agp-nm">
-          <span class="agp-nm-text">${agent.display_name || agent.name}</span>
-          ${renderChangeBadge(changes)}
-          ${agent.mode && agent.mode !== 'interactive' ? html`<span class="og-chip og-chip--dim">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}</span>` : null}
-          ${platform ? html`<span class="og-chip og-chip--dim">${platform}</span>` : null}
-          ${agent.federate && html`<span class="og-chip og-chip--dim">${t('profile.federated')}</span>`}
-          <small>${agentGaii(agent)}</small>
+      <div class="listing listing--name-runs-access-last-doors listing--cols">
+        <div class=${`listing-row agp-row ${state === 'problem' ? 'agp-row--problem' : ''}`} onClick=${() => onToggle(agent.name)}>
+          <div class="listing-name">
+            <span class="agp-nm-text">${agent.display_name || agent.name}</span>
+            ${renderChangeBadge(changes)}
+            ${agent.mode && agent.mode !== 'interactive' ? html`<span class="poster-chip">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}</span>` : null}
+            ${platform ? html`<span class="poster-chip">${platform}</span>` : null}
+            ${agent.federate && html`<span class="poster-chip">${t('profile.federated')}</span>`}
+            <small>${agentGaii(agent)}</small>
+          </div>
+          <div class="listing-who">${runsWord}</div>
+          <div class="listing-who">${accessLabel}</div>
+          <div class="poster-time">${agent.last_seen ? timeAgo(agent.last_seen) : t('profile.agents.page.neverSeen')}</div>
+          <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row">${t('profile.agents.page.openRow')}</button></div>
         </div>
-        <div class="agp-w">${runsWord}</div>
-        <div class="agp-w">${accessLabel}</div>
-        <div class="agp-m">${agent.last_seen ? timeAgo(agent.last_seen) : t('profile.agents.page.neverSeen')}</div>
-        <div class="agp-go"><button type="button" class="og-door">${t('profile.agents.page.openRow')}</button></div>
       </div>
     `;
   }
@@ -314,7 +343,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
                 if (changeKey && onTabSeen) onTabSeen(agent.name, changeKey);
               }}>
         ${label !== tab.key ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
-        ${count > 0 ? html`<span class="pf-agd-tab-badge pf-agd-tab-badge--dot ${failed ? 'pf-agd-tab-badge--failed' : ''}"></span>` : ''}
+        ${count > 0 ? html`<span class=${`status-dot ${failed ? 'status-dot--error' : ''}`}></span>` : ''}
       </button>
     `;
   };
@@ -333,22 +362,21 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             ${renderPlatformBadge(onboarding)}
             ${renderModelBadge(agent)}
             ${renderReadinessBadge(state, onboarding)}
-            ${agent.last_seen ? html`<span class=${`og-chip ${state === 'problem' ? 'agp-chip--warn' : (state === 'production' || state === 'idle') ? 'agp-chip--ok' : 'og-chip--dim'}`}>${agent?.health?.delivery ? deliveryLabel(agent.health.delivery) : t('profile.agents.detail.lastSeen')} · ${timeAgo(agent.last_seen)}</span>` : null}
+            ${agent.last_seen ? html`<span class=${`poster-status ${state === 'problem' ? 'poster-status--danger' : (state === 'production' || state === 'idle') ? 'poster-status--fine' : 'poster-status--off'}`}>${agent?.health?.delivery ? deliveryLabel(agent.health.delivery) : t('profile.agents.detail.lastSeen')} · ${timeAgo(agent.last_seen)}</span>` : null}
             <${CapabilitiesSummary} agent=${agent} />
             ${onFederateToggle
-              ? html`<button type="button" class="og-chip og-chip--dim"
-                  title=${agent.federate ? (t('profile.agents.detail.federationOnHint') || 'Click to make local only') : (t('profile.agents.detail.federationOffHint') || 'Click to share via federation')}
-                  onClick=${() => onFederateToggle(agent)}>
-                  ${t('profile.agents.detail.federationLabel')} ${agent.federate ? t('profile.agents.detail.federationOn') : t('profile.agents.detail.federationOff')}
-                </button>`
-              : agent.federate ? html`<span class="og-chip og-chip--dim">${t('profile.federated')}</span>` : null}
+              ? html`<span title=${agent.federate ? (t('profile.agents.detail.federationOnHint') || 'Click to make local only') : (t('profile.agents.detail.federationOffHint') || 'Click to share via federation')}>
+                  <${Switch} on=${!!agent.federate} onToggle=${() => onFederateToggle(agent)}
+                    label=${`${t('profile.agents.detail.federationLabel')} ${agent.federate ? t('profile.agents.detail.federationOn') : t('profile.agents.detail.federationOff')}`} />
+                </span>`
+              : agent.federate ? html`<span class="poster-chip">${t('profile.federated')}</span>` : null}
             <${TagStrip} agent=${agent} showToast=${showToast} />
           </div>
         </div>
         <div class="agp-side" onClick=${stop}>
           <div class="poster-sticker">
             <b class="poster-stat-number poster-stat-number--small">${accessLabel}</b>
-            ${onScopesClick && html`<button type="button" class="og-door" onClick=${() => onScopesClick(agent)}>${t('profile.agents.page.manageAccess')} →</button>`}
+            ${onScopesClick && html`<button type="button" class="poster-action poster-action--small" onClick=${() => onScopesClick(agent)}>${t('profile.agents.page.manageAccess')} →</button>`}
           </div>
           ${renderPopOut(onPopOut, agent)}
           ${renderHostConsole(agent)}
@@ -357,10 +385,10 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
       ${/* How this agent is meant to be RUN: one sentence, and the switch behind one door. The
             node stores and shows this and never enforces it; the sentence says what is true. */''}
-      <div class="agp-runs" onClick=${stop}>
-        <span class="og-label">${t('profile.agents.runMode.label')}</span>
+      <div class="poster-row agp-runs" onClick=${stop}>
+        <span class="poster-label">${t('profile.agents.runMode.label')}</span>
         <span>${t(`profile.agents.page.runs.${agent.run_mode || 'unset'}`)}</span>
-        <button type="button" class="og-door og-door--quiet" onClick=${() => setRunsOpen(v => !v)}>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setRunsOpen(v => !v)}>
           ${runsOpen ? t('profile.agents.page.close') : (agent.run_mode ? t('profile.agents.page.runsChange') : t('profile.agents.page.runsDecide'))} →
         </button>
         ${runsOpen && html`<${RunModeSwitch} agent=${agent} showToast=${showToast} />`}
@@ -375,7 +403,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           if (members.length === 0) return null;
           return html`
             <div class="agp-nav-group" key=${g.id}>
-              <span class="og-label">${t(g.key)}</span>
+              <span class="poster-label">${t(g.key)}</span>
               <div class="agp-tabs">${members.map(tabButton)}</div>
             </div>`;
         })}
@@ -405,15 +433,15 @@ function CapabilitiesSummary({ agent }) {
   // A chip in the masthead's row; the full list opens under the row (agp-caps takes the row's
   // whole width) so a wall of pills never sits between the name and the tabs uninvited.
   return html`
-    <button type="button" class="og-chip og-chip--dim" aria-expanded=${open ? 'true' : 'false'}
+    <button type="button" class="poster-chip" aria-expanded=${open ? 'true' : 'false'}
       onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>
       ${parts.join(' · ')} ${open ? '↑' : '↓'}
     </button>
     ${open && html`
       <div class="agp-caps">
-        ${tools.map(c => html`<span key=${c.name || c} class="og-chip">${c.name || c}</span>`)}
-        ${skills.map(c => html`<span key=${c} class="og-chip og-chip--dim">${c}</span>`)}
-        ${langs.map(l => html`<span key=${'lang-' + l} class="og-chip og-chip--dim">${'Language: ' + l}</span>`)}
+        ${tools.map(c => html`<span key=${c.name || c} class="poster-chip">${c.name || c}</span>`)}
+        ${skills.map(c => html`<span key=${c} class="poster-chip">${c}</span>`)}
+        ${langs.map(l => html`<span key=${'lang-' + l} class="poster-chip">${'Language: ' + l}</span>`)}
       </div>
     `}
   `;
@@ -423,7 +451,7 @@ function CapabilitiesSummary({ agent }) {
 // one). Only rendered when the parent supplies onPopOut — the standalone solo view omits it.
 function renderPopOut(onPopOut, agent) {
   if (!onPopOut) return null;
-  return html`<button type="button" class="og-door og-door--quiet" title=${t('profile.agents.detail.popOut')}
+  return html`<button type="button" class="poster-action poster-action--small poster-action--lower" title=${t('profile.agents.detail.popOut')}
     onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>${t('profile.agents.detail.popOut')} ↗</button>`;
 }
 
@@ -443,7 +471,7 @@ function renderHostConsole(agent) {
     // eslint-disable-next-line aimeat/no-silent-catch -- an unparseable address is simply not offered
     return null;
   }
-  return html`<a class="og-door og-door--quiet agp-host" href=${url} target="_blank" rel="noopener noreferrer"
+  return html`<a class="poster-action poster-action--small poster-action--lower agp-host" href=${url} target="_blank" rel="noopener noreferrer"
     title=${url} onClick=${(e) => e.stopPropagation()}>${t('profile.agents.detail.openInHost', { host })} ↗</a>`;
 }
 
@@ -460,7 +488,7 @@ function renderChangeBadge(changes) {
   const title = `${t('profile.agents.detail.changes.title')} — ${parts.join(', ')}`;
   // Has-unseen indicator (a dot, not an exact count). Neutral gray; red ONLY for unseen FAILED tasks.
   const failed = (changes.tasksFailed || 0) > 0;
-  return html`<span class="pf-agd-change-badge pf-agd-change-badge--dot ${failed ? 'pf-agd-change-badge--failed' : ''}" title=${title}></span>`;
+  return html`<span class=${`status-dot ${failed ? 'status-dot--error' : ''}`} title=${title}></span>`;
 }
 
 function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
@@ -471,10 +499,10 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
     case 'new':
       return html`
         <div class="pf-agd-zone2 pf-agd-zone2--new poster-aside poster-aside--small">
-          <div class="pf-agd-zone2-title">${t('profile.agents.detail.zone2.newTitle')}</div>
-          <div class="pf-agd-zone2-desc">${t('profile.agents.detail.zone2.newDesc')}</div>
+          <div class="pf-agd-zone2-title sub-heading">${t('profile.agents.detail.zone2.newTitle')}</div>
+          <div>${t('profile.agents.detail.zone2.newDesc')}</div>
           <div class="pf-agd-zone2-actions">
-            <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); setActiveTab('integration'); }}>
+            <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); setActiveTab('integration'); }}>
               ${t('profile.agents.detail.zone2.goToIntegration')}
             </button>
           </div>
@@ -487,17 +515,17 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
       const pct = Math.round((passed / total) * 100);
       const nextStep = steps.find(s => s.status === 'pending');
       return html`
-        <div class="pf-agd-zone2 pf-agd-zone2--onboarding poster-aside poster-aside--small">
-          <div class="pf-agd-zone2-title">
+        <div class="pf-agd-zone2 pf-agd-zone2--onboarding poster-aside poster-aside--small poster-aside--waiting">
+          <div class="pf-agd-zone2-title sub-heading">
             ${t('profile.agents.detail.zone2.onboardingTitle')}: ${passed} / ${total}
             ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}</span>` : ''}
           </div>
-          <div class="pf-agd-progress-bar">
-            <div class="pf-agd-progress-fill" style="width: ${pct}%"></div>
+          <div class="pf-agd-progress-bar poster-box poster-box--meter">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width=${pct} height="100" /></svg>
           </div>
           <div class="pf-agd-step-pills">
             ${steps.map(s => html`
-              <span key=${s.id} class="pf-agd-step-pill pf-agd-step-pill--${s.status}">
+              <span key=${s.id} class=${stepStatusClass(s.status)}>
                 ${s.status === 'passed' ? '✓' : '○'} ${tOr('agentOnboarding.steps.' + s.id, s.title || s.id)}
               </span>
             `)}
@@ -511,14 +539,15 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
     case 'idle':
     case 'production':
     default: {
-      // Same source as the header indicator — see renderDeliveryIndicator for why the MCP branch
-      // is gone rather than rewired.
+      // The server's channel verdict (services/agent-health.ts), as the header's status reads it. An
+      // MCP branch used to be computed here from fields no record carries, so it could never be
+      // chosen; it is gone rather than rewired, because there is nothing to rewire it to.
       const zoneDelivery = agent?.health?.delivery
         ? deliveryLabel(agent.health.delivery)
         : t('profile.agents.detail.deliveryPolling');
       const stats = agent.taskStats;
       return html`
-        <div class="pf-agd-zone2 pf-agd-zone2--production">
+        <div class="poster-hint pf-agd-zone2 pf-agd-zone2--production">
           <div class="pf-agd-zone2-stats">
             <span>${zoneDelivery}</span>
             ${agent.last_seen ? html`<span>${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}</span>` : ''}
@@ -534,7 +563,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
 function renderModeBadge(agent) {
   const mode = agent.mode || 'interactive';
   const label = t(`profile.agents.mode.${mode}`) || mode;
-  return html`<span class="og-chip og-chip--dim" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
+  return html`<span class="poster-chip" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
 }
 
 // Editable tag strip shown in the expanded card header. The same owner-managed
@@ -580,14 +609,14 @@ function TagStrip({ agent, showToast }) {
   return html`
     <div class="pf-agd-tag-strip pf-agd-tag-strip--editable">
       ${tags.map(tag => html`
-        <span key=${tag} class="og-chip">
+        <span key=${tag} class="poster-chip">
           ${tag}
-          <button type="button" class="pf-agd-tag-chip-remove" title=${t('profile.agents.detail.data_access.tagRemoved')}
+          <button type="button" class="poster-chip-x" title=${t('profile.agents.detail.data_access.tagRemoved')}
                   onClick=${(e) => { e.stopPropagation(); removeTag(tag); }}>✗</button>
         </span>
       `)}
       ${adding
-        ? html`<input class="pf-agd-tag-add-input" autofocus value=${newTag}
+        ? html`<input class="og-input pf-agd-tag-add-input" autofocus value=${newTag}
                  placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
                  onInput=${(e) => setNewTag(e.target.value)}
                  onKeyDown=${(e) => {
@@ -595,7 +624,7 @@ function TagStrip({ agent, showToast }) {
                    else if (e.key === 'Escape') { setAdding(false); setNewTag(''); }
                  }}
                  onBlur=${() => { if (newTag.trim()) addTag(); else setAdding(false); }} />`
-        : html`<button type="button" class="og-chip og-chip--dim" onClick=${() => setAdding(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>`}
+        : html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setAdding(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>`}
     </div>
   `;
 }
@@ -657,32 +686,32 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
 
   return html`
     <div class="pf-agd-zone2 pf-agd-zone2--problem poster-aside poster-aside--small">
-      <div class="pf-agd-zone2-title">${t('profile.agents.detail.zone2.problemTitle')}</div>
-      <div class="pf-agd-zone2-desc">
+      <div class="pf-agd-zone2-title sub-heading">${t('profile.agents.detail.zone2.problemTitle')}</div>
+      <div>
         ${reasons.map(r => html`<div>${(reasonText[r] ?? (() => r))()}</div>`)}
       </div>
       <div class="pf-agd-zone2-actions">
         ${delivery?.webhook_configured && html`
-        <button class="btn-outline btn-sm" onClick=${handleTestWebhook} disabled=${testing}>
+        <button class="poster-action poster-action--small" onClick=${handleTestWebhook} disabled=${testing}>
           ${t('profile.agents.detail.zone2.testWebhook')}
         </button>`}
-        <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingUrl(!editingUrl); }}>
+        <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); setEditingUrl(!editingUrl); }}>
           ${t('profile.agents.detail.zone2.updateUrl')}
         </button>
-        <button class="btn-outline btn-sm" onClick=${handleOverrideReadiness}>
+        <button class="poster-action poster-action--small" onClick=${handleOverrideReadiness}>
           ${t('profile.agents.detail.zone2.overrideReadiness')}
         </button>
       </div>
       ${editingUrl && html`
         <div class="pf-agd-zone2-url-form">
-          <input type="text" value=${urlValue}
+          <input class="og-input" type="text" value=${urlValue}
                  onInput=${(e) => setUrlValue(e.target.value)}
                  onClick=${(e) => e.stopPropagation()}
                  placeholder="https://..." />
-          <button class="btn-primary btn-sm" onClick=${handleSaveUrl}>
+          <button class="poster-action poster-action--small" onClick=${handleSaveUrl}>
             ${t('profile.agents.detail.zone2.save')}
           </button>
-          <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingUrl(false); }}>
+          <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); setEditingUrl(false); }}>
             ${t('profile.agents.detail.zone2.cancel')}
           </button>
         </div>

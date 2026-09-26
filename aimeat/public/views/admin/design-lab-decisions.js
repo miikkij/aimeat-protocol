@@ -5,7 +5,7 @@
  * @description aimeat-design-lab, the decisions view: one decision per job the pages do in more
  *   than one way. Laid out as Jouni asked (2026-09-23), in five parts:
  *
- *   1. The proposal: its picture in light and dark, "If you accept, these become one component:"
+ *   1. The proposal: its picture in light and dark, "If you accept, all of these take the proposal's look:"
  *      with each option it covers, its picture and the tone it becomes, then "What would change" in
  *      plain words, and two buttons, Accept the proposal and No thanks.
  *   2. Every option on its own: its pictures in light and dark (from its own page where a crop
@@ -32,6 +32,16 @@
  *   ProposalPart · OptionPart · DetailsPart · Answer · useChoice · answersOf
  * @usage Mounted by views/admin/design-lab-tab.js (the Decisions switch).
  * @version-history
+ *   v4.8.0 — 2026-09-26 — A decision may also be drawn in a theme (`look`: the proposal, and each
+ *     option today and after, in that theme too, with what changes there), and may be a text page
+ *     (`textOnly`: its options said in words, no pictures), for the last round of Settings.
+ *   v4.7.0 — 2026-09-25 — Under the list, the round's notes that are not a decision page
+ *     (decisions-conflicts.js CONFLICT_NOTES).
+ *   v4.6.0 — 2026-09-25 — Every picture's caption says the width it is drawn at (the frames often
+ *     sit below the pages' phone widths; the crops are 1280 px), and "If you accept" says what
+ *     accepting does instead of "one component" (review of the conflicts round).
+ *   v4.5.0 — 2026-09-25 — A decision opens at its top and the way back keeps the list's place; the
+ *     Built data comes from built-data.js; an answer not given yet reads "not answered yet".
  *   v4.4.0 — 2026-09-24 — A built entry's `values`: a titled table of named values (the shape values).
  *   v4.3.0 — 2026-09-24 — A built entry's `reach`: per page, what it reached and what it did not.
  *   v4.2.0 — 2026-09-24 — Built work without a decision (Themes & Styles) under the summary.
@@ -45,7 +55,7 @@
  *   v1.0.0 — 2026-09-23 — Initial: the decisions view (UI consolidation phase 2).
  */
 import { h } from 'preact';
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api, apiGet } from '/js/api.js';
@@ -59,13 +69,18 @@ import { FoldButton } from '/components/FoldButton.js';
 import { ActionRow } from '/components/ActionRow.js';
 import { ChooserFold } from '/components/Chooser.js';
 import { Specimens, Specimen, SpecimenImage } from '/components/Specimen.js';
-import { DECISIONS, BUILT, BUILT_WITHOUT_DECISION } from '/views/design-lab/decisions-data.js';
+import { DECISIONS } from '/views/design-lab/decisions-data.js';
+import { CONFLICT_NOTES } from '/views/design-lab/decisions-conflicts.js';
+import { BUILT, BUILT_WITHOUT_DECISION } from '/views/design-lab/built-data.js';
 import { plainDiff } from '/views/design-lab/plain-diff.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-const variantSrc = (id, v, theme, solo = false) => `/v1/design-lab/frame?id=decision:${encodeURIComponent(id)}&v=${v}&theme=${theme}${solo ? '&solo=1' : ''}`;
-const afterSrc = (id, v, theme) => `/v1/design-lab/frame?id=after:${encodeURIComponent(id)}&v=${v}&theme=${theme}&solo=1`;
+const variantSrc = (id, v, theme, solo = false, q = '') => `/v1/design-lab/frame?id=decision:${encodeURIComponent(id)}&v=${v}&theme=${theme}${solo ? '&solo=1' : ''}${q}`;
+const afterSrc = (id, v, theme, q = '') => `/v1/design-lab/frame?id=after:${encodeURIComponent(id)}&v=${v}&theme=${theme}&solo=1${q}`;
+/** A decision also drawn in a theme (`decision.look`: { theme, style, name }): the frame's query for it. */
+const lookQuery = (look) => (look ? `&look=${encodeURIComponent(look.theme)}&style=${encodeURIComponent(look.style)}` : '');
+const inLook = (look) => tr('designLab.inLook', 'in {name}').replace('{name}', look.name);
 const choiceKey = (id) => `design-lab.choice.${id}`;
 /** A decision's short name: its title up to the colon. */
 const shortTitle = (d) => d.title.split(':')[0];
@@ -73,9 +88,11 @@ const THEMES = /** @type {const} */ (['light', 'dark']);
 const themeWord = (theme) => (theme === 'light' ? tr('designLab.lightWord', 'light') : tr('designLab.darkWord', 'dark'));
 
 /** The proposal's picture: its own composition, or the proposed option's sample. */
-function proposalSrc(decision, theme) {
-  if (decision.proposal.variant === 'proposal') return `/v1/design-lab/frame?id=proposal:${encodeURIComponent(decision.id)}&v=0&theme=${theme}&solo=1`;
-  return variantSrc(decision.id, decision.variants.findIndex((v) => v.id === decision.proposal.variant), theme, true);
+function proposalSrc(decision, theme, q = '') {
+  if (decision.proposal.variant === 'proposal') return `/v1/design-lab/frame?id=proposal:${encodeURIComponent(decision.id)}&v=0&theme=${theme}&solo=1${q}`;
+  const index = decision.variants.findIndex((v) => v.id === decision.proposal.variant);
+  // A named option whose own look changes in the theme is drawn as the proposal would draw it.
+  return q ? afterSrc(decision.id, index, theme, q) : variantSrc(decision.id, index, theme, true);
 }
 
 /** One stable setter per key, so a frame's listener is not re-made on every render. */
@@ -124,22 +141,68 @@ function Answer({ state, acceptLabel, rejectLabel, onSet }) {
     <//>`;
 }
 
+/**
+ * The width the preview frames inside `ref` are drawn at, read from the first one (the frames of one
+ * grid share it), so each caption can say it: the pages' phone rules start at 560 and 760 px, and a
+ * frame is often narrower than both, while the pictures from the real pages are 1280 px wide.
+ */
+function useFrameWidth() {
+  const ref = useRef(/** @type {HTMLDivElement|null} */ (null));
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const read = () => {
+      const frame = /** @type {HTMLElement|null} */ (el.querySelector('.poster-specimen-frame'));
+      if (frame) setWidth(Math.round(frame.clientWidth));
+    };
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    read();
+    return () => ro.disconnect();
+  }, []);
+  return { ref, width };
+}
+const widthWord = (w) => (w ? `, ${tr('designLab.widthWord', '{n} px wide').replace('{n}', String(w))}` : '');
+/** The window the crop script shoots a page in (scripts/design-lab-crops.ts VIEW.width). */
+const CROP_WIDTH = 1280;
+
 /** Part 1: the proposal, what it covers, what would change, and its answer. */
 function ProposalPart({ decision, state, onSet }) {
   const tones = decision.proposal.tones ?? [];
+  const top = useFrameWidth();
+  const rows = useFrameWidth();
+  const look = decision.look;
+  // A text page (a check's numbers, a rule) has no picture: its options are said in words.
+  if (decision.textOnly) {
+    return html`
+      <${Band} title=${`${tr('designLab.proposal', 'The proposal')}: ${decision.proposal.name}`} tight=${true}>
+        <p>${decision.proposal.summary}</p>
+        <p><strong>${tr('designLab.ifAcceptText', 'If you accept the proposal, this is what becomes of each option:')}</strong></p>
+        ${decision.variants.map((v) => html`<${NamedRow} key=${v.id} label=${v.name}>→ ${v.becomes}<//>`)}
+      <//>
+      ${changesAndAnswer(decision, state, onSet)}`;
+  }
   return html`
     <${Band} title=${`${tr('designLab.proposal', 'The proposal')}: ${decision.proposal.name}`} tight=${true}>
-      <${Specimens}>
-        ${THEMES.map((theme) => html`<${Specimen} key=${theme} label=${`${tr('designLab.proposal', 'The proposal')}, ${themeWord(theme)}`} src=${proposalSrc(decision, theme)} />`)}
-      <//>
+      <div ref=${top.ref}><${Specimens}>
+        ${THEMES.map((theme) => html`<${Specimen} key=${theme} label=${`${tr('designLab.proposal', 'The proposal')}, ${themeWord(theme)}${widthWord(top.width)}`} src=${proposalSrc(decision, theme)} />`)}
+        ${look && html`<${Specimen} key="look" label=${`${tr('designLab.proposal', 'The proposal')}, ${inLook(look)}, ${themeWord('light')}${widthWord(top.width)}`} src=${proposalSrc(decision, 'light', lookQuery(look))} />`}
+      <//></div>
       <p>${decision.proposal.summary}</p>
       ${tones.map((tn) => html`<${NamedRow} key=${tn.name} label=${tn.name}>${tn.meaning}<//>`)}
-      <p><strong>${tr('designLab.ifAccept', 'If you accept, these become one component:')}</strong></p>
-      <${Specimens}>
+      <p><strong>${tr('designLab.ifAccept', 'If you accept, all of these take the proposal\'s look:')}</strong></p>
+      <div ref=${rows.ref}><${Specimens}>
         ${decision.variants.map((v, i) => html`
-          <${Specimen} key=${v.id} label=${v.name} src=${variantSrc(decision.id, i, 'light', true)} note=${`→ ${v.becomes}`} />`)}
-      <//>
+          <${Specimen} key=${v.id} label=${`${v.name}${widthWord(rows.width)}`} src=${variantSrc(decision.id, i, 'light', true)} note=${`→ ${v.becomes}`} />`)}
+      <//></div>
     <//>
+    ${changesAndAnswer(decision, state, onSet)}`;
+}
+
+/** Part 1's end: "What would change", then the decided note or the proposal's two buttons. */
+function changesAndAnswer(decision, state, onSet) {
+  return html`
     <${Band} title=${tr('designLab.changes', 'What would change')} tight=${true}>
       ${decision.changes.map((c) => html`<${NamedRow} key=${c.page} label=${c.page}>${c.what}<//>`)}
     <//>
@@ -157,24 +220,42 @@ function ProposalPart({ decision, state, onSet }) {
  */
 function OptionPart({ decision, variant, index, crops, state, onSet }) {
   const crop = crops?.[decision.id]?.[variant.id] ?? {};
-  const { values, setters } = useValues(['today', 'after']);
+  const { values, setters } = useValues(['today', 'after', 'lookToday', 'lookAfter']);
   const changes = plainDiff(values.today, values.after);
+  const look = decision.look;
+  const lookChanges = look ? plainDiff(values.lookToday, values.lookAfter) : null;
+  const frames = useFrameWidth();
+  const answer = !decision.choice && html`<${Answer} state=${state} acceptLabel=${tr('designLab.acceptOne', 'Accept')}
+    rejectLabel=${tr('designLab.reject', 'Reject')} onSet=${onSet} />`;
+  if (decision.textOnly) {
+    return html`
+      <${Band} title=${variant.name} tight=${true}>
+        <${NamedRow} label=${tr('designLab.whatItIs', 'What it is')}>${variant.look}<//>
+        <${NamedRow} label=${tr('designLab.pages', 'Pages')}>${variant.where}<//>
+        ${answer}
+      <//>`;
+  }
   return html`
     <${Band} title=${variant.name} tight=${true}>
-      <${Specimens}>
+      <div ref=${frames.ref}><${Specimens}>
         ${THEMES.map((theme) => html`
-          <${Specimen} key=${`t-${theme}`} label=${`${tr('designLab.today', 'Today')}, ${themeWord(theme)}`}
+          <${Specimen} key=${`t-${theme}`} label=${`${tr('designLab.today', 'Today')}, ${themeWord(theme)}${widthWord(frames.width)}`}
             src=${variantSrc(decision.id, index, theme, true)} eager=${theme === 'light'} onValues=${theme === 'light' ? setters.today : undefined} />
-          <${Specimen} key=${`a-${theme}`} label=${`${tr('designLab.afterProposal', 'After the proposal')}, ${themeWord(theme)}`}
+          <${Specimen} key=${`a-${theme}`} label=${`${tr('designLab.afterProposal', 'After the proposal')}, ${themeWord(theme)}${widthWord(frames.width)}`}
             src=${afterSrc(decision.id, index, theme)} eager=${theme === 'light'} onValues=${theme === 'light' ? setters.after : undefined} />`)}
-      <//>
+        ${look && html`
+          <${Specimen} key="t-look" label=${`${tr('designLab.today', 'Today')}, ${inLook(look)}, ${themeWord('light')}${widthWord(frames.width)}`}
+            src=${variantSrc(decision.id, index, 'light', true, lookQuery(look))} eager=${true} onValues=${setters.lookToday} />
+          <${Specimen} key="a-look" label=${`${tr('designLab.afterProposal', 'After the proposal')}, ${inLook(look)}, ${themeWord('light')}${widthWord(frames.width)}`}
+            src=${afterSrc(decision.id, index, 'light', lookQuery(look))} eager=${true} onValues=${setters.lookAfter} />`}
+      <//></div>
       <${NamedRow} label=${tr('designLab.whatChanges', 'What changes')}>${changes ? changes.join(' ') : tr('designLab.measuring', 'measuring…')}<//>
+      ${look && html`<${NamedRow} label=${tr('designLab.whatChangesIn', 'What changes in {name}').replace('{name}', look.name)}>${lookChanges ? lookChanges.join(' ') : tr('designLab.measuring', 'measuring…')}<//>`}
       ${crop.context
-        ? html`<${Specimens}><${SpecimenImage} label=${tr('designLab.onItsPage', 'Where it is on its page (outlined)')} src=${crop.context} /><//>`
+        ? html`<${Specimens}><${SpecimenImage} label=${`${tr('designLab.onItsPage', 'Where it is on its page (outlined)')}${widthWord(CROP_WIDTH)}`} src=${crop.context} /><//>`
         : html`<${Hint}>${tr('designLab.noContext', 'No picture from a real page')}: ${crop.missing || tr('designLab.noContextYet', 'not taken yet')}.<//>`}
       <${NamedRow} label=${tr('designLab.pages', 'Pages')}>${variant.where}<//>
-      ${!decision.choice && html`<${Answer} state=${state} acceptLabel=${tr('designLab.acceptOne', 'Accept')}
-        rejectLabel=${tr('designLab.reject', 'Reject')} onSet=${onSet} />`}
+      ${answer}
     <//>`;
 }
 
@@ -197,10 +278,10 @@ function DetailsPart({ decision }) {
         <${NamedRow} key=${v.id} label=${v.name}>
           ${v.code}.${decision.counted && v.files ? ` ${v.files} ${tr('designLab.files', 'files')}.` : ''}
         <//>
-        <${Specimens}>
+        ${!decision.textOnly && html`<${Specimens}>
           ${THEMES.map((theme) => html`<${Specimen} key=${theme} label=${themeWord(theme)} src=${variantSrc(decision.id, i, theme)}
             onValues=${setters[`${v.id}:${theme}`]} note=${measured(`${v.id}:${theme}`)} />`)}
-        <//>`)}
+        <//>`}`)}
     <//>`;
 }
 
@@ -335,13 +416,29 @@ export default function DecisionsView() {
     if (open) return;
     Promise.all(DECISIONS.map(async (d) => [d.id, await readChoice(d.id)])).then((pairs) => setRecords(Object.fromEntries(pairs)));
   }, [open]);
+  // A decision opens at its top, where its question is; the way back returns the list to where it
+  // was. Without this a decision opened at the list's scroll position, at its own last option.
+  const listTop = useRef(0);
+  useEffect(() => {
+    const region = document.querySelector('.page-content');
+    if (!region) return;
+    region.scrollTop = open ? 0 : listTop.current;
+  }, [open]);
+  const openDecision = (id) => {
+    listTop.current = document.querySelector('.page-content')?.scrollTop ?? 0;
+    setOpen(id);
+  };
   const decision = DECISIONS.find((d) => d.id === open);
   if (decision) return html`<${DecisionDetail} decision=${decision} crops=${crops} built=${built} onBack=${() => setOpen(null)} />`;
   const waiting = DECISIONS.filter((d) => !d.choice && !answersOf(records?.[d.id]).proposal).length;
   return html`
     <${Hint}>${tr('designLab.decisionsIntro', 'One decision per job the pages do in more than one way. Open one to see the proposal, what it covers and what would change, and answer the proposal and every option. You can change an answer at any time; nothing changes on the pages before you say so in chat.')}<//>
     <${BandNote}>${tr('designLab.decisionsCount', '{n} decisions, {w} waiting for you').replace('{n}', String(DECISIONS.length)).replace('{w}', String(waiting))}<//>
-    <${Summary} records=${records} onOpen=${setOpen} />
+    <${Summary} records=${records} onOpen=${openDecision} />
+    ${CONFLICT_NOTES.length > 0 && html`
+      <${Band} title=${tr('designLab.roundNotes', 'Notes on this round')} tight=${true}>
+        ${CONFLICT_NOTES.map((n) => html`<${NamedRow} key=${n.title} label=${n.title}>${n.text}<//>`)}
+      <//>`}
     ${Object.entries(BUILT_WITHOUT_DECISION).map(([id, b]) => html`
       <${BandNote} key=${'n' + id}>${t('designLab.builtWithout', { title: b.title })}<//>
       <${BuiltPart} key=${id} decision=${{ id }} built=${b} pictures=${built?.[id]} />`)}`;

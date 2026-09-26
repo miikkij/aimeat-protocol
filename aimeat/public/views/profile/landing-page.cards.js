@@ -4,9 +4,30 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.19.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.18.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.17.0 -- 2026-09-26 -- A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
+ *   v1.16.0 -- 2026-09-26 -- The overview's head is the home's head, the Masthead: the picture and the name at the home's sizes, the picture beside the middle of the name block; this AIMEAT's address, the marks, availability, AI chat instructions and Profile stay (a unification: Jouni's decision "Person head").
+ *   v1.15.0 -- 2026-09-26 -- The overview's rows that open a recent thing, an agent or the next job are the folded row's event tone (og-fold og-fold--event): the name in bold, the time or the next run at the right; .pf-home-row and its label go (a unification: the look most tabs use).
+ *   v1.14.0 -- 2026-09-26 -- The last labels over a field, a meter or a chart are the row label (.poster-label): the Decide editors' field labels, the overview's quota names, the AI budget chart's title; their own looks go (a unification: Jouni's decision Row label).
+ *   v1.13.0 -- 2026-09-25 -- The overview's rows under the AI spend (where it went, by model) are the Listing; their row, name, cost, share and meta rules go, the colour mark keeps its size (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- The P&L result and the overview's commerce, AI spend and agent ledger figures are the figure strip (.og-strip); a profit keeps its green as the fine tone and a loss its red as the danger tone (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- The "Waiting for you" rows are the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v1.10.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
+ *   v1.9.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.8.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.7.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.6.0 -- 2026-09-25 -- A button that is a mark, not a word (a delete or close mark, a menu's
+ *     dots, an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's
+ *     decision "Icon button").
+ *   v1.5.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
+ *   v1.4.0 -- 2026-09-25 -- The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v1.3.0 -- 2026-09-13 -- V2: compose the avatar with the shared poster frame.
  *   2026-09-03 — The AI page's menu item is route id 'ai' (was 'generator'), and the usage card's
  *     own-key door goes there.
@@ -26,6 +47,8 @@
  */
 import { h } from "preact";
 import { OpenItemsList } from '/components/OpenItemsList.js';
+import { Masthead } from '/components/Masthead.js';
+import { IndexList, IndexItem } from '/components/NumberedIndex.js';
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
@@ -45,6 +68,7 @@ import { UsageChart, colorForIndex } from "/components/UsageChart.js";
 import { minidenticon } from "/lib/minidenticons.min.js";
 import { PresencePill } from "./landing-page.modals.js";
 import { swallowed } from '/js/swallowed.js';
+import { SideMenuItem } from '/components/SideMenu.js';
 import {
   relTime, fmtClock, openProfileTab, gotoWorkspace, gotoOrganism, gotoOrganismsList,
   fmtBytes, fmtUsd, fmtCompact,
@@ -70,11 +94,12 @@ export function WaitingForYou() {
 
   if (!items || items.length === 0) return null;
   return html`
-    <div class="pf-waiting">
-      <div class="pf-waiting-title">${'📨 '}${t('profile.landing.waitingTitle') || 'Waiting for you'}</div>
+    <div class="pf-waiting poster-aside poster-aside--small">
+      <div class="pf-waiting-title poster-day-title">${'📨 '}${t('profile.landing.waitingTitle') || 'Waiting for you'}</div>
+      <div class="listing listing--name-state listing--cols">
       ${items.map((it, i) => html`
-        <div class="pf-waiting-row" key=${i}>
-          <span class="pf-waiting-text">
+        <div class="listing-row" key=${i}>
+          <div><span class="pf-waiting-text">
             ${it.kind === 'review' ? html`
               <b>${(t('profile.landing.draftsToReview') || '{n} drafts to review').replace('{n}', String(it.n))}</b>
               <span class="pf-waiting-where"> · ${escHtml(it.orgName)} / ${escHtml(it.wsName)}</span>` : null}
@@ -84,15 +109,18 @@ export function WaitingForYou() {
             ${it.kind === 'invite' ? html`
               <b>${t('profile.landing.inviteWaiting') || 'You’re invited'}</b>
               <span class="pf-waiting-where"> · ${escHtml(it.orgName)}</span>` : null}
-          </span>
+          </span></div>
+          <div class="listing-doors">
           ${it.kind === 'review' ? html`
-            <button class="btn-outline btn-sm" onClick=${() => (it.wsId ? gotoWorkspace(it.orgId, it.wsId, 'review') : gotoOrganism(it.orgId))}>${t('profile.landing.reviewBtn') || 'Review'}</button>` : null}
+            <button class="poster-action poster-action--small poster-action--row" onClick=${() => (it.wsId ? gotoWorkspace(it.orgId, it.wsId, 'review') : gotoOrganism(it.orgId))}>${t('profile.landing.reviewBtn') || 'Review'}</button>` : null}
           ${it.kind === 'join' ? html`
-            <button class="btn-outline btn-sm" onClick=${() => gotoOrganism(it.orgId, 'members')}>${t('profile.landing.viewBtn') || 'View'}</button>` : null}
+            <button class="poster-action poster-action--small poster-action--row" onClick=${() => gotoOrganism(it.orgId, 'members')}>${t('profile.landing.viewBtn') || 'View'}</button>` : null}
           ${it.kind === 'invite' ? html`
-            <button class="btn-outline btn-sm" onClick=${() => gotoOrganismsList()}>${t('profile.landing.viewBtn') || 'View'}</button>` : null}
+            <button class="poster-action poster-action--small poster-action--row" onClick=${() => gotoOrganismsList()}>${t('profile.landing.viewBtn') || 'View'}</button>` : null}
+          </div>
         </div>
       `)}
+      </div>
     </div>
   `;
 }
@@ -111,11 +139,11 @@ export function ContinueCard() {
   return html`
     <div class="pf-home-card">
       <div class="poster-section-title pf-home-card-title">${t('profile.landing.continueTitle') || 'Continue'}</div>
-      ${items.map((it, index) => html`
-        <button class=${`pf-home-row ${index === 0 ? 'poster-row--thing' : ''}`} key=${it.type + it.id} onClick=${() => openItem(it)}>
+      ${items.map((it) => html`
+        <button type="button" class="og-fold og-fold--event" key=${it.type + it.id} onClick=${() => openItem(it)}>
           <span class="pf-home-row-ico">${RECENT_ICONS[it.type] || '•'}</span>
-          <span class="pf-home-row-label">${escHtml(it.label)}</span>
-          <span class="pf-home-row-meta">${relTime(it.at)}</span>
+          <b>${escHtml(it.label)}</b>
+          <span class="pf-home-row-meta poster-time">${relTime(it.at)}</span>
         </button>
       `)}
     </div>
@@ -167,24 +195,24 @@ export function AgentsCard({ owner, initialAgents }) {
         ${activeToday > 0 ? html`<span class="pf-home-card-note"> · ${(t('profile.landing.activeTodayCount') || '{n} active today').replace('{n}', String(activeToday))}</span>` : null}
       </button>
       ${agents.slice(0, 3).map(a => html`
-        <button class="pf-home-row" key=${a.gaii || a.name}
+        <button type="button" class="og-fold og-fold--event" key=${a.gaii || a.name}
           onClick=${() => {
             // eslint-disable-next-line aimeat/no-silent-catch -- a browser refusing sessionStorage here IS the answer: the tab still opens, it just does not preselect this agent
             try { sessionStorage.setItem('aimeat.agents.open', a.name); } catch { /* noop */ }
             openProfileTab('agents');
           }}>
           <span class="pf-home-row-ico">${'🤖'}</span>
-          <span class="pf-home-row-label">${escHtml(a.display_name || a.name)}</span>
-          <span class="pf-home-row-meta ${isToday(a.last_seen) ? 'pf-ok' : ''}">
+          <b>${escHtml(a.display_name || a.name)}</b>
+          <span class="pf-home-row-meta poster-time ${isToday(a.last_seen) ? 'pf-ok' : ''}">
             ${a.last_seen ? (isToday(a.last_seen) ? (t('profile.landing.agentActiveToday') || 'active today') : relTime(a.last_seen)) : '—'}
           </span>
         </button>
       `)}
       ${nextJob ? html`
-        <button class="pf-home-row" key="nextjob" onClick=${() => openProfileTab('scheduler')}>
+        <button type="button" class="og-fold og-fold--event" key="nextjob" onClick=${() => openProfileTab('scheduler')}>
           <span class="pf-home-row-ico">⏰</span>
-          <span class="pf-home-row-label">${escHtml(nextJob.name || nextJob.id || '')}</span>
-          <span class="pf-home-row-meta">${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}</span>
+          <b>${escHtml(nextJob.name || nextJob.id || '')}</b>
+          <span class="og-fold-r">${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}</span>
         </button>` : null}
     </div>
   `;
@@ -213,7 +241,7 @@ export function UsageCard({ switchTab, initialUsage }) {
     return html`
       <div class="pf-usage-row">
         <div class="pf-usage-head">
-          <span class="pf-usage-label">${label}</span>
+          <span class="poster-label">${label}</span>
           <span class="text-meta-sm">${usedText}</span>
         </div>
         <div class="pf-usage-bar poster-box poster-box--meter poster-box--quota ${pct >= 90 ? 'is-full' : ''}"><svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="100%" aria-hidden="true"><rect width=${pct} height="100" /></svg></div>
@@ -233,7 +261,7 @@ export function UsageCard({ switchTab, initialUsage }) {
       return html`
         <div class="pf-usage-row">
           <div class="pf-usage-head">
-            <span class="pf-usage-label">${t('profile.landing.usageAi')}</span>
+            <span class="poster-label">${t('profile.landing.usageAi')}</span>
             <span class="text-meta-sm">${t('profile.landing.usageAiOwnKey')}</span>
           </div>
         </div>`;
@@ -242,7 +270,7 @@ export function UsageCard({ switchTab, initialUsage }) {
       return html`
         <div class="pf-usage-row">
           <div class="pf-usage-head">
-            <span class="pf-usage-label">${t('profile.landing.usageAi')}</span>
+            <span class="poster-label">${t('profile.landing.usageAi')}</span>
             <span class="text-meta-sm">${t('profile.landing.usageAiNoGrant')}</span>
           </div>
         </div>`;
@@ -258,11 +286,11 @@ export function UsageCard({ switchTab, initialUsage }) {
         <div class="pf-usage-exhausted text-meta-sm">
           ${t('profile.landing.usageAiSpent')}
           ${' '}
-          <button type="button" class="btn-ghost btn-sm" onClick=${() => switchTab('ai')}>
+          <button type="button" class="poster-action poster-action--small" onClick=${() => switchTab('ai')}>
             ${t('profile.landing.usageAiOwnKeyCta')}
           </button>
           ${' '}
-          <button type="button" class="btn-ghost btn-sm" onClick=${() => switchTab('agents')}>
+          <button type="button" class="poster-action poster-action--small" onClick=${() => switchTab('agents')}>
             ${t('profile.landing.usageAiConnectCta')}
           </button>
         </div>`}`;
@@ -338,10 +366,10 @@ export function CommerceCard() {
 
   if (!stats) return null;
   const chip = (label, main, sub) => html`
-    <div class="pf-ai-win">
-      <span class="pf-ai-win-label">${label}</span>
-      <span class="pf-ai-win-cost poster-stat-number">${main}</span>
-      <span class="pf-ai-win-sub">${sub}</span>
+    <div>
+      <b>${main}</b>
+      <span>${label}</span>
+      <small>${sub}</small>
     </div>`;
   const morsels = t('profile.landing.commerceMorsels') || 'morsels';
   // "10 morsels · 15.00 EUR" — money amounts are micro-units, never summed with morsels.
@@ -351,7 +379,7 @@ export function CommerceCard() {
   return html`
     <div class="pf-home-card pf-commerce-card">
       <div class="poster-section-title pf-home-card-title">${t('profile.landing.commerceTitle') || 'Commerce'}</div>
-      <div class="pf-ai-windows">
+      <div class="og-strip">
         ${chip(t('profile.landing.commerceBought') || 'Purchases', String(stats.bought), fmtTotals(stats.spentBy))}
         ${chip(t('profile.landing.commerceSold') || 'Sales', String(stats.sold), fmtTotals(stats.earnedBy))}
         ${chip(t('profile.landing.commerceOpen') || 'Open carts', String(stats.open), t('profile.landing.commerceOpenSub') || 'checkout sessions')}
@@ -385,16 +413,16 @@ export function AiSpendCard() {
     .sort((a, b) => b[1].cost_usd - a[1].cost_usd).slice(0, 5);
 
   const win = (label, w) => html`
-    <div class="pf-ai-win">
-      <span class="pf-ai-win-label">${label}</span>
-      <span class="pf-ai-win-cost poster-stat-number">${fmtUsd(w && w.cost_usd)}</span>
-      <span class="pf-ai-win-sub">${fmtCompact(w && w.tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'}</span>
+    <div>
+      <b>${fmtUsd(w && w.cost_usd)}</b>
+      <span>${label}</span>
+      <small>${fmtCompact(w && w.tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'}</small>
     </div>`;
 
   return html`
     <div class="pf-home-card pf-ai-card">
       <div class="poster-section-title pf-home-card-title">${t('profile.landing.aiSpendTitle') || 'AI apps spend'}</div>
-      <div class="pf-ai-windows">
+      <div class="og-strip">
         ${win(t('profile.landing.aiWin24h') || 'Today', windows && windows.d1)}
         ${win(t('profile.landing.aiWin7d') || '7 days', windows && windows.d7)}
         ${win(t('profile.landing.aiWin30d') || '30 days', windows && windows.d30)}
@@ -406,17 +434,18 @@ export function AiSpendCard() {
         </div>`}
       ${topApps.length > 0 && html`
         <div class="pf-ai-apps">
-          <div class="pf-ai-apps-head">${t('profile.landing.aiWhereMoney') || 'Where it went (30d)'}</div>
+          <div class="pf-ai-apps-head poster-day-title">${t('profile.landing.aiWhereMoney') || 'Where it went (30d)'}</div>
+          <div class="listing listing--cols listing--name-n-n">
           ${topApps.map(([app, m]) => {
             const pct = totalCost > 0 ? Math.round((m.cost_usd / totalCost) * 100) : 0;
             return html`
-              <div class="pf-ai-app-row" key=${app}>
-                <svg class="pf-ai-app-dot" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" fill=${colorForIndex(apps.indexOf(app))} /></svg>
-                <span class="pf-ai-app-name">${app}</span>
-                <span class="pf-ai-app-cost">${fmtUsd(m.cost_usd)}</span>
-                <span class="pf-ai-app-pct">${pct}%</span>
+              <div class="listing-row" key=${app}>
+                <div class="listing-name"><svg class="pf-ai-app-dot" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" fill=${colorForIndex(apps.indexOf(app))} /></svg> ${app}</div>
+                <div class="listing-n">${fmtUsd(m.cost_usd)}</div>
+                <div class="listing-desc listing-n">${pct}%</div>
               </div>`;
           })}
+          </div>
         </div>`}
     </div>`;
 }
@@ -441,28 +470,30 @@ export function AgentLedgerCard() {
   const topModels = [...groups].sort((a, b) => (b.cost_usd || 0) - (a.cost_usd || 0)).slice(0, 5);
 
   const tile = (label, value) => html`
-    <div class="pf-ai-win">
-      <span class="pf-ai-win-label">${label}</span>
-      <span class="pf-ai-win-cost poster-stat-number">${value}</span>
+    <div>
+      <b>${value}</b>
+      <span>${label}</span>
     </div>`;
 
   return html`
     <div class="pf-home-card pf-ai-card">
       <div class="poster-section-title pf-home-card-title">${t('profile.landing.agentLedgerTitle') || 'Agent LLM usage'}</div>
-      <div class="pf-ai-windows">
+      <div class="og-strip">
         ${tile(t('profile.landing.agentLedgerCost') || 'Cost', fmtUsd(totals.cost_usd))}
         ${tile(t('profile.landing.agentLedgerTokens') || 'Tokens', fmtCompact(totals.total_tokens))}
         ${tile(t('profile.landing.agentLedgerCalls') || 'LLM calls', fmtCompact(totals.calls))}
       </div>
       ${topModels.length > 0 && html`
         <div class="pf-ai-apps">
-          <div class="pf-ai-apps-head">${t('profile.landing.agentLedgerByModel') || 'By model'}</div>
+          <div class="pf-ai-apps-head poster-day-title">${t('profile.landing.agentLedgerByModel') || 'By model'}</div>
+          <div class="listing listing--cols listing--name-desc-doors">
           ${topModels.map((g) => html`
-            <div class="pf-ai-app-row" key=${g.key}>
-              <span class="pf-ai-app-name">${g.key}</span>
-              <span class="pf-ai-app-meta">${(g.providers && g.providers.length) ? g.providers.join(', ') + ' · ' : ''}${fmtCompact(g.total_tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'} · ${fmtCompact(g.calls)}</span>
-              <span class="pf-ai-app-cost">${fmtUsd(g.cost_usd)}</span>
+            <div class="listing-row" key=${g.key}>
+              <div class="listing-name">${g.key}</div>
+              <div class="listing-desc">${(g.providers && g.providers.length) ? g.providers.join(', ') + ' · ' : ''}${fmtCompact(g.total_tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'} · ${fmtCompact(g.calls)}</div>
+              <div class="listing-n">${fmtUsd(g.cost_usd)}</div>
             </div>`)}
+          </div>
         </div>`}
     </div>`;
 }
@@ -483,7 +514,7 @@ function McpConnectedBadge() {
     return () => { cancelled = true; };
   }, []);
   if (!proven) return null;
-  return html`<div class="pf-federation-badge pf-mcp-badge">
+  return html`<div class="poster-chip poster-chip--sun">
     <span class="pf-fed-dot"></span>${t('profile.mcpConnected') || 'MCP connected'}
   </div>`;
 }
@@ -505,35 +536,30 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
 
   return html`
     <div class="pf-lp-card">
-      <div class="pf-lp-card-header">
-        <div class="pf-lp-avatar poster-frame" role="button" tabindex="0" title=${t('profile.landing.editProfile')}
-          onClick=${() => onEditProfile?.()} dangerouslySetInnerHTML=${{ __html: avatarSvg }}></div>
-        <div class="pf-lp-info">
-          <div class="pf-lp-name-row">
-            <span class="pf-lp-name">${escHtml(session.displayName || session.owner)}</span>
-          </div>
-          <div class="pf-lp-ghii">${escHtml(session.ghii || '')}</div>
+      <${Masthead} avatarSvg=${avatarSvg} name=${escHtml(session.displayName || session.owner)}
+        identity=${escHtml(session.ghii || '')}
+        identityTitle=${t('home.identityHint')}
+        onAvatar=${() => onEditProfile?.()} avatarTitle=${t('profile.landing.editProfile')}
+        plate=${html`<div class="pf-lp-info">
           <div class="pf-lp-node">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
           <${McpConnectedBadge} />
           ${typeof stats.nodes === 'number' && stats.nodes > 0
-            ? html`<div class="pf-federation-badge">
+            ? html`<div class="poster-chip">
                 <span class="pf-fed-dot"></span>
                 ${t('profile.federation.statusConnected').replace('{count}', String(stats.nodes))}
               </div>`
-            : html`<div class="pf-federation-badge pf-federation-standalone">
+            : html`<div class="poster-chip">
                 ${t('profile.federation.statusStandalone')}
               </div>`
           }
-        </div>
-        <div class="pf-lp-actions">
-          <${PresencePill} />
-          <button class="btn-outline btn-sm" onClick=${() => setInstrOpen(true)}
-            title=${t('setup.instrBtnHint') || 'The block to paste into your AI chat’s instructions, and where it goes in your tool'}>
-            ${t('setup.instrBtn') || 'AI chat instructions'}</button>
-          <button class="btn-outline btn-sm" onClick=${() => onEditProfile?.()}>
-            ${t('profile.landing.profileBtn') || 'Profile'}</button>
-        </div>
-      </div>
+        </div>`}>
+        <${PresencePill} />
+        <button class="poster-action" onClick=${() => setInstrOpen(true)}
+          title=${t('setup.instrBtnHint') || 'The block to paste into your AI chat’s instructions, and where it goes in your tool'}>
+          ${t('setup.instrBtn') || 'AI chat instructions'}</button>
+        <button class="poster-action" onClick=${() => onEditProfile?.()}>
+          ${t('profile.landing.profileBtn') || 'Profile'}</button>
+      <//>
       <div class="pf-lp-stats">
         ${isNew ? html`
           ${stats.memory > 0 && stat('\u{1F9E0}', stats.memory, 'profile.stats.memories', 'memory')}
@@ -602,19 +628,12 @@ export function NextSteps({ switchTab, hasApps }) {
   return html`
     <div class="pf-next">
       <div class="poster-section-title pf-next-title">${t('profile.landing.nextTitle')}</div>
-      <div class="pf-next-grid poster-row--thing">
+      <${IndexList}>
         ${steps.map((s, i) => html`
-          <button class=${'pf-next-card' + (i === 0 ? ' pf-next-card--primary' : '')} key=${s.key}
-            onClick=${s.go}>
-            <span class="pf-next-ico">${s.icon}</span>
-            <span class="pf-next-body">
-              <span class="pf-next-card-title">${t('profile.landing.next.' + s.key + 'Title')}</span>
-              <span class="pf-next-card-desc">${t('profile.landing.next.' + s.key + 'Desc')}</span>
-            </span>
-            <span class="pf-next-arrow" aria-hidden="true">→</span>
-          </button>
+          <${IndexItem} key=${s.key} first=${i === 0} onClick=${s.go}
+            line=${t('profile.landing.next.' + s.key + 'Desc')}>${t('profile.landing.next.' + s.key + 'Title')}<//>
         `)}
-      </div>
+      <//>
       <${OpenItemsList} />
     </div>
   `;
@@ -624,19 +643,19 @@ export function NextSteps({ switchTab, hasApps }) {
  * After that the same content lives on the Extensions page; for a seasoned user it was dead space. */
 export function CortexSection({ switchTab, onDismiss }) {
   return html`
-    <div class="pf-landing-section pf-promo">
+    <div class="pf-landing-section poster-box pf-promo">
       <div class="pf-menu-title">${t('profile.landing.cortexSectionTitle')}
-        <button class="pf-promo-dismiss" title=${t('profile.landing.promoDismiss') || 'Hide'}
+        <button class="poster-icon poster-icon--small pf-promo-dismiss" title=${t('profile.landing.promoDismiss') || 'Hide'}
           onClick=${(e) => { e.stopPropagation(); onDismiss?.(); }}>✕</button>
       </div>
       <div class="pf-cortex-grid">
-        <div class="pf-cortex-card" onClick=${() => switchTab('extensions')}>
+        <div class="pf-cortex-card poster-box" onClick=${() => switchTab('extensions')}>
           <div class="pf-cortex-header">
             <span>\u{1F4CA}</span><span>${t('profile.landing.cortexCharts')}</span>
           </div>
           <p class="pf-cortex-desc">${t('profile.landing.cortexChartsDesc')}</p>
         </div>
-        <div class="pf-cortex-card" onClick=${() => switchTab('extensions')}>
+        <div class="pf-cortex-card poster-box" onClick=${() => switchTab('extensions')}>
           <div class="pf-cortex-header">
             <span>\u{1F3A8}</span><span>${t('profile.landing.cortexCanvas')}</span>
           </div>
@@ -660,11 +679,7 @@ export function InboxNavButton({ active, onClick }) {
   useEffect(() => { load(); }, [load]);
   const ref = useRef(load); ref.current = load;
   useEffect(() => onLiveUpdate(['messages'], () => ref.current()), []);
-  return html`
-    <button class="pf-side-item${active ? ' pf-side-item--active' : ''}" onClick=${onClick}>
-      <span class="pf-side-label">${t('profile.tabs.inbox')}</span>
-      ${unread > 0 ? html`<span class="pf-side-badge">${unread}</span>` : null}
-    </button>`;
+  return html`<${SideMenuItem} active=${active} onClick=${onClick} count=${unread}>${t('profile.tabs.inbox')}<//>`;
 }
 
 /* ───── Persistent sidebar groups (replaces the tier-adaptive menu) ─────

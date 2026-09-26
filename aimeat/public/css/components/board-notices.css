@@ -1,0 +1,39 @@
+/**
+ * @file board-notices.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A board's notices: one per row with a rule under it, its category as a Tag on the left
+ *   (a grey dot when it has none), the title as a button that turns coral under the pointer, the
+ *   words, who posted it and on which board in typewriter, the replies and the time in typewriter on
+ *   the right; a notice's own page shows its text in a reading size and each reply beside a grey edge.
+ *   On a phone the columns stack. Drawn only by the Boards page; moved here unchanged with its class
+ *   names (UI consolidation phase 5, a move). The reply's edge reads the shape tokens.
+ *   Drawn as markup by views/profile/boards/board.js, cover.js and notice.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-25 — A notice's category is the Tag (.poster-chip, plain), a unification: Jouni's decision "Tag"; its coral capitals go.
+ *   v1.0.0 — 2026-09-25 — Moved out of boards-poster.css (UI consolidation phase 5, a move).
+ */
+
+.bp-notice { display: grid; grid-template-columns: 6rem minmax(0, 1fr) 9rem; gap: 0 1.1rem; padding: .85rem 0; border-bottom: 1px solid var(--border); align-items: start; }
+/* The category is the Tag (.poster-chip, plain): it names a kind. The cell keeps its place. */
+.bp-cat { padding-top: .2rem; overflow-wrap: anywhere; }
+.bp-cat--q { color: var(--text-dim); }
+.bp-notice-body { min-width: 0; }
+.bp-notice-title { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); text-align: left; display: block; overflow-wrap: anywhere; }
+.bp-notice-title:hover { color: var(--accent); }
+.bp-notice-body p { margin: .25rem 0 0; font-size: .88rem; line-height: 1.55; color: var(--text); max-width: 66ch; overflow-wrap: anywhere; }
+.bp-who { margin-top: .35rem; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+.bp-who b { color: var(--text); font-weight: 500; }
+.bp-who-board { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
+.bp-r { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; color: var(--text-dim); }
+.bp-r b { display: block; font-weight: 500; }
+.bp-notice-text { margin: 1.2rem 0 0; font-size: 1.05rem; line-height: 1.6; color: var(--text); max-width: 66ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bp-reply { padding: .7rem 0 .7rem 1.2rem; border-left: var(--shape-frame-heavy) solid var(--border); margin-top: .7rem; }
+.bp-reply p { margin: .25rem 0 0; font-size: .92rem; line-height: 1.55; color: var(--text); max-width: 66ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .bp-notice { grid-template-columns: minmax(0, 1fr); gap: .3rem 0; }
+  .bp-r { text-align: left; }
+  .bp-r b { display: inline; margin-right: .5rem; }
+}

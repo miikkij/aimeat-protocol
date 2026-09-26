@@ -1,0 +1,34 @@
+/**
+ * @file fold-row.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Rows that open in place: a coral mono number, the name, a mono detail at the right and an arrow;
+ *   the toggle, the event and the name cuts.
+ *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
+ *   the organism pages and the admin), under its own name; the class names stay, because every page
+ *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-26 — The done tone, .og-fold--done: a finished step's number in green, a meaning (formerly calibrator-poster.css .cal-step.is-done).
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
+ */
+
+.og-folds { display: flex; flex-direction: column; }
+.og-fold { display: flex; align-items: center; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); font-size: 1rem; font-weight: 600; line-height: 1.3; color: var(--text); }
+.og-folds .og-fold:last-child { border-bottom: 0; }
+.og-fold i { font-family: var(--font-mono); font-size: .78rem; font-style: normal; color: var(--accent); flex: 0 0 4.2rem; }
+.og-fold-r { margin-left: auto; font-family: var(--font-mono); font-size: .75rem; font-weight: 500; color: var(--text-dim); white-space: nowrap; }
+.og-fold-arrow { font-family: var(--font-poster); font-size: 1.1rem; color: var(--text); margin-left: .6rem; }
+.og-fold--toggle { width: 100%; background: none; border: 0; border-bottom: 0; padding: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: 1.05rem; }
+.og-fold--toggle i { flex-basis: 2rem; }
+/* The done tone: a step that is finished shows its number in green (a meaning, not a style). */
+.og-fold--done i { color: var(--success-fg); }
+.og-fold--toggle:hover span:first-of-type { color: var(--accent); }
+.og-fold-sec.is-open .og-fold--toggle { margin-bottom: .9rem; }
+.og-fold-body { display: flex; flex-direction: column; gap: .8rem; }
+.og-fold-name { font-weight: 700; min-width: 0; }
+.og-fold-door { font-size: .72rem; flex: none; }
+.og-fold--event { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .95rem; }
+.og-fold--event:hover b { color: var(--accent); }
+.og-fold--event b { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-fold-who { color: var(--text-dim); font-weight: 600; white-space: nowrap; }

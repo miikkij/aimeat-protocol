@@ -5,6 +5,17 @@
  * @description Styles for the profile Notebook tab (pf-nb-* prefix): capture box, librarian hits,
  *   and inbox notes. Dark-theme only — all colors/spacing via theme.css variables.
  * @version-history
+ *   v1.10.0 -- 2026-09-26 -- The trust settings are the Check line: their size and grey go, their row stays (a unification: Jouni's decision "Check line").
+ *   v1.9.0 -- 2026-09-26 -- The librarian's hits are the Listing: .pf-nb-hits, .pf-nb-hit and its head, title, snippet, foot, key and producer go (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-26 -- A hit's key wears the Key (.key-name); .pf-nb-hit-key keeps only its one line (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-26 -- The steps of a note's sorting (.pf-nb-steps, .pf-nb-step and its done and active states) are the library's Progress steps (css/components/progress-steps.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v1.6.0 -- 2026-09-25 -- The labels over a note's and a living document's fields are the row label (.poster-label): .pf-nb-suggest-label keeps only its margin (Jouni's decision "Row label", a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.4.0 -- 2026-09-25 -- A framed box's own frame and ground go: it is the Object box (.poster-box, css/poster.css); its place (margin, padding) stays here (Jouni's decision "Object box", a unification).
+ *   v1.3.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.1.0 — 2026-09-25 — A button that is a mark, not a word, is the library's small icon button,
+ *     .poster-icon--small (Jouni's decision "Icon button"): the rules that drew the old marks here go;
+ *     a place's layout value stays on its own class.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian + inbox (slice A).
  *   v1.1.0 — 2026-06-21 — Enrich (plan) panel: plan steps, run controls, enriched preview.
@@ -14,12 +25,7 @@
 .pf-nb-capture {
   margin-bottom: var(--space-lg, 1.5rem);
 }
-.pf-nb-textarea {
-  width: 100%;
-  resize: vertical;
-  min-height: 5rem;
-  font-family: inherit;
-}
+.pf-nb-textarea { min-height: 5rem; }
 .pf-nb-capture-actions {
   display: flex;
   align-items: center;
@@ -37,51 +43,7 @@
 }
 
 .pf-nb-scope { margin-bottom: var(--space-sm, 0.75rem); }
-.pf-nb-hit-producer {
-  margin-top: var(--space-xs, 0.4rem);
-  color: var(--text-dim, var(--text));
-}
-
-.pf-nb-hits {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm, 0.75rem);
-}
-.pf-nb-hit {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 8px);
-  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
-}
-.pf-nb-hit-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm, 0.75rem);
-}
-.pf-nb-hit-title {
-  font-weight: 600;
-  color: var(--text);
-}
-.pf-nb-hit-snippet {
-  margin-top: var(--space-xs, 0.4rem);
-  color: var(--text-dim, var(--text));
-  font-size: 0.9em;
-  line-height: 1.4;
-}
-.pf-nb-hit-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm, 0.75rem);
-  margin-top: var(--space-xs, 0.4rem);
-}
-.pf-nb-hit-key {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono, monospace);
-}
+/* The librarian's hits are the Listing (css/components/listing.css). */
 
 .pf-nb-inbox {
   display: flex;
@@ -128,10 +90,6 @@
   align-items: center;
   gap: var(--space-xs, 0.4rem);
 }
-.pf-nb-view-btn {
-  padding: 0.05rem 0.45rem;
-  line-height: 1.2;
-}
 .pf-nb-note-foot {
   display: flex;
   align-items: center;
@@ -158,15 +116,9 @@
   font-style: italic;
   margin-bottom: var(--space-xs, 0.4rem);
 }
+/* A field's label is the row label (.poster-label); it keeps its place. */
 .pf-nb-suggest-label {
-  font-size: 0.8em;
-  color: var(--text-dim, var(--text));
   margin-top: var(--space-xs, 0.4rem);
-}
-.pf-nb-suggest-body {
-  width: 100%;
-  resize: vertical;
-  font-family: inherit;
 }
 .pf-nb-suggest-alts {
   display: flex;
@@ -183,21 +135,7 @@
 }
 
 .pf-nb-progress { gap: var(--space-sm, 0.75rem); }
-.pf-nb-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-.pf-nb-step {
-  font-size: 0.85em;
-  color: var(--text-dim, var(--text));
-  opacity: 0.6;
-}
-.pf-nb-step.active { opacity: 1; color: var(--text); font-weight: 600; }
-.pf-nb-step.done { opacity: 0.85; color: var(--success, var(--text)); }
+/* The steps of the sorting (.pf-nb-steps, .pf-nb-step) are a library part: css/components/progress-steps.css. */
 
 /* ── Enrich (plan) panel ── */
 .pf-nb-enrich {
@@ -237,7 +175,6 @@
   flex-wrap: wrap;
 }
 .pf-nb-plan-step-title { font-weight: 600; color: var(--text); }
-.pf-nb-plan-tag { color: var(--success, var(--text)); font-size: 0.85em; }
 .pf-nb-plan-why { font-style: italic; }
 .pf-nb-plan-step-btns {
   display: flex;
@@ -251,9 +188,7 @@
 .pf-nb-enrich-preview-body {
   max-height: 24rem;
   overflow: auto;
-  background: var(--bg-dim, var(--card));
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 8px);
+  margin: 0;
   padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
 }
 
@@ -269,8 +204,6 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.85em;
-  color: var(--text-dim, var(--text));
   cursor: pointer;
 }
 

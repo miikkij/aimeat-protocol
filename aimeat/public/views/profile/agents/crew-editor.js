@@ -14,6 +14,24 @@
  *     bundle, and its verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- The crew form's check lines are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.13.0 -- 2026-09-26 -- A crew member's and a task's place (agents[0], tasks[0]), a tool's id and a tag's memory prefix are the inline code (.code-inline), a unification: the look most tabs use for an identifier.
+ *   v1.12.0 -- 2026-09-26 -- A part of the crew form under its hairline is the split (.og-split), a unification: the line Workflows and Boards draw.
+ *   v1.11.0 -- 2026-09-25 -- A field's or a directive's label is the Row label (.poster-label), a unification: Jouni's decision Row label.
+ *   v1.10.0 -- 2026-09-25 -- Every quiet way on is the action link (.poster-action, its quiet tone where it sits among controls), and the one loud action is the dark block (.poster-slab, its control cut), a unification: Jouni's decisions Action link and Loud action.
+ *   v1.9.0 -- 2026-09-25 -- A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.5.0 -- 2026-09-25 -- The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.4.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.2.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   2026-09-20 -- ToolMenu has a Decisions group: `decide` and `decide:<rule>`, disabled with the
  *     reason and a link to the settings when no TypeSafe key exists for this agent.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -92,7 +110,7 @@ function ListInput({ value, onChange, placeholder, id, toText, fromText }) {
     const names = text.split(',').map(s => s.trim()).filter(Boolean);
     onChange(fromText ? fromText(names, list) : names);
   };
-  return html`<input id=${id} type="text" class="input-field input-sm" value=${text} placeholder=${placeholder || ''}
+  return html`<input id=${id} type="text" class="og-input" value=${text} placeholder=${placeholder || ''}
     onInput=${e => setText(e.target.value)} onBlur=${commit} />`;
 }
 
@@ -117,18 +135,18 @@ function JsonInput({ value, onChange, id, rows }) {
     catch (e) { setErr(e.message); }
   };
   return html`
-    <textarea id=${id} class="input-field pf-agd-crew-json" rows=${rows || 4} value=${text}
+    <textarea id=${id} class="og-textarea" rows=${rows || 4} value=${text}
       onInput=${e => setText(e.target.value)} onBlur=${commit}></textarea>
-    ${err && html`<div class="pf-agd-crew-parse-error">${t(`${K}.messages.jsonInvalid`, { err })}</div>`}
+    ${err && html`<div class="form-message form-message--error">${t(`${K}.messages.jsonInvalid`, { err })}</div>`}
   `;
 }
 
 function Field({ label, hint, children, htmlFor }) {
   return html`
     <div class="pf-agd-form-field pf-agd-crew-field">
-      <label for=${htmlFor}>${label}</label>
+      <label class="poster-label" for=${htmlFor}>${label}</label>
       ${children}
-      ${hint && html`<div class="pf-agd-help-text">${hint}</div>`}
+      ${hint && html`<div class="poster-hint pf-agd-help-text">${hint}</div>`}
     </div>
   `;
 }
@@ -177,41 +195,41 @@ export function ToolMenu({ selected, onChange, idPrefix, runtimeTools, decideToo
       <label key=${id} class=${`pf-agd-crew-tool ${decideOff && !set.has(id) ? 'pf-agd-crew-tool--off' : ''}`}>
         <input type="checkbox" id=${`${idPrefix}-${id}`} checked=${set.has(id)} disabled=${decideOff && !set.has(id)}
                onChange=${() => toggle(id)} />
-        <span class="pf-agd-crew-tool-id">${id}</span>
+        <code class="code-inline pf-agd-crew-tool-id">${id}</code>
         <span class="pf-agd-crew-tool-desc">${desc}</span>
       </label>`;
   };
   const row = (id) => html`
     <label key=${id} class="pf-agd-crew-tool">
       <input type="checkbox" id=${`${idPrefix}-${id}`} checked=${set.has(id)} onChange=${() => toggle(id)} />
-      <span class="pf-agd-crew-tool-id">${id}</span>
+      <code class="code-inline pf-agd-crew-tool-id">${id}</code>
       <span class="pf-agd-crew-tool-desc">${livePurpose.get(id) || t(toolLabelKey(id))}</span>
     </label>
   `;
   return html`
     <div class="pf-agd-crew-tools">
       <div class="pf-agd-crew-tools-group poster-row--thing">
-        <div class="pf-agd-crew-tools-title">${t(`${K}.tools.core`)}</div>
+        <div class="pf-agd-crew-tools-title poster-day-title">${t(`${K}.tools.core`)}</div>
         ${core.map(row)}
       </div>
       <div class="pf-agd-crew-tools-group poster-row--thing">
-        <div class="pf-agd-crew-tools-title">${t(`${K}.tools.exchange`)}</div>
+        <div class="pf-agd-crew-tools-title poster-day-title">${t(`${K}.tools.exchange`)}</div>
         ${row(EXCHANGE_BUNDLE)}
-        <button type="button" class="btn-ghost btn-sm pf-agd-crew-tools-refine" onClick=${() => setRefine(r => !r)}>
+        <button type="button" class="poster-action poster-action--small pf-agd-crew-tools-refine" onClick=${() => setRefine(r => !r)}>
           ${refine ? '▾' : '▸'} ${t(`${K}.tools.exchangeRefine`)}
         </button>
         ${refine && html`<div class="pf-agd-crew-tools-verbs">${verbs.map(row)}</div>`}
       </div>
       <div class="pf-agd-crew-tools-group poster-row--thing">
-        <div class="pf-agd-crew-tools-title">${t(`${K}.tools.decisions`)}</div>
+        <div class="pf-agd-crew-tools-title poster-day-title">${t(`${K}.tools.decisions`)}</div>
         ${decideOff && html`
-          <p class="pf-agd-help-text" role="note">
+          <p class="poster-hint pf-agd-help-text" role="note">
             ${decideTools && !decideTools.enabled ? t(`${K}.tools.decideOffOperator`) : t(`${K}.tools.decideNoKey`)}
-            ${' '}<a class="pf-agd-crew-link" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a>
+            ${' '}<a class="poster-action poster-action--small" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a>
           </p>`}
         ${decideIds.map(decideRow)}
         ${!decideOff && ruleIds.length === 0 && html`
-          <p class="pf-agd-help-text">${t(`${K}.tools.decideNoRules`)} <a class="pf-agd-crew-link" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a></p>`}
+          <p class="poster-hint pf-agd-help-text">${t(`${K}.tools.decideNoRules`)} <a class="poster-action poster-action--small" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a></p>`}
       </div>
     </div>
   `;
@@ -219,7 +237,7 @@ export function ToolMenu({ selected, onChange, idPrefix, runtimeTools, decideToo
 
 function SectionHead({ title, lines }) {
   return html`
-    <div class="pf-agd-section-title">${title}</div>
+    <div class="pf-agd-section-title sub-heading">${title}</div>
     <${ErrorLines} lines=${lines} />
   `;
 }
@@ -229,10 +247,10 @@ export function IdentitySection({ doc, onChange, errors }) {
   const caps = (doc.capabilities && typeof doc.capabilities === 'object') ? doc.capabilities : {};
   const setCap = (k, v) => set({ capabilities: { ...caps, [k]: v } });
   return html`
-    <section class="pf-agd-crew-section">
+    <section class="og-split pf-agd-crew-section">
       <${SectionHead} title=${t(`${K}.sections.identity`)} lines=${errors.identity} />
       <${Field} label=${t(`${K}.fields.agentName`)} hint=${t(`${K}.fields.agentNameHint`)} htmlFor="crew-agent-name">
-        <input id="crew-agent-name" type="text" class="input-field input-sm" value=${doc.agent_name || ''} readonly />
+        <input id="crew-agent-name" type="text" class="og-input" value=${doc.agent_name || ''} readonly />
       <//>
       <${Field} label=${t(`${K}.fields.tags`)} hint=${t(`${K}.fields.tagsHint`)} htmlFor="crew-tags">
         <${ListInput} id="crew-tags" value=${doc.tags} onChange=${v => set({ tags: v })} placeholder="research, news" />
@@ -253,7 +271,7 @@ export function IdentitySection({ doc, onChange, errors }) {
         <${ListInput} id="crew-skills" value=${doc.skills} onChange=${v => set({ skills: v.length ? v : undefined })} />
       <//>
       <${Field} label=${t(`${K}.fields.readme`)} htmlFor="crew-readme">
-        <textarea id="crew-readme" class="input-field" rows="3" value=${doc.readme_md || ''}
+        <textarea id="crew-readme" class="og-textarea" rows="3" value=${doc.readme_md || ''}
           onInput=${e => set({ readme_md: e.target.value || undefined })}></textarea>
       <//>
     </section>
@@ -271,67 +289,67 @@ export function CrewSection({ doc, onChange, errors, runtimeTools, decideTools }
   const patchTask = (i, patch) => setTasks(tasks.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const memberKeys = agents.map(memberKey).filter(Boolean);
   return html`
-    <section class="pf-agd-crew-section">
+    <section class="og-split pf-agd-crew-section">
       <${SectionHead} title=${t(`${K}.sections.crew`)} lines=${[]} />
       <div class="pf-agd-crew-sub">${t(`${K}.fields.members`)}</div>
       ${agents.map((a, i) => html`
         <div key=${`m${i}`} class="pf-agd-crew-card ${errors.agents.has(i) ? 'pf-agd-crew-card--problem' : ''}">
           <div class="pf-agd-crew-card-head">
-            <span class="pf-agd-crew-card-index">agents[${i}]</span>
-            <button type="button" class="btn-ghost btn-sm" onClick=${() => setAgents(agents.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}</button>
+            <code class="code-inline pf-agd-crew-card-index">agents[${i}]</code>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => setAgents(agents.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}</button>
           </div>
           <${ErrorLines} lines=${errors.agents.get(i)} />
           <div class="pf-agd-crew-grid2">
             <${Field} label=${t(`${K}.fields.memberName`)} htmlFor=${`crew-m${i}-name`}>
-              <input id=${`crew-m${i}-name`} type="text" class="input-field input-sm" value=${a.name || ''} onInput=${e => patchAgent(i, { name: e.target.value })} />
+              <input id=${`crew-m${i}-name`} type="text" class="og-input" value=${a.name || ''} onInput=${e => patchAgent(i, { name: e.target.value })} />
             <//>
             <${Field} label=${t(`${K}.fields.memberRole`)} htmlFor=${`crew-m${i}-role`}>
-              <input id=${`crew-m${i}-role`} type="text" class="input-field input-sm" value=${a.role || ''} onInput=${e => patchAgent(i, { role: e.target.value })} />
+              <input id=${`crew-m${i}-role`} type="text" class="og-input" value=${a.role || ''} onInput=${e => patchAgent(i, { role: e.target.value })} />
             <//>
           </div>
           <${Field} label=${t(`${K}.fields.memberGoal`)} htmlFor=${`crew-m${i}-goal`}>
-            <textarea id=${`crew-m${i}-goal`} class="input-field" rows="2" value=${a.goal || ''} onInput=${e => patchAgent(i, { goal: e.target.value })}></textarea>
+            <textarea id=${`crew-m${i}-goal`} class="og-textarea" rows="2" value=${a.goal || ''} onInput=${e => patchAgent(i, { goal: e.target.value })}></textarea>
           <//>
           <${Field} label=${t(`${K}.fields.memberBackstory`)} htmlFor=${`crew-m${i}-backstory`}>
-            <textarea id=${`crew-m${i}-backstory`} class="input-field" rows="2" value=${a.backstory || ''} onInput=${e => patchAgent(i, { backstory: e.target.value })}></textarea>
+            <textarea id=${`crew-m${i}-backstory`} class="og-textarea" rows="2" value=${a.backstory || ''} onInput=${e => patchAgent(i, { backstory: e.target.value })}></textarea>
           <//>
           <${Field} label=${t(`${K}.fields.memberTools`)}>
             <${ToolMenu} idPrefix=${`crew-m${i}-tool`} selected=${a.tools} runtimeTools=${runtimeTools} decideTools=${decideTools} onChange=${v => patchAgent(i, { tools: v })} />
           <//>
-          <label class="pf-agd-crew-check">
+          <label class="pf-agd-crew-check check-line">
             <input type="checkbox" checked=${!!a.allow_delegation} onChange=${e => patchAgent(i, { allow_delegation: e.target.checked })} />
             ${t(`${K}.fields.allowDelegation`)}
           </label>
         </div>
       `)}
       <div class="pf-agd-form-actions">
-        <button type="button" class="btn-outline btn-sm" onClick=${() => setAgents([...agents, emptyMember()])}>${t(`${K}.actions.addMember`)}</button>
+        <button type="button" class="poster-action poster-action--small" onClick=${() => setAgents([...agents, emptyMember()])}>${t(`${K}.actions.addMember`)}</button>
       </div>
 
       <div class="pf-agd-crew-sub">${t(`${K}.fields.tasks`)}</div>
       ${tasks.map((task, i) => html`
         <div key=${`t${i}`} class="pf-agd-crew-card ${errors.tasks.has(i) ? 'pf-agd-crew-card--problem' : ''}">
           <div class="pf-agd-crew-card-head">
-            <span class="pf-agd-crew-card-index">tasks[${i}]</span>
-            <button type="button" class="btn-ghost btn-sm" onClick=${() => setTasks(tasks.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}</button>
+            <code class="code-inline pf-agd-crew-card-index">tasks[${i}]</code>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => setTasks(tasks.filter((_, j) => j !== i))}>${t(`${K}.actions.remove`)}</button>
           </div>
           <${ErrorLines} lines=${errors.tasks.get(i)} />
           <div class="pf-agd-crew-grid2">
             <${Field} label=${t(`${K}.fields.taskId`)} htmlFor=${`crew-t${i}-id`}>
-              <input id=${`crew-t${i}-id`} type="text" class="input-field input-sm" value=${task.id || ''} onInput=${e => patchTask(i, { id: e.target.value })} />
+              <input id=${`crew-t${i}-id`} type="text" class="og-input" value=${task.id || ''} onInput=${e => patchTask(i, { id: e.target.value })} />
             <//>
             <${Field} label=${t(`${K}.fields.taskAgent`)} htmlFor=${`crew-t${i}-agent`}>
-              <select id=${`crew-t${i}-agent`} class="input-field input-sm" value=${task.agent || ''} onChange=${e => patchTask(i, { agent: e.target.value })}>
+              <select id=${`crew-t${i}-agent`} class="select-field" value=${task.agent || ''} onChange=${e => patchTask(i, { agent: e.target.value })}>
                 <option value="">—</option>
                 ${memberKeys.map(k => html`<option key=${k} value=${k}>${k}</option>`)}
               </select>
             <//>
           </div>
           <${Field} label=${t(`${K}.fields.taskDescription`)} hint=${t(`${K}.fields.taskDescriptionHint`)} htmlFor=${`crew-t${i}-desc`}>
-            <textarea id=${`crew-t${i}-desc`} class="input-field" rows="3" value=${task.description || ''} onInput=${e => patchTask(i, { description: e.target.value })}></textarea>
+            <textarea id=${`crew-t${i}-desc`} class="og-textarea" rows="3" value=${task.description || ''} onInput=${e => patchTask(i, { description: e.target.value })}></textarea>
           <//>
           <${Field} label=${t(`${K}.fields.taskExpected`)} htmlFor=${`crew-t${i}-expected`}>
-            <textarea id=${`crew-t${i}-expected`} class="input-field" rows="2" value=${task.expected_output || ''} onInput=${e => patchTask(i, { expected_output: e.target.value })}></textarea>
+            <textarea id=${`crew-t${i}-expected`} class="og-textarea" rows="2" value=${task.expected_output || ''} onInput=${e => patchTask(i, { expected_output: e.target.value })}></textarea>
           <//>
           ${i > 0 && html`
             <${Field} label=${t(`${K}.fields.taskContext`)}>
@@ -339,7 +357,7 @@ export function CrewSection({ doc, onChange, errors, runtimeTools, decideTools }
                 ${tasks.slice(0, i).map((prev, j) => {
                   const pid = prev.id || `#${j + 1}`;
                   const on = Array.isArray(task.context) && task.context.includes(prev.id);
-                  return html`<label key=${j} class="pf-agd-crew-check pf-agd-crew-check--inline">
+                  return html`<label key=${j} class="pf-agd-crew-check pf-agd-crew-check--inline check-line">
                     <input type="checkbox" checked=${on} disabled=${!prev.id} onChange=${e => {
                       const cur = Array.isArray(task.context) ? task.context : [];
                       patchTask(i, { context: e.target.checked ? [...cur, prev.id] : cur.filter(x => x !== prev.id) });
@@ -348,19 +366,19 @@ export function CrewSection({ doc, onChange, errors, runtimeTools, decideTools }
               </div>
             <//>
           `}
-          <label class="pf-agd-crew-check">
+          <label class="pf-agd-crew-check check-line">
             <input type="checkbox" checked=${!!task.async} onChange=${e => patchTask(i, { async: e.target.checked })} />
             ${t(`${K}.fields.taskAsync`)}
           </label>
         </div>
       `)}
       <div class="pf-agd-form-actions">
-        <button type="button" class="btn-outline btn-sm" onClick=${() => setTasks([...tasks, emptyTask()])}>${t(`${K}.actions.addTask`)}</button>
+        <button type="button" class="poster-action poster-action--small" onClick=${() => setTasks([...tasks, emptyTask()])}>${t(`${K}.actions.addTask`)}</button>
       </div>
 
       ${tasks.length > 0 && html`
         <div class="pf-agd-crew-sub">${t(`${K}.dag.title`)}</div>
-        <div class="pf-agd-help-text">${t(`${K}.dag.hint`)}</div>
+        <div class="poster-hint pf-agd-help-text">${t(`${K}.dag.hint`)}</div>
         <${TaskDag} tasks=${tasks} problemIds=${errors.problemTaskIndexes} />
       `}
     </section>
@@ -380,18 +398,18 @@ export function RunSection({ doc, onChange, errors }) {
     set({ listen_for: list.length ? list : undefined });
   };
   return html`
-    <section class="pf-agd-crew-section">
+    <section class="og-split pf-agd-crew-section">
       <${SectionHead} title=${t(`${K}.sections.run`)} lines=${errors.run} />
       <div class="pf-agd-crew-grid3">
         <${Field} label=${t(`${K}.fields.llmProfile`)} hint=${t(`${K}.fields.llmProfileHint`)} htmlFor="crew-llm">
-          <input id="crew-llm" type="text" class="input-field input-sm" value=${doc.llm_profile || ''} onInput=${e => set({ llm_profile: e.target.value || undefined })} />
+          <input id="crew-llm" type="text" class="og-input" value=${doc.llm_profile || ''} onInput=${e => set({ llm_profile: e.target.value || undefined })} />
         <//>
         <${Field} label=${t(`${K}.fields.temperature`)} htmlFor="crew-temp">
-          <input id="crew-temp" type="number" min="0" max="2" step="0.1" class="input-field input-sm" value=${doc.temperature ?? ''}
+          <input id="crew-temp" type="number" min="0" max="2" step="0.1" class="og-input" value=${doc.temperature ?? ''}
             onInput=${e => set({ temperature: e.target.value === '' ? undefined : Number(e.target.value) })} />
         <//>
         <${Field} label=${t(`${K}.fields.process`)} htmlFor="crew-process">
-          <select id="crew-process" class="input-field input-sm" value=${doc.process || 'sequential'} onChange=${e => set({ process: e.target.value })}>
+          <select id="crew-process" class="select-field" value=${doc.process || 'sequential'} onChange=${e => set({ process: e.target.value })}>
             <option value="sequential">${t(`${K}.fields.processSequential`)}</option>
             <option value="hierarchical">${t(`${K}.fields.processHierarchical`)}</option>
           </select>
@@ -399,14 +417,14 @@ export function RunSection({ doc, onChange, errors }) {
       </div>
       <${Field} label=${t(`${K}.fields.listenFor`)}>
         <div class="pf-agd-crew-context">
-          ${LISTEN.map(k => html`<label key=${k} class="pf-agd-crew-check pf-agd-crew-check--inline">
+          ${LISTEN.map(k => html`<label key=${k} class="pf-agd-crew-check pf-agd-crew-check--inline check-line">
             <input type="checkbox" checked=${listen.has(k)} onChange=${() => toggleListen(k)} />${t(`${K}.fields.${LISTEN_KEY[k]}`)}</label>`)}
         </div>
       <//>
-      <label class="pf-agd-crew-check">
+      <label class="pf-agd-crew-check check-line">
         <input type="checkbox" checked=${!!doc.memory} onChange=${e => set({ memory: e.target.checked })} />${t(`${K}.fields.memory`)}
       </label>
-      <label class="pf-agd-crew-check">
+      <label class="pf-agd-crew-check check-line">
         <input type="checkbox" checked=${!!doc.discover} onChange=${e => set({ discover: e.target.checked })} />${t(`${K}.fields.discover`)}
       </label>
     </section>
@@ -416,7 +434,7 @@ export function RunSection({ doc, onChange, errors }) {
 export function ContractSection({ doc, onChange, errors }) {
   const set = (patch) => onChange({ ...doc, ...patch });
   return html`
-    <section class="pf-agd-crew-section">
+    <section class="og-split pf-agd-crew-section">
       <${SectionHead} title=${t(`${K}.sections.contract`)} lines=${errors.contract} />
       <${Field} label=${t(`${K}.fields.offers`)} hint=${t(`${K}.fields.offersHint`)} htmlFor="crew-offers">
         <${JsonInput} id="crew-offers" value=${doc.offers} onChange=${v => set({ offers: v })} rows="4" />

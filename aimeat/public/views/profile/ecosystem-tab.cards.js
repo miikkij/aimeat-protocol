@@ -8,10 +8,36 @@
  *   details" disclosure: principal, grants, subscriptions, binding). Extracted from ecosystem-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- An app's setup guide is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
+ *   v1.16.0 -- 2026-09-26 -- A sample prompt is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v1.15.0 -- 2026-09-26 -- A sample prompt is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v1.14.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.13.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 -- 2026-09-26 -- A control that opens a panel below it is the Tab's fold tone (.poster-tab--fold, is-on while open), and the parameters section that is one row until opened is the FoldSection; their own toggles, carets and arrows go (a unification: Jouni's decision Tabs and filters, and the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- The ecosystem card's help lines are the Hint (.poster-hint); their own sizes go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- A node's agents, the CORS chain, the ecosystem's identifiers and its pairing code are inline code (.code-inline); their own mono looks go (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
+ *   v1.7.0 -- 2026-09-25 -- The binding (your side, the app's origin, the key's fingerprint) is the Facts (css/components/facts.css), a unification: the look most tabs use; its note follows under it.
+ *   v1.6.0 -- 2026-09-25 -- A data entry's row, which opens its value in place, is the folded row (og-fold og-fold--event, the arrow for the caret), a unification: the look most tabs use.
+ *   v1.5.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.4.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.3.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from ecosystem-tab.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy control unified: the bespoke .copy-prompt-btn is the shared .btn-primary, whose
  *       .copied state now lives in theme.css. Copy labels come from the shared common.* keys.
+ *   v1.2.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.3.0 — 2026-09-25 — Code inside a sentence or a value line is the code-inline cut of the Code block (UI consolidation phase 5, a unification).
+ *   v1.4.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -27,6 +53,7 @@ import { getAutomationRecipe } from '/js/services/ecosystem.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { keyFp, OUTBOUND_EVENTS, resolveOrganismName } from './ecosystem-tab.helpers.js';
 import { swallowed } from '/js/swallowed.js';
+import { Hint } from '/components/Hint.js';
 
 /**
  * One "Data this app wrote" entry: collapsed row (key + visibility chip + timeAgo) that expands to
@@ -37,12 +64,12 @@ export function EcoDataEntry({ entry }) {
   const [open, setOpen] = useState(false);
   return html`
     <div class="pf-eco-data-entry">
-      <button class="pf-eco-data-row" onClick=${() => setOpen(o => !o)}
+      <button class="og-fold og-fold--event pf-eco-data-row" onClick=${() => setOpen(o => !o)}
         aria-expanded=${open} title=${open ? t('profile.ecosystem.dataCollapse') : t('profile.ecosystem.dataExpand')}>
-        <span class="pf-eco-caret">${open ? '▼' : '▶'}</span>
-        <span class="pf-eco-mono pf-eco-data-key">${entry.key}</span>
-        <span class="pf-eco-chip pf-eco-data-vis">${entry.visibility}</span>
-        <span class="pf-eco-dim pf-eco-data-time">${entry.updated_at ? timeAgo(entry.updated_at) : ''}</span>
+        <b class="pf-eco-data-key">${entry.key}</b>
+        <span class=${`poster-chip ${entry.visibility === 'public' ? 'poster-chip--sun' : ''}`}>${entry.visibility}</span>
+        <span class="pf-eco-data-time poster-time">${entry.updated_at ? timeAgo(entry.updated_at) : ''}</span>
+        <span class="og-fold-arrow">${open ? '↓' : '→'}</span>
       </button>
       ${open && html`
         <div class="pf-eco-data-body">
@@ -71,8 +98,8 @@ export function EcoSetupGuide({ app }) {
     <div class="pf-eco-section poster-row--thing pf-eco-setup-guide">
       <div class="pf-eco-section-title">${t('profile.ecosystem.setupGuideTitle')}</div>
       ${guide
-        ? html`<div class="pf-eco-setup-guide-md"><${Markdown} text=${guide} /></div>`
-        : html`<p class="pf-eco-dim pf-eco-setup-guide-missing">${t('profile.ecosystem.setupGuideMissing')}</p>`}
+        ? html`<div class="pf-eco-setup-guide-md"><${Markdown} text=${guide} small /></div>`
+        : html`<p class="poster-hint">${t('profile.ecosystem.setupGuideMissing')}</p>`}
     </div>`;
 }
 
@@ -122,18 +149,18 @@ export function EcoAskInClaude({ app }) {
           <span class="pf-eco-mcp-icon">💬</span>
           <strong class="pf-eco-mcp-title">${t('profile.ecosystem.mcpTitle')}</strong>
         </div>
-        <p class="pf-eco-dim pf-eco-mcp-sub">${t('profile.ecosystem.mcpSub')}</p>
-        <p class="pf-eco-dim pf-eco-mcp-connect">${t('profile.ecosystem.mcpConnect')}</p>
+        <p class="poster-hint">${t('profile.ecosystem.mcpSub')}</p>
+        <p class="poster-hint">${t('profile.ecosystem.mcpConnect')}</p>
         <div class="pf-eco-mcp-sample">
           ${organismName
             ? html`
-              <div class="pf-eco-mcp-sample-label">${t('profile.ecosystem.mcpSampleLabel')}</div>
+              <div class="poster-label">${t('profile.ecosystem.mcpSampleLabel')}</div>
               <div class="pf-eco-mcp-sample-row">
-                <code class="pf-eco-mcp-sample-prompt">${samplePrompt}</code>
-                <${CopyButton} className="btn-primary" text=${samplePrompt} />
+                <code class="code-block pf-eco-mcp-sample-prompt">${samplePrompt}</code>
+                <${CopyButton} className="poster-slab" text=${samplePrompt} />
               </div>
-              <p class="pf-eco-dim pf-eco-mcp-sample-note">${t('profile.ecosystem.mcpAccessNote')}</p>`
-            : html`<p class="pf-eco-dim pf-eco-mcp-no-organism">${t('profile.ecosystem.mcpNoOrganism')}</p>`}
+              <${Hint}>${t('profile.ecosystem.mcpAccessNote')}<//>`
+            : html`<p class="poster-hint">${t('profile.ecosystem.mcpNoOrganism')}</p>`}
         </div>
       </div>
     </div>`;
@@ -156,26 +183,24 @@ export function EcoAskInClaude({ app }) {
 export function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, setSubForm }) {
   const [open, setOpen] = useState(false);
   return html`
-    <div class="pf-eco-tech">
-      <button class="pf-eco-tech-toggle" aria-expanded=${open} onClick=${() => setOpen(o => !o)}>
-        <span class="pf-eco-caret">${open ? '▼' : '▶'}</span>
-        <span class="pf-eco-tech-icon">🔧</span>
-        <span class="pf-eco-tech-toggle-label">${t('profile.ecosystem.techDetailsTitle')}</span>
+    <div class="pf-eco-tech poster-box">
+      <button type="button" class=${`poster-tab poster-tab--fold pf-eco-tech-toggle ${open ? 'is-on' : ''}`} aria-expanded=${open} onClick=${() => setOpen(o => !o)}>
+        🔧 ${t('profile.ecosystem.techDetailsTitle')}
       </button>
       ${open && html`
         <div class="pf-eco-tech-body">
-          <p class="pf-eco-dim pf-eco-tech-hint">${t('profile.ecosystem.techDetailsHint')}</p>
+          <${Hint}>${t('profile.ecosystem.techDetailsHint')}<//>
 
           <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.principalTitle')}</div>
-            <code class="pf-eco-mono pf-eco-tech-principal">${app.geai}</code>
+            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.principalTitle')}</div>
+            <code class="code-inline">${app.geai}</code>
           </div>
 
           <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.grants')}</div>
-            <p class="pf-eco-dim pf-eco-tech-access">${t('profile.ecosystem.accessPlain')}</p>
-            <div class="pf-eco-chips">
-              ${(app.scopes || []).map(s => html`<span class="pf-eco-chip" key=${s}>${s}</span>`)}
+            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.grants')}</div>
+            <p class="poster-hint pf-eco-tech-access">${t('profile.ecosystem.accessPlain')}</p>
+            <div class="poster-chips">
+              ${(app.scopes || []).map(s => html`<span class="poster-chip" key=${s}>${s}</span>`)}
             </div>
             ${/* The areas this app may write used to be listed HERE, three disclosures deep. A
                   statement of what an outside app puts into your store is the opposite of a
@@ -184,33 +209,33 @@ export function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, setSu
           </div>
 
           <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.subscriptions')}</div>
-            <p class="pf-eco-dim pf-eco-sub-direction">${t('profile.ecosystem.subscriptionsDirection')}</p>
+            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.subscriptions')}</div>
+            <p class="poster-hint pf-eco-sub-direction">${t('profile.ecosystem.subscriptionsDirection')}</p>
             ${appSubs.length === 0
-              ? html`<div class="pf-eco-dim">${t('profile.ecosystem.noSubs')}</div>`
+              ? html`<div class="poster-quiet">${t('profile.ecosystem.noSubs')}</div>`
               : appSubs.map(s => html`
                 <div class="pf-eco-sub-row" key=${s.event + (s.createdAt || '')}>
-                  <span class="pf-eco-mono">${s.event}</span>
+                  <span class="code-inline">${s.event}</span>
                   ${s.match && html`<span class="pf-eco-dim">${JSON.stringify(s.match)}</span>`}
-                  <button class="btn-ghost btn-sm" onClick=${() => onUnsubscribe(app.app, s.event)}>${t('profile.ecosystem.removeSub')}</button>
+                  <button class="poster-action poster-action--small" onClick=${() => onUnsubscribe(app.app, s.event)}>${t('profile.ecosystem.removeSub')}</button>
                 </div>`)}
             ${app.status !== 'revoked' && html`
               <div class="pf-eco-sub-add">
-                <select class="pf-eco-select" onChange=${e => setSubForm(f => ({ ...f, [app.app]: { event: e.target.value } }))}>
+                <select class="select-field" onChange=${e => setSubForm(f => ({ ...f, [app.app]: { event: e.target.value } }))}>
                   ${OUTBOUND_EVENTS.map(ev => html`<option value=${ev} key=${ev}>${ev}</option>`)}
                 </select>
-                <button class="btn-outline btn-sm" onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}</button>
+                <button class="poster-action poster-action--small" onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}</button>
               </div>`}
           </div>
 
           <div class="pf-eco-tech-section">
-            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.binding')}</div>
-            <div class="pf-eco-binding">
-              <div>${t('profile.ecosystem.aimeatSide')}: <span class="pf-eco-mono">${app.owner}</span></div>
-              <div>${t('profile.ecosystem.appOrigin')}: <span class="pf-eco-mono">${app.app}</span></div>
-              <div>${t('profile.ecosystem.keyFp')}: <span class="pf-eco-mono">${keyFp(app.public_key)}</span></div>
-              <p class="pf-eco-dim">${t('profile.ecosystem.bindingNote')}</p>
+            <div class="pf-eco-tech-section-title sub-heading">${t('profile.ecosystem.binding')}</div>
+            <div class="facts">
+              <div class="facts-k poster-label">${t('profile.ecosystem.aimeatSide')}</div><div class="facts-v"><span class="code-inline">${app.owner}</span></div>
+              <div class="facts-k poster-label">${t('profile.ecosystem.appOrigin')}</div><div class="facts-v"><span class="code-inline">${app.app}</span></div>
+              <div class="facts-k poster-label">${t('profile.ecosystem.keyFp')}</div><div class="facts-v"><span class="code-inline">${keyFp(app.public_key)}</span></div>
             </div>
+            <p class="poster-hint">${t('profile.ecosystem.bindingNote')}</p>
           </div>
         </div>`}
     </div>`;

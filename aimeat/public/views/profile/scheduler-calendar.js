@@ -14,6 +14,19 @@
  *   import SchedulerCalendar from './scheduler-calendar.js';
  *   <${SchedulerCalendar} schedules=${[...managed, ...extensions]} reloadKey=${tick} onJumpTo=${jump} />
  * @version-history
+ *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.6.0 -- 2026-09-25 -- The calendar's month, week and day and the spend chart's cost, tokens and seconds are the Tab (.poster-tab, the chosen one .is-on); their rows take the tabs' row gap (Jouni's decisions "Tabs and filters" and "Choice", a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.4.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.3.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.2.0 -- 2026-09-25 -- A button that is a mark, not a word (a delete or close mark, a menu's
+ *     dots, an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's
+ *     decision "Icon button").
+ *   v1.1.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-07-03 -- Initial day/week/month scheduler calendar (server-projected cron cadence)
  *   v1.1.0 -- 2026-07-17 -- Continuous / high-frequency schedules (server `frequent` summary — per-minute /
@@ -68,7 +81,7 @@ function readerToday() {
 function fallsOn(at, cell) { return dayKey(at) === cellDay(cell); }
 function fmtTime(d) { return time(d, { hour: '2-digit', minute: '2-digit' }); }
 
-/** Schedule kind → the CSS/colour suffix used by .sch-cal-ev--* and .sch-badge--*. */
+/** Schedule kind → the CSS/colour suffix used by .sch-cal-ev--*. */
 function kindClass(type) {
   return ({ ai: 'ai', agent_task: 'agent', extension: 'ext', 'eco-capability': 'eco' })[type] || 'core';
 }
@@ -199,7 +212,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   const evClass = (e) => `sch-cal-ev sch-cal-ev--${kindClass(e.type)}${e.past ? ' sch-cal-ev--past' : ''}`;
   const evTitle = (e) => `${fmtTime(e.at)} · ${e.name} — ${t(e.past ? 'profile.scheduler.cal.ran' : 'profile.scheduler.cal.upcoming')}`;
   const chip = (e, i) => html`<button type="button" class=${evClass(e) + ' sch-cal-ev--click'} key=${i} title=${evTitle(e)} onClick=${onEv(e)}>
-      <span class="sch-cal-evtime">${fmtTime(e.at)}</span> ${e.name}</button>`;
+      <span class="sch-cal-evtime poster-time">${fmtTime(e.at)}</span> ${e.name}</button>`;
 
   const weekdays = useMemo(() => {
     const mon = startOfWeek(new Date(2024, 0, 1));
@@ -219,12 +232,12 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
       <div class="sch-cal-nav">
         <div class="sch-cal-modes">
           ${['month', 'week', 'day'].map((m) => html`<button key=${m} type="button"
-            class="${mode === m ? 'btn-primary' : 'btn-ghost'} btn-sm" onClick=${() => setMode(m)}>${t('profile.scheduler.cal.' + m)}</button>`)}
+            class=${`poster-tab${mode === m ? ' is-on' : ''}`} onClick=${() => setMode(m)}>${t('profile.scheduler.cal.' + m)}</button>`)}
         </div>
         <div class="sch-cal-move">
-          <button class="btn-ghost btn-sm" type="button" onClick=${() => shift(-1)} title=${t('profile.scheduler.cal.prev')}>‹</button>
-          <button class="btn-ghost btn-sm" type="button" onClick=${goToday}>${t('profile.scheduler.cal.today')}</button>
-          <button class="btn-ghost btn-sm" type="button" onClick=${() => shift(1)} title=${t('profile.scheduler.cal.next')}>›</button>
+          <button class="poster-icon poster-icon--small" type="button" onClick=${() => shift(-1)} title=${t('profile.scheduler.cal.prev')}>‹</button>
+          <button class="poster-action poster-action--small" type="button" onClick=${goToday}>${t('profile.scheduler.cal.today')}</button>
+          <button class="poster-icon poster-icon--small" type="button" onClick=${() => shift(1)} title=${t('profile.scheduler.cal.next')}>›</button>
         </div>
         ${legend}
       </div>
@@ -233,7 +246,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
     </div>`;
 
   const emptyHint = (!loading && events.length === 0 && frequentList.length === 0)
-    ? html`<div class="sch-cal-empty">${schedules.some((s) => s.enabled !== false && s.cron && s.cron !== '@activate')
+    ? html`<div class="poster-quiet sch-cal-empty">${schedules.some((s) => s.enabled !== false && s.cron && s.cron !== '@activate')
         ? t('profile.scheduler.cal.noEvents') : t('profile.scheduler.cal.empty')}</div>`
     : null;
 
@@ -241,8 +254,8 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   const FREQ_PREVIEW = 6;
   const frequentStrip = frequentList.length ? html`<div class="sch-cal-freq poster-row--thing">
     <div class="sch-cal-freq-head">
-      <span class="sch-cal-freq-title">${t('profile.scheduler.cal.frequentTitle')} <span class="sch-cal-freq-count">${frequentList.length}</span></span>
-      <button type="button" class="btn-ghost btn-sm" onClick=${() => setFoldFreq((v) => !v)}>
+      <span class="sch-cal-freq-title">${t('profile.scheduler.cal.frequentTitle')} <span class="poster-count poster-count--tally">${frequentList.length}</span></span>
+      <button type="button" class="poster-action poster-action--small" onClick=${() => setFoldFreq((v) => !v)}>
         ${foldFreq ? t('profile.scheduler.cal.freqHideGrid') : t('profile.scheduler.cal.freqShowGrid')}
       </button>
     </div>
@@ -330,7 +343,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   return html`<section class="sch-cal">
     ${head}
     ${frequentStrip}
-    ${dayEvents.length === 0 && frequentList.length === 0 && !loading ? html`<div class="sch-cal-empty">${t('profile.scheduler.cal.noEvents')}</div>` : null}
+    ${dayEvents.length === 0 && frequentList.length === 0 && !loading ? html`<div class="poster-quiet sch-cal-empty">${t('profile.scheduler.cal.noEvents')}</div>` : null}
     ${foldFreq && gridFreq.length ? html`<div class="sch-cal-bucket">
       <span class="sch-cal-hour"><span class="sch-cal-freqmark">⟳</span></span>
       <div class="sch-cal-hour-evs">${gridFreq.map((f, j) => freqChip(f, 'gf' + j))}</div>

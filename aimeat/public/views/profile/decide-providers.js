@@ -20,6 +20,20 @@
  * @usage import { DecideProviders } from './decide-providers.js';
  *   html`<${DecideProviders} view=${settings.providers} onSaved=${load} />`
  * @version-history
+ *   v1.12.0 — 2026-09-26 — A provider's lines beside its name are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.11.0 — 2026-09-26 — "Takes a key" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.10.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.9.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.7.0 — 2026-09-26 — The last labels over a field, a meter or a chart are the row label (.poster-label): the Decide editors' field labels, the overview's quota names, the AI budget chart's title; their own looks go (a unification: Jouni's decision Row label).
+ *   v1.6.0 — 2026-09-25 — A line that says a load or a save failed is the Form message in its error tone (.form-message--error); the error lines' own rules go (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
+ *   v1.3.0 — 2026-09-25 — The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   v1.1.0 — 2026-09-23 — Review round: a message is drawn beside the control that caused it and a
  *     closed form takes its message with it; the form names the three addresses a local model may
  *     have and says so while typing; an online service takes a price, and an owner's one without a
@@ -34,11 +48,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, money } from '/js/format.js';
 import { apiPut, apiDelete } from '/js/api.js';
+import { Hint } from '/components/Hint.js';
 
 const EMPTY = { id: '', title: '', kind: 'hosted', url: '', model: '', takesKey: true, apiKey: '', maxOptions: '', context: '', price: '' };
 
 /** The meta lines' class. One place, so a contrast fix is one line. */
-const META = 'pf-aitr-row-meta';
+const META = 'pf-aitr-row-meta listing-meta';
 
 /** A text length as a person reads it: to the nearest hundred once it is over a thousand. */
 function roundChars(c) { return c >= 1000 ? Math.round(c / 100) * 100 : c; }
@@ -90,7 +105,7 @@ export function toProviderBody(d) {
 /** A message where it was caused: `at` names the place, and only that place draws it. */
 function Note({ msg, at }) {
   if (!msg || msg.at !== at) return null;
-  return html`<p class=${msg.error ? 'pf-aitr-error pf-dr-pre' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key) : msg.text}</p>`;
+  return html`<p class=${msg.error ? 'form-message form-message--error pf-dr-pre' : 'form-message'} role="status">${msg.key ? t(msg.key) : msg.text}</p>`;
 }
 
 /** The three hosts the node accepts as "on this machine" (services/decide/providers.ts). */
@@ -108,53 +123,53 @@ function ProviderForm({ draft, busy, msg, onChange, onSave, onCancel }) {
   const notHere = localButNotHere(draft);
   return html`
     <div class="pf-dr-editor">
-      <label class="pf-dr-field"><span>${t('decideProviders.f.id')}</span>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.id')}</span>
         <input class="og-input og-input--mono" value=${draft.id} disabled=${busy} placeholder="my-model"
                onInput=${e => set('id', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span>${t('decideProviders.f.title')}</span>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.title')}</span>
         <input class="og-input" value=${draft.title} disabled=${busy} onInput=${e => set('title', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span>${t('decideProviders.f.kind')}</span>
-        <select class="og-input" value=${draft.kind} disabled=${busy}
+      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.kind')}</span>
+        <select class="select-field" value=${draft.kind} disabled=${busy}
                 onChange=${e => onChange({ ...draft, kind: e.currentTarget.value, takesKey: e.currentTarget.value === 'hosted' ? draft.takesKey : false })}>
           <option value="hosted">${t('decideProviders.kind.hosted')}</option>
           <option value="local">${t('decideProviders.kind.local')}</option>
         </select></label>
-      <p class="pf-aitr-note">${t('decideProviders.localHelp')}</p>
-      <label class="pf-dr-field"><span>${t('decideProviders.f.url')}</span>
+      <${Hint}>${t('decideProviders.localHelp')}<//>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.url')}</span>
         <input class="og-input og-input--mono" value=${draft.url} disabled=${busy}
                placeholder=${draft.kind === 'local' ? 'http://127.0.0.1:8801/v1/systemone' : 'https://…/v1/systemone'}
                onInput=${e => set('url', e.currentTarget.value)} /></label>
-      ${notHere && html`<p class="pf-aitr-error" role="status">${t('decideProviders.notHere')}</p>`}
-      <label class="pf-dr-field"><span>${t('decideProviders.f.model')}</span>
+      ${notHere && html`<p class="form-message form-message--error" role="status">${t('decideProviders.notHere')}</p>`}
+      <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.model')}</span>
         <input class="og-input og-input--mono" value=${draft.model} disabled=${busy} placeholder="multilingual"
                onInput=${e => set('model', e.currentTarget.value)} /></label>
-      <label class="pf-dr-check">
+      <label class="pf-dr-check check-line">
         <input type="checkbox" class="checkbox checkbox-sm" checked=${draft.takesKey} disabled=${busy}
                onChange=${() => set('takesKey', !draft.takesKey)} />
         ${' '}${t('decideProviders.f.takesKey')}
       </label>
       ${draft.takesKey && html`
-        <label class="pf-dr-field"><span>${t('decideProviders.f.key')}</span>
+        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.key')}</span>
           <input class="og-input" type="password" autocomplete="off" data-1p-ignore data-lpignore="true"
                  value=${draft.apiKey} disabled=${busy} onInput=${e => set('apiKey', e.currentTarget.value)} /></label>`}
       ${draft.kind === 'hosted' && html`
-        <label class="pf-dr-field"><span>${t('decideProviders.f.price')}</span>
+        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.price')}</span>
           <input class="og-input" type="number" min="0" step="any" value=${draft.price} disabled=${busy} placeholder="0.042"
                  onInput=${e => set('price', e.currentTarget.value)} /></label>`}
-      <h5 class="pf-dr-h">${t('decideProviders.limitsTitle')}</h5>
-      <p class="pf-aitr-note">${t('decideProviders.limitsHelp')}</p>
+      <h5 class="pf-dr-h sub-heading">${t('decideProviders.limitsTitle')}</h5>
+      <${Hint}>${t('decideProviders.limitsHelp')}<//>
       <div class="pf-dr-pair">
-        <label class="pf-dr-field"><span>${t('decideProviders.f.maxOptions')}</span>
+        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.maxOptions')}</span>
           <input class="og-input" type="number" min="2" step="1" value=${draft.maxOptions} disabled=${busy} placeholder="20"
                  onInput=${e => set('maxOptions', e.currentTarget.value)} /></label>
-        <label class="pf-dr-field"><span>${t('decideProviders.f.context')}</span>
+        <label class="pf-dr-field"><span class="poster-label">${t('decideProviders.f.context')}</span>
           <input class="og-input" type="number" min="256" step="1" value=${draft.context} disabled=${busy} placeholder="4096"
                  onInput=${e => set('context', e.currentTarget.value)} /></label>
       </div>
       <${Note} msg=${msg} at="form" />
       <div class="og-doors">
-        <button type="button" class="og-door" onClick=${onSave} disabled=${busy || notHere}>${t('decideProviders.save')}</button>
-        <button type="button" class="og-door og-door--quiet" onClick=${onCancel} disabled=${busy}>${t('decideProviders.cancel')}</button>
+        <button type="button" class="poster-action poster-action--small" onClick=${onSave} disabled=${busy || notHere}>${t('decideProviders.save')}</button>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${onCancel} disabled=${busy}>${t('decideProviders.cancel')}</button>
       </div>
     </div>`;
 }
@@ -201,11 +216,11 @@ export function DecideProviders({ view, onSaved }) {
 
   return html`
     <div class="pf-dr" id="decide-providers">
-      <h4 class="pf-aitr-sub">${t('decideProviders.title')}</h4>
-      <p class="pf-aitr-note">${t('decideProviders.desc')}</p>
-      <h5 class="pf-dr-h" id="decide-providers-default">${t('decideProviders.defaultLabel')}</h5>
+      <h4 class="pf-aitr-sub sub-heading">${t('decideProviders.title')}</h4>
+      <${Hint}>${t('decideProviders.desc')}<//>
+      <h5 class="pf-dr-h sub-heading" id="decide-providers-default">${t('decideProviders.defaultLabel')}</h5>
       <label class="pf-dr-field">
-        <select class="og-input" aria-labelledby="decide-providers-default" value=${view.default} disabled=${busy} onChange=${e => setDefault(e.currentTarget.value)}>
+        <select class="select-field" aria-labelledby="decide-providers-default" value=${view.default} disabled=${busy} onChange=${e => setDefault(e.currentTarget.value)}>
           ${list.map(p => html`<option key=${p.id} value=${p.id}>
             ${p.title}${p.id === view.node_default ? ` · ${t('decideProviders.serverDefault')}` : ''}</option>`)}
         </select></label>
@@ -214,7 +229,7 @@ export function DecideProviders({ view, onSaved }) {
 
       <ul class="pf-aitr-list">
         ${list.map(p => html`
-          <li key=${p.id} class="pf-aitr-row">
+          <li key=${p.id} class="pf-aitr-row poster-box">
             <span class="pf-aitr-row-main">${p.title}${p.id === view.default ? ` · ${t('decideProviders.isDefault')}` : ''}</span>
             <span class=${META}>
               ${t(`decideProviders.kind.${p.kind === 'local' ? 'local' : 'hosted'}`)} · ${t(`decideProviders.source.${p.source}`)} · ${p.model}
@@ -228,7 +243,7 @@ export function DecideProviders({ view, onSaved }) {
             <span class=${`${META} og-input--mono`} translate="no">${p.url}</span>
             ${p.source === 'owner' && html`
               <span class="og-doors">
-                <button type="button" class="og-door og-door--quiet" disabled=${busy}
+                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
                         onClick=${() => act(() => apiDelete(`/v1/ai/decide/providers/${encodeURIComponent(p.id)}`), 'decideProviders.removed', `row:${p.id}`, 'list')}>
                   ${t('decideProviders.remove')}</button>
               </span>`}
@@ -239,7 +254,7 @@ export function DecideProviders({ view, onSaved }) {
 
       ${!draft && html`
         <div class="og-doors">
-          <button type="button" class="og-door" disabled=${busy} onClick=${() => { setMsg(null); setDraft({ ...EMPTY }); }}>
+          <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => { setMsg(null); setDraft({ ...EMPTY }); }}>
             ${t('decideProviders.add')}</button>
         </div>`}
       ${draft && html`<${ProviderForm} draft=${draft} busy=${busy} msg=${msg} onChange=${setDraft} onSave=${save} onCancel=${cancel} />`}

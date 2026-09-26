@@ -14,6 +14,27 @@
  * @structure AiAppsBudgetPanel (default export of the section) · fmtCompact
  * @usage <${AiAppsBudgetPanel} />
  * @version-history
+ *   v1.16.0 — 2026-09-26 — The budget part is set off by the split (.og-split, a hairline) instead of its own 2px grey rule (a unification: the lead's ruling on the one 2px grey rule).
+ *   v1.15.0 — 2026-09-26 — The figure on the daily budget bar is the Meter's figure (.poster-meter-figure), the Wallet meter's look: small typewriter figures at the left instead of bold 11px in the middle (a unification: the lead's ruling on a figure written on a meter).
+ *   v1.14.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.13.0 — 2026-09-26 — The last labels over a field, a meter or a chart are the row label (.poster-label): the Decide editors' field labels, the overview's quota names, the AI budget chart's title; their own looks go (a unification: Jouni's decision Row label).
+ *   v1.12.0 — 2026-09-26 — A control that opens a panel below it is the Tab's fold tone (.poster-tab--fold, is-on while open), and the parameters section that is one row until opened is the FoldSection; their own toggles, carets and arrows go (a unification: Jouni's decision Tabs and filters, and the look most tabs use).
+ *   v1.11.0 — 2026-09-25 — The classic AI settings' daily budget bar is the quota meter (.poster-box--meter.poster-box--quota, is-full from 90 %); its ground, corners and fills go, its place, height and figure stay (a unification: the look most tabs use).
+ *   v1.10.0 — 2026-09-25 — The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
+ *   v1.9.0 — 2026-09-25 — The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.8.0 — 2026-09-25 — The calendar's month, week and day and the spend chart's cost, tokens and seconds are the Tab (.poster-tab, the chosen one .is-on); their rows take the tabs' row gap (Jouni's decisions "Tabs and filters" and "Choice", a unification).
+ *   v1.7.0 — 2026-09-25 — A table of rows is the Listing (css/components/listing.css): the P&L lines, the accountants, the usage report, the AI spend per app, the security overrides and an agent's internal jobs; figures stand at the right of their column (a unification: the look most tabs use).
+ *   v1.6.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
+ *   v1.4.0 — 2026-09-25 — The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.3.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   v1.0.0 — 2026-08-01 — Extracted from openrouter-settings.js v2.0.0, translated, seconds metric added.
  */
 import { h } from 'preact';
@@ -41,6 +62,7 @@ function fmtSeconds(n) {
 }
 
 export function AiAppsBudgetPanel() {
+  const [perAppOpen, setPerAppOpen] = useState(true);
   const [usage, setUsage] = useState(null);
   const [settings, setSettings] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -127,66 +149,62 @@ export function AiAppsBudgetPanel() {
   const appNames = Array.from(new Set([...perAppEntries.map(([a]) => a), ...historyApps, ...Object.keys(caps)]));
 
   return html`
-    <div class="pf-or-field pf-or-spend-section">
-      <label class="pf-or-label">${t('profile.openrouter.budget.title')}</label>
-      <div class="pf-or-spend-desc">${t('profile.openrouter.budget.desc')}</div>
+    <div class="pf-or-field pf-or-spend-section og-split">
+      <label class="poster-label pf-or-label">${t('profile.openrouter.budget.title')}</label>
+      <div class="poster-hint">${t('profile.openrouter.budget.desc')}</div>
 
       <div class="pf-or-spend-bar-row">
-        <div class="pf-or-spend-bar">
-          <div class="pf-or-spend-bar-fill ${pct >= 90 ? 'crit' : pct >= 60 ? 'warn' : ''}" style="width:${pct}%"></div>
-          <div class="pf-or-spend-bar-label">$${spent.toFixed(4)} / $${budget.toFixed(2)} (${pct}%)</div>
+        <div class=${`pf-or-spend-bar poster-box poster-box--meter poster-box--quota ${pct >= 90 ? 'is-full' : ''}`}>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width=${pct} height="100" /></svg>
+          <div class="poster-meter-figure">$${spent.toFixed(4)} / $${budget.toFixed(2)} (${pct}%)</div>
         </div>
         ${editing ? html`
           <input type="number" min="0" max="1000" step="0.10" value=${budgetInput}
                  onInput=${e => setBudgetInput(e.target.value)}
-                 class="pf-or-spend-budget-input" />
-          <button class="btn-primary btn-sm" onClick=${saveBudget} disabled=${saving}>
+                 class="og-input pf-or-spend-budget-input" />
+          <button class="poster-slab poster-slab--control" onClick=${saveBudget} disabled=${saving}>
             ${saving ? '…' : t('profile.openrouter.save')}
           </button>
-          <button class="btn-outline btn-sm" onClick=${() => setEditing(false)}>${t('profile.openrouter.cancel')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setEditing(false)}>${t('profile.openrouter.cancel')}</button>
         ` : html`
-          <button class="btn-outline btn-sm" onClick=${() => setEditing(true)}>${t('profile.openrouter.budget.change')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setEditing(true)}>${t('profile.openrouter.budget.change')}</button>
         `}
       </div>
 
-      ${message && html`<div class="pf-or-message pf-or-spend-msg ${message.error ? 'pf-or-message-error' : 'pf-or-message-success'}">${message.text}</div>`}
+      ${message && html`<div class="form-message ${message.error ? 'form-message--error' : ''}">${message.text}</div>`}
 
       ${appNames.length > 0 && html`
-        <details class="pf-or-spend-details" open>
-          <summary class="pf-or-spend-summary">${t('profile.openrouter.budget.perApp', { n: appNames.length })}</summary>
-          <div class="pf-or-spend-hint">${t('profile.openrouter.budget.perAppHint')}</div>
-          <table class="pf-or-spend-table">
-            <thead>
-              <tr>
-                <th>${t('profile.openrouter.budget.colApp')}</th>
-                <th class="num">${t('profile.openrouter.budget.colSpent')}</th>
-                <th class="num">${t('profile.openrouter.budget.colCap')}</th>
-                <th class="num">${t('profile.openrouter.budget.colCalls')}</th>
-              </tr>
-            </thead>
-            <tbody>
+        <details class="pf-or-spend-details" open onToggle=${(e) => setPerAppOpen(e.currentTarget.open)}>
+          <summary class=${`poster-tab poster-tab--fold ${perAppOpen ? 'is-on' : ''}`}>${t('profile.openrouter.budget.perApp', { n: appNames.length })}</summary>
+          <div class="poster-hint">${t('profile.openrouter.budget.perAppHint')}</div>
+          <div class="listing listing--cols listing--name-n-n-n pf-or-spend-table">
+              <div class="listing-row listing-row--head">
+                <div class="poster-label">${t('profile.openrouter.budget.colApp')}</div>
+                <div class="poster-label listing-n">${t('profile.openrouter.budget.colSpent')}</div>
+                <div class="poster-label listing-n">${t('profile.openrouter.budget.colCap')}</div>
+                <div class="poster-label listing-n">${t('profile.openrouter.budget.colCalls')}</div>
+              </div>
               ${appNames.map((app) => {
                 const s = usage.per_app[app] || { cost_usd: 0, calls: 0 };
                 return html`
-                <tr key=${app}>
-                  <td>${app}</td>
-                  <td class="num">$${(s.cost_usd || 0).toFixed(4)}</td>
-                  <td class="num">
+                <div class="listing-row" key=${app}>
+                  <div class="listing-name">${app}</div>
+                  <div class="listing-n">$${(s.cost_usd || 0).toFixed(4)}</div>
+                  <div class="listing-n">
                     <input type="number" min="0" max="1000" step="0.10"
                       value=${caps[app] ?? ''} placeholder=${budget.toFixed(2)}
                       onInput=${e => setCaps(c => ({ ...c, [app]: e.target.value }))}
-                      class="pf-or-spend-cap-input" />
-                  </td>
-                  <td class="num">${s.calls || 0}</td>
-                </tr>`;
+                      class="og-input pf-or-spend-cap-input" />
+                  </div>
+                  <div class="listing-n">${s.calls || 0}</div>
+                </div>`;
               })}
-            </tbody>
-          </table>
+          </div>
           <div class="pf-or-spend-actions">
-            <button class="btn-primary btn-sm" onClick=${saveCaps} disabled=${savingCaps}>
+            <button class="poster-slab poster-slab--control" onClick=${saveCaps} disabled=${savingCaps}>
               ${savingCaps ? '…' : t('profile.openrouter.budget.saveCaps')}
             </button>
-            ${capsMsg && html`<span class="pf-or-message ${capsMsg.error ? 'pf-or-message-error' : 'pf-or-message-success'}">${capsMsg.text}</span>`}
+            ${capsMsg && html`<span class="form-message ${capsMsg.error ? 'form-message--error' : ''}">${capsMsg.text}</span>`}
           </div>
         </details>
       `}
@@ -204,12 +222,12 @@ export function AiAppsBudgetPanel() {
           : metric === 'seconds' ? ((v) => fmtSeconds(v))
           : ((v) => '$' + (Number(v) < 1 ? Number(v).toFixed(3) : Number(v).toFixed(2)));
         const btn = (key, label) => html`
-          <button class=${metric === key ? 'btn-primary btn-sm' : 'btn-outline btn-sm'}
+          <button class=${`poster-tab${metric === key ? ' is-on' : ''}`}
                   onClick=${() => setMetric(key)}>${label}</button>`;
         return html`
           <div class="pf-or-spend-chart-wrap">
             <div class="pf-or-spend-chart-head">
-              <span class="pf-or-spend-chart-title">${t('profile.openrouter.budget.chartTitle')}</span>
+              <span class="poster-label">${t('profile.openrouter.budget.chartTitle')}</span>
               <span class="pf-or-spend-metric-toggle">
                 ${btn('cost', t('profile.openrouter.budget.metricCost'))}
                 ${btn('tokens', t('profile.openrouter.budget.metricTokens'))}
@@ -220,7 +238,7 @@ export function AiAppsBudgetPanel() {
           </div>`;
       })()}
 
-      <div class="pf-or-spend-footnote">${t('profile.openrouter.budget.footnote')}</div>
+      <div class="poster-hint">${t('profile.openrouter.budget.footnote')}</div>
     </div>
   `;
 }

@@ -1,0 +1,39 @@
+/**
+ * @file switch.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The switch: a setting that is on or off, as a button with its word on the left and a
+ *   small framed box on the right, the box on the sun when it is on. The look most Settings &
+ *   Controls tabs already draw (Notifications, Email, Messages: identical copies of .nt-sw), taken as
+ *   the one look for this kind (UI consolidation phase 5). Drawn by components/Switch.js.
+ *   The word on the left, the box on the right (Jouni, 2026-08-30): in a column of rows the boxes
+ *   line up on the right edge instead of drifting with the length of each word.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial, with the values of .nt-sw (notifications-poster.css) and its locked
+ *     cut (email-poster.css). The knob on the sun reads --on-sun, so it stays dark in dark mode.
+ */
+
+.switch {
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: .5rem; min-width: 5.2rem;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: .68rem; font-weight: 800;
+  text-transform: var(--shape-case-action); letter-spacing: var(--shape-tracking-action); color: var(--text-dim);
+}
+.switch i {
+  position: relative; display: inline-block; flex: none; box-sizing: border-box; width: 2.1rem; height: 1.1rem;
+  border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner-control);
+}
+.switch i::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: .55rem; height: .55rem;
+  background: var(--text); border-radius: var(--shape-corner-pill);
+}
+.switch:disabled { opacity: .5; cursor: default; }
+/* On: the words in ink, the box on the sun, the knob to the right. */
+.switch--on { color: var(--text); }
+.switch--on i { background: var(--sun); }
+.switch--on i::after { left: auto; right: 2px; background: var(--on-sun); }
+/* Locked: on, and it cannot be switched off (a mail that is always sent). */
+.switch--locked { color: var(--text-dim); }
+.switch--locked i { border-color: var(--text-dim); background: var(--bg-dim); }
+.switch--locked i::after { left: auto; right: 2px; background: var(--text-dim); }

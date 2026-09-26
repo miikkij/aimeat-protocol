@@ -1,0 +1,20 @@
+/**
+ * @file key-name.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A key: the name of a memory record, a file or a rule, written as the identifier it is,
+ *   in the typewriter face at medium weight; its size and colour are those of the line it sits in (a
+ *   row, a listing's name, a caption). The look most Settings & Controls tabs already gave a key
+ *   (Memory's key rows and listings, Access's and the agents' rule rows), taken as the one look for
+ *   this kind (UI consolidation phase 5, a unification). It has no corner, frame, shadow or case.
+ *   Inside an event row (.og-fold--event, whose words are heavy) a key keeps its own weight.
+ *   Drawn as markup: <span class="key-name">studio/clients/nordic-ferries</span>.
+ *   NOTE: this file must be linked in spa.html, in the block of the library parts of Settings &
+ *   Controls, after the view sheets.
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Initial (UI consolidation phase 5, wave 4): the typewriter keys of Memory, Access, the agents and the notebook.
+ */
+
+/* A key has no spaces to break at, so it breaks anywhere rather than run out of its line. */
+.key-name { font-family: var(--font-mono); font-weight: var(--weight-medium); overflow-wrap: anywhere; }
+.og-fold--event b.key-name { font-weight: var(--weight-medium); }

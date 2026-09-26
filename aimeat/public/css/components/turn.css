@@ -8,6 +8,9 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The name line above the words, the line under a turn that wraps, and your
+ *     words in Markdown at the turn's size with ink on the sun (moved from inbox-poster.css, the same
+ *     values): Messages draws a message as this turn (Jouni's decision "Message").
  *   v1.1.0 — 2026-09-24 — The corners and frames read the theme's shape values (a move).
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
@@ -65,6 +68,43 @@
   padding: 0 2px;
 }
 .poster-turn--agent .poster-turn-meta { padding-left: 24px; }
+/* The line under a turn wraps on a narrow screen, so nothing in it falls off the edge. */
+.poster-turn-meta { flex-wrap: wrap; row-gap: 4px; }
+/* The name line: who said it, above the words (Messages, where two people talk). It is the row
+   label's small capitals; yours in ink, the other side's in the label's coral. */
+.poster-turn-who { padding: 0 2px; }
+.poster-turn--agent .poster-turn-who { padding-left: 24px; }
+.poster-turn--user .poster-turn-who { color: var(--text); }
+/* Your words written in Markdown (Messages): the turn's own size and weight, and ink on the sun all
+   the way down. .md-body sets its own size and colour, which the dark theme makes near-white: 1.52:1
+   on the sun. The code plate inverts rather than takes the ink, because its ground stays dark. */
+.poster-turn--user .poster-turn-body .md-body { font-size: inherit; }
+.poster-turn--user .poster-turn-body .md-body,
+.poster-turn--user .poster-turn-body .md-body p,
+.poster-turn--user .poster-turn-body .md-body li,
+.poster-turn--user .poster-turn-body .md-body h1,
+.poster-turn--user .poster-turn-body .md-body h2,
+.poster-turn--user .poster-turn-body .md-body h3,
+.poster-turn--user .poster-turn-body .md-body h4,
+.poster-turn--user .poster-turn-body .md-body h5,
+.poster-turn--user .poster-turn-body .md-body h6,
+.poster-turn--user .poster-turn-body .md-body strong,
+.poster-turn--user .poster-turn-body .md-body em,
+.poster-turn--user .poster-turn-body .md-body a,
+.poster-turn--user .poster-turn-body .md-body .md-wikilink { color: var(--on-sun); }
+.poster-turn--user .poster-turn-body .md-body h1,
+.poster-turn--user .poster-turn-body .md-body h2,
+.poster-turn--user .poster-turn-body .md-body hr,
+.poster-turn--user .poster-turn-body .md-body th,
+.poster-turn--user .poster-turn-body .md-body td { border-color: var(--on-sun); }
+.poster-turn--user .poster-turn-body .md-body .md-code { background: var(--on-sun); border-color: var(--on-sun); color: var(--sun); }
+.poster-turn--user .poster-turn-body .md-body .md-pre { background: var(--on-sun); border-color: var(--on-sun); }
+.poster-turn--user .poster-turn-body .md-body .md-pre .md-code { color: var(--sun); }
+.poster-turn--user .poster-turn-body .md-body blockquote { background: transparent; color: var(--on-sun); border-left-color: var(--on-sun); }
+.poster-turn--user .poster-turn-body .md-body th,
+.poster-turn--user .poster-turn-body .md-body tbody tr:nth-child(even) { background: transparent; }
+/* A Tag on your words (an agent's Chat tab marks a slash command) takes the ink on the sun too. */
+.poster-turn--user .poster-turn-body .poster-chip { border-color: var(--on-sun); color: var(--on-sun); }
 .poster-turn-model { font-family: var(--font-mono); }
 /* Copy and Listen are the text tone of the action link (poster.css .poster-action--text). */
 /* ── A turn that could not run ── */
@@ -108,6 +148,6 @@
   .poster-turn { max-width: 92%; }
   .poster-turn--user .poster-turn-body { font-size: var(--text-md); padding: 9px 13px; }
   .poster-turn--agent .poster-turn-body { border-left-width: 5px; padding-left: 11px; }
-  .poster-turn--agent .poster-turn-meta { padding-left: 16px; }
+  .poster-turn--agent .poster-turn-meta, .poster-turn--agent .poster-turn-who { padding-left: 16px; }
 }
 .poster-turn--user .poster-turn-body { color: var(--on-sun); }

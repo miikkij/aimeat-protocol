@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The line under a name keeps to one line, cut short; on the open row it is
+ *     dark; a count on a row; the person tone (Jouni's decision "Conversation list").
  *   v1.2.0 — 2026-09-24 — The corner and the chosen row's rule read the theme's shape values (a move).
  *   v1.1.0 — 2026-09-24 — Delete is the small icon button; only its place and showing stay here.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
@@ -54,7 +56,13 @@
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--text-dim);
+  /* One line, cut short: it can carry the last message of a conversation. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+/* A number on a row (the unread count) sits between the words and the delete. */
+.poster-thread > .poster-count { flex: none; }
 /* Delete is the small icon button (poster.css .poster-icon--small, Jouni's decision "Icon button");
    this keeps its place and when it shows. */
 .poster-thread-del {
@@ -65,3 +73,14 @@
 .poster-thread:hover .poster-thread-del, .poster-thread--active .poster-thread-del { opacity: 1; }
 /* ── Words on the sun stay ink in every theme (moved from profile-poster.css, same selectors) ── */
 .poster-thread--active { color: var(--on-sun); }
+/* On the open row the line under the name takes the words-on-sun colour too: grey there read 2.7:1
+   (1.3:1 dark). */
+.poster-thread--active .poster-thread-sub { color: var(--on-sun); }
+
+/* ── The person tone (ThreadPerson): a heading over one person's conversations that opens and closes
+   them: the arrow, a small framed picture, the name, the presence word and the two counts, named ── */
+.poster-thread-person {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: 100%; padding: 10px 0 6px;
+  background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.poster-thread-person-name { font-weight: var(--weight-heavy); font-size: .92rem; }

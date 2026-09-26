@@ -17,6 +17,7 @@
  *   need a signed-in home, chat, profile and admin with data on them.
  * @usage pnpm design-lab:crops --base http://localhost:40609 --user sandbox --password '…' [--only tag]
  * @version-history
+ *   v2.1.0 — 2026-09-25 — Measures `left`, a line on the left side only, as frame.js does.
  *   v2.0.0 — 2026-09-23 — The context picture (outlined, with room around it) replaces the tight
  *     light and dark crops, which were narrow strips; the preview is measured against the page.
  *   v1.0.0 — 2026-09-23 — Initial: the decisions view (UI consolidation phase 2).
@@ -90,12 +91,17 @@ function measure(el: Element): Values {
   const width = parseFloat(s.borderTopWidth);
   const size = parseFloat(s.fontSize);
   const spacing = parseFloat(s.letterSpacing);
+  const lw = parseFloat(s.borderLeftWidth);
+  const left = s.borderLeftStyle === 'none' || !lw || colour(s.borderLeftColor) === 'none'
+    || (lw === width && s.borderLeftStyle === s.borderTopStyle && s.borderLeftColor === s.borderTopColor)
+    ? 'none' : `${Math.max(1, Math.round(lw))}px ${s.borderLeftStyle} ${colour(s.borderLeftColor)}`;
   return {
     font: `${s.fontFamily.split(',')[0].replace(/["']/g, '').trim()} ${rem(s.fontSize)} ${s.fontWeight}`,
     case: s.textTransform === 'none' ? 'as written' : s.textTransform,
     tracking: Number.isFinite(spacing) && size ? `${String(Math.round((spacing / size) * 100) / 100).replace(/^0\./, '.')}em` : 'normal',
     padding: s.padding.split(' ').map(rem).join(' '),
     frame: s.borderTopStyle === 'none' || !width ? 'none' : `${Math.max(1, Math.round(width))}px ${s.borderTopStyle} ${colour(s.borderTopColor)}`,
+    left,
     radius: s.borderRadius === '0px' ? 'none' : s.borderRadius,
     fill: s.backgroundImage !== 'none' && s.backgroundImage.includes('gradient') ? 'a gradient' : colour(s.backgroundColor),
     colour: colour(s.color),

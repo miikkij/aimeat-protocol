@@ -1,0 +1,20 @@
+/**
+ * @file job-prompt.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The job prompt: what a scheduled job sends, in the Object box (.poster-box): a row label
+ *   over it, the prompt's title at the page's size and its body in smaller grey words, long lines
+ *   wrapped. Two pages drew it two ways (the Scheduler's job, .sc-prompt-*; an agent's schedules,
+ *   .sch-dispatch-* on the copy tone); it is one part, in the Scheduler's values (Jouni's decision
+ *   "Box": a framed thing is the Object box, at the page's size).
+ *   Drawn as markup: <div class="poster-box job-prompt"><span class="poster-label">…</span>
+ *   <div class="job-prompt-title">…</div><div class="job-prompt-body">…</div></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial: the Scheduler's .sc-prompt words, one part for both schedule pages (a unification: Jouni's decision "Box").
+ */
+
+.job-prompt { font-size: 1rem; line-height: 1.6; color: var(--text); }
+.job-prompt > .poster-label { display: block; margin-bottom: .4rem; }
+.job-prompt-title { white-space: pre-wrap; overflow-wrap: anywhere; }
+.job-prompt-body { margin-top: .4rem; font-size: .88rem; color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }

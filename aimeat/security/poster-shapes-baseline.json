@@ -1,54 +1,23 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T17:14:00Z",
-    "files": 77,
-    "declarations": 558,
+    "date": "2026-09-26T17:52:33.435Z",
+    "files": 79,
+    "declarations": 343,
     "patterns": {
-      "sun": 127,
-      "box2": 177,
-      "record": 30,
-      "headline": 71,
-      "action": 72,
-      "frame3": 48,
-      "slab": 7,
-      "rule": 15,
+      "sun": 90,
+      "action": 53,
+      "box2": 94,
+      "frame3": 35,
+      "record": 8,
+      "headline": 51,
+      "slab": 5,
+      "rule": 5,
       "dialog": 1,
-      "label": 10
+      "label": 1
     }
   },
   "files": {
-    "public/css/components/archive.css": { "headline": 1, "rule": 1 },
-    "public/css/components/check-item.css": { "sun": 1, "box2": 1 },
-    "public/css/components/chooser.css": { "box2": 1 },
-    "public/css/components/composer.css": { "action": 1, "sun": 1, "box2": 2 },
-    "public/css/components/conversation-frame.css": { "headline": 3, "rule": 1, "action": 1, "sun": 2, "box2": 1, "slab": 1 },
-    "public/css/components/day-group.css": { "action": 1, "label": 1 },
-    "public/css/components/fold-button.css": { "sun": 1 },
-    "public/css/components/masthead.css": { "headline": 1 },
-    "public/css/components/numbered-index.css": { "headline": 1, "rule": 1, "sun": 1 },
-    "public/css/components/open-items.css": { "headline": 1, "rule": 1 },
-    "public/css/components/page-intro.css": { "headline": 1 },
-    "public/css/components/paste-box.css": { "box2": 1 },
-    "public/css/components/dialog.css": { "headline": 1, "rule": 1, "frame3": 1, "slab": 1, "dialog": 1 },
-    "public/css/components/prompt-card.css": { "box2": 1, "label": 1 },
-    "public/css/components/toast.css": { "sun": 1, "frame3": 1 },
-    "public/css/components/top-bar.css": { "action": 1, "sun": 2, "frame3": 1, "record": 1 },
-    "public/css/components/result-card.css": { "box2": 1 },
-    "public/css/components/stat-line.css": { "box2": 1 },
-    "public/css/components/step-card.css": { "headline": 1, "sun": 1, "record": 1 },
-    "public/css/components/suggestion.css": { "action": 1 },
-    "public/css/components/swatch-picker.css": { "sun": 1, "box2": 2 },
-    "public/css/components/text-input.css": { "box2": 1 },
-    "public/css/components/thing-link.css": { "headline": 1 },
-    "public/css/components/thread-list.css": { "sun": 1 },
-    "public/css/components/timeline.css": { "rule": 1, "sun": 1 },
-    "public/css/components/turn.css": { "sun": 1, "box2": 1 },
-    "public/css/views/access-poster.css": {
-      "sun": 2,
-      "box2": 2,
-      "record": 3
-    },
     "public/css/views/admin-agent-integration.css": {
       "sun": 2
     },
@@ -235,22 +204,6 @@
       "action": 1,
       "sun": 1
     },
-    "public/css/views/agents-detail.css": {
-      "sun": 1
-    },
-    "public/css/views/ai-poster.css": {
-      "sun": 3,
-      "box2": 3,
-      "frame3": 1,
-      "record": 1
-    },
-    "public/css/views/appdev-poster.css": {
-      "sun": 1,
-      "box2": 1
-    },
-    "public/css/views/apps-poster.css": {
-      "box2": 1
-    },
     "public/css/views/build-story.css": {
       "sun": 2,
       "box2": 3,
@@ -259,18 +212,6 @@
       "slab": 1,
       "dialog": 1
     },
-    "public/css/views/calibrator-poster.css": {
-      "headline": 2,
-      "sun": 2,
-      "box2": 5,
-      "frame3": 1,
-      "record": 2
-    },
-    "public/css/views/capabilities-poster.css": {
-      "sun": 1,
-      "box2": 2,
-      "record": 1
-    },
     "public/css/views/changelog.css": {
       "rule": 1,
       "action": 1,
@@ -278,50 +219,23 @@
       "box2": 2,
       "frame3": 2
     },
-    "public/css/views/companies-poster.css": {
-      "sun": 1,
-      "box2": 1,
-      "label": 4
-    },
     "public/css/views/contacts-poster.css": {
       "box2": 1
     },
-    "public/css/views/data-wallet-poster.css": {
-      "sun": 2,
-      "box2": 1,
-      "record": 2
-    },
     "public/css/views/discover-poster.css": {
-      "headline": 1,
-      "action": 2,
-      "sun": 1,
-      "box2": 1
-    },
-    "public/css/views/extensions-poster.css": {
-      "sun": 1,
-      "box2": 2,
-      "record": 1
-    },
-    "public/css/views/fleet.css": {
-      "headline": 1,
-      "sun": 1,
-      "box2": 1
+      "sun": 1
     },
     "public/css/views/help.css": {
       "sun": 2,
       "frame3": 2
     },
     "public/css/views/inbox-poster.css": {
-      "headline": 1,
       "action": 1,
-      "sun": 3,
-      "box2": 3
+      "sun": 2,
+      "box2": 1
     },
     "public/css/views/knowledge-poster.css": {
-      "headline": 1,
-      "action": 2,
-      "sun": 2,
-      "box2": 4
+      "action": 2
     },
     "public/css/views/landing-showroom.css": {
       "rule": 1,
@@ -337,49 +251,14 @@
       "box2": 1,
       "frame3": 6
     },
-    "public/css/views/libraries-poster.css": {
-      "sun": 1,
-      "box2": 1,
-      "record": 1
-    },
-    "public/css/views/mcp-poster.css": {
-      "headline": 2,
-      "action": 1,
-      "sun": 2,
-      "box2": 6,
-      "label": 1
-    },
     "public/css/views/members.css": {
       "box2": 1,
       "frame3": 2
     },
-    "public/css/views/memory.css": {
-      "box2": 2,
-      "frame3": 1
-    },
-    "public/css/views/notifications-poster.css": {
-      "sun": 1,
-      "box2": 3
-    },
-    "public/css/views/offers-poster.css": {
-      "headline": 4,
-      "action": 1,
-      "box2": 5
-    },
-    "public/css/views/organism.css": {
-      "headline": 7,
-      "rule": 2,
-      "action": 2,
-      "sun": 5,
-      "box2": 3,
-      "frame3": 1,
-      "record": 1,
-      "slab": 2
-    },
-    "public/css/views/packages-poster.css": {
+    "public/css/views/organism-controls.css": {
       "sun": 2,
-      "box2": 1,
-      "record": 1
+      "box2": 2,
+      "slab": 2
     },
     "public/css/views/portal-dev.css": {
       "action": 1,
@@ -387,55 +266,109 @@
       "box2": 13,
       "frame3": 5
     },
-    "public/css/views/portfolio-poster.css": {
-      "sun": 1,
-      "box2": 2,
-      "frame3": 1,
-      "record": 1
-    },
-    "public/css/views/profile-door.css": {
-      "rule": 1,
-      "box2": 2,
-      "frame3": 1
-    },
     "public/css/views/profile-poster.css": {
-      "headline": 3,
-      "action": 7,
-      "sun": 11,
-      "box2": 13,
-      "frame3": 5,
-      "record": 3,
-      "slab": 1,
-      "label": 2
-    },
-    "public/css/views/profile.css": {
       "headline": 2,
-      "rule": 2,
       "action": 2,
       "sun": 7,
-      "box2": 4,
+      "box2": 6,
+      "frame3": 2,
+      "slab": 1,
       "label": 1
     },
-    "public/css/views/scheduler-poster.css": {
-      "action": 1,
-      "sun": 2,
-      "box2": 4
-    },
-    "public/css/views/skills-poster.css": {
-      "sun": 2,
-      "box2": 1,
-      "record": 1
-    },
-    "public/css/views/wallet-poster.css": {
-      "headline": 3,
-      "sun": 1,
-      "box2": 3,
-      "record": 2
+    "public/css/views/profile.css": {
+      "sun": 1
     },
     "public/css/views/workflows-poster.css": {
-      "sun": 2,
-      "box2": 2,
-      "frame3": 3
+      "box2": 1
+    },
+    "public/css/components/archive.css": {
+      "headline": 1
+    },
+    "public/css/components/check-item.css": {
+      "sun": 1
+    },
+    "public/css/components/conversation-frame.css": {
+      "headline": 3,
+      "sun": 2
+    },
+    "public/css/components/dialog.css": {
+      "headline": 1
+    },
+    "public/css/components/doc-tree.css": {
+      "headline": 1,
+      "sun": 1
+    },
+    "public/css/components/figure-strip.css": {
+      "headline": 1
+    },
+    "public/css/components/fold-row.css": {
+      "headline": 1
+    },
+    "public/css/components/gaii-chip.css": {
+      "sun": 1
+    },
+    "public/css/components/masthead.css": {
+      "headline": 1
+    },
+    "public/css/components/model-picker.css": {
+      "sun": 1
+    },
+    "public/css/components/morsel-flow.css": {
+      "headline": 2
+    },
+    "public/css/components/numbered-index.css": {
+      "headline": 1,
+      "sun": 2
+    },
+    "public/css/components/offer-lines.css": {
+      "headline": 1
+    },
+    "public/css/components/open-items.css": {
+      "headline": 1
+    },
+    "public/css/components/page-intro.css": {
+      "headline": 1
+    },
+    "public/css/components/page-row.css": {
+      "sun": 1
+    },
+    "public/css/components/setting-box.css": {
+      "headline": 1
+    },
+    "public/css/components/side-menu.css": {
+      "sun": 1
+    },
+    "public/css/components/step-card.css": {
+      "headline": 1,
+      "sun": 1
+    },
+    "public/css/components/switch.css": {
+      "sun": 1
+    },
+    "public/css/components/tab-page.css": {
+      "headline": 2,
+      "sun": 2
+    },
+    "public/css/components/thing-link.css": {
+      "headline": 1
+    },
+    "public/css/components/thread-list.css": {
+      "sun": 1
+    },
+    "public/css/components/timeline.css": {
+      "sun": 1
+    },
+    "public/css/components/toast.css": {
+      "sun": 1
+    },
+    "public/css/components/top-bar.css": {
+      "sun": 2
+    },
+    "public/css/components/turn.css": {
+      "sun": 1
+    },
+    "public/css/components/week-rhythm.css": {
+      "sun": 1
     }
   }
 }

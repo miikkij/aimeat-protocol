@@ -9,58 +9,48 @@
  *   the members block and the two columns of the app fold. NOTE: this file must be linked in
  *   spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- The boards table is the Listing (css/components/listing.css), a unification: the look most tabs use. The grid, cells, heading row and narrow-screen columns of bp-rows go (the columns move to its cut, listing--cols); the name's one line and the faded empty words stay.
+ *   v1.16.0 -- 2026-09-26 -- The line under a board's name is the Listing's (.listing-meta): its body face, size and colour go; one line stays (a unification: Jouni's decision "Meta line").
+ *   v1.15.0 -- 2026-09-26 -- The SDK example is the Code block (css/components/code-block.css): the light frame goes and long lines wrap (a unification: Jouni's decision "Code block").
+ *   v1.14.0 -- 2026-09-26 -- The SDK example is the Code block (css/components/code-block.css): the light frame goes and long lines wrap (a unification: Jouni's decision "Code block").
+ *   v1.13.0 -- 2026-09-26 -- A member's ✗ is the Tag's remove mark (.poster-chip-x, poster.css); .bp-member-x goes (a unification: Jouni's decision "Remove mark").
+ *   v1.12.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.11.0 -- 2026-09-26 -- The hairline over a part of the panel is the split (.og-split), a unification: the line Workflows and Boards drew alike.
+ *   v1.10.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- A board's notices are the library's Board notices (css/components/board-notices.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v1.8.0 -- 2026-09-25 -- The loading line's blinking mark is the library's Loading mark (css/components/loading-mark.css), moved unchanged out of five sheets (UI consolidation phase 5, a move).
+ *   v1.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.6.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.4.0 -- 2026-09-25 -- The rules that leave the row labels out keep their old weight, with :where (a correction to the "Row label" unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
+ *   2026-09-25 -- The category, new and recent filters and the choice buttons lose their rules: the tab (.poster-tab) now draws them (a unification: Jouni's decision "Tabs and filters").
  *   v1.2.0 -- 2026-09-13 -- Compose the notice reply's top rule from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-bp .og-chip--coral { border-color: var(--accent); color: var(--accent); }
-.og-bp .bp-chip--case { text-transform: none; }
-.og-bp .bp-door--case { text-transform: none; }
-.og-bp .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
-.og-bp .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
-.og-bp .og-choice-btn:disabled { cursor: default; }
-.og-bp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-bp .bp-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
-.og-bp .og-field .bp-hint { margin-top: .2rem; }
-.og-bp .bp-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
-.og-bp .bp-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: bpBlink 1s steps(2, start) infinite; }
-@keyframes bpBlink { to { visibility: hidden; } }
+.og-bp .poster-quiet { margin: 0; }
+.og-bp .og-field .poster-hint { margin-top: .2rem; }
 .og-bp.og-page { --poster-page-size: 2.1rem; }
 .og-bp .bp-more { margin-top: .8rem; }
 .og-bp .og-rail-link.on { color: var(--accent); }
 .og-bp .bp-rail-static { cursor: default; }
 .og-bp .bp-rail-note { padding: .3rem 0 0 1.7rem; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
-.og-bp .og-label { display: block; }
+.og-bp .poster-label:where(:not(div)) { display: block; }
 /* A fold's title stays on one line; its long sub-line gives way instead of squeezing the title. */
 .og-bp .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-bp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── The boards table ───────────────────────────────────────────────────────────────────────── */
-.bp-rows { display: grid; grid-template-columns: minmax(0, 1fr) 6.5rem minmax(0, 8rem) minmax(0, 11rem) 3.5rem; gap: 0 1rem; align-items: center; }
-.bp-rows > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.bp-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.bp-rows .bp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.bp-rows .bp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-.bp-rows .bp-nm small { display: block; font-size: .78rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bp-rows .bp-m { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
-.bp-rows .bp-m b { color: var(--text); font-weight: 500; }
-.bp-rows .bp-m--q { color: var(--border); }
+/* ── The boards table: the Listing (css/components/listing.css) ──────────────────────────────── */
+.og-bp .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+/* The line under a name is the Listing's (.listing-meta); here it keeps to one line. */
+.bp-rows .listing-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* No notices yet, no latest: the words fade to the hairline's colour. */
+.bp-rows .listing-desc.bp-m--q { color: var(--border); }
 
 /* ── A notice as a row ──────────────────────────────────────────────────────────────────────── */
-.bp-notice { display: grid; grid-template-columns: 6rem minmax(0, 1fr) 9rem; gap: 0 1.1rem; padding: .85rem 0; border-bottom: 1px solid var(--border); align-items: start; }
-.bp-cat { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .2rem; overflow-wrap: anywhere; }
-.bp-cat--q { color: var(--text-dim); }
-.bp-notice-body { min-width: 0; }
-.bp-notice-title { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); text-align: left; display: block; overflow-wrap: anywhere; }
-.bp-notice-title:hover { color: var(--accent); }
-.bp-notice-body p { margin: .25rem 0 0; font-size: .88rem; line-height: 1.55; color: var(--text); max-width: 66ch; overflow-wrap: anywhere; }
-.bp-who { margin-top: .35rem; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
-.bp-who b { color: var(--text); font-weight: 500; }
-.bp-who-board { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
-.bp-r { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; color: var(--text-dim); }
-.bp-r b { display: block; color: var(--text); font-weight: 500; }
-.bp-notice-text { margin: 1.2rem 0 0; font-size: 1.05rem; line-height: 1.6; color: var(--text); max-width: 66ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ── The composer, a reply, the poster's tools ──────────────────────────────────────────────── */
 .bp-composer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1.2rem 1.6rem; align-items: start; }
@@ -68,35 +58,29 @@
 .bp-composer-main { gap: .6rem; }
 .bp-composer-side { display: flex; flex-direction: column; gap: 1rem; }
 .bp-composer-side .og-doors { margin-top: .2rem; }
-.bp-reply { padding: .7rem 0 .7rem 1.2rem; border-left: 3px solid var(--border); margin-top: .7rem; }
-.bp-reply p { margin: .25rem 0 0; font-size: .92rem; line-height: 1.55; color: var(--text); max-width: 66ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bp-tools { flex-wrap: wrap; }
 
 /* ── The own-board form, the rules, the members ─────────────────────────────────────────────── */
 .bp-form .og-fields--2 { gap: 1.2rem 1.6rem; }
 .bp-field--narrow .og-input { max-width: 10rem; }
-.bp-danger-row { margin-top: .4rem; padding-top: 1rem; border-top: 1px solid var(--border); }
-.bp-members { display: flex; flex-direction: column; gap: .5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
-.bp-members .bp-hint { margin: 0; }
+/* The members and the last doors, each under its hairline, are the split (.og-split, page-section.css);
+   their space only. */
+.bp-danger-row { margin-top: .4rem; padding-top: 1rem; }
+.bp-members { display: flex; flex-direction: column; gap: .5rem; padding-top: 1rem; }
+.bp-members .poster-hint { margin: 0; }
 .bp-member-list { display: flex; flex-wrap: wrap; gap: .4rem; }
-.bp-member-x { background: none; border: 0; padding: 0 0 0 .3rem; cursor: pointer; font: inherit; color: var(--accent); }
 .bp-member-add { display: flex; gap: 1rem; align-items: flex-end; }
 .bp-member-add .og-input { max-width: 24rem; }
 
 /* ── The app fold ───────────────────────────────────────────────────────────────────────────── */
 .bp-app { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.6rem; }
-.bp-app-col { display: flex; flex-direction: column; gap: .7rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); }
-.bp-app-col p { margin: 0; }
-.bp-app-col b { font-weight: 800; font-size: .95rem; color: var(--text); }
-.bp-code { margin: 0; padding: .7rem .9rem; border: 1px solid var(--border); background: var(--card-bg); font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; color: var(--text); overflow-x: auto; white-space: pre; }
+/* A column's sentence is the Hint (css/components/hint.css); its place only. */
+.bp-app-col { display: flex; flex-direction: column; gap: .7rem; }
+.bp-app-col .poster-hint { margin: 0; }
+/* The example is the Code block (css/components/code-block.css); its place only. */
+.bp-code.code-block { margin: 0; }
 
 @media (max-width: 900px) {
-  .bp-rows { grid-template-columns: minmax(0, 1fr) 5rem 3.5rem; }
-  .bp-rows--head { display: none; }
-  .bp-rows .bp-m:nth-child(5n + 3), .bp-rows .bp-m:nth-child(5n + 4) { display: none; }
-  .bp-notice { grid-template-columns: minmax(0, 1fr); gap: .3rem 0; }
-  .bp-r { text-align: left; }
-  .bp-r b { display: inline; margin-right: .5rem; }
   .bp-composer, .bp-composer--reply, .bp-app { grid-template-columns: minmax(0, 1fr); }
   .bp-form .og-fields--2 { grid-template-columns: minmax(0, 1fr); }
 }

@@ -9,6 +9,7 @@
  * @structure PAGE_DEMOS — { [id]: { variants: [{ name, render(ex) }] } }
  * @usage import { PAGE_DEMOS } from './demos-page.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The numbered list's first tone with a line and its steps (Jouni's decision "Numbered list").
  *   v1.1.0 — 2026-09-23 — The diagonal band's demo goes with ChatDoor (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
@@ -30,7 +31,7 @@ import { StarToggle } from '/components/StarToggle.js';
 import { FoldButton } from '/components/FoldButton.js';
 import { ModeSwitch } from '/components/ModeSwitch.js';
 import { QuietNote } from '/components/QuietNote.js';
-import { NumberedIndex, IndexPanel } from '/components/NumberedIndex.js';
+import { NumberedIndex, IndexPanel, IndexList, IndexItem, IndexStep } from '/components/NumberedIndex.js';
 import { InkFoot } from '/components/InkFoot.js';
 import { CheckItem } from '/components/CheckItem.js';
 import { Timeline, TimelineRow } from '/components/Timeline.js';
@@ -132,6 +133,11 @@ export const PAGE_DEMOS = {
         panel=${html`<${IndexPanel} what=${ex.panel.what} steps=${ex.panel.steps} proof=${ex.panel.proof}>
           <button type="button" class="btn-primary">Ask my agent</button><button type="button" class="btn-outline">Copy for my own AI</button><//>`}>
         ${ex.rows.map((r, i) => html`<${FoldButton} key=${i} on=${i === 0} expanded=${i === 0} onClick=${noop}>${r}<//>`)}<//>` },
+    { name: 'first, with a line', render: () => html`<${IndexList}>
+        <${IndexItem} first=${true} onClick=${noop} line="The AI sorts each note into the right workspace for you.">Write self-organizing notes<//>
+        <${IndexItem} onClick=${noop} line="A polished page that tells others who you are.">Create your portfolio<//><//>` },
+    { name: 'steps', render: () => html`<${IndexList} steps>
+        <${IndexStep}>Open claude.ai and go to Settings, then Connectors.<//><${IndexStep}>Click + and then Add custom connector.<//><//>` },
   ] },
   'ink-foot': { flush: true, variants: [
     { name: 'default', render: () => html`<${InkFoot}><p>AI-made content carries its label.</p><p>Your data is yours: export it, delete it.</p><//>` },

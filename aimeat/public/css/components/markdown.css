@@ -15,6 +15,9 @@
  *   v1.2.0 — 2026-09-11 — #crawler-body: the wrapper for the server-rendered page body. It carries
  *     .md-body for everything inside it, so this sheet stays the one place rendered markdown is
  *     styled and the block needs a width and a margin of its own and nothing else.
+ *   v1.3.0 — 2026-09-26 — The small cut (.md-body--small; Markdown's `small`) for every small place in
+ *     Settings: the words at the reader's own size, the headings a step larger than the words, the
+ *     paragraphs and lists .5rem apart (Jouni's decision "Small reader"; the values of an agent's README).
  */
 
 .md-body {
@@ -39,6 +42,11 @@
 .md-body h4 { font-size: var(--text-md); }
 .md-body h5 { font-size: var(--text-body-sm); }
 .md-body h6 { font-size: var(--text-note); color: var(--muted); }
+/* The small cut: a small place in Settings (an agent's README, a task's memory value, an organism's
+   README, a record field, the structure map, an app's setup guide, a task's description). */
+.md-body--small h1 { font-size: 1.4rem; }
+.md-body--small h2 { font-size: 1.2rem; }
+.md-body--small h3 { font-size: 1.05rem; }
 
 .md-body p { margin: 0.85em 0; }
 .md-body ul,
@@ -48,6 +56,9 @@
 .md-body li { margin: 0.32em 0; padding-left: 0.2em; }
 .md-body li > ul,
 .md-body li > ol { margin: 0.32em 0; }
+.md-body--small p,
+.md-body--small ul,
+.md-body--small ol { margin: 0.5rem 0; }
 
 .md-body a,
 .md-body .md-wikilink { color: var(--accent); text-decoration: none; }

@@ -7,6 +7,27 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.14.0 — 2026-09-26 — A suggested reply waiting for your yes is readable in dark mode (it no longer takes your own message's dark words for the sun), its emoji go, Reject is the danger tone (Jouni: "dark mode totally unreadable").
+ *   v2.13.0 — 2026-09-26 — A broadcast recipient's ✕ is the Tag's remove mark (.poster-chip-x, poster.css): grey, coral under the pointer, where it turned red on a card ground (a unification: Jouni's decision "Remove mark").
+ *   v2.12.0 — 2026-09-26 — A list of conversations is the chat's list (ThreadList's rows, .poster-thread): the name in bold, one quiet line with the time and the last message, the open one on the sun; a person's heading is its person tone (ThreadPerson) with the counts named; the row's archive square is the small icon button in the delete's place. Messages' rows, a broadcast's results list and an agent's Chat threads take it; their own row looks go (a unification: Jouni's decision "Conversation list").
+ *   v2.11.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v2.10.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v2.9.0 — 2026-09-25 — Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v2.8.0 — 2026-09-25 — Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v2.7.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v2.6.0 — 2026-09-25 — Code inside a sentence or a value line is the code-inline cut of the Code block (UI consolidation phase 5, a unification).
+ *   v2.5.0 — 2026-09-25 — Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v2.4.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
+ *   v2.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v2.1.0 — 2026-09-13 — ListPanel moved to ./list-panel.js, where the list gained its sections,
  *     closable groups, archive and selection. ThreadPanel's "…" menu carries an archive or restore
  *     item for the open conversation (`archiveItem`).
@@ -49,7 +70,7 @@ import { getSession } from '/js/services/auth.js';
 import { KebabMenu } from '../shared.js';
 import { Avatar, MessageBubble, Composer, CommandBar, CommandFill, SchedulePanel, PollBuilder } from './components.js';
 import { ThreadReadAloud } from './read-aloud.js';
-import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
+import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, dayKey, dayLabel, trackStateLabel, trackStatusClass, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
 
 export function ThreadPanel({
   activeConv, thread, urlMap, important, trackedByMsg, awaitingForConv, awaitingDrafts,
@@ -103,8 +124,8 @@ export function ThreadPanel({
         ${/* Two doors and the rest behind "…": the head used to carry six buttons, four of them for
               settings and second-order actions, on the row that names who you are talking to. */''}
         <${ThreadReadAloud} thread=${thread} peerLabelText=${peerDisplay(activeConv.peerGhii)} convId=${activeConv.conversationId} />
-        ${!viaAgentName ? html`<button type="button" class="og-door inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}><span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
-        <${KebabMenu} label=${t('inbox.cover.more') || 'More'} btnClass="og-door og-door--quiet" trigger="…" items=${[
+        ${!viaAgentName ? html`<button type="button" class="poster-action inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}><span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
+        <${KebabMenu} label=${t('inbox.cover.more') || 'More'} btnClass="poster-icon poster-icon--small" trigger="…" items=${[
           !viaAgentName ? { label: t('inbox.notebook.toNotebook'), onClick: openConversationNotebook } : null,
           { label: showLinkPreviews ? t('inbox.linkPreview.hideAll') : t('inbox.linkPreview.showAll'), onClick: toggleLinkPreviews },
           (thread.length >= 50) ? { label: threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll'), onClick: toggleThreadAll } : null,
@@ -113,10 +134,10 @@ export function ThreadPanel({
         ]} />
       </div>
       <div class="inbox-msgs" ref=${msgsRef}>
-        ${thread.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.noThread')}</div>` : null}
+        ${thread.length === 0 ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.noThread')}</div>` : null}
         ${(!threadAll && (activeConv.messageCount || 0) > thread.length) ? html`
           <div class="inbox-thread-older">
-            <button class="btn-ghost btn-sm" onClick=${toggleThreadAll}>
+            <button class="poster-action poster-action--more" onClick=${toggleThreadAll}>
               ↩ ${t('inbox.thread.showOlder', { count: activeConv.messageCount })}</button>
           </div>` : null}
         ${thread.map(m => {
@@ -139,13 +160,13 @@ export function ThreadPanel({
       </div>
       ${awaitingForConv.map(tr => html`
         <div class="inbox-row inbox-row--mine" key=${tr.id}>
-          <div class="inbox-bubble inbox-bubble--mine inbox-bubble--draft">
-            <div class="inbox-draft-label">🔗 ${t('inbox.trackReady')}</div>
+          <div class="inbox-bubble inbox-bubble--draft">
+            <div class="inbox-draft-label">${t('inbox.trackReady')}</div>
             <div class="inbox-bubble-body"><${Markdown} text=${awaitingDrafts[tr.id] || tr.title || ''} /></div>
             <div class="inbox-draft-actions">
-              <button class="btn-ghost btn-sm" onClick=${() => openRecord(tr)} title=${t('inbox.trackOpenRecord')}>📄 ${t('inbox.trackOpenRecord')}</button>
-              <button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackReject')}</button>
-              <button class="btn-primary btn-sm" onClick=${() => startSuggestedReply(tr)}>${t('inbox.trackApprove')}</button>
+              <button class="poster-action poster-action--small" onClick=${() => openRecord(tr)} title=${t('inbox.trackOpenRecord')}>${t('inbox.trackOpenRecord')}</button>
+              <button class="poster-action poster-action--small poster-action--danger" onClick=${() => cancelTracked(tr)}>${t('inbox.trackReject')}</button>
+              <button class="poster-slab poster-slab--control" onClick=${() => startSuggestedReply(tr)}>${t('inbox.trackApprove')}</button>
             </div>
           </div>
         </div>`)}
@@ -165,7 +186,7 @@ export function ThreadPanel({
               <span class="inbox-replybar-label">↩ ${t('inbox.replyingTo')} ${escHtml(quoteSender(replyQuote))}</span>
               <span class="inbox-replybar-text">${escHtml(quoteSnippet(replyQuote.body))}</span>
             </button>
-            <button class="btn-ghost btn-sm" onClick=${() => setReplyQuote?.(null)} title=${t('inbox.quoteCancel')}>✕</button>
+            <button class="poster-icon poster-icon--small" onClick=${() => setReplyQuote?.(null)} title=${t('inbox.quoteCancel')}>✕</button>
           </div>` : null}
           <${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' + prefillNonce : '')} recipient=${activeConv.peerGhii}
             sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}
@@ -204,21 +225,21 @@ export function renderBroadcastForm({
             <span>${t('inbox.bcModeAnnouncement')}</span>
           </label>
         </div>` : html`<${PollBuilder} questions=${bcQuestions} setQuestions=${setBcQuestions} />`}
-        ${bcRecipients.length ? html`<div class="inbox-bc-chips">
-          ${bcRecipients.map(r => html`<span class="inbox-bc-chip" key=${r}>${escHtml(peerName(r))}
-            <button class="inbox-bc-chip-x" title=${t('inbox.bcRemove')} onClick=${() => removeBcRecipient(r)}>✕</button></span>`)}
+        ${bcRecipients.length ? html`<div class="poster-chips inbox-bc-chips">
+          ${bcRecipients.map(r => html`<span class="poster-chip" key=${r}>${escHtml(peerName(r))}
+            <button class="poster-chip-x" title=${t('inbox.bcRemove')} onClick=${() => removeBcRecipient(r)}>✕</button></span>`)}
         </div>` : null}
         <div class="inbox-bc-add">
-          <input class="inbox-input" type="text" list="inbox-contact-suggest" placeholder=${t('inbox.bcAddPlaceholder')}
+          <input class="og-input" type="text" list="inbox-contact-suggest" placeholder=${t('inbox.bcAddPlaceholder')}
             value=${bcInput} onInput=${(e) => setBcInput(e.target.value)}
             onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); addBcRecipient(); } }} />
-          <button class="btn-outline btn-sm" onClick=${() => addBcRecipient()}>${t('inbox.bcAdd')}</button>
+          <button class="poster-action" onClick=${() => addBcRecipient()}>${t('inbox.bcAdd')}</button>
         </div>
-        ${myGroups.length ? html`<select class="inbox-input" value=${bcGroupId} onChange=${(e) => setBcGroupId(e.target.value)}>
+        ${myGroups.length ? html`<select class="select-field" value=${bcGroupId} onChange=${(e) => setBcGroupId(e.target.value)}>
           <option value="">${t('inbox.bcNoGroup')}</option>
           ${myGroups.map(g => html`<option value=${g.id} key=${g.id}>${escHtml(g.name)} (${(g.members || []).length})</option>`)}
         </select>` : null}
-        ${isOperator ? html`<select class=${`inbox-input${bcAudience ? ' inbox-bc-audience--on' : ''}`} value=${bcAudience} onChange=${(e) => setBcAudience(e.target.value)}>
+        ${isOperator ? html`<select class=${`select-field${bcAudience ? ' inbox-bc-audience--on' : ''}`} value=${bcAudience} onChange=${(e) => setBcAudience(e.target.value)}>
           <option value="">${t('inbox.bcNoAudience')}</option>
           <option value="node-users">${t('inbox.bcNodeUsers')}</option>
           <option value="federation-users">${t('inbox.bcFederationUsers')}</option>
@@ -240,32 +261,32 @@ export function TrackedPanel({ activeTracked, doneCount, openRecord, openTracked
   return html`
     <div class="inbox-panel">
       <div class="inbox-thread-head">
-        <div class="inbox-name">🔗 ${t('inbox.trackedTitle')} ${activeTracked.length ? html`<span class="inbox-count">${activeTracked.length}</span>` : ''}</div>
+        <div class="inbox-name">🔗 ${t('inbox.trackedTitle')} ${activeTracked.length ? html`<span class="poster-count poster-count--waiting">${activeTracked.length}</span>` : ''}</div>
       </div>
       <div class="inbox-tracked-list">
-        ${activeTracked.length === 0 ? html`<div class="inbox-empty-sm">${doneCount ? t('inbox.trackedAllDone') : t('inbox.trackedEmpty')}</div>` : null}
+        ${activeTracked.length === 0 ? html`<div class="poster-quiet inbox-empty-sm">${doneCount ? t('inbox.trackedAllDone') : t('inbox.trackedEmpty')}</div>` : null}
         ${activeTracked.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).map(tr => {
           const trk = trackStateLabel(tr.state);
           return html`
             <div class="inbox-tracked-row" key=${tr.id}>
               <div class="inbox-tracked-main">
                 <div class="inbox-tracked-line1">
-                  <span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`}>${trk.text}</span>
+                  <span class=${trackStatusClass(trk.tone)}>${trk.text}</span>
                   <span class="inbox-tracked-name">${escHtml(tr.title || t('inbox.trackResponse'))}</span>
                 </div>
                 <div class="inbox-tracked-sub">
                   ${t('inbox.trackedTo')} ${escHtml(peerName(tr.source?.peerGhii || ''))}
-                  · ${t('inbox.trackedWatching')} <code>${escHtml(recordLabel(tr))}</code>
+                  · ${t('inbox.trackedWatching')} <code class="code-inline">${escHtml(recordLabel(tr))}</code>
                   · ${tr.response?.mode === 'auto' ? t('inbox.trackModeAuto') : t('inbox.trackModeApprove')}
                   ${tr.tracking?.lastError ? html` · <span class="inbox-tracked-err">${escHtml(tr.tracking.lastError)}</span>` : null}
                 </div>
               </div>
               <div class="inbox-tracked-actions">
-                ${tr.references?.organismId ? html`<button class="btn-outline btn-sm" onClick=${() => openRecord(tr)}>📄 ${t('inbox.trackOpenRecord')}</button>` : null}
+                ${tr.references?.organismId ? html`<button class="poster-action" onClick=${() => openRecord(tr)}>📄 ${t('inbox.trackOpenRecord')}</button>` : null}
                 ${tr.state === 'awaiting-approval'
-                  ? html`<button class="btn-primary btn-sm" onClick=${() => openTracked(tr)}>${t('inbox.trackApprove')}</button>`
-                  : html`<button class="btn-ghost btn-sm" onClick=${() => openTracked(tr)} title=${t('inbox.trackedOpenConvo')}>💬</button>`}
-                <button class="btn-ghost btn-sm" onClick=${() => cancelTracked(tr)}>${t('inbox.trackedCancel')}</button>
+                  ? html`<button class="poster-slab poster-slab--control" onClick=${() => openTracked(tr)}>${t('inbox.trackApprove')}</button>`
+                  : html`<button class="poster-icon poster-icon--small" onClick=${() => openTracked(tr)} title=${t('inbox.trackedOpenConvo')}>💬</button>`}
+                <button class="poster-action" onClick=${() => cancelTracked(tr)}>${t('inbox.trackedCancel')}</button>
               </div>
             </div>`;
         })}
@@ -279,16 +300,14 @@ export function ResultsPanel({ resultsId, recentBroadcasts, results, openResults
     return html`<div class="inbox-panel">
       <div class="inbox-thread-head"><div class="inbox-name">📊 ${t('inbox.resultsTitle')}</div></div>
       <div class="inbox-tracked-list">
-        ${recentBroadcasts.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.resultsEmpty')}</div>` : null}
-        ${recentBroadcasts.map(b => html`
-          <button class="inbox-conv" key=${b.id} onClick=${() => openResults(b.id)}>
-            <div class="inbox-conv-main">
-              <div class="inbox-conv-line1">
-                <span class="inbox-name">${b.type === 'poll' ? '📊' : '📨'} ${escHtml(b.title)}</span>
-                <span class="inbox-conv-time" title=${b.createdAt ? stampFull(b.createdAt) : ''}>${b.createdAt ? stampShort(b.createdAt) : ''}</span>
-              </div>
-            </div>
-          </button>`)}
+        ${recentBroadcasts.length === 0 ? html`<div class="poster-quiet inbox-empty-sm">${t('inbox.resultsEmpty')}</div>` : null}
+        ${recentBroadcasts.length > 0 ? html`<div class="poster-thread-list">${recentBroadcasts.map(b => html`
+          <div class="poster-thread" key=${b.id}>
+            <button type="button" class="poster-thread-open" onClick=${() => openResults(b.id)}>
+              <span class="poster-thread-title">${b.type === 'poll' ? '📊' : '📨'} ${escHtml(b.title)}</span>
+              <span class="poster-thread-sub" title=${b.createdAt ? stampFull(b.createdAt) : ''}>${b.createdAt ? stampShort(b.createdAt) : ''}</span>
+            </button>
+          </div>`)}</div>` : null}
       </div>
     </div>`;
   }
@@ -297,11 +316,11 @@ export function ResultsPanel({ resultsId, recentBroadcasts, results, openResults
   const tallies = isPoll ? tallyPoll(r.interactive, r.recipients || []) : [];
   return html`<div class="inbox-panel">
     <div class="inbox-thread-head">
-      <button class="btn-ghost btn-sm" onClick=${() => { setResultsId(null); setResults(null); }}>←</button>
+      <button class="poster-icon poster-icon--small" onClick=${() => { setResultsId(null); setResults(null); }}>←</button>
       <div class="inbox-name">📊 ${t('inbox.resultsTitle')}</div>
     </div>
     <div class="inbox-msgs">
-      ${!r ? html`<div class="inbox-empty-sm">…</div>` : html`
+      ${!r ? html`<div class="poster-quiet inbox-empty-sm">…</div>` : html`
         <div class="inbox-results-summary">
           ${t('inbox.resultsRecipients')}: ${r.total} · ${t('inbox.resultsDelivered')}: ${r.delivered} · ${t('inbox.resultsRead')}: ${r.read}${isPoll ? ` · ${t('inbox.resultsAnswered')}: ${r.answered}` : ''}
         </div>

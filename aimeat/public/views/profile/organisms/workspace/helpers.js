@@ -10,6 +10,9 @@
  *   kpiMeets, firstLine, shortActor, cap, isMobileView, renderSpaceNotice
  * @usage import { PRIMARY_FIELD, groupDocs } from '/views/profile/organisms/workspace/helpers.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — Markdown in a record field is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
+ *   v1.1.0 — 2026-09-26 — An object in a record field is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   2026-09-25 -- A space whose items live elsewhere says so with the Hint (.poster-hint), a unification: the look most tabs use.
  *   2026-09-14 -- A row space reads as a row space: its own notice. It fell into the "backing not
  *     supported" branch, which told the owner to switch it to memory — the one change row spaces
  *     exist to prevent. The repeated name-and-badge head went with it: organism.css hides it inside
@@ -34,13 +37,13 @@ export const looksMarkdown = (s) => /\n/.test(s) || /(^|\s)[-*]\s/.test(s) || /[
 export const renderFieldVal = (v) => {
   if (Array.isArray(v)) {
     return html`<ul class="pj-rec-field-list">${v.map((it, i) => html`<li key=${i}>${
-      (it && typeof it === 'object') ? html`<pre class="pj-rec-json">${JSON.stringify(it, null, 2)}</pre>` : String(it)
+      (it && typeof it === 'object') ? html`<pre class="code-block pj-rec-json">${JSON.stringify(it, null, 2)}</pre>` : String(it)
     }</li>`)}</ul>`;
   }
-  if (v && typeof v === 'object') return html`<pre class="pj-rec-json">${JSON.stringify(v, null, 2)}</pre>`;
+  if (v && typeof v === 'object') return html`<pre class="code-block pj-rec-json">${JSON.stringify(v, null, 2)}</pre>`;
   if (typeof v === 'string') {
     return looksMarkdown(v)
-      ? html`<div class="pj-rec-md"><${Markdown} text=${v} /></div>`
+      ? html`<div class="pj-rec-md"><${Markdown} text=${v} small /></div>`
       : html`<span class="pj-rec-field-text">${v}</span>`;
   }
   return html`<span class="pj-rec-field-text">${String(v)}</span>`;
@@ -110,7 +113,7 @@ export const isMobileView = () => window.matchMedia('(max-width: 640px)').matche
 // og-page (css/views/organism.css), so it is the notice alone.
 export const renderSpaceNotice = (ot) => html`
   <div class="pj-section poster-row--thing" key=${ot.name}>
-    <div class="pj-space-notice">${ot.backing === 'tasks'
+    <div class="pj-space-notice poster-hint">${ot.backing === 'tasks'
       ? (t('organisms.spaceTasksBacked') || 'This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.')
       : ot.backing === 'rows'
         ? (t('organisms.spaceRowsBacked') || 'This space holds rows the group accumulates. They are appended and never edited, and this page does not list them — they are read with the row tools, which filter and page through them.')

@@ -9,6 +9,18 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- The rows of entries are the Listing (listing, listing-row and its head row, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
+ *   v1.10.0 -- 2026-09-26 -- The line under an entry's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.8.0 -- 2026-09-25 -- The loading line's blinking mark is the library's Loading mark (css/components/loading-mark.css), moved unchanged out of five sheets (UI consolidation phase 5, a move).
+ *   v1.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.6.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.4.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.3.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -21,6 +33,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
+import { Hint } from '/components/Hint.js';
 
 export const c = (key, vars) => t('discover.cover.' + key, vars);
 // The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
@@ -55,26 +68,29 @@ export function desk(ctx) {
     <div class="dv-desk poster-row--thing">
       <input type="search" class="dv-field" value=${ctx.q} placeholder=${ctx.scope === 'public' ? c('askPublic') : c('ask')}
         onInput=${(e) => ctx.setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') ctx.submit(); }} />
-      <div class="og-choice dv-scope">
-        ${SCOPES.map(s => html`<button type="button" key=${s} class=${`og-choice-btn ${ctx.scope === s ? 'on' : ''}`} onClick=${() => ctx.setScope(s)}>${t('discover.scope.' + s)}<i>${count(s) || (s === ctx.scope ? '…' : '')}</i></button>`)}
+      <div class="pf-tabs dv-scope">
+        ${SCOPES.map(s => html`<button type="button" key=${s} class=${`poster-tab ${ctx.scope === s ? 'is-on' : ''}`} onClick=${() => ctx.setScope(s)}>${t('discover.scope.' + s)}<i>${count(s) || (s === ctx.scope ? '…' : '')}</i></button>`)}
       </div>
-      <p class="dv-hint">${!ctx.facets[ctx.scope] ? html`<span class="dv-loading">${c('loading')}</span>` : ctx.query ? c('hintResults') : c('hint')}</p>
+      <${Hint}>${!ctx.facets[ctx.scope] ? html`<span class="loading-mark">${c('loading')}</span>` : ctx.query ? c('hintResults') : c('hint')}<//>
     </div>`;
 }
 
-/** The cells of entries: when, what (with the words marked), kind and place, a door. */
+/** The rows of entries (Listing rows): when, what (with the words marked), kind and place, a door. */
 export function entryCells(ctx, list, { words = [], time = true } = {}) {
   return list.map((e, i) => html`
-      ${time ? html`<div class="dv-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(new Date(e.updatedAt))}<small>${dayLabel(new Date(e.updatedAt))}</small></div>` : null}
-      <div class="dv-nm" key=${'n' + i}><button type="button" class="og-tbl-name" onClick=${() => openEntry(ctx, e)}>${hl(e.title || e.id, words)}</button>${e.description ? html`<small>${hl(e.description, words)}</small>` : null}</div>
-      <div class="dv-where" key=${'w' + i}><b>${kindName(e.type)}</b>${placeOf(e) ? ` · ${placeOf(e)}` : ''}${!time ? ` · ${rel(e.updatedAt)}` : ''}</div>
-      <div class="og-tbl-door" key=${'d' + i}><button type="button" class="og-door" onClick=${() => openEntry(ctx, e)}>${c('open')}</button></div>`);
+    <div class="listing-row" key=${'e' + i}>
+      ${time ? html`<div class="dv-at poster-stat-number poster-stat-number--small">${hhmm(new Date(e.updatedAt))}<small>${dayLabel(new Date(e.updatedAt))}</small></div>` : null}
+      <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => openEntry(ctx, e)}>${hl(e.title || e.id, words)}</button>${e.description ? html`<small class="listing-meta">${hl(e.description, words)}</small>` : null}</div>
+      <div class="listing-desc"><b>${kindName(e.type)}</b>${placeOf(e) ? ` · ${placeOf(e)}` : ''}${!time ? ` · ${rel(e.updatedAt)}` : ''}</div>
+      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => openEntry(ctx, e)}>${c('open')}</button></div>
+    </div>`);
 }
-/** Rows of entries in their own grid. */
+/** The Listing of entries; with `time: false` the hits' cut (no when column), with `head` its heading row. */
 export function entryRows(ctx, list, opts = {}) {
-  return html`<div class=${`dv-rows ${opts.time === false ? 'dv-rows--hits' : ''}`}>${entryCells(ctx, list, opts)}</div>`;
+  const hits = opts.time === false;
+  return html`<div class=${`listing listing--cols dv-rows ${hits ? 'listing--name-where-doors dv-rows--hits' : 'listing--when-name-where-doors'}`}>${opts.head ? rowsHead() : null}${entryCells(ctx, list, opts)}</div>`;
 }
-export const rowsHead = () => html`<div class="dv-rows dv-rows--head"><div>${c('colWhen')}</div><div>${c('colWhat')}</div><div>${c('colKindPlace')}</div><div></div></div>`;
+const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colWhen')}</div><div class="poster-label">${c('colWhat')}</div><div class="poster-label">${c('colKindPlace')}</div><div class="poster-label"></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
 export function crumb(ctx, parts) {
@@ -93,7 +109,7 @@ export function renderPage(ctx, { crumbs, title, chips = null, doors = null, rai
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title dv-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>

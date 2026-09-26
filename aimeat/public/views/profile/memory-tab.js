@@ -5,6 +5,7 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.1.0 — 2026-09-25 — A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
  *   v3.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Muistin sivu", direction A). The render
  *     is one call into memory-tab/cover.js: the cover (the store in four parts, what has happened,
  *     what is stale, who else sees), a key space and a record as pages, and the old list, discovery,
@@ -738,7 +739,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   return html`
     ${session.federated && html`
-      <div class="alert alert-info mb-half">
+      <div class="poster-aside poster-aside--small poster-aside--irreversible mb-half">
         <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
       </div>
     `}

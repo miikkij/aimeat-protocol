@@ -1,0 +1,25 @@
+/**
+ * @file file-drop.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Choosing files to upload: a dashed drop area with a big arrow and two lines (drop here, or
+ *   click), coral while a file is dragged over it or chosen, and under it one row per chosen file (its
+ *   mark, the key it will be stored under, its size, the mark that takes it off). Drawn by
+ *   FileUploadForm (views/profile/memory-tab/components.js) inside the Settings scope root (.pf).
+ *   Moved unchanged out of views/profile.css; the class names stay. The drop area's 2px dashed frame
+ *   reads --shape-frame (the same value); a file row's corner reads --shape-corner, a box's corner.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- A file row's 8px corner reads --shape-corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
+ */
+
+.pf .file-dropzone{border:var(--shape-frame) dashed var(--border,rgba(232,86,74,.3));border-radius:var(--radius,12px);padding:2rem 1.5rem;text-align:center;cursor:pointer;transition:all .2s;background:rgba(232,86,74,.03)}
+.pf .file-dropzone:hover{border-color:var(--accent,#E8564A);background:rgba(232,86,74,.06)}
+.pf .file-dropzone.dragover{border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1);transform:scale(1.01)}
+.pf .file-dropzone.has-file{border-color:var(--accent,#E8564A);background:rgba(232,86,74,.04)}
+.pf .file-dropzone-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;color:var(--text-dim,#6B7280);font-size:.9rem}
+.pf .file-upload-list{display:flex;flex-direction:column;gap:.5rem;margin:.75rem 0}
+.pf .file-upload-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--bg-surface);border:1px solid var(--border,rgba(232,86,74,.15));border-radius:var(--shape-corner)}
+.pf .pf-upload-icon   { font-size: 2rem; opacity: .5; }
+.pf .pf-file-icon     { font-size: 1.2rem; flex-shrink: 0; }

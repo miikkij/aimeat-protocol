@@ -5,10 +5,37 @@
  * @description The MCP page in the poster face (mc- prefix; design canvas "AIMEAT MCP-sivu",
  *   direction A). The shared parts come from organism.css's og- rules; this file carries what the
  *   page adds: the rows of connected AIs, the quick-ways grid, the prompt boxes, the suggestions
- *   switch, and the poster dress for the three components the page reuses from the classic shell
- *   (the setup guide .ast-*, the instruction block .ib-*, the install row .mcpi-*, the managed-
- *   environment note .mgd-*). NOTE: this file must be linked in spa.html.
+ *   switch, and the poster dress for the managed-environment note (.mgd-*). The setup guide, its
+ *   install row and the instruction block draw their own look. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.21.0 -- 2026-09-26 -- The prompts to paste are the Code block (css/components/code-block.css): the frame goes, the place and height stay (a unification: Jouni's decision "Code block").
+ *   v1.20.0 -- 2026-09-26 -- The setup guide (.ast-*), its install row (.mcpi-*) and the instruction block (.ib-*) are no longer dressed here: they draw their own look (a unification: Jouni's decision "MCP guide", the option classic).
+ *   v1.19.0 -- 2026-09-26 -- The setup guide (.ast-*), its install row (.mcpi-*) and the instruction block (.ib-*) are no longer dressed here: they draw their own look (a unification: Jouni's decision "MCP guide", the option classic).
+ *   v1.18.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.17.0 -- 2026-09-26 -- A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
+ *   v1.16.0 -- 2026-09-26 -- The one organism, shown where the drop-down would stand, is the Text field (.og-input), a unification: its own copy of that look goes.
+ *   v1.15.0 -- 2026-09-26 -- The paragraph that opens the proof and the organism prompt is the lead (.og-lead), a unification: the look most tabs use; the Form message and the managed-environment note under it keep their own look.
+ *   v1.14.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-26 -- The dashed avatar is the avatar's agent tone in css/poster.css (.poster-box--agent); its rule here goes.
+ *   v1.12.0 -- 2026-09-25 -- A line that says a part is still loading is the quiet sentence with the Loading mark (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- A line that says what happened after an action is the Form message, a failure in its error tone (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- The short ways in and the setup guide's fields are the Facts (css/components/facts.css), a unification: the look most tabs use. The rules of mc-quick-grid and its cells and of .og-mcp .ast-param and its label, value and note go (the rules between the fields go with them); the value's code and "leave empty" keep their face.
+ *   v1.9.0 -- 2026-09-25 -- The connected AIs are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of mc-rows and its cells go; the mark keeps its box size and dashed edge, and the coral word stays.
+ *   v1.8.0 -- 2026-09-25 -- The switch rules go: a setting that is on or off is the Switch (css/components/switch.css); a place's layout value stays here (UI consolidation phase 5, a unification).
+ *   v1.7.0 -- 2026-09-25 -- A note's own frame, ground and corners go: it is the Attention note (.poster-aside, css/poster.css); its place (margin) stays here (Jouni's decision "Attention note", a unification).
+ *   v1.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.5.0 -- 2026-09-25 -- The lead and paragraph rules go: they are the og-lead (css/components/page-section.css); the layout declarations of their places stay, on .og-lead (UI consolidation phase 5, a unification).
+ *   v1.4.0 -- 2026-09-25 -- The proof's paragraph rule leaves the Hint alone, so the proof's hint keeps the Hint's look (UI consolidation phase 5, a unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.2.0 — 2026-09-25 — The quiet ways on are the library's action link (Jouni's decision "Action
+ *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
+ *     place's layout value moves to the new class.
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab (Jouni's decision
+ *     "Loud action"): the rules that restyled the old og-slab and .btn-primary here go, and a place's
+ *     layout value moves to the new class.
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class. .mc-empty keeps only its place.
+ *   2026-09-25 -- The guide's tools and the instruction block's formats are tabs (.poster-tab, Jouni's
+ *     decision "Tabs and filters"): their framed look goes, the row's layout stays.
  *   2026-09-24 -- The guide's "Official instructions" is no longer redrawn here (the more tone).
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
@@ -16,135 +43,64 @@
  *   v1.0.0 — 2026-09-02 — Initial.
  */
 
-.og-mcp .og-chip--coral { border-color: var(--accent); color: var(--accent); }
-.og-mcp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-mcp .mc-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
-.og-mcp .mc-lead { margin: 0 0 .9rem; font-size: .95rem; line-height: 1.6; color: var(--text); }
+.og-mcp .poster-quiet { margin: 0; }
 .og-mcp .mc-proof { --poster-section-size: 1.25rem; }
 .og-mcp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-mcp .og-doors > a { text-decoration: none; }
-.og-mcp .og-door:disabled { opacity: .5; cursor: default; }
-.og-mcp .mc-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.5; font-weight: 600; color: var(--text-dim); }
-.og-mcp .mc-empty b { color: var(--text); font-weight: 800; }
+.og-mcp .mc-empty { margin: 0; padding: .3rem 0 .6rem; }
 
-/* ── The rows of connected AIs ──────────────────────────────────────────────────────────────── */
-.mc-rows { display: grid; grid-template-columns: 2.2rem minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .9fr) auto; gap: 0 1rem; align-items: center; }
-.mc-rows > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.mc-rows > .mc-head { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-/* The mark is a whole box of its own: the row rule above would otherwise cut its bottom border. */
-.mc-rows > .mc-av { width: 2.2rem; height: 2.2rem; }
-.mc-rows > .mc-av--dash { border-style: dashed; color: var(--text-dim); }
-.mc-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.mc-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
-.mc-w { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
-.mc-w b { color: var(--text); font-weight: 800; }
-.mc-w b.mc-coral { color: var(--accent); }
-.mc-w small { display: block; font-family: var(--font-mono); font-size: .7rem; }
-.mc-ctl { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
+/* ── The rows of connected AIs: the Listing (css/components/listing.css); the mark's box, and
+   the coral word for an AI that may do everything ────────────────────────────────────────────── */
+.og-mcp .mc-av { width: 2.2rem; height: 2.2rem; }
+.og-mcp .mc-coral { color: var(--accent); }
 
-/* ── The short way in, per tool ─────────────────────────────────────────────────────────────── */
+/* ── The short way in, per tool: the Facts (css/components/facts.css) ───────────────────────── */
 .mc-quick { margin-top: 1rem; }
-.mc-quick-grid { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr); gap: .55rem 1.2rem; margin-top: .4rem; align-items: baseline; }
-.mc-quick-k { font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); padding-top: .2rem; }
-.mc-quick-v { min-width: 0; }
-.mc-quick-v small { display: block; font-size: .74rem; line-height: 1.4; color: var(--text-dim); margin-top: .15rem; }
 
 /* ── Before you start, the proof, the organism prompt ───────────────────────────────────────── */
 .mc-pre { margin: 1rem 0 0; }
 .mc-pre p { margin: 0 0 .5rem; }
 .mc-pre p:last-child { margin-bottom: 0; }
-.mc-pre-label { display: block; margin-bottom: .35rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .75rem; letter-spacing: .05em; color: var(--accent); }
-.mc-proof p, .mc-org p { margin: 0 0 .6rem; font-size: .92rem; line-height: 1.6; color: var(--text); }
-.mc-code { margin: .6rem 0 0; padding: .75rem 1rem; border: 2px solid var(--text); background: var(--bg-dim); font-family: var(--font-mono); font-size: .76rem; line-height: 1.55; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; }
+.mc-pre-label { display: block; margin-bottom: .35rem; }
+/* The paragraph that opens the proof and the organism prompt is the lead (.og-lead); its place only. */
+.mc-proof .og-lead, .mc-org .og-lead { margin: 0 0 .6rem; }
+/* The prompts to paste are the Code block (css/components/code-block.css); their place and height only. */
+.mc-code.code-block { margin: .6rem 0 0; max-height: 24rem; overflow: auto; }
 .mc-proof-doors { margin-top: .9rem; }
-.mc-fail { margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--accent); }
+.mc-fail { margin-top: .9rem; }
 .mc-fail b { display: block; font-weight: 800; margin-bottom: .4rem; }
 .mc-fail ol { margin: 0; padding-left: 1.2rem; font-size: .88rem; line-height: 1.55; }
 .mc-fail li { margin-bottom: .3rem; }
 .mc-field { display: block; margin: .8rem 0 0; }
-.mc-field .og-label { display: block; margin-bottom: .3rem; }
-.mc-field-value { padding: .45rem 0; border-bottom: 3px solid var(--text); font-size: 1rem; font-weight: 600; color: var(--text); }
+.mc-field .poster-label { display: block; margin-bottom: .3rem; }
 .mc-instr-pick { margin-bottom: .6rem; }
 .mc-org-fold { margin-top: 1rem; }
-.mc-found { margin: .6rem 0 0; font-size: .88rem; color: var(--accent); }
-.mc-found--ok { color: var(--success-fg); }
+/* What the check found is the Form message, a refusal in its error tone; its line keeps its place. */
+.og-mcp .mc-found { margin: .6rem 0 0; }
 
 /* ── The suggestions switch ─────────────────────────────────────────────────────────────────── */
 .mc-setting { display: flex; align-items: flex-start; gap: 1.5rem; padding: .3rem 0 .6rem; }
 .mc-setting-words { flex: 1; min-width: 0; }
-.mc-setting-words b { display: block; font-size: .95rem; font-weight: 800; color: var(--text); }
-.mc-setting-words p { margin: .3rem 0 0; font-size: .85rem; line-height: 1.55; color: var(--text-dim); }
+.mc-setting-words b { display: block; }
+/* The sentence under the setting's name is the Hint (css/components/hint.css); its place only. */
+.mc-setting-words .poster-hint { margin: .3rem 0 0; }
 .mc-by { color: var(--accent); font-weight: 600; }
-.mc-switch { flex: none; width: 46px; height: 24px; box-sizing: border-box; border: 2px solid var(--text); background: var(--card-bg); padding: 2px; display: inline-flex; align-items: center; justify-content: flex-start; cursor: pointer; }
-.mc-switch i { display: block; width: 16px; height: 16px; background: var(--text); }
-.mc-switch.on { background: var(--text); justify-content: flex-end; }
-.mc-switch.on i { background: var(--bg); }
+/* The setting's switch is the library's (css/components/switch.css); here it keeps its place. */
+.mc-setting .switch { flex: none; }
 
-/* ── The reused components, in the poster dress ─────────────────────────────────────────────── */
-.og-mcp .ast { margin: 0; }
-.og-mcp .ast-lead { margin: 0 0 .6rem; font-size: .9rem; line-height: 1.55; color: var(--text-dim); }
-.og-mcp .ast-tools { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 .8rem; }
-.og-mcp .ast-tool { border: 2px solid var(--text); border-radius: 0; margin: 0 -2px 0 0; background: var(--card-bg); padding: .4rem .7rem; font-family: var(--font-showroom-body); font-size: .78rem; font-weight: 700; color: var(--text-dim); cursor: pointer; }
-.og-mcp .ast-tool--active { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
-.og-mcp .ast-tool-reco { font-family: var(--font-mono); font-size: .62rem; font-weight: 500; color: var(--accent); margin-left: .4rem; }
-.og-mcp .ast-plans, .og-mcp .ast-warn, .og-mcp .ast-note { margin: .5rem 0; padding: 0; border: 0; background: none; font-size: .86rem; line-height: 1.55; color: var(--text-dim); }
-.og-mcp .ast-warn { color: var(--accent); }
-.og-mcp .ast-steps { margin: .4rem 0 .8rem; padding-left: 1.3rem; font-size: .92rem; line-height: 1.6; color: var(--text); }
-.og-mcp .ast-cmd { margin: .2rem 0 .8rem; }
-.og-mcp .ast-cmd-text { margin: 0 0 .5rem; padding: .6rem .9rem; border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); font-family: var(--font-mono); font-size: .78rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-.og-mcp .ast-params { margin: .4rem 0 .8rem; padding: 0; border: 0; border-radius: 0; background: none; }
-.og-mcp .ast-params-head { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .3rem; }
-.og-mcp .ast-param { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr); gap: .1rem 1.2rem; padding: .45rem 0; border-top: 1px solid var(--border); align-items: baseline; }
-.og-mcp .ast-param:first-of-type { border-top: 0; }
-.og-mcp .ast-param-label { font-size: .8rem; font-weight: 700; color: var(--text); }
-.og-mcp .ast-param-value { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; min-width: 0; }
-.og-mcp .ast-param-note { grid-column: 2; font-size: .74rem; color: var(--text-dim); }
-.og-mcp .ast-code { font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .15rem .45rem; border: 0; overflow-wrap: anywhere; }
-.og-mcp .ast-param-empty { font-style: italic; color: var(--text-dim); font-size: .82rem; }
-/* "Official instructions" is the action link's more tone (Jouni's decision "Small link"); its place only. */
-.og-mcp .ast-docs { margin-top: .3rem; }
+/* The guide's steps are the numbered list (IndexList, the guide takes `stepRows`; Jouni's decision
+   "Numbered list"); their place only. */
+.og-mcp .ast-step-rows { margin: .4rem 0 .8rem; }
 
-.og-mcp .mcpi { gap: .45rem; }
-.og-mcp .mcpi--tool { margin: 0 0 .9rem; }
-.og-mcp .mcpi-head { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .75rem; letter-spacing: .05em; color: var(--accent); }
-.og-mcp .mcpi-note { font-size: .78rem; color: var(--text-dim); }
-.og-mcp .mcpi-oneclick, .og-mcp .mcpi-file { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
-
-.og-mcp .ib { margin: .6rem 0 0; }
-.og-mcp .ib-tabs { display: inline-flex; border: 2px solid var(--text); margin-bottom: .6rem; }
-.og-mcp .ib-tab { background: transparent; border: 0; border-right: 2px solid var(--text); border-radius: 0; padding: .4rem .8rem; cursor: pointer; font-family: var(--font-showroom-body); font-size: .78rem; font-weight: 700; color: var(--text-dim); }
-.og-mcp .ib-tab:last-child { border-right: 0; }
-.og-mcp .ib-tab--active { background: var(--sun); color: var(--on-sun); }
-.og-mcp .ib-place { margin: 0 0 .4rem; font-size: .84rem; line-height: 1.5; color: var(--text-dim); }
-.og-mcp .ib-block { margin: 0; padding: .75rem 1rem; border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); font-family: var(--font-mono); font-size: .76rem; line-height: 1.55; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; }
-.og-mcp .ib-actions { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin-top: .8rem; }
-.og-mcp .ib-meta { font-size: .78rem; color: var(--text-dim); }
-.og-mcp .ib-note { font-size: .84rem; color: var(--text-dim); }
-
+/* ── The managed-environment note ───────────────────────────────────────────────────────────── */
+/* The setup guide, its install row and the instruction block draw their own look
+   (css/components/hello-mcp.css, mcp-install.css; Jouni's decision "MCP guide", the option classic). */
 .og-mcp .mgd-note { margin-top: 1rem; padding: .7rem .9rem; border: 2px solid var(--border); font-size: .8rem; line-height: 1.5; color: var(--text-dim); }
 .og-mcp .mgd-note-title { margin: 0 0 .3rem; font-size: .8rem; font-weight: 800; color: var(--text); }
 .og-mcp .mgd-note-body { margin: 0 0 .4rem; }
 .og-mcp .mgd-note-link { font-weight: 700; color: var(--text); border-bottom: 2px solid var(--text); text-decoration: none; }
 
-/* The buttons the reused components draw as classic pills become the poster's underlined door:
-   the page keeps one loud slab (the proof's copy until the connection is proven, then the mast's
-   connect action), so nothing inside a section shouts over it. */
-.og-mcp .ib-actions .btn-primary, .og-mcp .ast-cmd .btn-primary, .og-mcp .mcpi .btn-primary,
-.og-mcp .ast .btn-ghost, .og-mcp .mcpi .btn-outline { display: inline-block; background: none; border: 0; border-radius: 0; border-bottom: 2px solid var(--text); padding: 0 0 1px; cursor: pointer; font-family: var(--font-showroom-body); font-weight: 800; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text); text-decoration: none; box-shadow: none; }
-.og-mcp .ib-actions .btn-primary:hover, .og-mcp .ast-cmd .btn-primary:hover, .og-mcp .mcpi .btn-primary:hover,
-.og-mcp .ast .btn-ghost:hover, .og-mcp .mcpi .btn-outline:hover { color: var(--accent); border-bottom-color: var(--accent); }
-.og-mcp .ib-actions .btn-primary.copied, .og-mcp .ast-cmd .btn-primary.copied { color: var(--success-fg); border-bottom-color: var(--success-fg); }
-
 /* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  .mc-rows { grid-template-columns: 2.2rem minmax(0, 1fr); }
-  .mc-rows > .mc-head { display: none; }
-  .mc-rows > .mc-w { display: none; }
-  .mc-rows > .mc-nm { border-bottom: 0; padding-bottom: .2rem; }
-  .mc-rows > .mc-ctl { grid-column: 2; justify-content: flex-start; padding-top: 0; }
-  .mc-quick-grid { grid-template-columns: 1fr; gap: .2rem 0; }
-  .mc-quick-k { padding-top: .6rem; }
-  .og-mcp .ast-param { grid-template-columns: 1fr; }
-  .og-mcp .ast-param-note { grid-column: 1; }
   .mc-setting { flex-direction: column; gap: .8rem; }
 }

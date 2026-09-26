@@ -10,6 +10,23 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   v2.13.0 -- 2026-09-26 -- The lines under a member's or a request's name are the Listing's typewriter line (.listing-meta); a request's own message keeps its look (a unification: Jouni's decision "Meta line").
+ *   v2.12.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v2.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v2.10.0 -- 2026-09-25 -- The label over a member's workspace access is the row label (.poster-label) (Jouni's decision "Row label", a unification).
+ *   v2.9.0 -- 2026-09-25 -- The blocked members are the Listing (css/components/listing.css), a unification: the look most tabs use. The roster and the join requests stay: the line under a name is in the body face, an open conflict.
+ *   v2.8.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v2.7.0 -- 2026-09-25 -- A picture of a person or a thing is the Object box's avatar cut (.poster-box--avatar), the look most Settings tabs draw (UI consolidation phase 5, a unification).
+ *   v2.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v2.5.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v2.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v2.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.2.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   v2.1.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v2.0.0 — 2026-07-16 — Unified add/invite panel (direct add default, invitation optional, email
  *     auto-detected); pending invites as editable rows; roster kebab gains Make/Remove admin +
@@ -51,16 +68,16 @@ function MemberAccessEditor({ orgId, member, wsOptions, wsAccess, busy, setBusy,
     finally { setBusy(false); }
   };
   return html`
-    <div class="pj-eminvite pj-member-access">
-      <div class="pj-eminvite-wslabel">${(t('organisms.editAccessFor') || 'Workspace access for {member}').replace('{member}', bare)}</div>
+    <div class="pj-eminvite poster-box pj-member-access">
+      <div class="pj-eminvite-wslabel poster-label">${(t('organisms.editAccessFor') || 'Workspace access for {member}').replace('{member}', bare)}</div>
       <div class="pj-eminvite-wslist">
         ${wsOptions.map(w => {
           const owned = (wsAccess?.[bare] || []).some(x => x.id === w.id && x.role === 'owner');
           return html`
             <div class="pj-eminvite-wsrow" key=${w.id}>
               <label>${w.name}</label>
-              ${owned ? html`<span class="badge badge-success">${t('organisms.wsCreator') || 'creator'}</span>` : html`
-                <select class="input-field input-sm" disabled=${busy} value=${current[w.id] || 'none'}
+              ${owned ? html`<span class="poster-chip">${t('organisms.wsCreator') || 'creator'}</span>` : html`
+                <select class="select-field" disabled=${busy} value=${current[w.id] || 'none'}
                   onChange=${(e) => apply(w.id, e.target.value)}>
                   <option value="none">${t('organisms.accessNone') || 'No access'}</option>
                   <option value="viewer">${t('organisms.roleViewer') || 'Viewer'}</option>
@@ -216,7 +233,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
         <div class="section-desc pj-tabhead-desc">${t('organisms.membersDesc') || 'Members can join workspaces; their agents inherit the role.'}
           ${' '}<span class="pj-members-cap">${(members || []).length}/${org.maxMembers || 500}</span></div>
         ${canManage ? html`<div class="pj-invite-btns">
-          <button class="btn-primary btn-sm" onClick=${() => setShowInvite(s => !s)}>${'+ '}${t('organisms.addPeople') || 'Add people'}</button>
+          <button class="poster-slab poster-slab--control" onClick=${() => setShowInvite(s => !s)}>${'+ '}${t('organisms.addPeople') || 'Add people'}</button>
         </div>` : null}
       </div>
 
@@ -230,16 +247,16 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
 
       ${canManage && pending.length > 0 ? pending.map(r => html`
         <div class="pj-org-row pj-req-row" key=${r.id}>
-          <div class="pj-org-avatar" aria-hidden="true">${'🙋'}</div>
+          <div class="pj-org-avatar poster-box poster-box--avatar poster-box--small" aria-hidden="true">${'🙋'}</div>
           <div class="pj-org-main pj-org-main-static">
             <div class="pj-org-titlerow">
               <span class="pj-org-name">${(r.ghii)}</span>
-              <span class="pj-org-desc">${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}</span>
+              <span class="pj-org-desc listing-meta">${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}</span>
             </div>
             ${r.message ? html`<div class="pj-org-desc">${(r.message)}</div>` : null}
           </div>
-          <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}</button>
-          <button class="btn-success btn-sm" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}</button>
+          <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}</button>
+          <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}</button>
         </div>
       `) : null}
 
@@ -267,23 +284,23 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
           return html`
             <div key=${m.ghii}>
               <div class="pj-org-row">
-                <div class="pj-org-avatar" aria-hidden="true">${orgInitials(m.ghii)}</div>
+                <div class="pj-org-avatar poster-box poster-box--avatar poster-box--small" aria-hidden="true">${orgInitials(m.ghii)}</div>
                 <div class="pj-org-main pj-org-main-static">
                   <div class="pj-org-titlerow">
                     <span class="pj-org-name">${(m.ghii)} <${PresenceDot} ghii=${toGhii(m.ghii)} /></span>
                     <!-- The stored role is still 'creator', and several members can hold it now, so
                          the badge says what it means: owner. Two rows both reading "creator" asks
                          the viewer which one really made the organism. -->
-                    <span class="badge ${isOwnerRow ? 'badge-success' : 'badge-info'}">
+                    <span class="poster-chip">
                       ${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : (m.role || 'member')}
                     </span>
                   </div>
                   ${(acc || m.joinedAt) ? html`
-                    <div class="pj-org-desc">
+                    <div class="pj-org-desc listing-meta">
                       ${acc ? `${t('organisms.accessLabel') || 'Access'}: ${acc}` : ''}${acc && m.joinedAt ? ' · ' : ''}${m.joinedAt ? (t('organisms.joinedDate') || 'joined {date}').replace('{date}', fmtDate(m.joinedAt)) : ''}
                     </div>` : null}
                   ${(m.agents || []).length ? html`
-                    <div class="pj-org-desc" title=${t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism"}>
+                    <div class="pj-org-desc listing-meta" title=${t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism"}>
                       ${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${m.agents.map(a => a.name || a.gaii).join(', ')}
                     </div>` : null}
                 </div>
@@ -297,13 +314,15 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
       </div>
 
       ${canManage && banned.length > 0 ? html`
-        <div class="detail-label">${t('organisms.blockedMembers') || 'Blocked'}</div>
-        ${banned.map(m => html`
-          <div class="pj-access-row" key=${'ban-' + m.ghii}>
-            <span>${(m.ghii)}</span>
-            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => unban(m.ghii)}>${t('organisms.unblock') || 'Unblock'}</button>
-          </div>
-        `)}
+        <div class="detail-label poster-day-title">${t('organisms.blockedMembers') || 'Blocked'}</div>
+        <div class="listing listing--name-doors listing--cols">
+          ${banned.map(m => html`
+            <div class="listing-row" key=${'ban-' + m.ghii}>
+              <div class="listing-name">${(m.ghii)}</div>
+              <div class="listing-doors"><button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => unban(m.ghii)}>${t('organisms.unblock') || 'Unblock'}</button></div>
+            </div>
+          `)}
+        </div>
       ` : null}
       ` : null}
     </div>

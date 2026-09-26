@@ -1,0 +1,35 @@
+/**
+ * @file app-cards.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The apps pinned to a workspace, as launch cards in a grid that fills the width: each card
+ *   is a button with the app's name in bold, two lines of its description in grey and its author (or
+ *   a Status when the catalogue no longer has it) small under it; a press opens the app with the
+ *   workspace as its context. In the poster face each card sits over a 2px ink rule with no card.
+ *   Drawn only by views/profile/organisms/workspace-apps.js; moved here unchanged with its class
+ *   names out of views/profile.css (the classic card) and views/profile-poster.css (the poster face,
+ *   taken out of its group with the ecosystem rows), in that order, so the later still wins (UI
+ *   consolidation phase 5, a move). The strip around the cards (.pj-apps-strip, its head and title)
+ *   stays in profile.css: its box and its heading are questions in the lab. The poster face's square
+ *   corner reads --shape-corner (0) and its 2px rule --shape-frame; the classic card reads --radius
+ *   and has no literal corner.
+ *   Drawn as markup: <div class="pj-apps-grid"><div class="pj-app-card" role="button" tabindex="0">
+ *   <div class="pj-app-name">…</div><div class="pj-app-desc">…</div><div class="pj-app-meta">…</div></div></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The poster face's rule reads --shape-rule-colour (a move: the AIMEAT values equal the old ones). Its corner stays: the classic card's --radius would show through without it.
+ *   v1.0.0 -- 2026-09-26 -- Moved out of profile.css and profile-poster.css (UI consolidation phase 5, a move).
+ */
+
+/* ── The classic card (was views/profile.css) ── */
+.pj-apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .6rem; }
+.pj-app-card { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: .6rem .75rem; cursor: pointer; transition: border-color .12s; }
+.pj-app-card:hover, .pj-app-card:focus-visible { border-color: var(--accent-border); box-shadow: var(--shadow-sm); }
+.pj-app-name { font-weight: 600; font-size: .9rem; }
+.pj-app-desc { margin-top: .25rem; font-size: .78rem; color: var(--text-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pj-app-meta { margin-top: .35rem; font-size: .72rem; color: var(--muted); }
+
+/* ── The poster face (was views/profile-poster.css): a row over an ink rule ── */
+.pf .pj-app-card {
+  background: none; border: 0; border-bottom: var(--shape-frame) solid var(--shape-rule-colour); border-radius: var(--shape-corner); box-shadow: none; padding: 0.9rem 0; margin-bottom: 0;
+}

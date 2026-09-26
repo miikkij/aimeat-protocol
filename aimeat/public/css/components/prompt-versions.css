@@ -1,0 +1,33 @@
+/**
+ * @file prompt-versions.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A prompt's versions and its two editors: one row per version (the number as a small
+ *   figure with its date in typewriter under it, what changed, the door), the version shown on the
+ *   grey ground; the prompt and the target output side by side, each with its label and a
+ *   typewriter count; the line that names the change and saves the next version. Drawn only by the
+ *   calibrator; moved here unchanged with its class names (UI consolidation phase 5, a move).
+ *   Drawn as markup by views/profile/calibrator/page.js (secPrompt, versionRow).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of calibrator-poster.css (UI consolidation phase 5, a move).
+ */
+
+.cal-vers { display: flex; flex-direction: column; margin-bottom: 1rem; }
+.cal-ver { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .88rem; }
+.cal-ver.is-on { background: var(--bg-dim); margin: 0 -.5rem; padding: .45rem .5rem; }
+.cal-ver-n { margin-right: 0; }
+.cal-ver-n small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
+.cal-ver-w { color: var(--text); overflow-wrap: anywhere; }
+.cal-ver-go { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+.cal-editors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.4rem; }
+.cal-field { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.cal-field .poster-label small { margin-left: .6rem; font-family: var(--font-mono); font-size: .66rem; letter-spacing: 0; text-transform: none; color: var(--text-dim); }
+.cal-save { display: flex; align-items: flex-end; gap: 1rem; margin-top: .9rem; }
+.cal-save .og-input { flex: 1 1 auto; min-width: 0; }
+.cal-save .poster-slab { flex: none; white-space: nowrap; }
+
+@media (max-width: 860px) {
+  .cal-editors { grid-template-columns: minmax(0, 1fr); }
+  .cal-save { flex-wrap: wrap; }
+}

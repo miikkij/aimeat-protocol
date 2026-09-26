@@ -7,6 +7,12 @@
  *   the request-changes modal and the memory-entry viewer (JSON tree, image, markdown). Pure
  *   extraction from ./task-item.js so that file stays under the 800-line limit.
  * @version-history
+ *   v1.6.0 -- 2026-09-26 -- A Markdown memory value is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
+ *   v1.5.0 -- 2026-09-25 -- A task memory entry's row, which opens its value in place, is the folded row (og-fold og-fold--event, the arrow for the caret), a unification: the look most tabs use.
+ *   v1.4.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.3.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.2.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.1.0 -- 2026-09-25 -- A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
  *   v1.0.0 -- 2026-09-14 -- Extracted from ./task-item.js (max-file-lines) while the Tasks tab
  *     took the poster face. The request-changes modal and the JSON viewer keep their existing
  *     pf-agd- classes on purpose; they are styled by agents-detail.css and are out of that scope.
@@ -20,6 +26,7 @@ import { Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import { swallowed } from '/js/swallowed.js';
+import { Hint } from '/components/Hint.js';
 
 // Per-browser "blur the title" preference. Used when screen-recording the tab
 // so sensitive task titles can be hidden without affecting other viewers or
@@ -52,13 +59,13 @@ export function statusLabel(status) {
   return val !== key ? val : status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-/** Which square chip a status wears: green frame when done, coral when failed, the shared sun
- *  ground while it runs, plain ink for everything else. */
+/** Which Status tone a task wears: fine when done, danger when failed, attention while it runs,
+ *  off for everything else. */
 export function statusChipClass(status) {
-  if (status === 'done') return 'agt-status--done';
-  if (status === 'failed') return 'agt-status--failed';
-  if (status === 'active') return 'og-chip--sun';
-  return '';
+  if (status === 'done') return 'poster-status--fine';
+  if (status === 'failed') return 'poster-status--danger';
+  if (status === 'active') return 'poster-status--attention';
+  return 'poster-status--off';
 }
 
 /** The tick box for one to-do: its modifier class and the glyph inside it. */
@@ -125,9 +132,9 @@ export function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
       <button class="poster-slab poster-slab--control" onClick=${handleSend} disabled=${submitting || !message.trim()}>
         ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
       </button>`}>
-    <p class="pf-agd-modal-help">${t('profile.agents.tasks.requestChangesHelp')}</p>
+    <${Hint}>${t('profile.agents.tasks.requestChangesHelp')}<//>
     <textarea
-      class="pf-agd-revision-textarea"
+      class="og-textarea pf-agd-revision-textarea"
       placeholder=${t('profile.agents.tasks.requestChangesPlaceholder')}
       value=${message}
       onInput=${e => setMessage(e.target.value)}
@@ -189,10 +196,10 @@ export function TaskMemoryEntry({ entry }) {
   const image = detectImage(isJson ? json : raw, entry.key);
   return html`
     <div class="pf-agd-task-memory-entry">
-      <button class="pf-agd-task-memory-head" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-expanded=${open}>
-        <span class="pf-agd-task-memory-caret">${open ? '▼' : '▶'}</span>
-        <code class="pf-agd-task-memory-key">${entry.key}</code>
-        ${image ? html`<span class="pf-agd-task-memory-badge">IMG</span>` : isJson && html`<span class="pf-agd-task-memory-badge">JSON</span>`}
+      <button class="og-fold og-fold--event" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-expanded=${open}>
+        <b class="pf-agd-task-memory-key">${entry.key}</b>
+        ${image ? html`<span class="poster-chip">IMG</span>` : isJson && html`<span class="poster-chip">JSON</span>`}
+        <span class="og-fold-arrow">${open ? '↓' : '→'}</span>
       </button>
       ${open && html`
         <div class="pf-agd-task-memory-body">
@@ -203,7 +210,7 @@ export function TaskMemoryEntry({ entry }) {
               // Non-JSON values (e.g. an agent's latest_output) are usually
               // markdown — render them formatted via the shared safe Markdown
               // component instead of raw text.
-              : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`}
+              : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} small /></div>`}
         </div>
       `}
     </div>

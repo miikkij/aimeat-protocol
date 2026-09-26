@@ -15,8 +15,35 @@
  *   renderRecord · renderPage
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.24.0 -- 2026-09-26 -- A stored value as written is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v1.23.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.22.0 -- 2026-09-26 -- A key is the Key (.key-name, css/components/key-name.css): the listings' .mp-key, a key space's key button, and the key in the search's and the history's event rows (a unification: the look most tabs use).
+ *   v1.21.0 -- 2026-09-26 -- The agent drop-down among the masthead's tags is the Select field (.select-field), not a select inside a grey chip (a unification: the look most tabs use).
+ *   v1.20.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.19.0 -- 2026-09-25 -- Active and Archived, which choose what the key list shows, are the Tab's fold tone (.poster-tab--fold, the shown one is-on and aria-pressed), a unification: Jouni's decision "Tabs and filters".
+ *   v1.18.0 -- 2026-09-25 -- A file's mark (its picture, or the first letters of its kind) is the avatar box (.poster-box--avatar, the small cut); the kind is written in capitals, as it was shown, a unification: the look most tabs use.
+ *   v1.17.0 -- 2026-09-25 -- The order of a key space's keys is a row of Tabs (.poster-tab, the chosen one .is-on; the dots between them go), and "show all N" is the action link (.poster-action), a unification: Jouni's decisions "Tabs and filters" and "Action link".
+ *   v1.16.0 -- 2026-09-25 -- A record's flat value is the Facts (css/components/facts.css, the wide cut), a unification: the look most tabs use.
+ *   v1.15.0 -- 2026-09-25 -- The tables of key spaces, the keys of a space, the files, the stale keys, who else sees and a record's shares are the Listing (css/components/listing.css), a unification: the look most tabs use. A table's head row now sits in the same grid as its rows.
+ *   v1.14.0 -- 2026-09-25 -- A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.11.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.10.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.9.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.8.0 -- 2026-09-25 -- A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.7.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.6.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
+ *   v1.5.0 -- 2026-09-25 -- The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v1.4.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose the record value's top rule from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -35,12 +62,15 @@ import { Markdown } from '/components/Markdown.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import TagEditor from '/js/components/tag-editor.js';
 import AuthImage from '/js/components/auth-image.js';
-import { Section, Fold, tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
+import { tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { formatBytes, formatRelativeTime, shortTok, groupOfKey, displayRemainder, VIS_OPTIONS } from './helpers.js';
 import { fileCategory, fileBytesUrl } from './file-helpers.js';
 import { MemoryForm, FileUploadForm, CartTray } from './components.js';
 import { renderEntries } from './entries-view.js';
 import { renderBrowsePanel } from './browse-view.js';
+import { Hint } from '/components/Hint.js';
 
 /* Key spaces the node and the agents write for their own use. Theirs to own, rarely theirs to read. */
 export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents', 'generator', 'org', 'gate', 'usage']);
@@ -77,7 +107,7 @@ export function classify(memories, orgNames) {
   return { spaces, own: all.filter(s => s.bucket === 'own'), org: all.filter(s => s.bucket === 'org'), sys: all.filter(s => s.bucket === 'sys') };
 }
 
-const visChip = (v) => html`<span class=${`og-chip ${v === 'public' ? 'og-chip--sun' : v === 'private' ? 'og-chip--dim' : ''}`}>${t('knowledge.visibility.' + (v || 'private')) || v}</span>`;
+const visChip = (v) => html`<span class=${`poster-chip ${v === 'public' ? 'poster-chip--sun' : ''}`}>${t('knowledge.visibility.' + (v || 'private')) || v}</span>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
 function crumb(ctx, parts) {
@@ -129,41 +159,45 @@ function spaceTable(ctx, list, { head = true, id = '' } = {}) {
   const open = !id || ctx.moreOpen.has(id);
   const shown = open ? list : list.slice(0, TABLE_ROWS);
   return html`
-    ${head ? html`<div class="og-tbl og-tbl--head mp-tbl"><div></div><div>${c('colSpace', 'Key space')}</div><div>${c('colSize', 'Size')}</div><div>${c('colLatest', 'Latest')}</div><div></div></div>` : null}
-    <div class="og-tbl mp-tbl">
+    <div class="listing listing--n-name-meta-latest-doors listing--cols">
+      ${head ? html`<div class="listing-row listing-row--head"><div class="poster-label"></div><div class="poster-label">${c('colSpace', 'Key space')}</div><div class="poster-label">${c('colSize', 'Size')}</div><div class="poster-label">${c('colLatest', 'Latest')}</div><div class="poster-label"></div></div>` : null}
       ${shown.map(s => html`
-        <div class="og-tbl-n poster-stat-number poster-stat-number--small" key=${'n' + s.id}>${s.items.length}</div>
-        <div class="og-tbl-nm" key=${'m' + s.id}>
-          <button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'space', id: s.id })}>${s.label}</button>
-          ${s.publicN || s.membersN ? html`<span class="og-tbl-marks">
-            ${s.publicN ? html`<span class="og-chip og-chip--sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}</span>` : null}
-            ${s.membersN ? html`<span class="og-chip">${c('membersN', '{n} for members').replace('{n}', String(s.membersN))}</span>` : null}
-          </span>` : null}
-        </div>
-        <div class="og-tbl-last" key=${'s' + s.id}>${formatBytes(s.bytes)}</div>
-        <div class="og-tbl-last" key=${'l' + s.id}>${s.latest ? html`<button type="button" class="og-tbl-go" onClick=${() => ctx.pickView({ kind: 'record', key: s.latest.key })}>${displayRemainder(s.latest.key, s.g)} · ${formatRelativeTime(s.latest.updated_at || s.latest.created_at)}</button>` : html`<span class="og-tbl-dot">·</span>`}</div>
-        <div class="og-tbl-door" key=${'d' + s.id}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'space', id: s.id })}>${c('open', 'Open')}</button></div>`)}
+        <div class="listing-row" key=${s.id}>
+          <div class="og-tbl-n poster-stat-number poster-stat-number--small">${s.items.length}</div>
+          <div class="listing-name">
+            <button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'space', id: s.id })}>${s.label}</button>
+            ${s.publicN || s.membersN ? html`<span class="og-tbl-marks">
+              ${s.publicN ? html`<span class="poster-chip poster-chip--sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}</span>` : null}
+              ${s.membersN ? html`<span class="poster-chip">${c('membersN', '{n} for members').replace('{n}', String(s.membersN))}</span>` : null}
+            </span>` : null}
+          </div>
+          <div class="mp-fig">${formatBytes(s.bytes)}</div>
+          <div class="mp-fig">${s.latest ? html`<button type="button" class="og-tbl-go" onClick=${() => ctx.pickView({ kind: 'record', key: s.latest.key })}>${displayRemainder(s.latest.key, s.g)} · ${formatRelativeTime(s.latest.updated_at || s.latest.created_at)}</button>` : html`<span class="og-tbl-dot">·</span>`}</div>
+          <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'space', id: s.id })}>${c('open', 'Open')}</button></div>
+        </div>`)}
     </div>
-    ${list.length > TABLE_ROWS && !open ? html`<p class="mp-sort"><button type="button" onClick=${() => ctx.toggleMore(id)}>${c('showAll', 'show all {n}').replace('{n}', String(list.length))}</button></p>` : null}`;
+    ${list.length > TABLE_ROWS && !open ? html`<p class="mp-sort"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.toggleMore(id)}>${c('showAll', 'show all {n}').replace('{n}', String(list.length))}</button></p>` : null}`;
 }
 
 function fileRows(ctx, files) {
   const { NODE_URL, setPreviewFile, handleDownloadFile, handleDeleteFile, showToast } = ctx;
   if (!files.length) return html`<p class="og-hint">${t('profile.files.empty') || 'No files yet.'}</p>`;
-  return html`<div class="og-folds">${files.map(f => {
+  return html`<div class="listing listing--mark-name-meta-doors listing--cols">${files.map(f => {
     const key = f.key || f.name;
     const cat = fileCategory(f.mime_type, key);
     const isImage = String(f.mime_type || '').startsWith('image');
     const url = f.owner_gaii ? `${NODE_URL}/v1/pub/${encodeURIComponent(f.owner_gaii)}/${String(key).split('/').map(encodeURIComponent).join('/')}` : `${NODE_URL}/v1/memory/files/${encodeURIComponent(key)}`;
     return html`
-      <div class="og-fold" key=${key}>
-        <span class="mp-file-kind">${isImage ? html`<${AuthImage} src=${fileBytesUrl(f, NODE_URL)} alt=${key} />` : String(cat || 'file').slice(0, 4)}</span>
-        <span class="og-fold-name">${key}<small class="og-fold-r"></small></span>
-        <span class="og-fold-r">${f.size ? formatBytes(f.size) : ''} · ${t('knowledge.visibility.' + (f.visibility || 'private')) || f.visibility}</span>
-        <button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => setPreviewFile(f)}>${t('profile.files.preview') || 'Preview'}</button>
-        <${CopyButton} text=${url} label=${t('common.copyUrl') || 'Copy URL'} className="og-door og-door--quiet og-fold-door" onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')} />
-        <button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => handleDownloadFile(f)}>${t('profile.files.download') || 'Download'}</button>
-        <button type="button" class="og-door og-door--quiet og-door--danger og-fold-door" onClick=${() => handleDeleteFile(key)}>${t('profile.files.delete') || 'Delete'}</button>
+      <div class="listing-row" key=${key}>
+        <div><span class="mp-file-kind poster-box poster-box--avatar poster-box--small">${isImage ? html`<${AuthImage} src=${fileBytesUrl(f, NODE_URL)} alt=${key} />` : String(cat || 'file').slice(0, 4).toUpperCase()}</span></div>
+        <div class="listing-name">${key}</div>
+        <div class="mp-fig">${f.size ? formatBytes(f.size) : ''} · ${t('knowledge.visibility.' + (f.visibility || 'private')) || f.visibility}</div>
+        <div class="listing-doors">
+          <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => setPreviewFile(f)}>${t('profile.files.preview') || 'Preview'}</button>
+          <${CopyButton} text=${url} label=${t('common.copyUrl') || 'Copy URL'} className="poster-action poster-action--small poster-action--row poster-action--lower" onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')} />
+          <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => handleDownloadFile(f)}>${t('profile.files.download') || 'Download'}</button>
+          <button type="button" class="poster-action poster-action--small poster-action--row poster-action--danger poster-action--lower" onClick=${() => handleDeleteFile(key)}>${t('profile.files.delete') || 'Delete'}</button>
+        </div>
       </div>`;
   })}</div>`;
 }
@@ -191,10 +225,10 @@ function renderCover(ctx) {
   const sysCount = cls.sys.reduce((n, s) => n + s.items.length, 0);
   const sysBytes = cls.sys.reduce((n, s) => n + s.bytes, 0);
   const seenRows = [];
-  if (publicKeys.length) seenRows.push(html`<div class="og-fold" key="pub"><span class="og-fold-name">${c('publicKeys', '{n} public keys').replace('{n}', String(publicKeys.length))}<small class="og-fold-r">${publicKeys.slice(0, 3).map(m => m.key).join(' · ')}${publicKeys.length > 3 ? ' …' : ''}</small></span><span class="og-fold-r">${visChip('public')}</span></div>`);
-  if (membersKeys.length) seenRows.push(html`<div class="og-fold" key="mem"><span class="og-fold-name">${c('membersKeys', '{n} keys for signed-in users').replace('{n}', String(membersKeys.length))}</span><span class="og-fold-r">${visChip('members')}</span></div>`);
-  for (const sh of shares || []) seenRows.push(html`<div class="og-fold" key=${'sh' + sh.id}><span class="og-fold-name mp-key">${sh.key_pattern}<small class="og-fold-r"> → ${groups.find(g => g.id === sh.group_id)?.name || sh.group_id}</small></span><span class="og-fold-r"><span class="og-chip">${c('share', 'key-space share')}</span></span><button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => ctx.revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}</button></div>`);
-  if (fedKeys.length) seenRows.push(html`<div class="og-fold" key="fed"><span class="og-fold-name">${c('fedKeys', '{n} keys in the federation').replace('{n}', String(fedKeys.length))}<small class="og-fold-r">${fedKeys.slice(0, 3).join(' · ')}</small></span><span class="og-fold-r"><span class="og-chip og-chip--dim">${c('federation', 'federation')}</span></span></div>`);
+  if (publicKeys.length) seenRows.push(html`<div class="listing-row" key="pub"><div class="listing-name">${c('publicKeys', '{n} public keys').replace('{n}', String(publicKeys.length))}<small>${publicKeys.slice(0, 3).map(m => m.key).join(' · ')}${publicKeys.length > 3 ? ' …' : ''}</small></div><div>${visChip('public')}</div><div class="listing-doors"></div></div>`);
+  if (membersKeys.length) seenRows.push(html`<div class="listing-row" key="mem"><div class="listing-name">${c('membersKeys', '{n} keys for signed-in users').replace('{n}', String(membersKeys.length))}</div><div>${visChip('members')}</div><div class="listing-doors"></div></div>`);
+  for (const sh of shares || []) seenRows.push(html`<div class="listing-row" key=${'sh' + sh.id}><div class="listing-name"><span class="key-name">${sh.key_pattern}</span><small> → ${groups.find(g => g.id === sh.group_id)?.name || sh.group_id}</small></div><div><span class="poster-chip">${c('share', 'key-space share')}</span></div><div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}</button></div></div>`);
+  if (fedKeys.length) seenRows.push(html`<div class="listing-row" key="fed"><div class="listing-name">${c('fedKeys', '{n} keys in the federation').replace('{n}', String(fedKeys.length))}<small>${fedKeys.slice(0, 3).join(' · ')}</small></div><div><span class="poster-chip">${c('federation', 'federation')}</span></div><div class="listing-doors"></div></div>`);
 
   let counter = 0; const next = () => String(++counter).padStart(2, '0');
   const rail = [];
@@ -211,17 +245,17 @@ function renderCover(ctx) {
     <a class="og-rail-link" key=${id} href=${'#' + id} onClick=${(e) => { e.preventDefault(); if (id === 'mp-sys') setSysOpen(true); setTimeout(() => scrollTo(id), 30); }}><i>${n}</i>${label}<em>${count}</em></a>`);
 
   const searchRow = (showSearch || searchResults !== null) ? html`
-    <div class="og-search">
+    <div class="search-line">
       <input type="text" class="og-input" autofocus placeholder=${t('profile.memory.searchContents') || 'Search content or key…'} value=${searchInput}
         onInput=${e => setSearchInput(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') runServerSearch(searchInput, ctx.searchScopePrefix); }} />
-      <button type="button" class="og-door" disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, ctx.searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}</button>
-      <button type="button" class="og-door og-door--quiet" onClick=${() => { clearServerSearch(); setShowSearch(false); }}>${t('search.clear') || 'Clear'}</button>
+      <button type="button" class="poster-action poster-action--small" disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, ctx.searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}</button>
+      <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => { clearServerSearch(); setShowSearch(false); }}>${t('search.clear') || 'Clear'}</button>
     </div>` : null;
 
   const resultRows = searchResults !== null ? html`
-    <${Section} id="mp-results" num="·" first=${true} title=${c('searchResults', '{n} matches').replace('{n}', String(searchResults.length))} count=${null}>
+    <${PageSection} id="mp-results" num="·" first=${true} title=${c('searchResults', '{n} matches').replace('{n}', String(searchResults.length))} count=${null}>
       ${searchResults.length === 0 ? html`<p class="og-hint">${t('profile.memory.searchEmpty') || 'No matches'}</p>` : html`<div class="og-folds">${searchResults.map(m => html`
-        <button type="button" class="og-fold og-fold--event" key=${m.key} onClick=${() => pickView({ kind: 'record', key: m.key })}><i>${formatRelativeTime(m.updated_at || m.created_at)}</i><b>${m.key}</b><span class="og-fold-r">${visChip(m.visibility)}</span></button>`)}</div>`}
+        <button type="button" class="og-fold og-fold--event" key=${m.key} onClick=${() => pickView({ kind: 'record', key: m.key })}><i>${formatRelativeTime(m.updated_at || m.created_at)}</i><b class="key-name">${m.key}</b><span class="og-fold-r">${visChip(m.visibility)}</span></button>`)}</div>`}
     <//>` : null;
 
   return html`
@@ -230,22 +264,22 @@ function renderCover(ctx) {
       <div class="og-mast">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title">${t('profile.memory.title') || 'Memory'}</h1>
-          <div class="og-chips">
-            <span class="og-chip">${num(all.length)} ${c('figKeys', 'keys')}</span>
-            <span class="og-chip">${formatBytes(bytes)}</span>
-            ${changedToday ? html`<span class="og-chip og-chip--sun">${c('changedToday', '{n} changed today').replace('{n}', String(changedToday))}</span>` : null}
-            ${agents.length > 1 ? html`<span class="og-chip og-chip--dim mp-agent"><select value=${selectedAgent} onChange=${e => setSelectedAgent(e.target.value)} aria-label=${t('profile.memory.agent') || 'Agent'}>
+          <div class="poster-chips">
+            <span class="poster-chip">${num(all.length)} ${c('figKeys', 'keys')}</span>
+            <span class="poster-chip">${formatBytes(bytes)}</span>
+            ${changedToday ? html`<span class="poster-chip poster-chip--sun">${c('changedToday', '{n} changed today').replace('{n}', String(changedToday))}</span>` : null}
+            ${agents.length > 1 ? html`<select class="select-field mp-agent" value=${selectedAgent} onChange=${e => setSelectedAgent(e.target.value)} aria-label=${t('profile.memory.agent') || 'Agent'}>
                 <option value="">${t('profile.memory.defaultAgent') || 'Default agent'}</option>
                 ${agents.map(a => html`<option key=${a.gaii} value=${a.gaii}>${a.name || a.gaii}</option>`)}
-              </select></span>` : html`<span class="og-chip og-chip--dim">${agentName}</span>`}
+              </select>` : html`<span class="poster-chip">${agentName}</span>`}
           </div>
           <p class="og-desc">${c('desc', 'What you and your agents have written here: notes, settings, research and the organisms’ content. Yours, and yours to decide about.')}</p>
         </div>
         <div class="og-mast-actions">
-          <button type="button" class="og-slab" onClick=${() => setShowSearch(true)}>${c('searchSlab', 'Search memory')}</button>
+          <button type="button" class="poster-slab" onClick=${() => setShowSearch(true)}>${c('searchSlab', 'Search memory')}</button>
           <div class="og-doors">
-            <button type="button" class="og-door" onClick=${() => { setShowFileForm(false); setShowMemForm(s => !s); }}>${c('newEntry', '+ New entry')}</button>
-            <button type="button" class="og-door" onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); }}>${c('upload', 'Upload a file')}</button>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => { setShowFileForm(false); setShowMemForm(s => !s); }}>${c('newEntry', '+ New entry')}</button>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); }}>${c('upload', 'Upload a file')}</button>
           </div>
         </div>
       </div>
@@ -258,55 +292,56 @@ function renderCover(ctx) {
       </div>
 
       ${searchRow}
-      ${showMemForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
-      ${showFileForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${c('upload', 'Upload a file')}</span><${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} /></div>` : null}
+      ${showMemForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
+      ${showFileForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${c('upload', 'Upload a file')}</span><${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} /></div>` : null}
 
       <div class="og-grid">
         <div class="og-main">
           ${resultRows}
-          <${Section} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${cls.own.reduce((n, s) => n + s.items.length, 0)}
-            doors=${html`<button type="button" class="og-door og-door--quiet" onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')}</button>`}>
+          <${PageSection} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${cls.own.reduce((n, s) => n + s.items.length, 0)}
+            doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')}</button>`}>
             ${cls.own.length ? spaceTable(ctx, cls.own, { id: 'own' }) : html`<p class="og-hint">${t('profile.memory.empty') || 'Nothing here yet.'}</p>`}
-            <p class="og-hint">${c('spaceHint', 'A key space is the first part of a key: document/pitch-2026 belongs to document. It is the unit that is shared, exported and cleaned.')}</p>
+            <${Hint}>${c('spaceHint', 'A key space is the first part of a key: document/pitch-2026 belongs to document. It is the unit that is shared, exported and cleaned.')}<//>
           <//>
 
-          <${Section} id="mp-org" num=${nOrg} title=${c('orgs', 'Organisms’')} count=${cls.org.reduce((n, s) => n + s.items.length, 0)}
-            doors=${html`<button type="button" class="og-door og-door--quiet" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }))}>${t('organisms.title') || 'Organisms'} →</button>`}>
+          <${PageSection} id="mp-org" num=${nOrg} title=${c('orgs', 'Organisms’')} count=${cls.org.reduce((n, s) => n + s.items.length, 0)}
+            doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }))}>${t('organisms.title') || 'Organisms'} →</button>`}>
             ${cls.org.length ? spaceTable(ctx, cls.org, { id: 'org' }) : html`<p class="og-hint">${t('profile.memory.empty') || 'Nothing here yet.'}</p>`}
-            <p class="og-hint">${c('orgHint', 'An organism’s content lives in your memory when you or your agents wrote it. It is managed on the organism’s page; here it shows so you know what you own and how much it takes.')}</p>
+            <${Hint}>${c('orgHint', 'An organism’s content lives in your memory when you or your agents wrote it. It is managed on the organism’s page; here it shows so you know what you own and how much it takes.')}<//>
           <//>
 
-          <${Fold} id="mp-sys" num=${nSys} title=${c('sys', 'The machine’s bookkeeping')} sub=${`${sysCount} ${c('figKeys', 'keys')} · ${formatBytes(sysBytes)}`} open=${sysOpen} onToggle=${() => setSysOpen(o => !o)}>
-            <p class="og-hint">${c('sysHint', 'What your environment and your agents write for their own use: notices, meters, receipts. Yours as well, but rarely for you to read.')}</p>
+          <${FoldSection} id="mp-sys" num=${nSys} title=${c('sys', 'The machine’s bookkeeping')} sub=${`${sysCount} ${c('figKeys', 'keys')} · ${formatBytes(sysBytes)}`} open=${sysOpen} onToggle=${() => setSysOpen(o => !o)}>
+            <${Hint}>${c('sysHint', 'What your environment and your agents write for their own use: notices, meters, receipts. Yours as well, but rarely for you to read.')}<//>
             ${cls.sys.length ? spaceTable(ctx, cls.sys, { head: false, id: 'sys' }) : html`<p class="og-hint">${t('profile.memory.empty') || 'Nothing here yet.'}</p>`}
           <//>
 
-          <${Section} id="mp-files" num=${nFiles} title=${c('files', 'Files')} count=${(files || []).length}
-            doors=${html`<button type="button" class="og-door" onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); setTimeout(() => scrollTo('mp-files'), 30); }}>${c('upload', 'Upload a file')}</button>`}>
+          <${PageSection} id="mp-files" num=${nFiles} title=${c('files', 'Files')} count=${(files || []).length}
+            doors=${html`<button type="button" class="poster-action poster-action--small" onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); setTimeout(() => scrollTo('mp-files'), 30); }}>${c('upload', 'Upload a file')}</button>`}>
             ${fileRows(ctx, files || [])}
           <//>
 
-          <${Section} id="mp-history" num=${nHist} title=${c('happened', 'What has happened')}
-            doors=${html`<button type="button" class="og-door og-door--quiet" onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')} →</button>`}>
+          <${PageSection} id="mp-history" num=${nHist} title=${c('happened', 'What has happened')}
+            doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')} →</button>`}>
             ${recent.length ? html`<div class="og-folds mp-events">${recent.map(m => html`
               <button type="button" class="og-fold og-fold--event" key=${m.key} onClick=${() => pickView({ kind: 'record', key: m.key })}>
                 <i>${formatRelativeTime(m.updated_at || m.created_at)}</i>
-                <span class="og-fold-who">${agentOf(m.owner_gaii) || c('you', 'you')}</span><span>${c('wrote', 'wrote')}</span><b>${m.key}</b>
+                <span class="og-fold-who">${agentOf(m.owner_gaii) || c('you', 'you')}</span><span>${c('wrote', 'wrote')}</span><b class="key-name">${m.key}</b>
               </button>`)}</div>` : html`<p class="og-hint">${t('profile.memory.empty') || 'Nothing here yet.'}</p>`}
           <//>
 
-          <${Section} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} count=${stale.length}>
-            <p class="og-hint">${c('staleHint', 'Keys nobody has changed in 90 days. Open one to decide; delete what no longer matters.')}</p>
-            ${stale.length ? html`<div class="og-folds">${(staleAll ? stale : stale.slice(0, 8)).map(m => html`
-              <div class="og-fold" key=${m.key}><span class="og-fold-name mp-key">${m.key}<small class="og-fold-r"> ${formatBytes(m.bytes)} · ${formatRelativeTime(m.updated_at || m.created_at)}</small></span>
-                <button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => pickView({ kind: 'record', key: m.key })}>${c('open', 'Open')}</button>
-                <button type="button" class="og-door og-door--quiet og-door--danger og-fold-door" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn') || 'Delete'}</button></div>`)}</div>
-              ${stale.length > 8 && !staleAll ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setStaleAll(true)}>${c('showAll', 'show all {n}').replace('{n}', String(stale.length))}</button>` : null}` : html`<p class="og-hint">${c('noStale', 'Nothing has gone stale.')}</p>`}
+          <${PageSection} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} count=${stale.length}>
+            <${Hint}>${c('staleHint', 'Keys nobody has changed in 90 days. Open one to decide; delete what no longer matters.')}<//>
+            ${stale.length ? html`<div class="listing listing--key-doors listing--cols">${(staleAll ? stale : stale.slice(0, 8)).map(m => html`
+              <div class="listing-row" key=${m.key}><div class="listing-name"><span class="key-name">${m.key}</span><small> ${formatBytes(m.bytes)} · ${formatRelativeTime(m.updated_at || m.created_at)}</small></div>
+                <div class="listing-doors">
+                  <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => pickView({ kind: 'record', key: m.key })}>${c('open', 'Open')}</button>
+                  <button type="button" class="poster-action poster-action--small poster-action--row poster-action--danger poster-action--lower" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn') || 'Delete'}</button></div></div>`)}</div>
+              ${stale.length > 8 && !staleAll ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => setStaleAll(true)}>${c('showAll', 'show all {n}').replace('{n}', String(stale.length))}</button>` : null}` : html`<p class="og-hint">${c('noStale', 'Nothing has gone stale.')}</p>`}
           <//>
 
-          <${Section} id="mp-seen" num=${nSeen} title=${c('seen', 'Who else sees')} count=${seenRows.length}
-            doors=${html`<button type="button" class="og-door og-door--quiet" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }))}>${t('profile.tabs.access') || 'Access'} →</button>`}>
-            ${seenRows.length ? html`<div class="og-folds">${seenRows}</div>` : html`<p class="og-hint">${c('none', 'Nobody but you and your agents.')}</p>`}
+          <${PageSection} id="mp-seen" num=${nSeen} title=${c('seen', 'Who else sees')} count=${seenRows.length}
+            doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }))}>${t('profile.tabs.access') || 'Access'} →</button>`}>
+            ${seenRows.length ? html`<div class="listing listing--name-kind-doors listing--cols">${seenRows}</div>` : html`<p class="og-hint">${c('none', 'Nobody but you and your agents.')}</p>`}
           <//>
         </div>
 
@@ -331,10 +366,10 @@ function renderSpace(ctx, id) {
   if (spaceSort === 'alpha') items.sort((a, b) => a.key.localeCompare(b.key));
   else if (spaceSort === 'size') items.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
   const kind = s.bucket === 'org' ? c('kindOrg', 'organism') : s.bucket === 'sys' ? c('kindSys', 'bookkeeping') : c('kindOwn', 'your key space');
-  const sub = html`<span>${kind}</span><span>${s.items.length} ${c('figKeys', 'keys')}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<span class="og-chip og-chip--sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}</span>` : null}`;
+  const sub = html`<span>${kind}</span><span>${s.items.length} ${c('figKeys', 'keys')}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<span class="poster-chip poster-chip--sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}</span>` : null}`;
   const doors = html`
-    ${prefix ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => { setSearchScopePrefix(prefix); setShowSearch(true); pickView({ kind: 'cover' }); }}>${c('searchHere', 'Search this space')}</button>` : null}
-    <button type="button" class="og-door" onClick=${() => setShowMemForm(v => !v)}>${c('newEntry', '+ New entry')}</button>`;
+    ${prefix ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => { setSearchScopePrefix(prefix); setShowSearch(true); pickView({ kind: 'cover' }); }}>${c('searchHere', 'Search this space')}</button>` : null}
+    <button type="button" class="poster-action poster-action--small" onClick=${() => setShowMemForm(v => !v)}>${c('newEntry', '+ New entry')}</button>`;
   const rail = html`
     <nav class="og-rail">
       <span class="og-rail-label">${c('thisSpace', 'This key space')}</span>
@@ -344,39 +379,41 @@ function renderSpace(ctx, id) {
       ${prefix ? html`<hr /><button type="button" class="og-rail-link" onClick=${() => deleteGroup(s.g, s.items.length)}><i>·</i>${c('deleteSpace', 'Delete the space')}<em>…</em></button>` : null}
     </nav>`;
   return renderPage(ctx, { id: 'space', crumbs: [{ label: s.label }], title: s.label, sub, doors, rail, children: html`
-    ${showMemForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
-    ${sharePanelFor ? html`<div class="og-box poster-aside poster-aside--small"><span class="og-box-label">${c('shareGroup', 'Share with a group')}</span>
+    ${showMemForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
+    ${sharePanelFor ? html`<div class="og-box poster-aside poster-aside--small"><span class="poster-label">${c('shareGroup', 'Share with a group')}</span>
       ${groups.length === 0 ? html`<p class="og-hint">${t('profile.memory.shNoGroups') || 'No sharing groups yet.'}</p>` : html`
-        <div class="og-fields"><div class="og-field"><span class="og-label">${t('profile.access.shPattern') || 'Pattern'}</span><input type="text" class="og-input" value=${sharePattern} onInput=${e => setSharePattern(e.target.value)} /><span class="og-hint">${t('profile.access.shPatternHelp') || ''}</span></div>
-        <div class="og-field"><span class="og-label">${t('profile.memory.shPickGroup') || 'Group'}</span><select class="og-input" value=${shareGroupId} onChange=${e => setShareGroupId(e.target.value)}>${groups.map(g => html`<option key=${g.id} value=${g.id}>${g.name}</option>`)}</select></div>
-        <div class="og-actions"><button type="button" class="og-slab" onClick=${submitShare}>${t('profile.access.shCreate') || 'Share'}</button><button type="button" class="og-door og-door--quiet" onClick=${() => setSharePanelFor(null)}>${t('profile.access.shCancel') || 'Cancel'}</button></div></div>`}
+        <div class="og-fields"><div class="og-field"><span class="poster-label">${t('profile.access.shPattern') || 'Pattern'}</span><input type="text" class="og-input" value=${sharePattern} onInput=${e => setSharePattern(e.target.value)} /><span class="poster-hint">${t('profile.access.shPatternHelp') || ''}</span></div>
+        <div class="og-field"><span class="poster-label">${t('profile.memory.shPickGroup') || 'Group'}</span><select class="select-field" value=${shareGroupId} onChange=${e => setShareGroupId(e.target.value)}>${groups.map(g => html`<option key=${g.id} value=${g.id}>${g.name}</option>`)}</select></div>
+        <div class="og-actions"><button type="button" class="poster-slab" onClick=${submitShare}>${t('profile.access.shCreate') || 'Share'}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setSharePanelFor(null)}>${t('profile.access.shCancel') || 'Cancel'}</button></div></div>`}
     </div>` : null}
-    <div class="og-tbl og-tbl--head mp-keys"><div>${c('colKey', 'Key')}</div><div>${c('colSize', 'Size')}</div><div>${c('colChanged', 'Changed')}</div><div>${c('colVisibility', 'Visibility')}</div><div></div></div>
-    <div class="og-tbl mp-keys">
+    <div class="listing listing--name-size-when-mark-doors listing--cols">
+      <div class="listing-row listing-row--head"><div class="poster-label">${c('colKey', 'Key')}</div><div class="poster-label">${c('colSize', 'Size')}</div><div class="poster-label">${c('colChanged', 'Changed')}</div><div class="poster-label">${c('colVisibility', 'Visibility')}</div><div class="poster-label"></div></div>
       ${items.map(m => html`
-        <div class="og-tbl-nm" key=${'k' + m.key}><button type="button" class="og-tbl-name mp-key" onClick=${() => pickView({ kind: 'record', key: m.key })}>${displayRemainder(m.key, s.g)}</button>${sharedWith(m.key).length ? html`<span class="og-chip">${t('profile.memory.shSharedBadge') || 'shared'}</span>` : null}</div>
-        <div class="og-tbl-last" key=${'s' + m.key}>${formatBytes(m.bytes)}</div>
-        <div class="og-tbl-last" key=${'t' + m.key}>${formatRelativeTime(m.updated_at || m.created_at)}</div>
-        <div key=${'v' + m.key}>${visChip(m.visibility)}</div>
-        <div class="og-tbl-door" key=${'d' + m.key}><button type="button" class="og-door" onClick=${() => pickView({ kind: 'record', key: m.key })}>${c('open', 'Open')}</button></div>`)}
+        <div class="listing-row" key=${m.key}>
+          <div class="listing-name"><button type="button" class="og-tbl-name key-name" onClick=${() => pickView({ kind: 'record', key: m.key })}>${displayRemainder(m.key, s.g)}</button>${sharedWith(m.key).length ? html`<span class="poster-chip">${t('profile.memory.shSharedBadge') || 'shared'}</span>` : null}</div>
+          <div class="mp-fig">${formatBytes(m.bytes)}</div>
+          <div><span class="poster-time">${formatRelativeTime(m.updated_at || m.created_at)}</span></div>
+          <div>${visChip(m.visibility)}</div>
+          <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => pickView({ kind: 'record', key: m.key })}>${c('open', 'Open')}</button></div>
+        </div>`)}
     </div>
-    <div class="mp-sort">${[['updated', c('sortUpdated', 'by change')], ['alpha', c('sortAlpha', 'alphabetical')], ['size', c('sortSize', 'largest first')]].map(([k, l], i) => html`${i ? html`<span>·</span>` : null}<button type="button" class=${spaceSort === k ? 'on' : ''} key=${k} onClick=${() => setSpaceSort(k)}>${l}</button>`)}</div>` });
+    <div class="mp-sort pf-tabs">${[['updated', c('sortUpdated', 'by change')], ['alpha', c('sortAlpha', 'alphabetical')], ['size', c('sortSize', 'largest first')]].map(([k, l]) => html`<button type="button" class=${`poster-tab ${spaceSort === k ? 'is-on' : ''}`} key=${k} onClick=${() => setSpaceSort(k)}>${l}</button>`)}</div>` });
 }
 
 /* ── A record as a page ────────────────────────────────────────────────────────────────────── */
 const looksLikeMarkdown = (s) => /(^|\n)#{1,6}\s|(^|\n)[-*]\s|\*\*|\[[^\]]+\]\(/.test(s);
 function renderValue(ctx, m, raw) {
   const v = ctx.valueOf(m);
-  if (v === undefined) return html`<p class="og-hint">${t('profile.memory.loadingValue') || 'Loading value…'}</p>`;
+  if (v === undefined) return html`<p class="poster-quiet loading-mark">${t('profile.memory.loadingValue') || 'Loading value…'}</p>`;
   const im = detectImage(v, m.key);
-  if (raw) return html`<pre class="mp-raw">${typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? '')}</pre>`;
+  if (raw) return html`<pre class="code-block mp-raw">${typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? '')}</pre>`;
   if (typeof v === 'string') return html`${im ? html`<${ImageView} desc=${im} />` : null}<div class="mp-prose">${looksLikeMarkdown(v) ? html`<${Markdown} text=${v} />` : v}</div>`;
   if (v && typeof v === 'object' && !Array.isArray(v)) {
     const rows = Object.entries(v);
     const flat = rows.every(([, x]) => x === null || typeof x !== 'object');
-    if (flat && rows.length) return html`${im ? html`<${ImageView} desc=${im} />` : null}<div class="mp-kv">${rows.map(([k, x]) => html`<div class="k" key=${'k' + k}>${k}</div><div class="v" key=${'v' + k}>${String(x ?? '')}</div>`)}</div>`;
+    if (flat && rows.length) return html`${im ? html`<${ImageView} desc=${im} />` : null}<div class="facts facts--wide">${rows.map(([k, x]) => html`<div class="facts-k poster-label" key=${'k' + k}>${k}</div><div class="facts-v" key=${'v' + k}>${String(x ?? '')}</div>`)}</div>`;
   }
-  return html`${im ? html`<${ImageView} desc=${im} />` : null}<pre class="mp-raw">${JSON.stringify(v, null, 2)}</pre>`;
+  return html`${im ? html`<${ImageView} desc=${im} />` : null}<pre class="code-block mp-raw">${JSON.stringify(v, null, 2)}</pre>`;
 }
 
 function renderRecord(ctx, key) {
@@ -392,17 +429,17 @@ function renderRecord(ctx, key) {
   const url = `${NODE_URL}/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`;
   const covering = sharesCovering(key);
   const doors = html`
-    ${v !== undefined ? html`<${CopyButton} text=${valueCopyText(m)} label=${t('profile.memory.copyValue') || 'Copy value'} className="og-door og-door--quiet" onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')} />` : null}
-    <${CopyButton} text=${url} label=${t('common.copyUrl') || 'Copy URL'} className="og-door og-door--quiet" onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')} />
-    <button type="button" class="og-door" onClick=${() => setEditModal({ key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null })}>${t('profile.memory.editBtn') || 'Edit'}</button>`;
+    ${v !== undefined ? html`<${CopyButton} text=${valueCopyText(m)} label=${t('profile.memory.copyValue') || 'Copy value'} className="poster-action poster-action--small poster-action--lower" onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')} />` : null}
+    <${CopyButton} text=${url} label=${t('common.copyUrl') || 'Copy URL'} className="poster-action poster-action--small poster-action--lower" onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')} />
+    <button type="button" class="poster-action poster-action--small" onClick=${() => setEditModal({ key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null })}>${t('profile.memory.editBtn') || 'Edit'}</button>`;
   const rail = html`
-    <div class="og-field"><span class="og-label">${c('visibility', 'Visibility')}</span>
-      <div class="og-choice">${VIS_OPTIONS.filter(x => x !== 'group').map(x => html`<button type="button" key=${x} class=${`og-choice-btn ${(m.visibility || 'private') === x ? 'on' : ''}`} onClick=${() => handleQuickVis(m, x)}>${t('knowledge.visibility.' + x) || x}</button>`)}</div>
-      <span class="og-hint">${c('visHint', 'Public: anyone with the address reads it. Sharing with a group is done per key space, not per key.')}</span></div>
-    <div class="og-field"><span class="og-label">${c('tags', 'Tags')}</span>
+    <div class="og-field"><span class="poster-label">${c('visibility', 'Visibility')}</span>
+      <div class="pf-tabs">${VIS_OPTIONS.filter(x => x !== 'group').map(x => html`<button type="button" key=${x} class=${`poster-tab ${(m.visibility || 'private') === x ? 'is-on' : ''}`} onClick=${() => handleQuickVis(m, x)}>${t('knowledge.visibility.' + x) || x}</button>`)}</div>
+      <span class="poster-hint">${c('visHint', 'Public: anyone with the address reads it. Sharing with a group is done per key space, not per key.')}</span></div>
+    <div class="og-field"><span class="poster-label">${c('tags', 'Tags')}</span>
       ${editingMemTags === key ? html`<${TagEditor} tags=${m.tags || []} onSave=${(tags) => { handleUpdateMemoryTags(key, tags, m.version); setEditingMemTags(null); }} />`
-        : html`<div class="mp-tags">${(m.tags || []).map(tag => html`<span class="og-chip og-chip--dim" key=${tag}>${tag}</span>`)}<button type="button" class="og-door og-door--quiet" onClick=${() => setEditingMemTags(key)}>${t('tags.editTags') || 'Edit tags'}</button></div>`}</div>
-    ${covering.length ? html`<div class="og-field"><span class="og-label">${c('share', 'key-space share')}</span>${covering.map(sh => html`<div class="og-fold" key=${sh.id}><span class="og-fold-name mp-key">${sh.key_pattern}<small class="og-fold-r"> → ${sh.group?.name || sh.group_id}</small></span><button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}</button></div>`)}</div>` : null}
+        : html`<div class="mp-tags">${(m.tags || []).map(tag => html`<span class="poster-chip" key=${tag}>${tag}</span>`)}<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setEditingMemTags(key)}>${t('tags.editTags') || 'Edit tags'}</button></div>`}</div>
+    ${covering.length ? html`<div class="og-field"><span class="poster-label">${c('share', 'key-space share')}</span><div class="listing listing--key-doors listing--cols">${covering.map(sh => html`<div class="listing-row" key=${sh.id}><div class="listing-name"><span class="key-name">${sh.key_pattern}</span><small> → ${sh.group?.name || sh.group_id}</small></div><div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}</button></div></div>`)}</div></div>` : null}
     <nav class="og-rail">
       <span class="og-rail-label">${c('thisRecord', 'This record')}</span>
       <button type="button" class="og-rail-link" onClick=${() => pickView({ kind: 'space', id: g.id })}><i>←</i>${space ? space.label : g.id}</button>
@@ -426,7 +463,7 @@ function renderRecord(ctx, key) {
     </div>
     <div class="mp-value poster-row--thing">
       ${renderValue(ctx, m, showRaw)}
-      ${v !== undefined ? html`<div class="og-actions"><button type="button" class="og-door og-door--quiet" onClick=${() => setShowRaw(r => !r)}>${showRaw ? c('showPretty', 'Show readable') : c('showRaw', 'Show raw')}</button></div>` : null}
+      ${v !== undefined ? html`<div class="og-actions"><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setShowRaw(r => !r)}>${showRaw ? c('showPretty', 'Show readable') : c('showRaw', 'Show raw')}</button></div>` : null}
     </div>` });
 }
 
@@ -438,8 +475,8 @@ function renderOther(ctx, id) {
   let body = null, doors = null;
   if (id === 'all' || id === 'archived') {
     doors = html`
-      <button type="button" class=${`og-door ${!memArchived ? '' : 'og-door--quiet'}`} onClick=${() => setMemArchived(false)}>${t('profile.memory.viewActive') || 'Active'}</button>
-      <button type="button" class=${`og-door ${memArchived ? '' : 'og-door--quiet'}`} onClick=${() => setMemArchived(true)}>${t('profile.memory.viewArchived') || 'Archived'}</button>`;
+      <button type="button" class=${`poster-tab poster-tab--fold ${!memArchived ? 'is-on' : ''}`} aria-pressed=${!memArchived ? 'true' : 'false'} onClick=${() => setMemArchived(false)}>${t('profile.memory.viewActive') || 'Active'}</button>
+      <button type="button" class=${`poster-tab poster-tab--fold ${memArchived ? 'is-on' : ''}`} aria-pressed=${memArchived ? 'true' : 'false'} onClick=${() => setMemArchived(true)}>${t('profile.memory.viewArchived') || 'Archived'}</button>`;
     body = html`<div class="mem-page">${renderEntries(ctx)}</div>`;
   } else if (id === 'discover' || id === 'remote') {
     body = html`<div class="mem-page">${renderBrowsePanel(ctx)}</div>`;
@@ -448,12 +485,12 @@ function renderOther(ctx, id) {
   } else if (id === 'tools') {
     body = html`
       <div class="og-fields">
-        <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${t('profile.memory.exportBtn') || 'Export'}</span><p class="og-hint">${c('exportHint', 'A JSON backup of every key in this memory (the selected agent’s, if one is chosen). A key space can be exported alone from its own page.')}</p><div class="og-actions"><button type="button" class="og-slab" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button></div></div>
-        <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${t('profile.memory.importBtn') || 'Import'}</span><p class="og-hint">${c('importHint', 'A JSON backup made here or by an agent. Choose first what happens when a key already exists.')}</p>
-          <div class="og-actions"><div class="og-choice">${['skip', 'overwrite', 'rename'].map(mode => html`<button type="button" key=${mode} class=${`og-choice-btn ${importMode === mode ? 'on' : ''}`} onClick=${() => setImportMode(mode)}>${t('profile.memory.importMode.' + mode) || mode}</button>`)}</div>
-          <button type="button" class="og-slab" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button></div>
+        <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${t('profile.memory.exportBtn') || 'Export'}</span><${Hint}>${c('exportHint', 'A JSON backup of every key in this memory (the selected agent’s, if one is chosen). A key space can be exported alone from its own page.')}<//><div class="og-actions"><button type="button" class="poster-slab" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button></div></div>
+        <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${t('profile.memory.importBtn') || 'Import'}</span><${Hint}>${c('importHint', 'A JSON backup made here or by an agent. Choose first what happens when a key already exists.')}<//>
+          <div class="og-actions"><div class="pf-tabs">${['skip', 'overwrite', 'rename'].map(mode => html`<button type="button" key=${mode} class=${`poster-tab ${importMode === mode ? 'is-on' : ''}`} onClick=${() => setImportMode(mode)}>${t('profile.memory.importMode.' + mode) || mode}</button>`)}</div>
+          <button type="button" class="poster-slab poster-slab--control" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button></div>
           <input type="file" accept="application/json,.json" ref=${importFileRef} class="pf-hidden" onChange=${handleImportFile} /></div>
-        ${!fullLoaded ? html`<div class="og-box poster-aside poster-aside--small"><span class="og-box-label">${t('profile.memory.loadContents') || 'Load all contents'}</span><p class="og-hint">${c('loadAllHint', 'The list carries keys and sizes only; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}</p><div class="og-actions"><button type="button" class="og-door" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button></div></div>` : null}
+        ${!fullLoaded ? html`<div class="og-box poster-aside poster-aside--small"><span class="poster-label">${t('profile.memory.loadContents') || 'Load all contents'}</span><${Hint}>${c('loadAllHint', 'The list carries keys and sizes only; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}<//><div class="og-actions"><button type="button" class="poster-action poster-action--small" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button></div></div>` : null}
       </div>`;
   }
   return renderPage(ctx, { id, crumbs: [{ label: title }], title, doors, children: body });

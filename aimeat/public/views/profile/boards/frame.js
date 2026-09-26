@@ -9,6 +9,13 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- The boards table is the Listing (listing, listing-row and its head row, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
+ *   v1.8.0 -- 2026-09-26 -- The line under a board's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.7.0 -- 2026-09-25 -- A notice's category is the Tag (.poster-chip, plain), a unification: Jouni's decision "Tag".
+ *   v1.6.0 -- 2026-09-25 -- The loading line's blinking mark is the library's Loading mark (css/components/loading-mark.css), moved unchanged out of five sheets (UI consolidation phase 5, a move).
+ *   v1.5.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.4.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Taulujen sivu", direction A).
@@ -86,17 +93,20 @@ export function boardSub(ctx, b) {
 }
 
 /** Rows of a boards table: name and its line, visibility, notices, latest, a door. */
-export function boardRows(ctx, list, door) {
-  return html`<div class="bp-rows">
+export function boardRows(ctx, list, door, { head = false } = {}) {
+  return html`<div class="listing listing--cols listing--name-state-count-last-doors bp-rows">
+    ${head ? rowsHead() : null}
     ${list.map(b => { const id = bid(b); const page = ctx.pages[id]; const n = page ? page.posts.length : null; const latest = page?.posts[0]; return html`
-      <div class="bp-nm" key=${'n' + id}><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'board', id })}>${b.name}</button><small>${boardSub(ctx, b)}</small></div>
-      <div class="bp-m" key=${'v' + id}>${visWord(b.visibility)}</div>
-      <div class=${`bp-m ${n ? '' : 'bp-m--q'}`} key=${'c' + id}>${n === null ? html`<span class="bp-loading">${t('common.loading')}</span>` : n ? html`<b>${n}${page.cursor ? '+' : ''}</b> ${c('noticesWord', { n })}` : c('noNotices')}</div>
-      <div class=${`bp-m ${latest ? '' : 'bp-m--q'}`} key=${'l' + id}>${latest ? html`${rel(latest.created_at)}<br />${who(latest.author_gaii).label}` : '·'}</div>
-      <div class="og-tbl-door" key=${'d' + id}>${door(b)}</div>`; })}
+      <div class="listing-row" key=${id}>
+        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'board', id })}>${b.name}</button><small class="listing-meta">${boardSub(ctx, b)}</small></div>
+        <div class="listing-desc">${visWord(b.visibility)}</div>
+        <div class=${`listing-desc ${n ? '' : 'bp-m--q'}`}>${n === null ? html`<span class="loading-mark">${t('common.loading')}</span>` : n ? html`<b>${n}${page.cursor ? '+' : ''}</b> ${c('noticesWord', { n })}` : c('noNotices')}</div>
+        <div class=${`listing-desc ${latest ? '' : 'bp-m--q'}`}>${latest ? html`${rel(latest.created_at)}<br />${who(latest.author_gaii).label}` : '·'}</div>
+        <div class="listing-doors">${door(b)}</div>
+      </div>`; })}
   </div>`;
 }
-export const rowsHead = () => html`<div class="bp-rows bp-rows--head"><div>${c('colBoard')}</div><div>${c('colVisibility')}</div><div>${c('colNotices')}</div><div>${c('colLatest')}</div><div></div></div>`;
+const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colBoard')}</div><div class="poster-label">${c('colVisibility')}</div><div class="poster-label">${c('colNotices')}</div><div class="poster-label">${c('colLatest')}</div><div class="poster-label"></div></div>`;
 
 /** A notice as a row: category, title and text, who and their standing, when and how long left. */
 export function noticeRow(ctx, boardId, p, authors, withBoard) {
@@ -105,13 +115,13 @@ export function noticeRow(ctx, boardId, p, authors, withBoard) {
   const board = withBoard ? ctx.boardById(boardId) : null;
   return html`
     <div class="bp-notice" key=${p.id}>
-      <div class=${`bp-cat ${p.category ? '' : 'bp-cat--q'}`}>${p.category || (isAgentPost(p) ? c('byAgent') : '·')}</div>
+      <div class=${`bp-cat ${p.category || isAgentPost(p) ? '' : 'bp-cat--q'}`}>${p.category || isAgentPost(p) ? html`<span class="poster-chip">${p.category || c('byAgent')}</span>` : '·'}</div>
       <div class="bp-notice-body">
         <button type="button" class="bp-notice-title" onClick=${() => ctx.pickView({ kind: 'notice', boardId, postId: p.id })}>${p.title}</button>
         <p>${String(p.body || '').slice(0, 220)}${String(p.body || '').length > 220 ? '…' : ''}</p>
         <div class="bp-who"><b>${w.label}</b>${authors?.[p.author_gaii] ? ` · ${standingWords(authors[p.author_gaii])}` : ''}${board ? html` · <button type="button" class="bp-who-board" onClick=${() => ctx.pickView({ kind: 'board', id: boardId })}>${board.name}</button>` : null}</div>
       </div>
-      <div class="bp-r"><b>${rel(p.created_at)}</b>${leftWords(p.ttl_expires_at)}<br />${p.replies ? c('repliesN', { n: p.replies }) + ' · ' : ''}${c('thanksN', { n: thanks })}</div>
+      <div class="bp-r"><b class="poster-time">${rel(p.created_at)}</b>${leftWords(p.ttl_expires_at)}<br />${p.replies ? c('repliesN', { n: p.replies }) + ' · ' : ''}${c('thanksN', { n: thanks })}</div>
     </div>`;
 }
 
@@ -139,9 +149,9 @@ export function renderPage(ctx, { crumbs, label = null, title, chips = null, doo
       ${crumb(ctx, crumbs)}
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
-          ${label ? html`<div class="og-label">${label}</div>` : null}
+          ${label ? html`<div class="poster-label">${label}</div>` : null}
           <h1 class="og-title poster-page-title bp-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>

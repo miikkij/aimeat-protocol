@@ -15,6 +15,11 @@
  * @structure InstructionBlock({ orgId }) — format tabs + block + copy + placement line
  * @usage import { InstructionBlock } from '/views/profile/instruction-block.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v1.0.0 — 2026-07-31 — Initial.
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
  *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
@@ -75,13 +80,13 @@ export function InstructionBlock({ orgId }) {
       <div class="ib-tabs">
         ${FORMATS.map(f => html`
           <button key=${f.id} type="button"
-            class=${'ib-tab' + (f.id === fmt ? ' ib-tab--active' : '')}
+            class=${'poster-tab' + (f.id === fmt ? ' is-on' : '')}
             onClick=${() => setFmt(f.id)}>${tr(f.labelKey, f.labelFallback)}</button>`)}
       </div>
       <p class="ib-place">${placement}</p>
       <pre class="ib-block">${text}</pre>
       <div class="ib-actions">
-        <${CopyButton} text=${text} className="btn-primary"
+        <${CopyButton} text=${text} className="poster-action poster-action--small"
           label=${tr('instrBlock.copy', 'Copy the block')}
           copiedLabel=${tr('common.copied', 'Copied')} />
         <span class="ib-meta">${tr('instrBlock.from', 'Generated from')} ${data.organism_name || data.organism_id}${

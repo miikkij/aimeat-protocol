@@ -12,6 +12,34 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.27.0 -- 2026-09-26 -- The ready-made request and the new token are the Code block (css/components/code-block.css): their look goes, their place stays (a unification: Jouni's decision "Code block").
+ *   v1.26.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
+ *   v1.25.0 -- 2026-09-26 -- A table's cells are the Listing's own: figures the figure cell (.listing-n), words the words cell (.listing-desc), a row of servers the Listing; the rules that drew them here go (a unification: the look most tabs use).
+ *   v1.24.0 -- 2026-09-25 -- The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.23.0 -- 2026-09-25 -- The devices signed in are the library's Device list (css/components/device-list.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v1.22.0 -- 2026-09-25 -- Picking a key's level, rights and expiry is the Tab in its tile tone, a risky choice in its attention tone (a unification: Jouni's decision "Choice").
+ *   v1.21.0 -- 2026-09-25 -- An opened key's rights are the Listing (css/components/listing.css), a unification: the look most tabs use. The grid, cell and phone rules of ac-rights go; its place, its words' face and their dim state stay.
+ *   v1.20.0 -- 2026-09-25 -- The addresses are the Facts (css/components/facts.css), a unification: the look most tabs use. The rules of ac-kv and its cells go.
+ *   v1.19.0 -- 2026-09-25 -- The sign-in rows, the keys and the secrets are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of ac-row, ac-keys, ac-secrets and their cells go; a count keeps its place in the doors, strong words in a key's words stay ink, the secrets keep their top margin.
+ *   v1.18.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.18.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.17.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.16.0 -- 2026-09-25 -- A framed box's own frame and ground go: it is the Object box (.poster-box, css/poster.css); its place (margin, padding) stays here. The lead roads keep their own heavier look (Jouni's decision "Object box", a unification).
+ *   v1.15.0 -- 2026-09-25 -- The form message rules go: the line a form says after it acted is the Form message (css/components/form-message.css) (UI consolidation phase 5, a unification).
+ *   v1.14.0 -- 2026-09-25 -- The inline code rules go: code is the Code block's inline cut (css/components/code-block.css); the layout declarations of their places stay, on .code-inline (UI consolidation phase 5, a unification).
+ *   v1.13.0 -- 2026-09-25 -- The lead and paragraph rules go: they are the og-lead (css/components/page-section.css); the layout declarations of their places stay, on .og-lead (UI consolidation phase 5, a unification).
+ *   v1.12.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.11.0 -- 2026-09-25 -- The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.10.0 -- 2026-09-25 -- The rules that leave the row labels out keep their old weight, with :where (a correction to the "Row label" unification).
+ *   v1.9.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.8.0 -- 2026-09-25 -- The quiet ways on are the library's action link (Jouni's decision "Action
+ *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
+ *     place's layout value moves to the new class.
+ *   v1.7.0 -- 2026-09-25 -- The loud action is the library's dark block (Jouni's decision "Loud action"):
+ *     the og-slab rule goes with the last og-slab on the page.
+ *   2026-09-25 -- .ac-empty is the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): its look goes, its place stays; its bold words take the sentence's colour.
+ *   2026-09-25 -- The key filters lose their rules: the tab's filter tone now draws them (a unification: Jouni's decision "Tabs and filters").
+ *   v1.6.0 -- 2026-09-25 -- Dead rules removed: selectors whose classes no file writes (UI consolidation phase 5, a move; the browser's reading proves only those went).
  *   v1.5.0 -- 2026-09-17 -- .ac-shost: the address line under a secret's "used by".
  *   v1.4.0 -- 2026-09-16 -- MCP servers are section 04, the section comments follow the new numbers,
  *     and an MCP server row wraps on a phone instead of cutting its remove button off.
@@ -26,192 +54,96 @@
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 
-.og-ac .og-door:disabled, .og-ac .og-slab:disabled { opacity: .5; cursor: default; }
 .og-ac .og-strip small { white-space: normal; overflow: visible; }
 .og-ac .is-low { color: var(--accent); }
 .og-ac .is-good { color: var(--success-fg); }
 .og-ac .is-dim { color: var(--text-dim); }
-.ac-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
-.ac-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text-dim); }
-.ac-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }
-.ac-empty { margin: 0; padding: .3rem 0 .8rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
-.ac-empty b { color: var(--text); font-weight: 800; }
-.ac-msg { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
-.ac-msg.is-err { color: var(--accent); }
-.ac-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
-.ac-why { margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
+.ac-empty { margin: 0; padding: .3rem 0 .8rem; }
+.ac-why { margin: .9rem 0 0; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
 .ac-why b { font-weight: 800; }
 .ac-form-gap { margin-top: 1.2rem; }
 .ac-token-created { margin: 0 0 1rem; }
-.ac-label { display: block; margin: 1.1rem 0 .3rem; }
 
-/* ── 01: the sign-in rows ─────────────────────────────────────────────────────────────────── */
+/* ── 01: the sign-in rows: each is a Listing (css/components/listing.css), the blocks between ─ */
 .ac-rows { display: flex; flex-direction: column; }
-.ac-row { display: flex; align-items: center; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--border); }
-.ac-row > .ac-nm { min-width: 0; flex: 1 1 auto; }
-.ac-row > .ac-nm b { display: block; font-size: .95rem; font-weight: 800; color: var(--text); }
-.ac-row > .ac-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; white-space: normal; }
-.ac-row > .ac-w { flex: 1 1 22rem; min-width: 0; font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
-.ac-row > .ac-w b { color: var(--text); font-weight: 800; }
-.ac-row > .ac-r { display: flex; align-items: center; gap: 1rem; flex: none; margin-left: auto; white-space: nowrap; }
-.ac-row > .ac-r .og-door { font-size: .72rem; }
-.ac-row > .ac-r .ac-n { margin-right: 0; }
-.ac-row.is-sub { padding-left: 1.4rem; }
-.ac-row.is-last { border-bottom: 0; }
+.og-ac .ac-n { margin-right: 0; }
 /* The two panels that come from the Security tab (two-step, passkeys) sit inside the row list and
    wear the poster skin; their own section titles duplicate the row above them and go. */
 .ac-panel { border-bottom: 1px solid var(--border); padding: .2rem 0 .6rem; }
-.ac-panel > .card-h3, .ac-panel > .text-caption:first-of-type { display: none; }
+.ac-panel > .card-h3, .ac-panel > .poster-hint:first-of-type { display: none; }
 .ac-panel .card { padding: .4rem 0 .4rem; margin-bottom: 0; }
 .ac-panel .card:last-child { padding-bottom: .2rem; }
-.ac-devices { display: grid; grid-template-columns: minmax(0, 1.3fr) 7rem 9rem; gap: 0 1rem; margin: .2rem 0 0 1.4rem; }
-.ac-devices > div { padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
-.ac-devices > div b { font-weight: 800; }
-.ac-devices > div small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
-.ac-devices > .ac-dh { padding: 0 0 .25rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.ac-devices > .ac-dn { text-align: right; margin-right: 0; }
-.ac-keybox { margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+.ac-keybox { margin: .9rem 0 0; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
 .ac-keybox b { font-weight: 800; }
 .ac-keybox code { display: inline-block; max-width: 100%; margin-top: .3rem; font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .15rem .5rem; overflow-wrap: anywhere; filter: blur(4px); transition: filter .2s; }
 .ac-keybox code.is-shown { filter: none; }
 .ac-keybox .og-doors { flex: none; margin-left: auto; }
 .ac-fed { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: .2rem 0 0 1.4rem; padding-bottom: .6rem; }
 .ac-fed .og-input { flex: 1 1 14rem; min-width: 10rem; }
-.ac-fed-node { display: flex; align-items: center; gap: .8rem; padding: .35rem 0; margin-left: 1.4rem; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: .78rem; }
-.ac-fed-node .og-door { font-size: .7rem; }
+/* The servers already allowed are the Listing (css/components/listing.css); their place under the row only. */
+.ac-fed-nodes { margin-left: 1.4rem; }
 
 /* ── 02: the keys ─────────────────────────────────────────────────────────────────────────── */
 .ac-filters { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; align-items: center; }
-.ac-filters .og-chip { cursor: pointer; background: transparent; }
-.ac-filters .og-chip.og-chip--sun { background: var(--sun); }
-.ac-filters .og-chip.og-chip--coral { border-color: var(--accent); color: var(--accent); }
-.ac-filters .ac-filters-r { margin-left: auto; }
-.ac-keys { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr) 7.5rem auto; gap: 0 1rem; align-items: stretch; }
-.ac-key { display: contents; }
-.ac-key > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
-.ac-key--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.ac-key.is-open > div { border-bottom: 0; }
-.ac-key > .ac-knm { font-size: .9rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
-.ac-knm .og-tbl-name { font-size: .9rem; }
-.ac-knm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; white-space: normal; }
-.ac-knm small.is-low { color: var(--accent); }
-.ac-key > .ac-kw { font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
-.ac-kw b { color: var(--text); font-weight: 800; }
-.ac-key > .ac-kwhen { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
-.ac-key > .ac-kwhen.is-low { color: var(--accent); }
-.ac-key > .ac-kgo { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
-.ac-kgo .og-door { font-size: .72rem; }
-.ac-key > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
+/* The keys are the Listing (css/components/listing.css); what a key may do says its strong words in ink. */
+.og-ac .listing-desc b { color: var(--text); font-weight: 800; }
 .ac-open .og-doors { margin-top: .9rem; }
-.ac-open .og-label { display: block; margin: .9rem 0 .3rem; }
-.ac-rights { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: 0 1rem; margin-top: .4rem; }
-.ac-rights > div { padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
-.ac-rights > .ac-rk { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); align-self: center; }
-.ac-rights > .ac-rk.is-dim { color: var(--text-dim); }
-.ac-rights > .ac-rw.is-dim { color: var(--text-dim); }
-.ac-rights > .ac-rw b { font-weight: 800; }
-.ac-rights > .ac-rgo { text-align: right; }
-.ac-rights .og-door { font-size: .7rem; }
-.ac-para.ac-spend-summary { margin: 0; }
-.ac-fed .ac-hint { margin: 0; }
+.ac-open .poster-label:where(:not(.ac-rk)) { display: block; margin: .9rem 0 .3rem; }
+.ac-rights { margin-top: .4rem; }
+.ac-rights .ac-rw { font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.ac-rights .ac-rk.is-dim, .ac-rights .ac-rw.is-dim { color: var(--text-dim); }
+.ac-rights .ac-rw b { font-weight: 800; }
+/* What the key has spent is the Hint (css/components/hint.css); its place only. */
+.ac-spend-summary { margin: 0; }
+.ac-fed .poster-hint { margin: 0; }
 .ac-spend { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; }
 .ac-spend .og-input { width: 9rem; }
 .ac-more { margin-top: .8rem; display: flex; gap: 1.4rem; flex-wrap: wrap; align-items: center; }
 
 /* the token form (a fold) and the token shown once */
 .ac-form { display: grid; grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr); gap: .9rem 1.2rem; margin-top: .4rem; align-items: start; }
-.ac-form .og-label { padding-top: .35rem; }
+.ac-form .poster-label { padding-top: .35rem; }
 .ac-form .og-input { width: 100%; box-sizing: border-box; }
-.ac-form .ac-hint { margin-top: .3rem; }
+.ac-form .poster-hint { margin-top: .3rem; }
 .ac-opts { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .4rem; }
-.ac-opt { padding: .2rem .7rem; border: 2px solid var(--border); background: transparent; font: inherit; font-size: .8rem; font-weight: 600; color: var(--text-dim); cursor: pointer; }
-.ac-opt.is-on { border-color: var(--text); color: var(--text); background: var(--sun); }
-.ac-opt.is-coral { border-color: var(--accent); color: var(--accent); }
-.ac-opt.is-coral.is-on { background: var(--accent); color: #FFFFFF; }
 .ac-form .ac-submit { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
-.ac-token { display: flex; align-items: center; gap: 1rem; margin: .6rem 0; padding: .6rem .8rem; border: 2px solid var(--text); background: var(--bg-dim); font-family: var(--font-mono); font-size: .78rem; overflow-wrap: anywhere; }
-.ac-token code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
-.ac-token .og-door { flex: none; font-size: .7rem; }
+/* The new token is the Code block (css/components/code-block.css); its row and place only. */
+.ac-token.code-block { display: flex; align-items: center; gap: 1rem; margin: .6rem 0; }
+.ac-token .code-inline { flex: 1 1 auto; min-width: 0; }
+.ac-token .poster-action { flex: none; }
 
 /* ── 05: the secrets ──────────────────────────────────────────────────────────────────────── */
-.ac-secrets { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 9rem auto; gap: 0 1rem; align-items: stretch; margin-top: .2rem; }
-.ac-secret { display: contents; }
-.ac-secret > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
-.ac-secret--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.ac-secret.is-open > div { border-bottom: 0; }
-.ac-secret > .ac-snm { min-width: 0; }
-.ac-snm b { display: block; font-family: var(--font-mono); font-size: .85rem; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
-/* .7rem, not the .68rem the key rows' sub-line wears: this line is the spelling a person copies
-   into a header, and 10.88 px is under the 11 px floor a finished surface is measured against. */
-.ac-snm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; }
-.ac-secret > .ac-sw { font-size: .85rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
-/* Where the value may go. .72rem keeps it above the 11 px floor, like the date line beside it. */
-.ac-secret > .ac-sw .ac-shost { display: block; margin-top: .2rem; font-size: .72rem; line-height: 1.45; color: var(--text-dim); overflow-wrap: anywhere; }
+/* The secrets are the Listing (css/components/listing.css). */
+.ac-secrets { margin-top: .2rem; }
 /* One label of a host name: never broken inside (not at its hyphen), only between labels. */
 .ac-shost-h { white-space: nowrap; }
-.ac-secret > .ac-swhen { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
-.ac-secret > .ac-sgo { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
-.ac-sgo .og-door { font-size: .72rem; }
-.ac-secret > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .ac-swrite { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; }
 .ac-swrite .og-input { flex: 1 1 16rem; min-width: 10rem; }
-.ac-swrite .og-door { font-size: .72rem; }
 
 /* ── 03, 04 and 06: the sections that keep their components ───────────────────────────────── */
 .ac-kept .access-section > .access-h3, .ac-kept > .card-h3, .ac-kept .card-h3.access-h3 { display: none; }
 .ac-kept .section-desc { display: none; }
-.ac-kept .access-section > .text-meta-sm:first-of-type { display: none; }
+.ac-kept .access-section > .poster-hint:first-of-type { display: none; }
 /* 04: an MCP server row carries a name and up to four actions. They wrap under the name on a phone
    instead of running past the edge, where the remove button was cut in half in Spanish. */
 .ac-mcp .mem-item { flex-wrap: wrap; row-gap: .4rem; }
-
-/* ── 07: the addresses ────────────────────────────────────────────────────────────────────── */
-.ac-kv { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr) auto; gap: 0 1.2rem; margin-top: .2rem; align-items: center; }
-.ac-kv > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.ac-kv > .ac-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.ac-kv > .ac-v { font-size: .9rem; line-height: 1.5; }
-.ac-kv > .ac-v code { display: inline-block; max-width: 100%; font-family: var(--font-mono); font-size: .8rem; font-weight: 500; background: var(--bg-dim); padding: .1rem .4rem; overflow-wrap: anywhere; }
-.ac-kv > .ac-v small { display: block; margin-top: .2rem; color: var(--text-dim); font-size: .8rem; }
-.ac-kv > .ac-go { text-align: right; }
-.ac-kv .og-door { font-size: .72rem; }
+.ac-mcp .mem-item .og-input, .ac-mcp .mem-item .select-field { width: auto; }
 
 /* ── 08: the two roads ────────────────────────────────────────────────────────────────────── */
 .ac-roads { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
-.ac-road { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
-.ac-road.is-lead { border-width: 3px; box-shadow: 8px 8px 0 var(--sun); }
+/* A road is the Object box (.poster-box); the lead road is its raised tone (.poster-box--raised). */
+.ac-road { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: .9rem 1.1rem; font-size: .9rem; line-height: 1.55; }
 .ac-road p { margin: 0; }
 .ac-road small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.ac-road pre { margin: 0; padding: .6rem .7rem; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; background: var(--bg-dim); border-left: 3px solid var(--text); }
+/* The ready-made request is the Code block (css/components/code-block.css); its place only. */
+.ac-road .code-block { margin: 0; }
 
 /* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
   .ac-roads { grid-template-columns: minmax(0, 1fr); }
-  .ac-row { flex-wrap: wrap; }
-  .ac-row > .ac-w { flex-basis: 100%; }
-  .ac-row > .ac-r { margin-left: 0; }
-  .ac-devices { grid-template-columns: minmax(0, 1fr) 4rem; margin-left: 0; }
-  .ac-devices > .ac-dh:nth-child(3), .ac-devices > div:nth-child(3n) { display: none; }
-  .ac-keys { grid-template-columns: minmax(0, 1fr) 5.5rem; }
-  .ac-key--head { display: none; }
-  .ac-key > .ac-kw, .ac-key > .ac-kwhen { grid-column: 1 / -1; padding-top: 0; border-bottom: 0; }
-  .ac-key > .ac-knm { border-bottom: 0; padding-bottom: .1rem; }
-  .ac-key > .ac-kgo { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
-  .ac-key > .ac-open { padding: .8rem .8rem .9rem; }
-  .ac-secrets { grid-template-columns: minmax(0, 1fr) 6.5rem; }
-  .ac-secret--head { display: none; }
-  .ac-secret > .ac-sw, .ac-secret > .ac-swhen { grid-column: 1 / -1; padding-top: 0; border-bottom: 0; }
-  .ac-secret > .ac-snm { border-bottom: 0; padding-bottom: .1rem; }
-  .ac-secret > .ac-sgo { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
-  .ac-secret > .ac-open { padding: .8rem .8rem .9rem; }
-  .ac-rights { grid-template-columns: minmax(0, 1fr); }
-  .ac-rights > .ac-rgo { text-align: left; }
   .ac-form { grid-template-columns: minmax(0, 1fr); gap: .3rem 0; }
-  .ac-form .og-label { padding-top: .6rem; }
-  .ac-kv { grid-template-columns: minmax(0, 1fr); }
-  .ac-kv > .ac-go { text-align: left; }
+  .ac-form .poster-label { padding-top: .6rem; }
   .ac-keybox { flex-direction: column; align-items: flex-start; }
   .ac-keybox .og-doors { margin-left: 0; }
-  .ac-slab-hint { text-align: left; }
-  .ac-filters .ac-filters-r { margin-left: 0; }
-  .ac-fed, .ac-fed-node { margin-left: 0; }
+  .ac-fed, .ac-fed-nodes { margin-left: 0; }
 }

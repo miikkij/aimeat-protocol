@@ -10,6 +10,20 @@
  *   timezone, purpose + the kind-specific payload). Handles pause/resume, run-now,
  *   edit (PATCH), and cancel itself; calls onChanged() to let the parent refetch.
  * @version-history
+ *   v1.13.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.12.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 — 2026-09-26 — An agent's schedules are the Listing (css/components/listing.css): the kind, name and by-agent tags in the name cell, the facts, the copy box and the purpose in the words cell, the actions in the doors, the edit form the open panel; the classic card's rules go (a unification: the look most tabs use).
+ *   v1.10.0 — 2026-09-25 — A framed box around one thing is the Object box (.poster-box; on a grey ground its copy tone), in the tone its look already was (Jouni's decision "Object box", a unification).
+ *   v1.9.0 — 2026-09-25 — Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.8.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.7.0 -- 2026-09-25 -- Code inside a sentence or a value line is the code-inline cut of the Code block (UI consolidation phase 5, a unification).
+ *   v1.6.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.5.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.4.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   v1.3.0 — 2026-08-30 — The inline editor moved to scheduler/edit-form.js (ScheduleEditForm) so the
  *     schedule's own page in the poster face edits through the same form; scheduleIo and
  *     describeDispatch are exported for that page. No behaviour change on the card.
@@ -33,9 +47,6 @@ import { ScheduleEditForm } from './scheduler/edit-form.js';
 
 const html = htm.bind(h);
 
-const KIND_BADGE = {
-  ai: 'sch-badge--ai', agent_task: 'sch-badge--agent', extension: 'sch-badge--ext', core: 'sch-badge--core',
-};
 const KIND_LABEL = {
   ai: 'profile.scheduler.kind.ai', agent_task: 'profile.scheduler.kind.agent_task',
   extension: 'profile.scheduler.kind.extension', core: 'profile.scheduler.kind.core',
@@ -118,34 +129,26 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
   const io = scheduleIo(s, t);
 
   return html`
-    <div class="sch-card" id=${'sch-card-' + s.id}>
-      <div class="sch-card-head">
-        <div class="sch-card-title">
-          <span class="sch-badge ${KIND_BADGE[s.type] || KIND_BADGE.core}">${t(KIND_LABEL[s.type] || KIND_LABEL.core)}</span>
-          <span class="sch-name">${s.displayName || s.name}</span>
-          ${s.createdByAgent ? html`<span class="sch-tag">${t('profile.scheduler.byAgent')}</span>` : null}
-        </div>
-        <div class="sch-actions">
-          <button class="btn-ghost sch-btn" disabled=${busy} onClick=${onToggle}>${s.enabled ? t('profile.scheduler.pause') : t('profile.scheduler.resume')}</button>
-          <button class="btn-ghost sch-btn" disabled=${busy} onClick=${onTrigger}>${t('profile.scheduler.runNow')}</button>
-          <button class="btn-ghost sch-btn" disabled=${busy} onClick=${() => setEditing(e => !e)}>${editing ? t('profile.scheduler.close') : t('profile.scheduler.edit')}</button>
-          <button class="btn-danger sch-btn" disabled=${busy} onClick=${onCancel}>${t('profile.scheduler.cancel')}</button>
-        </div>
+    <div class=${`listing-row ${editing ? 'is-open' : ''}`}>
+      <div class="listing-name" id=${'sch-card-' + s.id}>
+        <span class="poster-chip">${t(KIND_LABEL[s.type] || KIND_LABEL.core)}</span>
+        ${' '}${s.displayName || s.name}
+        ${s.createdByAgent ? html` <span class="poster-chip poster-chip--coral">${t('profile.scheduler.byAgent')}</span>` : null}
       </div>
-
+      <div class="listing-desc">
       <div class="sch-card-meta">
-        <span><span class="sch-meta-k">${t('profile.scheduler.col.cron')}:</span> <code class="sch-cron">${s.cron}</code>${s.timezone ? ' · ' + s.timezone : ''}</span>
-        ${s.agentName ? html`<span><span class="sch-meta-k">${t('profile.scheduler.col.agent')}:</span> ${s.agentName}</span>` : null}
-        <span><span class="sch-meta-k">${t('profile.scheduler.col.lastRun')}:</span> ${s.lastRunAt ? timeAgo(s.lastRunAt) : t('profile.scheduler.never')}${s.lastRunResult ? html` <span class="sch-badge ${s.lastRunResult === 'error' ? 'sch-badge--err' : 'sch-badge--ok'}">${s.lastRunResult}</span>` : ''}</span>
-        <span><span class="sch-meta-k">${t('profile.scheduler.col.nextRun')}:</span> ${s.enabled ? formatUntil(s.nextRunAt) : t('profile.scheduler.paused')}</span>
-        <span><span class="sch-meta-k">${t('profile.scheduler.col.runs')}:</span> ${s.runCount ?? 0}</span>
+        <span><span>${t('profile.scheduler.col.cron')}:</span> <code class="code-inline">${s.cron}</code>${s.timezone ? ' · ' + s.timezone : ''}</span>
+        ${s.agentName ? html`<span><span>${t('profile.scheduler.col.agent')}:</span> ${s.agentName}</span>` : null}
+        <span><span>${t('profile.scheduler.col.lastRun')}:</span> ${s.lastRunAt ? timeAgo(s.lastRunAt) : t('profile.scheduler.never')}${s.lastRunResult ? html` <span class="poster-status ${s.lastRunResult === 'error' ? 'poster-status--danger' : 'poster-status--fine'}">${s.lastRunResult}</span>` : ''}</span>
+        <span><span>${t('profile.scheduler.col.nextRun')}:</span> ${s.enabled ? formatUntil(s.nextRunAt) : t('profile.scheduler.paused')}</span>
+        <span><span>${t('profile.scheduler.col.runs')}:</span> ${s.runCount ?? 0}</span>
       </div>
 
       ${(d.title || d.body) && html`
-        <div class="sch-card-dispatch">
-          <div class="sch-dispatch-label">${t('profile.scheduler.dispatches')}</div>
-          ${d.title ? html`<div class="sch-dispatch-title">${d.title}</div>` : null}
-          ${d.body ? html`<div class="sch-dispatch-body">${d.body}</div>` : null}
+        <div class="sch-card-dispatch poster-box job-prompt">
+          <span class="poster-label">${t('profile.scheduler.dispatches')}</span>
+          ${d.title ? html`<div class="job-prompt-title">${d.title}</div>` : null}
+          ${d.body ? html`<div class="job-prompt-body">${d.body}</div>` : null}
         </div>`}
 
       ${/* WHAT IT READS AND WHAT IT WRITES, said in words. An `ai` schedule has carried these all
@@ -153,13 +156,20 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
             job that writes into your store every night should say so on its face. */ ''}
       ${io && html`
         <div class="sch-card-io">
-          <div><span class="sch-meta-k">${t('profile.scheduler.reads')}:</span> ${io.reads}</div>
-          <div><span class="sch-meta-k">${t('profile.scheduler.writes')}:</span> ${io.writes}</div>
+          <div><span>${t('profile.scheduler.reads')}:</span> ${io.reads}</div>
+          <div><span>${t('profile.scheduler.writes')}:</span> ${io.writes}</div>
         </div>`}
 
-      ${s.purpose && !editing ? html`<div class="sch-muted sch-purpose">${s.purpose}</div>` : null}
+      ${s.purpose && !editing ? html`<div class="sch-purpose">${s.purpose}</div>` : null}
+      </div>
+      <div class="listing-doors">
+        <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${onToggle}>${s.enabled ? t('profile.scheduler.pause') : t('profile.scheduler.resume')}</button>
+        <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${onTrigger}>${t('profile.scheduler.runNow')}</button>
+        <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => setEditing(e => !e)}>${editing ? t('profile.scheduler.close') : t('profile.scheduler.edit')}</button>
+        <button class="poster-action poster-action--small poster-action--row poster-action--danger" disabled=${busy} onClick=${onCancel}>${t('profile.scheduler.cancel')}</button>
+      </div>
 
-      ${editing && html`<${ScheduleEditForm} schedule=${s} showToast=${showToast}
-        onSaved=${() => { setEditing(false); onChanged?.(); }} onClose=${() => setEditing(false)} />`}
+      ${editing && html`<div class="listing-open poster-box poster-box--raised"><${ScheduleEditForm} schedule=${s} showToast=${showToast}
+        onSaved=${() => { setEditing(false); onChanged?.(); }} onClose=${() => setEditing(false)} /></div>`}
     </div>`;
 }

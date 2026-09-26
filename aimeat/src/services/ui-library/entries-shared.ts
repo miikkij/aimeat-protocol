@@ -9,6 +9,10 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.5.0 — 2026-09-26 — Markdown's small cut (.md-body--small, `small`), Jouni's decision "Small reader".
+ *   v1.4.0 — 2026-09-26 — A removable tag's x is the Tag's remove mark (.poster-chip-x), coral while the pointer is on the tag (Jouni's decision "Remove mark", a unification).
+ *   v1.3.0 — 2026-09-26 — A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
+ *   v1.2.0 — 2026-09-26 — TagList names its removable tag (.tag-removable, .tag-x), whose rules moved into tags.css unchanged (UI consolidation phase 5, a move).
  *   v1.1.0 — 2026-09-23 — DataMap deleted with its code (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
@@ -19,18 +23,18 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         id: 'card-menu', name: 'CardMenu', kind: 'component', status: 'active',
         summary: 'The dots in the top right corner of a card, and the menu they open.',
         module: '/components/CardMenu.js', sheet: '/css/components/card-menu.css',
-        data: { shape: 'CardMenu({ state, actions, label, onOpened })', fields: { state: "'off', 'open' or 'working': the colour of the dots", actions: '[{ label, run, done }]', label: 'what the dots are, for a screen reader', onOpened: 'called the first time it opens' } },
-        useFor: ['Acting on one card: always the same corner, on every card.'],
-        variants: [],
+        data: { shape: 'CardMenu({ state, actions, label, onOpened, inline })', fields: { state: "'off', 'open' or 'working': the colour of the dots", actions: '[{ label, run, done, danger }]', label: 'what the dots are, for a screen reader', onOpened: 'called the first time it opens', inline: "'start' or 'end': the dots in a line of words, the menu opening from that edge" } },
+        useFor: ['Acting on one card: always the same corner, on every card.', 'The actions of one message that do not fit its line (Messages).'],
+        variants: [{ name: 'inline', class: 'card-menu--inline', prop: 'inline', when: 'the dots in a line of words, not in a card\'s corner' }],
         example: { state: 'open', label: 'Your welcome mat', actions: [{ label: 'Take it off your open items' }] },
     },
     {
         id: 'markdown', name: 'Markdown', kind: 'component', status: 'active',
         summary: 'Rendered Markdown as a readable document: headings, tables, code, quotes, lists and links, sanitised.',
         module: '/components/Markdown.js', sheet: '/css/components/markdown.css',
-        data: { shape: 'Markdown({ text, onWikiLink })', fields: { text: 'the Markdown source', onWikiLink: 'handler for [[wiki]] links, when the page has them' } },
+        data: { shape: 'Markdown({ text, onWikiLink, small })', fields: { text: 'the Markdown source', onWikiLink: 'handler for [[wiki]] links, when the page has them', small: 'the small cut, for a small place in Settings' } },
         useFor: ['Anything an agent or a person wrote in Markdown: an agent turn, a document, an operator passage.'],
-        variants: [],
+        variants: [{ name: 'small', class: 'md-body--small', when: 'a small place in Settings (an agent\'s README, a task\'s memory value or description, an organism\'s README, a record field, the structure map, an app\'s setup guide): the headings a step larger than the words (Jouni\'s decision "Small reader")' }],
         example: { text: '## Hello\n\nA **bold** word and a [link](https://aimeat.io).' },
     },
     {
@@ -115,7 +119,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         module: '/components/TagList.js', sheet: '/css/components/tags.css',
         data: { shape: 'TagList({ tags, max, prefix, onTag })', fields: { tags: 'the tags', max: 'how many to show', prefix: 'text before each', onTag: 'a tag was pressed' } },
         useFor: ['The tags of an agent, an app or a record.'],
-        variants: [],
+        variants: [{ name: 'removable', class: 'tag-removable', when: 'a tag that takes itself off when pressed (the tag editor, js/components/tag-editor.js; a new contact\'s tags; a file\'s tags): its x is the Tag\'s remove mark (.poster-chip-x), grey, coral while the pointer is on the tag' }],
         example: { tags: ['music', 'charts'], max: 5 },
     },
     {

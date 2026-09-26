@@ -9,86 +9,71 @@
  *   with the panel that opens under one row, and the how-it-accrues facts.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.16.0 -- 2026-09-25 -- The count inside a filter's rules go: it is the Count (.poster-count, tally; dark on the sun in the chosen one), a unification: Jouni's decision "Count".
+ *   v1.15.0 -- 2026-09-25 -- Dead rule removed: .ad-open code (no AppDev markup writes a code element in an opened panel), a move.
+ *   v1.14.0 -- 2026-09-25 -- The two prompts are the Listing (css/components/listing.css, name-desc-doors), a unification: the look most tabs use. The rules of .ad-prl, .ad-pr and its cells, and their phone rules, go.
+ *   v1.13.0 -- 2026-09-25 -- "N more areas" is the small link (.poster-action--more), a unification: Jouni's decision "Small link". The rule of .ad-facet goes.
+ *   v1.12.0 -- 2026-09-25 -- A pitfall's severity is the Status (.poster-status: critical danger, warning attention, info off), a unification: Jouni's decision "Status". The rules of .ad-sv b and its tones go; the mark keeps its own width in the cell.
+ *   v1.11.0 -- 2026-09-25 -- A proposal's tier is the Tag (.poster-chip), a unification: Jouni's decision "Tag"; the severity mark's rule leaves it alone.
+ *   v1.10.0 -- 2026-09-25 -- The line under the list is the More line, css/components/more-line.css (a move): the rules of .ad-more go from here unchanged, under the part's name.
+ *   v1.9.0 -- 2026-09-25 -- The tiers are a library part, css/components/tier-list.css (a move): their rules go from here unchanged.
+ *   v1.8.0 -- 2026-09-25 -- How it accrues is the Facts (css/components/facts.css, the wide cut), a unification: the look most tabs use. The rules of ad-kv, ad-k, ad-v go; the facts keep their place under the head.
+ *   v1.7.0 -- 2026-09-25 -- A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.5.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.4.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.2.0 — 2026-09-25 — The quiet ways on are the library's action link (Jouni's decision "Action
+ *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
+ *     place's layout value moves to the new class.
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab (Jouni's decision
+ *     "Loud action"): the rules that restyled the old og-slab and .btn-primary here go, and a place's
+ *     layout value moves to the new class.
+ *   2026-09-25 -- .ad-empty is the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): its look goes, its place stays; its bold words take the sentence's colour.
+ *   2026-09-25 -- The facets are the tab's filter tone (a unification: Jouni's decision "Tabs and filters"); the count keeps its rules, its margin now the tab's own gap. .ad-facet stays for "more areas", which is an action, not a filter.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 
-.og-appdev .og-chip--coral { border-color: var(--accent); color: var(--accent); }
 .og-appdev .og-doors > a { text-decoration: none; }
-.og-appdev .og-door:disabled { opacity: .5; cursor: default; }
-.og-appdev .og-mast-actions .og-slab { text-decoration: none; }
-.ad-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
-.ad-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
-.ad-empty b { color: var(--text); font-weight: 800; }
+.ad-empty { margin: 0; padding: .3rem 0 .6rem; }
 
-/* ── The two prompts ───────────────────────────────────────────────────────────────────────── */
-.ad-prl { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 1.2rem; align-items: stretch; }
-.ad-pr { display: contents; }
-.ad-pr > div { padding: .8rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
-.ad-pr-nm { font-size: 1rem; font-weight: 800; color: var(--text); }
-.ad-pr-nm small { display: block; margin-top: .2rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; }
-.ad-pr-ds { font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
-/* The rows are display: contents, so a cell's parent selector is the row, never the grid. */
-.ad-pr > .ad-pr-go { display: flex; justify-content: flex-end; align-items: center; gap: .9rem; white-space: nowrap; }
-.ad-pr-go .og-door { font-size: .72rem; text-decoration: none; }
-.ad-tier { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: .35rem .9rem; margin-top: .8rem; font-size: .9rem; line-height: 1.5; color: var(--text); }
-.ad-tier b { font-family: var(--font-mono); font-size: .8rem; font-weight: 800; color: var(--accent); }
+/* ── The two prompts: the Listing (css/components/listing.css) ──────────────────────────────── */
+/* The tiers under the prompts are the Tier list (css/components/tier-list.css). */
 
 /* ── Filters and the search line ───────────────────────────────────────────────────────────── */
 .ad-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
-.ad-facet { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .55rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer; line-height: 1.5; }
-.ad-facet em { font-style: normal; color: var(--text-dim); margin-left: .35rem; }
-.ad-facet.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
-.ad-facet.is-on em { color: var(--on-sun); opacity: .75; }
-.ad-facet:disabled { opacity: .45; cursor: default; }
-.ad-search { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
-.ad-search .og-input { flex: 1 1 auto; min-width: 0; }
-.ad-search small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
 
 /* ── The list: a severity mark, the title, area and model, the doors; a panel under one row ── */
 .ad-pl { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) minmax(8rem, 12rem) auto; gap: 0 .9rem; align-items: stretch; }
 .ad-p { display: contents; }
 .ad-p > div { min-width: 0; display: grid; align-content: center; }
 .ad-p > div:where(:not(.poster-aside)) { padding: .65rem 0; border-bottom: 1px solid var(--border); }
-.ad-p--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ad-p--head > div { padding: 0 0 .35rem; border-bottom: 0; }
 .ad-p--dim > div { opacity: .6; }
-.ad-sv b { display: inline-block; justify-self: start; padding: .1rem .45rem; border: 2px solid var(--text); font-family: var(--font-mono); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text); white-space: nowrap; }
-.ad-sv b.is-crit { background: var(--accent); border-color: var(--accent); color: #fff; }
-.ad-sv b.is-info { border-color: var(--border); color: var(--text-dim); }
+/* The severity (the Status) and the tier (the Tag) keep their own width in the cell. */
+.ad-sv > b { justify-self: start; white-space: nowrap; }
 .ad-ti { font-size: .92rem; font-weight: 800; line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
 .ad-ti small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
 .ad-me { font-family: var(--font-mono); font-size: .72rem; line-height: 1.45; color: var(--text-dim); overflow-wrap: anywhere; }
 .ad-me b { display: block; font-weight: 700; color: var(--text); }
 .ad-p > .ad-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
-.ad-go .og-door { font-size: .72rem; text-decoration: none; }
 .ad-p > .ad-open { grid-column: 1 / -1; display: block; margin: 0 0 .2rem 6.5rem; }
-.ad-open .og-label { display: block; margin: .6rem 0 .2rem; }
-.ad-open .og-label:first-child { margin-top: 0; }
+.ad-open .poster-label { display: block; margin: .6rem 0 .2rem; }
+.ad-open .poster-label:first-child { margin-top: 0; }
 .ad-open p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.ad-open code { font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .05rem .3rem; }
-.ad-open .og-chips { margin-top: .4rem; }
-.ad-more { display: flex; align-items: center; gap: 1rem; margin-top: .8rem; }
-.ad-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.ad-open .poster-chips { margin-top: .4rem; }
 
 /* ── How it accrues ────────────────────────────────────────────────────────────────────────── */
-.ad-kv { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .8rem 1.2rem; align-items: start; }
-.ad-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
-.ad-v { font-size: .95rem; line-height: 1.5; color: var(--text); min-width: 0; }
-.ad-v small { display: block; margin-top: .15rem; font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
+/* The Facts (css/components/facts.css, the wide cut); they keep their place right under the head. */
+.og-appdev .ad-kv { margin-top: 0; }
 
 /* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  .ad-prl { grid-template-columns: minmax(0, 1fr); }
-  .ad-pr > .ad-pr-ds { border-bottom: 0; padding-top: 0; }
-  .ad-pr > .ad-pr-nm { border-bottom: 0; padding-bottom: .2rem; }
-  .ad-pr > .ad-pr-go { justify-content: flex-start; padding-top: 0; flex-wrap: wrap; }
-  .ad-search { flex-wrap: wrap; }
   .ad-pl { grid-template-columns: 5.6rem minmax(0, 1fr); }
   .ad-p--head > div { display: none; }
   .ad-p > .ad-ti { border-bottom: 0; padding-bottom: .2rem; }
   .ad-p > .ad-me { grid-column: 2; border-bottom: 0; padding-top: 0; padding-bottom: .2rem; }
   .ad-p > .ad-go { grid-column: 2; justify-content: flex-start; padding-top: 0; flex-wrap: wrap; }
   .ad-p > .ad-open { margin-left: 0; }
-  .ad-kv { grid-template-columns: 1fr; gap: .3rem 0; }
-  .ad-k { padding-top: .6rem; }
 }

@@ -14,7 +14,32 @@
  *   secRoads
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- The ready-made request is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v1.19.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.18.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.17.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.16.0 -- 2026-09-25 -- The grant form's options (who, what, may, where, until) are a choice: the Tab (.poster-tab, the chosen one .is-on), a unification: Jouni's decision "Choice".
+ *   v1.15.0 -- 2026-09-25 -- What the export holds is the Item grid (.item-grid, css/components/item-grid.css), a library part by a move.
+ *   v1.14.0 -- 2026-09-25 -- Who reaches what (by target, by person, the revoked) and the trail are the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v1.13.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- A framed box around one thing is the Object box (.poster-box; on a grey ground its copy tone), in the tone its look already was (Jouni's decision "Object box", a unification).
+ *   v1.11.0 -- 2026-09-25 -- The paragraph that opens a section is the og-lead, as in most tabs, not the Hint (UI consolidation phase 5, a unification).
+ *   v1.10.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.9.0 -- 2026-09-25 -- The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.8.0 -- 2026-09-25 -- A lead or a paragraph that opens or explains a section is the og-lead; a grey one that explains is the Hint (UI consolidation phase 5, a unification).
+ *   v1.7.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.6.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.4.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
+ *   v1.3.0 -- 2026-09-25 -- The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: select shared ink frames for explanations and the export row.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Tietolompakko-sivu", direction A).
@@ -25,12 +50,15 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { ContactPicker } from '/components/ContactPicker.js';
-import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
+import { scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { x, n, crumb, pageLinks, whoOf } from './frame.js';
 import { targetRow, personRow, revokedRow, groupRow, eventRow, groupId } from './rows.js';
+import { Hint } from '/components/Hint.js';
 
-const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
-const msg = (m) => (m ? html`<small class=${`dw-msg ${m.error ? 'is-err' : ''}`}>${m.text}</small>` : null);
+const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
+const msg = (m) => (m ? html`<small class=${`form-message ${m.error ? 'form-message--error' : ''}`}>${m.text}</small>` : null);
 
 export function renderPage(ctx) {
   if (ctx.federated) return federated(ctx);
@@ -49,7 +77,7 @@ export function renderPage(ctx) {
       ${strip(ctx)}
       <div class="og-grid">
         <div class="og-main">
-          ${!ov ? html`<p class="dw-empty">${ctx.failed ? x('loadFailed') : x('loading')}</p>` : html`
+          ${!ov ? html`<p class=${`poster-quiet dw-empty${ctx.failed ? '' : ' loading-mark'}`}>${ctx.failed ? x('loadFailed') : x('loading')}</p>` : html`
             ${secTargets(ctx)}
             ${secTrail(ctx)}
             ${secGrant(ctx)}
@@ -73,7 +101,7 @@ function federated(ctx) {
     <div class="og og-dw">
       ${crumb()}
       <div class="og-mast"><div class="og-mast-words"><h1 class="og-title poster-page-title">${t('profile.tabs.dataWallet')}<small>${x('titleSub')}</small></h1><p class="og-desc">${x('desc')}</p></div></div>
-      <div class="og-box og-box--solid dw-box poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
+      <div class="og-box og-box--solid dw-box poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
     </div>`;
 }
 
@@ -81,24 +109,24 @@ function mast(ctx) {
   const ov = ctx.ov;
   const ps = ov?.permSummary;
   const chips = !ov ? [] : [
-    chip(x('chipOwn', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) }), 'og-chip--sun'),
+    chip(x('chipOwn', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) }), 'poster-chip--sun'),
     chip(x('chipGrants', { active: ctx.active.length, revoked: ctx.revokedList.length })),
-    ctx.deniedCount ? chip(x('chipDenied', { n: n(ctx.deniedCount), days: ctx.days }), 'og-chip--coral') : chip(x('chipQuiet', { days: ctx.days }), 'og-chip--dim'),
-    ctx.expiring ? chip(x('chipExpiring', { n: ctx.expiring }), 'og-chip--dim') : chip(x('chipNoExpiry'), 'og-chip--dim'),
+    ctx.deniedCount ? chip(x('chipDenied', { n: n(ctx.deniedCount), days: ctx.days }), 'poster-chip--coral') : chip(x('chipQuiet', { days: ctx.days })),
+    ctx.expiring ? chip(x('chipExpiring', { n: ctx.expiring })) : chip(x('chipNoExpiry')),
   ];
   return html`
     <div class="og-mast">
       <div class="og-mast-words">
         <h1 class="og-title poster-page-title">${t('profile.tabs.dataWallet')}<small>${x('titleSub')}</small></h1>
-        <div class="og-chips">${chips}</div>
+        <div class="poster-chips">${chips}</div>
         <p class="og-desc">${x('desc')}</p>
       </div>
       <div class="og-mast-actions">
-        <button type="button" class="og-slab" onClick=${() => ctx.toggleForm(true)}>${x('grantSlab')}</button>
-        <small class="dw-slab-hint">${x('grantSlabHint')}</small>
+        <button type="button" class="poster-slab" onClick=${() => ctx.toggleForm(true)}>${x('grantSlab')}</button>
+        <small class="poster-hint poster-hint--slab">${x('grantSlabHint')}</small>
         <div class="og-doors">
-          <button type="button" class="og-door" disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}</button>
-          <button type="button" class="og-door og-door--quiet" onClick=${() => scrollTo('dw-roads')}>${x('toAi')}</button>
+          <button type="button" class="poster-action poster-action--small" disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}</button>
+          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => scrollTo('dw-roads')}>${x('toAi')}</button>
         </div>
       </div>
     </div>`;
@@ -127,29 +155,29 @@ function secTargets(ctx) {
   const list = f === 'orgs' ? ctx.targets.filter((r) => r.kind === 'org') : f === 'keys' ? ctx.targets.filter((r) => r.kind === 'key') : ctx.targets;
   const shown = ctx.personFocus && f === 'people' ? ctx.people.filter((p) => p.name === ctx.personFocus).concat(ctx.people.filter((p) => p.name !== ctx.personFocus)) : ctx.people;
   return html`
-    <${Section} id="dw-targets" num="01" title=${x('secTargets')} count=${x('secTargetsSub', { n: ctx.active.length, targets: ctx.targets.length })} first=${true}>
-      <p class="dw-para">${x('targetsIntro')}</p>
+    <${PageSection} id="dw-targets" num="01" title=${x('secTargets')} count=${x('secTargetsSub', { n: ctx.active.length, targets: ctx.targets.length })} first=${true}>
+      <p class="og-lead">${x('targetsIntro')}</p>
       ${ctx.active.length || ctx.revokedList.length ? html`
         <div class="dw-filters">
-          ${filters.map(([id, k]) => html`<button type="button" key=${id} class=${`og-chip ${f === id ? 'og-chip--sun' : ''}`} onClick=${() => ctx.setFilter(id)}>${x('filter.' + id)} · ${k}</button>`)}
-          <button type="button" class=${`og-chip dw-filters-r ${f === 'people' ? 'og-chip--sun' : 'og-chip--dim'}`} onClick=${() => ctx.setFilter('people')}>${x('filter.people')} · ${ctx.people.length}</button>
+          ${filters.map(([id, k]) => html`<button type="button" key=${id} class=${`poster-tab poster-tab--filter ${f === id ? 'is-on' : ''}`} onClick=${() => ctx.setFilter(id)}>${x('filter.' + id)} · ${k}</button>`)}
+          <button type="button" class=${`poster-tab poster-tab--filter dw-filters-r ${f === 'people' ? 'is-on' : ''}`} onClick=${() => ctx.setFilter('people')}>${x('filter.people')} · ${ctx.people.length}</button>
         </div>` : null}
       ${f === 'revoked' ? html`
-        ${ctx.revokedList.length ? html`<div class="dw-rows dw-rows--plain">
-          <div class="dw-row dw-row--head"><div>${x('col.target')}</div><div>${x('col.whoWhat')}</div><div>${x('col.span')}</div><div></div></div>
+        ${ctx.revokedList.length ? html`<div class="listing listing--cols listing--name-desc-span-doors">
+          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.target')}</div><div class="poster-label">${x('col.whoWhat')}</div><div class="poster-label">${x('col.span')}</div><div class="poster-label"></div></div>
           ${ctx.revokedList.map((c) => revokedRow(ctx, c))}
-        </div>` : html`<p class="dw-empty">${x('noRevoked')}</p>`}`
+        </div>` : html`<p class="poster-quiet dw-empty">${x('noRevoked')}</p>`}`
       : f === 'people' ? html`
-        ${ctx.people.length ? html`<div class="dw-rows">
-          <div class="dw-row dw-row--head"><div>${x('col.who')}</div><div>${x('col.reaches')}</div><div>${x('col.since')}</div><div></div></div>
+        ${ctx.people.length ? html`<div class="listing listing--cols listing--name-desc-since-doors">
+          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.who')}</div><div class="poster-label">${x('col.reaches')}</div><div class="poster-label">${x('col.since')}</div><div class="poster-label"></div></div>
           ${shown.map((p) => personRow(ctx, p))}
-        </div>` : html`<p class="dw-empty">${x('noGrants')}</p>`}`
+        </div>` : html`<p class="poster-quiet dw-empty">${x('noGrants')}</p>`}`
       : html`
-        ${list.length ? html`<div class="dw-rows">
-          <div class="dw-row dw-row--head"><div>${x('col.target')}</div><div>${x('col.whoWhat')}</div><div>${x('col.since')}</div><div></div></div>
+        ${list.length ? html`<div class="listing listing--cols listing--name-desc-since-doors">
+          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.target')}</div><div class="poster-label">${x('col.whoWhat')}</div><div class="poster-label">${x('col.since')}</div><div class="poster-label"></div></div>
           ${list.map((r) => targetRow(ctx, r))}
-        </div>` : html`<p class="dw-empty"><b>${x('noGrantsTitle')}</b> ${x('noGrantsBody')}</p>`}`}
-      <div class="dw-why poster-frame"><b>${x('howTitle')}</b> ${x('howBody')}</div>
+        </div>` : html`<p class="poster-quiet dw-empty"><b>${x('noGrantsTitle')}</b> ${x('noGrantsBody')}</p>`}`}
+      <div class="dw-why poster-box"><b>${x('howTitle')}</b> ${x('howBody')}</div>
     <//>`;
 }
 
@@ -160,27 +188,27 @@ function secTrail(ctx) {
   const items = ctx.trail;
   const shown = items.slice(0, ctx.shownTrail);
   return html`
-    <${Section} id="dw-trail" num="02" title=${x('secTrail')} count=${x('secTrailSub', { days: ctx.days, denied: n(ctx.deniedCount), events: ctx.events.length })}>
-      <p class="dw-para">${x('trailIntro')}</p>
+    <${PageSection} id="dw-trail" num="02" title=${x('secTrail')} count=${x('secTrailSub', { days: ctx.days, denied: n(ctx.deniedCount), events: ctx.events.length })}>
+      <p class="og-lead">${x('trailIntro')}</p>
       <div class="dw-filters">
-        ${[7, 30, 90].map((d) => html`<button type="button" key=${d} class=${`og-chip ${ctx.days === d ? 'og-chip--sun' : ''}`} disabled=${ctx.reloading} onClick=${() => ctx.setDays(d)}>${x('daysN', { n: d })}${ctx.days === d ? ` · ${n(ov.audit.total)}` : ''}</button>`)}
-        <button type="button" class=${`og-chip dw-filters-r ${ctx.trailFilter === 'events' ? 'og-chip--sun' : 'og-chip--dim'}`} onClick=${() => ctx.setTrailFilter(ctx.trailFilter === 'events' ? 'all' : 'events')}>${x('filter.eventsOnly')} · ${ctx.events.length}</button>
+        ${[7, 30, 90].map((d) => html`<button type="button" key=${d} class=${`poster-tab poster-tab--filter ${ctx.days === d ? 'is-on' : ''}`} disabled=${ctx.reloading} onClick=${() => ctx.setDays(d)}>${x('daysN', { n: d })}${ctx.days === d ? ` · ${n(ov.audit.total)}` : ''}</button>`)}
+        <button type="button" class=${`poster-tab poster-tab--filter dw-filters-r ${ctx.trailFilter === 'events' ? 'is-on' : ''}`} onClick=${() => ctx.setTrailFilter(ctx.trailFilter === 'events' ? 'all' : 'events')}>${x('filter.eventsOnly')} · ${ctx.events.length}</button>
       </div>
       ${items.length ? html`
-        <div class="dw-rows dw-rows--log">
-          <div class="dw-row dw-row--head"><div>${x('col.who')}</div><div>${x('col.what')}</div><div class="dw-n">${x('col.times')}</div><div>${x('col.when')}</div><div></div></div>
+        <div class="listing listing--cols listing--name-desc-count-when-doors">
+          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.who')}</div><div class="poster-label">${x('col.what')}</div><div class="dw-n poster-label">${x('col.times')}</div><div class="poster-label">${x('col.when')}</div><div class="poster-label"></div></div>
           ${shown.map((it) => (it.kind === 'group' ? groupRow(ctx, it.group) : eventRow(ctx, it.event)))}
         </div>
-        ${items.length > shown.length ? html`<div class="dw-more"><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.showMoreTrail()}>${x('moreRows', { n: items.length - shown.length })}</button></div>` : null}`
-      : html`<p class="dw-empty"><b>${x('trailEmptyTitle')}</b> ${x('trailEmptyBody')}</p>`}
-      ${ctx.manifestShare >= 0.5 && ctx.deniedCount >= 20 ? html`<div class="dw-why poster-frame"><b>${x('meaningTitle')}</b> ${x('meaningManifest', { n: n(ctx.manifestDenied), total: n(ctx.deniedCount) })}</div>` : null}
+        ${items.length > shown.length ? html`<div class="dw-more"><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.showMoreTrail()}>${x('moreRows', { n: items.length - shown.length })}</button></div>` : null}`
+      : html`<p class="poster-quiet dw-empty"><b>${x('trailEmptyTitle')}</b> ${x('trailEmptyBody')}</p>`}
+      ${ctx.manifestShare >= 0.5 && ctx.deniedCount >= 20 ? html`<div class="dw-why poster-box"><b>${x('meaningTitle')}</b> ${x('meaningManifest', { n: n(ctx.manifestDenied), total: n(ctx.deniedCount) })}</div>` : null}
     <//>`;
 }
 
 /* ── 03 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function opt(ctx, field, value, label) {
-  return html`<button type="button" class=${`dw-opt ${ctx.form[field] === value ? 'is-on' : ''}`} onClick=${() => ctx.setForm({ [field]: value })}>${label}</button>`;
+  return html`<button type="button" class=${`poster-tab ${ctx.form[field] === value ? 'is-on' : ''}`} onClick=${() => ctx.setForm({ [field]: value })}>${label}</button>`;
 }
 
 function secGrant(ctx) {
@@ -191,50 +219,50 @@ function secGrant(ctx) {
   const whoIsPicker = f.whoKind === 'contact';
   const ready = (whoIsPicker ? !!f.who.trim() : true) && (f.what === 'key' ? !!f.key.trim() : !!f.orgId && (f.what !== 'ws' || !!f.wsId)) && !!f.why.trim();
   return html`
-    <${Fold} id="dw-grant" num="03" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
-      <p class="dw-para">${x('grantIntro')}</p>
+    <${FoldSection} id="dw-grant" num="03" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
+      <p class="og-lead">${x('grantIntro')}</p>
       <div class="dw-form">
-        <span class="og-label">${x('form.who')}</span>
+        <span class="poster-label">${x('form.who')}</span>
         <div>
           <div class="dw-opts">${opt(ctx, 'whoKind', 'contact', x('form.whoContact'))}${opt(ctx, 'whoKind', 'orgMembers', x('form.whoOrgMembers'))}${opt(ctx, 'whoKind', 'nodeUsers', x('form.whoNodeUsers'))}${opt(ctx, 'whoKind', 'all', x('form.whoAll'))}</div>
           ${whoIsPicker ? html`<${ContactPicker} value=${f.who} onChange=${(v) => ctx.setForm({ who: v })} valueMode="full" placeholder=${x('form.whoPlaceholder')} />` : null}
-          <p class="dw-hint">${f.whoKind === 'all' ? x('form.whoAllHint') : f.whoKind === 'orgMembers' ? x('form.whoOrgMembersHint') : f.whoKind === 'nodeUsers' ? x('form.whoNodeUsersHint') : x('form.whoHint')}</p>
+          <${Hint}>${f.whoKind === 'all' ? x('form.whoAllHint') : f.whoKind === 'orgMembers' ? x('form.whoOrgMembersHint') : f.whoKind === 'nodeUsers' ? x('form.whoNodeUsersHint') : x('form.whoHint')}<//>
         </div>
-        <span class="og-label">${x('form.what')}</span>
+        <span class="poster-label">${x('form.what')}</span>
         <div>
           <div class="dw-opts">${opt(ctx, 'what', 'ws', x('form.whatWs'))}${opt(ctx, 'what', 'org', x('form.whatOrg'))}${opt(ctx, 'what', 'key', x('form.whatKey'))}</div>
-          ${f.what === 'key' ? html`<input class="og-input" type="text" value=${f.key} placeholder="portfolio/contact*" onInput=${(e) => ctx.setForm({ key: e.target.value })} /><p class="dw-hint">${x('form.keyHint')}</p>` : html`
-            <select class="og-input" value=${f.orgId} onChange=${(e) => ctx.setForm({ orgId: e.target.value, wsId: '' })}>
+          ${f.what === 'key' ? html`<input class="og-input" type="text" value=${f.key} placeholder="portfolio/contact*" onInput=${(e) => ctx.setForm({ key: e.target.value })} /><${Hint}>${x('form.keyHint')}<//>` : html`
+            <select class="select-field" value=${f.orgId} onChange=${(e) => ctx.setForm({ orgId: e.target.value, wsId: '' })}>
               <option value="">${ctx.orgs.length ? x('form.pickOrg') : x('form.noOrgs')}</option>
               ${ctx.orgs.map((o) => html`<option key=${o.id} value=${o.id}>${o.name}</option>`)}
             </select>
-            ${f.what === 'ws' ? html`<select class="og-input dw-workspace-select" value=${f.wsId} disabled=${!f.orgId} onChange=${(e) => ctx.setForm({ wsId: e.target.value })}>
+            ${f.what === 'ws' ? html`<select class="select-field dw-workspace-select" value=${f.wsId} disabled=${!f.orgId} onChange=${(e) => ctx.setForm({ wsId: e.target.value })}>
               <option value="">${!f.orgId ? x('form.pickOrgFirst') : wsList.length ? x('form.pickWs') : x('form.noWs')}</option>
               ${wsList.map((w) => html`<option key=${w.id} value=${w.id}>${w.name}</option>`)}
             </select>` : null}
-            <p class="dw-hint">${f.what === 'ws' ? x('form.wsHint') : x('form.orgHint')}</p>`}
+            <${Hint}>${f.what === 'ws' ? x('form.wsHint') : x('form.orgHint')}<//>`}
         </div>
-        <span class="og-label">${x('form.may')}</span>
+        <span class="poster-label">${x('form.may')}</span>
         <div>
           <div class="dw-opts">${opt(ctx, 'may', 'read', x('form.mayRead'))}${canWrite ? opt(ctx, 'may', 'write', x('form.mayWrite')) : null}</div>
-          <p class="dw-hint">${x('form.mayHint')}</p>
+          <${Hint}>${x('form.mayHint')}<//>
         </div>
-        <span class="og-label">${x('form.why')}</span>
+        <span class="poster-label">${x('form.why')}</span>
         <div><input class="og-input" type="text" value=${f.why} placeholder=${x('form.whyPlaceholder')} onInput=${(e) => ctx.setForm({ why: e.target.value })} /></div>
-        <span class="og-label">${x('form.scope')}</span>
+        <span class="poster-label">${x('form.scope')}</span>
         <div>
           <div class="dw-opts">${opt(ctx, 'scope', 'private', x('form.scopePrivate'))}${opt(ctx, 'scope', 'federation', x('form.scopeFederation'))}</div>
-          <p class="dw-hint">${x('form.scopeHint')}</p>
+          <${Hint}>${x('form.scopeHint')}<//>
         </div>
-        <span class="og-label">${x('form.until')}</span>
+        <span class="poster-label">${x('form.until')}</span>
         <div>
           <div class="dw-opts">${opt(ctx, 'untilKind', 'never', x('form.untilNever'))}${opt(ctx, 'untilKind', 'date', x('form.untilDate'))}</div>
           ${f.untilKind === 'date' ? html`<input class="og-input" type="date" value=${f.until} onInput=${(e) => ctx.setForm({ until: e.target.value })} />` : null}
         </div>
         <span></span>
         <div class="dw-submit">
-          <button type="button" class="og-slab" disabled=${!ready || ctx.busy === 'grant'} onClick=${() => ctx.submitGrant()}>${ctx.busy === 'grant' ? x('granting') : x('grantSlab')}</button>
-          <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.toggleForm(false)}>${x('cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control" disabled=${!ready || ctx.busy === 'grant'} onClick=${() => ctx.submitGrant()}>${ctx.busy === 'grant' ? x('granting') : x('grantSlab')}</button>
+          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleForm(false)}>${x('cancel')}</button>
           ${msg(ctx.formMsg)}
         </div>
       </div>
@@ -258,11 +286,11 @@ function secExport(ctx) {
     ['flags', x('export.flagsSub')],
   ];
   return html`
-    <${Section} id="dw-export" num="04" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
-      <p class="dw-para">${x('exportIntro', { mb })}</p>
-      <div class="dw-contents">${items.map(([k, sub]) => html`<div key=${k}><b>${x('export.' + k)}</b><small>${sub}</small></div>`)}</div>
-      <div class="dw-export poster-frame">
-        <button type="button" class="og-slab" disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}</button>
+    <${PageSection} id="dw-export" num="04" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
+      <p class="og-lead">${x('exportIntro', { mb })}</p>
+      <div class="item-grid">${items.map(([k, sub]) => html`<div key=${k}><b>${x('export.' + k)}</b><small>${sub}</small></div>`)}</div>
+      <div class="dw-export poster-box">
+        <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}</button>
         <div>${x('exportBody', { file: ctx.exportName })} ${msg(ctx.exportMsg)}</div>
       </div>
     <//>`;
@@ -273,16 +301,16 @@ function secExport(ctx) {
 function secRoads() {
   const ask = x('roadAskPrompt');
   return html`
-    <${Section} id="dw-roads" num="05" title=${x('secRoads')}>
+    <${PageSection} id="dw-roads" num="05" title=${x('secRoads')}>
       <div class="dw-roads">
-        <div class="dw-road is-lead">
-          <span class="og-box-label">${x('roadAskTitle')}</span>
+        <div class="dw-road poster-box poster-box--raised">
+          <span class="poster-label">${x('roadAskTitle')}</span>
           <p>${x('roadAskBody')}</p>
-          <pre>${ask}</pre>
-          <div class="og-doors"><${CopyButton} className="og-door og-door--quiet" text=${ask} label=${x('copyPrompt')} /></div>
+          <pre class="code-block">${ask}</pre>
+          <div class="og-doors"><${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${ask} label=${x('copyPrompt')} /></div>
         </div>
-        <div class="dw-road">
-          <span class="og-box-label">${x('roadAgentTitle')}</span>
+        <div class="dw-road poster-box">
+          <span class="poster-label">${x('roadAgentTitle')}</span>
           <p>${x('roadAgentBody')}</p>
           <small>aimeat_consent_list · aimeat_consent_grant · aimeat_consent_revoke · ${x('roadAgentScope')}</small>
         </div>

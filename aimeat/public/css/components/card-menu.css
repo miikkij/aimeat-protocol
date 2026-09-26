@@ -9,6 +9,7 @@
  *   rendered black and unpositioned, 140px down the card instead of in its corner. A stylesheet
  *   nobody loads is not a stylesheet.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The inline place: the dots in a line of words (Jouni's decision "Message").
  *   v1.2.0 — 2026-09-24 — The rows are the shared menu row.
  *   v1.1.0 — 2026-09-24 — The dots are the small icon button; the state fills stay here.
  *   v1.0.0 — 2026-08-09 — Initial.
@@ -53,5 +54,9 @@
   border-radius: var(--radius-sm); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18));
   overflow: hidden;
 }
+/* In a line of words (CardMenu inline): the dots stand where they are written, and the menu opens
+   from their left (from-start) or right edge (from-end), so it stays on the page. */
+.card-menu--inline { position: relative; top: auto; right: auto; display: inline-flex; }
+.card-menu--from-start .card-menu-list { left: 0; right: auto; }
 /* The rows are the shared menu row (poster.css .poster-menu-row, Jouni's decision "Menu row"). */
 .card-menu-item { cursor: pointer; }

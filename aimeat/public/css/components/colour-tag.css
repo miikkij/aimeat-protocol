@@ -1,0 +1,38 @@
+/**
+ * @file colour-tag.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The colour tag of a workspace section, document or record: a small dot that opens a row of
+ *   swatches (seven theme colours and "no colour"), and the coloured rail the chosen colour draws on
+ *   the left of the thing it marks. A .pj-tag-<colour> class sets --pj-tag; the dot, the swatch and
+ *   the rail read it, so the colours follow the theme. Drawn by
+ *   views/profile/organisms/workspace/color-picker.js.
+ *   Moved unchanged out of views/profile.css; the class names stay. The rail's 3px reads
+ *   --shape-frame-heavy (the same value); the swatch row is a small pop-up, so its corner reads
+ *   --shape-corner-dialog and its shadow --shape-shadow. The dot and the swatches stay circles.
+ *   NOTE: this file must be linked in spa.html, just AFTER views/profile.css: the rules sat late in that
+ *   sheet, and a record's draft rail there (.pj-item-draft) must stay under the colour's padding.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The swatch row's 8px corner reads --shape-corner-dialog and its soft shadow --shape-shadow (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
+ */
+
+/* ── Optional color tags (preset palette → theme tokens; never a free hex). A .pj-tag-{key} class
+ *    sets --pj-tag; structural classes consume it, so colors flip correctly with the theme. ── */
+.pj-tag-red    { --pj-tag: var(--danger); }
+.pj-tag-orange { --pj-tag: var(--orange); }
+.pj-tag-yellow { --pj-tag: var(--yellow); }
+.pj-tag-green  { --pj-tag: var(--success); }
+.pj-tag-blue   { --pj-tag: var(--blue); }
+.pj-tag-purple { --pj-tag: var(--purple); }
+.pj-tag-gray   { --pj-tag: var(--badge-node-bg); }
+.pj-colored { border-left: var(--shape-frame-heavy) solid var(--pj-tag); padding-left: 0.45rem; }
+.pj-cp { position: relative; display: inline-flex; align-items: center; }
+.pj-cp-dot { width: 11px; height: 11px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; flex-shrink: 0; opacity: 0.55; }
+.pj-cp-dot:hover { opacity: 1; }
+.pj-cp-dot.pj-colored { border-left: 0; padding-left: 0; background: var(--pj-tag); opacity: 1; }
+.pj-cp-empty { background: transparent; border: 1.5px solid var(--border); }
+.pj-cp-pop { position: absolute; top: 100%; left: 0; z-index: 30; display: flex; gap: 4px; padding: 5px; margin-top: 3px; background: var(--card); border: 1px solid var(--border); border-radius: var(--shape-corner-dialog); box-shadow: var(--shape-shadow); }
+.pj-cp-sw { width: 16px; height: 16px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; }
+.pj-cp-sw.pj-colored { border-left: 0; padding-left: 0; background: var(--pj-tag); }
+.pj-cp-none { background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); font-size: 0.7rem; line-height: 14px; text-align: center; }

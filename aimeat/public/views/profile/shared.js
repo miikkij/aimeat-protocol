@@ -3,9 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared components and utilities for profile tab modules.
- *   Exports: Spinner, recipientBadge, isExpiringSoon, VisibilityPill, ToggleSwitch, GlassCard,
+ *   Exports: LoadingLine, recipientBadge, isExpiringSoon, VisibilityPill, ToggleSwitch, GlassCard,
  *   KebabMenu, TagInput.
  * @version-history
+ *   v1.8.0 -- 2026-09-26 -- TagInput's × is the Tag's remove mark (.poster-chip-x, poster.css): grey, coral under the pointer, where it turned red (a unification: Jouni's decision "Remove mark").
+ *   v1.7.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-25 -- The visibility pill is the Tag (.poster-chip), on the sun when public, as the memory cover draws visibility; it stays a button (a unification: Jouni's decision "Tag").
+ *   v1.5.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.1.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
+ *   2026-09-25 -- KebabMenu's delete row keeps its danger colour, as the menu row's danger tone.
+ *   2026-09-25 -- KebabMenu's rows are the menu row (.poster-menu-row), a unification: Jouni's decision "Menu row"; a danger item reads like the others, as the notification's Approve does.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-03-07 — Initial shared helpers (Spinner, recipientBadge, isExpiringSoon)
  *   v1.1.0 — 2026-03-17 — Add VisibilityPill, ToggleSwitch, GlassCard components; refactor recipientBadge to CSS classes
@@ -23,27 +32,26 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner as BaseSpinner } from '/components/Spinner.js';
 import { Card } from '/components/Card.js';
 
-/** Loading spinner — delegates to the canonical /components/Spinner.js (single
- *  source of the .spinner markup); keeps the profile default loading label so the
- *  23 profile call sites that rely on it are unchanged. */
-export function Spinner({ text }) {
-  return html`<${BaseSpinner} text=${text || t('profile.loading')} />`;
+/** The loading line: the quiet sentence with the blinking Loading mark
+ *  (css/components/loading-mark.css), the look most Settings tabs use for "this is loading".
+ *  Without a text it says the profile's default "Loading…". */
+export function LoadingLine({ text }) {
+  return html`<p class="poster-quiet loading-mark">${text || t('profile.loading')}</p>`;
 }
 
-/** Render a colored recipient-type badge. */
+/** The recipient's kind as a Tag; "anyone" is the one to notice. */
 export function recipientBadge(recipient) {
   const r = recipient || '';
-  let label, cls;
-  if (r === '*')                        { label = t('permissions.badgeWildcard'); cls = 'badge-wildcard'; }
-  else if (r.startsWith('ghii:'))       { label = t('permissions.badgeGhii');     cls = 'badge-ghii'; }
-  else if (r.startsWith('organism.'))   { label = t('permissions.badgeOrganism'); cls = 'badge-organism'; }
-  else if (r.startsWith('domain:'))     { label = t('permissions.badgeDomain');   cls = 'badge-domain'; }
-  else if (r.startsWith('node:'))       { label = t('permissions.badgeNode');     cls = 'badge-node'; }
-  else                                  { label = t('permissions.badgeGaii');     cls = 'badge-gaii'; }
-  return html`<span class="badge-label ${cls}">${label}</span>`;
+  let label, cls = '';
+  if (r === '*')                        { label = t('permissions.badgeWildcard'); cls = 'poster-chip--coral'; }
+  else if (r.startsWith('ghii:'))       { label = t('permissions.badgeGhii'); }
+  else if (r.startsWith('organism.'))   { label = t('permissions.badgeOrganism'); }
+  else if (r.startsWith('domain:'))     { label = t('permissions.badgeDomain'); }
+  else if (r.startsWith('node:'))       { label = t('permissions.badgeNode'); }
+  else                                  { label = t('permissions.badgeGaii'); }
+  return html`<span class=${`poster-chip ${cls}`}>${label}</span>`;
 }
 
 /** Check if a consent is expiring within 7 days. */
@@ -53,9 +61,9 @@ export function isExpiringSoon(expiresAt) {
   return diff > 0 && diff < 7 * 86400000;
 }
 
-/** Shared visibility toggle pill (memory-tab, knowledge-tab). */
+/** Shared visibility tag (memory-tab, organisms): the Tag, on the sun when public, and a button. */
 export function VisibilityPill({ visibility, onClick }) {
-  return html`<button class="vis-pill vis-${visibility}" onClick=${onClick}>
+  return html`<button class=${`poster-chip vis-pill ${visibility === 'public' ? 'poster-chip--sun' : ''}`} onClick=${onClick}>
     ${t('profile.visibility.' + visibility)}
   </button>`;
 }
@@ -91,14 +99,14 @@ export function KebabMenu({ items, label, trigger, btnClass }) {
   if (visible.length === 0) return null;
   return html`
     <div class="pj-menu" ref=${ref}>
-      <button class=${btnClass || 'pj-icon-btn pj-menu-btn'} title=${label} aria-haspopup="menu" aria-expanded=${open}
+      <button class=${btnClass || 'poster-icon poster-icon--small'} title=${label} aria-haspopup="menu" aria-expanded=${open}
         onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>${trigger || '⋮'}</button>
       ${open ? html`
         <div class="pj-menu-pop" role="menu" onClick=${(e) => e.stopPropagation()}>
           ${visible.map((it, i) => it.divider
             ? html`<div class="pj-menu-sep" key=${'sep' + i}></div>`
             : html`
-            <button class="pj-menu-item ${it.danger ? 'pj-menu-item-danger' : ''}" role="menuitem" key=${it.label}
+            <button class=${`poster-menu-row${it.danger ? ' poster-menu-row--danger' : ''}`} role="menuitem" key=${it.label}
               onClick=${() => { setOpen(false); it.onClick?.(); }}>${it.icon ? `${it.icon} ` : ''}${it.label}</button>`)}
         </div>` : null}
     </div>`;
@@ -118,8 +126,8 @@ export function TagInput({ tags, onChange, placeholder }) {
   return html`
     <div class="pj-taginput">
       ${tags.map(tag => html`
-        <span class="file-tag pj-tag" key=${tag}>${(tag)}
-          <button class="pj-tag-x" title="×" onClick=${() => onChange(tags.filter(x => x !== tag))}>×</button>
+        <span class="poster-chip pj-tag" key=${tag}>${(tag)}
+          <button class="poster-chip-x" title="×" onClick=${() => onChange(tags.filter(x => x !== tag))}>×</button>
         </span>`)}
       <input class="pj-taginput-field" value=${val} placeholder=${placeholder || 'Add…'}
         onInput=${(e) => setVal(e.target.value)} onKeyDown=${onKey} onBlur=${add} />

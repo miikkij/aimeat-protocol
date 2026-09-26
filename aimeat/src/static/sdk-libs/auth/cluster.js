@@ -11,6 +11,9 @@
  * @structure ensureClusterStyles() — idempotent <style> injector.
  * @usage import { ensureClusterStyles } from './cluster.js';   (pill.js calls it once per render)
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The segments' and the popover trigger's frame, and the popover group name's
+ *     letter case and spacing, read the page theme's shape values (--shape-frame, --shape-frame-colour,
+ *     --shape-case-label, --shape-tracking-label), falling back to the values they replace (a move).
  *   v1.3.0 — 2026-09-24 — `.aimeat-pop-head`: the name of a group in the popover, for the themes
  *     and the styles of the node's own pages (Themes & Styles).
  *   v1.2.0 — 2026-09-05 — `.aimeat-seg--fixed` and the disabled segment: how a control that has
@@ -34,7 +37,7 @@ export function ensureClusterStyles() {
 
     /* Segmented group: one bordered pill, every option a button. */
     '.aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;',
-      'border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);',
+      'border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);',
       'overflow:hidden;background:transparent}',
     '.aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;',
       'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
@@ -58,7 +61,7 @@ export function ensureClusterStyles() {
     '.aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}',
     '.aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;',
       'gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;',
-      'border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);',
+      'border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);',
       'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
       'transition:background var(--motion-fast,120ms) ease}',
     '.aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}',
@@ -74,7 +77,7 @@ export function ensureClusterStyles() {
     '.aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}',
     /* A group's name inside the popover (the node's themes above the theme's styles). */
     '.aimeat-pop-head{grid-column:1/-1;padding:6px 9px 2px;font:800 10px/1.2 "Inter","Segoe UI",system-ui,sans-serif;',
-      'letter-spacing:.06em;text-transform:uppercase;opacity:.7}',
+      'letter-spacing:calc(var(--shape-tracking-label,.1em) * .6);text-transform:var(--shape-case-label,uppercase);opacity:.7}',
     /* A sentence in the popover (why the light/dark switch is off): plain words, not a group name. */
     '.aimeat-pop-note{grid-column:1/-1;padding:4px 9px 6px;font:600 12px/1.35 "Inter","Segoe UI",system-ui,sans-serif}',
     '.aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;',

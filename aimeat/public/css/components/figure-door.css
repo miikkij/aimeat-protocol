@@ -1,0 +1,34 @@
+/**
+ * @file figure-door.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A figure that is a door to its tab: a number in the poster face and a small grey capital
+ *   word beside it, in a square frame of the text colour, pressed to open the tab that holds what it
+ *   counts; one that opens nothing is not pressable. Drawn by the overview's Usage & quotas card
+ *   (views/profile/landing-page.cards.js: .pf-usage-chips, .pf-usage-chip, -val, -label).
+ *   Moved unchanged out of views/profile.css and the skin's chip group in views/profile-poster.css
+ *   (UI consolidation phase 5, a move); the class names stay. Its corner, 2px frame and capitals read
+ *   the shape values whose built-in values equal them (--shape-corner 0, --shape-frame 2px,
+ *   --shape-case-label uppercase, the word's tracking .06em as the label spacing * .6), so nothing
+ *   changes.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The word's spacing reads the label spacing (calc(var(--shape-tracking-label) * .6), .06em), a move. The frame keeps currentColor: a button's own colour is pure black (white in the dark), not the text colour, so the frame colour value would change AIMEAT.
+ *   v1.0.0 -- 2026-09-26 -- Moved out of views/profile.css and views/profile-poster.css, unchanged (UI consolidation phase 5, a move).
+ */
+
+.pf-usage-chips { display: flex; flex-wrap: wrap; gap: 0.6rem 1.8rem; margin-top: 1.2rem; }
+.pf-usage-chip { display: inline-flex; flex-direction: row; align-items: baseline; gap: 0.5rem; padding: 0; border: 0; border-radius: var(--shape-corner); background: none; cursor: pointer; text-align: left; font-family: inherit; }
+.pf-usage-chip[disabled] { cursor: default; }
+.pf-usage-chip:not([disabled]):hover .pf-usage-chip-val { color: var(--accent); }
+.pf-usage-chip-val { font-variant-numeric: tabular-nums; margin-right: 0; }
+.pf-usage-chip-label { font-size: 0.74rem; font-weight: 800; letter-spacing: calc(var(--shape-tracking-label) * .6); text-transform: var(--shape-case-label); color: var(--text-dim); }
+/* Let the quota chips shrink to their column on a narrow screen (tabular numbers otherwise hold an
+   intrinsic min-width and push the card past the viewport). */
+.pf-usage-chip { min-width: 0; }
+
+/* The skin's square frame (formerly in profile-poster.css's chip group). */
+.pf .pf-usage-chip {
+  border-radius: var(--shape-corner); background: none; border: var(--shape-frame) solid currentColor;
+  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
+}

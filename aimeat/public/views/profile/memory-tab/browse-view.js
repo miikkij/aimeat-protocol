@@ -7,6 +7,18 @@
  *   public memories to copy. Extracted verbatim from memory-tab.js; handlers and the render function
  *   take the shared ctx so all state/handlers still live in the MemoryTab component.
  * @version-history
+ *   v1.8.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.7.0 -- 2026-09-26 -- A key is the Key (.key-name, css/components/key-name.css): the public list's coral key and the listings' .mp-key (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.5.0 -- 2026-09-25 -- The home node's and a remote node's entries are the Listing (css/components/listing.css), a unification: the look most tabs use. The public discovery list stays: its row opens a preview under it.
+ *   v1.4.0 -- 2026-09-25 -- A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.3.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.2.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.1.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
@@ -18,7 +30,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Spinner, VisibilityPill } from '../shared.js';
+import { LoadingLine, VisibilityPill } from '../shared.js';
 import * as memoryService from '/js/services/memory.js';
 import { listPeers } from '/js/services/federation.js';
 import { formatRelativeTime } from './helpers.js';
@@ -175,15 +187,15 @@ export function renderBrowsePanel(ctx) {
             <div class="section-desc">${t('profile.memory.discoverDesc')}</div>
           </div>
         </div>
-        <div class="mem-discover-search mb-half">
-          <input type="text" class="input-field" placeholder=${t('profile.memory.discoverSearchPlaceholder')}
+        <div class="search-line mb-half">
+          <input type="text" class="og-input" placeholder=${t('profile.memory.discoverSearchPlaceholder')}
             value=${discoverSearch}
             onInput=${e => setDiscoverSearch(e.target.value)}
             onKeyDown=${e => e.key === 'Enter' && loadDiscoverEntries(ctx, discoverSearch)} />
-          <button class="btn-sm" onClick=${() => loadDiscoverEntries(ctx, discoverSearch)}>${t('profile.memory.searchBtn')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => loadDiscoverEntries(ctx, discoverSearch)}>${t('profile.memory.searchBtn')}</button>
         </div>
 
-        ${discoverLoading && html`<${Spinner} text=${t('profile.memory.discoverLoading')} />`}
+        ${discoverLoading && html`<${LoadingLine} text=${t('profile.memory.discoverLoading')} />`}
 
         ${discoverError && !discoverLoading && html`
           <div class="alert alert-warning"><span class="alert-msg">${discoverError}</span></div>
@@ -194,7 +206,7 @@ export function renderBrowsePanel(ctx) {
             ${t('profile.memory.discoverCount').replace('{count}', discoverEntries.length)}
           </div>
           ${discoverEntries.length === 0
-            ? html`<div class="empty">${t('profile.memory.discoverEmpty')}</div>`
+            ? html`<div class="poster-quiet">${t('profile.memory.discoverEmpty')}</div>`
             : html`<div class="mem-browse-list">
                 ${discoverEntries.map(entry => {
                   const ownerShort = entry.owner_gaii?.split('@')[0] || entry.owner_gaii;
@@ -203,14 +215,14 @@ export function renderBrowsePanel(ctx) {
                     <div key=${entry.owner_gaii + '/' + entry.key} class="mem-discover-item">
                       <div class="mem-discover-row" onClick=${() => setExpandedDiscover(isExpanded ? null : entry.owner_gaii + '/' + entry.key)}>
                         <div class="mem-discover-info">
-                          <div class="mem-browse-key" title=${entry.key}>${escHtml(entry.key)}</div>
+                          <div class="mem-browse-key key-name" title=${entry.key}>${escHtml(entry.key)}</div>
                           <div class="mem-discover-owner">${escHtml(ownerShort)}</div>
                         </div>
                         <div class="mem-browse-meta">
                           ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
-                          <span class="mem-time">${formatRelativeTime(entry.updated_at || entry.created_at)}</span>
+                          <span class="mem-time poster-time">${formatRelativeTime(entry.updated_at || entry.created_at)}</span>
                         </div>
-                        <button class="btn-outline btn-sm"
+                        <button class="poster-action poster-action--small"
                           disabled=${copyingKeys.has(entry.key)}
                           onClick=${(e) => { e.stopPropagation(); handleCopyEntry(ctx, entry.owner_gaii, entry.key); }}>
                           ${copyingKeys.has(entry.key) ? '...' : t('common.copy')}
@@ -243,9 +255,9 @@ export function renderBrowsePanel(ctx) {
       ${!isHome && !selectedPeer && html`
         <div class="mb-1">
           ${remotePeers.length === 0
-            ? html`<div class="empty">${t('profile.memory.noPeers')}</div>`
+            ? html`<div class="poster-quiet">${t('profile.memory.noPeers')}</div>`
             : html`
-              <select class="input-field" onChange=${e => loadBrowseRemote(ctx, e.target.value)}>
+              <select class="select-field" onChange=${e => loadBrowseRemote(ctx, e.target.value)}>
                 <option value="">${t('profile.memory.browseRemoteSelect')}</option>
                 ${remotePeers.map(p => html`<option key=${p.node_id} value=${p.node_id}>${escHtml(p.node_id)} (${escHtml(p.url || '')})</option>`)}
               </select>
@@ -253,7 +265,7 @@ export function renderBrowsePanel(ctx) {
         </div>
       `}
 
-      ${browseLoading && html`<${Spinner} text=${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')} />`}
+      ${browseLoading && html`<${LoadingLine} text=${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')} />`}
 
       ${browseError && !browseLoading && html`
         <div class="alert alert-warning">
@@ -267,24 +279,26 @@ export function renderBrowsePanel(ctx) {
             ? t('profile.memory.homeEntries').replace('{count}', remoteEntries.length)
             : t('profile.memory.remoteEntries').replace('{count}', remoteEntries.length).replace('{node}', selectedPeer)}
           ${remoteEntries.length > 0 && html`
-            <button class="btn-ghost btn-sm pf-ml-half" onClick=${() => handlePullAll(ctx)}>${t('profile.memory.pullAllBtn')}</button>
+            <button class="poster-action poster-action--small pf-ml-half" onClick=${() => handlePullAll(ctx)}>${t('profile.memory.pullAllBtn')}</button>
           `}
         </div>
         ${remoteEntries.length === 0
-          ? html`<div class="empty">${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}</div>`
-          : html`<div class="mem-browse-list">
+          ? html`<div class="poster-quiet">${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}</div>`
+          : html`<div class="listing listing--name-tags-doors listing--cols">
               ${remoteEntries.map(entry => html`
-                <div key=${entry.key} class="mem-browse-item">
-                  <div class="mem-browse-key" title=${entry.key}>${escHtml(entry.key)}</div>
-                  <div class="mem-browse-meta">
+                <div key=${entry.key} class="listing-row">
+                  <div class="listing-name" title=${entry.key}><span class="key-name">${escHtml(entry.key)}</span></div>
+                  <div><span class="poster-chips">
                     <${VisibilityPill} visibility=${entry.visibility} />
                     ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
+                  </span></div>
+                  <div class="listing-doors">
+                    <button class="poster-action poster-action--small poster-action--row"
+                      disabled=${pullingKeys.has(entry.key)}
+                      onClick=${() => handlePullRemoteEntry(ctx, entry.key)}>
+                      ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}
+                    </button>
                   </div>
-                  <button class="btn-outline btn-sm"
-                    disabled=${pullingKeys.has(entry.key)}
-                    onClick=${() => handlePullRemoteEntry(ctx, entry.key)}>
-                    ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}
-                  </button>
                 </div>
               `)}
             </div>`

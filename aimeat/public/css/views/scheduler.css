@@ -6,68 +6,51 @@
  *   and the agent Schedules sub-tab (agents/tab-schedules.js). Prefix: sch-.
  *   Theme-token driven (no hardcoded colors) so it flips with dark/light mode.
  * @version-history
+ *   v1.21.0 -- 2026-09-26 -- The run limits' words are the Check line: their size and colour go, their row stays (a unification: Jouni's decision "Check line").
+ *   v1.20.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.19.0 -- 2026-09-26 -- An agent's schedules are the Listing (css/components/listing.css): the kind, name and by-agent tags in the name cell, the facts, the copy box and the purpose in the words cell, the actions in the doors, the edit form the open panel; the classic card's rules go (a unification: the look most tabs use).
+ *   v1.18.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.17.0 -- 2026-09-25 -- The schedule calendar (the scheduler's month, week and day, .sch-cal-*), moved unchanged out of views/scheduler.css into css/components/schedule-calendar.css (UI consolidation phase 5, a move).
+ *   v1.16.0 -- 2026-09-25 -- More dead rules go (a move, nothing on screen changes): the classic agent card's gaii, caps, expanded, clickable head and expand icon, sec-revoke-btn, scroll-x, w-full, the work rules, pf-badge-gap, the tx- members, sch-internal-note and sch-badge; no markup writes them.
+ *   v1.15.0 -- 2026-09-25 -- The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
+ *   v1.14.0 -- 2026-09-25 -- A line that says a load or a save failed is the Form message in its error tone (.form-message--error); the error lines' own rules go (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-25 -- The calendar's month, week and day and the spend chart's cost, tokens and seconds are the Tab (.poster-tab, the chosen one .is-on); their rows take the tabs' row gap (Jouni's decisions "Tabs and filters" and "Choice", a unification).
+ *   v1.12.0 -- 2026-09-25 -- A table of rows is the Listing (css/components/listing.css): the P&L lines, the accountants, the usage report, the AI spend per app, the security overrides and an agent's internal jobs; figures stand at the right of their column (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- A framed box's own frame and ground go: it is the Object box (.poster-box, css/poster.css); its place (margin, padding) stays here (Jouni's decision "Object box", a unification).
+ *   v1.5.0 -- 2026-09-25 -- The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.4.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title; their rules here keep only their place (Jouni's decision "Group heading", a unification).
+ *   v1.1.0 -- 2026-09-25 -- The quiet ways on are the library's action link (Jouni's decision "Action
+ *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
+ *     place's layout value moves to the new class.
+ *   2026-09-25 -- .sch-cal-empty is the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): its look goes, its place stays.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-06-03 -- Initial scheduler styles
  *   v1.1.0 -- 2026-07-03 -- Add the day/week/month calendar (.sch-cal-*) + .sch-flash highlight used
  *     when a calendar event scrolls to its schedule card/row. Kind colour via a --k custom property.
  *   v1.2.0 -- 2026-07-17 -- Add the "Continuously running" strip (.sch-cal-freq*): cadence pills for
  *     high-frequency schedules kept out of the grid, plus the aggregated ⟳ ×N fold chip (.sch-cal-freqchip).
+ *   v1.3.0 -- 2026-09-25 -- Dead rules removed: selectors whose classes no file writes (UI consolidation phase 5, a move; the browser's reading proves only those went).
+ *   v1.7.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.6.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.5.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.4.0 -- 2026-09-25 -- The inline code rules go: code is the Code block's inline cut (css/components/code-block.css); the layout declarations of their places stay, on .code-inline (UI consolidation phase 5, a unification).
  */
 
 .sch-tab { display: flex; flex-direction: column; gap: 1.25rem; }
 
-.sch-head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
-}
-
-.sch-loading, .sch-internal-note {
-  color: var(--text-dim); padding: 0.75rem 0; font-size: 0.92rem;
-}
-.sch-error {
-  background: var(--danger-bg); color: var(--danger-fg);
-  border: 1px solid var(--danger-border); border-radius: var(--radius-sm);
-  padding: 0.6rem 0.85rem;
-}
+.sch-loading { padding: 0.75rem 0; }
 
 .sch-section { display: flex; flex-direction: column; gap: 0.5rem; }
-.sch-section-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0.25rem 0; }
 
-.sch-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.sch-table th {
-  text-align: left; font-weight: 600; color: var(--text-dim);
-  padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); font-size: 0.82rem;
-}
-.sch-table td {
-  padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--border-subtle, var(--border));
-  vertical-align: top; color: var(--text);
-}
-.sch-name { font-weight: 600; }
 .sch-purpose { margin-top: 0.15rem; }
 .sch-muted { color: var(--text-dim); font-size: 0.82rem; }
-.sch-cron { font-family: var(--font-mono, monospace); font-size: 0.82rem; color: var(--text); }
 
-.sch-badge {
-  display: inline-block; padding: 0.1rem 0.5rem; border-radius: var(--radius-full, 999px);
-  font-size: 0.72rem; font-weight: 700; line-height: 1.5;
-}
-.sch-badge--ai { background: var(--info-bg); color: var(--info-fg); }
-.sch-badge--agent { background: var(--warn-bg); color: var(--warn-fg); }
-.sch-badge--ext { background: var(--success-bg); color: var(--success-fg); }
-.sch-badge--core { background: var(--bg-dim); color: var(--text-dim); }
-.sch-badge--ok { background: var(--success-bg); color: var(--success-fg); }
-.sch-badge--err { background: var(--danger-bg); color: var(--danger-fg); }
-
-.sch-tag {
-  display: inline-block; margin-top: 0.2rem; padding: 0.05rem 0.45rem;
-  border-radius: var(--radius-full, 999px); font-size: 0.68rem;
-  background: var(--accent-faint, var(--bg-dim)); color: var(--accent);
-}
-
-.sch-actions { white-space: nowrap; }
-.sch-btn { margin-left: 0.35rem; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
-
-.sch-internal-group { margin-bottom: 0.75rem; }
-.sch-internal-agent { font-weight: 600; color: var(--text); margin: 0.35rem 0 0.15rem; }
 
 /* ── Create form ── */
 .sch-form {
@@ -75,31 +58,11 @@
   border-radius: var(--radius); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.75rem;
 }
 .sch-form-row { display: flex; flex-direction: column; gap: 0.3rem; }
-.sch-form-row > label { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); }
-.sch-form-row input[type="text"], .sch-form-row input[type="number"],
-.sch-form-row select, .sch-form-row textarea {
-  background: var(--bg-input); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 0.45rem 0.6rem; font: inherit; width: 100%;
-}
-.sch-kind-fields {
-  border-left: 2px solid var(--accent-soft, var(--border)); padding-left: 0.85rem;
-  display: flex; flex-direction: column; gap: 0.6rem;
-}
-.sch-presets { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
-.sch-preset {
-  padding: 0.3rem 0.7rem; border-radius: var(--radius-full, 999px);
-  border: 1px solid var(--border); background: var(--bg-dim); color: var(--text-dim);
-  font-size: 0.8rem; cursor: pointer;
-}
-.sch-preset--on { background: var(--accent); color: var(--on-inverted, #fff); border-color: var(--accent); }
-.sch-cron-input { font-family: var(--font-mono, monospace); }
 
 .sch-constraints {
   border-top: 1px solid var(--border); padding-top: 0.65rem; display: flex; flex-direction: column; gap: 0.4rem;
 }
-.sch-constraints-title { font-size: 0.82rem; font-weight: 700; color: var(--text-dim); }
-.sch-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: var(--text); }
+.sch-check { display: flex; align-items: center; gap: 0.5rem; }
 .sch-num { width: 5rem !important; }
 
 .sch-form-actions { display: flex; justify-content: flex-end; }
@@ -107,133 +70,15 @@
 .sch-budget-section { margin-bottom: 1rem; }
 
 /* ── Editable schedule card (master + agent views) ── */
-.sch-card-list { display: flex; flex-direction: column; gap: 0.6rem; }
-.sch-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;
-}
-.sch-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
-.sch-card-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
-.sch-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; font-size: 0.82rem; color: var(--text); }
-.sch-meta-k { color: var(--text-dim); }
-.sch-card-dispatch { background: var(--bg-dim); border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; }
-.sch-dispatch-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.2rem; }
-.sch-dispatch-title { font-weight: 600; font-size: 0.9rem; color: var(--text); white-space: pre-wrap; }
-.sch-dispatch-body { font-size: 0.84rem; color: var(--text-dim); margin-top: 0.15rem; white-space: pre-wrap; word-break: break-word; }
-.sch-edit { display: flex; flex-direction: column; gap: 0.55rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }
-
-/* ══ Calendar (day / week / month cadence view) ══ */
-.sch-cal-section { gap: 0.6rem; }
-.sch-cal { display: flex; flex-direction: column; gap: 0.5rem; }
-
-.sch-cal-head { display: flex; flex-direction: column; gap: 0.35rem; }
-.sch-cal-nav { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
-.sch-cal-modes, .sch-cal-move { display: inline-flex; gap: 0.25rem; }
-.sch-cal-range { color: var(--text-dim); font-size: 0.85rem; }
-.sch-cal-trunc { color: var(--warn-fg); font-size: 0.78rem; }
-
-.sch-cal-legend { display: inline-flex; flex-wrap: wrap; gap: 0.15rem 0.75rem; margin-left: auto; }
-.sch-cal-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; color: var(--text-dim); }
-.sch-cal-swatch { width: 0.7rem; height: 0.7rem; border-radius: 3px; display: inline-block; background: var(--k, var(--border)); }
-
-/* kind → colour (one custom property drives both the chip stripe and the legend swatch) */
-.sch-cal-ev--ai    { --k: var(--info-fg); }
-.sch-cal-ev--agent { --k: var(--warn-fg); }
-.sch-cal-ev--ext   { --k: var(--success-fg); }
-.sch-cal-ev--eco   { --k: var(--accent); }
-.sch-cal-ev--sec   { --k: var(--accent); }
-.sch-cal-ev--core  { --k: var(--text-dim); }
-
-/* event chip (a reset button so it's clickable + keyboard-focusable) */
-.sch-cal-ev {
-  display: block; width: 100%; box-sizing: border-box; text-align: left; font: inherit;
-  font-size: 0.72rem; padding: 0.12rem 0.4rem; border-radius: 4px;
-  border: 0; border-left: 3px solid var(--k, var(--border));
-  background: var(--card); color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.sch-cal-ev--past { opacity: 0.55; }
-.sch-cal-ev--click { cursor: pointer; }
-.sch-cal-ev--click:hover { filter: brightness(1.15); border-color: var(--accent); }
-.sch-cal-ev--dot { padding: 0.05rem 0.35rem; border-radius: 3px; border-left-width: 3px; }
-.sch-cal-evtime { color: var(--text-dim); }
-.sch-cal-more { font-size: 0.66rem; color: var(--text-dim); padding-left: 0.15rem; }
-.sch-cal-empty { text-align: center; color: var(--text-dim); font-size: 0.85rem; padding: 0.75rem; }
-.sch-cal-dotempty { color: var(--text-dim); text-align: center; font-size: 0.8rem; }
-
-/* month grid */
-.sch-cal-weekrow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.sch-cal-wd { font-size: 0.72rem; color: var(--text-dim); text-align: center; padding: 0.2rem 0; }
-.sch-cal-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.sch-cal-cell {
-  min-height: 66px; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; padding: 0.25rem;
-  background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px;
-}
-.sch-cal-cell--dim { opacity: 0.45; }
-.sch-cal-cell--today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.sch-cal-daynum { font-size: 0.78rem; color: var(--text); font-weight: 600; }
-.sch-cal-cell-evs { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }
-
-/* week grid */
-.sch-cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.sch-cal-weekcol { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; min-height: 120px; min-width: 0; display: flex; flex-direction: column; }
-.sch-cal-weekcol--today { border-color: var(--accent); }
-.sch-cal-weekcol-head { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.3rem; border-bottom: 1px solid var(--border); }
-.sch-cal-weekcol-evs { display: flex; flex-direction: column; gap: 2px; padding: 0.25rem; min-width: 0; }
-
-/* day rail */
-.sch-cal-day { display: flex; flex-direction: column; gap: 1px; }
-.sch-cal-hourrow, .sch-cal-bucket { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 0.5rem; align-items: start; }
-.sch-cal-hourrow { min-height: 1.9rem; border-top: 1px solid var(--border); padding-top: 0.2rem; }
-.sch-cal-bucket { margin: 0.3rem 0; }
-.sch-cal-hour { font-size: 0.72rem; color: var(--text-dim); padding-top: 0.15rem; }
-.sch-cal-hour-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-
-/* ── "Continuously running" strip — high-frequency schedules kept out of the grid ── */
-.sch-cal-freq {
-border-radius: 8px;
-  background: var(--bg-dim); padding: 0.5rem 0.65rem;
-  display: flex; flex-direction: column; gap: 0.45rem;
-}
-.sch-cal-freq-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-.sch-cal-freq-title { font-size: 0.8rem; font-weight: 700; color: var(--text-dim); display: inline-flex; align-items: center; gap: 0.4rem; }
-.sch-cal-freq-count {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 1.35rem;
-  padding: 0 0.35rem; height: 1.2rem; border-radius: 999px;
-  background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 0.72rem;
-}
-.sch-cal-freq-pills { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.sch-cal-freqpill {
-  display: inline-flex; align-items: center; gap: 0.4rem; max-width: 100%;
-  font: inherit; font-size: 0.74rem; text-align: left; cursor: pointer;
-  padding: 0.2rem 0.55rem; border-radius: 999px;
-  border: 1px solid var(--border); border-left: 3px solid var(--k, var(--border));
-  background: var(--card); color: var(--text);
-}
-.sch-cal-freqpill:hover { filter: brightness(1.12); border-color: var(--accent); }
-.sch-cal-freqdot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--k, var(--border)); flex: none; }
-.sch-cal-freqname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sch-cal-freqcad { color: var(--text-dim); white-space: nowrap; }
-.sch-cal-freqmore {
-  font: inherit; font-size: 0.74rem; cursor: pointer; color: var(--accent);
-  background: transparent; border: 0; padding: 0.2rem 0.4rem;
-}
-/* aggregated ⟳ ×N chip when continuous schedules are folded into the grid */
-.sch-cal-freqchip { border-left-style: dashed; }
-.sch-cal-freqmark { color: var(--text-dim); }
-.sch-cal-freqcount { display: inline-flex; align-items: center; gap: 0.2rem; opacity: 0.85; }
+.sch-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; }
+.sch-card-dispatch { margin: 0.5rem 0 0; padding: 0.5rem 0.7rem; }
+.sch-edit { display: flex; flex-direction: column; gap: 0.55rem; }
 
 /* highlight a card/row jumped to from the calendar */
-.sch-flash { outline: 2px solid transparent; outline-offset: 2px; animation: schFlash 1.6s ease-out; }
 @keyframes schFlash {
   0%   { outline-color: var(--accent); background-color: var(--bg-dim); }
   70%  { outline-color: var(--accent); }
   100% { outline-color: transparent; background-color: transparent; }
-}
-
-@media (max-width: 640px) {
-  .sch-cal-legend { margin-left: 0; width: 100%; }
-  .sch-cal-cell { min-height: 52px; }
 }
 
 /* What a scheduled job reads and what it writes, on the card. These were carried all along and
@@ -244,6 +89,4 @@ border-radius: 8px;
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-4);
   margin-top: var(--sp-2);
-  font-size: var(--text-sm);
-  color: var(--text-dim);
 }

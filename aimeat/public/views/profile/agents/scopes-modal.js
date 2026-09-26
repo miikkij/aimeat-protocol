@@ -6,6 +6,17 @@
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-09-26 — A permission beside its check box is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.13.0 — 2026-09-26 — The scope dialog's permission groups stand under the section rule (.poster-row--thing) instead of their own 3px ink border (a unification: the look most tabs use).
+ *   v1.12.0 — 2026-09-26 — A scope group's all switch is the Tab's filter tone (.poster-tab--filter, is-on while every permission of the group is ticked); .domain-toggle's rules go (a unification: Jouni's decision Tabs and filters).
+ *   v1.11.0 — 2026-09-26 — The agent's GAII and a permission's technical name are the inline code (.code-inline); their own typewriter looks go (a unification: the look most tabs use).
+ *   v1.10.0 — 2026-09-26 — A permission's always-on and not-in-full-access marks are the Tag (.poster-chip, coral for the one to act on); their own rules go (a unification: Jouni's decision Tag).
+ *   v1.9.0 — 2026-09-26 — A control that opens a panel below it is the Tab's fold tone (.poster-tab--fold, is-on while open), and the parameters section that is one row until opened is the FoldSection; their own toggles, carets and arrows go (a unification: Jouni's decision Tabs and filters, and the look most tabs use).
+ *   v1.8.0 — 2026-09-26 — The classic AI settings' why-lines are the lead and the Hint, and the scope dialog's reconnect note is the Hint under the section rule; their own looks go (a unification: the look most tabs use).
+ *   v1.7.0 — 2026-09-25 — The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
+ *   v1.6.0 — 2026-09-25 — The model's page link (↗) and the agent's mail link are the small icon button (.poster-icon--small); their look goes, the mail icon keeps its drawing size (Jouni's decision "Icon button", a unification).
+ *   v1.4.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v1.0.1 — 2026-09-13 — The large dialog size; Cancel and Save sit in the footer, where they stay in
  *     view while the advanced list scrolls.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
@@ -21,6 +32,8 @@
  *     next connection, which is what the session-scope snapshot actually does.
  *   v1.3.0 — 2026-08-29 — The poster face (profile.css "Scope Management UI"): the envelope is an
  *     inline SVG, the always-on mark and the "all" toggle are words in a mono chip, no emoji.
+ *   v1.4.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.5.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -35,6 +48,7 @@ import {
   wildcardScopes, bulkScopes, expandScopes, collapseScopes, detectTemplate, unknownScopes,
   templateLabel, domainLabel, permLabel,
 } from './scope-config.js';
+import { Hint } from '/components/Hint.js';
 
 // The envelope beside the agent's address: the door to its inbox thread.
 const MAIL_ICON = html`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 7l9 6 9-6"/></svg>`;
@@ -98,28 +112,27 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
         <button class="poster-slab poster-slab--control" onClick=${handleSave} disabled=${saving}>
           ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
         </button>`}>
-        <div class="scope-agent-info">${escHtml(agent.gaii || '')}
-          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="scope-agent-msg">${MAIL_ICON}</${InboxLink}>` : null}
+        <div class="scope-agent-info"><code class="code-inline">${escHtml(agent.gaii || '')}</code>
+          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="poster-icon poster-icon--small scope-agent-msg">${MAIL_ICON}</${InboxLink}>` : null}
         </div>
 
         ${isReadOnly ? html`
-          <p class="text-caption mb-1">${t('profile.agents.scopeUi.readOnlyView')}</p>
+          <p class="poster-hint mb-1">${t('profile.agents.scopeUi.readOnlyView')}</p>
           <div class="scope-readonly-list">
-            ${scopes.map(s => html`<span class="scope-tag">${escHtml(s)}</span>`)}
+            ${scopes.map(s => html`<span class="poster-chip">${escHtml(s)}</span>`)}
           </div>
         ` : html`
           <div class="scope-templates">
             ${['readonly', 'standard', 'full'].map(tpl => html`
-              <button class="scope-tpl-btn ${currentTemplate === tpl ? 'active' : ''}"
+              <button class="poster-tab ${currentTemplate === tpl ? 'is-on' : ''}"
                       onClick=${() => applyTemplate(tpl)}>
                 ${templateLabel(tpl)}
               </button>
             `)}
           </div>
 
-          <button class="scope-advanced-toggle" onClick=${() => setAdvanced(!advanced)}>
-            <span>${t('profile.agents.scopeUi.advanced')}</span>
-            <span class="pf-chevron ${advanced ? 'pf-chevron-open' : ''}">▼</span>
+          <button type="button" class=${`poster-tab poster-tab--fold scope-advanced-toggle ${advanced ? 'is-on' : ''}`} aria-pressed=${advanced ? 'true' : 'false'} onClick=${() => setAdvanced(!advanced)}>
+            ${t('profile.agents.scopeUi.advanced')}
           </button>
 
           ${advanced && html`
@@ -128,10 +141,10 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                 const allChecked = bulkScopes(d).every(s => checked.has(s));
                 const isCatalogue = d.key === 'catalogue';
                 return html`
-                  <div class="scope-domain">
+                  <div class="scope-domain poster-row--thing">
                     <div class="scope-domain-header" onClick=${() => !isCatalogue && toggleDomain(d.key)}>
-                      <span class="domain-label">${domainLabel(d.key)}</span>
-                      ${!isCatalogue && html`<span class=${`domain-toggle ${allChecked ? 'on' : ''}`}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}</span>`}
+                      <span class="poster-label domain-label">${domainLabel(d.key)}</span>
+                      ${!isCatalogue && html`<span class=${`poster-tab poster-tab--filter ${allChecked ? 'is-on' : ''}`}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}</span>`}
                     </div>
                     ${d.permissions.map(p => {
                       const scope = `${d.key}:${p}`;
@@ -139,16 +152,16 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                       const isExtra = NOT_IN_WILDCARD.includes(scope);
                       return html`
                         <div class="scope-row ${isLocked ? 'disabled' : ''}">
-                          <label>
+                          <label class="check-line">
                             <input type="checkbox"
                               checked=${checked.has(scope) || isLocked}
                               onChange=${() => !isLocked && toggleScope(scope)}
                               disabled=${isLocked}
                             />
                             <span class="scope-friendly">${permLabel(p, d.key)}</span>
-                            <span class="scope-technical">${scope}</span>
-                            ${isLocked && html`<span class="scope-lock">${t('profile.agents.scopeUi.alwaysOn')}</span>`}
-                            ${isExtra && html`<span class="scope-extra-note">${t('profile.agents.scopeUi.notInFullAccess')}</span>`}
+                            <code class="code-inline">${scope}</code>
+                            ${isLocked && html`<span class="poster-chip">${t('profile.agents.scopeUi.alwaysOn')}</span>`}
+                            ${isExtra && html`<span class="poster-chip poster-chip--coral">${t('profile.agents.scopeUi.notInFullAccess')}</span>`}
                           </label>
                         </div>`;
                     })}
@@ -156,19 +169,19 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
               })}
 
               ${unknown.length > 0 && html`
-                <div class="scope-domain">
+                <div class="scope-domain poster-row--thing">
                   <div class="scope-domain-header">
-                    <span class="domain-label">${t('profile.agents.scopeUi.domainOther')}</span>
+                    <span class="poster-label domain-label">${t('profile.agents.scopeUi.domainOther')}</span>
                   </div>
-                  <p class="scope-domain-desc">${t('profile.agents.scopeUi.otherScopesHint')}</p>
+                  <${Hint}>${t('profile.agents.scopeUi.otherScopesHint')}<//>
                   ${unknown.map(scope => html`
                     <div class="scope-row">
-                      <label>
+                      <label class="check-line">
                         <input type="checkbox"
                           checked=${checked.has(scope)}
                           onChange=${() => toggleScope(scope)}
                         />
-                        <span class="scope-technical">${escHtml(scope)}</span>
+                        <code class="code-inline">${escHtml(scope)}</code>
                       </label>
                     </div>`)}
                 </div>
@@ -176,7 +189,7 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
             </div>
           `}
 
-          <p class="scope-reconnect-note">${t('profile.agents.scopeUi.reconnectNote')}</p>
+          <p class="poster-hint poster-row--thing scope-reconnect-note">${t('profile.agents.scopeUi.reconnectNote')}</p>
         `}
     <//>`;
 }

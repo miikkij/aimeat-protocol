@@ -1,0 +1,24 @@
+/**
+ * @file crew-dag.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The task-order picture of a crew: each task a grey box in a thin frame with its id in
+ *   bold typewriter and its agent in small grey words under it, a coral arrow from a task to each
+ *   task that reads it, a coral frame on a task with a problem; it scrolls sideways when it is wider
+ *   than its place. Drawn by views/profile/agents/crew-dag.js (TaskDag), inline SVG.
+ *   Moved unchanged out of views/agents-crew.css (the agent Crew tab, the only place that draws it);
+ *   the class names stay. It has no corner, no 2px or 3px frame, no shadow and no letter case, so it
+ *   reads no shape token.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of views/agents-crew.css (UI consolidation phase 5, a move).
+ */
+
+.pf .pf-agd-crew-dag { overflow-x: auto; margin-top: 0.5rem; }
+.pf .pf-agd-crew-dag svg { display: block; max-width: 100%; height: auto; }
+.pf .pf-agd-crew-dag-node rect { fill: var(--card-bg-alt); stroke: var(--border); stroke-width: 1; }
+.pf .pf-agd-crew-dag-node--problem rect { stroke: var(--danger); stroke-width: 1.5; }
+.pf .pf-agd-crew-dag-id { font-size: 12px; font-weight: 600; fill: var(--text); font-family: var(--font-mono, monospace); }
+.pf .pf-agd-crew-dag-agent { font-size: 11px; fill: var(--text-dim); }
+.pf .pf-agd-crew-dag-edge { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.pf .pf-agd-crew-dag-arrow { fill: var(--accent); }

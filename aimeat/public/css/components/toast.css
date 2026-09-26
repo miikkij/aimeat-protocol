@@ -7,6 +7,7 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The frame reads --shape-frame-heavy and --shape-frame-colour, the corner --shape-corner (a move: the AIMEAT values equal the old ones). The offset shadows (6px) have no shape value and stay.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1711-1745), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
@@ -34,7 +35,7 @@
      over the one it draws. No display here: an author display would beat the browser's
      display:none on a popover that is not open. */
   top: auto; right: auto; margin: 0; overflow: visible;
-  border: 3px solid var(--text); border-radius: 0;
+  border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner);
 }
 .toast::before { font-weight: var(--weight-heavy); margin-right: 0.55em; }
 .toast-success::before { content: '✓'; color: var(--success-fg); }

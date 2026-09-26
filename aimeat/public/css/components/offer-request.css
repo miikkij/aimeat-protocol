@@ -1,0 +1,22 @@
+/**
+ * @file offer-request.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The request on an offer's page: what the offer does in a reading size, the request
+ *   field under it, the row with the button and its warnings (coral words in a coral frame: it sends
+ *   outside, it is blocked), and what came of it (bold words beside a sun edge, the provenance in
+ *   typewriter under them). Drawn only by the Offers page; moved here unchanged with its class names
+ *   (UI consolidation phase 5, a move). The warning's frame and the result's edge read the shape
+ *   tokens.
+ *   Drawn as markup by views/profile/offers/offer-page.js (renderOffer).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of offers-poster.css (UI consolidation phase 5, a move).
+ */
+
+.op-ask { margin: 0; font-size: 1rem; line-height: 1.6; max-width: 68ch; }
+.op-request { margin-top: 1rem; }
+.op-ask-row { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin-top: .9rem; }
+.op-warn { display: inline-block; padding: .25rem .6rem; border: var(--shape-frame) solid var(--accent); color: var(--accent); font-size: .78rem; font-weight: 700; line-height: 1.4; }
+.op-result { margin-top: .9rem; padding: .7rem .9rem; border-left: var(--shape-frame-heavy) solid var(--sun); background: var(--card-bg); font-weight: 700; font-size: .9rem; }
+.op-result small { display: block; margin-top: .25rem; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); }

@@ -12,6 +12,7 @@
  *   import BoardsTab from './boards-tab.js';
  *   html`<${BoardsTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v2.1.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Taulujen sivu", direction A): the
  *     cover with followed boards, the newest notices, public boards, a board of one's own and a
  *     board for an app; a board's page with notices, the composer and the rules; a notice's page
@@ -129,7 +130,7 @@ export default function BoardsTab({ session, showToast }) {
     setView(v);
     setFolds(f => ({ ...f, rules: false, tools: false }));
     setCatFilter('');
-    const box = document.querySelector('.page-content') || document.querySelector('.pf-content');
+    const box = document.querySelector('.page-content') || document.querySelector('.settings-frame-content');
     if (box) box.scrollTo({ top: 0 });
     if (v.kind === 'board') { const b = boardById(v.id); setRules(rulesFormOf(b)); setNotice(EMPTY_NOTICE); loadPage(v.id); }
     if (v.kind === 'notice') { setOpenNotice(null); setReplyText(''); loadNotice(v.boardId, v.postId); }
