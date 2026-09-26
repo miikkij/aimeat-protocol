@@ -12,6 +12,11 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- Onto the components: section Cards in a CardGrid, the figures the
+ *     FigureStrip (lead), the durations Marks, the reviews and the deliverables to rate a List (the
+ *     count and the context word the meta Note), every star rating the Stars (shown, or to give: the
+ *     pointer preview is the sheet's hover rule), the custom metrics the Facts, the lines the Note. The file
+ *     writes no class any more.
  *   v1.19.0 -- 2026-09-26 -- The line under a review's context is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.18.0 -- 2026-09-26 -- Every star rating is the library's Rating stars (css/components/rating-stars.css): the reviews, the overall line and a rated row in the shown tone, dark and grey; the inline picker in the tone to give, dark up to the star under the pointer (a unification: Jouni's decision "Rating stars").
  *   v1.17.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -57,14 +62,20 @@ import { getAgentStatistics, getQualityOverview, listTasks, rateTask } from '/js
 import RateModal from './rate-modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { num, dateTime as fmtDateTime } from '/js/format.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts } from '/components/Facts.js';
+import { List, Row, Name, Doors } from '/components/List.js';
+import { Mark, Marks } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
+import { Stars } from '/components/Stars.js';
 
 const html = htm.bind(h);
 
-/** An average star value (rounded to the nearest whole star) as the Rating stars' shown tone
- *  (css/components/rating-stars.css): the given stars dark, the others grey. */
+/** An average star value (rounded to the nearest whole star) as the Rating stars' shown tone. */
 function starGlyphs(value) {
-  const full = Math.max(0, Math.min(5, Math.round(value)));
-  return html`<span class="op-stars op-stars--shown" role="img" aria-label=${`${full}/5`}>${[1, 2, 3, 4, 5].map(n => html`<span key=${n} class=${`op-star${n <= full ? ' on' : ''}`} aria-hidden="true">★</span>`)}</span>`;
+  return html`<${Stars} value=${value} />`;
 }
 
 /** Localised context label, falling back to the raw enum value. */
@@ -82,21 +93,6 @@ function fmtSeconds(secs) {
 function fmtWhen(s) {
   if (!s) return '';
   return fmtDateTime(s, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-/** Inline 1–5 star picker — hovering previews, clicking submits right in the row (no modal hop).
- *  The full modal stays available for re-rates (context/comment edits). */
-function InlineStars({ onPick, disabled }) {
-  const [hover, setHover] = useState(0);
-  return html`
-    <span class="op-stars" role="radiogroup" onMouseLeave=${() => setHover(0)}>
-      ${[1, 2, 3, 4, 5].map(n => html`
-        <button key=${n} class="op-star ${n <= hover ? 'on' : ''}"
-          disabled=${disabled} aria-label=${String(n)}
-          onMouseEnter=${() => setHover(n)}
-          onClick=${() => onPick(n)}>★</button>
-      `)}
-    </span>`;
 }
 
 export default function TabQuality({ agentName, showToast }) {
@@ -166,7 +162,7 @@ export default function TabQuality({ agentName, showToast }) {
   useEffect(() => onLiveUpdate(['agents'], () => loadRef.current()), []);
 
   if (loading) {
-    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
+    return html`<${Note} kind="loading" />`;
   }
 
   const perf = data?.performance || {};
@@ -178,116 +174,77 @@ export default function TabQuality({ agentName, showToast }) {
   const durKeys = Object.keys(durByContext);
 
   return html`
-    <div class="pf-agd-quality pf-agd-card-grid">
+    <${CardGrid} cols="sections">
       <!-- Performance -->
-      <div class="pf-agd-card pf-agd-card--full poster-row--thing">
-      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.performanceTitle')}</div>
-      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.performanceDesc')}</div>
-      <div class="og-strip pf-figures">
-        <div>
-          <b>${perf.tasks?.total ?? 0}</b>
-          <span>${t('profile.agents.detail.quality.tasksTotal')}</span>
-        </div>
-        <div>
-          <b>${perf.tasks?.completed ?? 0}</b>
-          <span>${t('profile.agents.detail.quality.tasksCompleted')}</span>
-        </div>
-        <div>
-          <b>${perf.tasks?.successRate != null ? `${Math.round(perf.tasks.successRate * 100)}%` : '-'}</b>
-          <span>${t('profile.agents.detail.quality.successRate')}</span>
-        </div>
-        <div>
-          <b>${fmtSeconds(perf.duration?.avgCompletionSeconds)}</b>
-          <span>${t('profile.agents.detail.quality.avgTime')}</span>
-        </div>
-        <div>
-          <b>${perf.events?.total ?? 0}</b>
-          <span>${t('profile.agents.detail.quality.events')}</span>
-        </div>
-      </div>
-      ${durKeys.length > 0 && html`
-        <div class="pf-agd-quality-durations">
-          ${durKeys.map(ctx => html`
-            <span key=${ctx} class="poster-chip">
-              ${ctxLabel(ctx)}: ${fmtSeconds(durByContext[ctx].avgSeconds)} (${durByContext[ctx].count})
-            </span>
-          `)}
-        </div>
-      `}
-
-      </div>
+      <${Card} tone="section" wide title=${t('profile.agents.detail.quality.performanceTitle')}>
+        <${Note}>${t('profile.agents.detail.quality.performanceDesc')}<//>
+        <${FigureStrip} lead items=${[
+          { key: 'total', n: perf.tasks?.total ?? 0, label: t('profile.agents.detail.quality.tasksTotal') },
+          { key: 'done', n: perf.tasks?.completed ?? 0, label: t('profile.agents.detail.quality.tasksCompleted') },
+          { key: 'rate', n: perf.tasks?.successRate != null ? `${Math.round(perf.tasks.successRate * 100)}%` : '-', label: t('profile.agents.detail.quality.successRate') },
+          { key: 'avg', n: fmtSeconds(perf.duration?.avgCompletionSeconds), label: t('profile.agents.detail.quality.avgTime') },
+          { key: 'events', n: perf.events?.total ?? 0, label: t('profile.agents.detail.quality.events') },
+        ]} />
+        ${durKeys.length > 0 && html`
+          <${Marks}>
+            ${durKeys.map(ctx => html`
+              <${Mark} key=${ctx}>${ctxLabel(ctx)}: ${fmtSeconds(durByContext[ctx].avgSeconds)} (${durByContext[ctx].count})<//>
+            `)}
+          <//>
+        `}
+      <//>
 
       <!-- Reviews by context -->
-      <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.reviewsTitle')}</div>
-      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.reviewsDesc')}</div>
-      ${contextKeys.length === 0
-        ? html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.quality.noReviews')}</div>`
-        : html`
-          <div class="pf-agd-quality-reviews">
-            ${contextKeys.map(ctx => {
-              const s = byContext[ctx];
-              return html`
-                <div key=${ctx} class="pf-agd-quality-review-row">
-                  <div class="pf-agd-quality-review-head">
-                    <span class="pf-agd-quality-ctx">${ctxLabel(ctx)}</span>
-                    ${starGlyphs(s.avgStars)}
-                    <span class="pf-agd-quality-avg">${Number(s.avgStars).toFixed(1)}</span>
-                    <span class="pf-agd-quality-n">${t('profile.agents.detail.quality.ratings', { count: s.n })}</span>
-                    ${s.lowConfidence && html`<span class="poster-status poster-status--attention">${t('profile.agents.detail.quality.lowConfidence')}</span>`}
-                  </div>
-                  <div class="pf-agd-quality-review-meta listing-meta">${t('profile.agents.detail.quality.grounded', { count: s.sourceGroundedN })}</div>
-                </div>
-              `;
-            })}
-            <div class="pf-agd-quality-overall">
+      <${Card} tone="section" title=${t('profile.agents.detail.quality.reviewsTitle')}>
+        <${Note}>${t('profile.agents.detail.quality.reviewsDesc')}<//>
+        ${contextKeys.length === 0
+          ? html`<${Note} kind="quiet">${t('profile.agents.detail.quality.noReviews')}<//>`
+          : html`
+            <${List} cols="name">
+              ${contextKeys.map(ctx => {
+                const s = byContext[ctx];
+                return html`
+                  <${Row} key=${ctx}>
+                    <${Name} meta=${t('profile.agents.detail.quality.grounded', { count: s.sourceGroundedN })}
+                      after=${html` ${starGlyphs(s.avgStars)} <b>${Number(s.avgStars).toFixed(1)}</b> <${Note} kind="meta" inline>${t('profile.agents.detail.quality.ratings', { count: s.n })}<//>${s.lowConfidence ? html` <${Mark} kind="status" tone="attention">${t('profile.agents.detail.quality.lowConfidence')}<//>` : null}`}>
+                      ${ctxLabel(ctx)}
+                    <//>
+                  <//>
+                `;
+              })}
+            <//>
+            <${Note}>
               ${t('profile.agents.detail.quality.overall')}: ${starGlyphs(reviews.overall?.avgStars || 0)} ${Number(reviews.overall?.avgStars || 0).toFixed(1)} (${t('profile.agents.detail.quality.ratings', { count: reviews.overall?.n || 0 })})
-            </div>
-          </div>
-        `}
-
-      </div>
+            <//>
+          `}
+      <//>
 
       <!-- Rate deliverables (completed tasks the owner can rate) -->
-      <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.pendingTitle')}</div>
-      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.pendingDesc')}</div>
-      ${doneTasks.length === 0
-        ? html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.quality.allRated')}</div>`
-        : html`
-          <div class="pf-agd-quality-pending">
-            ${[...doneTasks].sort((a, b) => (a.rating ? 1 : 0) - (b.rating ? 1 : 0)).map(task => html`
-              <div key=${task.id} class="pf-agd-quality-pending-row poster-box">
-                <span class="pf-agd-quality-pending-title">${task.title || task.id}</span>
-                <span class="pf-agd-quality-pending-when poster-time" title=${task.completedAt || ''}>${fmtWhen(task.completedAt || task.updatedAt)}</span>
+      <${Card} tone="section" title=${t('profile.agents.detail.quality.pendingTitle')}>
+        <${Note}>${t('profile.agents.detail.quality.pendingDesc')}<//>
+        <${List} cols="name-doors" dense empty=${t('profile.agents.detail.quality.allRated')}>
+          ${[...doneTasks].sort((a, b) => (a.rating ? 1 : 0) - (b.rating ? 1 : 0)).map(task => html`
+            <${Row} key=${task.id}>
+              <${Name} title=${task.completedAt || ''} meta=${fmtWhen(task.completedAt || task.updatedAt)}>${task.title || task.id}<//>
+              <${Doors}>
                 ${task.rating
                   ? html`
-                    <span class="pf-agd-quality-pending-rated">${starGlyphs(task.rating.stars)} ${ctxLabel(task.rating.context)}</span>
-                    <button class="poster-action poster-action--small" onClick=${() => setRateTarget(task)}>${t('profile.agents.tasks.rate.rerate')}</button>`
-                  : html`<${InlineStars} onPick=${(n) => handleInlineRate(task, n)} disabled=${sendingRate} />`}
-              </div>
-            `)}
-          </div>
-        `}
-
-      </div>
+                    ${starGlyphs(task.rating.stars)} <${Note} kind="meta" inline>${ctxLabel(task.rating.context)}<//>
+                    <${Action} small onClick=${() => setRateTarget(task)}>${t('profile.agents.tasks.rate.rerate')}<//>`
+                  : html`<${Stars} onPick=${(n) => handleInlineRate(task, n)} disabled=${sendingRate} />`}
+              <//>
+            <//>
+          `)}
+        <//>
+      <//>
 
       <!-- Custom metrics -->
-      <div class="pf-agd-card pf-agd-card--full poster-row--thing">
-      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.customTitle')}</div>
-      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.customDesc')}</div>
-      ${custom.length === 0
-        ? html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.quality.noCustom')}</div>`
-        : html`
-          <div class="facts">
-            ${custom.map(c => html`
-              <span class="facts-k poster-label" key=${'k' + c.key}>${c.key}</span>
-              <span class="facts-v" key=${c.key}>${typeof c.value === 'object' ? JSON.stringify(c.value) : String(c.value)}</span>
-            `)}
-          </div>
-        `}
-
-      </div>
+      <${Card} tone="section" wide title=${t('profile.agents.detail.quality.customTitle')}>
+        <${Note}>${t('profile.agents.detail.quality.customDesc')}<//>
+        ${custom.length === 0
+          ? html`<${Note} kind="quiet">${t('profile.agents.detail.quality.noCustom')}<//>`
+          : html`<${Facts} rows=${custom.map(c => ({ key: c.key, k: c.key, v: typeof c.value === 'object' ? JSON.stringify(c.value) : String(c.value) }))} />`}
+      <//>
 
       <${RateModal}
         open=${!!rateTarget}
@@ -296,6 +253,6 @@ export default function TabQuality({ agentName, showToast }) {
         submitting=${sendingRate}
         existing=${rateTarget?.rating}
       />
-    </div>
+    <//>
   `;
 }

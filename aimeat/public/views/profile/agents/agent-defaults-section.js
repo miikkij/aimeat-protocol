@@ -5,6 +5,10 @@
  * @description Agent Defaults section — owner-level default rules and token
  *   budget for agents. Mounted at the foot of the Your agents page.
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the headings
+ *     are SubHeading, the two boxes are the section card, the rules and the token budget are the
+ *     List's rows with the name in the key's face (asKey), the new rule is the TextField with its Add
+ *     beside it (Enter adds), the budget a number TextField, the foot FormActions.
  *   v1.10.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.8.0 -- 2026-09-26 -- A rule's name and the token budget's name wear the Key's face (.key-name, css/components/key-name.css); .mem-key keeps only its place (a unification: the look most tabs use).
@@ -36,6 +40,13 @@ import { escHtml } from '/js/utils.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
 import { swallowed } from '/js/swallowed.js';
 import { num } from '/js/format.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Card } from '/components/Card.js';
+import { Row, Space } from '/components/Layout.js';
+import { Action, Loud } from '/components/Action.js';
+import { List, Row as ListRow, Name, Cell, Doors } from '/components/List.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
 
 export function AgentDefaultsSection({ showToast, initial }) {
   const [defaults, setDefaults] = useState(initial?.defaults ?? null);   // seeded from /v1/access/overview; else self-loads
@@ -115,76 +126,77 @@ export function AgentDefaultsSection({ showToast, initial }) {
   const budget = defaults?.default_token_budget;
 
   return html`
-    <h3 class="card-h3 sub-heading access-h3 mt-section">${t('profile.access.adTitle') || 'Agent Defaults'}</h3>
-    <div class="section-desc">${t('profile.access.adDesc') || 'Owner-level defaults that apply to all your agents unless overridden by per-agent directives.'}</div>
+    <${Space} above="section">
+      <${SubHeading} level=${3} desc=${t('profile.access.adDesc') || 'Owner-level defaults that apply to all your agents unless overridden by per-agent directives.'}>${t('profile.access.adTitle') || 'Agent Defaults'}<//>
+    <//>
 
     ${!editing ? html`
-      <div class="card poster-row--thing">
-        <div class="flex-between mb-half">
-          <div class="sub-heading">${t('profile.access.adRules') || 'Default Rules'}</div>
-          <button class="poster-action poster-action--small" onClick=${startEdit}>
+      <${Card} tone="section">
+        <${Row} gap="none" justify="between" below="small">
+          <${SubHeading}>${t('profile.access.adRules') || 'Default Rules'}<//>
+          <${Action} small onClick=${startEdit}>
             ${t('profile.access.adEdit') || 'Edit'}
-          </button>
-        </div>
+          <//>
+        <//>
 
-        ${rules.length === 0
-          ? html`<div class="poster-quiet mb-half">${t('profile.access.adNoRules') || 'No default rules set.'} ${t('profile.access.adRuleExample') || 'Example: "Always answer in Finnish" or "Never spend morsels without asking".'}</div>`
-          : rules.map((rule, i) => html`
-              <div class="mem-item" key=${i}>
-                <span class="mem-key key-name">${escHtml(rule)}</span>
-              </div>
-            `)
-        }
+        <${List} cols="name-doors" dense
+          empty=${`${t('profile.access.adNoRules') || 'No default rules set.'} ${t('profile.access.adRuleExample') || 'Example: "Always answer in Finnish" or "Never spend morsels without asking".'}`}>
+          ${rules.map((rule, i) => html`
+            <${ListRow} key=${i}>
+              <${Name} asKey>${escHtml(rule)}<//>
+              <${Cell} />
+            <//>
+          `)}
+        <//>
 
-        <div class="mem-item">
-          <span class="mem-key key-name">${t('profile.access.adTokenBudget') || 'Token Budget'}</span>
-          <button class="pj-linklike" title=${t('profile.access.adEdit') || 'Edit'} onClick=${startEdit}>
-            ${budget != null ? num(budget) : (t('profile.access.adUnlimited') || 'Unlimited')} ✎
-          </button>
-        </div>
-      </div>
+        <${List} cols="name-doors" dense>
+          <${ListRow}>
+            <${Name} asKey>${t('profile.access.adTokenBudget') || 'Token Budget'}<//>
+            <${Doors}>
+              <${Action} tone="text" title=${t('profile.access.adEdit') || 'Edit'} onClick=${startEdit}>
+                ${budget != null ? num(budget) : (t('profile.access.adUnlimited') || 'Unlimited')} ✎
+              <//>
+            <//>
+          <//>
+        <//>
+      <//>
     ` : html`
-      <div class="create-form poster-row--thing">
-        <h4 class="card-h3 sub-heading mb-half">${t('profile.access.adEditTitle') || 'Edit Agent Defaults'}</h4>
-        <div class="flex-col">
-          <div class="form-row">
-            <label class="poster-label">${t('profile.access.adRules') || 'Rules'}</label>
-            ${editRules.map((rule, i) => html`
-              <div class="mem-item" key=${i}>
-                <span class="mem-key key-name">${escHtml(rule)}</span>
-                <button class="poster-action poster-action--small poster-action--danger" onClick=${() => removeRule(i)}>
-                  ${t('profile.access.adRemoveRule') || 'Remove'}
-                </button>
-              </div>
-            `)}
-            <div class="flex-row">
-              <input type="text" class="og-input"
-                placeholder=${t('profile.access.adRulePlaceholder') || 'Add a rule...'}
-                value=${newRule} onInput=${e => setNewRule(e.target.value)}
-                onKeyDown=${e => e.key === 'Enter' && addRule()} />
-              <button class="poster-action poster-action--small" onClick=${addRule}>
-                ${t('profile.access.adAddRule') || 'Add'}
-              </button>
-            </div>
-          </div>
+      <${Card} tone="section">
+        <${SubHeading} level=${4}>${t('profile.access.adEditTitle') || 'Edit Agent Defaults'}<//>
+        <${Fields}>
+          <${Field} label=${t('profile.access.adRules') || 'Rules'} group>
+            <${List} cols="name-doors" dense>
+              ${editRules.map((rule, i) => html`
+                <${ListRow} key=${i}>
+                  <${Name} asKey>${escHtml(rule)}<//>
+                  <${Doors}>
+                    <${Action} small tone="danger" onClick=${() => removeRule(i)}>
+                      ${t('profile.access.adRemoveRule') || 'Remove'}
+                    <//>
+                  <//>
+                <//>
+              `)}
+            <//>
+            <${TextField} ariaLabel=${t('profile.access.adRulePlaceholder') || 'Add a rule...'}
+              placeholder=${t('profile.access.adRulePlaceholder') || 'Add a rule...'}
+              value=${newRule} onInput=${setNewRule} onEnter=${addRule}
+              actions=${html`<${Action} small onClick=${addRule}>${t('profile.access.adAddRule') || 'Add'}<//>`} />
+          <//>
 
-          <div class="form-row">
-            <label class="poster-label">${t('profile.access.adTokenBudget') || 'Token Budget'}</label>
-            <input type="number" class="og-input" min="0"
-              placeholder=${t('profile.access.adBudgetPlaceholder') || 'Leave empty for unlimited'}
-              value=${editBudget} onInput=${e => setEditBudget(e.target.value)} />
-          </div>
+          <${TextField} type="number" min="0" label=${t('profile.access.adTokenBudget') || 'Token Budget'}
+            placeholder=${t('profile.access.adBudgetPlaceholder') || 'Leave empty for unlimited'}
+            value=${editBudget} onInput=${setEditBudget} />
 
-          <div class="form-actions">
-            <button class="poster-slab poster-slab--control" onClick=${handleSave} disabled=${saving}>
+          <${FormActions}>
+            <${Loud} control onClick=${handleSave} disabled=${saving}>
               ${saving ? '...' : (t('profile.access.adSave') || 'Save')}
-            </button>
-            <button class="poster-action poster-action--small" onClick=${() => setEditing(false)}>
+            <//>
+            <${Action} small onClick=${() => setEditing(false)}>
               ${t('profile.access.adCancel') || 'Cancel'}
-            </button>
-          </div>
-        </div>
-      </div>
+            <//>
+          <//>
+        <//>
+      <//>
     `}
   `;
 }

@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The person tone's name turns coral under the pointer, as main's person
+ *     heading in Messages did (put back).
  *   v1.3.0 — 2026-09-26 — The line under a name keeps to one line, cut short; on the open row it is
  *     dark; a count on a row; the person tone (Jouni's decision "Conversation list").
  *   v1.2.0 — 2026-09-24 — The corner and the chosen row's rule read the theme's shape values (a move).
@@ -84,3 +86,5 @@
   background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer;
 }
 .poster-thread-person-name { font-weight: var(--weight-heavy); font-size: .92rem; }
+/* The name turns coral under the pointer: the heading is a control (main's .inbox-conv-group-head). */
+.poster-thread-person:hover .poster-thread-person-name { color: var(--accent); }

@@ -6,9 +6,13 @@
  *   /v1/pricing ONLY (one implementation, no copied text). tel: + mailto: links.
  *   Name, email and phone come from this node's siteLinks config, so another
  *   operator's site never prints someone else's contact details. Renders nothing
- *   when the node has no contact email configured.
+ *   when the node has no contact email configured. Its look is css/components/contact-card.css
+ *   (.contact-card and its parts) inside the large dashed aside of poster.css.
  * @usage import { ContactCard } from '/components/ContactCard.js';
  * @version-history
+ *   v2.3.0 -- 2026-09-27 -- Draws its own names: .ld-contact(-title/-people/-person/-name/-role/-links/
+ *     -sub) is .contact-card(-…); the rules moved with them out of css/views/landing.css into
+ *     css/components/contact-card.css (a move).
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-06-10 — Initial (owner spec: human card).
  *   v2.0.0 — 2026-07-28 — Contact details from siteLinks instead of hardcoded. A clone of
@@ -35,14 +39,14 @@ export function ContactCard() {
   if (contacts.length === 0) return null;
 
   return html`
-    <div class="ld-contact poster-aside poster-aside--large">
-      <div class="ld-contact-title">${tr('contact.title', 'Talk to a human.')}</div>
-      <div class="ld-contact-people">
+    <div class="contact-card poster-aside poster-aside--large">
+      <div class="contact-card-title">${tr('contact.title', 'Talk to a human.')}</div>
+      <div class="contact-card-people">
         ${contacts.map(c => html`
-          <div class="ld-contact-person" key=${c.email}>
-            <div class="ld-contact-name">${c.name || c.email}</div>
-            ${c.role ? html`<div class="ld-contact-role">${c.role}</div>` : ''}
-            <div class="ld-contact-links">
+          <div class="contact-card-person" key=${c.email}>
+            <div class="contact-card-name">${c.name || c.email}</div>
+            ${c.role ? html`<div class="contact-card-role">${c.role}</div>` : ''}
+            <div class="contact-card-links">
               ${c.phone ? html`<a href=${`tel:${c.phone.replace(/[\s-]/g, '')}`}>${c.phone}</a>` : ''}
               <a href=${`mailto:${c.email}`}>${c.email}</a>
               ${c.linkedin ? html`<a href=${c.linkedin} target="_blank" rel="noopener">${tr('contact.linkedin', 'LinkedIn')}</a>` : ''}
@@ -50,7 +54,7 @@ export function ContactCard() {
           </div>
         `)}
       </div>
-      <div class="ld-contact-sub">${tr('contact.sub', 'You reach us directly. A demo fits in the same call.')}</div>
+      <div class="contact-card-sub">${tr('contact.sub', 'You reach us directly. A demo fits in the same call.')}</div>
     </div>
   `;
 }

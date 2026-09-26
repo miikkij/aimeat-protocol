@@ -84,16 +84,18 @@ test.describe('Agent message option-prompts', () => {
     const card = await openAgentMessagesTab(page);
 
     // Chips render, including the implicit "Other".
-    const colorChip = card.locator('.agd-msg-prompt-option', { hasText: /^color$/ }).first();
+    const colorChip = card.locator('.poster-suggestion', { hasText: /^color$/ }).first();
     await expect(colorChip).toBeVisible({ timeout: 15_000 });
-    await expect(card.locator('.agd-msg-prompt-option--other')).toBeVisible();
+    await expect(card.locator('.poster-suggestion--other')).toBeVisible();
 
-    // Click "color" -> the answer is sent as a new inbound message (pf-prefixed bubble).
+    // Click "color" -> the answer is sent as a new inbound message. The words of a message are
+    // .message-words (Markdown) or .message-said (plain) inside .message-body, which also holds the
+    // sender's name, so the exact-text match is made on the words.
     await colorChip.click();
-    await expect(card.locator('.pf-agd-msg-bubble', { hasText: /^color$/ }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(card.locator('.message-body :is(.message-words, .message-said)', { hasText: /^color$/ }).first()).toBeVisible({ timeout: 15_000 });
 
     // Prompt is now locked (a newer message exists) and "color" is highlighted.
-    await expect(card.locator('.agd-msg-prompt-option--chosen', { hasText: /^color$/ }).first()).toBeVisible({ timeout: 15_000 });
-    await expect(card.locator('.agd-msg-prompt-option', { hasText: /^photorealistic$/ }).first()).toBeDisabled();
+    await expect(card.locator('.poster-suggestion--chosen', { hasText: /^color$/ }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(card.locator('.poster-suggestion', { hasText: /^photorealistic$/ }).first()).toBeDisabled();
   });
 });

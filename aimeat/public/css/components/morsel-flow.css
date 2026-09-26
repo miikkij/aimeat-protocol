@@ -2,21 +2,50 @@
  * @file morsel-flow.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The wallet's morsel flow: two columns (what came in, what went out), each headed by its
- *   total in the poster face with a typewriter count, then its sources one per row (the name with a
- *   typewriter count, the sum in the poster face); the pace, a sentence beside the meter with its
- *   figure in typewriter (what morsels buy is the Item grid, css/components/item-grid.css). One
- *   column on a phone. Drawn only by the Wallet page; moved here
- *   unchanged with its class names (UI consolidation phase 5, a move).
- *   Drawn as markup by views/profile/wallet/page.js.
+ * @description The morsel flow, drawn by components/MorselFlow.js: two columns (what came in, what went
+ *   out), each an Object box headed by its total (the Figure, in its state colour) with a typewriter
+ *   count at the head's right end, then its sources one per row (the name with a typewriter line, the
+ *   sum a Figure at the right); the pace, a sentence beside the Meter (components/Figure.js, beside).
+ *   One column on a phone. Reads only theme tokens; the numeral's face is the Figure's
+ *   (.poster-stat-number, poster.css), this sheet gives it its size here.
+ *   The .wal-* rules at the foot are the old markup's, kept only because the design lab's demo
+ *   (views/design-lab/demos-settings.js) still draws it; they go when the lab moves to MorselFlow.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v2.0.0 — 2026-09-26 — On the component kit (page group G7): the morsel flow is components/MorselFlow.js
+ *     with its own class names (.morsel-flow, .morsel-flow-col, .morsel-flow-head, .morsel-flow-count,
+ *     .morsel-flow-src, .morsel-pace); the numerals are the Figure and the bar the one Meter (beside),
+ *     so .wal-pace and the .wal-bar rules go. The .wal-flow, .wal-col, .wal-col-h and .wal-src rules
+ *     stay for the design lab's demo only.
  *   v1.3.0 — 2026-09-26 — The figure on the pace meter is the Meter's figure (.poster-meter-figure, poster.css), whose look this sheet's .wal-bar span gave it; its line height stays here. Nothing on screen changes.
  *   v1.2.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.1.0 — 2026-09-25 — What morsels buy is the Item grid (css/components/item-grid.css), a unification: the look most tabs use; the .wal-uses rules go.
  *   v1.0.0 — 2026-09-25 — Moved out of wallet-poster.css (UI consolidation phase 5, a move).
  */
 
+/* ── The flow: two columns ─────────────────────────────────────────────────────────────────── */
+.morsel-flow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; margin-top: .4rem; }
+.morsel-flow-col { margin: 0; padding: .8rem 1rem; min-width: 0; }
+.morsel-flow-head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; font-size: .9rem; font-weight: 800; margin-bottom: .5rem; }
+.morsel-flow-head .figure { font-size: 1.9rem; line-height: 1; letter-spacing: normal; }
+.morsel-flow-count { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.morsel-flow-src { display: flex; justify-content: space-between; gap: .8rem; padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .86rem; line-height: 1.45; }
+.morsel-flow-src:last-child { border-bottom: 0; }
+.morsel-flow-src span { min-width: 0; overflow-wrap: anywhere; }
+.morsel-flow-src small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.morsel-flow-src .figure { font-size: 1.15rem; line-height: inherit; letter-spacing: normal; white-space: nowrap; }
+.morsel-flow-src--empty { color: var(--text-dim); }
+
+/* ── The pace: the sentence beside the meter ───────────────────────────────────────────────── */
+.morsel-pace { display: flex; align-items: center; gap: 1.2rem; margin: .9rem 0 0; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
+.morsel-pace b { font-weight: 800; }
+
+@media (max-width: 860px) {
+  .morsel-flow { grid-template-columns: minmax(0, 1fr); }
+  .morsel-pace { flex-direction: column; align-items: stretch; }
+}
+
+/* ── The old markup, for the design lab's demo only (views/design-lab/demos-settings.js) ──── */
 .wal-flow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; margin-top: .4rem; }
 .wal-col { margin: 0; padding: .8rem 1rem; min-width: 0; }
 .wal-col-h { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; font-size: .9rem; font-weight: 800; margin-bottom: .5rem; }
@@ -27,15 +56,7 @@
 .wal-src span { min-width: 0; overflow-wrap: anywhere; }
 .wal-src small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
 .wal-src b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; white-space: nowrap; }
-.wal-pace { display: flex; align-items: center; gap: 1.2rem; margin: .9rem 0 0; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
-.wal-pace b { font-weight: 800; }
-.wal-bar { position: relative; flex: 0 0 15rem; height: 1.5rem; overflow: hidden; }
-.wal-bar svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-/* The figure on the meter is the Meter's figure (poster.css .poster-meter-figure); its line height here. */
-.wal-bar .poster-meter-figure { line-height: 1.3rem; }
 
 @media (max-width: 860px) {
   .wal-flow { grid-template-columns: minmax(0, 1fr); }
-  .wal-pace { flex-direction: column; align-items: stretch; }
-  .wal-bar { flex-basis: auto; }
 }

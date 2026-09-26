@@ -6,6 +6,10 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the page frame
+ *     (SettingsPage), the view tabs (Tabs bar), the list (List, Row, Name, Desc, Doors), the state (Mark status), the
+ *     ways on (Loud, Action), the dialogs' words (Note, TextArea) and the stars to give (components/Stars.js, now
+ *     buttons in a radio group, so a keyboard can rate too). The page writes no class.
  *   v1.15.0 -- 2026-09-26 -- Rating a work item is the library's Rating stars in the tone to give (css/components/rating-stars.css): dark up to the rating and up to the star under the pointer, instead of amber (a unification: Jouni's decision "Rating stars").
  *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.13.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -43,7 +47,15 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { escHtml, timeAgo } from '/js/utils.js';
-import { LoadingLine } from './shared.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { TextArea } from '/components/TextField.js';
+import { Stack } from '/components/Layout.js';
+import { Stars } from '/components/Stars.js';
 import { listInbox, listSent, getWorkOverview, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -148,22 +160,21 @@ export default function WorkTab({ session, showToast, onStats }) {
     }
   }
 
-  function statusBadgeClass(status) {
+  function statusTone(status) {
     switch (status) {
       case 'completed':
       case 'accepted':
-      case 'in_progress': return 'poster-status--fine';
-      case 'delivered': return 'poster-status--attention';
+      case 'in_progress': return 'fine';
+      case 'delivered': return 'attention';
       case 'rejected':
-      case 'cancelled': return 'poster-status--danger';
-      default: return 'poster-status--off';
+      case 'cancelled': return 'danger';
+      default: return 'off';
     }
   }
 
   function renderList(items, type) {
-    if (!items) return html`<${LoadingLine} text=${t('profile.work.loading')} />`;
-    if (items.length === 0) return html`<div class="poster-quiet">${t(type === 'sent' ? 'profile.work.sentEmpty' : 'profile.work.empty')}</div>`;
-    return html`<div class="listing listing--name-desc-doors">${items.map(w => {
+    if (!items) return html`<${List} loading=${t('profile.work.loading')} />`;
+    return html`<${List} cols="name-desc-doors" empty=${t(type === 'sent' ? 'profile.work.sentEmpty' : 'profile.work.empty')}>${items.map(w => {
       const tc = w.tc || w.id || w.work_id;
       const isLoading = actionLoading === tc;
       const status = w.status || '-';
@@ -171,61 +182,59 @@ export default function WorkTab({ session, showToast, onStats }) {
       const isActive = status === 'accepted' || status === 'in_progress';
 
       return html`
-        <div class="listing-row" key=${tc}>
-          <div class="listing-name">${escHtml(w.description || w.action_name || '-')}</div>
-          <div class="listing-desc">
+        <${Row} key=${tc}>
+          <${Name}>${escHtml(w.description || w.action_name || '-')}<//>
+          <${Desc}>
             ${type === 'sent' ? t('profile.work.provider') + ': ' + escHtml(w.provider_gaii || '-') : t('profile.work.from') + ': ' + escHtml(w.requester_gaii || '-')}
             ${w.price_morsels != null ? ' \u2502 ' + t('profile.work.cost') + ': ' + w.price_morsels + ' \u2764\uFE0F' : ''}
             ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
-          </div>
-          <div class="listing-doors">
-          <span class="poster-status ${statusBadgeClass(status)}">${status}</span>
+          <//>
+          <${Doors}>
+          <${Mark} kind="status" tone=${statusTone(status)}>${status}<//>
           ${type === 'inbox' && isPending && html`
-              <button class="poster-slab poster-slab--control" disabled=${isLoading} onClick=${() => handleAccept(tc)}>
+              <${Loud} control disabled=${isLoading} onClick=${() => handleAccept(tc)}>
                 ${isLoading ? '...' : t('profile.work.accepted')}
-              </button>
-              <button class="poster-action poster-action--small poster-action--row" disabled=${isLoading} onClick=${() => handleReject(tc)}>
+              <//>
+              <${Action} small row disabled=${isLoading} onClick=${() => handleReject(tc)}>
                 ${isLoading ? '...' : t('profile.work.declined')}
-              </button>
+              <//>
           `}
 
           ${type === 'inbox' && isActive && html`
-              <button class="poster-slab poster-slab--control" disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
+              <${Loud} control disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
                 ${t('profile.work.deliver')}
-              </button>
+              <//>
           `}
 
           ${type === 'sent' && w.status === 'delivered' && html`
-            <button class="poster-action poster-action--small poster-action--row" onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}</button>
+            <${Action} small row onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}<//>
           `}
-          </div>
-        </div>
+          <//>
+        <//>
       `;
-    })}</div>`;
+    })}<//>`;
   }
 
   return html`
-    <div class="og mb-1">
-      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.work')}</span></div>
-      <div class="og-mast"><div class="og-mast-words">
-        <div class="og-title poster-page-title">${t('profile.work.title')}</div>
-        <div class="og-desc">${t('profile.work.desc')}</div>
-      </div></div>
-    </div>
-    <div class="sub-tabs poster-row--thing">
-      <button class="poster-tab ${workSubTab === 'inbox' ? 'is-on' : ''}" onClick=${() => setWorkSubTab('inbox')}>${t('profile.work.inbox')}</button>
-      <button class="poster-tab ${workSubTab === 'sent' ? 'is-on' : ''}" onClick=${() => setWorkSubTab('sent')}>${t('profile.work.sent')}</button>
-    </div>
-    ${workSubTab === 'inbox' ? renderList(workInbox, 'inbox') : renderList(workSent, 'sent')}
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.tabs.work')]}
+      title=${t('profile.work.title')}
+      desc=${t('profile.work.desc')}>
+      <${Tabs} bar kind="view" value=${workSubTab} onSelect=${setWorkSubTab} items=${[
+        { value: 'inbox', label: t('profile.work.inbox') },
+        { value: 'sent', label: t('profile.work.sent') },
+      ]} />
+      ${workSubTab === 'inbox' ? renderList(workInbox, 'inbox') : renderList(workSent, 'sent')}
 
-    ${rateModal && html`<${RateModal} desc=${rateModal.desc}
-      onSubmit=${(r, c) => handleRate(rateModal.workId, r, c)}
-      onCancel=${() => setRateModal(null)} />`}
+      ${rateModal && html`<${RateModal} desc=${rateModal.desc}
+        onSubmit=${(r, c) => handleRate(rateModal.workId, r, c)}
+        onCancel=${() => setRateModal(null)} />`}
 
-    ${deliverModal && html`<${DeliverModal} desc=${deliverModal.desc}
-      loading=${actionLoading === deliverModal.tc}
-      onSubmit=${(result) => handleDeliver(deliverModal.tc, result)}
-      onCancel=${() => setDeliverModal(null)} />`}
+      ${deliverModal && html`<${DeliverModal} desc=${deliverModal.desc}
+        loading=${actionLoading === deliverModal.tc}
+        onSubmit=${(result) => handleDeliver(deliverModal.tc, result)}
+        onCancel=${() => setDeliverModal(null)} />`}
+    <//>
   `;
 }
 
@@ -235,15 +244,13 @@ function RateModal({ desc, onSubmit, onCancel }) {
   return html`
     <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.rateTitle')}
       footer=${html`
-        <button class="poster-action" onClick=${onCancel}>${t('profile.cancel')}</button>
-        <button class="poster-slab poster-slab--control" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>`}>
-      <p class="poster-hint mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
-      <div class="op-stars mb-1">
-        ${[1,2,3,4,5].map(i => html`
-          <span class="op-star ${i <= rating ? 'on' : ''}" onClick=${() => setRating(i)}>\u2605</span>
-        `)}
-      </div>
-      <div class="form-row"><label class="poster-label">${t('profile.work.commentLabel')}</label><textarea class="og-textarea" rows="2" value=${comment} onInput=${e => setComment(e.target.value)}></textarea></div>
+        <${Action} onClick=${onCancel}>${t('profile.cancel')}<//>
+        <${Loud} control onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}<//>`}>
+      <${Stack} gap="large">
+        <${Note}>${t('profile.work.rateDesc')} ${escHtml(desc || '')}<//>
+        <${Stars} value=${rating} onPick=${setRating} label=${t('profile.work.rateTitle')} />
+        <${TextArea} label=${t('profile.work.commentLabel')} rows=${2} value=${comment} onInput=${setComment} />
+      <//>
     <//>`;
 }
 
@@ -252,15 +259,14 @@ function DeliverModal({ desc, loading, onSubmit, onCancel }) {
   return html`
     <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.deliver')}
       footer=${html`
-        <button class="poster-action" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
-        <button class="poster-slab poster-slab--control" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
+        <${Action} disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}<//>
+        <${Loud} control disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
           ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
-        </button>`}>
-      <p class="poster-hint mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>
-      <div class="form-row">
-        <label class="poster-label">${t('profile.work.commentLabel')}</label>
-        <textarea class="og-textarea" rows="4" placeholder="Describe the completed work or attach results..."
-          value=${result} onInput=${e => setResult(e.target.value)}></textarea>
-      </div>
+        <//>`}>
+      <${Stack} gap="large">
+        <${Note}>${t('profile.work.delivering')}: ${escHtml(desc || '')}<//>
+        <${TextArea} label=${t('profile.work.commentLabel')} rows=${4} placeholder="Describe the completed work or attach results..."
+          value=${result} onInput=${setResult} />
+      <//>
     <//>`;
 }

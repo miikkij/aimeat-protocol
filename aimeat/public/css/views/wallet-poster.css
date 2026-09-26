@@ -2,14 +2,20 @@
  * @file wallet-poster.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The wallet page in the poster face (wal- prefix; design canvas "AIMEAT
- *   Lompakko-sivu", direction A). The shared parts come from organism.css's og- rules; this file
- *   carries what the page adds: the two columns of where the morsels came from and went to, the pace
- *   bar, the grid of what morsels buy, the ledger rows (words, when, amount, door) and the opened
- *   row, the share figures, the rail rows and the field that opens under one, the two roads. Every
- *   column is bounded so a long tracking code or label wraps inside its cell. NOTE: this file must
- *   be linked in spa.html.
+ * @description What is left of the wallet page's own sheet (wal- prefix). The Wallet page draws no
+ *   class of its own since page group G7 (it is on the component kit: SettingsPage, List, Facts,
+ *   FigureStrip, Roads, CardGrid, TextField, and its own view components/MorselFlow.js). The three
+ *   rules below are kept ONLY because the design lab's sample of the old key steps
+ *   (views/design-lab/decision-samples-conflicts.js, "wallet-steps") still draws .wal-label and
+ *   .wal-steps; this file and its spa.html link go when the lab moves.
+ *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v2.0.0 — 2026-09-26 — On the component kit (page group G7): every rule the Wallet page used goes
+ *     (the strip's and the amounts' colours are FigureStrip, Figure and Tinted tones; the empty lines
+ *     Note; the filters Tabs; the rail's words, the amount and its unit the List's Desc and Figure;
+ *     the more line More; the share strip FigureStrip; the two roads Roads; the federated box
+ *     SettingBox). The unscoped .is-good, .is-low and .is-dim go with them: calibrator-poster.css
+ *     still defines the same three, with the same values, for the pages that write them.
  *   v1.21.0 -- 2026-09-26 -- The ready-made request is the Code block (css/components/code-block.css): its look goes, its place stays (a unification: Jouni's decision "Code block").
  *   v1.20.0 -- 2026-09-26 -- A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
  *   v1.19.0 -- 2026-09-26 -- A payout rail's state (a key or an address stored, or none) is the Status: fine or attention, a unification: Jouni's decision Status.
@@ -42,49 +48,7 @@
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 
-.og-wal .og-doors > a { text-decoration: none; }
-.og-wal .og-strip b.is-dim { color: var(--text-dim); }
-.og-wal .og-strip b .is-good, .is-good { color: var(--success-fg); }
-.og-wal .og-strip b .is-low, .is-low { color: var(--accent); }
-.is-dim { color: var(--text-dim); }
-.wal-empty { margin: 0; padding: .3rem 0 .8rem; }
+/* The design lab's sample of the old key steps only (views/design-lab/decision-samples-conflicts.js). */
 .wal-label { display: block; margin: 1rem 0 .4rem; }
-.wal-box { margin-top: 1.4rem; }
-
-/* ── 01: two columns, the pace, what morsels buy ───────────────────────────────────────────── */
-
-/* ── The rows: ledger, shares, money, rails ────────────────────────────────────────────────── */
-.wal-filters { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; }
-/* The rows are the Listing (css/components/listing.css). A rail's state: the Status (a key or an
-   address stored is fine, none is attention), the network under it; the currencies are the Listing's
-   words cell; an amount is the figure, right-aligned, its colour its meaning. */
-.og-wal .wal-w small { display: block; font-family: var(--font-mono); font-size: .68rem; }
-.og-wal .wal-cur { overflow-wrap: anywhere; }
-.og-wal .wal-amt { text-align: right; white-space: nowrap; margin-right: 0; }
-.og-wal .wal-amt.is-in { color: var(--success-fg); }
-.og-wal .wal-amt.is-out { color: var(--accent); }
-.og-wal .wal-amt.is-dim { color: var(--text-dim); }
-.wal-amt small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
-.wal-more { margin-top: .8rem; }
-/* The steps to get a key are the numbered list (IndexList, Jouni's decision "Numbered list"); their
-   place, and their links keep the link colour. */
 .wal-steps { margin: .3rem 0 0; }
 .wal-steps a { color: var(--accent); }
-
-/* ── 03: the share figures are the figure strip (css/components/figure-strip.css); their place stays ── */
-.og-wal .wal-share { margin: .4rem 0 1rem; }
-.wal-rows--money { margin-top: .6rem; }
-
-/* ── 05: the two roads ─────────────────────────────────────────────────────────────────────── */
-.wal-roads { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
-/* A road is the Object box (.poster-box); the lead road is its raised tone (.poster-box--raised). */
-.wal-road { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: .9rem 1.1rem; font-size: .9rem; line-height: 1.55; }
-.wal-road p { margin: 0; }
-.wal-road small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-/* The ready-made request is the Code block (css/components/code-block.css); its place only. */
-.wal-road .code-block { margin: 0; }
-
-/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .wal-roads { grid-template-columns: minmax(0, 1fr); }
-}

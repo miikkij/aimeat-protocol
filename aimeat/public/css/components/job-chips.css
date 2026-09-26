@@ -4,16 +4,19 @@
  * SPDX-License-Identifier: MIT
  * @description The jobs that run all the time, on the Scheduler page: a wrapping row of framed buttons,
  *   each the job's name in bold with how often it runs in typewriter; coral under the pointer, and a
- *   coral frame when its last run failed. Drawn only by the Scheduler page; moved here unchanged with
- *   its class names (UI consolidation phase 5, a move). The frame reads the shape tokens.
- *   Drawn as markup by views/profile/scheduler/cover.js.
+ *   coral frame when its last run failed. Drawn by components/JobChips.js, with its own class names
+ *   (.job-chips, .job-chips-job, .job-chips-job--warn). The frame reads the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — The component's own class names (.sc-cont → .job-chips, .sc-job → .job-chips-job,
+ *     .sc-job--warn → .job-chips-job--warn); every declaration kept (Jouni: components draw only their
+ *     own class names, a move).
+ *   v1.1.0 — 2026-09-26 — Drawn by components/JobChips.js, which takes data (page group G5); no rule changes.
  *   v1.0.0 — 2026-09-25 — Moved out of scheduler-poster.css (UI consolidation phase 5, a move).
  */
 
-.sc-cont { display: flex; flex-wrap: wrap; gap: .5rem .6rem; }
-.sc-job { display: inline-flex; align-items: baseline; gap: .5rem; max-width: 100%; padding: .3rem .65rem; border: var(--shape-frame) solid var(--shape-frame-colour); background: none; cursor: pointer; font-family: var(--font-showroom-body); font-weight: 700; font-size: .8rem; color: var(--text); text-align: left; }
-.sc-job:hover { border-color: var(--accent); color: var(--accent); }
-.sc-job i { font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); white-space: nowrap; }
-.sc-job--warn { border-color: var(--accent); }
+.job-chips { display: flex; flex-wrap: wrap; gap: .5rem .6rem; }
+.job-chips-job { display: inline-flex; align-items: baseline; gap: .5rem; max-width: 100%; padding: .3rem .65rem; border: var(--shape-frame) solid var(--shape-frame-colour); background: none; cursor: pointer; font-family: var(--font-showroom-body); font-weight: 700; font-size: .8rem; color: var(--text); text-align: left; }
+.job-chips-job:hover { border-color: var(--accent); color: var(--accent); }
+.job-chips-job i { font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); white-space: nowrap; }
+.job-chips-job--warn { border-color: var(--accent); }

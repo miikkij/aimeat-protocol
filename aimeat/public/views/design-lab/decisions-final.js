@@ -11,6 +11,9 @@
  * @structure FINAL_DECISIONS — [the DECISIONS shape, plus look? and textOnly?]
  * @usage import { FINAL_DECISIONS } from './decisions-final.js';
  * @version-history
+ *   v1.1.0 — 2026-09-27 — The crops of a delivery's stars and the page thumbnail name what their
+ *     pages draw now (the List's cell with the Stars' row cut, the List's Thumb); the texts are
+ *     unchanged (the catalogue pass).
  *   v1.0.0 — 2026-09-26 — Initial: twelve questions (Jouni: everything he looks at is in the admin).
  */
 
@@ -83,7 +86,7 @@ export const FINAL_DECISIONS = [
       text: 'offers/frame.js deliveryRows: .listing-desc.op-st holds the Status and " · " with "★".repeat(stars); .op-st (offers-poster.css) does not wrap and cuts with an ellipsis; the column is minmax(0, 7rem) (listing.css .listing--when-name-who-state-doors), measured 112px at 1280. The library\'s shown tone (.op-stars--shown .op-star, rating-stars.css) is 1rem with .05rem on each side. Measured in the lab: the status "done" 39px, five library stars 75px, together 117px in the 112px cell, so the last star is cut; a longer status (queued, stalled) cuts more. The proposal (lab .dl-stars--row): .7rem, no side room, the given stars --text, the others --text-dim, after the status: the stars 47px, all of it 112px. Measured on the sandbox\'s one rated delivery ("done · ★★★★").',
     },
     variants: [
-      { id: 'row-stars', name: 'The row\'s own stars', code: '.op-st (offers/frame.js deliveryRows, offers-poster.css)', becomes: 'the library\'s five stars, cut small', look: 'the status, " · " and one ★ per star given, in the cell\'s letters; cut with … when too long', where: 'Settings & Controls: Offers, What came back', crop: { url: '/v1/profile?tab=offers', selector: '.op-st:has-text("★")' } },
+      { id: 'row-stars', name: 'The row\'s own stars', code: '.op-st (offers/frame.js deliveryRows, offers-poster.css)', becomes: 'the library\'s five stars, cut small', look: 'the status, " · " and one ★ per star given, in the cell\'s letters; cut with … when too long', where: 'Settings & Controls: Offers, What came back', crop: { url: '/v1/profile?tab=offers', selector: '.list-clip-cell:has(.stars--row)' } },
     ],
     changes: [
       { page: 'Offers: What came back, and the list on an offer\'s page', what: 'A rated delivery shows five small stars after its status: the stars given dark, the others grey. Today it shows only the stars given, grey, as letters after a dot, and a long status can cut them off.' },
@@ -162,7 +165,7 @@ export const FINAL_DECISIONS = [
     },
     variants: [
       { id: 'rail', name: 'The contents rail', code: '.og-rail (tab-page.css)', becomes: 'the new colour value (no visible change)', look: 'the text colour as ground, words in the page colour', where: 'Settings & Controls: every kit page with a contents rail', crop: { url: '/v1/profile?tab=wallet', selector: '.og-rail' } },
-      { id: 'thumb', name: 'The page thumbnail', code: '.pf-thumb (page-row.css)', becomes: 'the new colour value (no visible change)', look: 'the text colour as ground, a coral and a yellow bar', where: 'Settings & Controls: Portfolio, your pages', crop: { url: '/v1/profile?tab=portfolio', selector: '.pf-thumb' } },
+      { id: 'thumb', name: 'The page thumbnail', code: '.pf-thumb (page-row.css)', becomes: 'the new colour value (no visible change)', look: 'the text colour as ground, a coral and a yellow bar', where: 'Settings & Controls: Portfolio, your pages', crop: { url: '/v1/profile?tab=portfolio', selector: '.list-thumb' } },
     ],
     changes: [
       { page: 'AIMEAT and Pebble', what: 'Nothing you can see. A theme can now give the rail and the thumbnail a ground of its own.' },

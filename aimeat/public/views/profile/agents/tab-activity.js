@@ -5,6 +5,10 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.21.0 -- 2026-09-26 -- Onto the components: the figures are the FigureStrip (lead), governance a
+ *     section Card with the Facts (the warn tone for policy issues), the dots the StatusDot, the filter
+ *     row the Tabs (filter tone), the log the TimelineList (scroll) with its kind as a Mark (coral for
+ *     trouble), "show all" the More line, the lines the Note. The file writes no class any more.
  *   v1.20.0 -- 2026-09-26 -- The event log is the home's Timeline (components/Timeline.js): the time, a dot for the kind (trouble, access, the agent's work, the system), and one line with the kind tag kept before what happened; the grey second line joins the first (a unification: Jouni's decision "Activity log").
  *   v1.19.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.18.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -51,6 +55,14 @@ import { getLedgerUsage } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
 import { num, time as fmtTime } from '/js/format.js';
 import { TimelineList, TimelineRow } from '/components/Timeline.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts } from '/components/Facts.js';
+import { Card } from '/components/Card.js';
+import { Tabs } from '/components/Tabs.js';
+import { More } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { StatusDot } from '/components/StatusDot.js';
 
 const html = htm.bind(h);
 
@@ -207,7 +219,7 @@ export default function TabActivity({ agent, agentName }) {
   }
 
   if (loading) {
-    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
+    return html`<${Note} kind="loading" />`;
   }
 
   // Strict newest-first ordering — the backend pages can interleave lifecycle events
@@ -220,99 +232,68 @@ export default function TabActivity({ agent, agentName }) {
   const ledgerTokens = (ledgerTotals && (ledgerTotals.calls || 0) > 0) ? (ledgerTotals.total_tokens || 0) : null;
   const telemetryConnected = ledgerTokens != null || (governance?.telemetryCount || 0) > 0 || (stats?.tokensUsed30d || 0) > 0;
 
+  const g = governance;
+  const recentlySeen = socketHeld(agent) || (agent?.last_seen && (Date.now() - new Date(agent.last_seen).getTime() < 24 * 3600 * 1000));
+  const delivery = g && ((!g.mcpActive && !g.webhookEnabled)
+    ? html`<${StatusDot} status=${recentlySeen ? 'active' : 'inactive'} /> ${socketHeld(agent) ? (t('profile.agents.detail.activity.deliverySocketLine') || 'Delivery: live link') : (t('profile.agents.detail.activity.deliveryPollingLine') || 'Delivery: polling')}`
+    : html`
+      ${g.mcpActive
+        ? html`<${StatusDot} status="active" /> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`
+        : html`<${StatusDot} status="inactive" /> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.notConfigured')}`
+      }
+      ${' | '}
+      ${g.webhookEnabled
+        ? `${t('profile.agents.webhook.title')}: ${g.webhookSuccessCount}/${g.webhookTotalCount}`
+        : t('profile.agents.detail.integration.webhookNotConfigured')
+      }`);
+
   return html`
     <div>
       <!-- Stats summary -->
-      ${stats && html`
-        <div class="og-strip pf-figures">
-          <div>
-            <b>${stats.tasksCompleted ?? 0}</b>
-            <span>${t('profile.agents.activity.tasksCompleted')}</span>
-          </div>
-          <div>
-            <b>${ledgerTokens != null ? num(ledgerTokens) : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—')}</b>
-            <span>${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}</span>
-          </div>
-          <div>
-            <b>${stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-'}</b>
-            <span>${t('profile.agents.activity.successRate')}</span>
-          </div>
-        </div>
-      `}
+      ${stats && html`<${FigureStrip} lead items=${[
+        { key: 'done', n: stats.tasksCompleted ?? 0, label: t('profile.agents.activity.tasksCompleted') },
+        { key: 'tokens', n: ledgerTokens != null ? num(ledgerTokens) : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—'),
+          label: `${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}` },
+        { key: 'rate', n: stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-', label: t('profile.agents.activity.successRate') },
+      ]} />`}
 
       <!-- Governance summary -->
-      ${governance && html`
-        <div class="pf-agd-governance-section poster-row--thing">
-          <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.activity.governance.title')}</div>
-          <div class="facts">
-            ${governance.budget ? html`
-                <span class="facts-k poster-label">${t('profile.agents.detail.activity.governance.tokenBudget')}</span>
-                <span class="facts-v">${num(governance.tokensUsedToday || 0)} / ${num(governance.budget.max_tokens_per_day || '---')}${governance.budget.max_tokens_per_day ? ` (${Math.round((governance.tokensUsedToday || 0) / governance.budget.max_tokens_per_day * 100)}%)` : ''}</span>
-            ` : ''}
-              <span class="facts-k poster-label">${t('profile.agents.detail.activity.governance.tasksToday')}</span>
-              <span class="facts-v">${t('profile.agents.detail.activity.governance.completed')}: ${governance.tasksCompleted}, ${t('profile.agents.detail.activity.governance.activeTasks')}: ${governance.tasksActive}, ${t('profile.agents.detail.activity.governance.failed')}: ${governance.tasksFailed}</span>
-              <span class="facts-k poster-label">${t('profile.agents.detail.activity.governance.policyIssues')}</span>
-              <span class="facts-v ${governance.policyIssues > 0 ? 'facts-v--warn' : ''}">${governance.policyIssues}</span>
-              <span class="facts-k poster-label">${t('profile.agents.detail.activity.governance.telemetryEvents')}</span>
-              <span class="facts-v">${governance.telemetryCount}</span>
-            <span class="facts-k poster-label">${t('profile.agents.detail.activity.governance.deliveryHealth')}</span>
-            <span class="facts-v">
-              ${(!governance.mcpActive && !governance.webhookEnabled)
-                ? html`<span class="status-dot pf-agd-status-dot ${socketHeld(agent) || (agent?.last_seen && (Date.now() - new Date(agent.last_seen).getTime() < 24 * 3600 * 1000)) ? 'status-dot--active' : 'status-dot--inactive'}"></span> ${socketHeld(agent) ? (t('profile.agents.detail.activity.deliverySocketLine') || 'Delivery: live link') : (t('profile.agents.detail.activity.deliveryPollingLine') || 'Delivery: polling')}`
-                : html`
-                  ${governance.mcpActive
-                    ? html`<span class="status-dot pf-agd-status-dot status-dot--active"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`
-                    : html`<span class="status-dot pf-agd-status-dot status-dot--inactive"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.notConfigured')}`
-                  }
-                  ${' | '}
-                  ${governance.webhookEnabled
-                    ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
-                    : t('profile.agents.detail.integration.webhookNotConfigured')
-                  }`}
-            </span>
-          </div>
-        </div>
+      ${g && html`
+        <${Card} tone="section" title=${t('profile.agents.detail.activity.governance.title')}>
+          <${Facts} rows=${[
+            g.budget && { k: t('profile.agents.detail.activity.governance.tokenBudget'),
+              v: `${num(g.tokensUsedToday || 0)} / ${num(g.budget.max_tokens_per_day || '---')}${g.budget.max_tokens_per_day ? ` (${Math.round((g.tokensUsedToday || 0) / g.budget.max_tokens_per_day * 100)}%)` : ''}` },
+            { k: t('profile.agents.detail.activity.governance.tasksToday'),
+              v: `${t('profile.agents.detail.activity.governance.completed')}: ${g.tasksCompleted}, ${t('profile.agents.detail.activity.governance.activeTasks')}: ${g.tasksActive}, ${t('profile.agents.detail.activity.governance.failed')}: ${g.tasksFailed}` },
+            { k: t('profile.agents.detail.activity.governance.policyIssues'), v: g.policyIssues, warn: g.policyIssues > 0 },
+            { k: t('profile.agents.detail.activity.governance.telemetryEvents'), v: g.telemetryCount },
+            { k: t('profile.agents.detail.activity.governance.deliveryHealth'), v: delivery },
+          ]} />
+        <//>
       `}
 
       <!-- Filter bar -->
-      <div class="pf-agd-filter-bar">
-        ${FILTERS.map(f => {
-          const label = t(f.key);
-          return html`
-            <button key=${f.id}
-                    class="poster-tab poster-tab--filter ${filter === f.id ? 'is-on' : ''}"
-                    onClick=${() => setFilter(f.id)}>
-              ${label !== f.key ? label : f.id.charAt(0).toUpperCase() + f.id.slice(1)}
-            </button>
-          `;
-        })}
-      </div>
+      <${Tabs} tone="filter" value=${filter} onSelect=${setFilter} items=${FILTERS.map((f) => {
+        const label = t(f.key);
+        return { value: f.id, label: label !== f.key ? label : f.id.charAt(0).toUpperCase() + f.id.slice(1) };
+      })} />
 
       <!-- Event log -->
-      <div class="pf-agd-event-log-scroll">
-        ${filtered.length === 0 && html`
-          <div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.empty.activity')}</div>
-        `}
-        ${filtered.length > 0 && html`<${TimelineList}>${filtered.map((ev, i) => {
-          const cat = eventCategory(ev);
-          const evType = (ev.type || '').toLowerCase();
-          const trouble = evType.includes('policy') || evType.includes('violation');
-          const badgeClass = trouble ? 'poster-chip--coral' : '';
-          return html`
-            <${TimelineRow} key=${ev.id || i} category=${dotOf(cat, evType)}
-              when=${ev.timestamp ? fmtTime(ev.timestamp, { hour: '2-digit', minute: '2-digit' }) : '-'}
-              text=${html`<span class="poster-chip ${badgeClass}">${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}</span> ${ev.type || ev.event || '-'}${ev.message ? `: ${ev.message}` : ''}`} />
-          `;
-        })}<//>`}
-      </div>
+      ${filtered.length === 0 && html`<${Note} kind="quiet">${t('profile.agents.detail.empty.activity')}<//>`}
+      ${filtered.length > 0 && html`<${TimelineList} scroll>${filtered.map((ev, i) => {
+        const cat = eventCategory(ev);
+        const evType = (ev.type || '').toLowerCase();
+        const trouble = evType.includes('policy') || evType.includes('violation');
+        return html`
+          <${TimelineRow} key=${ev.id || i} category=${dotOf(cat, evType)}
+            when=${ev.timestamp ? fmtTime(ev.timestamp, { hour: '2-digit', minute: '2-digit' }) : '-'}
+            text=${html`<${Mark} tone=${trouble ? 'coral' : undefined}>${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}<//> ${ev.type || ev.event || '-'}${ev.message ? `: ${ev.message}` : ''}`} />
+        `;
+      })}<//>`}
 
-      ${hasMore && html`
-        <button class="poster-action poster-action--more" onClick=${handleLoadMore}>
-          ${t('profile.agents.detail.showAll')}
-        </button>
-      `}
+      ${hasMore && html`<${More} label=${t('profile.agents.detail.showAll')} onMore=${handleLoadMore} />`}
 
-      <div class="poster-hint pf-agd-help-text">${t('profile.agents.detail.activity.auditTrail')}</div>
+      <${Note}>${t('profile.agents.detail.activity.auditTrail')}<//>
     </div>
   `;
 }

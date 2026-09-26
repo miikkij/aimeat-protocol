@@ -5,11 +5,15 @@
  * @description Shared "human-readable value" renderer. Renders a JSON object/array as an indented
  *   key/value TREE (type-coloured primitives) — far easier to scan than raw JSON — and renders a
  *   non-JSON string as safe Markdown. Mirrors the agent-tasks memory renderer so structured data
- *   looks the SAME everywhere. The tree's look is css/components/json-view.css (the `pf-agd-json-*`
- *   classes); the Markdown wrapper `pf-agd-task-memory-md` is styled in css/views/agents-detail.css.
+ *   looks the SAME everywhere. The tree's look is css/components/json-view.css (its own class names,
+ *   `json-view-*`); the Markdown wrapper `json-view-text` has no rules of its own.
  * @structure parseValue · JsonNode · JsonValue
  * @usage import { JsonValue } from '/components/JsonView.js';  html`<${JsonValue} value=${v} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — Its own class names (.pf-agd-json-* → .json-view-*, block, row, row--nested,
+ *     key, str, num, bool, null, empty; the Markdown wrapper .pf-agd-task-memory-md → .json-view-text,
+ *     which no sheet styles); every rule keeps its value (Jouni: components draw only their own class
+ *     names, a move).
  *   v1.0.1 — 2026-09-25 — The tree's rules live in css/components/json-view.css (UI consolidation phase 5, a move).
  *   v1.0.0 — 2026-06-15 — extracted the agents-tasks structured JSON/markdown renderer into a shared
  *     component so the Ecosystem-apps "Data this app wrote" view (and others) render values the same way.
@@ -41,22 +45,22 @@ export function parseValue(value) {
  * type-coloured values. Far easier to scan than raw JSON. (Same markup the agent tasks view uses.)
  */
 export function JsonNode({ value }) {
-  if (value === null) return html`<span class="pf-agd-json-null">null</span>`;
+  if (value === null) return html`<span class="json-view-null">null</span>`;
   const ty = typeof value;
-  if (ty === 'string') return html`<span class="pf-agd-json-str">${value}</span>`;
-  if (ty === 'number') return html`<span class="pf-agd-json-num">${value}</span>`;
-  if (ty === 'boolean') return html`<span class="pf-agd-json-bool">${value ? 'true' : 'false'}</span>`;
+  if (ty === 'string') return html`<span class="json-view-str">${value}</span>`;
+  if (ty === 'number') return html`<span class="json-view-num">${value}</span>`;
+  if (ty === 'boolean') return html`<span class="json-view-bool">${value ? 'true' : 'false'}</span>`;
   const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v]) : Object.entries(value || {});
   if (entries.length === 0) {
-    return html`<span class="pf-agd-json-empty">${Array.isArray(value) ? '[ ]' : '{ }'}</span>`;
+    return html`<span class="json-view-empty">${Array.isArray(value) ? '[ ]' : '{ }'}</span>`;
   }
   return html`
-    <div class="pf-agd-json-block">
+    <div class="json-view-block">
       ${entries.map(([k, v]) => {
         const nested = v !== null && typeof v === 'object';
         return html`
-          <div class=${`pf-agd-json-row ${nested ? 'pf-agd-json-row--nested' : ''}`} key=${k}>
-            <span class="pf-agd-json-key">${k}</span>
+          <div class=${`json-view-row ${nested ? 'json-view-row--nested' : ''}`} key=${k}>
+            <span class="json-view-key">${k}</span>
             <${JsonNode} value=${v} />
           </div>`;
       })}
@@ -67,5 +71,5 @@ export function JsonNode({ value }) {
 export function JsonValue({ value }) {
   const { json, raw } = parseValue(value);
   if (json !== undefined) return html`<${JsonNode} value=${json} />`;
-  return html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`;
+  return html`<div class="json-view-text"><${Markdown} text=${raw} /></div>`;
 }

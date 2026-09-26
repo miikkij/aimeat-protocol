@@ -3,14 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The agent card's Tasks tab in the poster face (agt- prefix; design canvas
- *   "Tasks.dc.html"). The shared shapes come from poster.css (.poster-record, .poster-record-title)
- *   and organism.css (.og-label, .og-door, .og-slab, .og-chip, .og-field); this file carries what
- *   the task queue adds: the runs-at-a-time sentence, the bucket bar and its search, the four-column
- *   task row, the opened task's record with its parts (to do, what happened, details, memory,
- *   rating) and the actions row. NOTE: this file must be linked in spa.html AFTER organism.css
- *   and profile-poster.css (useViewCSS is a no-op, and the underline inputs tie on specificity
- *   with the raw .pf field rules).
+ *   "Tasks.dc.html"). The Tasks tab draws every part with a component now (views/profile/
+ *   agents-tasks-subtab.js, agents/task-item.js: the List, its Panel, Tabs, SearchLine, TextField,
+ *   Facts, Stars); what is left here is only what the design lab's samples still draw with the old
+ *   markup (the tab's face, a mono line, the rating row), for the lead's pass over the lab.
+ *   NOTE: this file must be linked in spa.html AFTER organism.css and profile-poster.css.
  * @version-history
+ *   v1.19.0 -- 2026-09-26 -- Every part of the Tasks tab is a component (page group G1a): the head line, the
+ *     runs sentence, the buckets and the search, the row's eye and blurred name, the record's head,
+ *     its parts, the preview, the actions row, the empty lines and the create form go with their rules;
+ *     the rules the design lab's samples still use stay.
  *   v1.18.0 -- 2026-09-26 -- A task's description is the Markdown reader's small cut: its size and line go, its place and width stay (a unification: Jouni's decision "Small reader").
  *   v1.17.0 -- 2026-09-26 -- An opened task's "What happened" is the Timeline (components/Timeline.js); the .agt-log table, .agt-w and .agt-msg go (a unification: Jouni's decision "Activity log").
  *   v1.16.0 -- 2026-09-26 -- A rated task's stars are the library's Rating stars in the shown tone (css/components/rating-stars.css); .agt-stars and .agt-stars-off go (a unification: Jouni's decision "Rating stars").
@@ -36,78 +38,9 @@
  *   v1.0.0 -- 2026-09-14 -- Initial: the Tasks tab wears the poster face.
  */
 
+/* ── Kept for the design lab's samples only ─────────────────────────────────────────────────── */
 .agt-tab { font-family: var(--font-showroom-body); color: var(--text); }
-
-/* ── The top line: what this is, and the one loud action ────────────────────────────────────── */
-.agt-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-
-/* ── Runs [ n ] task at a time. The field is the Text field (.og-input); only its box is ours. ── */
-.agt-runs { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; margin: 1rem 0 1.2rem; font-size: .95rem; font-weight: 600; }
-.agt-tab input.agt-runs-n {
-  width: 2.4rem; padding: 0 0 .1rem; text-align: center; appearance: textfield;
-}
-.agt-tab input.agt-runs-n::-webkit-outer-spin-button,
-.agt-tab input.agt-runs-n::-webkit-inner-spin-button { appearance: none; margin: 0; }
-.agt-tab input.agt-runs-n:disabled { opacity: .5; }
-.agt-runs .poster-hint { margin: 0; }
-
-/* ── The buckets, and the search that opens under them ──────────────────────────────────────── */
-.agt-filters { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; margin: 1.2rem 0 .2rem; }
-/* "Find a task" is the action link (.poster-action, its quiet tone); its place only. */
-.agt-tab .agt-find { margin-left: auto; }
-
-.search-line.agt-search { flex-wrap: wrap; }
-.agt-tab .agt-search .og-input { flex: 1 1 16rem; }
-.agt-chips { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-
-/* ── One task, closed: the Listing (css/components/listing.css), cut name-count-when-state. The
-      row opens its record when pressed anywhere but inside the record; the eye sits before the
-      name, and the name turns coral while its record is open. ───────────────────────────────── */
-.agt-tab .listing-row.agt-row > div:where(:not(.listing-open)) { cursor: pointer; }
-.agt-nm-t.is-open { color: var(--accent); }
-.agt-nm-t.is-hidden { filter: blur(6px); user-select: none; }
-/* The eye before a task's name is the icon button (.poster-icon, its small cut); its place only. */
-.agt-tab .agt-eye { flex: none; vertical-align: middle; margin-right: .55rem; }
-.agt-eye svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
 .agt-m:where(:not(.poster-time)) { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
-
-/* A task's state is the Status (poster.css); only its place in the row is here. */
-.agt-tab .agt-status { display: inline-block; white-space: nowrap; justify-self: start; }
-
-/* ── One task, open: the record (the Listing's open panel) and its parts ─────────────────────── */
-.agt-record-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-/* The description is the Markdown reader's small cut (Markdown `small`); its place and width only. */
-.agt-desc { margin: .6rem 0 0; max-width: 760px; }
-.agt-stamps { display: block; margin-top: .5rem; }
-
-/* The 3px top rule is .poster-row--thing, carried in the markup beside this class. */
-.agt-part { margin-top: 1.4rem; padding-top: .7rem; }
-.agt-part-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .4rem; }
-
-/* ── To do: the to-do list is its own part now (css/components/todo-list.css) ───────────────── */
-
-/* ── What happened: the Timeline (components/Timeline.js) ───────────────────────────────────── */
-
-/* ── Details, memory, rating ────────────────────────────────────────────────────────────────── */
-/* The details are the Facts (css/components/facts.css); the deliverable's door keeps its place. */
 .agt-tab .facts-v > .poster-action { margin-left: .6rem; }
-.agt-preview { margin-top: .8rem; }
-.agt-preview img { max-width: 100%; height: auto; }
 .agt-rating { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; font-size: .9rem; }
 .agt-rating-note { color: var(--text-dim); }
-
-/* ── The actions, with what cannot be undone pushed to the far right ────────────────────────── */
-.agt-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; margin-top: 1.2rem; }
-.agt-actions .agt-act-end { margin-left: auto; }
-.agt-actions .agt-act-end ~ .agt-act-end { margin-left: 0; }
-
-/* ── Nothing here yet ───────────────────────────────────────────────────────────────────────── */
-.agt-empty { margin: .8rem 0; }
-
-/* ── The create form. The top rule is .poster-row--thing, the text area .og-textarea, the
-      underline field .og-input; this sheet holds the sizes only. ─────────────────────────────── */
-.agt-form { display: flex; flex-direction: column; gap: 1.1rem; margin: 1.2rem 0 1.4rem; padding-top: 1.1rem; }
-.agt-tab .agt-ta { margin: 0; }
-/* The character count under the text area: the Count (.poster-count); its place only. */
-.agt-count { margin-top: .3rem; text-align: right; }
-.agt-form-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }

@@ -10,6 +10,7 @@
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the frame is SettingsPage (crumb, head with its rename field, strip, rail as data), the sections Section (the four instruction prompts still fold), the runs and the versions the List, the editors Field and Text area with the count beside the label, the roads Roads, the lines Note (component plan, page group G4).
  *   v1.17.0 -- 2026-09-26 -- The ready-made request is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -40,18 +41,26 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { CopyButton } from '/components/CopyButton.js';
-import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Section } from '/components/Section.js';
+import { Folds } from '/components/Folds.js';
+import { railSection } from '/components/Rail.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure } from '/components/Figure.js';
+import { List, Row, Cell, Doors } from '/components/List.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Field, Fields } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Roads, Road } from '/components/Roads.js';
+import { Stack } from '/components/Layout.js';
 import { x, dateWord, timeWord, isEmptyRun, runAverage, runsInOrder, judgeOf, candidatesOf, crumb, pageLinks } from './frame.js';
 import { ScoreChart } from './chart.js';
 import { runRow, emptiesRow } from './run.js';
 import { secModels } from './models.js';
-import { Hint } from '/components/Hint.js';
 
-const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
-const msg = (m) => (m ? html`<small class=${`form-message ${m.error ? 'form-message--error' : ''}`}>${m.text}</small>` : null);
+const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 const TEMPLATES = [
   { key: 'analysis', field: 'analysisPromptTemplate' },
   { key: 'reflection', field: 'reflectionPromptTemplate' },
@@ -65,75 +74,61 @@ export function renderPage(ctx) {
   const runs = runsInOrder(ctx.batches);
   const empties = (ctx.batches || []).filter(isEmptyRun);
   const latest = runs.length ? runs[runs.length - 1] : null;
-  const rail = [
-    ['01', 'cal-runs', x('secRuns'), runs.length ? x('railRuns', { n: runs.length }) : '0'],
-    ['02', 'cal-prompt', x('secPrompt'), p.currentVersion ? 'v' + p.currentVersion : ''],
-    ['03', 'cal-models', x('secModels'), x('railModels', { n: candidatesOf(p).length })],
-    ['04', 'cal-templates', x('secTemplates'), '4'],
-    ['05', 'cal-roads', x('secRoads'), ''],
+  const sections = [
+    { num: '01', id: 'cal-runs', label: x('secRuns'), count: runs.length ? x('railRuns', { n: runs.length }) : '0' },
+    { num: '02', id: 'cal-prompt', label: x('secPrompt'), count: p.currentVersion ? 'v' + p.currentVersion : '' },
+    { num: '03', id: 'cal-models', label: x('secModels'), count: x('railModels', { n: candidatesOf(p).length }) },
+    { num: '04', id: 'cal-templates', label: x('secTemplates'), count: '4' },
+    { num: '05', id: 'cal-roads', label: x('secRoads'), count: '' },
   ];
+  const rail = {
+    title: x('railTitle'),
+    groups: [
+      { label: x('railTitle'), items: sections.map(railSection) },
+      { items: [{ back: true, key: 'back', label: x('allCalibrations'), onClick: () => ctx.back() }] },
+      { label: x('pages'), rule: false, items: pageLinks() },
+    ],
+  };
   return html`
-    <div class="og og-cal og-page">
-      ${crumb(p.name)}
-      ${mast(ctx, runs, latest)}
-      ${strip(ctx, runs, latest)}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">
-          ${secRuns(ctx, runs, empties)}
-          ${secPrompt(ctx)}
-          ${secModels(ctx)}
-          ${secTemplates(ctx)}
-          ${secRoads(ctx)}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${rail.map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <button type="button" class="og-rail-link" onClick=${() => ctx.back()}><i>←</i>${x('allCalibrations')}</button>
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} page crumb=${crumb(p.name)} ...${mast(ctx, runs, latest)} strip=${strip(ctx, runs, latest)} rail=${rail}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${secRuns(ctx, runs, empties)}
+      ${secPrompt(ctx)}
+      ${secModels(ctx)}
+      ${secTemplates(ctx)}
+      ${secRoads(ctx)}
+    <//>`;
 }
 
+/** The head's data: the name (or its rename field), the tags, the sentence, the run and the doors. */
 function mast(ctx, runs, latest) {
   const p = ctx.project;
   const judge = judgeOf(p, ctx.settings);
   const cands = candidatesOf(p);
   const avg = latest ? runAverage(latest) : null;
   const canRun = !!p.currentVersion && cands.length > 0 && ctx.keyed && !ctx.anyRunning;
-  const chips = [
-    avg != null ? chip(x('chipLatest', { n: avg }), 'poster-chip--sun') : chip(p.currentVersion ? x('chipNoRuns') : x('chipNoPrompt'), 'poster-chip--coral'),
-    chip(x('chipCandidates', { n: cands.length })),
-    judge.modelId ? chip(x('chipJudge', { name: judge.label })) : null,
-    chip(x('chipRunsVersions', { runs: (ctx.batches || []).length, done: runs.length, v: p.currentVersion || 0 })),
-    p.status === 'archived' ? chip(x('archived')) : null,
+  const marks = [
+    avg != null ? { label: x('chipLatest', { n: avg }), tone: 'sun' } : { label: p.currentVersion ? x('chipNoRuns') : x('chipNoPrompt'), tone: 'coral' },
+    { label: x('chipCandidates', { n: cands.length }) },
+    judge.modelId ? { label: x('chipJudge', { name: judge.label }) } : null,
+    { label: x('chipRunsVersions', { runs: (ctx.batches || []).length, done: runs.length, v: p.currentVersion || 0 }) },
+    p.status === 'archived' ? { label: x('archived') } : null,
   ];
-  return html`
-    <div class="og-mast og-mast--page">
-      <div class="og-mast-words">
-        ${ctx.renaming ? html`
-          <div class="cal-rename">
-            <input class="og-input" type="text" value=${ctx.nameDraft} aria-label=${x('rename')} onInput=${(e) => ctx.setNameDraft(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') ctx.saveName(); if (e.key === 'Escape') ctx.setRenaming(false); }} />
-            <button type="button" class="poster-action poster-action--small" disabled=${!ctx.nameDraft.trim() || ctx.busy === 'project'} onClick=${() => ctx.saveName()}>${x('save')}</button>
-            <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setRenaming(false)}>${x('cancel')}</button>
-          </div>` : html`<h1 class="og-title poster-page-title">${p.name}<small>${x('titleSubProject')}</small></h1>`}
-        <div class="poster-chips">${chips}</div>
-        <p class="og-desc og-desc--page">${x('projectDesc')}${avg != null && runs.length >= 2 ? ' ' + x('projectDescTrend', { from: runAverage(runs[0]) ?? 0, to: avg, n: runs.length }) : ''}</p>
-        ${msg(ctx.projectMsg)}
-      </div>
-      <div class="og-mast-actions">
-        <button type="button" class="poster-slab poster-slab--control" disabled=${!canRun} onClick=${() => ctx.newRun()}>${ctx.anyRunning ? x('running') : x('newRun')}</button>
-        ${!canRun && !ctx.anyRunning ? html`<small class="poster-hint poster-hint--slab">${!ctx.keyed ? x('needKey') : !p.currentVersion ? x('needPrompt') : !cands.length ? x('needCandidate') : ''}</small>` : null}
-        <div class="og-doors">
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setRenaming(true)}>${x('rename')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'project'} onClick=${() => ctx.setArchived(p.status !== 'archived')}>${p.status === 'archived' ? x('unarchive') : x('archive')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" disabled=${ctx.busy === 'project'} onClick=${() => ctx.deleteProject()}>${x('deleteCalibration')}</button>
-        </div>
-      </div>
-    </div>`;
+  const edit = ctx.renaming ? html`
+    <${TextField} value=${ctx.nameDraft} ariaLabel=${x('rename')} onInput=${(v) => ctx.setNameDraft(v)} onEnter=${() => ctx.saveName()} onEscape=${() => ctx.setRenaming(false)}
+      actions=${html`
+        <${Action} small disabled=${!ctx.nameDraft.trim() || ctx.busy === 'project'} onClick=${() => ctx.saveName()}>${x('save')}<//>
+        <${Action} small soft onClick=${() => ctx.setRenaming(false)}>${x('cancel')}<//>`} />` : null;
+  const desc = html`${x('projectDesc')}${avg != null && runs.length >= 2 ? ' ' + x('projectDescTrend', { from: runAverage(runs[0]) ?? 0, to: avg, n: runs.length }) : ''}${msg(ctx.projectMsg)}`;
+  const actions = html`
+    <${Loud} control disabled=${!canRun} onClick=${() => ctx.newRun()}>${ctx.anyRunning ? x('running') : x('newRun')}<//>
+    ${!canRun && !ctx.anyRunning ? html`<${Note} kind="hint" slab inline>${!ctx.keyed ? x('needKey') : !p.currentVersion ? x('needPrompt') : !cands.length ? x('needCandidate') : ''}<//>` : null}
+    <${Actions}>
+      <${Action} small soft onClick=${() => ctx.setRenaming(true)}>${x('rename')}<//>
+      <${Action} small soft disabled=${ctx.busy === 'project'} onClick=${() => ctx.setArchived(p.status !== 'archived')}>${p.status === 'archived' ? x('unarchive') : x('archive')}<//>
+      <${Action} small soft tone="danger" disabled=${ctx.busy === 'project'} onClick=${() => ctx.deleteProject()}>${x('deleteCalibration')}<//>
+    <//>`;
+  return { title: p.name, sub: x('titleSubProject'), edit, marks, desc, actions };
 }
 
 function strip(ctx, runs, latest) {
@@ -143,13 +138,18 @@ function strip(ctx, runs, latest) {
   const avg = latest ? runAverage(latest) : null;
   const first = runs.length >= 2 ? runAverage(runs[0]) : null;
   const cur = ctx.current;
-  return html`
-    <div class="og-strip">
-      <div>${avg != null ? html`<b>${avg} %</b><span>${x('stripLatest')}</span><small>${x('stripLatestSub', { date: dateWord(latest.createdAt), v: latest.promptVersion, n: (latest.scores || []).length })}</small>` : html`<b class="is-dim">·</b><span>${x('stripLatest')}</span><small>${x('stripNoRuns')}</small>`}</div>
-      <div>${first != null && avg != null ? html`<b>${first} % → ${avg} %</b><span>${x('stripTrend', { n: runs.length })}</span><small>${x('stripTrendSub', { from: runs[0].promptVersion, to: latest.promptVersion })}</small>` : html`<b class="is-dim">·</b><span>${x('stripTrend', { n: runs.length })}</span><small>${x('stripTrendNone')}</small>`}</div>
-      <div><b>${cands.length}</b><span>${x('stripCandidates')}</span><small>${judge.modelId ? x('stripJudge', { name: judge.label }) : x('stripNoJudge')}</small></div>
-      <div>${cur ? html`<b>v${cur.version}</b><span>${x('stripVersion')}</span><small>${dateWord(cur.createdAt)} · ${cur.changelog || ''}</small>` : html`<b class="is-dim">·</b><span>${x('stripVersion')}</span><small>${x('stripNoVersion')}</small>`}</div>
-    </div>`;
+  return html`<${FigureStrip} items=${[
+    avg != null
+      ? { key: 'latest', n: `${avg} %`, label: x('stripLatest'), sub: x('stripLatestSub', { date: dateWord(latest.createdAt), v: latest.promptVersion, n: (latest.scores || []).length }) }
+      : { key: 'latest', n: '·', tone: 'dim', label: x('stripLatest'), sub: x('stripNoRuns') },
+    first != null && avg != null
+      ? { key: 'trend', n: `${first} % → ${avg} %`, label: x('stripTrend', { n: runs.length }), sub: x('stripTrendSub', { from: runs[0].promptVersion, to: latest.promptVersion }) }
+      : { key: 'trend', n: '·', tone: 'dim', label: x('stripTrend', { n: runs.length }), sub: x('stripTrendNone') },
+    { key: 'models', n: cands.length, label: x('stripCandidates'), sub: judge.modelId ? x('stripJudge', { name: judge.label }) : x('stripNoJudge') },
+    cur
+      ? { key: 'version', n: `v${cur.version}`, label: x('stripVersion'), sub: html`${dateWord(cur.createdAt)} · ${cur.changelog || ''}` }
+      : { key: 'version', n: '·', tone: 'dim', label: x('stripVersion'), sub: x('stripNoVersion') },
+  ]} />`;
 }
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -157,15 +157,14 @@ function strip(ctx, runs, latest) {
 function secRuns(ctx, runs, empties) {
   const newest = runs.slice().reverse();
   return html`
-    <${PageSection} id="cal-runs" num="01" title=${x('secRuns')} count=${runs.length ? x('secRunsSub', { n: runs.length, empty: empties.length }) : null} first=${true}>
-      ${!runs.length && !empties.length ? html`<p class="poster-quiet cal-empty"><b>${x('noRunsLead')}</b> ${x('noRunsBody')}</p>` : html`
-        <div class="listing listing--name-score-desc-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('colRun')}</div><div class="poster-label">${x('colScores')}</div><div class="poster-label">${x('colWhat')}</div><div class="poster-label"></div></div>
-          ${newest.map((r) => runRow(ctx, r))}
-          ${emptiesRow(ctx, empties)}
-        </div>`}
+    <${Section} id="cal-runs" num="01" title=${x('secRuns')} count=${runs.length ? x('secRunsSub', { n: runs.length, empty: empties.length }) : null} first=${true}>
+      <${List} cols="name-score-desc-doors" head=${[x('colRun'), x('colScores'), x('colWhat'), '']}
+        empty=${html`<${Note} kind="quiet"><b>${x('noRunsLead')}</b> ${x('noRunsBody')}<//>`}>
+        ${newest.map((r) => runRow(ctx, r))}
+        ${emptiesRow(ctx, empties)}
+      <//>
       ${runs.filter((r) => runAverage(r) != null).length ? html`<${ScoreChart} runs=${runs} />` : null}
-      <${Hint}>${x('hintRuns')}<//>
+      <${Note}>${x('hintRuns')}<//>
     <//>`;
 }
 
@@ -177,32 +176,29 @@ function secPrompt(ctx) {
   const readOnly = !!viewing && viewing.version !== p.currentVersion;
   const versions = (ctx.versions || []).slice().reverse();
   return html`
-    <${PageSection} id="cal-prompt" num="02" title=${x('secPrompt')} count=${p.currentVersion ? x('secPromptSub', { n: (ctx.versions || []).length }) : null}>
-      ${versions.length ? html`
-        <div class="cal-vers">
-          ${versions.map((v) => versionRow(ctx, v, viewing))}
-        </div>` : html`<p class="poster-quiet cal-empty"><b>${x('noVersionLead')}</b> ${x('noVersionBody')}</p>`}
-      ${readOnly ? html`<p class="form-message">${x('viewingOld', { n: viewing.version })} <button type="button" class="poster-action poster-action--back" onClick=${() => ctx.backToCurrent()}>${x('backToCurrent')}</button></p>` : null}
-      <div class="cal-editors">
-        <div class="cal-field">
-          <span class="poster-label">${x('prompt')}${viewing ? ` · v${viewing.version}` : ''}<small>${x('charsN', { n: (ctx.promptDraft || '').length })}</small></span>
-          <textarea class="og-textarea" rows="12" value=${ctx.promptDraft} disabled=${readOnly} placeholder=${x('promptPlaceholder')} aria-label=${x('prompt')} onInput=${(e) => ctx.setPromptDraft(e.target.value)}></textarea>
-          <div class="og-doors"><${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${ctx.promptDraft} label=${x('copyPrompt')} disabled=${!ctx.promptDraft} /></div>
-        </div>
-        <div class="cal-field">
-          <span class="poster-label">${x('target')}<small>${x('charsN', { n: (ctx.targetDraft || '').length })}</small></span>
-          <textarea class="og-textarea" rows="12" value=${ctx.targetDraft} disabled=${readOnly} placeholder=${x('targetPlaceholder')} aria-label=${x('target')} onInput=${(e) => ctx.setTargetDraft(e.target.value)}></textarea>
-          <div class="og-doors"><${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${ctx.targetDraft} label=${x('copyTarget')} disabled=${!ctx.targetDraft} /></div>
-        </div>
-      </div>
+    <${Section} id="cal-prompt" num="02" title=${x('secPrompt')} count=${p.currentVersion ? x('secPromptSub', { n: (ctx.versions || []).length }) : null}>
+      <${List} cols="label-words-doors" empty=${html`<${Note} kind="quiet"><b>${x('noVersionLead')}</b> ${x('noVersionBody')}<//>`}>
+        ${versions.map((v) => versionRow(ctx, v, viewing))}
+      <//>
+      ${readOnly ? html`<${Note} kind="message">${x('viewingOld', { n: viewing.version })} <${Action} tone="back" onClick=${() => ctx.backToCurrent()}>${x('backToCurrent')}<//><//>` : null}
+      <${Fields} cols=${2}>
+        <${Field} id="cal-prompt-text" label=${html`${x('prompt')}${viewing ? ` · v${viewing.version}` : ''}`} labelNote=${x('charsN', { n: (ctx.promptDraft || '').length })}>
+          <${TextArea} id="cal-prompt-text" rows=${12} value=${ctx.promptDraft} disabled=${readOnly} placeholder=${x('promptPlaceholder')} ariaLabel=${x('prompt')} onInput=${(v) => ctx.setPromptDraft(v)} />
+          <${Actions}><${Action} small soft copy=${ctx.promptDraft} disabled=${!ctx.promptDraft}>${x('copyPrompt')}<//><//>
+        <//>
+        <${Field} id="cal-target-text" label=${x('target')} labelNote=${x('charsN', { n: (ctx.targetDraft || '').length })}>
+          <${TextArea} id="cal-target-text" rows=${12} value=${ctx.targetDraft} disabled=${readOnly} placeholder=${x('targetPlaceholder')} ariaLabel=${x('target')} onInput=${(v) => ctx.setTargetDraft(v)} />
+          <${Actions}><${Action} small soft copy=${ctx.targetDraft} disabled=${!ctx.targetDraft}>${x('copyTarget')}<//><//>
+        <//>
+      <//>
       ${!readOnly ? html`
-        <div class="cal-save">
-          <input class="og-input" type="text" value=${ctx.changelog} placeholder=${x('changelogPlaceholder')} aria-label=${x('changelog')} onInput=${(e) => ctx.setChangelog(e.target.value)} />
-          <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'version' || !ctx.promptDraft.trim() || !ctx.dirty} onClick=${() => ctx.saveVersion()}>${p.currentVersion ? x('saveVersion', { n: p.currentVersion + 1 }) : x('saveFirstVersion')}</button>
-        </div>
-        <small class="poster-hint">${p.currentVersion ? x('saveVersionHint') : x('saveFirstVersionHint')}</small>` : null}
+        <${Stack} above="large">
+          <${TextField} value=${ctx.changelog} placeholder=${x('changelogPlaceholder')} ariaLabel=${x('changelog')} onInput=${(v) => ctx.setChangelog(v)}
+            actions=${html`<${Loud} control disabled=${ctx.busy === 'version' || !ctx.promptDraft.trim() || !ctx.dirty} onClick=${() => ctx.saveVersion()}>${p.currentVersion ? x('saveVersion', { n: p.currentVersion + 1 }) : x('saveFirstVersion')}<//>`} />
+          <${Note}>${p.currentVersion ? x('saveVersionHint') : x('saveFirstVersionHint')}<//>
+        <//>` : null}
       ${msg(ctx.promptMsg)}
-      <${Hint}>${x('hintPrompt')}<//>
+      <${Note}>${x('hintPrompt')}<//>
     <//>`;
 }
 
@@ -210,37 +206,39 @@ function versionRow(ctx, v, viewing) {
   const p = ctx.project;
   const shown = viewing ? viewing.version === v.version : v.version === p.currentVersion;
   return html`
-    <div class=${`cal-ver ${shown ? 'is-on' : ''}`} key=${v.version}>
-      <div class="cal-ver-n poster-stat-number poster-stat-number--small">v${v.version}<small>${dateWord(v.createdAt)} ${timeWord(v.createdAt)}</small></div>
-      <div class="cal-ver-w">${v.changelog || x('noChangelog')}${v.version === p.currentVersion ? html` <span class="poster-chip poster-chip--sun">${x('current')}</span>` : null}</div>
-      <div class="cal-ver-go">${shown ? html`<small>${x('shown')}</small>` : html`<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.viewVersion(v.version)}>${x('show')}</button>`}</div>
-    </div>`;
+    <${Row} key=${v.version} selected=${shown}>
+      <${Cell}><${Figure} small n=${`v${v.version}`} sub=${`${dateWord(v.createdAt)} ${timeWord(v.createdAt)}`} /><//>
+      <${Cell}>${v.changelog || x('noChangelog')}${v.version === p.currentVersion ? html` <${Mark} tone="sun">${x('current')}<//>` : null}<//>
+      <${Doors}>${shown
+        ? html`<${Note} kind="meta" inline>${x('shown')}<//>`
+        : html`<${Action} small row soft onClick=${() => ctx.viewVersion(v.version)}>${x('show')}<//>`}<//>
+    <//>`;
 }
 
 /* ── 04 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secTemplates(ctx) {
   return html`
-    <${PageSection} id="cal-templates" num="04" title=${x('secTemplates')} count=${null}>
-      <p class="og-lead">${x('templatesIntro')}</p>
-      <div class="og-folds">
+    <${Section} id="cal-templates" num="04" title=${x('secTemplates')} count=${null}>
+      <${Note} kind="lead">${x('templatesIntro')}<//>
+      <${Folds}>
         ${TEMPLATES.map((tp, i) => {
           const open = ctx.templatesOpen.has(tp.key);
           const draft = ctx.templateDrafts[tp.key] ?? '';
           const stored = ctx.project[tp.field] || '';
           return html`
-            <${FoldSection} key=${tp.key} id=${'cal-tpl-' + tp.key} num=${String(i + 1).padStart(2, '0')} title=${x('tpl.' + tp.key)} sub=${x('charsN', { n: stored.length })} open=${open} onToggle=${() => ctx.toggleTemplate(tp.key)}>
-              <p class="og-lead">${x('tplWhat.' + tp.key)}</p>
-              <small class="poster-hint">${x('tplSlots.' + tp.key)}</small>
-              <textarea class="og-textarea" rows="14" value=${draft} aria-label=${x('tpl.' + tp.key)} onInput=${(e) => ctx.setTemplateDraft(tp.key, e.target.value)}></textarea>
-              <div class="og-doors">
-                <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'template' || draft === stored || !draft.trim()} onClick=${() => ctx.saveTemplate(tp.key)}>${x('save')}</button>
-                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'template'} onClick=${() => ctx.resetTemplate(tp.key)}>${x('resetTemplate')}</button>
-                <${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${draft} label=${x('copy')} />
-              </div>
+            <${Section} fold key=${tp.key} id=${'cal-tpl-' + tp.key} num=${String(i + 1).padStart(2, '0')} title=${x('tpl.' + tp.key)} sub=${x('charsN', { n: stored.length })} open=${open} onToggle=${() => ctx.toggleTemplate(tp.key)}>
+              <${Note} kind="lead">${x('tplWhat.' + tp.key)}<//>
+              <${Note}>${x('tplSlots.' + tp.key)}<//>
+              <${TextArea} rows=${14} value=${draft} ariaLabel=${x('tpl.' + tp.key)} onInput=${(v) => ctx.setTemplateDraft(tp.key, v)} />
+              <${Actions}>
+                <${Action} small disabled=${ctx.busy === 'template' || draft === stored || !draft.trim()} onClick=${() => ctx.saveTemplate(tp.key)}>${x('save')}<//>
+                <${Action} small soft disabled=${ctx.busy === 'template'} onClick=${() => ctx.resetTemplate(tp.key)}>${x('resetTemplate')}<//>
+                <${Action} small soft copy=${draft}>${x('copy')}<//>
+              <//>
             <//>`;
         })}
-      </div>
+      <//>
       ${msg(ctx.templateMsg)}
     <//>`;
 }
@@ -250,20 +248,13 @@ function secTemplates(ctx) {
 function secRoads(ctx) {
   const request = ctx.leadRequest();
   return html`
-    <${PageSection} id="cal-roads" num="05" title=${x('secRoads')} count=${null}>
-      <p class="og-lead">${x('roadsIntro')}</p>
-      <div class="cal-roads">
-        <div class="cal-road poster-box poster-box--raised">
-          <span class="poster-label">${x('roadLead')}</span>
-          <p>${x('roadLeadBody', { name: ctx.project.name })}</p>
-          <pre class="code-block">${request}</pre>
-          <div class="og-doors"><${CopyButton} className="poster-action poster-action--small" text=${request} label=${x('copyRequest')} /></div>
-        </div>
-        <div class="cal-road poster-box">
-          <span class="poster-label">${x('roadSteps')}</span>
-          <p>${x('roadStepsBody')}</p>
-        </div>
-      </div>
-      <${Hint}>${x('hintRoads')}<//>
+    <${Section} id="cal-roads" num="05" title=${x('secRoads')} count=${null}>
+      <${Note} kind="lead">${x('roadsIntro')}<//>
+      <${Roads}>
+        <${Road} lead name=${x('roadLead')} text=${x('roadLeadBody', { name: ctx.project.name })} code=${request}
+          doors=${html`<${Action} small copy=${request}>${x('copyRequest')}<//>`} />
+        <${Road} name=${x('roadSteps')} text=${x('roadStepsBody')} />
+      <//>
+      <${Note}>${x('hintRoads')}<//>
     <//>`;
 }

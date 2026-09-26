@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — .text-meta-sm--mono, for the Note's meta kind in the typewriter face (additive, G3).
+ *   v1.1.0 — 2026-09-26 — .text-meta-sm, unscoped, for the Note's meta kind (component plan C9; additive).
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1602-1610), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
@@ -19,4 +21,10 @@
 .muted, .text-dim { color: var(--text-dim); }
 .text-faint { color: var(--text-muted); }
 .meta { font-size: var(--text-sm); color: var(--text-dim); }
+/* The small grey words of the classic Settings pages (components/Note.js kind="meta"), unscoped so
+   the admin reads them too; the values of profile.css .pf .text-meta-sm, which still wins inside
+   Settings until it goes. */
+.text-meta-sm { font-size: .75rem; color: var(--text-dim); }
+/* The same words in the typewriter face (Note kind="meta" mono: a record's facts, formerly memory.css .mp-meta). */
+.text-meta-sm--mono { font-family: var(--font-mono); }
 

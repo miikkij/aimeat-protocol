@@ -19,6 +19,12 @@
  * @structure AgentAiSection({ agentName, showToast })
  * @usage import { AgentAiSection } from './agent-ai-section.js';
  * @version-history
+ *   v1.13.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the section card,
+ *     SubHeading and Note, the key a password TextField that keeps password managers out (no eye, as
+ *     on main), the variable name the code TextField, the provider the Select, the daily cap a short
+ *     number field with Save beside it, the gate the Choice, the quality figures the FigureStrip, the
+ *     per-rule lines the List with the typewriter line under each rule, a test's answer the message;
+ *     every control keeps main's 44px thumb target (Touch with its tabs, was .pf .pf-aai).
  *   v1.12.0 — 2026-09-26 — A rule's line beside its name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.11.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.10.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -45,7 +51,17 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { Hint } from '/components/Hint.js';
+import { Card } from '/components/Card.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Note } from '/components/Note.js';
+import { Fields } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Choice } from '/components/Choice.js';
+import { Action, Actions } from '/components/Action.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name } from '/components/List.js';
+import { Stack, Touch } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const MODELS = ['decide', 'openrouter'];
@@ -157,99 +173,87 @@ export function AgentAiSection({ agentName, showToast }) {
   const provList = providers?.providers || [];
   const ownDefault = provList.find(p => p.id === providers?.default);
 
+  // One part of the section: its sub-heading, then its hint, fields and doors in a column.
+  const part = (title, body) => html`<${Stack} gap="small" above="large"><${SubHeading}>${title}<//>${body}<//>`;
+  const testWords = (x) => (x.ok
+    ? t(`agentAi.testOk.${x.key_source}`, { model: x.model || '' })
+    : (x.message || t('agentAi.testFailed')));
+
+  // Every control of the section is a thumb's target, 44px at every width, the gate's tabs included:
+  // measured at 390 on main the three SAVE buttons were 16 px, the tests 18, the gate 28 (Touch tabs).
   return html`
-    <div class="sch-form poster-row--thing pf-aai" id="agent-ai-section">
-      <div class="pf-agd-section-title sub-heading">${t('agentAi.title')}</div>
-      <div class="section-desc">${t('agentAi.desc')}</div>
+    <${Card} tone="section" id="agent-ai-section"><${Touch} tabs>
+      <${SubHeading} desc=${t('agentAi.desc')}>${t('agentAi.title')}<//>
 
       ${MODELS.map(model => html`
-        <div class="pf-aai-model" key=${model}>
-          <div class="pf-aai-model-title sub-heading">${t(`agentAi.model.${model}`)}</div>
-          <p class="poster-hint">${data[model].has_key
-            ? t('agentAi.keySet', { when: String(data[model].set_at || '').slice(0, 10) })
-            : t('agentAi.keyNotSet')}</p>
-          <div class="pf-aai-row">
-            <input class="og-input" type="password" autocomplete="off" data-1p-ignore data-lpignore="true"
-                   aria-label=${t('agentAi.keyLabel')} placeholder=${t('agentAi.keyLabel')}
-                   value=${keys[model]} disabled=${!!busy} onInput=${e => setKeys(k => ({ ...k, [model]: e.currentTarget.value }))} />
-            <input class="og-input og-input--mono" aria-label=${t('agentAi.envLabel')} placeholder=${t(`agentAi.envHint.${model}`)}
-                   value=${envs[model]} disabled=${!!busy} onInput=${e => setEnvs(x => ({ ...x, [model]: e.currentTarget.value }))} />
-          </div>
-          <p class="poster-hint">${t('agentAi.envHelp')}</p>
-          <div class="og-doors">
-            <button type="button" class="poster-action poster-action--small" disabled=${!!busy} onClick=${() => saveKey(model)}>${t('agentAi.save')}</button>
-            <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${!!busy} onClick=${() => test(model)}>
-              ${busy === model ? t('agentAi.testing') : t('agentAi.test')}</button>
-            ${(data[model].has_key || data[model].key_env) && html`
-              <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${!!busy} onClick=${() => forget(model)}>${t('agentAi.forget')}</button>`}
-          </div>
-          ${tested[model] && html`
-            <p class=${tested[model].ok ? 'form-message' : 'form-message form-message--error'} role="status">
-              ${tested[model].ok
-                ? t(`agentAi.testOk.${tested[model].key_source}`, { model: tested[model].model || '' })
-                : (tested[model].message || t('agentAi.testFailed'))}
-            </p>`}
+        <div key=${model}>
+          ${part(t(`agentAi.model.${model}`), html`
+            <${Note}>${data[model].has_key
+              ? t('agentAi.keySet', { when: String(data[model].set_at || '').slice(0, 10) })
+              : t('agentAi.keyNotSet')}<//>
+            <${Fields} cols=${2}>
+              <${TextField} type="password" unmanaged ariaLabel=${t('agentAi.keyLabel')} placeholder=${t('agentAi.keyLabel')}
+                value=${keys[model]} disabled=${!!busy} onInput=${v => setKeys(k => ({ ...k, [model]: v }))} />
+              <${TextField} code ariaLabel=${t('agentAi.envLabel')} placeholder=${t(`agentAi.envHint.${model}`)}
+                value=${envs[model]} disabled=${!!busy} onInput=${v => setEnvs(x => ({ ...x, [model]: v }))} />
+            <//>
+            <${Note}>${t('agentAi.envHelp')}<//>
+            <${Actions}>
+              <${Action} small disabled=${!!busy} onClick=${() => saveKey(model)}>${t('agentAi.save')}<//>
+              <${Action} small soft disabled=${!!busy} onClick=${() => test(model)}>
+                ${busy === model ? t('agentAi.testing') : t('agentAi.test')}<//>
+              ${(data[model].has_key || data[model].key_env) && html`
+                <${Action} small soft disabled=${!!busy} onClick=${() => forget(model)}>${t('agentAi.forget')}<//>`}
+            <//>
+            ${tested[model] && html`<${Note} kind="message" error=${!tested[model].ok} role="status">${testWords(tested[model])}<//>`}
+          `)}
         </div>`)}
 
-      ${provList.length > 0 && html`
-        <div class="pf-aai-model">
-          <div class="pf-aai-model-title sub-heading">${t('agentAi.providerTitle')}</div>
-          <${Hint}>${t('agentAi.providerDesc')}<//>
-          <div class="pf-aai-row">
-            <select class="select-field" aria-label=${t('agentAi.providerTitle')} disabled=${!!busy}
-                    value=${providers.agents?.[agentName] || ''} onChange=${e => setProvider(e.currentTarget.value)}>
-              <option value="">${t('agentAi.providerDefault', { provider: ownDefault ? ownDefault.title : String(providers.default || '') })}</option>
-              ${provList.map(p => html`<option key=${p.id} value=${p.id}>${p.title}</option>`)}
-            </select>
-          </div>
-          ${provSaved && html`<p class=${provSaved.error ? 'form-message form-message--error' : 'form-message'} role="status">
-            ${provSaved.error ? provSaved.text : t('agentAi.providerSaved', {
-              provider: (provList.find(p => p.id === (provSaved.id || providers.default)) || {}).title || String(provSaved.id || providers.default || ''),
-            })}</p>`}
-        </div>`}
+      ${provList.length > 0 && part(t('agentAi.providerTitle'), html`
+        <${Note}>${t('agentAi.providerDesc')}<//>
+        <${Select} ariaLabel=${t('agentAi.providerTitle')} disabled=${!!busy}
+          value=${providers.agents?.[agentName] || ''} onChange=${setProvider}
+          placeholder=${t('agentAi.providerDefault', { provider: ownDefault ? ownDefault.title : String(providers.default || '') })}
+          options=${provList.map(p => ({ value: p.id, label: p.title }))} />
+        ${provSaved && html`<${Note} kind="message" error=${provSaved.error} role="status">
+          ${provSaved.error ? provSaved.text : t('agentAi.providerSaved', {
+            provider: (provList.find(p => p.id === (provSaved.id || providers.default)) || {}).title || String(provSaved.id || providers.default || ''),
+          })}<//>`}
+      `)}
 
-      <div class="pf-aai-model">
-        <div class="pf-aai-model-title sub-heading">${t('agentAi.capTitle')}</div>
-        <${Hint}>${t('agentAi.capDesc', { spent: money(data.spent_today_usd) })}<//>
-        <div class="pf-aai-row">
-          <input class="og-input" type="number" min="0" step="0.1" aria-label=${t('agentAi.capLabel')} placeholder=${t('agentAi.capNone')}
-                 value=${cap} disabled=${!!busy} onInput=${e => setCap(e.currentTarget.value)} />
-          <button type="button" class="poster-action poster-action--small" disabled=${!!busy}
-                  onClick=${() => put({ daily_usd: cap.trim() === '' ? null : Number(cap) }, 'agentAi.saved')}>${t('agentAi.save')}</button>
-        </div>
-      </div>
+      ${part(t('agentAi.capTitle'), html`
+        <${Note}>${t('agentAi.capDesc', { spent: money(data.spent_today_usd) })}<//>
+        <${TextField} type="number" min="0" step="0.1" size="short" ariaLabel=${t('agentAi.capLabel')} placeholder=${t('agentAi.capNone')}
+          value=${cap} disabled=${!!busy} onInput=${setCap}
+          actions=${html`<${Action} small disabled=${!!busy}
+            onClick=${() => put({ daily_usd: cap.trim() === '' ? null : Number(cap) }, 'agentAi.saved')}>${t('agentAi.save')}<//>`} />
+      `)}
 
-      <div class="pf-aai-model">
-        <div class="pf-aai-model-title sub-heading">${t('agentAi.gateTitle')}</div>
-        <${Hint}>${t('agentAi.gateDesc')}<//>
-        <div class="pf-tabs" role="radiogroup" aria-label=${t('agentAi.gateTitle')}>
-          ${['rule', 'on', 'off'].map(g => html`
-            <button type="button" key=${g} role="radio" aria-checked=${data.gate === g}
-                    class=${`poster-tab ${data.gate === g ? 'is-on' : ''}`} disabled=${!!busy}
-                    onClick=${() => put({ gate: g }, 'agentAi.saved')}>${t(`agentAi.gate.${g}`)}</button>`)}
-        </div>
-      </div>
+      ${part(t('agentAi.gateTitle'), html`
+        <${Note}>${t('agentAi.gateDesc')}<//>
+        <${Choice} ariaLabel=${t('agentAi.gateTitle')} value=${data.gate} disabled=${!!busy}
+          options=${['rule', 'on', 'off'].map(g => ({ value: g, label: t(`agentAi.gate.${g}`) }))}
+          onChange=${g => put({ gate: g }, 'agentAi.saved')} />
+      `)}
 
-      <div class="pf-aai-model">
-        <div class="pf-aai-model-title sub-heading">${t('agentAi.qualityTitle')}</div>
-        <div class="og-strip">
-          <div><b>${q.decisions ?? 0}</b><span>${t('agentAi.q.decisions')}</span></div>
-          <div><b>${q.gateStops ?? 0}</b><span>${t('agentAi.q.gateStops')}</span></div>
-          <div><b>${q.overridden ?? 0}</b><span>${t('agentAi.q.overridden')}</span></div>
-          <div><b>${money(q.costUsd)}</b><span>${t('agentAi.q.cost')}</span></div>
-        </div>
+      ${part(t('agentAi.qualityTitle'), html`
+        <${FigureStrip} flush items=${[
+          { key: 'decisions', n: q.decisions ?? 0, label: t('agentAi.q.decisions') },
+          { key: 'stops', n: q.gateStops ?? 0, label: t('agentAi.q.gateStops') },
+          { key: 'overridden', n: q.overridden ?? 0, label: t('agentAi.q.overridden') },
+          { key: 'cost', n: money(q.costUsd), label: t('agentAi.q.cost') },
+        ]} />
         ${Object.keys(data.quality_by_rule || {}).length > 0 && html`
-          <ul class="pf-aitr-list pf-aai-rules">
+          <${List} cols="name" dense>
             ${Object.entries(data.quality_by_rule).map(([rule, r]) => html`
-              <li key=${rule} class="pf-aitr-row poster-box">
-                <span class="pf-aitr-row-main">${rule}</span>
-                <span class="pf-aitr-row-meta listing-meta">${t('agentAi.q.perRule', {
+              <${Row} key=${rule}>
+                <${Name} meta=${t('agentAi.q.perRule', {
                   decisions: String(r.decisions), stops: String(r.gateStops), overridden: String(r.overridden), cost: money(r.costUsd),
-                })}</span>
-              </li>`)}
-          </ul>`}
-      </div>
-    </div>`;
+                })}>${rule}<//>
+              <//>`)}
+          <//>`}
+      `)}
+    <//><//>`;
 }
 
 export default AgentAiSection;

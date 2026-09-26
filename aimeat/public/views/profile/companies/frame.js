@@ -9,12 +9,12 @@
  * @structure c · day · rel · FIELDS · factsOf · missingWord · kindWord · senderWord · crumb · pageLinks
  * @usage import { c, FIELDS, factsOf, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's sibling pages are data for SettingsPage; goTab is
+ *     the Rail's openTab (component plan C9); this file writes no markup (page group G8).
  *   v1.0.0 — 2026-08-31 — Initial (design canvas "AIMEAT Yritysten sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
@@ -67,18 +67,18 @@ export const kindWord = (kind) => t('profile.companies.front' + (kind === 'app' 
 /** Whose server the company's mail leaves from. */
 export const senderWord = (smtpSet) => c(smtpSet ? 'senderOwn' : 'senderShared');
 
+/** The crumb's steps (SettingsPage draws them): the company's name is the page you are on. */
 export function crumb(company) {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span>${company
-    ? html`<span>${c('title')}</span><span>/</span><span class="og-crumb-here">${company.name}</span>`
-    : html`<span class="og-crumb-here">${c('title')}</span>`}</div>`;
+  return [t('nav.profile'), ...(company ? [c('title'), company.name] : [c('title')])];
 }
 
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The sibling pages in the rail, as data (SettingsPage draws them → … →). */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('pnl')}><i>→</i>${t('profile.tabs.pnl')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('email')}><i>→</i>${t('profile.tabs.email')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>`;
+  return [
+    { tab: 'pnl', label: t('profile.tabs.pnl') },
+    { tab: 'email', label: t('profile.tabs.email') },
+    { tab: 'apps', label: t('profile.tabs.apps') },
+  ];
 }
 export const goTab = openTab;
 

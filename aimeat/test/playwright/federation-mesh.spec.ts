@@ -67,7 +67,7 @@ async function gotoAgentsTab(page: Page) {
     await expect(card).toBeVisible({ timeout: 5_000 });
     await card.click();
   }
-  await expect(page.locator('.agent-cta, .agent-card, .empty').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.agent-consent, .agent-card, .empty').first()).toBeVisible({ timeout: 15_000 });
 }
 
 /** Navigate to profile and open boards tab. */

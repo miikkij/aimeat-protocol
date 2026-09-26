@@ -9,6 +9,11 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — .og-fields--4: four short fields in a row, two under 1100px (an offer's price,
+ *     moved from offers-poster.css .op-sell; page group G6).
+ *   v1.4.0 — 2026-09-26 — .og-fields--3: three short fields in a row (the crew form's grid3, moved from agents-crew.css).
+ *   v1.3.0 — 2026-09-26 — The Field family's cuts: .og-textarea--code, the refused field (.og-input--invalid,
+ *     .og-textarea--invalid), the actions row's .og-actions--end and --apart (component plan C5).
  *   v1.2.0 — 2026-09-26 — The Text field's code cut, .og-input--code: a field that holds an identifier, in the typewriter face (a unification: the workflow form's id fields).
  *   v1.1.0 — 2026-09-25 — A Hint in the actions row keeps the row's margin 0, as the og-hint did (UI consolidation phase 5, a unification).
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
@@ -27,7 +32,22 @@
 .og-textarea:focus { border-color: var(--accent); }
 .og-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
 .og-actions .og-hint, .og-actions .poster-hint { margin: 0; }
+/* The Field family's cuts (components/Field.js, TextField.js): a many-line field of code (a JSON
+   editor, a prompt) in the typewriter face; a field the form refused, its frame in the danger colour
+   (formerly profile.css .mem-edit-textarea--error); the actions row at the right, or its first thing
+   at the left and the rest at the right (formerly .cp-form-doors, .ex-form-doors). */
+.og-textarea--code { font-family: var(--font-mono); font-size: .85rem; }
+.og-input--invalid, .og-textarea--invalid { border-color: var(--danger-fg); }
+.og-actions--end { justify-content: flex-end; }
+.og-actions--apart { justify-content: space-between; }
+
+/* Three short fields side by side (an agent's crew). */
+.og-fields--3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.2rem; }
+/* Four short fields side by side, their feet level (an offer's price; formerly offers-poster.css .op-sell). */
+.og-fields--4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem 1.2rem; align-items: end; }
 
 @media (max-width: 1100px) {
   .og-fields--2 { grid-template-columns: 1fr; }
+  .og-fields--3 { grid-template-columns: 1fr; }
+  .og-fields--4 { grid-template-columns: 1fr 1fr; }
 }

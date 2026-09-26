@@ -9,6 +9,7 @@
  * @structure ScheduleEditForm
  * @usage <${ScheduleEditForm} schedule=${s} showToast=${showToast} onSaved=${reload} onClose=${close} />
  * @version-history
+ *   v1.7.0 — 2026-09-26 — The form is the Field family (Fields, TextField and TextArea with their labels, FormActions at the right) and the Action family; it writes no class (page group G5).
  *   v1.6.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.5.0 — 2026-09-25 — The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
  *   v1.4.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
@@ -27,6 +28,9 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { updateSchedule } from '/js/services/schedules.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Action, Loud } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -65,35 +69,26 @@ export function ScheduleEditForm({ schedule: s, showToast, onSaved, onClose }) {
   };
 
   return html`
-    <div class="sch-edit">
-      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.displayName')}</label>
-        <input class="og-input" type="text" value=${f.display_name} onInput=${e => set('display_name', e.target.value)} /></div>
-      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.schedule')} (cron)</label>
-        <input type="text" class="og-input" value=${f.cron} onInput=${e => set('cron', e.target.value)} placeholder="0 7 * * *" /></div>
-      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.ph.timezone')}</label>
-        <input class="og-input" type="text" value=${f.timezone} onInput=${e => set('timezone', e.target.value)} placeholder="Europe/Helsinki" /></div>
+    <${Fields}>
+      <${TextField} label=${t('profile.scheduler.field.displayName')} value=${f.display_name} onInput=${v => set('display_name', v)} />
+      <${TextField} label=${`${t('profile.scheduler.field.schedule')} (cron)`} value=${f.cron} onInput=${v => set('cron', v)} placeholder="0 7 * * *" />
+      <${TextField} label=${t('profile.scheduler.ph.timezone')} value=${f.timezone} onInput=${v => set('timezone', v)} placeholder="Europe/Helsinki" />
 
       ${s.type === 'agent_task' && html`
-        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.taskTitle')}</label>
-          <input class="og-input" type="text" value=${f.task_title} onInput=${e => set('task_title', e.target.value)} /></div>
-        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.taskDescription')}</label>
-          <textarea class="og-textarea" rows="3" value=${f.task_description} onInput=${e => set('task_description', e.target.value)}></textarea></div>
+        <${TextField} label=${t('profile.scheduler.field.taskTitle')} value=${f.task_title} onInput=${v => set('task_title', v)} />
+        <${TextArea} label=${t('profile.scheduler.field.taskDescription')} rows=${3} value=${f.task_description} onInput=${v => set('task_description', v)} />
       `}
       ${s.type === 'ai' && html`
-        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.inputKeys')}</label>
-          <input class="og-input" type="text" value=${f.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} /></div>
-        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.prompt')}</label>
-          <textarea class="og-textarea" rows="3" value=${f.prompt} onInput=${e => set('prompt', e.target.value)}></textarea></div>
-        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.outputKey')}</label>
-          <input class="og-input" type="text" value=${f.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} /></div>
+        <${TextField} label=${t('profile.scheduler.field.inputKeys')} value=${f.input_keys} onInput=${v => set('input_keys', v)} placeholder=${t('profile.scheduler.ph.inputKeys')} />
+        <${TextArea} label=${t('profile.scheduler.field.prompt')} rows=${3} value=${f.prompt} onInput=${v => set('prompt', v)} />
+        <${TextField} label=${t('profile.scheduler.field.outputKey')} value=${f.output_key} onInput=${v => set('output_key', v)} placeholder=${t('profile.scheduler.ph.outputKey')} />
       `}
 
-      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.purpose')}</label>
-        <input class="og-input" type="text" value=${f.purpose} onInput=${e => set('purpose', e.target.value)} /></div>
+      <${TextField} label=${t('profile.scheduler.field.purpose')} value=${f.purpose} onInput=${v => set('purpose', v)} />
 
-      <div class="sch-form-actions">
-        <button class="poster-slab poster-slab--control" disabled=${busy} onClick=${onSave}>${busy ? t('profile.scheduler.saving') : t('profile.scheduler.save')}</button>
-        <button class="poster-action poster-action--small" disabled=${busy} onClick=${onClose}>${t('profile.scheduler.close')}</button>
-      </div>
-    </div>`;
+      <${FormActions} end>
+        <${Loud} control disabled=${busy} onClick=${onSave}>${busy ? t('profile.scheduler.saving') : t('profile.scheduler.save')}<//>
+        <${Action} small disabled=${busy} onClick=${onClose}>${t('profile.scheduler.close')}<//>
+      <//>
+    <//>`;
 }

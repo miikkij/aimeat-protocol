@@ -31,6 +31,9 @@
  *   What was built from them is in built-data.js (BUILT, BUILT_WITHOUT_DECISION).
  * @usage import { DECISIONS } from './decisions-data.js';
  * @version-history
+ *   v3.14.0 — 2026-09-27 — Every crop names what its page draws now for the same thing (the
+ *     catalogue pass: the Settings pages draw components, the home's tabs and menu rows are the
+ *     library's); the decisions' texts and Jouni's answers are unchanged.
  *   v3.13.0 — 2026-09-26 — The last round of Settings (decisions-final.js) spread in after the
  *     conflicts round; a decision may carry `look` (also drawn in a theme) and `textOnly`.
  *   v3.12.0 — 2026-09-25 — The conflicts round moved to decisions-conflicts.js unchanged and spread
@@ -90,10 +93,10 @@ export const DECISIONS = [
     variants: [
       { id: 'poster-chip', name: 'The design language\'s chip, not used by any page yet', code: '.poster-chip (poster.css)', becomes: 'plain', look: 'mono .68rem 500, 1px ink frame, square, no fill', where: 'no page yet', files: 0, crop: null },
       { id: 'og-chip', name: 'The profile chip ("7 unread", "2 requests")', code: '.og-chip, --sun, --dim (organism.css)', becomes: 'plain; "7 unread" becomes sun; "archived" becomes plain', look: 'mono .68rem 500, 2px ink frame, lowercase; --sun fills it; --dim greys it', where: 'almost every profile page, admin Compliance, the public knowledge page', files: 63, crop: { url: '/v1/profile?tab=messages', selector: '.og-chip.og-chip--sun' } },
-      { id: 'pf-mono-chip', name: 'The schedule kind ("AI", "agent task")', code: '.sch-badge (scheduler.css, profile-poster.css)', becomes: 'plain; its blue and orange frames go', look: 'mono .68rem 500, 2px frame in blue or orange by kind', where: 'profile Scheduler, Offers, Memory files, Organisms, Access', files: 10, crop: { url: '/v1/profile?tab=scheduler', selector: '.sch-badge' } },
-      { id: 'row-tag', name: 'The version tag in a list row ("v1.4.0")', code: '.sk-tag, .lb-tag, .pk-tag, .ex-tag, .cp-tag', becomes: 'plain, with dark words instead of grey', look: 'mono .66rem 500, 1px grey frame, grey words', where: 'profile Skills, Libraries, Packages, Extensions, Capabilities', files: 5, crop: { url: '/v1/profile?tab=skills', selector: '.sk-tag' } },
+      { id: 'pf-mono-chip', name: 'The schedule kind ("AI", "agent task")', code: '.sch-badge (scheduler.css, profile-poster.css)', becomes: 'plain; its blue and orange frames go', look: 'mono .68rem 500, 2px frame in blue or orange by kind', where: 'profile Scheduler, Offers, Memory files, Organisms, Access', files: 10, crop: { url: '/v1/profile?tab=scheduler', selector: '.list-before .poster-chip' } },
+      { id: 'row-tag', name: 'The version tag in a list row ("v1.4.0")', code: '.sk-tag, .lb-tag, .pk-tag, .ex-tag, .cp-tag', becomes: 'plain, with dark words instead of grey', look: 'mono .66rem 500, 1px grey frame, grey words', where: 'profile Skills, Libraries, Packages, Extensions, Capabilities', files: 5, crop: { url: '/v1/profile?tab=skills', selector: '.listing-name > .poster-chip' } },
       { id: 'adm-state-chip', name: 'The admin role chip ("member", "operator", "you")', code: '.adm-own-chip and kin (admin-owners.css)', becomes: 'plain; "operator" becomes coral; "you" becomes sun', look: 'mono .66rem 500, 2px grey frame; --op coral; --you on the sun', where: 'admin Owners, Organism ownership, Realtime, CSM, Memory, Boards; the fleet page', files: 8, crop: { url: '/v1/admin?tab=owners', selector: '.adm-own-chip.adm-own-chip--you' } },
-      { id: 'ct-tag', name: 'The contact tag ("colleague", "design")', code: '.ct-tag, --rel (contacts-poster.css)', becomes: 'plain, in the typewriter face; the relation becomes ink', look: 'Archivo .68rem 700, 1px ink frame; --rel ink fill', where: 'profile Contacts', files: 3, crop: { url: '/v1/profile?tab=contacts', selector: '.ct-tag' } },
+      { id: 'ct-tag', name: 'The contact tag ("colleague", "design")', code: '.ct-tag, --rel (contacts-poster.css)', becomes: 'plain, in the typewriter face; the relation becomes ink', look: 'Archivo .68rem 700, 1px ink frame; --rel ink fill', where: 'profile Contacts', files: 3, crop: { url: '/v1/profile?tab=contacts', selector: '.listing-row .poster-chips .poster-chip' } },
       { id: 'tag-pill', name: 'The memory tag ("music", "notes")', code: '.tag-pill, .active (tags.css, profile-poster.css)', becomes: 'plain with a thinner frame; the chosen one becomes sun', look: 'mono .72rem, 2px ink frame, square; .active on the sun', where: 'profile Memory, the portfolio builder', files: 3, crop: { url: '/v1/profile?tab=memory', selector: '.tag-pill' } },
     ],
     changes: [
@@ -123,7 +126,7 @@ export const DECISIONS = [
       text: 'One Status on .adm-badge (4): mono .66rem 500 caps, no frame, the state in a tinted fill. A frame (3) reads as a tag; a fill reads as a state, and it keeps a status apart from a tag in the same row. 5 and 9 move onto it.',
     },
     variants: [
-      { id: 'pf-badge', name: 'The profile status ("active", "paused")', code: '.pf .badge, badge-success/warn/danger/muted (profile-poster.css)', becomes: 'active becomes fine; paused becomes attention; revoked becomes danger; archived becomes off', look: 'mono .66rem 500, 2px frame in the tone colour, warn on the sun', where: 'profile Access, Organisms, Nodes, Living, the agent approval card (on Organisms the same look also names a kind, such as "Community", which is a tag\'s job)', files: 32, crop: { url: '/v1/profile?tab=access', selector: '.pf .badge.badge-muted' } },
+      { id: 'pf-badge', name: 'The profile status ("active", "paused")', code: '.pf .badge, badge-success/warn/danger/muted (profile-poster.css)', becomes: 'active becomes fine; paused becomes attention; revoked becomes danger; archived becomes off', look: 'mono .66rem 500, 2px frame in the tone colour, warn on the sun', where: 'profile Access, Organisms, Nodes, Living, the agent approval card (on Organisms the same look also names a kind, such as "Community", which is a tag\'s job)', files: 32, crop: { url: '/v1/profile?tab=access', selector: '.pf .card-section .card-header .poster-status' } },
       { id: 'adm-badge', name: 'The admin status ("healthy", "critical")', code: '.adm-badge-* (admin.css)', becomes: 'healthy becomes fine; warning becomes attention; critical becomes danger; idle becomes off', look: 'mono .66rem 500 caps, no frame, a tinted fill per tone', where: 'every admin roster: Agents, Apps, Actions, Hooks, SSO', files: 51, crop: { url: '/v1/admin?tab=agents', selector: '.adm-badge' } },
       { id: 'theme-badge', name: 'The rounded grey word ("Active", "anon")', code: '.badge with bg-green or bg-dim (theme.css); no sheet styles bg-green or bg-dim, so both draw the same', becomes: '"Active" becomes fine; "anon" becomes off', where: 'admin Chat instances (today "Active" and "anon" look the same)', files: 1, crop: { url: '/v1/admin?tab=chatInstances', selector: '.badge' } },
       { id: 'adm-grey-tag', name: 'The admin filled word ("per day", "quiet")', code: '.adm-st-chip and kin', becomes: 'good becomes fine; bad becomes danger; quiet becomes off', look: 'mono .66rem, grey fill, no frame, some in caps', where: 'admin SSO, Knowledge, Subdomains, Statistics, Portal', files: 5, crop: { url: '/v1/admin?tab=stats', selector: '.adm-st-chip' } },
@@ -151,7 +154,7 @@ export const DECISIONS = [
       text: 'One Count, two tones. The bell count (14) is waiting, smaller because it sits on an icon. The morsel count (15) is a balance with its heart, the product\'s own mark in the top bar, and stays as it is.',
     },
     variants: [
-      { id: 'count-coral', name: 'The coral count in the profile menu and on open items', code: '.side-menu-count, .open-items-count', becomes: 'waiting', look: 'mono .7rem, coral fill, paper words', where: 'the profile menu, the open items button', files: 3, crop: { url: '/v1/profile', selector: '.side-menu-count' } },
+      { id: 'count-coral', name: 'The coral count in the profile menu and on open items', code: '.side-menu-count, .open-items-count', becomes: 'waiting', look: 'mono .7rem, coral fill, paper words', where: 'the profile menu, the open items button', files: 3, crop: { url: '/v1/profile', selector: '.side-menu-item .poster-count--waiting' } },
       { id: 'count-bell', name: 'The count on the bell', code: '.notif-badge (theme.css)', becomes: 'waiting, at the bell\'s small size', look: 'mono .6rem 700, coral fill, white words, 15px high', where: 'the top bar on every signed-in page', files: 1, crop: home('.notif-badge') },
       { id: 'count-morsels', name: 'The morsel badge with its heart', code: '.brand-morsels (theme.css)', becomes: 'stays as it is', look: 'mono .76rem 500, sun fill, a coral heart before it; hidden below 1180px', where: 'the top bar on every signed-in page', files: 1, keptAsIs: true, crop: home('.brand-morsels') },
       { id: 'count-admin-nav', name: 'The count in the admin menu', code: '.adm-nav-item .cnt (admin.css)', becomes: 'tally, a little larger', look: 'mono .66rem 500, no fill, the menu\'s dim colour', where: 'the admin menu', files: 1, crop: { url: '/v1/admin', selector: '.adm-nav-item .cnt' } },
@@ -175,7 +178,7 @@ export const DECISIONS = [
     },
     variants: [
       { id: 'poster-label', name: 'The home\'s row label ("Assets")', code: '.poster-label (poster.css)', becomes: 'this is the proposal', look: 'Archivo .72rem 800 caps, .1em, coral', where: 'the home: the named rows', files: 4, crop: home('.poster-label') },
-      { id: 'prompt-label', name: 'The prompt card\'s label ("The prompt")', code: '.poster-prompt-label (prompt-card.css)', becomes: 'the same look; only its own copy of the rule goes', look: 'the same values, in its own rule', where: 'the home: the prompt card', files: 3, crop: home('.poster-prompt-label') },
+      { id: 'prompt-label', name: 'The prompt card\'s label ("The prompt")', code: '.poster-prompt-label (prompt-card.css)', becomes: 'the same look; only its own copy of the rule goes', look: 'the same values, in its own rule', where: 'the home: the prompt card', files: 3, crop: home('.poster-prompt-head .poster-label') },
       { id: 'og-label', name: 'The profile\'s label ("Visibility")', code: '.og-label (organism.css)', becomes: 'the proposal\'s look, a hair larger and tighter', look: '.68rem 800 caps, .12em, coral', where: 'every profile page', files: 57, crop: { url: '/v1/profile?tab=skills', selector: '.og-label' } },
     ],
     changes: [
@@ -272,7 +275,7 @@ export const DECISIONS = [
     },
     variants: [
       { id: 'poster-action', name: 'Underlined capitals ("Settings")', code: '.poster-action (poster.css)', becomes: 'this is the proposal', look: 'Archivo .9rem 800 caps, 3px ink underline', where: 'the home: the top doors, the settings dialog', crop: home('.poster-masthead-actions .poster-action') },
-      { id: 'fold', name: '"Show all" under a list', code: '.poster-fold (fold-button.css)', becomes: 'underlined capitals', look: 'mono coral words with an underline', where: 'the home: under a shortened list', crop: home('.poster-fold') },
+      { id: 'fold', name: '"Show all" under a list', code: '.poster-fold (fold-button.css)', becomes: 'underlined capitals', look: 'mono coral words with an underline', where: 'the home: under a shortened list', crop: home('.poster-action--more') },
       { id: 'rail-action', name: 'The chat column actions ("Copy conversation")', code: '.poster-rail-action (rail-action.css)', becomes: 'underlined capitals', look: 'small ink underline, grey words', where: 'the chat: the side column', crop: { url: '/v1/chat', selector: '.poster-rail-action' } },
       { id: 'back', name: 'The back link ("Back to your home")', code: '.poster-back (back-link.css)', becomes: 'underlined capitals', look: 'mono coral words with ↩', where: 'the history page', crop: { url: '/v1/home?history=1', selector: '.poster-back' } },
       { id: 'btn-outline', name: 'The rounded frame button ("Open")', code: '.btn-outline (components.css)', becomes: 'underlined capitals', look: 'a rounded thin frame from the classic buttons', where: 'the chat: on a result card', crop: chatThread(3, '.poster-result-open') },
@@ -296,8 +299,8 @@ export const DECISIONS = [
       text: '.poster-tab with .is-on on the sun. The home switch already chooses on the sun; the mode tabs and the 25 admin filter rules become tabs.',
     },
     variants: [
-      { id: 'chooser-choice', name: 'The home\'s task choice ("Remember something")', code: '.poster-action with .poster-fold--on (Chooser.js ChooserChoice)', becomes: 'tabs', where: 'the home: the task chooser', files: 1, crop: home('.poster-chooser-choices .poster-fold--on') },
-      { id: 'fold-switch', name: 'The home\'s switch ("Recent", "Mine")', code: '.poster-fold, .poster-fold--on (fold-button.css)', becomes: 'tabs', where: 'the home: the apps switch', files: 2, crop: home('.poster-fold.poster-fold--on') },
+      { id: 'chooser-choice', name: 'The home\'s task choice ("Remember something")', code: '.poster-action with .poster-fold--on (Chooser.js ChooserChoice)', becomes: 'tabs', where: 'the home: the task chooser', files: 1, crop: home('.poster-chooser-choices .poster-tab.is-on') },
+      { id: 'fold-switch', name: 'The home\'s switch ("Recent", "Mine")', code: '.poster-fold, .poster-fold--on (fold-button.css)', becomes: 'tabs', where: 'the home: the apps switch', files: 2, crop: home('.poster-tab--fold.is-on') },
       { id: 'mode-tabs', name: 'The agent step\'s two ways', code: '.poster-mode--on (mode-tabs.css)', becomes: 'tabs', look: 'outlined classic buttons; the chosen one in a coral outline', where: 'the home: the agent step', files: 1, crop: null },
       { id: 'poster-tab', name: 'Tabs ("Overview", "Tasks")', code: '.poster-tab, .is-on (poster.css)', becomes: 'this is the proposal', look: 'Archivo caps, 3px ink underline; .is-on on the sun', where: 'profile Agents, the agent card, Inbox, the setup guide', files: 4, crop: { url: '/v1/profile?tab=agents', selector: '.poster-tab' } },
       { id: 'adm-filter-chip', name: 'The admin filters ("all", "failed")', code: '.adm-hook-fchip and 24 copies', becomes: 'tabs; the chosen one stays on the sun', look: 'mono .72rem 500, 2px grey frame; the chosen one on the sun', where: 'about 25 admin pages', files: 25, crop: { url: '/v1/admin?tab=hooks', selector: '.adm-hook-fchip' } },
@@ -462,8 +465,8 @@ export const DECISIONS = [
     },
     variants: [
       { id: 'setup-tools', name: 'The setup guide\'s tools ("Claude Desktop", "ChatGPT")', code: '.ast-tool, .ast-tool--active (hello-mcp.css, chooser.css)', becomes: 'tabs; "recommended" stays beside the name, in the tab\'s own text colour', where: 'the home: connecting your AI', crop: home('.ast-tool--active', { click: '.poster-chooser-status button' }) },
-      { id: 'pattern-choice', name: 'The background pattern tiles ("Off", "Pixel grid")', code: '.poster-settings-pattern-choice, .active (SwatchPicker.js)', becomes: 'tabs', where: 'the home: the settings dialog', crop: home('.poster-settings-pattern-choice.active', { click: '.poster-masthead-button' }) },
-      { id: 'start-page', name: 'The start page switch ("Home", "Settings & controls")', code: '.seg-btn, .active (StartPageSetting.js; the .pf rules do not reach the home)', becomes: 'tabs', where: 'the home: the settings dialog', crop: home('.seg-btn.active', { click: '.poster-masthead-button', around: '.start-page-seg' }) },
+      { id: 'pattern-choice', name: 'The background pattern tiles ("Off", "Pixel grid")', code: '.poster-settings-pattern-choice, .active (SwatchPicker.js)', becomes: 'tabs', where: 'the home: the settings dialog', crop: home('.poster-settings-pattern-choices .poster-tab--tile.is-on', { click: '.poster-masthead-button' }) },
+      { id: 'start-page', name: 'The start page switch ("Home", "Settings & controls")', code: '.seg-btn, .active (StartPageSetting.js; the .pf rules do not reach the home)', becomes: 'tabs', where: 'the home: the settings dialog', crop: home('.start-page-seg .poster-tab.is-on', { click: '.poster-masthead-button', around: '.start-page-seg' }) },
     ],
     changes: [
       { page: 'Home', what: 'The setup guide\'s tools, the pattern tiles and the start page switch become tabs.' },
@@ -481,7 +484,7 @@ export const DECISIONS = [
     },
     variants: [
       { id: 'sentence', name: 'The suggestion after an answer ("A single column with your name large")', code: '.poster-suggestion (Suggestion.js Choices)', becomes: 'this is the proposal', where: 'the chat: under an answer that offers choices', crop: chatThread(2, '.poster-suggestion') },
-      { id: 'caps', name: 'The welcome\'s suggestion ("Make my welcome page")', code: '.poster-suggestion--caps (Suggestion.js)', becomes: 'the sentence', where: 'the chat: the welcome for a new person', crop: { url: '/v1/chat', selector: '.poster-suggestion--caps', user: 'member' } },
+      { id: 'caps', name: 'The welcome\'s suggestion ("Make my welcome page")', code: '.poster-suggestion--caps (Suggestion.js)', becomes: 'the sentence', where: 'the chat: the welcome for a new person', crop: { url: '/v1/chat', selector: '.poster-conversation-welcome .poster-suggestion', user: 'member' } },
     ],
     changes: [
       { page: 'Chat', what: 'The welcome\'s suggestions read as sentences instead of capitals.' },
@@ -498,7 +501,7 @@ export const DECISIONS = [
       text: '.poster-prompt-menu-item: left-aligned, .55rem .85rem, .85rem, a 1px --border line between rows. Moves to a shared part when accepted.',
     },
     variants: [
-      { id: 'prompt-menu', name: 'The prompt card\'s menu rows ("Save as my own")', code: '.btn-ghost.poster-prompt-menu-item (PromptCard.js)', becomes: 'this is the proposal', where: 'the home: a prompt card\'s more menu', crop: home('.poster-prompt-menu-item', { click: '.poster-prompt-more' }) },
+      { id: 'prompt-menu', name: 'The prompt card\'s menu rows ("Save as my own")', code: '.btn-ghost.poster-prompt-menu-item (PromptCard.js)', becomes: 'this is the proposal', where: 'the home: a prompt card\'s more menu', crop: home('.poster-prompt-menu .poster-menu-row', { click: '.poster-prompt-more' }) },
       { id: 'card-menu', name: 'A card\'s menu rows', code: '.card-menu-item (CardMenu.js)', becomes: 'the prompt card\'s row', where: 'the home: a card\'s menu', crop: home('.card-menu-item', { click: '.card-menu-dots', around: '.card-menu-list' }) },
       { id: 'notif-action', name: 'A notification\'s actions', code: '.notif-action-btn with .btn-primary/.btn-outline/.btn-ghost (NotificationBell.js)', becomes: 'the prompt card\'s row; "Approve" loses its coral, so every action reads the same', where: 'every signed-in page: the bell\'s list', crop: null },
     ],

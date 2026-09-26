@@ -3,12 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Scheduler in the poster face (sc- prefix; design canvas "AIMEAT Ajastimen sivu",
- *   direction A). The shared parts (crumb, masthead, strip, sections, folds, rail) come from
- *   organism.css's og- rules; this file carries what the scheduler adds: the agenda of what fires
- *   next, the week's rhythm table, the continuous jobs as framed chips, the register, the prompt
- *   box and the key/value facts on a schedule's page, and the new-schedule form. NOTE: this file
- *   must be linked in spa.html (useViewCSS is a no-op).
+ *   direction A). Every part of the page is a component with its own sheet now (the page frame, the
+ *   List, the FigureStrip, the WeekRhythm, the JobChips, the ScheduleCalendar, the JobPrompt, the
+ *   Field family); this file keeps only what is the page's own, keyed on its root (.og-sc, which
+ *   SettingsPage name="sc" draws): the sub-pages' title size and the narrow-screen fold and strip.
+ *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.26.0 -- 2026-09-26 -- The page's parts are components (page group G5): the lists are the List (the time the Figure, the countdown the Num's sign, the clipped words the cells' clip: .sc-at, .sc-in, .sc-n, .sc-list, .sc-reg, .sc-more go), a run's result the Status Mark and the strip's tones (.sc-res--* go), the rail one rail (.sc-side goes), the agents' jobs the Group (.sc-internal, .sc-internal-agent go), what a job sends the JobPrompt (.sc-prompt goes), the forms the Field family (.sc-form*, .sc-choices, .sc-when, .sc-limits, .og-sc .og-fold-body .sch-edit go), the rhythm's narrow name rule moves to week-rhythm.css; the page-wide tweaks of the quiet line and .og-empty go (the look most pages have). The page title's size and the narrow-screen fold and strip rules stay, keyed on the page's root (SettingsPage name="sc").
  *   v1.25.0 -- 2026-09-26 -- The runs on a schedule's page are the Timeline (css/components/timeline.css), a unification: Jouni's decision "Activity log". The rules of sc-agenda, its name line, sc-nm--run, sc-err and sc-who, and their narrow-screen columns, go; sc-in stays under the Listing, where the countdown to the next run still wears it.
  *   v1.24.0 -- 2026-09-26 -- What fires next, the rarer ones, what is coming, the register and the agents' own jobs are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of sc-reg, sc-reg--internal, sc-agenda--coming and the agenda's name line go (the narrow-screen columns move to the cuts, listing--cols); one line each, a paused Status beside a name and the run count's margin stay. The runs keep sc-agenda: a list of what happened (Jouni's decision "Activity log").
  *   v1.23.0 -- 2026-09-26 -- The line under a schedule's name is the Listing's (.listing-meta): its body face, size and colour go; one line and the register's full width stay (a unification: Jouni's decision "Meta line").
@@ -46,65 +47,13 @@
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-sc .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-sc .poster-quiet { margin: 0; }
-/* "Show the rest" is the action link's more tone (.poster-action--more); its line keeps its place. */
-.og-sc .sc-more { margin: .8rem 0 0; }
-.sc-res--success { color: var(--success, #10B981); }
-.sc-res--error { color: var(--accent); }
-.sc-res--skipped { color: var(--text-dim); }
-.og-sc .og-strip b.sc-res--success { color: var(--success, #10B981); }
-.og-sc .og-strip b.sc-res--error { color: var(--accent); }
+/* A schedule's page and the rail's pages: the page title's measured size. */
 .og-sc.og-page { --poster-page-size: 2.2rem; }
-.sc-side { display: flex; flex-direction: column; gap: 1rem; }
-
-/* ── What fires next, the rarer ones, what is coming, the register, the agents' own jobs: the
-      Listing (css/components/listing.css) ─────────────────────────────────────────────────────── */
-.sc-at { margin-right: 0; }
-.sc-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
-/* The line under a name is the Listing's (.listing-meta); here it keeps to one line, and so do who
-   runs it and the register's words. */
-.sc-list .listing-name small, .sc-list .listing-who, .sc-reg :is(.listing-desc, .listing-who, .poster-time) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* A paused schedule's Status beside its name; the run count is the figure, without the stat number's margin. */
-.og-sc .listing-name .poster-status { margin-left: .5rem; }
-.og-sc .sc-n { margin-right: 0; }
-/* The countdown to the next run ("in 7h") in what fires next and the register. */
-.sc-in { font-family: var(--font-mono); font-size: .75rem; color: var(--accent); text-align: right; white-space: nowrap; }
-
-/* ── The week's rhythm: one row per schedule, a mark on each day it fires ───────────────────── */
-
-/* ── Continuous jobs ────────────────────────────────────────────────────────────────────────── */
-
-/* ── The agents' own jobs ───────────────────────────────────────────────────────────────────── */
-.sc-internal { margin-top: .4rem; }
-/* The agent over its own jobs is the Group heading (.poster-day-title); its place only. */
-.sc-internal-agent { margin: .6rem 0 .2rem; }
-
-/* ── A schedule's page ──────────────────────────────────────────────────────────────────────── */
-/* What a job asks is the Object box (.poster-box) at the page's own size; its place only. */
-.sc-prompt { margin: 0; padding: .9rem 1.1rem; }
-.og-sc .og-fold-body .sch-edit { border-top: 0; padding-top: 0; }
-
-/* ── The new-schedule form ──────────────────────────────────────────────────────────────────── */
-.sc-form { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr); gap: 1.1rem 1.5rem; align-items: start; }
-.sc-form-k { padding-top: .5rem; }
-/* The line under a label is the Hint (css/components/hint.css), as in the new agent form; its place only. */
-.sc-form-k .poster-hint { display: block; margin-top: .15rem; }
-.sc-form-v { min-width: 0; display: flex; flex-direction: column; gap: .6rem; }
-.sc-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; }
-.sc-when { display: grid; grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; align-items: end; }
-.sc-when label { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
-.sc-limits { display: flex; flex-wrap: wrap; gap: .6rem 1.6rem; }
-.sc-form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1.4rem; padding-top: 1rem; }
 
 @media (max-width: 1100px) {
+  /* A fold's detail goes under its title, and the four figures two by two. */
   .og-sc .og-fold { flex-wrap: wrap; row-gap: .35rem; }
   .og-sc .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
-  .og-sc .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-  .sc-form { grid-template-columns: 1fr; gap: .4rem 0; }
-  .sc-form-k { padding-top: .8rem; }
-  .sc-choices { grid-template-columns: 1fr; }
-  .sc-when { grid-template-columns: 1fr; }
   .og-sc .og-strip { flex-wrap: wrap; }
   .og-sc .og-strip > div { flex: 1 1 45%; }
 }

@@ -2,12 +2,17 @@
  * @file memory.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Memory page in the poster face (mp- prefix; design canvas "AIMEAT Muistin sivu",
- *   direction A). The shared parts (crumb, masthead, strip, sections, folds, rail, tables) come from
- *   organism.css's og- rules; this file carries only what memory adds: the search row, the record's
- *   value as prose or as key/value rows, the file rows, and the quiet forms the old list still uses
- *   when it sits inside a page. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
+ * @description The Memory page's one rule of its own (the root is .og-mp: SettingsPage name="mp").
+ *   Every other part of the page is a component with its own sheet: the search line, the stored
+ *   value (StoredValue, stored-value.css), the facts, the lists, the rails, the head.
+ *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- The page is on the components (G3 page migration): the rules for .mp-sort,
+ *     .mp-title--key (now PageHead asKey, .og-title--key), .mp-meta (Note kind="meta" mono), .mp-value,
+ *     .mp-prose and .mp-raw (StoredValue), .mp-side (SettingsPage's list of rails), .mp-tags,
+ *     .mp-file-kind (Avatar size large), .mp-agent (Select fit), .mem-page, .mp-fig and the listing
+ *     places (the List's cells) go, because no file writes those classes any more. Only the narrow
+ *     screen's event rows stay.
  *   v1.11.0 -- 2026-09-26 -- A stored value as written is the Code block (css/components/code-block.css): the frame goes, the place and height stay (a unification: Jouni's decision "Code block").
  *   v1.10.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.9.0 -- 2026-09-26 -- A key is the Key (.key-name, css/components/key-name.css): .mp-key and the history rows' key rule go (a unification: the look most tabs use).
@@ -23,35 +28,6 @@
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 
-/* The order of a key space is a row of Tabs (.poster-tab in .pf-tabs), "show all" the action link; the row keeps its place. */
-.mp-sort { margin-top: .8rem; }
-.og-title.mp-title--key { font-family: var(--font-mono); font-weight: 500; font-size: 1.7rem; text-transform: none; letter-spacing: 0; }
-.mp-meta { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
-.mp-value { margin-top: 1.2rem; padding-top: 1rem; }
-.mp-prose { font-size: 1rem; line-height: 1.65; max-width: 68ch; white-space: pre-wrap; overflow-wrap: anywhere; }
-.mp-prose .md-body, .mp-prose .markdown { white-space: normal; }
-/* A record's flat value is the Facts (css/components/facts.css); a stored value keeps its line breaks. */
-.og-mp .mp-value .facts-v { white-space: pre-wrap; }
-/* A stored value as written is the Code block (css/components/code-block.css); its place and height only. */
-.mp-raw.code-block { margin: 0; max-height: 60vh; overflow: auto; }
-.mp-side { display: flex; flex-direction: column; gap: 1rem; }
-.mp-side .og-rail { position: static; }
-.mp-tags { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; margin-top: .4rem; }
-/* A file's mark is the avatar box (.poster-box--avatar, small); its size stays here. */
-.mp-file-kind { width: 2.4rem; height: 2.4rem; flex: none; }
-.mp-file-kind img { width: 100%; height: 100%; object-fit: cover; }
-/* The agent to read as is the Select field (css/components/select-field.css); among the tags it keeps its own width. */
-.select-field.mp-agent { width: auto; }
-/* The old list, the browse panels and the cart keep their pj-/mem- shapes inside a page; the page
-   head already names the view, so the old title, description and tab rows go. */
-.og-page .mem-page > .section-title, .og-page .mem-page > .section-desc, .og-page .mem-page > .sub-tabs { display: none; }
-/* The listings (css/components/listing.css): a size or a latest key in small grey type, a tag
-   beside a name, a space's visibility tags at the far end of its name, and a tag or a latest key
-   alone in a cell keeps its own width. */
-.og-mp .mp-fig { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; }
-.og-mp .listing-row > div > :is(.poster-chip, .og-tbl-go) { justify-self: start; }
-.og-mp .listing-name .poster-chip { margin-left: .45rem; vertical-align: middle; }
-.og-mp .listing-name .og-tbl-marks { float: right; margin-left: .6rem; }
 @media (max-width: 1100px) {
   /* An event row wraps on a narrow screen, and a search hit's tag goes under the key. */
   .og-mp .og-fold { flex-wrap: wrap; row-gap: .35rem; }

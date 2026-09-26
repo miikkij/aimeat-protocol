@@ -13,6 +13,11 @@
  *   - TaskItem + its helpers (status labels, JSON tree, memory entry, RequestChangesModal,
  *     blur preference) now live in ./agents/task-item.js (extracted for max-file-lines)
  * @version-history
+ *   v5.13.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the create
+ *     form is the section card with TextArea, TextField and FormActions (the count at the right under
+ *     the text area is the Mark count), "Runs [n] task at a time" a short number TextField inside the
+ *     sentence, the buckets the Tabs with their counts and the find toggle a fold Tab after them, the
+ *     search the SearchLine with the time filters in it, the tasks the List (its empty line included).
  *   v5.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v5.11.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v5.10.0 -- 2026-09-25 -- "Find a task", which shows the search line and stays pressed while it is shown, is the Tab's fold tone (.poster-tab--fold, is-on while shown; its aria-pressed stays), a unification: Jouni's decision "Tabs and filters".
@@ -117,6 +122,15 @@ import { t, tOr } from '/js/i18n.js';
 import { listTasks, createTask } from '/js/services/agent-tasks.js';
 import { setMaxConcurrentTasks } from '/js/services/agents.js';
 import { TaskItem } from './agents/task-item.js';
+import { Card } from '/components/Card.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Row, Stack } from '/components/Layout.js';
+import { Mark, Label } from '/components/Mark.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Tabs, Tab } from '/components/Tabs.js';
+import { List, SearchLine } from '/components/List.js';
 
 // Tasks-tab triage buckets (server-derived) + on-demand search time chips.
 const BUCKETS = ['recent', 'keep', 'archive'];
@@ -175,41 +189,29 @@ function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
   }
 
   return html`
-    <div class="agt-form poster-row--thing">
-      <div class="og-field">
-        <span class="poster-label">${t('profile.agents.tasks.descLabel')}</span>
-        <textarea
-          class="og-textarea agt-ta"
-          placeholder=${t('profile.agents.tasks.builder.placeholder')}
-          value=${description}
-          maxlength=${DESC_MAX}
-          onInput=${e => setDescription(e.target.value)}
-          rows="6"
-        ></textarea>
-        <div class="agt-count"><span class=${`poster-count ${description.length >= DESC_MAX ? 'poster-count--waiting' : 'poster-count--tally'}`}>
-          ${description.length} / ${DESC_MAX}
-        </span></div>
-      </div>
-      <div class="og-field">
-        <span class="poster-label">${t('profile.agents.tasks.titleLabel')}</span>
-        <input
-          class="og-input"
-          type="text"
-          maxlength=${TITLE_MAX}
-          placeholder=${t('profile.agents.tasks.titlePlaceholder')}
-          value=${title}
-          onInput=${e => setTitle(e.target.value)}
-        />
-      </div>
-      <div class="agt-form-actions">
-        <button type="button" class="poster-slab poster-slab--control" onClick=${handleCreate} disabled=${creating || !description.trim()}>
-          ${creating ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.createTask')}
-        </button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${onCancel} disabled=${creating}>
-          ${t('profile.agents.tasks.cancel')}
-        </button>
-      </div>
-    </div>
+    <${Card} tone="section">
+      <${Fields}>
+        <${Stack} gap="tight">
+          <${TextArea} label=${t('profile.agents.tasks.descLabel')} rows=${6}
+            placeholder=${t('profile.agents.tasks.builder.placeholder')}
+            value=${description} maxLength=${DESC_MAX} onInput=${setDescription} />
+          ${/* The character count under the text area, at the right; waiting when the limit is reached. */''}
+          <${Row} gap="none" justify="end">
+            <${Mark} kind="count" tone=${description.length >= DESC_MAX ? 'waiting' : 'tally'}>${description.length} / ${DESC_MAX}<//>
+          <//>
+        <//>
+        <${TextField} label=${t('profile.agents.tasks.titleLabel')} type="text" maxLength=${TITLE_MAX}
+          placeholder=${t('profile.agents.tasks.titlePlaceholder')} value=${title} onInput=${setTitle} />
+        <${FormActions}>
+          <${Loud} control onClick=${handleCreate} disabled=${creating || !description.trim()}>
+            ${creating ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.createTask')}
+          <//>
+          <${Action} small soft onClick=${onCancel} disabled=${creating}>
+            ${t('profile.agents.tasks.cancel')}
+          <//>
+        <//>
+      <//>
+    <//>
   `;
 }
 
@@ -289,87 +291,61 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
   }
 
   if (tasks === null) {
-    return html`<div class="agt-tab"><div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div></div>`;
+    return html`<${Note} kind="loading" />`;
   }
 
   const totalTasks = counts.recent + counts.keep + counts.archive;
 
   return html`
-    <div class="agt-tab">
-      <div class="agt-head">
-        <span class="poster-label">
+    <div>
+      <${Row} wrap justify="between" gap="large">
+        <${Label}>
           ${t('profile.agents.tasks.title')}${totalTasks > 0 ? ` · ${totalTasks}` : ''}
-        </span>
-        <button type="button" class="poster-slab" onClick=${() => setShowCreate(!showCreate)} aria-expanded=${showCreate}>
+        <//>
+        <${Loud} onClick=${() => setShowCreate(!showCreate)} expanded=${showCreate}>
           ${t('profile.agents.tasks.newTask')}
-        </button>
-      </div>
+        <//>
+      <//>
 
-      <div class="agt-runs">
+      ${/* Runs [ n ] task at a time: the number is a short field inside the sentence. */''}
+      <${Row} wrap align="baseline" above="large" below="large">
         <span>${tOr('profile.agents.tasks.concurrency.runsBefore', 'Runs')}</span>
-        <input
-          class="og-input agt-runs-n"
-          type="number"
-          min="1"
-          max="20"
-          value=${maxConcurrent}
-          disabled=${savingConcurrency}
-          aria-label=${t('profile.agents.tasks.concurrency.label')}
-          onChange=${e => handleSaveConcurrency(e.target.value)}
-        />
+        <${TextField} type="number" size="short" min="1" max="20"
+          value=${maxConcurrent} disabled=${savingConcurrency}
+          ariaLabel=${t('profile.agents.tasks.concurrency.label')}
+          onChange=${handleSaveConcurrency} />
         <span>${tOr('profile.agents.tasks.concurrency.runsAfter', 'task at a time.')}</span>
-        <span class="poster-hint">${t('profile.agents.tasks.concurrency.hint')}</span>
-      </div>
+        <${Note} inline>${t('profile.agents.tasks.concurrency.hint')}<//>
+      <//>
 
       ${showCreate && html`
         <${TaskCreateForm} agentName=${agentName} showToast=${showToast} onCreated=${handleCreated} onCancel=${() => setShowCreate(false)} />
       `}
 
-      ${error && html`<div class="poster-quiet agt-empty">${error}</div>`}
+      ${error && html`<${Note} kind="quiet">${error}<//>`}
 
-      <div class="agt-filters">
-        ${BUCKETS.map(b => html`
-          <button type="button" key=${b}
-                  class=${`poster-tab ${bucket === b ? 'is-on' : ''}`}
-                  onClick=${() => setBucket(b)}>
-            ${t(`profile.agents.tasks.bucket.${b}`)}<span class="poster-count poster-count--tally">${counts[b] ?? 0}</span>
-          </button>
-        `)}
-        <button type="button"
-                class=${`poster-tab poster-tab--fold agt-find ${searchOpen ? 'is-on' : ''}`}
-                onClick=${() => setSearchOpen(o => !o)}
-                aria-pressed=${searchOpen}>
+      <${Tabs} value=${bucket} onSelect=${setBucket} label=${t('profile.agents.tasks.title')}
+        items=${BUCKETS.map(b => ({ value: b, key: b, label: t(`profile.agents.tasks.bucket.${b}`), count: counts[b] ?? 0 }))}>
+        <${Tab} tone="fold" on=${searchOpen} pressed=${searchOpen} onClick=${() => setSearchOpen(o => !o)}>
           ${tOr('profile.agents.tasks.search.toggle', 'Find a task by its name or id')}
-        </button>
-      </div>
+        <//>
+      <//>
 
       ${searchOpen && html`
-        <div class="search-line agt-search">
-          <input class="og-input" type="search"
-                 placeholder=${t('profile.agents.tasks.search.placeholder')}
-                 value=${q} onInput=${e => setQ(e.target.value)} />
-          <div class="agt-chips">
-            ${TIME_CHIPS.map(c => html`
-              <button type="button" key=${c}
-                      class=${`poster-tab poster-tab--filter ${timeChip === c ? 'is-on' : ''}`}
-                      onClick=${() => setTimeChip(c)}>
-                ${t(`profile.agents.tasks.search.time.${c}`)}
-              </button>
-            `)}
-          </div>
-        </div>
+        <${SearchLine} placeholder=${t('profile.agents.tasks.search.placeholder')}
+          value=${q} onInput=${e => setQ(e.target.value)}>
+          <${Tabs} tone="filter" value=${timeChip} onSelect=${setTimeChip} label=${t('profile.agents.tasks.search.placeholder')}
+            items=${TIME_CHIPS.map(c => ({ value: c, key: c, label: t(`profile.agents.tasks.search.time.${c}`) }))} />
+        <//>
       `}
 
-      ${tasks.length > 0 ? html`
-        <div class="listing listing--name-count-when-state listing--cols">
-          ${tasks.map(task => html`
-            <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks}
-              autoOpen=${task.id === openTaskId ? openTaskNonce : 0} />
-          `)}
-        </div>
-      ` : html`
-        <div class="poster-quiet agt-empty">${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}</div>
-      `}
+      <${List} cols="name-count-when-state" keepCols
+        empty=${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}>
+        ${tasks.map(task => html`
+          <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks}
+            autoOpen=${task.id === openTaskId ? openTaskNonce : 0} />
+        `)}
+      <//>
     </div>
   `;
 }

@@ -59,7 +59,7 @@ async function gotoAgentsTab(page: Page) {
     await card.click();
   }
   // Wait for the agents tab content to render (new tab-view uses pf-agd-card classes)
-  await expect(page.locator('.agent-cta, .pf-agd-card, .pf-agd-collapsed, .empty').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.agent-consent, .pf-agd-card, .pf-agd-collapsed, .empty').first()).toBeVisible({ timeout: 15_000 });
 }
 
 /** Register user, create an agent, navigate to agents tab, wait for tab to load. */
@@ -267,7 +267,7 @@ test.describe('Agents — Device Auth Pending Requests', () => {
     await gotoAgentsTab(page);
 
     // Wait for the pending request section to appear (polled every 5s)
-    const pendingCode = page.locator('.pf-device-code');
+    const pendingCode = page.locator('.agent-consent-code');
     await expect(pendingCode).toBeVisible({ timeout: 12_000 });
     const codeText = await pendingCode.textContent();
     expect(codeText).toContain(userCode);

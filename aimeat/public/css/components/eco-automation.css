@@ -5,55 +5,53 @@
  * @description An ecosystem app's automation: the numbered steps of its one flow (what the app produces,
  *   the schedule, the agents, where results go, how guidance is delivered) in a card, a step's
  *   coral number and title, the save row; the status timeline of the latest run (published,
- *   processed, delivered, each a dot on a line in its state's colour); a job's facts and doors and
- *   its run log. Drawn by the ecosystem tab of Settings & Controls (ecosystem-tab.automation.js).
- *   Moved unchanged out of views/profile.css; the class names stay. The 2px timeline line and the
- *   dots' 2px rings read --shape-frame (2px built in, so nothing changes); the flow card's corner
- *   reads --shape-corner, a box's corner; the dots stay circles.
+ *   processed, delivered, each a dot on a line in its state's colour); a job's run log. Drawn by
+ *   components/EcoAutomation.js (FlowCard, FlowStep, StatusTimeline, StatusStep, RunLog), which the
+ *   ecosystem tab of Settings & Controls gives its data; its own class names (.eco-automation-*).
+ *   The 2px timeline line and the dots' 2px rings read --shape-frame (2px built in, so nothing
+ *   changes); the flow card's corner reads --shape-corner, a box's corner; the dots stay circles.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.1 -- 2026-09-27 -- The card's poster reset reads --shape-corner (0 in AIMEAT, so nothing changes; a theme reaches it).
+ *   v1.4.0 -- 2026-09-27 -- The component's own class names: .pf-eco-auto-flow-card → .eco-automation-card, -flow-save → -save, -flow-step → -step, -flow-step-disabled → -step--off, -flow-num → -num, .pf-eco-recipe-head → .eco-automation-status-title, .pf-eco-auto-status → .eco-automation-status, -status-timeline → -timeline, -status-step → -stage, -status-head → -stage-head, -status-dot → -dot, -status-dot-{ok,wait,off,error} → -dot--{ok,wait,off,error}, -status-label → -stage-label, -status-body → -stage-body, .pf-eco-auto-log(-row, -time, -trigger, -dur, -reason) → .eco-automation-log(…). The card's poster reset (.pf .pf-eco-auto-flow-card in views/profile-poster.css: no side and bottom frame, no corner, no shadow, the section's padding) moves in as .pf .eco-automation-card with the same specificity, so it still wins over the card's own rule. Every declaration kept (Jouni: components draw only their own class names, a move).
+ *   v1.3.0 -- 2026-09-26 -- Drawn by components/EcoAutomation.js, which takes data (page group G5). The rules of what the page draws with other components now go: the produced facts (.pf-eco-auto-produces: a Stack), the schedule's controls and the e-mail line (.pf-eco-auto-flow-controls, -email: a Row, a Check), the advanced part (.pf-eco-auto-flow-advanced, -body: a FlowStep with a TextField), a job's facts and doors (.pf-eco-auto-job-meta, -actions: a Row, the Actions), the agents' tags (.pf-eco-auto-status-agents: the Marks) and the log's empty line (.pf-eco-auto-log-empty: the quiet Note).
  *   v1.2.0 -- 2026-09-26 -- The flow card's 10px corner reads --shape-corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
  *   v1.1.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
  */
 
-/* Automation section */
-.pf-eco-auto-job-meta { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .78rem; }
-.pf-eco-auto-job-actions { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-/* Editable cadence select on an existing schedule row */
-/* Per-row last Run-now attempt note (a skip stays visible until the next load) */
-/* Per-schedule run-history log expander */
-.pf-eco-auto-log-empty { margin-top: .3rem; }
-.pf-eco-auto-log { display: flex; flex-direction: column; gap: .3rem; margin-top: .4rem; padding-top: .4rem; border-top: 1px dashed var(--border); }
-.pf-eco-auto-log-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .78rem; }
-.pf-eco-auto-log-time { flex: 0 0 auto; }
-.pf-eco-auto-log-trigger { font-size: .72rem; opacity: .85; }
-.pf-eco-auto-log-dur { font-size: .72rem; opacity: .85; }
-.pf-eco-auto-log-reason { flex: 1 1 100%; word-break: break-word; }
-.pf-eco-recipe-head { font-weight: 700; font-size: .88rem; color: var(--text); }
-.pf-eco-auto-flow-card { border-radius: var(--shape-corner); background: var(--card); padding: .4rem .9rem; margin: .3rem 0 .9rem; }
-.pf-eco-auto-flow-step { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: .5rem; }
-.pf-eco-auto-flow-step:first-child { border-top: none; }
-.pf-eco-auto-flow-step-disabled { opacity: .6; }
-.pf-eco-auto-flow-num { font-weight: 700; font-size: .85rem; color: var(--accent); }
-.pf-eco-auto-flow-controls { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
-.pf-eco-auto-produces { display: flex; flex-direction: column; gap: .3rem; }
-.pf-eco-auto-flow-email { margin-top: .2rem; }
-.pf-eco-auto-flow-advanced { gap: .35rem; }
-.pf-eco-auto-flow-advanced-body { display: flex; flex-direction: column; gap: .35rem; padding-left: 1.2rem; }
-.pf-eco-auto-flow-save { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+/* A job's run log */
+.eco-automation-log { display: flex; flex-direction: column; gap: .3rem; margin-top: .4rem; padding-top: .4rem; border-top: 1px dashed var(--border); }
+.eco-automation-log-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .78rem; }
+.eco-automation-log-time { flex: 0 0 auto; }
+.eco-automation-log-trigger { font-size: .72rem; opacity: .85; }
+.eco-automation-log-dur { font-size: .72rem; opacity: .85; }
+.eco-automation-log-reason { flex: 1 1 100%; word-break: break-word; }
 
-/* ── Ecosystem Automation — status timeline (pf-eco-auto-status-*) ── */
-.pf-eco-auto-status { margin-top: .4rem; }
-.pf-eco-auto-status-timeline { display: flex; flex-direction: column; gap: 0; margin-top: .5rem; }
-.pf-eco-auto-status-step { position: relative; padding: 0 0 1rem 1.4rem; border-left: var(--shape-frame) solid var(--border); }
-.pf-eco-auto-status-step:last-child { border-left-color: transparent; padding-bottom: 0; }
-.pf-eco-auto-status-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-bottom: .35rem; }
-.pf-eco-auto-status-dot { position: absolute; left: -7px; top: .15rem; width: 12px; height: 12px; border-radius: 50%; background: var(--bg-dim); border: var(--shape-frame) solid var(--border); }
-.pf-eco-auto-status-dot-ok { background: var(--success, var(--accent)); border-color: var(--success, var(--accent)); }
-.pf-eco-auto-status-dot-wait { background: var(--bg-dim); border-color: var(--accent); }
-.pf-eco-auto-status-dot-off { background: var(--bg-dim); border-color: var(--border); }
-.pf-eco-auto-status-dot-error { background: var(--danger, var(--accent)); border-color: var(--danger, var(--accent)); }
-.pf-eco-auto-status-label { font-size: .88rem; color: var(--text); }
-.pf-eco-auto-status-body { display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-auto-status-agents { display: flex; flex-wrap: wrap; gap: .35rem; }
+/* The one flow card and its numbered steps */
+.eco-automation-status-title { font-weight: 700; font-size: .88rem; color: var(--text); }
+.eco-automation-card { border-radius: var(--shape-corner); background: var(--card); padding: .4rem .9rem; margin: .3rem 0 .9rem; }
+/* The poster skin of the machine room: the card is a section under the rule, no frame and no corner
+   (moved from views/profile-poster.css, the same .pf scope, so it wins over the rule above). */
+.pf .eco-automation-card {
+  background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: var(--shape-corner); box-shadow: none; padding: 1rem 0 1.25rem;
+}
+.eco-automation-step { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: .5rem; }
+.eco-automation-step:first-child { border-top: none; }
+.eco-automation-step--off { opacity: .6; }
+.eco-automation-num { font-weight: 700; font-size: .85rem; color: var(--accent); }
+.eco-automation-save { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+
+/* ── The status timeline of the latest run ── */
+.eco-automation-status { margin-top: .4rem; }
+.eco-automation-timeline { display: flex; flex-direction: column; gap: 0; margin-top: .5rem; }
+.eco-automation-stage { position: relative; padding: 0 0 1rem 1.4rem; border-left: var(--shape-frame) solid var(--border); }
+.eco-automation-stage:last-child { border-left-color: transparent; padding-bottom: 0; }
+.eco-automation-stage-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.eco-automation-dot { position: absolute; left: -7px; top: .15rem; width: 12px; height: 12px; border-radius: 50%; background: var(--bg-dim); border: var(--shape-frame) solid var(--border); }
+.eco-automation-dot--ok { background: var(--success, var(--accent)); border-color: var(--success, var(--accent)); }
+.eco-automation-dot--wait { background: var(--bg-dim); border-color: var(--accent); }
+.eco-automation-dot--off { background: var(--bg-dim); border-color: var(--border); }
+.eco-automation-dot--error { background: var(--danger, var(--accent)); border-color: var(--danger, var(--accent)); }
+.eco-automation-stage-label { font-size: .88rem; color: var(--text); }
+.eco-automation-stage-body { display: flex; flex-direction: column; gap: .4rem; }

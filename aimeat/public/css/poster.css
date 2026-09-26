@@ -3,6 +3,8 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.30.0 -- 2026-09-27 -- A count inside the chosen tab takes the tab's own words' colour (it was --on-sun, which a theme that draws the chosen tab on its accent, Pebble, could not read); the action link's pressed tone.
+ *   v1.29.0 -- 2026-09-26 -- The shapes are drawn by the components (components/Action.js, Mark.js, Note.js), which pages call with data; .poster-label--block, a label on a line of its own.
  *   v1.28.0 -- 2026-09-26 -- The pill corner stays on the tab and on the action link's tone with a ground (jump), and leaves the action link's underline; a disabled action's line reads --shape-rule-colour and the quiet tone's line --shape-frame (a move: the AIMEAT values equal the old ones).
  *   v1.27.0 -- 2026-09-26 -- The Tag's frame colour reads --shape-frame-colour and its letter spacing --shape-tracking-action (a move: the AIMEAT values equal the old ones).
  *   v1.26.0 -- 2026-09-26 -- The figure written on a meter, .poster-meter-figure: the Wallet meter's figure, taken by the AI budget bars too.
@@ -81,6 +83,8 @@
   font-size: var(--text-xs); color: var(--accent); text-transform: var(--shape-case-label);
   letter-spacing: var(--shape-tracking-label); font-weight: var(--weight-heavy); line-height: 1.3;
 }
+/* A label on a line of its own (components/Mark.js Label `block`). */
+.poster-label--block { display: block; }
 
 /* @app-catalog:begin — the app catalog's build (scripts/build-app-catalog.ts) copies every range
    between these markers into its page, so its dialogs draw the action link and the loud action from
@@ -108,7 +112,7 @@
 .poster-tab:disabled { opacity: 0.45; cursor: default; }
 /* A count inside a tab is the Count (.poster-count, tally); inside the chosen tab it keeps dark
    words on the sun, as the tab's own words do. The Count has no frame, so only its words change. */
-.poster-tab.is-on .poster-count { color: var(--on-sun); }
+.poster-tab.is-on .poster-count { color: inherit; }
 /* The action link's Settings tones (Jouni's decision "Action link in Settings"): the size and the
    thinner line the Settings pages' own way on had (formerly .og-door, organism-controls.css). small:
    in a page head or a section; lower: a softer way on ("Show 13 more", "Copy ref"; formerly
@@ -145,6 +149,9 @@
    the same as the action link's own hover. A difference that carries meaning stays a tone. */
 .poster-action--danger { color: var(--accent); border-bottom-color: var(--accent); }
 .poster-action--danger:hover { color: var(--accent); border-color: var(--accent); }
+/* An action that stays pressed while what it started runs (Listen while it reads): the pale coral
+   ground main's .inbox-speak-btn--on drew (components/Action.js `pressed`). */
+.poster-action.is-on { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent); }
 /* Two small links Jouni kept as they look (decision "Small link"), each in the values it had with the
    classic button it wore, hover included. notice: "What does that mean?" under the AI notice
    (formerly .btn-ghost with .poster-ai-notice-more); jump: the jump to the latest message (formerly
@@ -327,6 +334,9 @@
 .poster-chip--sun { background: var(--sun); color: var(--on-sun); }
 .poster-chip--coral { border-color: var(--accent); color: var(--accent); }
 .poster-chip--ink { background: var(--text); color: var(--card-bg); }
+/* dim: a tag that counts nothing yet (no workspaces, no rights), grey frame and words, as main's
+   .og-chip--dim drew it. */
+.poster-chip--dim { border-color: var(--border); color: var(--text-dim); }
 /* A row of tags. */
 .poster-chips { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 /* The remove mark (Jouni's decision "Remove mark", 2026-09-26): the ✗ after a tag's name that takes a

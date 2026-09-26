@@ -12,6 +12,16 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.17.0 — 2026-09-26 — The cut state-name-who-doors for App development's pitfall lists (a
+ *     severity or a tier in its own column), and n-name-doors for the Apps page's condition rows,
+ *     each with its old narrow-screen columns (page group G6).
+ *   v1.16.0 — 2026-09-26 — The cut check-name-size-when-mark-doors for memory's old key list (a key
+ *     picked by its box, opened in place), with the key space's narrow rule: at 1100px the size and
+ *     the change go (page group G3).
+ *   v1.15.0 — 2026-09-26 — The List component (components/List.js) draws this sheet; the cuts of the
+ *     other Settings list kinds it takes (group 9: search hits, a checklist, the uses of an address,
+ *     a task's to-dos, the devices, an access group's rows, what was sent, the notifications,
+ *     organisms and workspaces, a pick list), with their old narrow-screen columns.
  *   v1.14.0 — 2026-09-26 — The cut id-desc-n-doors for Capabilities' members of an opened provider.
  *   v1.13.0 — 2026-09-26 — The cut name-name for Contacts' "Where": two names to a line.
  *   v1.12.0 — 2026-09-26 — The cut for Workflows' table: its name keeps 10rem, and under 900px the
@@ -231,6 +241,12 @@
   .listing--name-size-when-mark-doors > .listing-row > :nth-child(2), .listing--name-size-when-mark-doors > .listing-row > :nth-child(3) { display: none; }
   .listing--name-size-when-mark-doors > .listing-row--head > div { display: none; }
 }
+/* Memory's old key list: the pick box, the key, its size, its change, its marks, its doors. */
+.listing--check-name-size-when-mark-doors { grid-template-columns: auto minmax(0, 1fr) auto auto auto auto; }
+@media (max-width: 1100px) {
+  .listing--check-name-size-when-mark-doors { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .listing--check-name-size-when-mark-doors > .listing-row > :nth-child(3), .listing--check-name-size-when-mark-doors > .listing-row > :nth-child(4) { display: none; }
+}
 /* Memory's file rows (fold rows): at 1100px the size went to a line of its own and the doors under it. */
 .listing--mark-name-meta-doors { grid-template-columns: auto minmax(0, 1fr) auto auto; }
 @media (max-width: 1100px) {
@@ -372,6 +388,75 @@
 /* Capabilities: an opened provider's members (the id, what it does, the calls, the try door); on a
    phone they stack. */
 .listing--id-desc-n-doors { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) 6rem auto; }
+/* cuts: group 9 (the other list kinds of Settings, drawn by the List component, components/List.js).
+   Each keeps the columns and the narrow rules its own sheet had. */
+/* A search's hits (organisms, a workspace): one name to a row, the words under it. */
+.listing--name { grid-template-columns: minmax(0, 1fr); }
+/* A checklist under a field (the password rules): the mark, the words. */
+.listing--mark-name { grid-template-columns: auto minmax(0, 1fr); }
+/* What an address is used for (Email): two uses to a line, one on a phone. */
+.listing--mark-name-mark-name { grid-template-columns: 1rem minmax(0, 1fr) 1rem minmax(0, 1fr); }
+/* A task's to-dos: the tick, the to-do with its lines, its estimate and when it was done. */
+.listing--mark-name-meta { grid-template-columns: auto minmax(0, 1fr) auto; }
+/* The devices signed in (Access): the device, its sessions, when last used. */
+.listing--name-n-when { grid-template-columns: minmax(0, 1.3fr) 7rem 9rem; }
+/* An access group's rows (Data wallet): when, the key, what came of it. */
+.listing--when-name-state { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 9rem; }
+/* What was sent (Email): when, what, by which road, a door. */
+.listing--when-name-via-doors { grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 12rem) auto; }
+/* The notifications (Notifications): when, who, what, the doors. */
+.listing--when-who-name-doors { grid-template-columns: 6.5rem minmax(0, 9rem) minmax(0, 1fr) auto; }
+/* Organisms and workspaces: the mark, the name, its marks, its counts, the door and the menu. */
+.listing--mark-name-tags-stats-doors { grid-template-columns: 2.2rem minmax(0, 1fr) 8rem auto auto; }
+/* The type's tag keeps 6rem and is cut with … (a type is free text up to 40 signs), so every lock
+   after it stands at the same place down the list; the full word is on its title. */
+.listing--mark-name-tags-stats-doors > .listing-row > :nth-child(3) > .poster-chip:first-child { min-width: 6rem; max-width: 100%; box-sizing: border-box; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A pick list (Packages, the apps to put in a package): the box, the app, what it loads. */
+.listing--check-name-desc { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.1fr); }
+@media (max-width: 860px) {
+  .listing--mark-name-mark-name { grid-template-columns: 1rem minmax(0, 1fr); }
+  .listing--name-n-when { grid-template-columns: minmax(0, 1fr) 4rem; }
+  .listing--name-n-when > .listing-row--head > div { display: grid; }
+  .listing--name-n-when > .listing-row > :nth-child(3) { display: none; }
+  .listing--when-name-via-doors { grid-template-columns: minmax(0, 1fr) auto; grid-auto-flow: dense; }
+  .listing--when-name-via-doors > .listing-row > :is(:nth-child(1), :nth-child(3)) { grid-column: 1; border-bottom: 0; padding-bottom: 0; }
+  .listing--when-name-via-doors > .listing-row > :nth-child(2) { grid-column: 1; padding-top: .1rem; }
+  .listing--when-name-via-doors > .listing-row > :nth-child(4) { grid-column: 2; grid-row: span 3; align-self: center; }
+  .listing--when-who-name-doors { grid-template-columns: minmax(0, 1fr) auto; grid-auto-flow: dense; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(1) { grid-column: 1; border-bottom: 0; padding-bottom: 0; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(1) b { display: inline; margin-right: .5rem; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(2) { display: none; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(3) { grid-column: 1 / -1; padding-top: .1rem; border-bottom: 0; padding-bottom: .4rem; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(4) { grid-column: 1 / -1; padding-top: 0; white-space: normal; justify-content: flex-start; flex-wrap: wrap; }
+  .listing--mark-name-tags-stats-doors { grid-template-columns: 2.2rem minmax(0, 1fr) auto; grid-auto-flow: dense; }
+  .listing--mark-name-tags-stats-doors > .listing-row > :nth-child(1) { grid-column: 1; grid-row: span 3; align-content: start; }
+  .listing--mark-name-tags-stats-doors > .listing-row > :nth-child(2) { grid-column: 2; border-bottom: 0; padding-bottom: .1rem; }
+  .listing--mark-name-tags-stats-doors > .listing-row > :nth-child(3) { grid-column: 2 / 4; border-bottom: 0; padding-top: 0; padding-bottom: .1rem; }
+  .listing--mark-name-tags-stats-doors > .listing-row > :nth-child(4) { grid-column: 2 / 4; padding-top: .1rem; }
+  .listing--mark-name-tags-stats-doors > .listing-row > :nth-child(5) { grid-column: 3; border-bottom: 0; padding-bottom: .1rem; }
+  .listing--check-name-desc { grid-template-columns: auto minmax(0, 1fr); }
+  .listing--check-name-desc > .listing-row > :nth-child(3) { grid-column: 2; }
+}
+/* App development's three pitfall lists: a state mark in its own column (a severity Status, a tier
+   Tag) that keeps its own width, the pitfall, where it applies, the doors. On a phone the mark keeps
+   its column and the rest stands under the name (page group G6; formerly appdev-poster.css .ad-pl). */
+.listing--state-name-who-doors { grid-template-columns: 5.6rem minmax(0, 1fr) minmax(8rem, 12rem) auto; }
+.listing--state-name-who-doors > .listing-row:not(.listing-row--head) > :first-child > * { justify-self: start; white-space: nowrap; }
+@media (max-width: 860px) {
+  .listing--state-name-who-doors { grid-template-columns: 5.6rem minmax(0, 1fr); }
+  .listing--state-name-who-doors > .listing-row > :nth-child(2) { border-bottom: 0; padding-bottom: .2rem; }
+  .listing--state-name-who-doors > .listing-row > :nth-child(3) { grid-column: 2; border-bottom: 0; padding-top: 0; padding-bottom: .2rem; }
+  .listing--state-name-who-doors > .listing-row > :nth-child(4) { grid-column: 2; justify-content: flex-start; padding-top: 0; flex-wrap: wrap; }
+}
+/* The Apps page's condition rows: a count in the poster face, what it counts with why, the way to
+   those apps. On a phone the way stands under the words (page group G6; formerly apps-poster.css
+   .ap-kn). */
+.listing--n-name-doors { grid-template-columns: 5.5rem minmax(0, 1fr) auto; }
+@media (max-width: 860px) {
+  .listing--n-name-doors { grid-template-columns: 3.6rem minmax(0, 1fr); }
+  .listing--n-name-doors > .listing-row > :nth-child(2) { border-bottom: 0; padding-bottom: .2rem; }
+  .listing--n-name-doors > .listing-row > :nth-child(3) { grid-column: 2; justify-content: flex-start; padding-top: 0; }
+}
 
 @media (max-width: 860px) {
   .listing-row--head > div { display: none; }

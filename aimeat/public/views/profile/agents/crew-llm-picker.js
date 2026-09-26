@@ -20,6 +20,9 @@
  * @structure CrewLlmPicker({ agentName, menu, onSaved, showToast })
  * @usage <${CrewLlmPicker} agentName=${name} menu=${menu} onSaved=${reload} showToast=${showToast} />
  * @version-history
+ *   v1.8.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the box is Box,
+ *     the heading SubHeading, the lines Note, the picker the Select with its two named groups as
+ *     data, the doors Action; the current choice stands in the text's own colour, as before.
  *   v1.7.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.6.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.5.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -40,6 +43,12 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPut } from '/js/api.js';
+import { Box } from '/components/Box.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Note } from '/components/Note.js';
+import { Select } from '/components/Select.js';
+import { Action } from '/components/Action.js';
+import { Row } from '/components/Layout.js';
 
 const K = 'profile.agents.detail.crew.llm';
 
@@ -115,51 +124,47 @@ export default function CrewLlmPicker({ agentName, menu, onSaved, showToast }) {
 
   const nothingToOffer = profiles.length === 0 && models.length === 0;
 
+  const options = [
+    profiles.length > 0 && { group: t(`${K}.profiles`), options: profiles.map(p => ({ value: `profile:${p}`, label: p })) },
+    models.length > 0 && { group: t(`${K}.models`), options: models.map(m => ({ value: `model:${m.label}`, label: m.label })) },
+  ].filter(Boolean);
+
   return html`
-    <div class="pf-agd-crew-llm poster-box">
-      <div class="pf-agd-section-title sub-heading">${t(`${K}.title`)}</div>
-      <div class="poster-hint pf-agd-help-text">${t(`${K}.hint`)}</div>
+    <${Box}>
+      <${SubHeading}>${t(`${K}.title`)}<//>
+      <${Note}>${t(`${K}.hint`)}<//>
 
       ${nothingToOffer ? html`
         ${/* A CHOICE CAN EXIST WITH NO LIST TO SHOW IT IN: it was made while the agent was up, or
               from a chat, and the machine has not reported since. Saying only "never said which
               models" would tell the owner nothing is set while something is. */''}
         ${choice && html`
-          <div class="pf-agd-crew-llm-row">
-            <span class="pf-agd-crew-llm-current">
+          <${Row} wrap gap="medium">
+            <span>
               ${t(inherited ? `${K}.currentInherited` : `${K}.current`, {
                 what: choice.value.profile || choice.value.label || '',
               })}
             </span>
             ${!inherited && html`
-              <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => save('')}>
+              <${Action} small disabled=${busy} onClick=${() => save('')}>
                 ${t(`${K}.clear`)}
-              </button>`}
-          </div>`}
-        <div class="poster-quiet pf-agd-crew-llm-empty">${t(`${K}.noneKnown`)}</div>
+              <//>`}
+          <//>`}
+        <${Note} kind="quiet">${t(`${K}.noneKnown`)}<//>
       ` : html`
-        <div class="pf-agd-crew-llm-row">
-          <select class="select-field" disabled=${busy} value=${current} onChange=${e => save(e.target.value)}>
-            <option value="">${inherited ? t(`${K}.inherited`) : t(`${K}.unset`)}</option>
-            ${profiles.length > 0 && html`
-              <optgroup label=${t(`${K}.profiles`)}>
-                ${profiles.map(p => html`<option key=${p} value=${`profile:${p}`}>${p}</option>`)}
-              </optgroup>`}
-            ${models.length > 0 && html`
-              <optgroup label=${t(`${K}.models`)}>
-                ${models.map(m => html`<option key=${m.label} value=${`model:${m.label}`}>${m.label}</option>`)}
-              </optgroup>`}
-          </select>
-          <button type="button" class="poster-action poster-action--small" disabled=${busy || !current} onClick=${saveDefault}>
+        <${Row} wrap gap="medium">
+          <${Select} ariaLabel=${t(`${K}.title`)} disabled=${busy} value=${current} onChange=${save}
+            placeholder=${inherited ? t(`${K}.inherited`) : t(`${K}.unset`)} options=${options} />
+          <${Action} small disabled=${busy || !current} onClick=${saveDefault}>
             ${t(`${K}.setDefault`)}
-          </button>
-        </div>
-        <div class="poster-hint pf-agd-help-text">
+          <//>
+        <//>
+        <${Note}>
           ${inherited && choice?.value
             ? t(`${K}.inheritedFrom`, { what: choice.value.profile || choice.value.label || '' })
             : t(menu?.source === 'runtime' ? `${K}.fromRuntime` : `${K}.fromCatalog`)}
-        </div>
+        <//>
       `}
-    </div>
+    <//>
   `;
 }

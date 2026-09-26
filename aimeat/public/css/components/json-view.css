@@ -4,39 +4,41 @@
  * SPDX-License-Identifier: MIT
  * @description A stored value as readable JSON: one key and its value per row, a nested value
  *   indented under a thin guide line, the key in bold grey typewriter, a number in blue, a true or
- *   false in coral, an empty value grey and slanted. Drawn by components/JsonView.js.
- *   Moved unchanged out of views/agents-detail.css (the agent page's sheet, where the component's
- *   look had lived since it was written for an agent task's memory); the class names stay. It has no
- *   corner, no 2px or 3px frame, no shadow and no letter case, so it reads no shape token.
+ *   false in coral, an empty value grey and slanted. Drawn by components/JsonView.js, with its own
+ *   class names (.json-view-*). It has no corner, no 2px or 3px frame, no shadow and no letter case,
+ *   so it reads no shape token.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — The component's own class names (.pf-agd-json-block, -row, -row--nested,
+ *     -key, -str, -num, -bool, -null, -empty → .json-view-*); every declaration and selector shape
+ *     kept, the .pf scope with it (Jouni: components draw only their own class names, a move).
  *   v1.0.0 — 2026-09-25 — Moved out of views/agents-detail.css (UI consolidation phase 5, a move).
  */
 
 /* Structured JSON view: key/value rows, nested blocks indented with a guide line. */
-.pf .pf-agd-json-block { display: flex; flex-direction: column; gap: 0.05rem; }
-.pf .pf-agd-json-row {
+.pf .json-view-block { display: flex; flex-direction: column; gap: 0.05rem; }
+.pf .json-view-row {
   display: flex;
   gap: 0.45rem;
   align-items: baseline;
   padding: 0.05rem 0;
 }
-.pf .pf-agd-json-row--nested { display: block; }
-.pf .pf-agd-json-row--nested > .pf-agd-json-block {
+.pf .json-view-row--nested { display: block; }
+.pf .json-view-row--nested > .json-view-block {
   margin: 0.1rem 0 0.2rem 0.3rem;
   padding-left: 0.65rem;
   border-left: 1px solid var(--border, #E5E7EB);
 }
-.pf .pf-agd-json-key {
+.pf .json-view-key {
   font-weight: 600;
   color: var(--text-dim, #6B7280);
   font-family: var(--font-mono, monospace);
   white-space: nowrap;
   flex-shrink: 0;
 }
-.pf .pf-agd-json-key::after { content: ':'; color: var(--text-muted, #9CA3AF); font-weight: 400; }
-.pf .pf-agd-json-str { color: var(--text, #1A1A2E); word-break: break-word; }
-.pf .pf-agd-json-num { color: var(--info, #3B82F6); font-family: var(--font-mono, monospace); }
-.pf .pf-agd-json-bool { color: var(--accent, #E8564A); font-family: var(--font-mono, monospace); }
-.pf .pf-agd-json-null,
-.pf .pf-agd-json-empty { color: var(--text-muted, #9CA3AF); font-style: italic; }
+.pf .json-view-key::after { content: ':'; color: var(--text-muted, #9CA3AF); font-weight: 400; }
+.pf .json-view-str { color: var(--text, #1A1A2E); word-break: break-word; }
+.pf .json-view-num { color: var(--info, #3B82F6); font-family: var(--font-mono, monospace); }
+.pf .json-view-bool { color: var(--accent, #E8564A); font-family: var(--font-mono, monospace); }
+.pf .json-view-null,
+.pf .json-view-empty { color: var(--text-muted, #9CA3AF); font-style: italic; }

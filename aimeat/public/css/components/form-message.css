@@ -8,8 +8,11 @@
  *   Drawn as markup: <span class="form-message">Saved.</span> · <span class="form-message form-message--error">…</span>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — .form-message--pre (Note message `pre`), from main's .pf-dr-pre (page group G8).
  *   v1.0.0 — 2026-09-25 — Initial, with the values of the copies in the Settings tabs (xx-msg, is-err).
  */
 
 .form-message { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
 .form-message--error { color: var(--accent); }
+/* pre: a message that names several problems keeps one per line (main's .pf-dr-pre; G8). */
+.form-message--pre { white-space: pre-line; }

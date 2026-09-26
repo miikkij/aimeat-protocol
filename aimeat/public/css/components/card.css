@@ -4,9 +4,23 @@
  * SPDX-License-Identifier: MIT
  * @description The classic card and its kin: the glass card, the content group, the stat card, the category card, the card header and title.
  *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ *   At the end, the Card component's tile and grid (components/Card.js): the ruled tile (the Item
+ *   grid's values, formerly css/components/item-grid.css), the framed tile (the Road's and
+ *   Notifications' device card's values, formerly how-roads.css .nt-road and .nt-dev-card), the
+ *   section card in a grid (formerly agents-detail.css .pf-agd-card-grid), the overview's panels
+ *   (formerly profile.css .pf-home-grid and .pf-home-card), and the figure door
+ *   (formerly figure-door.css .pf-usage-chip and its skin in the poster face). Their selectors carry
+ *   two classes where a later sheet's single class (poster.css .poster-box, .poster-choice; the
+ *   profile's .pf .card) would otherwise win, because this sheet is linked first.
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.4.1 — 2026-09-26 — The door tile's focus ring reads var(--shape-frame) (2px in AIMEAT), not a
+ *     literal (check:shape-tokens; fix pass).
+ *   v1.4.0 — 2026-09-26 —The tile's lines (.card-tile-lines, .card-tile-line: Discover's places, main's .dv-ws; G8, additive).
+ *   v1.3.0 — 2026-09-26 — A hint beside a tile's door has no margin of its own (Packages' roads; G7, additive).
+ *   v1.2.0 — 2026-09-26 — The section inside a list row (.card-section--in-row; G3, additive).
+ *   v1.1.0 — 2026-09-26 — The Card component's tile, grid, section and figure (component plan C3).
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1112-1223, 1752-1756), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
@@ -133,4 +147,93 @@
 /* Phone (formerly theme.css "Responsive"). */
 @media (max-width: 480px) {
   .content-group { margin-top: 2rem; padding: 1.5rem 1rem; }
+}
+
+/* ── The Card component (components/Card.js) ─────────────────────────────────────────────── */
+
+/* The grid. Three columns by default; the framed tiles stand further apart than the ruled ones. */
+.card-grid { display: grid; gap: .4rem 1.2rem; margin-top: .2rem; }
+.card-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.card-grid--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.card-grid--fill { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.card-grid--one { grid-template-columns: minmax(0, 1fr); }
+.card-grid:has(> .card-tile--framed) { gap: .8rem; }
+/* Section cards side by side (an agent's tabs pair short groups); `wide` spans every column. */
+.card-grid--sections { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 2rem; align-items: stretch; }
+.card-grid.card-grid--sections > .card { margin-top: 0; margin-bottom: 0; min-width: 0; }
+.card-grid.card-grid--sections > .card-section--wide { grid-column: 1 / -1; }
+/* Figure doors in a line. */
+.card-grid--figures { display: flex; flex-wrap: wrap; gap: .6rem 1.8rem; margin-top: 1.2rem; }
+
+/* The parts every tile shares. */
+.card-tile { min-width: 0; }
+.card-tile .card-tile-name { margin: 0; font-weight: 800; color: var(--text); }
+.card-tile .card-tile-text { margin: 0; }
+.card-tile .card-tile-text--clamp { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.card-tile .card-tile-meta { display: block; font-family: var(--font-mono); color: var(--text-dim); overflow-wrap: anywhere; }
+.card-tile .card-tile-kicker { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
+.card-tile .card-tile-head { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.card-tile .card-tile-mark { flex: none; display: inline-flex; }
+.card-tile .code-block { margin: 0; }
+
+/* The ruled tile: the name in bold over its words and a grey typewriter line, a thin rule under it. */
+.card-tile.card-tile--ruled { padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .84rem; line-height: 1.5; }
+.card-tile--ruled .card-tile-name { display: block; }
+.card-tile--ruled .card-tile-meta { margin-top: .1rem; font-size: .68rem; }
+
+/* The framed tile: the Object box, its parts in a column, the doors or the code at its foot. */
+.card-tile.card-tile--framed { display: flex; flex-direction: column; gap: .35rem; margin: 0; padding: .9rem 1rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.card-tile--framed .card-tile-name { font-size: .95rem; }
+.card-tile--framed .card-tile-meta { font-size: .7rem; }
+.card-tile--framed .card-tile-foot { margin-top: auto; }
+.card-tile--framed .card-tile-doors { margin-top: auto; padding-top: .4rem; flex-wrap: wrap; align-items: center; }
+/* A hint beside a tile's door stands in its line (main's Packages .pk-road .pk-hint; page group G7). */
+.card-tile-doors > .poster-hint { margin: 0; }
+
+/* A tile that is a door: the name and the frame or rule turn coral under the pointer and the focus. */
+/* The tile's lines: named counts under the meta line, a hairline over each (main's Discover .dv-ws). */
+.card-tile .card-tile-lines { display: flex; flex-direction: column; margin-top: .35rem; }
+.card-tile .card-tile-line { display: flex; gap: .5rem; padding: .3rem 0; border-top: 1px solid var(--border); font-size: .8rem; font-weight: 600; min-width: 0; }
+.card-tile .card-tile-line i { font-style: normal; margin-left: auto; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); flex: none; }
+.card-tile .card-tile-line--dim { color: var(--text-dim); }
+
+.card-tile.card-tile--door { cursor: pointer; }
+.card-tile--door:hover .card-tile-name, .card-tile--door:focus-visible .card-tile-name { color: var(--accent); }
+.card-tile.card-tile--ruled.card-tile--door:hover, .card-tile.card-tile--ruled.card-tile--door:focus-visible { border-bottom-color: var(--accent); }
+.card-tile.card-tile--framed.card-tile--door:hover, .card-tile.card-tile--framed.card-tile--door:focus-visible { border-color: var(--accent); }
+.card-tile--door:focus-visible { outline: var(--shape-frame) solid var(--accent); outline-offset: 2px; }
+
+/* The section card's head: its title and what stands at its right. */
+.card-section > .card-header > .sub-heading { margin: 0; }
+/* A section inside a list row (the Access page's two-step and passkey rows; main's .ac-panel .card). */
+.card.card-section.card-section--in-row { padding: .4rem 0; margin-bottom: 0; }
+.card.card-section.card-section--in-row:last-child { padding-bottom: .2rem; }
+
+/* The overview's panels (formerly profile.css .pf-home-grid, .pf-home-card and its title, link and
+   note): two columns, one on a phone; the headline a door where it opens its tab. */
+.card-grid.card-grid--panels { grid-template-columns: 1fr 1fr; gap: 3rem 2.75rem; margin: 3rem 0 0; font-family: var(--font-showroom-body); }
+.card-panel { background: none; padding: 0; min-width: 0; }
+.card-panel.card-panel--wide { grid-column: 1 / -1; }
+.card-panel .card-panel-title { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; text-align: left; border-top: 0; border-right: 0; border-left: 0; }
+.card-panel .card-panel-title--door { cursor: pointer; }
+.card-panel .card-panel-title--door:hover { color: var(--accent); }
+.card-panel-note { font-family: var(--font-mono); font-weight: 400; font-size: .8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); }
+
+/* The figure door: a number and its word, in a square frame of the text colour. */
+.card-figure {
+  display: inline-flex; flex-direction: row; align-items: baseline; gap: .5rem; min-width: 0;
+  padding: 1px 7px; border: var(--shape-frame) solid currentColor; border-radius: var(--shape-corner); background: none;
+  cursor: pointer; text-align: left; font-family: var(--font-mono); font-size: .68rem; font-weight: 500;
+  letter-spacing: 0; text-transform: none; line-height: 1.5;
+}
+.card-figure[disabled] { cursor: default; }
+.card-figure:not([disabled]):hover .card-figure-value { color: var(--accent); }
+.card-figure .card-figure-value { font-variant-numeric: tabular-nums; margin-right: 0; }
+.card-figure-word { font-size: .74rem; font-weight: 800; letter-spacing: calc(var(--shape-tracking-label) * .6); text-transform: var(--shape-case-label); color: var(--text-dim); }
+
+@media (max-width: 860px) {
+  .card-grid--three, .card-grid--two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .card-grid.card-grid--panels { grid-template-columns: 1fr; gap: 2.5rem; }
 }

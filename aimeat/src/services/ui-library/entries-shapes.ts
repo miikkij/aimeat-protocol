@@ -9,6 +9,8 @@
  * @structure SHAPE_ENTRIES
  * @usage import { SHAPE_ENTRIES } from './entries-shapes.js';
  * @version-history
+ *   v1.18.0 — 2026-09-27 — The box and the choice tile are box-shape and choice-shape: their old ids name the Box and
+ *     Choice components (components/Box.js, Choice.js), which own box.css and choice.css and wear these shapes.
  *   v1.17.0 — 2026-09-26 — The Meter's figure (.poster-meter-figure), the Wallet meter's look, taken by the AI budget bars (a unification).
  *   v1.16.0 — 2026-09-26 — The Tag's remove mark (.poster-chip-x), Jouni's decision "Remove mark".
  *   v1.15.0 — 2026-09-26 — The box's raised tone (.poster-box--raised), Jouni's decision "Box".
@@ -98,7 +100,8 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
     shape('menu-row', 'Menu row', ['poster-menu-row', 'poster-menu-row--danger'], '<div class="poster-prompt-menu"><button class="poster-menu-row">…</button>…</div>',
         'One choice in an opened menu: plain words on a quiet ground, a thin line between rows.', 'The prompt card\'s other ways to send, a card\'s actions, a notification\'s actions.',
         [{ name: 'danger', class: 'poster-menu-row--danger', when: 'a row that removes something: the danger colour' }]),
-    shape('box', 'Box', ['poster-box', 'poster-box--raised', 'poster-box--avatar', 'poster-box--small', 'poster-box--agent', 'poster-box--meter', 'poster-box--quota', 'poster-box--copy', 'poster-box--row', 'poster-meter-figure'], '<div class="poster-box">…</div>',
+    // Its id is box-shape since 2026-09-27: `box` is the Box component (components/Box.js, box.css), which wears it.
+    shape('box-shape', 'Box shape', ['poster-box', 'poster-box--raised', 'poster-box--avatar', 'poster-box--small', 'poster-box--agent', 'poster-box--meter', 'poster-box--quota', 'poster-box--copy', 'poster-box--row', 'poster-meter-figure'], '<div class="poster-box">…</div>',
         'A 2px ink frame that carries one object; its size and place belong to the view.', 'An initials box, a meter, or a framed result.',
         [
             { name: 'raised', class: 'poster-box--raised', when: 'the thing that stands out: a row you opened, or the way to take first; the heavier frame with the raised shadow' },
@@ -116,7 +119,8 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
     shape('record', 'Record', ['poster-record', 'poster-record-title', 'poster-record-title--small'], '<div class="poster-record"><h3 class="poster-record-title">…</h3>…</div>',
         'A card in an ink frame with a sun shadow, and its headline.', 'One thing opened up: an index entry, a record, a detail.',
         [{ name: 'small title', class: 'poster-record-title--small', when: 'a record inside a narrow column' }]),
-    shape('choice', 'Choice tile', ['poster-choice'], '<button class="poster-choice"><b>…</b>…</button>',
+    // Its id is choice-shape since 2026-09-27: `choice` is the Choice component (components/Choice.js, choice.css), whose boxed cut wears it.
+    shape('choice-shape', 'Choice tile', ['poster-choice'], '<button class="poster-choice"><b>…</b>…</button>',
         'One of a few boxed answers, the chosen one on the sun with an ink shadow.', 'A choice where each answer needs a line of explanation.'),
     shape('sticker', 'Sticker', ['poster-sticker'], '<div class="poster-sticker">…</div>',
         'A small sun-ground box with a short headline and one door.', 'The one fact about a thing that must be seen before its name.'),

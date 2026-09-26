@@ -9,12 +9,12 @@
  *   crumb · pageLinks · goTab
  * @usage import { a, day, areaLabel, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (Crumb, Rail);
+ *     openTab is the Rail's (component plan C9, page group G6).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AppDev: tieto ja kiihdytys", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate } from '/js/format.js';
 
 export const a = (key, vars) => t('appdevpage.' + key, vars);
@@ -48,16 +48,18 @@ export function catalogUrl(params = {}) {
 /** The build prompt as a file, in the profile's language; a same-origin link, so no fetch. */
 export const buildPromptFileUrl = () => `/v1/prompts/build-app?format=txt${getLocale() === 'fi' ? '&lang=fi' : ''}`;
 
+/** The crumb's steps (components/Crumb.js): the last is the page you are on. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.appDev')}</span></div>`;
+  return [t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.tabs.appDev')];
 }
 
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export const goTab = openTab;
+/** The sibling pages in the rail, as data (components/Rail.js): each is → … →. */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('skills')}><i>→</i>${t('skills.tabLabel')}<em>→</em></button>
-    <a class="og-rail-link" href=${catalogUrl()} target="_blank" rel="noopener"><i>→</i>${t('profile.apps.launcherTitle')}<em>→</em></a>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('work')}><i>→</i>${t('profile.tabs.work')}<em>→</em></button>`;
+  return [
+    { tab: 'apps', label: t('profile.tabs.apps') },
+    { tab: 'skills', label: t('skills.tabLabel') },
+    { href: catalogUrl(), newTab: true, label: t('profile.apps.launcherTitle') },
+    { tab: 'work', label: t('profile.tabs.work') },
+  ];
 }

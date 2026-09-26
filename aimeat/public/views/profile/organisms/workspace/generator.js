@@ -10,6 +10,10 @@
  * @structure WorkspaceGenerator
  * @usage import { WorkspaceGenerator } from '/views/profile/organisms/workspace/generator.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- Every part is a library component that takes data: the section Card, the
+ *     Sub-heading with its description, the Text areas, FormActions with the loud action (its spinner
+ *     the Spinner) and the action link, and the Attention note with the row Label and each refusal as
+ *     the Form message. The page writes no class (page migration G2b).
  *   v1.8.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.6.0 -- 2026-09-25 -- A failed generation's note: its heading is the row label (.poster-label) and each reason the Form message's refused cut (.form-message--error), as the attention notes and forms of the other tabs say it (a unification: the look most tabs use).
@@ -37,6 +41,15 @@ import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import * as orgService from '/js/services/organisms.js';
 import { OpenRouterSettings } from '/views/profile/openrouter-settings.js';
+import { Card } from '/components/Card.js';
+import { Action, Loud } from '/components/Action.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SubHeading, HeadDesc } from '/components/SubHeading.js';
+import { TextArea } from '/components/TextField.js';
+import { FormActions } from '/components/Field.js';
+import { Spinner } from '/components/Spinner.js';
+import { Stack } from '/components/Layout.js';
 
 export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSettings, showRegenerate, manifest, genBusy, setGenBusy }) {
   const [genDesc, setGenDesc] = useState('');
@@ -96,55 +109,54 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
     } catch (e) { showToast((e && e.message) || 'Failed to copy'); }
   }, [pasteText, genErrors, showToast]);
 
+  const descWords = t('organisms.generatePlaceholder') || 'e.g. A research study tracking hypotheses, experiments and validated findings';
+  const pasteWords = t('organisms.pastePlaceholder') || 'Paste the AI JSON response here';
   return html`
-    <div class="pj-section poster-row--thing">
-      <div class="pj-section-title sub-heading">${showRegenerate ? (t('organisms.restructureTitle') || 'Restructure / add types with AI') : (t('organisms.generateTitle') || 'Or generate a custom workspace with AI')}</div>
-      <div class="section-desc">${showRegenerate
-        ? (t('organisms.restructureDesc') || 'Describe what to add or change. Existing types and their data are kept — the AI extends the current structure. (To start completely fresh, delete the workspace below first.)')
-        : (t('organisms.generateDesc') || 'Describe what you want to track — the AI designs the object types. Use your OpenRouter key for one-click generation, or copy the prompt into any AI chat (free) and paste the result back.')}</div>
+    <${Card} tone="section">
+      <${Stack}>
+        <${SubHeading} desc=${showRegenerate
+          ? (t('organisms.restructureDesc') || 'Describe what to add or change. Existing types and their data are kept — the AI extends the current structure. (To start completely fresh, delete the workspace below first.)')
+          : (t('organisms.generateDesc') || 'Describe what you want to track — the AI designs the object types. Use your OpenRouter key for one-click generation, or copy the prompt into any AI chat (free) and paste the result back.')}>${showRegenerate ? (t('organisms.restructureTitle') || 'Restructure / add types with AI') : (t('organisms.generateTitle') || 'Or generate a custom workspace with AI')}<//>
 
-      <textarea class="og-textarea" rows="3"
-        placeholder=${t('organisms.generatePlaceholder') || 'e.g. A research study tracking hypotheses, experiments and validated findings'}
-        value=${genDesc} onInput=${e => setGenDesc(e.target.value)}></textarea>
+        <${TextArea} rows=${3} placeholder=${descWords} ariaLabel=${descWords} value=${genDesc} onInput=${setGenDesc} />
 
-      <${OpenRouterSettings} onSettingsChange=${s => setHasAiKey(!!(s && s.hasApiKey))} />
+        <${OpenRouterSettings} onSettingsChange=${s => setHasAiKey(!!(s && s.hasApiKey))} />
 
-      <div class="form-actions">
-        ${hasAiKey ? html`
-          <button class="poster-slab poster-slab--control" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
-            ${genBusy ? html`<span class="spinner"></span> ${t('organisms.generating') || 'Generating…'}` : (t('organisms.generate') || 'Generate with AI')}
-          </button>
-        ` : null}
-        <button class="poster-action poster-action--small" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}</button>
-      </div>
+        <${FormActions}>
+          ${hasAiKey ? html`
+            <${Loud} control onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
+              ${genBusy ? html`<${Spinner} /> ${t('organisms.generating') || 'Generating…'}` : (t('organisms.generate') || 'Generate with AI')}
+            <//>
+          ` : null}
+          <${Action} small onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}<//>
+        <//>
 
-      <div class="section-desc">${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}</div>
-      <textarea class="og-textarea" rows="4"
-        placeholder=${t('organisms.pastePlaceholder') || 'Paste the AI JSON response here'}
-        value=${pasteText} onInput=${e => setPasteText(e.target.value)}></textarea>
+        <${HeadDesc}>${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}<//>
+        <${TextArea} rows=${4} placeholder=${pasteWords} ariaLabel=${pasteWords} value=${pasteText} onInput=${setPasteText} />
 
-      ${genFail && html`
-        <div class="pj-errors poster-aside poster-aside--small">
-          <div class="poster-label">${t('organisms.genFailed') || 'Generation failed — try again'}</div>
-          <div class="form-message form-message--error">${(genFail)}</div>
-        </div>
-      `}
+        ${genFail && html`
+          <${Note} kind="aside" size="small">
+            <${Label} block>${t('organisms.genFailed') || 'Generation failed — try again'}<//>
+            <${Note} kind="message" error>${(genFail)}<//>
+          <//>
+        `}
 
-      ${genErrors.length > 0 && html`
-        <div class="pj-errors poster-aside poster-aside--small">
-          <div class="poster-label">${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}</div>
-          ${genErrors.map((e, i) => html`<div class="form-message form-message--error" key=${i}>${(e)}</div>`)}
-          <div class="form-actions">
-            <button class="poster-action poster-action--small" onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}</button>
-          </div>
-        </div>
-      `}
+        ${genErrors.length > 0 && html`
+          <${Note} kind="aside" size="small">
+            <${Label} block>${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}<//>
+            <${Stack} gap="tight">${genErrors.map((e, i) => html`<${Note} kind="message" error key=${i}>${(e)}<//>`)}<//>
+            <${FormActions}>
+              <${Action} small onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}<//>
+            <//>
+          <//>
+        `}
 
-      <div class="form-actions">
-        <button class="poster-slab poster-slab--control" onClick=${applyPasted} disabled=${applyBusy || !pasteText.trim()}>
-          ${applyBusy ? html`<span class="spinner"></span> ` : ''}${t('organisms.applyPasted') || 'Validate & apply'}
-        </button>
-      </div>
-    </div>
+        <${FormActions}>
+          <${Loud} control onClick=${applyPasted} disabled=${applyBusy || !pasteText.trim()}>
+            ${applyBusy ? html`<${Spinner} /> ` : ''}${t('organisms.applyPasted') || 'Validate & apply'}
+          <//>
+        <//>
+      <//>
+    <//>
   `;
 }

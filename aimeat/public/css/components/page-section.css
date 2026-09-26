@@ -9,6 +9,9 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.1 — 2026-09-26 — The side split's line reads var(--shape-frame) (2px in AIMEAT), not a literal
+ *     (check:shape-tokens; fix pass).
+ *   v1.4.0 — 2026-09-26 —The side split, .og-split--side (Layout Split `side`), from main's .access-cx-own (page group G3).
  *   v1.3.0 — 2026-09-26 — The split, .og-split: a part of a section set off from what is above it by a hairline (a panel's last doors, a group inside it), the line Workflows and Boards drew alike (a unification).
  *   v1.2.0 — 2026-09-25 — The lead takes the look most Settings & Controls tabs draw for a lead or a paragraph: line-height 1.55 (was 1.6) and a gap of .7rem below (was .9rem). The admin's and the organism pages' leads change with it (UI consolidation phase 5, a unification).
  *   v1.1.0 — 2026-09-25 — The headings over lists wear .poster-day-title; their rules here keep only their place (Jouni's decision "Group heading", a unification).
@@ -26,5 +29,8 @@
 /* The split: a part of a section set off from what is above it by a hairline (a panel's last doors,
    a group inside it). Its space above belongs to the place. */
 .og-split { border-top: 1px solid var(--border); }
+/* The side split (Split side): the line at the part's start, the part indented; a quieter side door
+   that belongs to what is above it (main's .access-cx-own in profile.css, with its values). */
+.og-split--side { border-top: 0; border-left: var(--shape-frame) solid var(--border); padding-left: .75rem; }
 .og-hint--label { margin-top: 1.1rem; }
 .og-hint--label small { font-family: var(--font-mono); font-size: .75rem; color: var(--accent); margin-left: .4rem; }

@@ -9,6 +9,8 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.5.1 — 2026-09-27 — InstructionBlock draws its own names from instruction-block.css (formerly
+ *     .ib-* in hello-mcp.css; a move); its entry id follows its sheet (hello-mcp → instruction-block).
  *   v1.5.0 — 2026-09-26 — Markdown's small cut (.md-body--small, `small`), Jouni's decision "Small reader".
  *   v1.4.0 — 2026-09-26 — A removable tag's x is the Tag's remove mark (.poster-chip-x), coral while the pointer is on the tag (Jouni's decision "Remove mark", a unification).
  *   v1.3.0 — 2026-09-26 — A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
@@ -95,14 +97,20 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         example: { serverName: 'aimeat', title: 'Connect your AI' },
     },
     {
-        id: 'hello-mcp', name: 'InstructionBlock', kind: 'component', status: 'active',
-        summary: 'The organism instruction block and the per-tool setup guide, the two onboarding components of the Agents page and every organism.',
-        module: '/views/profile/instruction-block.js', sheet: '/css/components/hello-mcp.css',
-        data: { shape: 'InstructionBlock({ orgId }) · McpSetupGuide({ installClassName, tabClass, activeClass }) (views/profile/ai-setup-guide.js)', fields: { orgId: 'the organism whose instructions to show', tabClass: 'the tab class for the guide', activeClass: 'the chosen tab class' } },
-        useFor: ['Telling a person how to connect their AI to an organism, tool by tool.'],
-        variants: [],
+        id: 'instruction-block', name: 'InstructionBlock', kind: 'component', status: 'active',
+        summary: 'The copyable instruction block of one organism, in the three formats people paste it into (the AI chat\'s instructions, CLAUDE.md, AGENTS.md): the formats as the tab row, a line that says where the chosen one goes, the block in the typewriter face, and a row with its copy door and a grey line naming the organism and how many workspaces it was made from. A grey line while it loads or when it cannot be read.',
+        module: '/components/InstructionBlock.js', sheet: '/css/components/instruction-block.css',
+        data: {
+            shape: 'InstructionBlock({ orgId })',
+            fields: { orgId: 'the organism whose block it shows; the node writes the block from the organism\'s real structure, in the reader\'s language, and it is read again when the language changes' },
+        },
+        useFor: ['Giving a person the text that tells their AI where things live in an organism, and where to paste it.'],
+        variants: [
+            { name: 'formats', class: 'instruction-block-tabs', when: 'the three formats, one tab each; the chosen one decides the block and the line that says where it goes' },
+            { name: 'loading or failed', class: 'instruction-block-note', prop: 'orgId', when: 'the block is still being read, or could not be read' },
+        ],
         example: { orgId: 'fbb51de5-…' },
-        note: 'Two modules read this sheet: views/profile/instruction-block.js and views/profile/ai-setup-guide.js. The MCP page draws the same components in the poster dress (views/mcp-poster.css).',
+        note: 'Moved on 2026-09-26 out of views/profile/instruction-block.js, which only re-exports it now. Since 2026-09-27 it draws its own names (.instruction-block-*, formerly .ib-*) from its own sheet, moved unchanged out of hello-mcp.css, whose other half is the setup guide\'s setup-guide.css (entry setup-guide, components/SetupGuide.js; its InstructionsDialog also draws this block). The MCP page, the organism pages and the instructions dialog draw it.',
     },
     {
         id: 'contact-picker', name: 'ContactPicker', kind: 'component', status: 'active',

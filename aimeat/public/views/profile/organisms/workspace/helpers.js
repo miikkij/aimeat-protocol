@@ -10,6 +10,10 @@
  *   kpiMeets, firstLine, shortActor, cap, isMobileView, renderSpaceNotice
  * @usage import { PRIMARY_FIELD, groupDocs } from '/views/profile/organisms/workspace/helpers.js';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — A record field's value is made of library components for a Facts row: an
+ *     array one FactLine per item with its bullet, an object the Code block that scrolls (as the
+ *     .pj-rec-json box did), Markdown the small reader, plain words as they are; a space whose items
+ *     live elsewhere is a section Card with the Hint. The module writes no class (page migration G2b).
  *   v1.2.0 — 2026-09-26 — Markdown in a record field is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   v1.1.0 — 2026-09-26 — An object in a record field is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   2026-09-25 -- A space whose items live elsewhere says so with the Hint (.poster-hint), a unification: the look most tabs use.
@@ -25,6 +29,10 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
+import { Card } from '/components/Card.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { FactLine } from '/components/Facts.js';
 
 export const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', resource: 'label', decision: 'summary' };
 
@@ -34,19 +42,17 @@ export const looksMarkdown = (s) => /\n/.test(s) || /(^|\s)[-*]\s/.test(s) || /[
 // are multi-line) render through the safe Markdown component; plain strings wrap as text; arrays
 // become a bullet list; objects pretty-print in a wrapped <pre>. (Was a right-aligned KeyValueRow
 // with everything String()'d onto one line — unreadable for real record data.)
+// The value goes into a Facts row (components/Facts.js): an array is one line per item with its
+// bullet (FactLine), an object the Code block that scrolls, Markdown the small reader.
 export const renderFieldVal = (v) => {
   if (Array.isArray(v)) {
-    return html`<ul class="pj-rec-field-list">${v.map((it, i) => html`<li key=${i}>${
-      (it && typeof it === 'object') ? html`<pre class="code-block pj-rec-json">${JSON.stringify(it, null, 2)}</pre>` : String(it)
-    }</li>`)}</ul>`;
+    return v.map((it, i) => html`<${FactLine} key=${i}>${
+      (it && typeof it === 'object') ? html`<${Code} block scroll>${JSON.stringify(it, null, 2)}<//>` : `• ${String(it)}`
+    }<//>`);
   }
-  if (v && typeof v === 'object') return html`<pre class="code-block pj-rec-json">${JSON.stringify(v, null, 2)}</pre>`;
-  if (typeof v === 'string') {
-    return looksMarkdown(v)
-      ? html`<div class="pj-rec-md"><${Markdown} text=${v} small /></div>`
-      : html`<span class="pj-rec-field-text">${v}</span>`;
-  }
-  return html`<span class="pj-rec-field-text">${String(v)}</span>`;
+  if (v && typeof v === 'object') return html`<${Code} block scroll>${JSON.stringify(v, null, 2)}<//>`;
+  if (typeof v === 'string') return looksMarkdown(v) ? html`<${Markdown} text=${v} small />` : v;
+  return String(v);
 };
 
 // ── Series niputus: collapse multi-part documents ("Foo — osa 2", "Foo — part 3") under one
@@ -112,10 +118,10 @@ export const isMobileView = () => window.matchMedia('(max-width: 640px)').matche
 // this (cover.js), and the section head this used to repeat them in is `display: none` inside an
 // og-page (css/views/organism.css), so it is the notice alone.
 export const renderSpaceNotice = (ot) => html`
-  <div class="pj-section poster-row--thing" key=${ot.name}>
-    <div class="pj-space-notice poster-hint">${ot.backing === 'tasks'
+  <${Card} tone="section" key=${ot.name}>
+    <${Note}>${ot.backing === 'tasks'
       ? (t('organisms.spaceTasksBacked') || 'This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.')
       : ot.backing === 'rows'
         ? (t('organisms.spaceRowsBacked') || 'This space holds rows the group accumulates. They are appended and never edited, and this page does not list them — they are read with the row tools, which filter and page through them.')
-        : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}</div>
-  </div>`;
+        : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}<//>
+  <//>`;

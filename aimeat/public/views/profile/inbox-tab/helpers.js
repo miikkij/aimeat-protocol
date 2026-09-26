@@ -7,6 +7,10 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-26 — The Toast UI loader, the big editor's height and the attachment rule moved
+ *     into the components that use them (components/MessageComposer.js, MessageFile.js); attachKind
+ *     is re-exported from there. trackStatusClass became trackStatusTone: the page gives the tone as
+ *     data to the Status (components/Mark.js), not a class.
  *   v1.7.0 — 2026-09-25 — Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
  *   v1.x — 2026-08-18 — stampShort/stampFull: the list-row stamp that answers WHEN, not just what
  *     time of day. timeShort stays for rows inside an open thread, under their day separators.
@@ -148,27 +152,8 @@ export async function resolveThreadAttachmentUrls(msgs, conversationId, prevCach
   return { convId: conversationId, map, ts };
 }
 
-/* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
- * document space uses, so composing a message feels like editing a document (Markdown⇄WYSIWYG).
- * ~520KB, so it stays out of the main bundle and loads only when the Inbox composer mounts. */
-let _tuiPromise = null;
-export function loadToastUI() {
-  if (window.toastui && window.toastui.Editor) return Promise.resolve(window.toastui.Editor);
-  if (_tuiPromise) return _tuiPromise;
-  _tuiPromise = new Promise((resolve, reject) => {
-    if (!document.querySelector('link[data-tui]')) {
-      const css = document.createElement('link');
-      css.rel = 'stylesheet'; css.href = '/lib/toastui/toastui-editor.min.css'; css.setAttribute('data-tui', '1');
-      document.head.appendChild(css);
-    }
-    const s = document.createElement('script');
-    s.src = '/lib/toastui/toastui-editor-all.min.js';
-    s.onload = () => (window.toastui && window.toastui.Editor) ? resolve(window.toastui.Editor) : reject(new Error('editor missing'));
-    s.onerror = () => reject(new Error('failed to load editor'));
-    document.head.appendChild(s);
-  });
-  return _tuiPromise;
-}
+/* The Toast UI loader and the big editor's height moved with the composer to
+ * components/MessageComposer.js (loadToastUI, bigEditorHeight). */
 
 /* ── Helpers ── */
 
@@ -291,25 +276,16 @@ export function trackStateLabel(state) {
   }
 }
 
-/** A tracked state's tone as a Status: waiting for your approval needs a look, replied is fine, an
- *  error is danger, still watching is off. */
-export const trackStatusClass = (tone) => `poster-status poster-status--${tone === 'ready' ? 'attention' : tone === 'done' ? 'fine' : tone === 'err' ? 'danger' : 'off'}`;
+/** A tracked state's tone as the Status's tone (components/Mark.js kind="status"): waiting for your
+ *  approval needs a look, replied is fine, an error is danger, still watching is off. */
+export const trackStatusTone = (tone) => (tone === 'ready' ? 'attention' : tone === 'done' ? 'fine' : tone === 'err' ? 'danger' : 'off');
 
-/** Classify an attachment for rendering: how to view it (thumbnail / native tab / markdown viewer). */
-export const ATTACH_ICO = { image: '🖼', pdf: '📄', markdown: '📄', audio: '🎵', video: '🎬', file: '📎' };
-export function attachKind(a) {
-  const mime = a.mime || '';
-  const name = a.name || a.storageKey || '';
-  if (a.kind === 'image' || /^image\//.test(mime)) return 'image';
-  if (mime === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf';
-  if (/markdown/.test(mime) || /\.(md|markdown|mdx)$/i.test(name)) return 'markdown';
-  if (a.kind === 'audio' || /^audio\//.test(mime)) return 'audio';
-  if (a.kind === 'video' || /^video\//.test(mime)) return 'video';
-  return 'file';
-}
+/** Classify an attachment for rendering (thumbnail / native tab / markdown viewer): the Message
+ *  component's own rule (components/MessageFile.js), reachable from here for ai-actions.js. */
+export { attachKind } from '/components/MessageFile.js';
 
-// Sentinel option id for the freeform "Other" choice (never collides with a real option id).
-export const IFORM_OTHER = '__other__';
+// The freeform "Other" choice's id is the question component's (components/MessageQuestions.js).
+export { QUESTION_OTHER as IFORM_OTHER } from '/components/MessageQuestions.js';
 
 /** Build the human-readable markdown summary that becomes the reply body (so the thread + un-upgraded
  *  peers read the answer naturally, alongside the machine-readable `interactive.answers`). */
@@ -342,13 +318,3 @@ export function tallyPoll(spec, recipients) {
   return out;
 }
 
-/**
- * How tall the big editor opens when someone asks for it with ⤢.
- *
- * The default composer is the thin auto-growing line; this is the other state. Roughly half the
- * window, floored so it is worth the switch and capped so the conversation never disappears behind it.
- */
-export function bigEditorHeight() {
-  if (typeof window === 'undefined') return 320;
-  return Math.min(560, Math.max(240, Math.round(window.innerHeight * 0.5)));
-}

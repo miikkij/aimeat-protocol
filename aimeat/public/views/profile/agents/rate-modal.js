@@ -15,6 +15,10 @@
  *   import RateModal, { RATE_CONTEXTS } from './rate-modal.js';
  *   <RateModal open onClose onSubmit submitting existing=${task.rating} />
  * @version-history
+ *   v1.6.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the stars are
+ *     Stars (the pointer on a star shows the rating it gives), the context is the Select with its
+ *     label over it (was beside it), the grounded box is Check, the comment is TextArea, the footer
+ *     Action and Loud, the whole a column of Fields.
  *   v1.5.0 — 2026-09-26 — The grounded check line is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.4.0 — 2026-09-26 — The stars are the library's Rating stars in the tone to give (css/components/rating-stars.css): dark up to the rating and up to the star under the pointer, instead of coral; the row keeps only its margin (a unification: Jouni's decision "Rating stars").
  *   v1.3.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
@@ -29,7 +33,13 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
-import { Hint } from '/components/Hint.js';
+import { Note } from '/components/Note.js';
+import { Stars } from '/components/Stars.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { TextArea } from '/components/TextField.js';
+import { Fields } from '/components/Field.js';
+import { Action, Loud } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -63,36 +73,23 @@ export default function RateModal({ open, onClose, onSubmit, submitting, existin
   }
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.rate.title')}
     footer=${html`
-      <button class="poster-action" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="poster-slab poster-slab--control" onClick=${handleSend} disabled=${submitting || !stars}>
+      <${Action} onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}<//>
+      <${Loud} control onClick=${handleSend} disabled=${submitting || !stars}>
         ${submitting ? t('profile.agents.tasks.rate.submitting') : t('profile.agents.tasks.rate.submit')}
-      </button>`}>
-    <${Hint}>${t('profile.agents.tasks.rate.help')}<//>
-    <div class="op-stars pf-agd-rate-stars" role="radiogroup">
-      ${[1, 2, 3, 4, 5].map(n => html`
-        <button key=${n}
-                class=${`op-star ${n <= stars ? 'on' : ''}`}
-                onClick=${() => setStars(n)}
-                aria-label=${String(n)}
-                aria-pressed=${n <= stars}>★</button>
-      `)}
-    </div>
-    <label class="pf-agd-rate-field">
-      <span>${t('profile.agents.tasks.rate.context')}</span>
-      <select class="select-field" value=${context} onChange=${e => setContext(e.target.value)}>
-        ${RATE_CONTEXTS.map(c => html`<option key=${c} value=${c}>${t(`profile.agents.detail.quality.contexts.${c}`)}</option>`)}
-      </select>
-    </label>
-    <label class="pf-agd-rate-check check-line">
-      <input type="checkbox" checked=${grounded} onChange=${e => setGrounded(e.target.checked)} />
-      <span>${t('profile.agents.tasks.rate.grounded')}</span>
-    </label>
-    <textarea
-      class="og-textarea pf-agd-revision-textarea"
-      placeholder=${t('profile.agents.tasks.rate.commentPlaceholder')}
-      value=${comment}
-      onInput=${e => setComment(e.target.value)}
-      rows=${3}
-    ></textarea>
+      <//>`}>
+    <${Fields}>
+      <${Note}>${t('profile.agents.tasks.rate.help')}<//>
+      <${Stars} value=${stars} onPick=${setStars} label=${t('profile.agents.tasks.rate.title')} />
+      <${Select} label=${t('profile.agents.tasks.rate.context')} value=${context} onChange=${setContext}
+        options=${RATE_CONTEXTS.map(c => [c, t(`profile.agents.detail.quality.contexts.${c}`)])} />
+      <${Check} checked=${grounded} onChange=${setGrounded}>${t('profile.agents.tasks.rate.grounded')}<//>
+      <${TextArea}
+        ariaLabel=${t('profile.agents.tasks.rate.commentPlaceholder')}
+        placeholder=${t('profile.agents.tasks.rate.commentPlaceholder')}
+        value=${comment}
+        onInput=${setComment}
+        rows=${3}
+      />
+    <//>
   <//>`;
 }

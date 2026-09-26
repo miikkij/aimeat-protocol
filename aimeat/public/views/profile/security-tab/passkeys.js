@@ -13,9 +13,17 @@
  *   two-step sign-in; it is another way in, and the section says so, because a person who thinks
  *   their password is gone will not understand what happened when they are asked for it.
  *
- * @structure PasskeysSection({ passkeysAvailable, showToast, onChanged })
- * @usage html`<${PasskeysSection} passkeysAvailable=${true} ... />`
+ *   IN A ROW. The Access page shows this section inside its own sign-in row, which already names it:
+ *   `inRow` leaves out the heading and the first line, and the card takes a row's air.
+ *
+ * @structure PasskeysSection({ showToast, inRow })
+ * @usage html`<${PasskeysSection} showToast=${showToast} inRow />`
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- Every part is a component that takes data (Card section, List rows with
+ *     the typewriter meta line and the doors at the end, Note, Action/Loud, TextField, SubHeading,
+ *     Layout); the section writes no class. The devices are list rows (the majority look for rows
+ *     of things) instead of a framed box each; nothing they said or did goes. `inRow` replaces the
+ *     Access page's CSS that hid the heading and the first line.
  *   v1.10.0 -- 2026-09-26 -- The line under a passkey's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.9.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.8.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -47,7 +55,13 @@ import * as securityService from '/js/services/security.js';
 import { passkeySupported, addPasskey } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
-import { Hint } from '/components/Hint.js';
+import { Card } from '/components/Card.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud } from '/components/Action.js';
+import { TextField } from '/components/TextField.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Space } from '/components/Layout.js';
+import { List, Row, Name, Doors } from '/components/List.js';
 
 /** What the device is, in the person's words rather than the protocol's. */
 function whereItLives(p) {
@@ -56,7 +70,7 @@ function whereItLives(p) {
   return t('profile.security.passkeys.securityKey');
 }
 
-export function PasskeysSection({ showToast }) {
+export function PasskeysSection({ showToast, inRow }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -118,58 +132,49 @@ export function PasskeysSection({ showToast }) {
     }, { danger: true });
   }
 
+  // One device: its name (or the field that renames it), what it is and when it was last used (the
+  // typewriter meta line), and its two ways on at the end of the row.
+  const device = (p) => html`
+    <${Row} key=${p.id}>
+      <${Name} meta=${html`${whereItLives(p)}${' · '}${p.last_used_at
+          ? t('profile.security.passkeys.lastUsed').replace('{when}', fmtDate(p.last_used_at))
+          : t('profile.security.passkeys.neverUsed')}`}>
+        ${renaming === p.id
+          ? html`<${TextField} maxLength=${80} value=${renameValue} autoFocus
+              onInput=${setRenameValue} onEnter=${() => saveName(p.id)}
+              actions=${html`
+                <${Loud} control onClick=${() => saveName(p.id)}>${t('profile.security.save')}<//>
+                <${Action} small onClick=${() => setRenaming(null)}>${t('profile.cancel')}<//>`} />`
+          : escHtml(p.label)}
+      <//>
+      <${Doors}>${renaming !== p.id && html`
+        <${Action} small row onClick=${() => { setRenaming(p.id); setRenameValue(p.label); }}>
+          ${t('profile.security.passkeys.rename')}
+        <//>
+        <${Action} small row tone="danger" onClick=${() => removeDevice(p)}>
+          ${t('profile.security.passkeys.remove')}
+        <//>
+      `}<//>
+    <//>`;
+
   return html`
-    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.passkeys.title')}</h3>
-    <p class="poster-hint mb-1">${t('profile.security.passkeys.desc')}</p>
-    <div class="card poster-row--thing">
+    ${inRow ? null : html`
+      <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.passkeys.title')}<//><//>
+      <${Space} below="large"><${Note}>${t('profile.security.passkeys.desc')}<//><//>`}
+    <${Card} tone="section" inRow=${inRow}>
       ${state.count === 0
-        ? html`<p class="poster-quiet mb-half">${t('profile.security.passkeys.none')}</p>`
-        : html`
-          <div class="pf-2fa-devices mb-1">
-            ${state.passkeys.map(p => html`
-              <div class="pf-2fa-device poster-box" key=${p.id}>
-                <div class="pf-flex-fill">
-                  ${renaming === p.id
-                    ? html`<div class="flex-row">
-                        <input class="og-input" maxlength="80" value=${renameValue}
-                          onInput=${e => setRenameValue(e.target.value)}
-                          onKeyDown=${e => { if (e.key === 'Enter') saveName(p.id); }} />
-                        <button class="poster-slab poster-slab--control" onClick=${() => saveName(p.id)}>${t('profile.security.save')}</button>
-                        <button class="poster-action poster-action--small" onClick=${() => setRenaming(null)}>${t('profile.cancel')}</button>
-                      </div>`
-                    : html`<span class="pf-bold">${escHtml(p.label)}</span>`}
-                  <div class="listing-meta">
-                    ${whereItLives(p)}
-                    ${' · '}
-                    ${p.last_used_at
-                      ? t('profile.security.passkeys.lastUsed').replace('{when}', fmtDate(p.last_used_at))
-                      : t('profile.security.passkeys.neverUsed')}
-                  </div>
-                </div>
-                ${renaming !== p.id && html`
-                  <div class="flex-row">
-                    <button class="poster-action poster-action--small" onClick=${() => { setRenaming(p.id); setRenameValue(p.label); }}>
-                      ${t('profile.security.passkeys.rename')}
-                    </button>
-                    <button class="poster-action poster-action--small poster-action--danger" onClick=${() => removeDevice(p)}>
-                      ${t('profile.security.passkeys.remove')}
-                    </button>
-                  </div>
-                `}
-              </div>
-            `)}
-          </div>
-        `}
+        ? html`<${Space} below="small"><${Note} kind="quiet">${t('profile.security.passkeys.none')}<//><//>`
+        : html`<${Space} below="large"><${List} cols="name-doors">${state.passkeys.map(device)}<//><//>`}
 
       ${supported
         ? html`
-          <button class="poster-slab poster-slab--control" disabled=${busy} onClick=${addThisDevice}>
+          <${Loud} control disabled=${busy} onClick=${addThisDevice}>
             ${busy ? t('profile.security.twoFactor.working') : t('profile.security.passkeys.addThisDevice')}
-          </button>
-          <p class="poster-hint mt-xs">${t('profile.security.passkeys.stillHavePassword')}</p>
+          <//>
+          <${Space} above="tight"><${Note}>${t('profile.security.passkeys.stillHavePassword')}<//><//>
         `
-        : html`<${Hint}>${t('profile.security.passkeys.unsupported')}<//>`}
-    </div>
+        : html`<${Note}>${t('profile.security.passkeys.unsupported')}<//>`}
+    <//>
     <${ConfirmUI} />
   `;
 }

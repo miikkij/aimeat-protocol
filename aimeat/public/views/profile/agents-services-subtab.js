@@ -9,6 +9,9 @@
  *   - AgentServicesSubtab (default export) -- main component
  *   - ServiceCard -- individual service display card
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- A service is the List's row (page group G1a): the state dot before its name,
+ *     the state word after it, what it does under it, price, visibility, calls, success and time on
+ *     the typewriter line, Unpublish at the row's end; the loading, the hint and the empty line are Note.
  *   v1.8.0 -- 2026-09-26 -- The line under a service's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.6.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -31,6 +34,10 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getAgentServices } from '/js/services/agent-services.js';
+import { List, Row, Name, Doors } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
 
 function ServiceCard({ service, onUnpublish }) {
   const name = service.display_name || service.name || service.action_id || t('profile.agents.services.unnamed');
@@ -42,27 +49,27 @@ function ServiceCard({ service, onUnpublish }) {
   const successRate = service.success_rate != null ? `${Math.round(service.success_rate)}%` : null;
   const avgResponse = service.avg_response_ms != null ? `${Math.round(service.avg_response_ms)}ms` : null;
 
+  // One service is one row: the state dot and the state word by its name, what it does under it, then
+  // its price, who sees it, its calls and how it has done on the typewriter line.
+  const meta = [
+    cost,
+    visibility,
+    `${calls} ${t('profile.agents.services.calls')}`,
+    successRate && `${successRate} ${t('profile.agents.activity.successRate')}`,
+    avgResponse && `${avgResponse} ${t('profile.agents.services.avg')}`,
+  ].filter(Boolean).join(' · ');
   return html`
-    <div class="agd-service-card">
-      <div class="agd-service-name">
-        <span class="status-dot pf-agd-status-dot ${isActive ? 'status-dot--active' : 'status-dot--inactive'}"></span>
+    <${Row}>
+      <${Name} dot=${isActive ? 'active' : 'inactive'} desc=${desc || null} meta=${meta}
+        after=${html`<${Mark} kind="status" tone=${isActive ? 'fine' : 'off'}>${isActive ? t('profile.agents.detail.services.active') : t('profile.agents.detail.services.inactive')}<//>`}>
         ${name}
-      </div>
-      ${desc && html`<div class="agd-service-desc">${desc}</div>`}
-      <div class="agd-service-meta listing-meta">
-        <span>${cost}</span>
-        <span>${visibility}</span>
-        <span class="poster-status ${isActive ? 'poster-status--fine' : 'poster-status--off'}">${isActive ? t('profile.agents.detail.services.active') : t('profile.agents.detail.services.inactive')}</span>
-        <span>${calls} ${t('profile.agents.services.calls')}</span>
-        ${successRate && html`<span>${successRate} ${t('profile.agents.activity.successRate')}</span>`}
-        ${avgResponse && html`<span>${avgResponse} ${t('profile.agents.services.avg')}</span>`}
-      </div>
-      <div class="agd-service-actions">
-        <button class="poster-action poster-action--small" onClick=${() => onUnpublish(service)}>
+      <//>
+      <${Doors}>
+        <${Action} small row onClick=${() => onUnpublish(service)}>
           ${t('profile.agents.services.unpublish')}
-        </button>
-      </div>
-    </div>
+        <//>
+      <//>
+    <//>
   `;
 }
 
@@ -114,24 +121,15 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
   }, [agentName]);
 
   if (loading) {
-    return html`<div class="poster-quiet agd-empty loading-mark">${t('profile.loading')}</div>`;
+    return html`<${Note} kind="loading" />`;
   }
 
   return html`
     <div>
-      <p class="poster-hint agd-services-info">
-        ${t('profile.agents.detail.services.info')}
-      </p>
-
-      ${services.length === 0 && html`
-        <div class="poster-quiet agd-empty">${t('profile.agents.detail.empty.services')}</div>
-      `}
-
-      ${services.length > 0 && html`
-        <div class="agd-services-list">
-          ${services.map(s => html`<${ServiceCard} service=${s} key=${s.action_id || s.name} onUnpublish=${handleUnpublish} />`)}
-        </div>
-      `}
+      <${Note}>${t('profile.agents.detail.services.info')}<//>
+      <${List} cols="name-doors" empty=${t('profile.agents.detail.empty.services')}>
+        ${services.map(s => html`<${ServiceCard} service=${s} key=${s.action_id || s.name} onUnpublish=${handleUnpublish} />`)}
+      <//>
     </div>
   `;
 }

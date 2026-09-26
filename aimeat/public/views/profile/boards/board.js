@@ -11,6 +11,7 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v1.12.0 — 2026-09-26 — On the component kit (page group G7): the tags, the strip and the rail are data (the topics and the most thanked as rail items), the category filter the Tabs in the fold tone, "show more" the More line, the composer the Beside with the TextField, TextArea and Choice (a chosen category pressed again clears it), the rules the Fields with the Choice, the members the Tags with their remove mark and the TextField with its add door, the hairlines the Split. The file writes no class.
  *   v1.11.0 — 2026-09-26 — A member's ✗ is the Tag's remove mark (.poster-chip-x, poster.css): grey, coral under the pointer, where it was coral always (a unification: Jouni's decision "Remove mark").
  *   v1.10.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 — 2026-09-26 — The hairline over a part of the panel is the split (.og-split), a unification: the line Workflows and Boards drew alike.
@@ -37,10 +38,20 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Section } from '/components/Section.js';
+import { scrollToSection } from '/components/Rail.js';
 import { c, rel, who, bid, visWord, ownerOf, standingWords, noticeRow, renderPage } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { Note } from '/components/Note.js';
+import { Mark, Marks, Label } from '/components/Mark.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Tabs } from '/components/Tabs.js';
+import { More } from '/components/List.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Fields } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Choice } from '/components/Choice.js';
+import { Stack, Space, Split, Beside } from '/components/Layout.js';
 
 export function priceWords(b) {
   if (b.visibility !== 'public' && b.visibility !== 'system') return c('chipFree');
@@ -61,47 +72,53 @@ export function renderBoard(ctx, b) {
   const latest = page.posts[0];
   const ttlDays = Math.round((b.rules?.default_ttl_hours ?? 168) / 24);
 
-  const chips = html`
-    <span class=${`poster-chip ${b.visibility === 'public' ? 'poster-chip--sun' : ''}`}>${visWord(b.visibility)}</span>
-    <span class="poster-chip">${c('chipNotices', { n: page.posts.length + (page.cursor ? '+' : '') })}</span>
-    ${b.owner_gaii ? html`<span class="poster-chip">${mine ? c('ownBoard') : c('chipKeeper', { name: ownerOf(b.owner_gaii) })}</span>` : null}
-    <span class="poster-chip">${priceWords(b)}</span>
-    <span class="poster-chip">${c('chipLifetime', { n: ttlDays })}</span>
-    ${b.federate ? html`<span class="poster-chip">${t('profile.federated')}</span>` : null}`;
+  const marks = [
+    { label: visWord(b.visibility), tone: b.visibility === 'public' ? 'sun' : undefined },
+    { label: c('chipNotices', { n: page.posts.length + (page.cursor ? '+' : '') }) },
+    b.owner_gaii ? { label: mine ? c('ownBoard') : c('chipKeeper', { name: ownerOf(b.owner_gaii) }) } : null,
+    { label: priceWords(b), tone: 'dim' },
+    { label: c('chipLifetime', { n: ttlDays }), tone: 'dim' },
+    b.federate ? { label: t('profile.federated'), tone: 'dim' } : null,
+  ];
+  const follow = () => (subscribed ? ctx.handleUnfollow(id) : ctx.handleFollow(id));
+  const openRules = () => { ctx.setFold('rules', true); scrollToSection('bp-rules'); };
   const doors = html`
-    <button type="button" class="poster-slab" onClick=${() => scrollTo('bp-compose')}>${c('post')}</button>
-    ${(b.visibility === 'public' || b.visibility === 'system') && !mine ? html`<button type="button" class="poster-action poster-action--small" onClick=${() => subscribed ? ctx.handleUnfollow(id) : ctx.handleFollow(id)}>${subscribed ? c('unfollow') : c('follow')}</button>` : null}
-    <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => { ctx.setFold('rules', true); scrollTo('bp-rules'); }}>${c('rules')}</button>`;
-  const strip = html`
-    <div class="og-strip">
-      <div>${latest ? html`<b>${rel(latest.created_at)}</b><span>${c('stripLatest')}</span><small>${who(latest.author_gaii).label} · "${latest.title}"</small>` : html`<b>·</b><span>${c('stripLatest')}</span><small>${c('noneYet')}</small>`}</div>
-      <div><b>${page.posts.length}${page.cursor ? '+' : ''}</b><span>${c('stripNotices')}</span><small>${c('stripNoticesSub', { a: page.posts.filter(p => who(p.author_gaii).agent).length, h: page.posts.filter(p => !who(p.author_gaii).agent).length })}</small></div>
-      <div><b>${Object.keys(page.authors || {}).length}</b><span>${c('stripPosters')}</span><small>${authorsSorted.map(a => who(a.gaii).label).slice(0, 3).join(' · ') || c('noneYet')}</small></div>
-      <div><b class=${subscribed || mine ? '' : 'og-strip-coral'}>${mine ? c('ownShort') : subscribed ? c('followingShort') : c('notFollowingShort')}</b><span>${c('stripFollow')}</span><small>${mine ? c('stripFollowOwn') : subscribed ? c('stripFollowOn') : c('stripFollowOff')}</small></div>
-    </div>`;
-  const rail = html`
-    <hr />
-    <span class="og-rail-label">${c('topics')}</span>
-    <button type="button" class=${`og-rail-link ${!ctx.catFilter ? 'on' : ''}`} onClick=${() => ctx.setCatFilter('')}><i>${page.posts.length}</i>${c('all')}</button>
-    ${cats.map(cat => html`<button type="button" key=${cat} class=${`og-rail-link ${ctx.catFilter === cat ? 'on' : ''}`} onClick=${() => ctx.setCatFilter(cat)}><i>${page.posts.filter(p => p.category === cat).length}</i>${cat}</button>`)}
-    ${authorsSorted.length ? html`<hr /><span class="og-rail-label">${c('mostThanked')}</span>${authorsSorted.map(a => html`<span class="og-rail-link bp-rail-static" key=${a.gaii}><i>${a.thanks || 0}</i>${who(a.gaii).label}</span>`)}` : null}`;
+    <${Loud} onClick=${() => scrollToSection('bp-compose')}>${c('post')}<//>
+    ${(b.visibility === 'public' || b.visibility === 'system') && !mine ? html`<${Action} small onClick=${follow}>${subscribed ? c('unfollow') : c('follow')}<//>` : null}
+    <${Action} small soft onClick=${openRules}>${c('rules')}<//>`;
+  const strip = html`<${FigureStrip} items=${[
+    latest
+      ? { n: rel(latest.created_at), label: c('stripLatest'), sub: `${who(latest.author_gaii).label} · "${latest.title}"` }
+      : { n: '·', label: c('stripLatest'), sub: c('noneYet') },
+    { n: `${page.posts.length}${page.cursor ? '+' : ''}`, label: c('stripNotices'), sub: c('stripNoticesSub', { a: page.posts.filter(p => who(p.author_gaii).agent).length, h: page.posts.filter(p => !who(p.author_gaii).agent).length }) },
+    { n: Object.keys(page.authors || {}).length, label: c('stripPosters'), sub: authorsSorted.map(a => who(a.gaii).label).slice(0, 3).join(' · ') || c('noneYet') },
+    { n: mine ? c('ownShort') : subscribed ? c('followingShort') : c('notFollowingShort'), tone: subscribed || mine ? undefined : 'coral', label: c('stripFollow'), sub: mine ? c('stripFollowOwn') : subscribed ? c('stripFollowOn') : c('stripFollowOff') },
+  ]} />`;
+  const rail = [
+    { label: c('topics'), items: [
+      { mark: page.posts.length, label: c('all'), on: !ctx.catFilter, onClick: () => ctx.setCatFilter(''), key: '*' },
+      ...cats.map((cat) => ({ key: cat, mark: page.posts.filter(p => p.category === cat).length, label: cat, on: ctx.catFilter === cat, onClick: () => ctx.setCatFilter(cat) })),
+    ] },
+    authorsSorted.length ? { label: c('mostThanked'), items: authorsSorted.map((a) => ({ key: a.gaii, plain: true, mark: a.thanks || 0, label: who(a.gaii).label })) } : null,
+  ].filter(Boolean);
 
-  const catDoors = cats.length ? html`<button type="button" class=${`poster-tab poster-tab--fold ${!ctx.catFilter ? 'is-on' : ''}`} onClick=${() => ctx.setCatFilter('')}>${c('all')}</button>${cats.map(cat => html`<button type="button" key=${cat} class=${`poster-tab poster-tab--fold ${ctx.catFilter === cat ? 'is-on' : ''}`} onClick=${() => ctx.setCatFilter(cat)}>${cat}</button>`)}` : null;
+  const catDoors = cats.length ? html`<${Tabs} tone="fold" value=${ctx.catFilter || ''} onSelect=${(v) => ctx.setCatFilter(v)}
+    items=${[{ value: '', label: c('all') }, ...cats.map((cat) => ({ value: cat, label: cat }))]} />` : null;
+  const loadMore = () => ctx.loadMore(id);
   return renderPage(ctx, {
-    crumbs: [b.name], title: b.name, chips, doors, strip, rail,
+    crumbs: [b.name], title: b.name, marks, desc: b.description || null, doors, strip, rail,
+    after: html`<${ctx.ConfirmUI} />`,
     children: html`
-      ${b.description ? html`<p class="og-desc og-desc--page">${b.description}</p>` : null}
       <${PageSection} id="bp-notices" num="01" title=${c('secNotices')} count=${`${page.posts.length}${page.cursor ? '+' : ''} · ${c('newestFirst')}`} doors=${catDoors} first>
-        ${ctx.pageLoading === id && !page.posts.length ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>`
-          : !posts.length ? html`<p class="poster-quiet">${c('noticesEmpty')}</p>`
+        ${ctx.pageLoading === id && !page.posts.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+          : !posts.length ? html`<${Note} kind="quiet">${c('noticesEmpty')}<//>`
           : posts.map(p => noticeRow(ctx, id, p, page.authors, false))}
-        ${page.cursor ? html`<div class="og-doors bp-more"><button type="button" class="poster-action poster-action--more" disabled=${ctx.pageLoading === id} onClick=${() => ctx.loadMore(id)}>${c('showMore')}</button></div>` : null}
+        ${page.cursor ? html`<${More} label=${c('showMore')} disabled=${ctx.pageLoading === id} onMore=${loadMore} />` : null}
       <//>
       <${PageSection} id="bp-compose" num="02" title=${c('secPost')}>
         ${composer(ctx, b, cats)}
       <//>
-      <${FoldSection} id="bp-rules" num="03" title=${c('secRules')} sub=${mine ? c('rulesSub') : c('rulesSubReader')} open=${ctx.folds.rules} onToggle=${() => ctx.setFold('rules', !ctx.folds.rules)}>${rulesFold(ctx, b, mine)}<//>
-      <${ctx.ConfirmUI} />`,
+      <${Section} fold clip id="bp-rules" num="03" title=${c('secRules')} sub=${mine ? c('rulesSub') : c('rulesSubReader')} open=${ctx.folds.rules} onToggle=${() => ctx.setFold('rules', !ctx.folds.rules)}>${rulesFold(ctx, b, mine)}<//>`,
   });
 }
 
@@ -112,59 +129,58 @@ function composer(ctx, b, cats) {
   const label = cost === 0 || cost === undefined && b.visibility !== 'public' ? c('publish') : cost !== undefined ? c('publishFor', { n: cost }) : c('publishPriced');
   const ttlDefault = String(b.rules?.default_ttl_hours ?? 168);
   const ttl = n.ttl || ttlDefault;
+  const post = () => ctx.handlePost(bid(b));
+  const side = html`
+    <${Stack} gap="large">
+      ${cats.length
+        ? html`<${Choice} label=${c('fCategory')} clearable value=${n.category} onChange=${(v) => set('category', v)} options=${cats.map((cat) => [cat, cat])} />`
+        : html`<${TextField} id="bp-n-cat" label=${c('fCategory')} value=${n.category} onInput=${(v) => set('category', v)} placeholder=${c('categoryFree')} />`}
+      <${Choice} label=${c('fLifetime')} value=${ttl} onChange=${(v) => set('ttl', v)} options=${[['72', c('life3')], ['168', c('life7')], ['720', c('life30')]]} />
+      <${Actions}><${Loud} control disabled=${ctx.posting || !n.title.trim() || !n.body.trim()} onClick=${post}>${label}<//><//>
+    <//>`;
   return html`
-    <div class="bp-composer">
-      <div class="og-field bp-composer-main">
-        <label class="poster-label" for="bp-n-title">${c('fTitle')}</label>
-        <input id="bp-n-title" class="og-input" value=${n.title} onInput=${e => set('title', e.target.value)} placeholder=${c('titlePlaceholder')} />
-        <textarea id="bp-n-body" class="og-textarea" rows="3" value=${n.body} onInput=${e => set('body', e.target.value)} placeholder=${c('bodyPlaceholder')}></textarea>
-      </div>
-      <div class="bp-composer-side">
-        ${cats.length ? html`<div class="og-field"><span class="poster-label">${c('fCategory')}</span><div class="pf-tabs">${cats.map(cat => html`<button type="button" key=${cat} class=${`poster-tab ${n.category === cat ? 'is-on' : ''}`} onClick=${() => set('category', n.category === cat ? '' : cat)}>${cat}</button>`)}</div></div>`
-          : html`<div class="og-field"><label class="poster-label" for="bp-n-cat">${c('fCategory')}</label><input id="bp-n-cat" class="og-input" value=${n.category} onInput=${e => set('category', e.target.value)} placeholder=${c('categoryFree')} /></div>`}
-        <div class="og-field"><span class="poster-label">${c('fLifetime')}</span><div class="pf-tabs">${[['72', c('life3')], ['168', c('life7')], ['720', c('life30')]].map(([v, l]) => html`<button type="button" key=${v} class=${`poster-tab ${ttl === v ? 'is-on' : ''}`} onClick=${() => set('ttl', v)}>${l}</button>`)}</div></div>
-        <div class="og-doors"><button type="button" class="poster-slab poster-slab--control" disabled=${ctx.posting || !n.title.trim() || !n.body.trim()} onClick=${() => ctx.handlePost(bid(b))}>${label}</button></div>
-      </div>
-    </div>
+    <${Beside} narrow side=${side}>
+      <${Stack} gap="small">
+        <${TextField} id="bp-n-title" label=${c('fTitle')} value=${n.title} onInput=${(v) => set('title', v)} placeholder=${c('titlePlaceholder')} />
+        <${TextArea} id="bp-n-body" rows=${3} ariaLabel=${c('bodyPlaceholder')} value=${n.body} onInput=${(v) => set('body', v)} placeholder=${c('bodyPlaceholder')} />
+      <//>
+    <//>
     <${Hint}>${c('postHint')}<//>`;
 }
 
 function rulesFold(ctx, b, mine) {
   const r = ctx.rules;
   const set = (k, v) => ctx.setRules({ ...r, [k]: v });
-  const choice = (key, options) => html`<div class="pf-tabs">${options.map(([v, label]) => html`<button type="button" key=${v} class=${`poster-tab ${r[key] === v ? 'is-on' : ''}`} disabled=${!mine} onClick=${() => mine && set(key, v)}>${label}</button>`)}</div>`;
+  const choice = (key, label, options, hint) => html`<${Choice} label=${label} hint=${hint} disabled=${!mine} value=${r[key]} onChange=${(v) => mine && set(key, v)} options=${options} />`;
+  const save = () => ctx.handleSaveRules(bid(b));
+  const remove = () => ctx.handleDeleteBoard(bid(b));
   return html`
-    <div class="og-fields bp-form">
-      <div class="og-fields--2">
-        <div class="og-field"><span class="poster-label">${c('fSees')}</span>${choice('visibility', [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}</div>
-        <div class="og-field"><span class="poster-label">${c('fPosts')}</span>${choice('posting', [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}</div>
-      </div>
-      <div class="og-fields--2">
-        <div class="og-field"><label class="poster-label" for="bp-r-cats">${c('fCategories')}</label><input id="bp-r-cats" class="og-input" value=${r.categories} disabled=${!mine} onInput=${e => set('categories', e.target.value)} placeholder=${c('categoriesPlaceholder')} /></div>
-        <div class="og-field"><span class="poster-label">${c('fLifetime')}</span>${choice('ttl', [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}</div>
-      </div>
-      ${r.visibility === 'public' ? html`<div class="og-fields--2">
-        <div class="og-field bp-field--narrow"><label class="poster-label" for="bp-r-price">${c('fPrice')}</label><input id="bp-r-price" class="og-input" type="number" min="0" step="1" value=${r.price} disabled=${!mine} onInput=${e => set('price', e.target.value)} /><span class="poster-hint">${c('priceHint')}</span></div>
-        <div class="og-field"><span class="poster-label">${c('federate')}</span>${choice('federate', [['no', c('federateNo')], ['yes', c('federateYes')]])}<span class="poster-hint">${c('federateHint')}</span></div>
-      </div>` : null}
-      ${mine ? html`<div class="og-doors"><button type="button" class="poster-slab poster-slab--control" disabled=${ctx.savingRules} onClick=${() => ctx.handleSaveRules(bid(b))}>${c('saveRules')}</button></div>` : null}
-      ${mine && (b.visibility === 'shared' || r.visibility === 'shared') ? membersBlock(ctx, b) : null}
-      ${mine ? html`<div class="og-doors og-split bp-danger-row"><button type="button" class="poster-action poster-action--small poster-action--danger" onClick=${() => ctx.handleDeleteBoard(bid(b))}>${c('deleteBoard')}</button></div>` : null}
-    </div>`;
+    <${Fields} cols=${2}>
+      ${choice('visibility', c('fSees'), [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}
+      ${choice('posting', c('fPosts'), [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}
+      <${TextField} id="bp-r-cats" label=${c('fCategories')} value=${r.categories} disabled=${!mine} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
+      ${choice('ttl', c('fLifetime'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
+      ${r.visibility === 'public' ? html`
+        <${TextField} id="bp-r-price" size="short" label=${c('fPrice')} hint=${c('priceHint')} type="number" min="0" step="1" value=${r.price} disabled=${!mine} onInput=${(v) => set('price', v)} />
+        ${choice('federate', c('federate'), [['no', c('federateNo')], ['yes', c('federateYes')]], c('federateHint'))}` : null}
+    <//>
+    ${mine ? html`<${Space} above="large"><${Actions}><${Loud} control disabled=${ctx.savingRules} onClick=${save}>${c('saveRules')}<//><//><//>` : null}
+    ${mine && (b.visibility === 'shared' || r.visibility === 'shared') ? membersBlock(ctx, b) : null}
+    ${mine ? html`<${Split} above="small" pad="large"><${Actions}><${Action} small tone="danger" onClick=${remove}>${c('deleteBoard')}<//><//><//>` : null}`;
 }
 
 function membersBlock(ctx, b) {
   const members = b.allowed_gaiis || [];
+  const add = () => ctx.handleAddMember(bid(b));
+  const removeMember = (g) => () => ctx.handleRemoveMember(bid(b), g);
   return html`
-    <div class="og-split bp-members">
-      <span class="poster-label">${c('members')}</span>
+    <${Split} pad="large" gap="small">
+      <${Label} block>${c('members')}<//>
       <${Hint}>${c('membersHint')}<//>
-      ${members.length ? html`<div class="bp-member-list">${members.map(g => html`<span class="poster-chip" key=${g}>${who(g).label} <button type="button" class="poster-chip-x" aria-label=${c('remove')} onClick=${() => ctx.handleRemoveMember(bid(b), g)}>✗</button></span>`)}</div>` : null}
-      <div class="bp-member-add">
-        <input class="og-input" value=${ctx.memberInput} onInput=${e => ctx.setMemberInput(e.target.value)} placeholder=${c('memberPlaceholder')} onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); ctx.handleAddMember(bid(b)); } }} />
-        <button type="button" class="poster-action poster-action--small" disabled=${!ctx.memberInput.trim()} onClick=${() => ctx.handleAddMember(bid(b))}>${c('addMember')}</button>
-      </div>
-    </div>`;
+      ${members.length ? html`<${Marks}>${members.map(g => html`<${Mark} key=${g} removeLabel=${c('remove')} onRemove=${removeMember(g)}>${who(g).label}<//>`)}<//>` : null}
+      <${TextField} value=${ctx.memberInput} onInput=${(v) => ctx.setMemberInput(v)} placeholder=${c('memberPlaceholder')} ariaLabel=${c('memberPlaceholder')} onEnter=${add}
+        actions=${html`<${Action} small disabled=${!ctx.memberInput.trim()} onClick=${add}>${c('addMember')}<//>`} />
+    <//>`;
 }
 
 export { standingWords };

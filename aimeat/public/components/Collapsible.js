@@ -9,8 +9,8 @@ const html = htm.bind(h);
  * @description Canonical expand/collapse (chevron) section — a clickable header
  *   (title + a chevron that rotates 180° when open) with its body rendered only
  *   while open. CONTROLLED component: the parent owns the `open` state and is
- *   notified via `onToggle`. Backed by `.collapsible*` in theme.css, whose colors
- *   are all theme tokens so it flips correctly in dark mode. Establishes the
+ *   notified via `onToggle`. Backed by `.collapsible*` in css/components/collapsible.css,
+ *   whose colors are all theme tokens so it flips correctly in dark mode. Establishes the
  *   canonical shape for the hand-rolled toggles scattered across views
  *   (.expand-btn + .pf-chevron, .scope-advanced-toggle, .pkv-entry-arrow); those
  *   bespoke toggles are left in place where their expanded markup is wired into
@@ -29,6 +29,8 @@ const html = htm.bind(h);
  *   v1.0.0 — 2026-06-02 — Component unification (#23): created canonical
  *     expand/collapse section, consolidating the .expand-btn + .pf-chevron,
  *     .scope-advanced-toggle and .pkv-entry-arrow toggle patterns.
+ *   v1.0.1 — 2026-09-27 — Its sheet is css/components/collapsible.css, which now names
+ *     .collapsible-title too (the header's alignment; nothing moves).
  */
 export function Collapsible({ title, open, onToggle, children }) {
   return html`<div class="collapsible">

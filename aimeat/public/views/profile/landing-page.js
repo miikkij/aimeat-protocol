@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   2026-09-26 — The open tab's crumb is SettingsFrameHead's `crumb`, the overview's panels stand in the
+ *     CardGrid of panels, the start page is StartPageSetting's footer: this file writes no class (page group G8).
  *   2026-09-13 — Fix: a ?tab= in the address beats the tab remembered in sessionStorage, so the home
  *     settings' link to access opens access even after Scheduler was open earlier in the same tab.
  *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
@@ -124,6 +126,7 @@ import { syncTabHistory } from "./landing-page.helpers.js";
 import { EditProfileModal, ChangePasswordModal } from "./landing-page.modals.js";
 import { swallowed } from '/js/swallowed.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
+import { CardGrid } from '/components/Card.js';
 import { SettingsFrame, SettingsFrameHead, SettingsFrameBody } from '/components/SettingsFrame.js';
 import { SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuMore } from '/components/SideMenu.js';
 import {
@@ -449,9 +452,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         onChanged=${() => { setPwOpen(false); showToast?.(t('profile.landing.passwordChanged')); }}
       />`}`}>
         ${openView ? html`
-          <${SettingsFrameHead}>
-            <span class="poster-crumb">${getTabLabel(openView.tabId)}</span>
-          <//>
+          <${SettingsFrameHead} crumb=${getTabLabel(openView.tabId)} />
           <${SettingsFrameBody}>${renderTab(openView.tabId)}<//>
         ` : html`
           <${ProfileCard} tier=${tier} stats=${stats} session=${session}
@@ -460,7 +461,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
           <${WaitingForYou} owner=${owner} />
           <${NextSteps} switchTab=${(id) => open(id, 'main')}
             hasApps=${appsLoaded ? apps.length > 0 : undefined} />
-          <div class="pf-home-grid">
+          <${CardGrid} cols="panels">
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} initialAgents=${homeAgents} />
             ${/* Inventory (quotas, spend, commerce) stays OFF the first screen until the account
@@ -471,13 +472,13 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
               <${AiSpendCard} />
               <${AgentLedgerCard} />
               <${CommerceCard} />` : null}
-          </div>
+          <//>
           ${(showPromo && apps.length < 3) ? html`
             <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo} />` : null}
           ${/* Where a sign-in lands. The same control the home mounts in its own settings, at the
                 foot of this overview as a footer preference. The way to the home itself is the
                 header and the top of the sidebar; this only decides the start page. */''}
-          <${StartPageSetting} className="pf-start-page poster-row--thing" />
+          <${StartPageSetting} footer />
         `}
     <//>
   `;

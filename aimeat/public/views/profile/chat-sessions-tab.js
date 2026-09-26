@@ -6,6 +6,7 @@
  *   Shows active sessions, allows creating new ones via prompt copy, and
  *   removing existing sessions.
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage, the create card the Card's section tone, the sessions the List whose row opens its panel (the Facts, the copy and the remove at its foot), the copy the Action's copy; it writes no class.
  *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -50,8 +51,15 @@ import { t } from '/js/i18n.js';
 import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { LoadingLine } from './shared.js';
 import { PageSection } from '/components/PageSection.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Card } from '/components/Card.js';
+import { List, Row as ListRow, Name, Desc, Doors } from '/components/List.js';
+import { Facts } from '/components/Facts.js';
+import { Action, Loud, Icon } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Row, Space } from '/components/Layout.js';
 import { listChatSessions, deleteAgent } from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
@@ -122,94 +130,65 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
 
   if (!chatSessions) return html`<${LoadingLine} text=${t('profile.chatSessions.loading')} />`;
   return html`
-    <div class="og">
-    <div class="mb-1">
-      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuActivity')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.chatSessions')}</span></div>
-      <div class="og-mast"><div class="og-mast-words">
-        <div class="og-title poster-page-title">${t('profile.chatSessions.title')}</div>
-        <div class="og-desc">${t('profile.chatSessions.desc')}</div>
-      </div></div>
-    </div>
+    <${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuActivity'), t('profile.tabs.chatSessions')]}
+      title=${t('profile.chatSessions.title')} desc=${t('profile.chatSessions.desc')}>
 
-    <div class="card mb-1 poster-row--thing">
-      <div class="card-header">
-        <div class="sub-heading">${t('profile.chatSessions.createTitle')}</div>
-      </div>
-      <div class="cs-create-body">
-        <p class="poster-hint cs-create-desc">
+    <${Space} below="large">
+      <${Card} tone="section" title=${t('profile.chatSessions.createTitle')}>
+        <${Note}>
           ${t('profile.chatSessions.createDesc')}
-        </p>
-        <div class="flex-row-wrap mb-half">
-          <button class="poster-slab poster-slab--control" onClick=${() => copyPrompt('quick')}
+        <//>
+        <${Row} wrap below="small">
+          <${Loud} control onClick=${() => copyPrompt('quick')}
             disabled=${copying === 'quick'}>
             ${copying === 'quick' ? '...' : t('profile.chatSessions.copyQuickPrompt')}
-          </button>
-          <button class="poster-action poster-action--small" onClick=${() => copyPrompt('detailed')}
+          <//>
+          <${Action} small onClick=${() => copyPrompt('detailed')}
             disabled=${copying === 'detailed'}>
             ${copying === 'detailed' ? '...' : t('profile.chatSessions.copyDetailedPrompt')}
-          </button>
-        </div>
-        <p class="poster-hint">
+          <//>
+        <//>
+        <${Note}>
           ${t('profile.chatSessions.createHint')}
-        </p>
-      </div>
-    </div>
+        <//>
+      <//>
+    <//>
 
     ${chatSessions.length === 0
-      ? html`<div class="poster-quiet">${t('profile.chatSessions.empty')}</div>`
+      ? html`<${Note} kind="quiet">${t('profile.chatSessions.empty')}<//>`
       : html`
         <${PageSection} title=${t('profile.chatSessions.startedByYou')}>
-        <div class="og-lead">${t('profile.chatSessions.startedByYouDesc')}</div>
-        <div class="listing listing--name-desc-doors">
+        <${Note} kind="lead">${t('profile.chatSessions.startedByYouDesc')}<//>
+        <${List} cols="name-desc-doors">
         ${chatSessions.map(s => {
           const isExpanded = expanded === s.name;
           return html`
-            <div class=${`listing-row cs-row ${isExpanded ? 'is-open' : ''}`} key=${s.name} onClick=${(e) => { if (!e.target.closest?.('.listing-open')) toggleExpand(s.name); }}>
-              <div class="listing-name">${escHtml(s.display_name || s.name || '-')}</div>
-              <div class="listing-desc">${t('profile.chatSessions.lastSeen')}: ${s.last_seen ? timeAgo(s.last_seen) : '-'}</div>
-              <div class="listing-doors"><span class="poster-chip">${escHtml(s.name || '')}</span><button type="button" class="poster-icon poster-icon--small">${isExpanded ? '\u25BC' : '\u25B6'}</button></div>
-
-              ${isExpanded && html`
-                <div class="listing-open poster-box poster-box--raised">
-                  <div class="facts">
-                    <span class="facts-k poster-label">GAII</span>
-                    <span class="facts-v"><code class="code-inline">${escHtml(s.gaii || '-')}</code></span>
-                    ${s.description ? html`
-                      <span class="facts-k poster-label">${t('profile.chatSessions.description')}</span>
-                      <span class="facts-v">${escHtml(s.description)}</span>
-                    ` : null}
-                    <span class="facts-k poster-label">${t('profile.chatSessions.trust')}</span>
-                    <span class="facts-v">${s.trust_score ?? '-'}</span>
-                    <span class="facts-k poster-label">${t('profile.chatSessions.balance')}</span>
-                    <span class="facts-v">${s.morsel_balance ?? '-'} morsels</span>
-                    ${s.roles ? html`
-                      <span class="facts-k poster-label">${t('profile.chatSessions.roles')}</span>
-                      <span class="facts-v">${(s.roles || []).join(', ')}</span>
-                    ` : null}
-                    ${s.created_at ? html`
-                      <span class="facts-k poster-label">${t('profile.chatSessions.created')}</span>
-                      <span class="facts-v">${fmtDateTime(s.created_at)}</span>
-                    ` : null}
-                  </div>
-
-                  <div class="og-doors listing-open-doors">
-                    <span onClick=${(e) => e.stopPropagation()}>
-                      <${CopyButton} text=${s.gaii || s.name} label=${t('profile.agents.copyGaii')} className="poster-action poster-action--small" onCopied=${() => showToast('GAII copied')} />
-                    </span>
-                    <button class="poster-action poster-action--small poster-action--danger" onClick=${(e) => { e.stopPropagation(); handleDelete(s); }}
+            <${ListRow} key=${s.name} open=${isExpanded} onToggle=${() => toggleExpand(s.name)}
+              panel=${html`
+                  <${Facts} rows=${[
+                    { k: 'GAII', v: escHtml(s.gaii || '-'), mono: true },
+                    s.description && { k: t('profile.chatSessions.description'), v: escHtml(s.description) },
+                    { k: t('profile.chatSessions.trust'), v: s.trust_score ?? '-' },
+                    { k: t('profile.chatSessions.balance'), v: `${s.morsel_balance ?? '-'} morsels` },
+                    s.roles && { k: t('profile.chatSessions.roles'), v: (s.roles || []).join(', ') },
+                    s.created_at && { k: t('profile.chatSessions.created'), v: fmtDateTime(s.created_at) },
+                  ]} />`}
+              panelDoors=${html`
+                    <${Action} small copy=${s.gaii || s.name} onCopied=${() => showToast('GAII copied')}>${t('profile.agents.copyGaii')}<//>
+                    <${Action} small tone="danger" onClick=${(e) => { e.stopPropagation(); handleDelete(s); }}
                       disabled=${deleting === s.name}>
                       ${deleting === s.name ? '...' : t('profile.chatSessions.remove')}
-                    </button>
-                  </div>
-                </div>
-              `}
-            </div>
+                    <//>`}>
+              <${Name}>${escHtml(s.display_name || s.name || '-')}<//>
+              <${Desc}>${t('profile.chatSessions.lastSeen')}: ${s.last_seen ? timeAgo(s.last_seen) : '-'}<//>
+              <${Doors}><${Mark}>${escHtml(s.name || '')}<//><${Icon} small>${isExpanded ? '\u25BC' : '\u25B6'}<//><//>
+            <//>
           `;
         })}
-        </div>
+        <//>
         <//>
       `
     }
-    </div>
+    <//>
     <${ConfirmUI} />`;
 }

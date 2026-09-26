@@ -10,6 +10,8 @@
  *   then render <${ToastContainer} /> at the view root (NOT inside any element
  *   with transform/filter — those trap the fixed-position pill).
  * @version-history
+ *   v1.3.0 — 2026-09-26 — ToastBox: the pill alone, for a view that keeps its own toast state (the
+ *     Settings shell, views/profile.js); ToastContainer draws it. Additive, by page group G8.
  *   2026-09-14 — Header follows theme.css: the toast is drawn in the poster face, not as a coloured pill.
  *   v1.2.0 — 2026-09-13 — The pill shows above an open dialog (raiseAboveDialogs): a dialog is in
  *     the browser's top layer, and a toast raised from inside one sat under its dimmed backdrop.
@@ -39,6 +41,16 @@ export function normalizeToastType(kind) {
 }
 
 /**
+ * The toast pill itself, for a view that keeps its own toast state ({ msg, type } or null): drawn
+ * above an open dialog. ToastContainer draws this.
+ * @param {{ toast: { msg: any, type: string } | null }} props
+ */
+export function ToastBox({ toast }) {
+  if (!toast) return null;
+  return html`<div class="toast toast-${normalizeToastType(toast.type)}" ref=${raiseAboveDialogs}>${toast.msg}</div>`;
+}
+
+/**
  * useToast — hook that provides showToast() + a ToastContainer component.
  * @returns {{ showToast: (msg: string, kind?: boolean|string) => void, ToastContainer: Function }}
  */
@@ -53,8 +65,7 @@ export function useToast() {
   }, []);
 
   function ToastContainer() {
-    if (!toast) return null;
-    return html`<div class="toast toast-${toast.type}" ref=${raiseAboveDialogs}>${toast.msg}</div>`;
+    return html`<${ToastBox} toast=${toast} />`;
   }
 
   return { showToast, ToastContainer };

@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.18.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its crumb, tags, loud copy, strip and rail as data; FigureStrip; Filters; SearchLine; List; More; Box; Facts; Note): the page passes data and writes no class (page group G8).
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.15.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -40,15 +41,21 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts } from '/components/Facts.js';
+import { Box } from '/components/Box.js';
+import { List, Filters, Filter, SearchLine, More } from '/components/List.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
 import { x, shelfOf, isCommunity, crumb, pageLinks, aiRule } from './frame.js';
 import { packRow } from './rows.js';
 import { Hint } from '/components/Hint.js';
 
 const PAGE = 20;
-const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--filter ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<span class="poster-count poster-count--tally">${n}</span></button>`;
+const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 const used = (p) => p.used_by?.apps || 0;
 const proven = (p) => (p.proofs || []).length > 0;
@@ -63,53 +70,49 @@ export function renderPage(ctx) {
   const provenN = all.filter(proven).length;
   const deprecatedN = all.filter((p) => p.status === 'deprecated').length;
   const appsUsing = ctx.appsUsing;   // { using, total } or null
-  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
   const top = all.slice().sort((a, b) => used(b) - used(a)).slice(0, 3).filter((p) => used(p) > 0).map((p) => `${p.id} ${used(p)}`).join(' · ');
 
-  const strip = html`
-    <div class="og-strip">
-      <div><b>${packs ? base.length : '…'}</b><span>${x('stripBase')}</span><small>${x('stripBaseSub')}${deprecatedN && base.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: base.filter((p) => p.status === 'deprecated').length })}` : ''}</small></div>
-      <div><b>${packs ? ui.length : '…'}</b><span>${x('stripUi')}</span><small>${packs ? x('stripUiSub', { node: ui.filter((p) => !isCommunity(p)).length, community: ui.filter(isCommunity).length }) : ''}</small></div>
-      <div><b>${packs ? third.length : '…'}</b><span>${x('stripThird')}</span><small>${x('stripThirdSub')}${third.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: third.filter((p) => p.status === 'deprecated').length })}` : ''}</small></div>
-      <div><b>${appsUsing ? appsUsing.using : (packs ? inUse : '…')}</b><span>${appsUsing ? x('stripApps', { total: appsUsing.total }) : x('stripInUse')}</span><small>${top ? x('stripTop', { list: top }) : ''}</small></div>
-    </div>`;
+  const strip = html`<${FigureStrip} items=${[
+    { key: 'base', n: packs ? base.length : '…', label: x('stripBase'),
+      sub: `${x('stripBaseSub')}${deprecatedN && base.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: base.filter((p) => p.status === 'deprecated').length })}` : ''}` },
+    { key: 'ui', n: packs ? ui.length : '…', label: x('stripUi'),
+      sub: packs ? x('stripUiSub', { node: ui.filter((p) => !isCommunity(p)).length, community: ui.filter(isCommunity).length }) : '' },
+    { key: 'third', n: packs ? third.length : '…', label: x('stripThird'),
+      sub: `${x('stripThirdSub')}${third.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: third.filter((p) => p.status === 'deprecated').length })}` : ''}` },
+    { key: 'apps', n: appsUsing ? appsUsing.using : (packs ? inUse : '…'), label: appsUsing ? x('stripApps', { total: appsUsing.total }) : x('stripInUse'),
+      sub: top ? x('stripTop', { list: top }) : '' },
+  ]} />`;
 
   return html`
-    <div class="og og-libs">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('librariesTab.tabLabel')}<small>${x('titleSub')}</small></h1>
-          <div class="poster-chips">
-            ${packs ? chip(x('chipAll', { n: all.length }), 'poster-chip--sun') : null}
-            ${packs ? chip(x('chipInUse', { n: inUse })) : null}
-            ${packs ? chip(x('chipProven', { n: provenN })) : null}
-            ${packs && deprecatedN ? chip(x('chipDeprecated', { n: deprecatedN })) : null}
-          </div>
-          <p class="og-desc">${x('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <${CopyButton} text=${aiRule(ctx.nodeUrl)} className="poster-slab" label=${x('copyRule')} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))} />
-          <div class="og-doors"><a class="poster-action poster-action--small" href="https://design-book.apps.aimeat.io/" target="_blank" rel="noopener">Design Book</a></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${shelf(ctx, 'base', '01', x('secBase'), x('secBaseSub'), base, true)}
-          ${shelf(ctx, 'ui', '02', x('secUi'), x('secUiSub'), ui, false)}
-          ${shelf(ctx, 'third', '03', x('secThird'), x('secThirdSub'), third, false)}
-          ${secAI(ctx, '04', all)}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${[['01', 'lb-base', x('secBase'), packs ? base.length : ''], ['02', 'lb-ui', x('secUi'), packs ? ui.length : ''], ['03', 'lb-third', x('secThird'), packs ? third.length : ''], ['04', 'lb-ai', x('secAi'), '']].map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+    <${SettingsPage} name="libs"
+      crumb=${crumb()}
+      title=${t('librariesTab.tabLabel')}
+      sub=${x('titleSub')}
+      marks=${packs ? [
+        { label: x('chipAll', { n: all.length }), tone: 'sun' },
+        { label: x('chipInUse', { n: inUse }) },
+        { label: x('chipProven', { n: provenN }) },
+        deprecatedN ? { label: x('chipDeprecated', { n: deprecatedN }) } : null,
+      ] : []}
+      desc=${x('desc')}
+      actions=${html`
+        <${Loud} copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
+        <${Actions}><${Action} small href="https://design-book.apps.aimeat.io/" newTab>Design Book<//><//>`}
+      strip=${strip}
+      railTitle=${x('railTitle')}
+      sections=${[
+        { id: 'lb-base', num: '01', label: x('secBase'), count: packs ? base.length : '' },
+        { id: 'lb-ui', num: '02', label: x('secUi'), count: packs ? ui.length : '' },
+        { id: 'lb-third', num: '03', label: x('secThird'), count: packs ? third.length : '' },
+        { id: 'lb-ai', num: '04', label: x('secAi'), count: '' },
+      ]}
+      pagesLabel=${x('pages')}
+      pages=${pageLinks()}>
+      ${shelf(ctx, 'base', '01', x('secBase'), x('secBaseSub'), base, true)}
+      ${shelf(ctx, 'ui', '02', x('secUi'), x('secUiSub'), ui, false)}
+      ${shelf(ctx, 'third', '03', x('secThird'), x('secThirdSub'), third, false)}
+      ${secAI(ctx, '04', all)}
+    <//>`;
 }
 
 /* ── One shelf: facets, search, rows ─────────────────────────────────────────────────────────── */
@@ -151,18 +154,19 @@ function shelf(ctx, key, num, title, sub, list, first) {
   const ids = { base: 'lb-base', ui: 'lb-ui', third: 'lb-third' };
   return html`
     <${PageSection} id=${ids[key]} num=${num} title=${title} count=${ctx.packs ? sub : null} first=${first}>
-      ${!ctx.packs ? html`<p class="poster-quiet lb-empty loading-mark">${t('common.loading')}</p>` : html`
-        <div class="lb-facets">${facets}</div>
-        <div class="search-line"><input class="og-input" type="search" value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} aria-label=${x('search.' + key)} onInput=${(e) => ctx.setQuery(key, e.target.value)} /><small>${x('searchOrder')}</small></div>
-        ${!rows.length ? html`<p class="poster-quiet lb-empty">${key === 'ui' && F.who === 'community' && !count(isCommunity) ? x('communityEmpty') : x('noMatch')}</p>` : html`
-          <div class="listing listing--name-desc-api-doors">
-            <div class="listing-row listing-row--head"><div class="poster-label">${x('col.' + key)}</div><div class="poster-label">${key === 'ui' ? x('colGives') : x('colDoes')}</div><div class="poster-label">${x('colInApp')}</div><div class="poster-label"></div></div>
-            ${shown.map((p) => packRow(ctx, p))}
-          </div>`}
-        <div class="more-line">
-          ${shown.length < rows.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShown(key, ctx.shown[key] + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}</button>` : null}
-          <small>${x('shownOf', { shown: shown.length, total: rows.length })}</small>
-        </div>
+      ${!ctx.packs ? html`<${Note} kind="loading">${t('common.loading')}<//>` : html`
+        <${Filters}>${facets}<//>
+        <${SearchLine} value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} label=${x('search.' + key)}
+          onInput=${(e) => ctx.setQuery(key, e.target.value)} note=${x('searchOrder')} />
+        <${List} cols="name-desc-api-doors"
+          empty=${key === 'ui' && F.who === 'community' && !count(isCommunity) ? x('communityEmpty') : x('noMatch')}
+          head=${rows.length ? [x('col.' + key), key === 'ui' ? x('colGives') : x('colDoes'), x('colInApp'), ''] : null}>
+          ${shown.map((p) => packRow(ctx, p))}
+        <//>
+        <${More}
+          label=${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}
+          onMore=${shown.length < rows.length ? () => ctx.setShown(key, ctx.shown[key] + PAGE) : null}
+          note=${x('shownOf', { shown: shown.length, total: rows.length })} />
         <${Hint}>${x('hint.' + key)}<//>`}
     <//>`;
 }
@@ -176,16 +180,15 @@ function secAI(ctx, num, all) {
   const appsUsing = ctx.appsUsing;
   return html`
     <${PageSection} id="lb-ai" num=${num} title=${x('secAi')} count=${null}>
-      <p class="og-lead">${x('aiIntro')}</p>
-      <div class="lb-rule poster-box">
-        <span class="poster-label">${x('ruleLabel')}</span>
-        <p class="og-lead">${x('ruleBody', { base: ctx.nodeUrl })}</p>
-        <div class="og-doors"><${CopyButton} text=${aiRule(ctx.nodeUrl)} className="poster-action poster-action--small" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
-      </div>
-      <div class="facts facts--wide">
-        <div class="facts-k poster-label">${x('aiModelK')}</div><div class="facts-v">${x('aiModelBody')}<small>${x('aiModelSub')}</small></div>
-        <div class="facts-k poster-label">${x('aiProvenK')}</div><div class="facts-v">${x('aiProvenBody', { n: all.filter(proven).length, runs: proofs, passed, failed: proofs - passed })}<small>${x('aiProvenSub')}</small></div>
-        <div class="facts-k poster-label">${x('aiUsedK')}</div><div class="facts-v">${appsUsing ? x('aiUsedBody', { using: appsUsing.using, total: appsUsing.total, libs: inUse, unused: all.length - inUse }) : x('aiUsedBodyShort', { libs: inUse, unused: all.length - inUse })}</div>
-      </div>
+      <${Note} kind="lead">${x('aiIntro')}<//>
+      <${Box} doors=${html`<${Action} small copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
+        <${Label} block>${x('ruleLabel')}<//>
+        <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>
+      <//>
+      <${Facts} wide rows=${[
+        { k: x('aiModelK'), v: x('aiModelBody'), sub: x('aiModelSub') },
+        { k: x('aiProvenK'), v: x('aiProvenBody', { n: all.filter(proven).length, runs: proofs, passed, failed: proofs - passed }), sub: x('aiProvenSub') },
+        { k: x('aiUsedK'), v: appsUsing ? x('aiUsedBody', { using: appsUsing.using, total: appsUsing.total, libs: inUse, unused: all.length - inUse }) : x('aiUsedBodyShort', { libs: inUse, unused: all.length - inUse }) },
+      ]} />
     <//>`;
 }

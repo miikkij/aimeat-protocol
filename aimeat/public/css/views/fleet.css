@@ -17,6 +17,8 @@
  *   square mono chip, 2px framed, selected on the sun; and the ink slab, which comes from
  *   .btn-primary rather than from here.
  * @version-history
+ *   v2.14.0 -- 2026-09-26 -- The embedded fleet also keys on .og-fleet, the root SettingsPage gives the
+ *     Settings tab now that its wrapper (.pf-fleet-tab) is gone (additive, page group G1a).
  *   v2.13.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v2.12.0 -- 2026-09-25 -- The move box's sentences are the Attention note's own words; the blocked and ready lines keep their colour as a tone (a unification: Jouni's decision Attention note).
  *   v2.11.0 -- 2026-09-25 -- What a press did, said where it was pressed, is the Form message (css/components/form-message.css, its error cut when refused); a place keeps only its margin, a unification: the look most tabs use.
@@ -51,7 +53,8 @@
 
 /* Embedded in Settings & Controls the tab already owns the column and the padding, so the
    standalone page's centring would inset the section inside an inset. */
-.pf-fleet-tab .flt {
+.pf-fleet-tab .flt,
+.og-fleet .flt {
   max-width: none;
   margin: 0;
   padding: 0;

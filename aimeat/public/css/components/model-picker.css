@@ -12,6 +12,8 @@
  *   <li class="model-picker-row"><button>…</button></li></ul><div class="model-picker-more">…</div></div>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — Drawn by components/ModelPicker.js (ModelList, ModelPicker); the classic AI
+ *     settings' own picker rules moved in from profile.css under the component's names (component plan C5).
  *   v1.0.0 — 2026-09-25 — Moved out of ai-poster.css and calibrator-poster.css (UI consolidation phase 5, a move).
  */
 
@@ -35,8 +37,19 @@
 .model-picker-row button:disabled { cursor: default; }
 .model-picker-more { display: flex; align-items: center; gap: 1rem; padding: .5rem .75rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
 .model-picker-empty { padding: .6rem .75rem; }
+/* The classic AI settings' picker (components/ModelPicker.js ModelPicker), moved unchanged out of
+   profile.css (.pf-or-picker*, .pf-or-mcustom): dimmed while there is no key, the chosen model above
+   the search with "Clear" at the right, a row with a link to the model's page (no trait column), a
+   field for an id the catalogue does not list, and the hint under it. */
+.model-picker--off { opacity: .55; }
+.model-picker-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: .5rem .75rem; }
+.model-picker-picked .poster-status { margin-left: 6px; }
+.model-picker-row--link { grid-template-columns: minmax(0, 1.3fr) auto auto auto; }
+.model-picker-custom { display: flex; gap: 8px; flex-wrap: wrap; padding: .5rem .75rem; }
+.model-picker-custom .og-input { flex: 1; min-width: 180px; }
+.model-picker > .poster-hint { display: block; margin: 0; padding: 0 .75rem .6rem; }
 
 @media (max-width: 860px) {
-  .model-picker-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .model-picker-row, .model-picker-row--link { grid-template-columns: minmax(0, 1fr) auto; }
   .model-picker-row .model-picker-trait, .model-picker-row .model-picker-note { grid-column: 1 / -1; }
 }

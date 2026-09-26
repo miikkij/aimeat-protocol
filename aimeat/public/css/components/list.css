@@ -1,0 +1,234 @@
+/**
+ * @file list.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The List component's own rules (public/components/List.js), beside the Listing's
+ *   (listing.css), which it draws and which the admin pages share. Here is what the Listing lacked
+ *   and the Settings lists had in their own sheets: the parts of a name (its dot, tags, a sentence
+ *   and a coral note under it, the unread square, a meta line cut to one line), the marks at a row's
+ *   start (the tick, the thumbnail; the avatar is the one Avatar, avatar.css), the fixed counts of
+ *   an organism's row, a row that opens on a click anywhere, one that is picked, selected, past,
+ *   dragged or carries a rail, what always shows under a row, the group heading over rows, the
+ *   filter that stands at the end of the filter row (the row is Tabs' tab-row.css), and the list's
+ *   tones (dense, under a row, a small checklist, a capped pick list). Every value is one a Settings
+ *   page drew on main; where pages differed, the one most of them drew. The sun grounds (the
+ *   thumbnail's second bar, a found word) are poster.css's .poster-chip--sun in the markup.
+ *   NOTE: this file must be linked in spa.html, after listing.css.
+ * @version-history
+ *   v1.8.0 — 2026-09-27 — The Name's way in is .list-name-link, the List's own class, with the values
+ *     of .og-tbl-name (space-table.css) that it wore before; .list-name .og-tbl-name, a.og-tbl-name,
+ *     .is-attention .og-tbl-name and .list-row--toggle:hover .og-tbl-name follow it (Jouni: components
+ *     draw only their own class names, a move). .og-tbl-name stays in space-table.css for the pages
+ *     that still write it (the public knowledge viewer, the design lab's space table).
+ *   v1.7.0 — 2026-09-26 — .list-group-head--folds (Group wholeHead): the pointer over a heading
+ *     that folds from anywhere, main's .mem-cart-head cursor; .list-row--hover (Row hover), main's
+ *     .pf .mem-item:hover coral name; .list--scroll-medium (List scroll="medium", 300px), main's
+ *     .pf-agd-event-log-scroll; the coloured warn row's edge written from the token first
+ *     (check:shape-tokens); fix pass.
+ *   v1.6.0 — 2026-09-26 — The typewriter cell's head word and grey line (.list-meta-head, -dim,
+ *     .list-meta-sub): Cell meta head/sub, main's Extensions .ex-me; Desc pre (.list-pre), main's
+ *     Apps .ap-road-text; page group G6.
+ *   v1.5.0 — 2026-09-26 — Desc lines and marks (.list-lines, .list-marks), Who warn
+ *     (.listing-who small.is-warn), More wrap (.list-more--wrap): main's Packages rows; page group G7.
+ *   v1.4.0 — 2026-09-26 — Cell `code`: the name code calls a thing by, typewriter in ink with a grey
+ *     line under it (.list-code-words; main's Libraries .lb-me); page group G8.
+ *   v1.3.0 — 2026-09-26 — A row label on a line of its own inside an opened panel keeps main's space
+ *     (.listing-open > .poster-label--block, from data-wallet-poster.css .dw-open .og-label; page
+ *     group G7, Data wallet).
+ *   v1.2.0 — 2026-09-26 — .list-when--warn (When warn) and the dim cell's row label, from main's
+ *     access-poster.css .ac-kwhen.is-low and .ac-rk.is-dim (page group G3).
+ *   v1.1.0 — 2026-09-26 — The drag handle in the gutter (.list-grip, shown while the pointer is on
+ *     the row) and the row being dragged (.is-dragging), moved from agents-detail.css
+ *     (.pf-agd-dnd-grip, .pf-agd-dnd-dragging) with their values; a pick row that cannot be changed
+ *     now (.list-row--pick-off, formerly agents-crew.css .pf-agd-crew-tool--off); an opened record's
+ *     title row (.list-panel-head, formerly agent-tasks-poster.css .agt-record-h). Page group G1a.
+ *   v1.0.0 — 2026-09-26 — Initial (component plan C1). Moved from the Settings sheets: the name's tag
+ *     and dot places (skills, extensions, capabilities, libraries, packages, memory), the unread
+ *     square and the answer's line (notification-feed.css), the hit's sentence and "why" line
+ *     (offer-hits.css), the tick (todo-list.css), the thumbnail (page-row.css), the counts
+ *     (org-row.css), the draft rail (record-row.css), the pick row and its capped box
+ *     (app-picker.css), the group heading's place (discover, knowledge, offers), the filter at the
+ *     row's end (data-wallet-poster.css .dw-filters-r).
+ */
+
+/* ── The line in the list's place while it loads or has nothing (the place seven Settings sheets
+   gave their empty line: sk, ex, lb, ap, cp, ad, pk-empty). ── */
+.list-empty > .poster-quiet { margin: 0; padding: .3rem 0 .6rem; }
+
+/* ── The name cell's parts ──────────────────────────────────────────────────────────────────── */
+.list-name .status-dot:first-child { margin-right: .45rem; vertical-align: middle; }
+.list-name > .poster-chip, .list-name > .poster-status { margin-left: .45rem; vertical-align: middle; }
+/* The name as the way into the thing (the values of .og-tbl-name, space-table.css, which it wore before). */
+.list-name-link { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left; }
+.list-name-link:hover { color: var(--accent); }
+.list-name .list-name-link { white-space: normal; overflow-wrap: anywhere; }
+.list-name a.list-name-link { text-decoration: none; }
+.list-name.is-unread::before { content: ''; display: inline-block; width: .5rem; height: .5rem; background: var(--accent); margin-right: .5rem; vertical-align: middle; }
+.list-name .list-desc { margin: .25rem 0 0; font-size: .85rem; font-weight: 400; line-height: 1.5; color: var(--text-dim); }
+.list-note { display: block; margin-top: .3rem; font-family: var(--font-mono); font-size: .75rem; font-weight: 400; color: var(--accent); }
+.list-note--fine { color: var(--success-fg, #1f8f5a); }
+.list-clip > small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-clip2 > small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* A control before the name (the task's eye) and the name blurred for privacy (agent tasks). */
+.list-name > .list-before { display: inline-flex; vertical-align: middle; margin-right: .55rem; }
+.list-blur { filter: blur(6px); user-select: none; }
+/* Marks at the far end of the name cell, in one line down the list (memory's visibility chips). */
+.list-name > .list-end { float: right; margin-left: .6rem; }
+.list-name.is-attention,.list-name.is-attention .list-name-link { color: var(--accent); }
+/* A search's words found in a name or its line (Discover): Found, on the sun (.poster-chip--sun). */
+.list-found { padding: 0 2px; }
+
+/* ── The other cells ────────────────────────────────────────────────────────────────────────── */
+.list-dim { color: var(--text-dim); }
+/* A dim cell dims its row label too (the base package's line in an opened key, Access). */
+.list-dim > .poster-label { color: var(--text-dim); }
+.list-faint { color: var(--border); }
+/* A cell cut to one line (the register and catalogue columns of Scheduler and Offers). */
+.listing-row > .list-clip-cell { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The words cell's own line under it and its bold words (Data wallet, Wallet, Extensions, Calibrator). */
+.list-words > small { display: block; font-family: var(--font-mono); font-size: .7rem; line-height: 1.45; overflow-wrap: anywhere; }
+.list-words b { color: var(--text); font-weight: 800; }
+.list-who > .code-inline:not(:first-child) { margin-left: .4rem; }
+/* Marks that stand in one line in a cell, wrapping (an organism's type, lock and archived mark). */
+.listing-row > .list-line { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; min-width: 0; }
+.list-line > span:not([class]) { display: inline-flex; align-items: center; color: var(--text-dim); }
+/* An identifier alone in a plain cell keeps its own width (Packages' components). */
+.listing-row > div:where(:not([class])) > .code-inline:only-child { justify-self: start; }
+.list-when { line-height: 1.5; }
+.list-when b { display: block; color: var(--text); font-weight: 500; }
+/* A time that needs a look (When warn): a key unused for 30 days (Access, main's .ac-kwhen.is-low). */
+.list-when--warn, .list-when--warn b { color: var(--accent); }
+.listing-row > .list-meta-cell { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+/* The typewriter cell's bold word on its own line and its grey line under it (Cell meta head/sub;
+   Extensions' who-uses-it column, main's .ex-me). */
+.list-meta-cell > .list-meta-head { display: block; font-weight: 700; color: var(--text); }
+.list-meta-cell > .list-meta-head--dim { color: var(--text-dim); }
+.list-meta-cell > .list-meta-sub { display: block; color: var(--text-dim); }
+/* Words a person wrote, kept with their own line breaks (Desc pre; main's Apps .ap-road-text). */
+.listing-row > .list-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.listing-row > .list-code { font-family: var(--font-mono); font-size: .8rem; font-weight: 800; color: var(--accent); }
+/* The sign in a figure column: how soon a thing fires (Scheduler), coral typewriter at the right. */
+.listing-row > .list-code--soon { font-size: .75rem; font-weight: 400; white-space: nowrap; }
+
+/* ── The marks at a row's start ─────────────────────────────────────────────────────────────── */
+.list-tick { box-sizing: border-box; width: 18px; height: 18px; border: var(--shape-frame) solid var(--border); color: var(--text-dim); font-size: .75rem; line-height: 14px; text-align: center; font-weight: 800; }
+.list-tick.list-tick--done { border-color: var(--success-fg, #047857); color: var(--success-fg, #047857); }
+.list-tick.list-tick--failed { border-color: var(--accent); color: var(--accent); }
+.list-tick.list-tick--pending { border-color: var(--text); }
+.list-tick.list-tick--active { border-color: var(--text); color: var(--accent); }
+/* The glyph without its box: a use that is on (✓, green) or not (·, grey), a rule met or not. */
+.list-glyph { font-style: normal; font-weight: 800; color: var(--text-dim); min-width: 1rem; }
+.list-glyph.list-tick--done { color: var(--success-fg, #1f8f5a); }
+.list-thumb { width: 5.6rem; height: 3.6rem; border: var(--shape-frame) solid var(--shape-frame-colour); background: var(--ink-ground); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; }
+.list-thumb i { display: block; width: 3.6rem; height: .3rem; background: var(--accent); }
+/* The second bar is on the sun: the markup wears the sun ground (.poster-chip--sun, poster.css). */
+.list-thumb i + i { width: 2.4rem; }
+
+/* ── Fixed counts (an organism's row): each count its own track, from the measured worst case
+   (three digits 41px, a ten-character date 64px) with tabular figures, so every icon stands under
+   its own down the list; the first track grows to hold a pressed tab; the date keeps the last. ── */
+.list-stats { display: grid; grid-template-columns: minmax(2.4rem, auto) 2.4rem 2.4rem 4.1rem; align-items: center; gap: 0 .8rem; font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.list-stat { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; min-width: 0; }
+.list-stat--date { justify-content: flex-end; grid-column: -2; }
+
+/* ── Rows ───────────────────────────────────────────────────────────────────────────────────── */
+/* A row that opens on a click anywhere but its panel; the name is its button. */
+.list-row--toggle > div:not(.listing-open) { cursor: pointer; user-select: none; }
+.list-row--toggle:hover .list-name-link { color: var(--accent); }
+/* Row hover: a row that opens nothing still answers the pointer (main's .pf .mem-item:hover). */
+.list-row--hover:hover > .listing-name { color: var(--accent); }
+.listing-row.is-selected > div:not(.listing-open) { background: var(--bg-dim); }
+/* A thing that is past: .6 (outdated to-dos, revoked ecosystem apps; a retired contract drew .72). */
+.listing-row.is-faded > div:not(.listing-open) { opacity: .6; }
+.listing-row.is-fine > div { color: var(--success-fg, var(--text)); }
+/* A rail at the row's start: a draft or a request that waits (warn), or the colour a person gave. */
+.list-colour--red { --list-colour: var(--danger); }
+.list-colour--orange { --list-colour: var(--orange); }
+.list-colour--yellow { --list-colour: var(--yellow); }
+.list-colour--green { --list-colour: var(--success); }
+.list-colour--blue { --list-colour: var(--blue); }
+.list-colour--purple { --list-colour: var(--purple); }
+.list-colour--gray { --list-colour: var(--badge-node-bg); }
+.list-row--warn > div:first-child { border-left: var(--shape-frame-heavy) solid var(--warn, var(--accent)); padding-left: .5rem; }
+.list-row--colour > div:first-child { border-left: var(--shape-frame-heavy) solid var(--list-colour); padding-left: .45rem; }
+.list-row--colour.list-row--warn > div:first-child { box-shadow: var(--shape-frame-heavy) 0 0 var(--warn, var(--accent)) inset; padding-left: .8rem; }
+.list-row--drag > div:not(.listing-open) { cursor: grab; }
+/* The drag handle hangs in the gutter before the name and shows while the pointer is on the row;
+   the row being dragged is dimmed (the agents list's reorder). */
+.list-row--grip > .list-name { position: relative; }
+.list-grip { position: absolute; left: -1.3rem; top: .75rem; cursor: grab; color: var(--text-muted); font-size: .85rem; line-height: 1; opacity: 0; transition: opacity .15s; user-select: none; }
+.list-row--grip:hover .list-grip { opacity: .7; }
+.list-grip:active { cursor: grabbing; }
+.listing-row.is-dragging > div { opacity: .45; }
+/* A pick row whose box cannot be changed now (a crew's decision tool while no key exists). */
+.list-row--pick-off > div { opacity: .55; cursor: not-allowed; }
+.listing-row.is-drag-over > div:not(.listing-open) { border-bottom-color: var(--accent); }
+.list-row--pick > div { cursor: pointer; }
+.list-row--pick:hover > div { background: var(--hover-bg, var(--card-bg)); }
+/* What always shows under a row: it spans the row, and the row's rule falls under it. */
+.listing-row > .list-below { grid-column: 1 / -1; display: block; padding-top: .2rem; }
+.listing-row:has(> .list-below) > div:not(.list-below, .listing-open) { border-bottom: 0; padding-bottom: .2rem; }
+/* An opened record's own title, its status at the right (an agent's task; formerly .agt-record-h). */
+.list-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.list-text { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.6; max-width: 72ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A row label on a line of its own inside an opened panel (Label block): the space around it that
+   main's data-wallet-poster.css .dw-open .og-label gave it, over the part it names. */
+.listing-open > .poster-label--block { margin: .9rem 0 .3rem; }
+
+/* ── The group heading over rows (Jouni's decision "Group heading"): in a list it spans the row,
+   its count at the end. ── */
+.list-group-head { display: flex; align-items: baseline; gap: .6rem; padding: .9rem 0 .25rem; }
+.listing > .list-group-head { grid-column: 1 / -1; }
+.list-group-head:first-child { padding-top: 0; }
+.list-group-title { min-width: 0; }
+.list-group-head > .poster-count { margin-left: auto; }
+.list-group-doors { display: inline-flex; align-items: center; gap: .6rem; }
+.list-group-head--folds { cursor: pointer; }
+
+/* ── The filters over a list (the row is Tabs' filter row, tab-row.css): the one that stands
+   apart at the row's end (Data wallet's "people" and "events only"). ── */
+.list-filter--end { margin-left: auto; display: inline-flex; }
+
+/* ── The list's tones ───────────────────────────────────────────────────────────────────────── */
+/* dense: a list inside a panel or under a row, less air and smaller words. */
+:where(.list--dense) > .listing-row > div:where(:not(.listing-open)) { padding-top: .45rem; padding-bottom: .45rem; }
+:where(.list--dense) > .listing-row > div:where(:not([class])) { font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
+:where(.list--dense) > .listing-row--head > div { padding: 0 0 .25rem; }
+/* apart: a list that stands a little apart from the label or line above it (the place most
+   Settings sheets gave a list under a label: dw-sub, ac-rights, agc-list, the crew versions). */
+.list--apart { margin-top: .4rem; }
+/* under: it belongs to the row above it. */
+.list--under { margin: .2rem 0 0 1.4rem; }
+/* small: the conditions under a field, small grey words without rules. */
+.list--small { margin: .1rem 0 .5rem; gap: 0 .4rem; }
+:where(.list--small) > .listing-row > div { padding: .08rem 0; border-bottom: 0; font-size: .78rem; color: var(--muted); }
+/* scroll: a long pick list, capped, in a box of its own. */
+.list--scroll { max-height: 17rem; overflow-y: auto; border: 1px solid var(--border); padding: .4rem; margin-bottom: .6rem; gap: 0 .5rem; }
+:where(.list--scroll) > .listing-row > div { padding: .35rem .3rem; }
+/* scroll="medium": capped at 300px (main's .pf-agd-event-log-scroll, an agent's usage lists). */
+.list--scroll-medium { max-height: 300px; }
+
+/* Cell code: the name code calls a thing by, in the typewriter face in ink, a grey line under it
+   (main's Libraries .lb-me). */
+.list-code-words { display: block; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.list-code-words small { display: block; color: var(--text-dim); }
+.list-code-words small.list-code-words--quiet { font-style: italic; }
+
+/* Desc lines: a description that runs to a paragraph keeps its first lines in the row, the opened
+   panel shows the rest; Desc marks: tags in a line under the words (main's Packages .pk-desc and
+   .pk-parts; page group G7). */
+.list-lines { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.list-lines--2 { -webkit-line-clamp: 2; }
+.list-lines--3 { -webkit-line-clamp: 3; }
+.list-lines--4 { -webkit-line-clamp: 4; }
+.list-marks { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+/* Who warn: the line under it in coral (main's Packages .is-warn on an edited part; page group G7). */
+.listing-who small.is-warn { color: var(--accent); }
+/* More wrap: a foot with several doors wraps on a narrow screen (main's .pk-more; page group G7). */
+.more-line.list-more--wrap { flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .list-filter--end { margin-left: 0; }
+  .list--under { margin-left: 0; }
+}

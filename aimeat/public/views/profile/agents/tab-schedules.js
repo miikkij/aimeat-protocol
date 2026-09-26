@@ -7,6 +7,10 @@
  *   internal (the agent's self-reported mirror, read-only). Lets the owner create
  *   a new schedule targeting this agent (reusing the master view's CreateForm).
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- Onto the components: the head a Row with the Sub-heading and the action,
+ *     the two groups section Cards with a Group heading over a List (its empty line), the internal
+ *     jobs' rows List cells, the lines the Note. The file writes no class any more (ScheduleItem,
+ *     ../schedule-item.js, still draws its own row).
  *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.13.0 -- 2026-09-26 -- An agent's schedules are the Listing (css/components/listing.css): the kind, name and by-agent tags in the name cell, the facts, the copy box and the purpose in the words cell, the actions in the doors, the edit form the open panel; the classic card's rules go (a unification: the look most tabs use).
@@ -39,6 +43,13 @@ import { t } from '/js/i18n.js';
 import { listAgentSchedules } from '/js/services/schedules.js';
 import { CreateForm } from '../scheduler/create-form.js';
 import ScheduleItem from '../schedule-item.js';
+import { Card } from '/components/Card.js';
+import { Row, Stack } from '/components/Layout.js';
+import { SubHeading, HeadDesc } from '/components/SubHeading.js';
+import { List, Row as ListRow, Name, Desc, Who, Doors, Group } from '/components/List.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -66,41 +77,43 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
     return onLiveUpdate(['scheduler', 'agent-tasks'], () => loadRef.current());
   }, [loadData]);
 
-  if (loading) return html`<div class="poster-quiet loading-mark sch-loading">${t('profile.scheduler.loading')}</div>`;
+  if (loading) return html`<${Note} kind="loading">${t('profile.scheduler.loading')}<//>`;
 
   return html`
-    <div class="sch-tab">
-      <div class="pf-agd-section-header">
-        <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.tabs.schedules')}${managed.length + internal.length > 0 ? ` (${managed.length + internal.length})` : ''}</span>
-        <button class="poster-action poster-action--small" onClick=${() => setShowForm(v => !v)}>
-          ${showForm ? '-' : '+'} ${t('profile.scheduler.newSchedule')}
-        </button>
+    <${Stack} gap="large">
+      <div>
+        <${Row} gap="none" justify="between">
+          <${SubHeading} inline>${t('profile.agents.detail.tabs.schedules')}${managed.length + internal.length > 0 ? ` (${managed.length + internal.length})` : ''}<//>
+          <${Action} small onClick=${() => setShowForm(v => !v)}>
+            ${showForm ? '-' : '+'} ${t('profile.scheduler.newSchedule')}
+          <//>
+        <//>
+        <${HeadDesc}>${t('profile.scheduler.agentDesc')}<//>
       </div>
-      <div class="section-desc">${t('profile.scheduler.agentDesc')}</div>
 
       ${showForm && html`<${CreateForm} agents=${allAgents} lockedAgent=${agentName} showToast=${showToast}
         onCreated=${() => { setShowForm(false); loadData(); }} />`}
 
-      <div class="sch-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-title poster-day-title">${t('profile.scheduler.dispatchedTitle')}</div>
-        ${managed.length === 0
-          ? html`<div class="poster-quiet pf-agd-empty">${t('profile.scheduler.noDispatched')}</div>`
-          : html`<div class="listing listing--name-desc-doors">${managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
-      </div>
+      <${Card} tone="section">
+        <${Group} title=${t('profile.scheduler.dispatchedTitle')}>
+          <${List} cols="name-desc-doors" empty=${t('profile.scheduler.noDispatched')}>
+            ${managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}
+          <//>
+        <//>
+      <//>
 
-      <div class="sch-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-title poster-day-title">${t('profile.scheduler.internalTitle')}</div>
-        <div class="poster-hint">${t('profile.scheduler.internalNote')}</div>
-        ${internal.length === 0
-          ? html`<div class="poster-quiet pf-agd-empty">${t('profile.scheduler.noInternal')}</div>`
-          : html`<div class="listing listing--name-desc-who-doors">
-            ${internal.map((e, i) => html`<div class="listing-row" key=${e.id || i}>
-              <div class="listing-name">${e.name}</div>
-              <div class="listing-desc">${e.purpose || ''}</div>
-              <div class="listing-who"><code class="code-inline">${e.cron || e.schedule || '—'}</code>${e.timezone && html`<small>${e.timezone}</small>`}</div>
-              <div class="listing-doors">${e.status || 'active'}</div>
-            </div>`)}
-          </div>`}
-      </div>
-    </div>`;
+      <${Card} tone="section">
+        <${Group} title=${t('profile.scheduler.internalTitle')}>
+          <${Note}>${t('profile.scheduler.internalNote')}<//>
+          <${List} cols="name-desc-who-doors" empty=${t('profile.scheduler.noInternal')}>
+            ${internal.map((e, i) => html`<${ListRow} key=${e.id || i}>
+              <${Name}>${e.name}<//>
+              <${Desc}>${e.purpose || ''}<//>
+              <${Who} sub=${e.timezone}><${Code}>${e.cron || e.schedule || '—'}<//><//>
+              <${Doors}>${e.status || 'active'}<//>
+            <//>`)}
+          <//>
+        <//>
+      <//>
+    <//>`;
 }

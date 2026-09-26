@@ -10,6 +10,7 @@
  * @structure roleRow · roleOpen · pickerRow · sttPanel · appRow
  * @usage import { roleRow, appRow } from './rows.js';
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- Every part is a kit component (List Row with its Name, Who, Desc, Num, Doors and Panel; ModelList for the picker; Facts; Check; TextField; Box; Note; Action; VoiceRecorder's small cut): the page passes data and writes no class (page group G8).
  *   v1.13.0 -- 2026-09-26 -- The speech language's radio dots carry the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.12.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -34,6 +35,16 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
+import { Row, Name, Who, Desc, Num, Doors, Panel } from '/components/List.js';
+import { ModelList } from '/components/ModelPicker.js';
+import { Facts, FactLine } from '/components/Facts.js';
+import { Tinted } from '/components/Figure.js';
+import { Box } from '/components/Box.js';
+import { TextField } from '/components/TextField.js';
+import { Check } from '/components/Check.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
 import { rankModels, matchesQuery, modelPageUrl } from '/views/profile/openrouter/pricing.js';
 import { x, poolFor, findModel, modelWords, priceWords, contextWords, modelTraits, money, compact } from './frame.js';
 
@@ -49,7 +60,8 @@ export function roleRow(ctx, role) {
   const model = findModel(id, pool) || findModel(id, ctx.models);
   const keyed = ctx.keyed;
   const unset = !id;
-  const modelWord = unset ? html`<span class="is-unset">${x('roleUnset')}</span>` : html`${modelWords(model, id)} <code class="code-inline">${id}</code>`;
+  // A role with no model says so in grey (main's .is-unset).
+  const modelWord = unset ? html`<${Tinted} tone="dim">${x('roleUnset')}<//>` : html`${modelWords(model, id)} <${Code}>${id}<//>`;
   const facts = unset
     ? [role.off === 'default' ? x('roleUsesDefault') : role.id === 'image' ? x('roleImageOff') : x('roleOff')]
     : model
@@ -61,82 +73,64 @@ export function roleRow(ctx, role) {
   }
   const sub = facts.filter(Boolean).join(' · ');
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${role.id} id=${'ai-role-' + role.id}>
-      <div class="listing-name">${x('role.' + role.id)}<small>${x('roleSub.' + role.id)}</small></div>
-      <div class="listing-who">${modelWord}<small>${sub}</small></div>
-      <div class="listing-desc">${x('roleWhat.' + role.id)}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" disabled=${!keyed} onClick=${() => ctx.toggleRole(role.id)}>${open ? x('close') : x('change')}</button></div>
+    <${Row} key=${role.id} open=${open} id=${'ai-role-' + role.id}>
+      <${Name} meta=${x('roleSub.' + role.id)}>${x('role.' + role.id)}<//>
+      <${Who} sub=${sub}>${modelWord}<//>
+      <${Desc}>${x('roleWhat.' + role.id)}<//>
+      <${Doors}><${Action} small row disabled=${!keyed} onClick=${() => ctx.toggleRole(role.id)}>${open ? x('close') : x('change')}<//><//>
       ${open ? roleOpen(ctx, role, pool, model, id) : null}
-    </div>`;
+    <//>`;
 }
 
 function roleOpen(ctx, role, pool, model, id) {
-  const q = (ctx.query || '').trim().toLowerCase();
-  const recommended = rankModels(pool, role.pool).slice(0, RECOMMENDED);
-  const filtered = pool.filter((m) => matchesQuery(m, q));
-  const visible = q ? filtered : (ctx.showAll ? filtered : recommended);
   const lead = id
     ? x('roleLead', { name: modelWords(model, id), price: model ? priceWords(model, role) : '', ctx: model ? contextWords(model) : '' })
     : (role.off === 'default' ? x('roleLeadUnsetDefault') : x('roleLeadUnsetOff'));
+  const doors = html`
+    ${id ? html`<${Action} small soft disabled=${ctx.busy === 'role'} onClick=${() => ctx.setRole(role, '')}>${role.off === 'default' ? x('clearToDefault') : x('turnOff')}<//>` : null}
+    ${id && ctx.isOpenRouter ? html`<${Action} small soft href=${modelPageUrl(id)} newTab>${x('openModelPage')}<//>` : null}
+    <${Action} small soft onClick=${() => ctx.toggleRole(role.id)}>${x('close')}<//>`;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${lead} ${x('roleWhat.' + role.id)}</p>
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${lead} ${x('roleWhat.' + role.id)}<//>
       ${pool.length ? html`
-        <div class="model-picker">
-          <input class="og-input" type="search" value=${ctx.query || ''} placeholder=${x('searchModels', { n: pool.length })} aria-label=${x('searchModels', { n: pool.length })} onInput=${(e) => ctx.setQuery(e.target.value)} />
-          ${!q && !ctx.showAll ? html`<div class="model-picker-group poster-day-title">${x('recommended')}</div>` : null}
-          ${visible.length ? html`<ul class="model-picker-list">${visible.map((m) => pickerRow(ctx, role, m, m.id === id))}</ul>` : html`<div class="poster-quiet model-picker-empty">${x('noMatch')}</div>`}
-          <div class="model-picker-more">
-            ${!q && !ctx.showAll && filtered.length > visible.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShowAll(true)}>${x('showAll', { n: filtered.length })}</button>` : null}
-            <span>${x('poolFacts.' + role.pool, { n: pool.length })}</span>
-          </div>
-        </div>` : html`<p class="poster-quiet ai-empty">${role.pool === 'transcription' ? x('sttNone') : role.pool === 'image' ? x('imageNone') : x('modelsNone')}</p>`}
+        <${ModelList} models=${pool} recommended=${rankModels(pool, role.pool).slice(0, RECOMMENDED)} value=${id}
+          disabled=${ctx.busy === 'role'} onPick=${(m) => ctx.setRole(role, m.id)}
+          match=${(m, q) => matchesQuery(m, q.trim().toLowerCase())}
+          query=${ctx.query || ''} onQuery=${(q) => ctx.setQuery(q)} showAll=${ctx.showAll} onShowAll=${(v) => ctx.setShowAll(v)}
+          searchLabel=${x('searchModels', { n: pool.length })} recommendedLabel=${x('recommended')} noMatchLabel=${x('noMatch')}
+          showAllLabel=${(n) => x('showAll', { n })} facts=${x('poolFacts.' + role.pool, { n: pool.length })}
+          describe=${(m) => describe(role, m)} />`
+        : html`<${Note} kind="quiet">${role.pool === 'transcription' ? x('sttNone') : role.pool === 'image' ? x('imageNone') : x('modelsNone')}<//>`}
       ${role.id === 'stt' ? sttPanel(ctx) : null}
-      <div class="og-doors listing-open-doors">
-        ${id ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'role'} onClick=${() => ctx.setRole(role, '')}>${role.off === 'default' ? x('clearToDefault') : x('turnOff')}</button>` : null}
-        ${id && ctx.isOpenRouter ? html`<a class="poster-action poster-action--small poster-action--lower" href=${modelPageUrl(id)} target="_blank" rel="noopener">${x('openModelPage')}</a>` : null}
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleRole(role.id)}>${x('close')}</button>
-      </div>
-    </div>`;
+    <//>`;
 }
 
-function pickerRow(ctx, role, m, on) {
+/** What one model's row in the picker says: its name, its traits, its price and its context. */
+function describe(role, m) {
   const tr = modelTraits(m);
   const trait = [tr.free ? x('traitFree') : '', tr.varies ? x('traitVaries') : '', tr.images && role.pool !== 'vision' && role.pool !== 'image' ? x('readsImages') : ''].filter(Boolean).join(' · ');
-  return html`
-    <li class=${`model-picker-row ${on ? 'is-on' : ''}`} key=${m.id}>
-      <button type="button" disabled=${ctx.busy === 'role'} onClick=${() => ctx.setRole(role, m.id)}>
-        <span><b>${modelWords(m, m.id)}</b><code>${m.id}</code></span>
-        <span class="model-picker-trait">${trait}</span>
-        <span class="model-picker-price">${priceWords(m, role)}</span>
-        <span class="model-picker-ctx">${contextWords(m)}</span>
-      </button>
-    </li>`;
+  return { name: modelWords(m, m.id), trait, price: priceWords(m, role), context: contextWords(m) };
 }
 
 function sttPanel(ctx) {
   const lang = ctx.settings?.sttLanguage || '';
   const r = ctx.sttResult;
   const max = Math.min(30, Number(ctx.settings?.limits?.voice_msg_max_seconds) || 30);
-  return html`
-    <div class="facts">
-      <div class="facts-k poster-label">${x('sttLanguage')}</div>
-      <div class="facts-v">
-        <div class="ai-radios">
-          ${STT_LANGS.map((code) => html`<label class="ai-radio check-line" key=${code || 'auto'}><input type="radio" name="ai-stt-lang" checked=${lang === code} disabled=${ctx.busy === 'role'} onChange=${() => ctx.setSttLanguage(code)} />${code ? t('profile.openrouter.stt.lang_' + code) : x('sttLangDetect')}</label>`)}
-        </div>
-        <small>${x('sttLanguageHint')}</small>
-      </div>
-      <div class="facts-k poster-label">${x('sttMeasured')}</div>
-      <div class="facts-v">${x('sttMeasuredBody')}<small>${x('sttMeasuredSub', { max, limit: Number(ctx.settings?.limits?.voice_msg_max_seconds) || 300 })}</small>
-        <div class="og-doors">
-          <${VoiceRecorder} maxSeconds=${max} disabled=${ctx.busy === 'stt' || !ctx.settings?.sttModel} label=${x('sttRecord')} className="poster-action poster-action--small" onRecorded=${(file) => ctx.sttTest(file)} />
-          ${ctx.busy === 'stt' ? html`<small class="form-message">${x('sttTesting')}</small>` : null}
-        </div>
-        ${ctx.sttError ? html`<small class="form-message form-message--error">${ctx.sttError}</small>` : null}
-        ${r ? html`<div class="ai-stt-result poster-box">${r.text || x('sttSilent')}<small>${x('sttResultMeta', { seconds: (Number(r.seconds) || 0).toFixed(1), cost: money(r.usage?.cost_usd || 0), model: r.model || ctx.settings?.sttModel || '' })}${r.usage?.cost_exact === false ? ` · ${x('sttCostNotReported')}` : ''}</small></div>` : null}
-      </div>
-    </div>`;
+  const langs = STT_LANGS.map((code) => html`<${Check} radio inline name="ai-stt-lang" key=${code || 'auto'} checked=${lang === code} disabled=${ctx.busy === 'role'} onChange=${() => ctx.setSttLanguage(code)}>${code ? t('profile.openrouter.stt.lang_' + code) : x('sttLangDetect')}<//>`);
+  const result = r ? html`<${Box} tone="row">${r.text || x('sttSilent')}<${Note} kind="meta">${x('sttResultMeta', { seconds: (Number(r.seconds) || 0).toFixed(1), cost: money(r.usage?.cost_usd || 0), model: r.model || ctx.settings?.sttModel || '' })}${r.usage?.cost_exact === false ? ` · ${x('sttCostNotReported')}` : ''}<//><//>` : null;
+  const measured = html`
+    <${FactLine} sub=${x('sttMeasuredSub', { max, limit: Number(ctx.settings?.limits?.voice_msg_max_seconds) || 300 })}>${x('sttMeasuredBody')}<//>
+    <${Actions}>
+      <${VoiceRecorder} small maxSeconds=${max} disabled=${ctx.busy === 'stt' || !ctx.settings?.sttModel} label=${x('sttRecord')} onRecorded=${(file) => ctx.sttTest(file)} />
+      ${ctx.busy === 'stt' ? html`<${Note} kind="message">${x('sttTesting')}<//>` : null}
+    <//>
+    ${ctx.sttError ? html`<${Note} kind="message" error>${ctx.sttError}<//>` : null}
+    ${result}`;
+  return html`<${Facts} rows=${[
+    { k: x('sttLanguage'), v: langs, sub: x('sttLanguageHint') },
+    { k: x('sttMeasured'), v: measured },
+  ]} />`;
 }
 
 /* ── One app in the spend table ───────────────────────────────────────────────────────────────── */
@@ -145,13 +139,13 @@ export function appRow(ctx, row, editing) {
   const cap = ctx.quotas?.[row.app]?.daily_usd;
   const draft = ctx.caps?.[row.app];
   return html`
-    <div class="listing-row" key=${row.app}>
-      <div class="listing-name"><b>${row.app}</b><small>${[row.tokens ? x('tokensN', { n: compact(row.tokens) }) : '', row.seconds ? x('secondsN', { n: Math.round(row.seconds) }) : ''].filter(Boolean).join(' · ')}</small></div>
-      <div class="listing-n">${money(row.cost)}</div>
-      <div class="listing-n is-dim">${money(row.today)}</div>
-      <div class="listing-n ai-cap">${editing
-        ? html`<input class="og-input" type="number" min="0" max="1000" step="0.10" value=${draft ?? ''} placeholder=${x('noCap')} aria-label=${x('colCap')} onInput=${(e) => ctx.setCap(row.app, e.target.value)} />`
-        : (cap != null ? html`<b>${money(cap)}</b>` : html`<span class="is-dim">${x('noCap')}</span>`)}</div>
-      <div class="listing-n is-dim">${row.calls}</div>
-    </div>`;
+    <${Row} key=${row.app}>
+      <${Name} meta=${[row.tokens ? x('tokensN', { n: compact(row.tokens) }) : '', row.seconds ? x('secondsN', { n: Math.round(row.seconds) }) : ''].filter(Boolean).join(' · ')}>${row.app}<//>
+      <${Num}>${money(row.cost)}<//>
+      <${Num} dim>${money(row.today)}<//>
+      ${editing
+        ? html`<${Num}><${TextField} type="number" size="short" min="0" max="1000" step="0.10" value=${draft ?? ''} placeholder=${x('noCap')} ariaLabel=${x('colCap')} onInput=${(v) => ctx.setCap(row.app, v)} /><//>`
+        : cap != null ? html`<${Num} strong>${money(cap)}<//>` : html`<${Num} dim>${x('noCap')}<//>`}
+      <${Num} dim>${row.calls}<//>
+    <//>`;
 }

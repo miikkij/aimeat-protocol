@@ -1,0 +1,252 @@
+/**
+ * @file message.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One thing somebody said, and the thread that holds them: drawn by components/Message.js
+ *   and components/MessageFile.js over the chat's turn (turn.css, .poster-turn). The parts a turn
+ *   does not have: who wrote it and the line with the marks, the time and the read marks, both inside
+ *   the message; the quoted message it answers; the questions it asks (components/MessageQuestions.js);
+ *   its files (a picture, a voice message and its transcript, any other file); the line under it with Copy, Listen and ⋯; the thread's scrolling
+ *   column and its day lines; the suggested reply's dashed box; a workspace comment framed on the grey
+ *   ground; a board reply beside a grey edge. Reads only the tokens in theme.css and the shapes in
+ *   poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, after turn.css.
+ * @version-history
+ *   v1.1.1 — 2026-09-26 — The flash ring and the quote's left edge read var(--shape-frame-heavy) (3px
+ *     in AIMEAT), not a literal (check:shape-tokens; fix pass).
+ *   v1.1.0 — 2026-09-26 —.message-thread--capped (Thread `capped`): a thread inside a page scrolls
+ *     after 400px, with main's values from css/views/agents-detail.css .pf-agd-msg-history; additive.
+ *   v1.0.0 — 2026-09-26 — Initial, moved with their values from css/views/inbox.css and
+ *     inbox-poster.css (the bubble's name, meta, quote, ticks, files, voice, transcript, thread, day,
+ *     draft, the question form .inbox-iform*), css/components/comments.css (.pj-comment*) and board-notices.css (.bp-reply, .bp-who).
+ */
+
+/* ── The message: who and when inside it ── */
+.message-body { position: relative; }
+/* Who wrote it, above the words: the row label's small capitals (Jouni's decision "Row label"),
+   coral beside the spine, ink on the sun. */
+.message-who { margin-bottom: 2px; }
+.poster-turn--user .message-who { color: var(--on-sun); }
+.message-words { word-break: break-word; }
+.message-words .md-body > :first-child { margin-top: 0; }
+.message-words .md-body > :last-child { margin-bottom: 0; }
+.message-words img { max-width: 100%; border-radius: var(--shape-corner-control); margin-top: 6px; }
+.message-said { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The line with the marks, the time and the read marks, at the foot of the message. */
+.message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: var(--weight-regular);
+  letter-spacing: normal;
+  color: var(--text-dim);
+}
+.message-meta .poster-chip, .message-meta .poster-status { white-space: nowrap; }
+.poster-turn--user .message-meta,
+.poster-turn--user .message-meta .poster-time { color: var(--on-sun); }
+.message-receipt { font-size: 11px; }
+.message-receipt--read { color: var(--accent); }
+.message-receipt--error { color: var(--danger); }
+/* On your own words the marks are ink, as main draws them on the sun. */
+.poster-turn--user .message-receipt { color: var(--on-sun); }
+/* The line under the message: Copy, Listen and ⋯ (its place under the spine is the turn's own). */
+.message-actions { gap: 4px; }
+
+/* A quote jumps to the message it answers, which shows itself for a moment. */
+.message--flash .poster-turn-body {
+  border-color: var(--accent);
+  box-shadow: var(--accent-subtle) 0 0 0 var(--shape-frame-heavy);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+/* ── The quoted message a reply answers ── */
+.message-quote {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  border: none; border-left: var(--shape-frame-heavy) solid var(--accent);
+  border-radius: var(--shape-corner-control);
+  background: var(--bg-dim);
+  padding: 5px 9px; margin-bottom: 6px;
+  font: inherit; font-weight: var(--weight-regular); letter-spacing: normal; color: inherit;
+}
+.message-quote-name { display: block; font-size: 11px; font-weight: 600; color: var(--accent); }
+.message-quote-text {
+  font-size: 12px; color: var(--text-dim);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ── Files ── */
+.message-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.message-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  font-size: 12px;
+  font-weight: var(--weight-regular);
+  letter-spacing: normal;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--shape-corner-pill);
+  background: var(--card-bg);
+  text-decoration: none;
+  color: inherit;
+}
+.message-file--pending { opacity: 0.55; }
+.message-file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.message-file-state { color: var(--text-dim); font-style: italic; }
+/* The chip's main way (a link or a button) opens the file; the download mark sits beside it. */
+.message-file-open {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; color: inherit; text-decoration: none;
+}
+.message-file-open:hover .message-file-name { text-decoration: underline; }
+.message-file-get {
+  flex-shrink: 0; text-decoration: none; color: var(--text-dim);
+  font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: var(--shape-corner-control);
+}
+.message-file-get:hover { color: var(--text); background: var(--bg-dim); }
+/* A picture: the thumbnail and a caption line (the name and the download mark). */
+.message-file-picture { display: inline-flex; flex-direction: column; gap: 4px; max-width: 200px; }
+.message-file-thumb-link { display: block; line-height: 0; }
+.message-file-thumb {
+  max-width: 200px; max-height: 160px; border-radius: var(--shape-corner-control);
+  border: 1px solid var(--border); object-fit: cover; cursor: zoom-in;
+}
+.message-file-cap { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: var(--weight-regular); letter-spacing: normal; max-width: 200px; }
+.message-file-cap .message-file-name { flex: 1; min-width: 0; color: var(--text-dim); }
+/* A file in your own message sits on the sun: the chip's own plate would read as a hole there, so it
+   takes the sun's ground, an ink frame and ink words. */
+.poster-turn--user .message-file { background: transparent; border-color: var(--on-sun); }
+.poster-turn--user .message-file--pending { opacity: 1; border-style: dashed; }
+.poster-turn--user .message-file-name,
+.poster-turn--user .message-file-state,
+.poster-turn--user .message-file-cap .message-file-name { color: var(--on-sun); }
+
+/* A voice message plays where it sits: opening it in a new tab is a download, not a conversation. */
+.message-file-voice { display: flex; flex-direction: column; gap: 4px; width: 100%; max-width: 380px; }
+.message-file-voice .message-file-cap { max-width: none; }
+.message-audio { width: 100%; height: 34px; }
+.message-audio--small { max-width: 190px; height: 30px; }
+.message-file-length { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* The transcript: closed by default so a thread of voice messages stays easy to scan, and the label
+   always says who produced the text. */
+.message-transcript { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; font-weight: var(--weight-regular); letter-spacing: normal; }
+.message-transcript-toggle {
+  background: none; border: none; cursor: pointer; padding: 2px 0;
+  font-size: 11px; color: var(--text-dim); display: inline-flex; align-items: center; gap: 6px;
+}
+.message-transcript-toggle:hover { color: var(--text); }
+.message-transcript-src { color: var(--text-muted); }
+.message-transcript-text {
+  flex-basis: 100%; font-size: 13px; white-space: pre-wrap; word-break: break-word;
+  padding: 8px; border-radius: var(--shape-corner-control);
+  background: var(--bg-dim); border: 1px solid var(--border);
+}
+.message-transcript-btn {
+  background: none; border: 1px solid var(--border); border-radius: var(--shape-corner-pill); cursor: pointer;
+  font-size: 11px; padding: 2px 10px; color: var(--text-dim);
+}
+.message-transcript-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.message-transcript-btn:disabled { opacity: .6; cursor: progress; }
+.message-transcript .poster-hint, .message-transcript .form-message { margin: 0; }
+
+@media (max-width: 520px) {
+  /* Full width on a phone: a 380px cap would leave the player floating in a narrow column. */
+  .message-file-voice { max-width: 100%; }
+  .message-audio--small { max-width: 100%; }
+}
+
+/* ── The questions a message asks (components/MessageQuestions.js; moved from inbox.css .inbox-iform*) ── */
+.message-questions { margin-top: 10px; display: flex; flex-direction: column; gap: 14px; font-weight: var(--weight-regular); letter-spacing: normal; }
+.message-questions-q { display: flex; flex-direction: column; gap: 6px; }
+.message-questions-tag { align-self: flex-start; }
+.message-questions-prompt { font-weight: 600; font-size: 13px; }
+.message-questions-req { color: var(--accent); }
+.message-questions-opts { display: flex; flex-direction: column; gap: 6px; }
+.message-questions-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--shape-corner-control);
+  background: var(--card-bg);
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.message-questions-opt:hover { border-color: var(--accent-border); }
+.message-questions-opt--on { border-color: var(--accent); background: var(--accent-subtle); }
+.message-questions-opt input { accent-color: var(--accent); flex-shrink: 0; }
+.message-questions-opt-label { min-width: 0; }
+.message-questions-other { margin-top: 2px; }
+.message-questions-send { align-self: flex-start; margin-top: 2px; }
+/* Read only, once answered. */
+.message-questions--done { gap: 8px; }
+.message-questions-answered { font-size: 13px; color: var(--text-dim); }
+
+/* ── The thread: the scrolling column, the day between runs, the way to older messages ── */
+.message-thread {
+  flex: 1;
+  min-height: 0;            /* required so the column scrolls instead of growing past the composer */
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: transparent;
+}
+/* A thread inside a page (Thread `capped`: an agent's Messages tab): it scrolls after 400px, as main's
+   .pf-agd-msg-history did, instead of filling a column. */
+.message-thread--capped { flex: none; max-height: 400px; padding: .5rem 0; }
+.message-thread-day { text-align: center; margin: 8px 0; }
+.message-thread-day span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 3px 10px;
+}
+.message-thread-top { text-align: center; padding: 2px 0 6px; }
+@media (max-width: 760px) {
+  .message-thread { padding: 12px 10px; }
+}
+
+/* ── The suggested reply: your AI's words waiting for your yes, on your side in a dashed box ── */
+.message--draft { display: flex; justify-content: flex-end; max-width: 100%; }
+.message-draft {
+  max-width: 72%;
+  padding: 8px 12px;
+  border: 1px dashed var(--accent-border);
+  background: var(--accent-subtle);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.message-draft, .message-draft .md-body, .message-draft .md-body * { color: var(--text); }
+.message-draft-label { font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+.message-draft-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .6rem 1.4rem; margin-top: 8px; }
+@media (max-width: 760px) {
+  .message-draft { max-width: 85%; }
+}
+
+/* ── A comment on a workspace record or document (moved from comments.css, the same values) ── */
+.message-comments { margin: 0.5rem 0 0.25rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.message--comment { padding: 0.4rem 0.5rem; margin: 0.3rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--shape-corner); }
+.message--comment.message--reply { margin-left: 1.2rem; border-left: var(--shape-frame) solid var(--accent, var(--border)); }
+.message-head { font-size: 0.85rem; color: var(--muted); }
+.message-head-note { font-size: 0.6rem; padding: 0 0.25rem; vertical-align: middle; }
+.message--comment .message-said { margin: 0.2rem 0; overflow-wrap: normal; }
+.message-foot { display: flex; gap: 0.3rem; }
+.message-thread-form { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem; }
+.message-thread-form textarea { resize: vertical; }
+
+/* ── A reply to a board notice (moved from board-notices.css, the same values) ── */
+.message--board { padding: .7rem 0 .7rem 1.2rem; border-left: var(--shape-frame-heavy) solid var(--border); margin-top: .7rem; }
+.message-by { margin-top: .35rem; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+.message-by b { color: var(--text); font-weight: 500; }
+.message--board .message-said { margin: .25rem 0 0; font-size: .92rem; line-height: 1.55; color: var(--text); max-width: 66ch; }

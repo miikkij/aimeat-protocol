@@ -10,6 +10,10 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.10.0 — 2026-09-26 — The panes are the ConversationPane component: the measurement reads
+ *     .conversation-panes (open: --open) and publishes --conversation-desk-avail / --conversation-avail.
+ *   v1.9.0 — 2026-09-26 — The composer is the Composer component (.poster-composer) and the thread the Thread
+ *     component (.message-thread); the two selectors follow them.
  *   v1.8.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v1.7.0 — 2026-08-29 — --inbox-desk-avail is published on every width, so the phone's list view is
  *     measured too instead of assuming a header height.
@@ -117,7 +121,7 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
     // scroll out from under the caret — so suppress the one-time new-message jump when the composer is
     // focused (near-bottom follow still applies: if you were already at the bottom you keep following).
     const ae = typeof document !== 'undefined' ? document.activeElement : null;
-    const composing = ae instanceof HTMLElement && !!ae.closest('.inbox-composer');
+    const composing = ae instanceof HTMLElement && !!ae.closest('.poster-composer');
     lastScrolledConvRef.current = convKey;
     lastMsgIdRef.current = lastId;
 
@@ -164,8 +168,8 @@ export function useMobileComposerKeyboard(mode) {
     const root = document.documentElement;
     const isNarrow = () => window.matchMedia('(max-width: 760px)').matches;
     const sync = () => {
-      const body = document.querySelector('.inbox-body');
-      if (!body) { root.style.removeProperty('--inbox-avail'); root.style.removeProperty('--inbox-desk-avail'); return; }
+      const body = document.querySelector('.conversation-panes');
+      if (!body) { root.style.removeProperty('--conversation-avail'); root.style.removeProperty('--conversation-desk-avail'); return; }
 
       // DESKTOP: the messenger used to be `100vh - 300px`, a guess at how much shell sits above it.
       // Measured on a 1280x900 window it left 94px of dead space below the pane AND still scrolled the
@@ -183,26 +187,26 @@ export function useMobileComposerKeyboard(mode) {
       const bottom = region ? region.getBoundingClientRect().bottom : window.innerHeight;
       const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 20;
       const deskAvail = Math.max(isNarrow() ? 240 : 320, Math.round(bottom - top - pad - 8));
-      root.style.setProperty('--inbox-desk-avail', `${deskAvail}px`);
-      if (!isNarrow()) { root.style.removeProperty('--inbox-avail'); return; }
-      if (!vv || !body.classList.contains('inbox-body--panel')) {
-        root.style.removeProperty('--inbox-avail');
+      root.style.setProperty('--conversation-desk-avail', `${deskAvail}px`);
+      if (!isNarrow()) { root.style.removeProperty('--conversation-avail'); return; }
+      if (!vv || !body.classList.contains('conversation-panes--open')) {
+        root.style.removeProperty('--conversation-avail');
         return;
       }
       // Distance from the body's top edge to the top of the visible (keyboard-excluded) area, then the
       // remaining height below it. Clamp so a mid-animation reading can't collapse the pane.
       const vvTop = top - (vv.offsetTop || 0);
       const avail = Math.max(220, Math.round(vv.height - vvTop));
-      root.style.setProperty('--inbox-avail', `${avail}px`);
+      root.style.setProperty('--conversation-avail', `${avail}px`);
     };
     syncRef.current = sync;
     const onFocusIn = (e) => {
       if (!isNarrow()) return;
       const el = e.target;
-      if (!(el instanceof HTMLElement) || !el.closest('.inbox-composer')) return;
+      if (!(el instanceof HTMLElement) || !el.closest('.poster-composer')) return;
       // The keyboard animates in — re-measure as the viewport settles, then keep the latest messages in view.
       setTimeout(sync, 120); setTimeout(sync, 360);
-      setTimeout(() => { const m = document.querySelector('.inbox-msgs'); if (m) m.scrollTop = m.scrollHeight; }, 380);
+      setTimeout(() => { const m = document.querySelector('.message-thread'); if (m) m.scrollTop = m.scrollHeight; }, 380);
     };
     if (vv) { vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); }
     window.addEventListener('resize', sync);
@@ -212,7 +216,7 @@ export function useMobileComposerKeyboard(mode) {
       if (vv) { vv.removeEventListener('resize', sync); vv.removeEventListener('scroll', sync); }
       window.removeEventListener('resize', sync);
       window.removeEventListener('focusin', onFocusIn);
-      root.style.removeProperty('--inbox-avail');
+      root.style.removeProperty('--conversation-avail');
     };
   }, []);
   // Re-measure when the panel opens/closes (mode change) — no viewport event fires on a pure route switch.

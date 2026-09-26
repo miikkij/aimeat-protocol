@@ -1,0 +1,22 @@
+/**
+ * @file mind-map.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A structure map a person can click (components/MindMap.js): its options in one line, the
+ *   diagram that scrolls inside after 36rem, the pointer and the hover on a node, and the heat colours
+ *   of a node (theme tokens). The frame is the Object box (.poster-box, poster.css).
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Moved out of views/profile.css (.pj-mindmap-opts, .pj-mm-opt, .pj-mm-check,
+ *     .pj-mindmap-canvas and its heat rules) under the component's own names (page migration G2b).
+ */
+
+.mind-map-options { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; margin-bottom: .6rem; }
+.mind-map-option { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--text-dim); }
+.mind-map-canvas { overflow: auto; max-height: 36rem; }
+.mind-map-canvas .node, .mind-map-canvas .mindmap-node { cursor: pointer; }
+.mind-map-canvas .node:hover, .mind-map-canvas .mindmap-node:hover { opacity: .82; }
+/* The heat of a node: `:::heatN` attaches the class to the node; its shape is coloured from the theme
+   (the flowcharts colour theirs through Mermaid's classDef with the same theme values). */
+.mind-map-canvas .heat1 rect, .mind-map-canvas .heat1 path, .mind-map-canvas .heat1 circle { fill: var(--success-bg); stroke: var(--success-fg); }
+.mind-map-canvas .heat2 rect, .mind-map-canvas .heat2 path, .mind-map-canvas .heat2 circle { fill: var(--warn-bg); stroke: var(--warn-fg); }
+.mind-map-canvas .heat3 rect, .mind-map-canvas .heat3 path, .mind-map-canvas .heat3 circle { fill: var(--danger-bg); stroke: var(--danger-fg); }

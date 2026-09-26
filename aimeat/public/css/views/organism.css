@@ -11,6 +11,10 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- Page group G2b: the workspace's pages draw only components, so .og .pj-ws-bar,
+ *     .og-ws .og-ws-fig, the .og-ws listing tag rules, .og-search, and the .og-page rules that hid a
+ *     space panel's own head and took the card off .pj-doc-view go (DocView draws the document
+ *     unframed inside a page itself). .og-apps stays: the Apps page's root wears the name.
  *   v1.13.0 -- 2026-09-26 -- The contents rail's own 6 px phone shadow goes: the rail has the raised shadow at every width (Jouni's decision "Contents rail on a phone").
  *   v1.12.0 -- 2026-09-26 -- A record inside a page (.og-page .pj-rec) is in the library's Record row (css/components/record-row.css), moved unchanged (UI consolidation phase 5, a move).
  *   v1.11.0 -- 2026-09-26 -- The inner panels' toggles are the FoldSection: the bold rule on .pj-struct-toggle goes (a unification: the look most tabs use).
@@ -38,23 +42,8 @@
    the kit. What stays here: the organism page's own panels and the kit's one shape value no token has. */
 
 
-/* The inner panels keep their shapes but lose the parts the section already carries. */
-.og .pj-ws-bar { margin-bottom: .6rem; }
-
-/* The workspace's listings (css/components/listing.css): the latest item in small grey type, a tag
-   beside a name, and a tag or a latest item alone in a cell keeps its own width. */
-.og-ws .og-ws-fig { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; }
-.og-ws .listing-row > div > :is(.poster-chip, .og-tbl-go) { justify-self: start; }
-.og-ws .listing-name .poster-chip { margin-left: .6rem; vertical-align: middle; }
-
-.og-search { display: flex; align-items: center; gap: 1.2rem; margin-top: 1.2rem; }
-.og-search > :first-child { flex: 1 1 auto; }
+/* The workspace's cover and pages draw only components now (views/profile/organisms/workspace/*):
+   the SettingsPage, the List, DocTree, DocView and the rest, each with its own sheet. */
+/* The workspace apps strip used to sit in .og-apps; the Apps page's root (SettingsPage name="apps")
+   wears the same name, so this margin stays for that page. */
 .og-apps { margin-top: 1.2rem; }
-
-/* ── A page of the workspace: a space, a panel, the settings ───────────────────────────────── */
-/* The space panels carry their own head (title + buttons); the page head already says both. */
-.og-page .pj-section > .pj-section-head { display: none; }
-.og-page .pj-section > .section-desc:first-of-type { display: none; }
-/* The document index's page look is in css/components/doc-tree.css with the tree. The document loses the card. */
-.og-page .pj-doc-view { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
-/* A record inside a page loses the card in css/components/record-row.css. */

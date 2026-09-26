@@ -9,6 +9,9 @@
  * @version-history
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1411-1459), so theme.css
  *     holds tokens only (UI consolidation, a move).
+ *   v1.1.0 — 2026-09-27 — .collapsible-title gets its rule here, the header's own left alignment
+ *     (which it already inherits, so nothing moves); until now the name had a rule only in the
+ *     landing page's sheet, under .ld-invite and .ld-log.
  */
 
 /* ── Collapsible (canonical) ──
@@ -45,6 +48,10 @@
 }
 .collapsible-header:hover {
   color: var(--accent);
+}
+/* The heading's words: aligned as the header is. */
+.collapsible-title {
+  text-align: left;
 }
 .collapsible-chevron {
   display: inline-block;

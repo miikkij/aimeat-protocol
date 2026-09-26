@@ -10,6 +10,9 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   v2.14.1 -- 2026-09-26 -- The owner tag in the roster and the workspace creator in the access
+ *     editor are green again, as main drew them (.badge-success: Mark tone="fine"; fix pass).
+ *   v2.14.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the head is a Row of the description with the count and the Loud action; the join requests, the roster and the blocked members are the List (a request waits on the warn rail, a member's access editor opens as the row's panel, its ⋯ menu the row's menu), the access editor a Field group of Selects. The owner tag is the ink tone, where main drew it green; the dashed line on top is the Split's hairline. The page writes no class.
  *   v2.13.0 -- 2026-09-26 -- The lines under a member's or a request's name are the Listing's typewriter line (.listing-meta); a request's own message keeps its look (a unification: Jouni's decision "Meta line").
  *   v2.12.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v2.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -42,8 +45,15 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { KebabMenu } from '/views/profile/shared.js';
 import { PresenceDot } from '/components/PresenceDot.js';
+import { List, Row as ListRow, Lead, Name, Doors, Group } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Field } from '/components/Field.js';
+import { Select } from '/components/Select.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { Row, Stack, Split } from '/components/Layout.js';
 import * as orgService from '/js/services/organisms.js';
 import { fmtDate, orgInitials, relTime } from '/views/profile/organisms/helpers.js';
 import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
@@ -68,25 +78,24 @@ function MemberAccessEditor({ orgId, member, wsOptions, wsAccess, busy, setBusy,
     finally { setBusy(false); }
   };
   return html`
-    <div class="pj-eminvite poster-box pj-member-access">
-      <div class="pj-eminvite-wslabel poster-label">${(t('organisms.editAccessFor') || 'Workspace access for {member}').replace('{member}', bare)}</div>
-      <div class="pj-eminvite-wslist">
+    <${Field} label=${(t('organisms.editAccessFor') || 'Workspace access for {member}').replace('{member}', bare)} group>
+      <${Stack}>
         ${wsOptions.map(w => {
           const owned = (wsAccess?.[bare] || []).some(x => x.id === w.id && x.role === 'owner');
           return html`
-            <div class="pj-eminvite-wsrow" key=${w.id}>
-              <label>${w.name}</label>
-              ${owned ? html`<span class="poster-chip">${t('organisms.wsCreator') || 'creator'}</span>` : html`
-                <select class="select-field" disabled=${busy} value=${current[w.id] || 'none'}
-                  onChange=${(e) => apply(w.id, e.target.value)}>
-                  <option value="none">${t('organisms.accessNone') || 'No access'}</option>
-                  <option value="viewer">${t('organisms.roleViewer') || 'Viewer'}</option>
-                  <option value="contributor">${t('organisms.roleContributor') || 'Contributor'}</option>
-                </select>`}
-            </div>`;
+            <${Row} key=${w.id} justify="between">
+              <span>${w.name}</span>
+              ${owned ? html`<${Mark} tone="fine">${t('organisms.wsCreator') || 'creator'}<//>` : html`
+                <${Select} fit disabled=${busy} value=${current[w.id] || 'none'} ariaLabel=${w.name}
+                  onChange=${(v) => apply(w.id, v)} options=${[
+                    ['none', t('organisms.accessNone') || 'No access'],
+                    ['viewer', t('organisms.roleViewer') || 'Viewer'],
+                    ['contributor', t('organisms.roleContributor') || 'Contributor'],
+                  ]} />`}
+            <//>`;
         })}
-      </div>
-    </div>`;
+      <//>
+    <//>`;
 }
 
 /**
@@ -227,15 +236,14 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
   const onPeopleChanged = async () => { await load(); reloadAccess(); onChanged?.(); };
 
   return html`
-    <div class="card-detail">
+    <${Split}>
       ${showMembers ? html`
-      <div class="pj-tabhead">
-        <div class="section-desc pj-tabhead-desc">${t('organisms.membersDesc') || 'Members can join workspaces; their agents inherit the role.'}
-          ${' '}<span class="pj-members-cap">${(members || []).length}/${org.maxMembers || 500}</span></div>
-        ${canManage ? html`<div class="pj-invite-btns">
-          <button class="poster-slab poster-slab--control" onClick=${() => setShowInvite(s => !s)}>${'+ '}${t('organisms.addPeople') || 'Add people'}</button>
-        </div>` : null}
-      </div>
+      <${Row} align="start" justify="between" gap="medium">
+        <${HeadDesc}>${t('organisms.membersDesc') || 'Members can join workspaces; their agents inherit the role.'}
+          ${' '}<${Note} kind="meta" inline>${(members || []).length}/${org.maxMembers || 500}<//><//>
+        ${canManage ? html`
+          <${Loud} control expanded=${showInvite} onClick=${() => setShowInvite(s => !s)}>${'+ '}${t('organisms.addPeople') || 'Add people'}<//>` : null}
+      <//>
 
       ${canManage && showInvite ? html`
         <${InvitePanel} orgId=${orgId} wsOptions=${wsOptions} showToast=${showToast}
@@ -245,22 +253,22 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
         <${PendingInvites} orgId=${orgId} invitations=${invitations} emailInvites=${emailInvites}
           wsOptions=${wsOptions} showToast=${showToast} onChanged=${onPeopleChanged} />` : null}
 
-      ${canManage && pending.length > 0 ? pending.map(r => html`
-        <div class="pj-org-row pj-req-row" key=${r.id}>
-          <div class="pj-org-avatar poster-box poster-box--avatar poster-box--small" aria-hidden="true">${'🙋'}</div>
-          <div class="pj-org-main pj-org-main-static">
-            <div class="pj-org-titlerow">
-              <span class="pj-org-name">${(r.ghii)}</span>
-              <span class="pj-org-desc listing-meta">${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}</span>
-            </div>
-            ${r.message ? html`<div class="pj-org-desc">${(r.message)}</div>` : null}
-          </div>
-          <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}</button>
-          <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}</button>
-        </div>
-      `) : null}
+      ${canManage && pending.length > 0 ? html`
+        <${List} cols="mark-name-doors" keepCols>
+          ${pending.map(r => html`
+            <${ListRow} key=${r.id} rail="warn">
+              <${Lead} text=${'🙋'} />
+              <${Name} meta=${`${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}`}
+                desc=${r.message ? (r.message) : null}>${(r.ghii)}<//>
+              <${Doors}>
+                <${Action} small disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}<//>
+                <${Action} small disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}<//>
+              <//>
+            <//>
+          `)}
+        <//>` : null}
 
-      <div class="pj-org-list poster-row--thing">
+      <${List} cols="mark-name-doors" keepCols>
         ${(members || []).map(m => {
           const acc = accessLine(m);
           const bare = String(m.ghii || '').split('@')[0];
@@ -281,50 +289,43 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
             { label: t('organisms.remove') || 'Remove', danger: true, onClick: () => remove(m.ghii, false) },
             { label: t('organisms.block') || 'Block', danger: true, onClick: () => remove(m.ghii, true) },
           ].filter(Boolean) : []));
+          // The lines under the name: the access and the join date, then the member's agents (with the
+          // tooltip that says what they are).
+          const line = (acc || m.joinedAt)
+            ? `${acc ? `${t('organisms.accessLabel') || 'Access'}: ${acc}` : ''}${acc && m.joinedAt ? ' · ' : ''}${m.joinedAt ? (t('organisms.joinedDate') || 'joined {date}').replace('{date}', fmtDate(m.joinedAt)) : ''}`
+            : null;
+          const agentsLine = (m.agents || []).length
+            ? html`<span title=${t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism"}>${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${m.agents.map(a => a.name || a.gaii).join(', ')}</span>`
+            : null;
+          const accessOpen = canManage && accessEditFor === bare;
           return html`
-            <div key=${m.ghii}>
-              <div class="pj-org-row">
-                <div class="pj-org-avatar poster-box poster-box--avatar poster-box--small" aria-hidden="true">${orgInitials(m.ghii)}</div>
-                <div class="pj-org-main pj-org-main-static">
-                  <div class="pj-org-titlerow">
-                    <span class="pj-org-name">${(m.ghii)} <${PresenceDot} ghii=${toGhii(m.ghii)} /></span>
-                    <!-- The stored role is still 'creator', and several members can hold it now, so
-                         the badge says what it means: owner. Two rows both reading "creator" asks
-                         the viewer which one really made the organism. -->
-                    <span class="poster-chip">
-                      ${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : (m.role || 'member')}
-                    </span>
-                  </div>
-                  ${(acc || m.joinedAt) ? html`
-                    <div class="pj-org-desc listing-meta">
-                      ${acc ? `${t('organisms.accessLabel') || 'Access'}: ${acc}` : ''}${acc && m.joinedAt ? ' · ' : ''}${m.joinedAt ? (t('organisms.joinedDate') || 'joined {date}').replace('{date}', fmtDate(m.joinedAt)) : ''}
-                    </div>` : null}
-                  ${(m.agents || []).length ? html`
-                    <div class="pj-org-desc listing-meta" title=${t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism"}>
-                      ${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${m.agents.map(a => a.name || a.gaii).join(', ')}
-                    </div>` : null}
-                </div>
-                ${menuItems.length ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
-              </div>
-              ${canManage && accessEditFor === bare ? html`
-                <${MemberAccessEditor} orgId=${orgId} member=${m} wsOptions=${wsOptions} wsAccess=${wsAccess}
-                  busy=${busy} setBusy=${setBusy} showToast=${showToast} onChanged=${reloadAccess} />` : null}
-            </div>`;
+            <${ListRow} key=${m.ghii} open=${accessOpen} panel=${accessOpen ? html`
+              <${MemberAccessEditor} orgId=${orgId} member=${m} wsOptions=${wsOptions} wsAccess=${wsAccess}
+                busy=${busy} setBusy=${setBusy} showToast=${showToast} onChanged=${reloadAccess} />` : null}>
+              <${Lead} text=${orgInitials(m.ghii)} />
+              <!-- The stored role is still 'creator', and several members can hold it now, so
+                   the badge says what it means: owner. Two rows both reading "creator" asks
+                   the viewer which one really made the organism. -->
+              <${Name} after=${html` <${PresenceDot} ghii=${toGhii(m.ghii)} /> <${Mark} tone=${isOwnerRow ? 'fine' : undefined}>${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : (m.role || 'member')}<//>`}
+                meta=${line || agentsLine ? html`${line}${line && agentsLine ? html`<br />` : null}${agentsLine}` : null}>${(m.ghii)}<//>
+              <${Doors} menu=${menuItems.length ? menuItems : null} menuLabel=${t('organisms.moreActions') || 'More actions'} />
+            <//>`;
         })}
-      </div>
+      <//>
 
       ${canManage && banned.length > 0 ? html`
-        <div class="detail-label poster-day-title">${t('organisms.blockedMembers') || 'Blocked'}</div>
-        <div class="listing listing--name-doors listing--cols">
-          ${banned.map(m => html`
-            <div class="listing-row" key=${'ban-' + m.ghii}>
-              <div class="listing-name">${(m.ghii)}</div>
-              <div class="listing-doors"><button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => unban(m.ghii)}>${t('organisms.unblock') || 'Unblock'}</button></div>
-            </div>
-          `)}
-        </div>
+        <${Group} title=${t('organisms.blockedMembers') || 'Blocked'}>
+          <${List} cols="name-doors" keepCols>
+            ${banned.map(m => html`
+              <${ListRow} key=${'ban-' + m.ghii}>
+                <${Name}>${(m.ghii)}<//>
+                <${Doors}><${Action} small row disabled=${busy} onClick=${() => unban(m.ghii)}>${t('organisms.unblock') || 'Unblock'}<//><//>
+              <//>
+            `)}
+          <//>
+        <//>
       ` : null}
       ` : null}
-    </div>
+    <//>
   `;
 }

@@ -1,0 +1,56 @@
+/**
+ * @file public/css/components/number-band.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The number band (components/NumberBand.js): an account's numbers riding one diagonal
+ *   coral band with a sun stripe, the same band the home's chat door is, each number a door to its
+ *   page. .number-band is the box that contains the band, so it never crosses what stands beside it.
+ *   Theme hooks: --number-band-ground (the band, the accent by default), --number-band-stripe (the
+ *   stripe, the sun), --number-band-ink (the numbers and words on the band, the page ground). The
+ *   numbers' own rule outranks the stat number's colour, so a style that recolours big numbers
+ *   (Pebble draws them in its accent) still shows them on the band.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — Its own class names (number-band-*), no longer .pf-lp-stat*; the band, the
+ *     stripe and the ink are theme hooks, and the numbers' own rule wins over a style's big-number
+ *     colour (Pebble drew the numbers in the accent on the accent band).
+ *   v1.0.1 — 2026-09-26 — The stat link's corner reads var(--shape-corner-control) (0 in AIMEAT), not a
+ *     literal (check:shape-tokens; fix pass).
+ *   v1.0.0 — 2026-09-26 — Initial: moved from profile.css (.pf .pf-lp-stats, .pf-lp-stat and its parts,
+ *     their phone lines, .pf-lp-stat-link), values unchanged (page group G8).
+ */
+.number-band {
+  --number-band-ground-v: var(--number-band-ground, var(--accent));
+  --number-band-stripe-v: var(--number-band-stripe, var(--sun));
+  --number-band-ink-v: var(--number-band-ink, var(--bg));
+  position: relative; overflow: hidden;
+}
+
+.number-band-row {
+  position: relative; overflow: hidden;
+  display: flex; gap: 44px; flex-wrap: wrap; align-items: flex-end;
+  margin: 2.5rem -1.5rem 0; padding: 4.5rem 2.5rem 5rem;
+  color: var(--number-band-ink-v);
+}
+.number-band-row::before, .number-band-row::after {
+  content: ''; position: absolute; left: -10%; right: -10%; top: 50%; z-index: 0;
+}
+.number-band-row::before { height: 200px; background: var(--number-band-ground-v); transform: translateY(-50%) rotate(-3deg); }
+.number-band-row::after { height: 24px; background: var(--number-band-stripe-v); transform: translateY(calc(-50% + 113px)) rotate(-3deg); }
+.number-band-item {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  background: none; border: 0; padding: 0; border-radius: var(--shape-corner-control);
+  cursor: pointer; font: inherit; color: var(--number-band-ink-v);
+}
+.number-band-icon { display: none; }
+.number-band .number-band-value { font-variant-numeric: tabular-nums; margin-right: 0; color: var(--number-band-ink-v); }
+/* Something earned (morsels) draws as the other numbers do: the variant names it for the catalogue. */
+.number-band .number-band-value--fine { color: var(--number-band-ink-v); }
+.number-band .number-band-item:hover .number-band-value { color: var(--number-band-stripe-v); }
+.number-band-label { font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.78rem; letter-spacing: calc(var(--shape-tracking-label) * .8); text-transform: var(--shape-case-label); }
+/* A phone: the numbers halve. */
+@media (max-width: 760px) {
+  .number-band-row { margin: 1.5rem -1rem 0; padding: 3rem 1.5rem 3.5rem; gap: 20px 28px; }
+  .number-band-row::before { height: 150px; }
+  .number-band-row::after { transform: translateY(calc(-50% + 88px)) rotate(-3deg); }
+}

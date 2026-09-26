@@ -10,11 +10,10 @@
  *   rollup · dateWord · crumb · pageLinks · openTab
  * @usage import { x, ROLES, poolFor } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's sibling pages are data for SettingsPage; openTab is
+ *     the Rail's (component plan C9); this file writes no markup (page group G8).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Tekoäly-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, money as fmtMoney } from '/js/format.js';
 import {
@@ -128,15 +127,18 @@ export function rollup(history, usage, quotas) {
   return { days: days.length, first: days[0]?.date || '', last: days[days.length - 1]?.date || '', cost, calls, tokens, maxDay, apps };
 }
 
+/** The crumb's steps (SettingsPage draws them). */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.generator.openrouter.title')}</span></div>`;
+  return [t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.generator.openrouter.title')];
 }
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+export { openTab } from '/components/Rail.js';
+/** The sibling pages in the rail, as data (SettingsPage draws them → … →). */
 export function pageLinks(navigate) {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('usage')}><i>→</i>${t('profile.tabs.usage')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => navigate('/v1/chat')}><i>→</i>${t('nav.chat')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>`;
+  return [
+    { tab: 'usage', label: t('profile.tabs.usage') },
+    { onClick: () => navigate('/v1/chat'), label: t('nav.chat') },
+    { tab: 'agents', label: t('profile.tabs.agents') },
+    { tab: 'apps', label: t('profile.tabs.apps') },
+  ];
 }

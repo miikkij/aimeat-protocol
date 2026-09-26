@@ -6,6 +6,18 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v2.100.0 -- 2026-09-26 -- The agents list, the opened agent's head and notices, the Tasks tab's record, the
+ *     rate and request-changes dialogs, the services list and the crew's model picker draw only
+ *     components now (page group G1a): their rules no file writes any more go (the form field and its
+ *     actions, the old empty line, the services cards, running now, the model picker's row, the tag
+ *     field, the custom group's name field, zone 2 and its bar and steps, the tab panel, the URL form,
+ *     the help text, the rating rows, the task memory rows, the run-mode switch).
+ *   v2.99.0 -- 2026-09-26 -- The agent detail tabs (activity, contracts, data access, directives, config,
+ *     messages, quality) draw only components now: the rules no file writes any more go (sub-tab bar,
+ *     section header, directives, messages and command palette, data-access forms and stored keys,
+ *     config upload and preview, filter pills, governance, quality lists, contracts). The rules the
+ *     design lab's samples still draw stay (card grid, event-log scroll, README, scope summary, config
+ *     list, review rows), as do the ones other agent files write (G1b, page migration).
  *   v2.98.0 -- 2026-09-26 -- The lines under a service's name and a review's context are the Listing's (.listing-meta): their size and colour go, their row and place stay (a unification: Jouni's decision "Meta line").
  *   v2.97.0 -- 2026-09-26 -- The configuration files are the Listing, the opened file's text the Code block: the grey boxes, the coral frame of the picked one and the preview's own frame go; the list's place and the text's height stay (a unification: Jouni's decision "File pick list").
  *   v2.96.0 -- 2026-09-26 -- The form field's grey label rule leaves the Check line alone; the grounded check line's size and colour go (a unification: Jouni's decision "Check line").
@@ -200,67 +212,11 @@
  *   v2.32.0 -- 2026-09-25 -- The note rules go: the grey help notes are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
  */
 
-/* The figures inside agent detail tabs (Activity, Quality, Usage) are the figure strip; here they
-   keep the gap under them. */
-.pf .pf-agd-tab-content .pf-figures { margin-bottom: 1.25rem; }
-
-/* Sub-tab bar */
-.pf .pf-agd-subtab-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  margin-top: 1rem;
-  padding-bottom: 0;
-}
-
-/* Section headers inside sub-tabs */
-.pf .pf-agd-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-/* When used as a standalone group heading (outside .pf-agd-section-header),
-   e.g. the Schedules tab's AIMEAT-dispatched / Agent-internal groups. */
-.pf .sch-section > .pf-agd-section-title {
-  display: block;
-  margin: 0.25rem 0 0.5rem;
-}
-
-/* Request-changes modal contents */
-.pf .pf-agd-revision-textarea { min-height: 8rem; }
-
-/* Task creation form */
-.pf .pf-agd-form-field { margin-bottom: 0.65rem; }
-/* A field's label is the Row label (.poster-label); its place only. The labels of the check-box lines
-   inside a field (the crew editor's) are the Check line (Jouni's decision "Check line"). */
-.pf .pf-agd-form-field label {
-  display: block;
-  margin-bottom: 0.25rem;
-}
-.pf .pf-agd-form-field label:not(.poster-label):not(.check-line) {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-dim, #6B7280);
-}
-.pf .pf-agd-form-field .og-textarea { min-height: 70px; }
-.pf .pf-agd-form-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
-
 /* Empty state */
-.pf .agd-empty ,
 .pf .pf-agd-empty  {
   text-align: center;
   padding: 1.5rem;
 }
-/* Directives display */
-.pf .pf-agd-directive-section { margin-bottom: 1rem; }
-/* A directive's label is the Row label (.poster-label); its place only. */
-.pf .pf-agd-directive-section h4 { margin-bottom: 0.35rem; }
-/* The purpose under its label is the Facts' value (.facts-v); its padding only. */
-.pf .pf-agd-purpose-text {
-  padding: 0.35rem 0;
-}
-
 /* Resource / memory area lists */
 
 /* Group picker popup (memory tab visibility cycling) */
@@ -292,69 +248,7 @@
 
 /* ── Services sub-tab ── */
 
-/* What the Services tab is for is the Hint (css/components/hint.css); its place only. */
-.pf .agd-services-info {
-  margin: 0 0 1rem;
-}
-.pf .agd-services-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.pf .agd-service-card {
-  background: var(--card, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-}
-.pf .agd-service-name {
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-.pf .agd-service-desc {
-  font-size: 0.8rem;
-  color: var(--text-dim, #6B7280);
-  margin-top: 0.25rem;
-}
-/* The line under a service's name is the Listing's (.listing-meta); its row and place only. */
-.pf .agd-service-meta {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-/* ── Messages sub-tab ── */
-
-.pf .pf-agd-msg-history {
-  max-height: 400px;
-  overflow-y: auto;
-  padding: 0.5rem 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-/* A message is the chat's turn (components/Turn.js classes, turn.css; Jouni's decision "Message");
-   its box in the history only. */
-.pf .pf-agd-msg { display: flex; flex-direction: column; gap: 5px; }
-.pf .pf-agd-msg-meta {
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  margin-top: 0.25rem;
-}
-/* The field and Send are the chat's one row (.poster-composer, Jouni's decision "Typing box"); its
-   place, and the field fills the box that also holds the command list. */
-.pf .pf-agd-msg-input { margin-top: 0.75rem; }
-.pf .pf-agd-input-wrap .poster-composer-input { width: 100%; }
-
-/* ── Option-prompt (agent asks the owner a single-select question): the chat's choices
-   (.poster-choices, .poster-suggestion); the question over them, and their place ── */
-.pf .agd-msg-prompt { margin-top: 0.4rem; }
-.pf .agd-msg-prompt-q { margin: 0 0 0.4rem; }
-/* The threads are the chat's conversation list (ThreadList's rows, Jouni's decision "Conversation
-   list"); their place only. */
-.pf .pf-agd-msg-threads { margin-bottom: 0.75rem; }
-.pf .pf-agd-msg-thread-more { align-self: flex-start; margin-top: 0.4rem; }
-/* "Show N more" under the threads is the action link's more tone (.poster-action--more). */
+/* A published service is the List's row now (agents-services-subtab.js). */
 
 /* ── Task Creation Builder (split-panel) ── */
 
@@ -367,16 +261,7 @@
 
 /* ── Shared Agent Board ── */
 
-/* Fleet "running now" (between the board and the agent list): the Group heading (.poster-day-title)
-   over the Listing (css/components/listing.css, cut mark-name-desc-doors); a row opens its task when
-   pressed anywhere. "+ N more" under it is the quiet sentence. Their places only. */
-.pf .pf-agd-active {
-  margin-bottom: 1rem;
-}
-.pf .pf-agd-active-head {
-  margin-bottom: 0.5rem;
-}
-.pf .pf-agd-active-row > div { cursor: pointer; }
+/* Fleet "running now" is the List's Group over its rows now (groups-render.js ActiveTasksPanel). */
 
 /* ── Agent ID card (hover/focus-revealed identity plate under a board mini-card) ──
    The default face (name + one figure) is untouched; the ID card is absolutely
@@ -446,35 +331,7 @@
 /* Run mode: how the agent is RUN, beside the mode badge that says what it is FOR. Outlined rather
    than filled, so a row of agents does not read as two competing filled chips per line. */
 
-/* ── Which model an agent thinks with ── */
-.pf .pf-agd-crew-llm {
-  padding: 0.75rem 0.9rem;
-  margin: 0.75rem 0;
-}
-.pf .pf-agd-crew-llm-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0.5rem 0 0.35rem;
-}
-.pf .pf-agd-crew-llm-row .select-field {
-  /* Wide enough for a model label, and it folds to the panel on a phone rather than pushing it. */
-  flex: 1 1 18rem;
-  min-width: 0;
-  max-width: 28rem;
-}
-.pf .pf-agd-crew-llm-empty {
-  margin-top: 0.5rem;
-}
-/* The current model carries the whole meaning of the panel, so it takes the plain text colour. The
-   panel is the Object box on the card's ground, where the hint's own grey reads (4.63:1). */
-.pf .pf-agd-crew-llm-current {
-  color: var(--text);
-}
-.pf .pf-agd-crew-llm-current {
-  font-size: 0.85rem;
-}
+/* ── Which model an agent thinks with: the Box of crew-llm-picker.js now. ── */
 
 /* Tag chip strip on expanded card */
 .pf .pf-agd-tag-strip {
@@ -484,88 +341,12 @@
   padding: 0.5rem 1rem 0;
 }
 
-/* Editable tag strip in the expanded card header (inline add/remove); a tag's ✗ is the Tag's remove
-   mark (.poster-chip-x, poster.css). */
-.pf .pf-agd-tag-add-input { width: 9rem; }
-
-/* Tag filter bar + group-by control */
-.pf .pf-agd-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 0;
-  margin-bottom: 0.5rem;
-}
-
-.pf .pf-agd-group { margin-bottom: 1.25rem; }
-
-/* ── Custom groups (user-defined sections, drag-to-assign) ── */
-.pf .pf-agd-cgroup-name-input { flex: 1; }
-
-/* Zone 2: Status (state-dependent): the Attention note (.poster-aside) and its own words; a working
-   agent's one line of figures is the Hint (css/components/hint.css), its place only. */
-.pf .pf-agd-zone2--production { margin: 0; padding: 0.375rem 1rem; }
-.pf .pf-agd-zone2-title {
-  margin-bottom: 0.25rem;
-}
-/* The grey "Next: <step>" inside the note's heading. */
-.pf .pf-agd-zone2-desc {
-  font-size: 0.8rem;
-  color: var(--text-dim, #6B7280);
-  line-height: 1.4;
-}
-/* "Next: <step>" nested inside the note's sub-heading reads as normal text, not as a second heading. */
-.pf .pf-agd-zone2-title .pf-agd-zone2-desc {
-  font-family: var(--font-body);
-  letter-spacing: 0;
-  font-weight: 500;
-}
-.pf .pf-agd-zone2-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-.pf .pf-agd-zone2-stats {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-/* ── Progress bar (onboarding zone2): the meter (poster.css .poster-box--meter); its place only ── */
-.pf .pf-agd-progress-bar {
-  width: 100%;
-  height: 12px;
-  overflow: hidden;
-  margin: 0.35rem 0;
-}
-.pf .pf-agd-progress-bar svg { display: block; width: 100%; height: 100%; }
-
-/* The onboarding steps (zone2): one Status each (poster.css), in a row. */
-.pf .pf-agd-step-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.35rem;
-}
-.pf .pf-agd-step-pills .poster-status { white-space: nowrap; }
-
-/* ── Tab Bar ── */
-
-.pf .pf-agd-tab-content {
-  padding: 1rem;
-  min-height: 150px;
-}
+/* The opened agent's tags are the TagInput, its custom groups the List's Group, its notices the
+   Note's aside with the Meter and the Mark statuses, its tab panel the OpenCard's (agent-card.js,
+   groups-render.js; page group G1a). */
 
 /* ── Unseen-change marks: the status dot (css/components/status-dot.css), grey, or red for unseen
    FAILED tasks, so a real alarm never drowns in routine changes. ── */
-
-/* ── Board legend (filter pills), capability summary, inline misc (2026-06-10 round) ── */
-/* "none" beside a section's label: the quiet sentence (.poster-quiet); its place only. */
-.pf .pf-agd-none-inline { margin: 0 auto 0 0.5rem; }
-.pf .pf-agd-quality-pending-when { white-space: nowrap; }
-/* No commands is the quiet sentence (.poster-quiet); its line only. */
-.pf .pf-agd-commands--empty { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.6rem; }
 
 /* ── README tab (rendered from agents.<name>.readme markdown) ── */
 .pf .pf-agd-readme {
@@ -603,103 +384,9 @@
   grid-column: 1 / -1;
 }
 
-/* ── Messages tab: Command palette ── */
+/* ── Data Access tab: the tab draws only components now (views/profile/agents/tab-data-access.js). ── */
 
-/* The commands: a folded row (og-fold--event) that opens, per category, the Group heading over the
-   Listing; the command is the inline code. Their places only. */
-.pf .pf-agd-commands {
-  margin-bottom: 1rem;
-}
-.pf .pf-agd-commands-body {
-  padding: 0.5rem 0 0;
-}
-.pf .pf-agd-commands-category {
-  margin-top: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-.pf .pf-agd-commands-category:first-child { margin-top: 0; }
-/* The suggestions under the chat's typing box (below) keep the command's typewriter name and grey words. */
-.pf .pf-agd-command-name {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  font-weight: 500;
-  min-width: 80px;
-  flex-shrink: 0;
-}
-.pf .pf-agd-command-desc {
-  flex: 1;
-  color: var(--text-dim, #6B7280);
-  font-size: 0.78rem;
-}
-
-/* Autocomplete dropdown for / commands */
-.pf .pf-agd-autocomplete {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  background: var(--card, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: var(--radius-xs, 6px);
-  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.06));
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 10;
-}
-.pf .pf-agd-autocomplete-item {
-  display: flex;
-  gap: 0.5rem;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.pf .pf-agd-autocomplete-item:hover {
-  background: var(--card-bg-alt, #F3F4F6);
-}
-
-/* ── Data Access tab ── */
-
-.pf .pf-agd-data-section {
-  margin-bottom: 1.25rem;
-}
-/* The shared tags, the memory areas, the knowledge packages and the skills are the Listing
-   (css/components/listing.css); a stored key, which opens its value in place, is the folded row
-   (og-fold og-fold--event, css/components/fold-row.css). */
-/* A stored value is the Code block (css/components/code-block.css); its place and height only. */
-.pf .pf-agd-memory-preview {
-  margin: 0.25rem 0 0.5rem 1.5rem;
-  max-height: 300px;
-  overflow-y: auto;
-}
-/* A stored key's name takes the folded row; its times, visibility and arrow sit at its end. */
-.pf .pf-agd-key-name { flex: 1 1 auto; }
-
-/* Stored memory key: expanded detail wrapper (value + action row) */
-.pf .pf-agd-memory-detail {
-  margin: 0.25rem 0 0.5rem 1.5rem;
-}
-.pf .pf-agd-memory-detail .pf-agd-memory-preview {
-  margin-left: 0;
-}
-
-/* Inline image preview(s) for a memory value that references image URLs (e.g. crews.<agent>.images.*
-   records from the image-maker crew): the image thumbnails (css/components/image-deliverable.css). */
-
-/* Inline value editor textarea for a stored memory key */
-.pf .pf-agd-memory-edit { min-height: 8rem; max-height: 360px; }
-.pf .pf-agd-memory-edit:disabled {
-  opacity: 0.6;
-}
-
-/* Action button row beneath a stored memory key's value/editor */
-.pf .pf-agd-memory-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.4rem;
-}
-
-/* Effective scope summary */
+/* Effective scope summary (kept for the design lab's samples, which draw it) */
 .pf .pf-agd-scope-summary {
   padding: 0.625rem 0.875rem;
   font-family: var(--font-mono);
@@ -712,52 +399,10 @@
 /* Scope summary footer note: the Hint (css/components/hint.css); its place only. */
 .pf .pf-agd-scope-footer { margin-top: 0.5rem; }
 
-/* Config file upload row */
-.pf .pf-agd-config-upload {
-  margin-bottom: 1rem;
-}
-/* Hidden file input */
-.pf .pf-agd-hidden-input {
-  display: none;
-}
-
-/* ── Agent Config tab ── */
-
-/* The files are the Listing (css/components/listing.css, cut name-state); the file you pick opens under
-   its row in the raised panel, its text the Code block. The list's place, a row's pointer and the text's
-   height only. */
+/* ── Agent Config tab: the tab draws only components now (tab-agent-config.js); the file list's
+   rules stay for the design lab's samples, which draw it. ── */
 .pf .pf-agd-config-list { margin-bottom: 1rem; }
 .pf .pf-agd-config-list > .listing-row > div:not(.listing-open) { cursor: pointer; }
-.pf .pf-agd-config-preview { max-height: 300px; overflow-y: auto; }
-.pf .pf-agd-config-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-/* ── Activity tab: Filter pills ── */
-
-.pf .pf-agd-filter-bar {
-  display: flex;
-  gap: 0.35rem;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
-}
-
-
-/* ── Directives tab (structured text editor) ── */
-/* The directives are the thing row (.poster-row--thing) as it is: the page's words under its rule;
-   the text keeps its lines, its leading, its padding and its height. */
-.pf .pf-agd-directives-content {
-  white-space: pre-wrap;
-  line-height: 1.6;
-  padding: 12px 14px;
-  min-height: 80px;
-}
-.pf .pf-agd-directives-textarea { min-height: 200px; }
 
 /* ── Services tab ── */
 
@@ -766,138 +411,9 @@
 /* Status dots (active/inactive): the status dot (css/components/status-dot.css); their place only. */
 .pf .pf-agd-status-dot { margin-right: 0.35rem; }
 
-/* Config tab: action buttons row */
-.pf .pf-agd-config-actions {
-  display: flex;
-  gap: 0.35rem;
-}
 
-/* Config tab: edit textarea */
-.pf .pf-agd-config-edit {
-  margin-top: 0.5rem;
-}
-.pf .pf-agd-config-textarea { min-height: 200px; }
-
-/* Zone 2 inline URL form */
-.pf .pf-agd-zone2-url-form {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
-  margin-top: 0.5rem;
-}
-.pf .pf-agd-zone2-url-form .og-input { flex: 1; }
-
-/* Help text (footer notes, explanatory text): the Hint (css/components/hint.css); its place only. */
-.pf .pf-agd-help-text { margin-top: 0.5rem; margin-bottom: 0.5rem; }
-
-/* Directive footer: the Hint (css/components/hint.css); its place only. */
-.pf .pf-agd-directive-footer { margin-top: 1rem; }
-
-/* Data access: area form */
-.pf .pf-agd-area-form {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-}
-.pf .pf-agd-area-form .select-field { width: auto; }
-.pf .pf-agd-area-form .og-input { flex: 1; min-width: 120px; }
-
-/* Data access: stored-key create form — stack inputs/value/actions vertically */
-.pf .pf-agd-keyadd-form {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.4rem;
-  padding: 0.5rem 0;
-}
-.pf .pf-agd-keyadd-form .og-input,
-.pf .pf-agd-keyadd-form .select-field { width: 100%; box-sizing: border-box; }
-.pf .pf-agd-keyadd-form .pf-agd-memory-edit { margin: 0; }
-
-/* Data access: stored-key sort controls (in the section header) */
-.pf .pf-agd-keys-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-.pf .pf-agd-keys-controls .select-field { width: auto; }
-
-/* Data access: per-key created/updated meta in the stored-key row: the Timestamp (.poster-time); its place only. */
-.pf .pf-agd-key-meta {
-  margin-left: auto;
-  display: flex;
-  gap: 0.75rem;
-  white-space: nowrap;
-}
-
-/* The "command" Tag on a slash command message: its place only. */
-/* The "command" tag before a slash command's words: its place. */
-.pf .pf-agd-msg-bubble > .poster-chip { margin-right: 0.25rem; }
-
-/* ── Input wrapper for autocomplete ── */
-.pf .pf-agd-input-wrap {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-.pf .pf-agd-tag-input-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-/* ── Governance section (Activity tab) ── */
-.pf .pf-agd-governance-section {
-  background: var(--card);
-
-  border-radius: 10px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-}
-
-/* The governance figures are the Facts (css/components/facts.css). A count of policy issues above
-   zero keeps its warn colour, a tone on its value; the crew's offline line wears it too. */
-
-/* ── Message command-reply pairing ── */
-
-/* A slash command and its reply stay together, the reply under a ↳; the two turns say who spoke. */
-.pf .pf-agd-msg-pair {
-  margin-bottom: 0.75rem;
-}
-.pf .pf-agd-msg-reply-indicator {
-  color: var(--text-muted, #9CA3AF);
-  font-size: 0.75rem;
-  padding: 0.15rem 0 0.15rem 0.25rem;
-}
-
-/* ── Quality tab ── */
-
-/* A card's explaining line: the Hint (css/components/hint.css); its place only. */
-.pf .pf-agd-quality-desc { margin: 0.25rem 0 0.75rem; }
-
-/* Section titles sit at the top of their own card now — card padding + grid gap
-   provide the separation the old stacked layout needed a margin-top for. */
-.pf .pf-agd-quality .pf-agd-section-title {
-  margin-top: 0;
-}
-
-/* Duration-by-context chips under the performance cards */
-.pf .pf-agd-quality-durations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
-}
-
-/* Per-context review rows */
-.pf .pf-agd-quality-reviews {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
+/* ── Quality tab: the tab draws only components now (tab-quality.js); these review-row rules stay
+   for the design lab's samples, which draw them. ── */
 .pf .pf-agd-quality-review-row {
   border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
@@ -923,10 +439,6 @@
   font-size: 0.75rem;
   color: var(--text-muted, #9CA3AF);
 }
-/* The line under a review's context is the Listing's (.listing-meta); its place only. */
-.pf .pf-agd-quality-review-meta {
-  margin-top: 0.3rem;
-}
 .pf .pf-agd-quality-overall {
   margin-top: 0.4rem;
   font-size: 0.85rem;
@@ -938,116 +450,15 @@
 
 /* ── Deliverable rating (Tasks tab) ── */
 
-/* The rate modal's stars are the Rating stars (css/components/rating-stars.css); their place only. */
-.pf .pf-agd-rate-stars {
-  margin: 0.5rem 0 0.75rem;
-}
+/* The rate dialog is Stars, Select, Check and TextArea in a column of Fields (rate-modal.js). */
 
-/* Context select + grounded checkbox rows in the rate modal */
-.pf .pf-agd-rate-field {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.6rem;
-  font-size: 0.85rem;
-  color: var(--text-dim, #6B7280);
-}
-.pf .pf-agd-rate-field .select-field {
-  flex: 1;
-}
-.pf .pf-agd-rate-check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.6rem;
-  cursor: pointer;
-}
-
-/* Quality tab "Rate deliverables" pending list */
-.pf .pf-agd-quality-pending {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.pf .pf-agd-quality-pending-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.5rem;
-  margin: 0;
-}
-.pf .pf-agd-quality-pending-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.85rem;
-  color: var(--text, #1A1A2E);
-}
-/* A rated row: the Rating stars' shown tone (css/components/rating-stars.css) and the context word. */
+/* Quality tab "Rate deliverables" (kept for the design lab's sample). A rated row: the Rating stars' shown tone (css/components/rating-stars.css) and the context word. */
 .pf .pf-agd-quality-pending-rated {
   font-size: 0.8rem;
   white-space: nowrap;
 }
 
-/* Per-task memory entries (expanded task) -- collapsible per entry */
-.pf .pf-agd-task-memory-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-top: 0.4rem;
-}
-/* Each entry's row, which opens its value in place, is the folded row (og-fold og-fold--event,
-   css/components/fold-row.css); the key takes the row's width and its tag keeps its size. */
-.pf .pf-agd-task-memory-key { flex: 1; }
-.pf .pf-agd-task-memory-entry .og-fold .poster-chip { flex-shrink: 0; }
-/* The value opened under its row is the JSON view (components/JsonView.js, css/components/json-view.css)
-   as the library draws it; the box keeps only its place and its scroll. */
-.pf .pf-agd-task-memory-body {
-  padding: 0.5rem 0.6rem;
-  line-height: 1.5;
-  max-height: 340px;
-  overflow: auto;
-}
-/* A Markdown value is the Markdown reader's small cut (Markdown `small`, css/components/markdown.css). */
-
-/* The structured JSON view is its own part now: css/components/json-view.css (components/JsonView.js). */
-
-/* ── Contracts sub-tab — agent-side contract-engagement visibility (active / retired). ── */
-.pf .pf-agd-contracts { padding: 0.25rem 0; }
-.pf .pf-agd-contracts .agc-mt { margin-top: 1rem; }
-.pf .pf-agd-contracts .agc-caps { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.4rem 0 0.2rem; }
-.pf .pf-agd-contracts .agc-list { margin-top: 0.4rem; }
-/* The engagements are the Listing (css/components/listing.css); a retired one is dimmed. */
-.pf .pf-agd-contracts .agc-row--retired > div { opacity: 0.72; }
-
-/* ── How this agent is RUN: the badge in the header says what, this says so what ──
-   Two buttons rather than a dropdown, because there are two values and a dropdown for two is a
-   click spent finding out what the choices are. Neither pressed means nobody has decided, which is
-   not the same as 'spawn'. */
-.pf .pf-agd-runmode {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin: 0.6rem 0 0.2rem;
-  min-width: 0;
-}
-
-/* "How it runs" before the choice: the row label (.poster-label). */
-
-.pf .pf-agd-runmode-choice {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem 0.9rem;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-/* The buttons are tabs (.poster-tab, Jouni's decision "Tabs and filters"): the chosen one on the
-   sun, which is how a selection reads everywhere else inside. */
-
-.pf .pf-agd-runmode .poster-hint { flex-basis: 100%; }
+/* A task's memory entries are FoldRows with their value in a scrolling copy box (task-item-parts.js),
+   and how an agent runs is the Choice under the card's line (agent-card-run-mode.js). */
 
 /* Status is data. Its colour lives here, including the quiet fallback for a future state. */

@@ -1,0 +1,18 @@
+/**
+ * @file how-to.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A short written how-to (components/HowTo.js): the words at .85rem with room between
+ *   the lines, the numbered steps indented, a command in coral typewriter letters on a pale coral
+ *   ground. The corner reads the shape token.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Moved out of css/views/profile.css (.pf .platform-content and its ol, li and
+ *     code), with the code's pale coral ground as a mix of the accent token and its 3px corner as the
+ *     shape corner (page group G1a).
+ */
+
+.how-to { margin-top: 1rem; font-size: .85rem; line-height: 1.7; }
+.how-to ol { margin-left: 1.5rem; margin-bottom: .75rem; }
+.how-to li { margin-bottom: .4rem; }
+.how-to code { background: color-mix(in srgb, var(--accent) 10%, transparent); padding: 1px 5px; border-radius: var(--shape-corner); font-size: .8rem; color: var(--accent); }

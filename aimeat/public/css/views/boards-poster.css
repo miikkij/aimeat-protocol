@@ -2,13 +2,14 @@
  * @file boards-poster.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Boards page in the poster face (bp- prefix; design canvas "AIMEAT Taulujen sivu",
- *   direction A). The shared parts (crumb, masthead, strip, sections, folds, rail, fields, choices)
- *   come from organism.css's og- rules; this file carries what boards add: the boards table, a
- *   notice as a row, the composer with its side column, a reply in the thread, the own-board form,
- *   the members block and the two columns of the app fold. NOTE: this file must be linked in
- *   spa.html (useViewCSS is a no-op).
+ * @description The Boards page in the poster face (design canvas "AIMEAT Taulujen sivu", direction
+ *   A). Every part of the page is a component now (page group G7): the frame (SettingsPage), the
+ *   boards table (List), the notices (BoardNotice), the composer and the app fold (Layout's Beside),
+ *   the forms (Field family). What stays here is what only this page has: the smaller title of a
+ *   board's or a notice's page, the chosen topic in coral in its rail, and the design lab's sample
+ *   rule for .bp-code. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.18.0 -- 2026-09-26 -- The page is on the component kit (page group G7): the rules of the boards table, the composer, the forms, the members, the app fold and the rail's static line and note go (the note is the rail's own now, tab-page.css .og-rail-note; the composer and the app fold are Layout's Beside, layout.css). Kept: the sub-page title size, the chosen rail item's coral, and .bp-code for the design lab's sample.
  *   v1.17.0 -- 2026-09-26 -- The boards table is the Listing (css/components/listing.css), a unification: the look most tabs use. The grid, cells, heading row and narrow-screen columns of bp-rows go (the columns move to its cut, listing--cols); the name's one line and the faded empty words stay.
  *   v1.16.0 -- 2026-09-26 -- The line under a board's name is the Listing's (.listing-meta): its body face, size and colour go; one line stays (a unification: Jouni's decision "Meta line").
  *   v1.15.0 -- 2026-09-26 -- The SDK example is the Code block (css/components/code-block.css): the light frame goes and long lines wrap (a unification: Jouni's decision "Code block").
@@ -31,56 +32,11 @@
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-bp .poster-quiet { margin: 0; }
-.og-bp .og-field .poster-hint { margin-top: .2rem; }
+/* A board's or a notice's page: its smaller title (the sub-page size, kept by each page's sheet). */
 .og-bp.og-page { --poster-page-size: 2.1rem; }
-.og-bp .bp-more { margin-top: .8rem; }
+/* The topic a board shows, and the poster of a notice, stand in coral in the rail. */
 .og-bp .og-rail-link.on { color: var(--accent); }
-.og-bp .bp-rail-static { cursor: default; }
-.og-bp .bp-rail-note { padding: .3rem 0 0 1.7rem; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
-.og-bp .poster-label:where(:not(div)) { display: block; }
-/* A fold's title stays on one line; its long sub-line gives way instead of squeezing the title. */
-.og-bp .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
-.og-bp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── The boards table: the Listing (css/components/listing.css) ──────────────────────────────── */
-.og-bp .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-/* The line under a name is the Listing's (.listing-meta); here it keeps to one line. */
-.bp-rows .listing-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* No notices yet, no latest: the words fade to the hairline's colour. */
-.bp-rows .listing-desc.bp-m--q { color: var(--border); }
-
-/* ── A notice as a row ──────────────────────────────────────────────────────────────────────── */
-
-/* ── The composer, a reply, the poster's tools ──────────────────────────────────────────────── */
-.bp-composer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1.2rem 1.6rem; align-items: start; }
-.bp-composer--reply { grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin-top: 1.2rem; padding-top: 1rem; }
-.bp-composer-main { gap: .6rem; }
-.bp-composer-side { display: flex; flex-direction: column; gap: 1rem; }
-.bp-composer-side .og-doors { margin-top: .2rem; }
-.bp-tools { flex-wrap: wrap; }
-
-/* ── The own-board form, the rules, the members ─────────────────────────────────────────────── */
-.bp-form .og-fields--2 { gap: 1.2rem 1.6rem; }
-.bp-field--narrow .og-input { max-width: 10rem; }
-/* The members and the last doors, each under its hairline, are the split (.og-split, page-section.css);
-   their space only. */
-.bp-danger-row { margin-top: .4rem; padding-top: 1rem; }
-.bp-members { display: flex; flex-direction: column; gap: .5rem; padding-top: 1rem; }
-.bp-members .poster-hint { margin: 0; }
-.bp-member-list { display: flex; flex-wrap: wrap; gap: .4rem; }
-.bp-member-add { display: flex; gap: 1rem; align-items: flex-end; }
-.bp-member-add .og-input { max-width: 24rem; }
-
-/* ── The app fold ───────────────────────────────────────────────────────────────────────────── */
-.bp-app { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.6rem; }
-/* A column's sentence is the Hint (css/components/hint.css); its place only. */
-.bp-app-col { display: flex; flex-direction: column; gap: .7rem; }
-.bp-app-col .poster-hint { margin: 0; }
-/* The example is the Code block (css/components/code-block.css); its place only. */
+/* Only the design lab's sample draws this (views/design-lab/decision-samples-conflicts.js); it goes
+   when the lab moves. */
 .bp-code.code-block { margin: 0; }
-
-@media (max-width: 900px) {
-  .bp-composer, .bp-composer--reply, .bp-app { grid-template-columns: minmax(0, 1fr); }
-  .bp-form .og-fields--2 { grid-template-columns: minmax(0, 1fr); }
-}

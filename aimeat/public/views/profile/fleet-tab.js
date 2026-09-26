@@ -23,6 +23,8 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The page head is SettingsPage (crumb, title, words under it), the page
+ *     writes no class (page group G1a); the embedded fleet's own sheet keys on .og-fleet.
  *   v1.2.0 — 2026-09-25 — The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
  *   2026-09-25 — The page head is the kit's crumb trail and page head (.og-crumb, .og-mast), the look most tabs use (a unification).
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -39,17 +41,16 @@ import { t } from '/js/i18n.js';
 import FleetView from '/views/fleet.js';
 import BasicAgentsPanel from '/views/profile/agents/basic-agents-panel.js';
 import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
+import { SettingsPage } from '/components/SettingsPage.js';
 
 export default function FleetTab({ session, showToast }) {
+  // The page's short name "fleet" roots it as .og-fleet, which css/views/fleet.css keys the embedded
+  // fleet on (no centring and no padding of its own inside the Settings column).
   return html`
-    <div class="pf-fleet-tab">
-      <div class="og mb-1">
-        <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAutomation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.fleet')}</span></div>
-        <div class="og-mast"><div class="og-mast-words">
-          <h2 class="og-title poster-page-title">${t('profile.tabs.fleet')}</h2>
-          <p class="og-desc">${t('fleet.desc')}</p>
-        </div></div>
-      </div>
+    <${SettingsPage} name="fleet"
+      crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.fleet')]}
+      title=${t('profile.tabs.fleet')}
+      desc=${t('fleet.desc')}>
 
       ${/* THE STARTER CARD IS A SLOT, NOT A HEADER. It sat above the fleet at first, and on a
             1280x460 screen the whole first view was an invitation to create MORE agents while
@@ -65,6 +66,6 @@ export default function FleetTab({ session, showToast }) {
             At the foot: a person comes here for the agents first, and the defaults are the one thing
             on this page that is about all of them at once. */''}
       <${AgentDefaultsSection} showToast=${showToast} />
-    </div>
+    <//>
   `;
 }

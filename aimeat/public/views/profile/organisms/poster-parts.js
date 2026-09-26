@@ -8,6 +8,8 @@
  * @structure tr(key, fallback) · scrollTo(id)
  * @usage import { tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
  * @version-history
+ *   v1.5.0 — 2026-09-26 — scrollTo is the contents rail's scrollToSection (/components/Rail.js),
+ *     moved there unchanged (component plan C9, a move).
  *   v1.4.0 — 2026-09-25 — Section and Fold moved to /components as PageSection and FoldSection
  *     (UI consolidation phase 5, a move).
  *   v1.3.0 -- 2026-09-25 -- The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
@@ -17,22 +19,14 @@
  *   v1.0.0 — 2026-08-29 — Extracted from home.js v3.0.0 for the workspace cover; no behaviour change.
  */
 import { t } from '/js/i18n.js';
+import { scrollToSection } from '/components/Rail.js';
 
 export const tr = (key, fb) => t(key) || fb;
 
 /**
- * Bring a section to the top of the content area, and move NOTHING else. scrollIntoView() walks
- * every scrollable ancestor, and on this shell that included the window: the static agent-footer
- * below #app gave the document 70 px of slack, and each rail click slid the whole page up by the
- * height of the top bar, which then sat above the viewport (aimeat.io, 2026-08-29, seen twice).
- * Scrolling the content region by hand touches one element and cannot reach the bar.
+ * Bring a section to the top of the content area, and move nothing else. The scroll is the
+ * contents rail's own now (/components/Rail.js scrollToSection, where its reason is written); this
+ * name stays for the pages that still import it here.
  * @param {string} id
  */
-export const scrollTo = (id) => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const box = el.closest('.page-content') || el.closest('.settings-frame-content') || null;
-  if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
-  const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - 16;
-  box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-};
+export const scrollTo = scrollToSection;

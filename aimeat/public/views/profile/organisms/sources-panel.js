@@ -9,6 +9,7 @@
  * @structure SRC_ICON (internal), SourcesPanel
  * @usage import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the description is the section description, the picker the Box with the Tabs (the source kind a view tab row) and the Search line, the results and the sources the List (an external source's tag dim again, as main's grey badge; the remove mark the Icon). The panel's own title and count are not drawn: the Sources page's head says both, and main hid them there. The Add source toggle, which stood in that hidden head, now stands under the description, so the picker opens.
  *   v1.11.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.10.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -39,7 +40,12 @@ import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
-import { QuietNote } from '/components/QuietNote.js';
+import { List, Row as ListRow, Name, Desc, Cell, Doors, SearchLine } from '/components/List.js';
+import { Action, Actions, Icon } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Box } from '/components/Box.js';
+import { Tabs } from '/components/Tabs.js';
+import { HeadDesc } from '/components/SubHeading.js';
 import { fmtBytes } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -129,56 +135,52 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
     else if (tab === 'storage') { label = item.key; meta = (item.mime_type || '') + ' · ' + fmtBytes(item.size || 0); }
     else { label = scope === 'mine' ? (item.value?.name || item.key) : (item.name || item.package_id); meta = (scope === 'mine' ? (item.value?.entries?.length || 0) : (item.entries_count || 0)) + ' ' + (t('organisms.entries') || 'entries'); }
     return html`
-      <div class="listing-row" key=${'r' + i}>
-        <div class="listing-name" title=${String(label)}>${(String(label))}</div>
-        <div class="listing-desc">${(String(meta))}</div>
-        <div class="listing-doors"><button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => attach(item)}>${t('organisms.attach') || 'Attach'}</button></div>
-      </div>`;
+      <${ListRow} key=${'r' + i}>
+        <${Name} title=${String(label)}>${(String(label))}<//>
+        <${Desc}>${(String(meta))}<//>
+        <${Doors}><${Action} small row disabled=${busy} onClick=${() => attach(item)}>${t('organisms.attach') || 'Attach'}<//><//>
+      <//>`;
   };
 
+  // The panel stands on the workspace's Sources page, whose head already says "Sources" (main hid the
+  // panel's own title and count there: organism.css `.og-page .pj-section > .pj-section-head`). The
+  // way to add a source stood in that hidden head; it is drawn here so the picker can be opened.
   return html`
-    <div class="pj-section pj-sources poster-row--thing">
-      <div class="pj-section-head">
-        <span class="pj-section-title sub-heading">${t('organisms.sources') || 'Sources'}<span class="poster-count poster-count--tally">${sources.length}</span></span>
-        <button class="poster-action poster-action--small" onClick=${() => setPicking(p => !p)}>
-          ${picking ? (t('organisms.close') || 'Close') : ('+ ' + (t('organisms.addSource') || 'Add source'))}
-        </button>
-      </div>
-      <div class="section-desc pj-sources-desc">${t('organisms.sourcesDesc') || 'References this workspace draws on — memory, files, and knowledge packages. Pointers only; the originals stay where they live.'}</div>
+    <${HeadDesc}>${t('organisms.sourcesDesc') || 'References this workspace draws on — memory, files, and knowledge packages. Pointers only; the originals stay where they live.'}<//>
+    <${Actions}>
+      <${Action} small expanded=${picking} onClick=${() => setPicking(p => !p)}>
+        ${picking ? (t('organisms.close') || 'Close') : ('+ ' + (t('organisms.addSource') || 'Add source'))}
+      <//>
+    <//>
 
-      ${picking ? html`
-        <div class="pj-src-picker poster-box">
-          <div class="pf-tabs" role="tablist">
-            ${['memory', 'storage', 'knowledge'].map(tk => html`<button class="poster-tab ${tab === tk ? 'is-on' : ''}" key=${tk} onClick=${() => setTab(tk)}>${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}</button>`)}
-          </div>
-          <div class="pj-src-controls">
-            ${tab !== 'storage' ? html`
-              <div class="pf-tabs">
-                <button class="poster-tab ${scope === 'mine' ? 'is-on' : ''}" onClick=${() => setScope('mine')}>${t('organisms.mine') || 'Mine'}</button>
-                <button class="poster-tab ${scope === 'discover' ? 'is-on' : ''}" onClick=${() => setScope('discover')}>${t('organisms.discover') || 'Discover'}</button>
-              </div>` : null}
-            <div class="pj-src-search search-line"><input class="og-input" type="search" value=${q} onInput=${e => setQ(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') doSearch(); }} placeholder=${t('organisms.searchSources') || 'Search…'} aria-label=${t('organisms.searchSources') || 'Search…'} /></div>
-            <button class="poster-action poster-action--small" onClick=${doSearch} disabled=${loading}>${t('organisms.search') || 'Search'}</button>
-          </div>
-          <div class="pj-src-results">
-            ${loading ? html`<${QuietNote}>${t('organisms.loading') || 'Loading…'}<//>`
-              : results.length === 0 ? html`<${QuietNote}>${t('organisms.noResults') || 'No results'}<//>`
-              : html`<div class="listing listing--name-tags-doors listing--cols">${results.slice(0, 100).map(resultRow)}</div>`}
-          </div>
-        </div>` : null}
+    ${picking ? html`
+      <${Box}>
+        <${Tabs} kind="view" value=${tab} onSelect=${setTab}
+          items=${['memory', 'storage', 'knowledge'].map(tk => ({ value: tk, label: `${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}` }))} />
+        ${tab !== 'storage' ? html`
+          <${Tabs} value=${scope} onSelect=${setScope} items=${[
+            { value: 'mine', label: t('organisms.mine') || 'Mine' },
+            { value: 'discover', label: t('organisms.discover') || 'Discover' },
+          ]} />` : null}
+        <${SearchLine} value=${q} onInput=${e => setQ(e.target.value)} onEnter=${doSearch} placeholder=${t('organisms.searchSources') || 'Search…'}>
+          <${Action} small onClick=${doSearch} disabled=${loading}>${t('organisms.search') || 'Search'}<//>
+        <//>
+        <${List} cols="name-tags-doors" keepCols scroll loading=${loading ? (t('organisms.loading') || 'Loading…') : false}
+          empty=${t('organisms.noResults') || 'No results'}>
+          ${results.slice(0, 100).map(resultRow)}
+        <//>
+      <//>` : null}
 
-      ${sources.length === 0 ? html`<${QuietNote}>${t('organisms.noSources') || 'No sources yet'}<//>`
-        : html`<div class="listing listing--mark-name-tags-doors listing--cols">
-          ${sources.map(s => html`
-            <div class="listing-row" key=${s.id}>
-              <div>${SRC_ICON[s.type] || '•'}</div>
-              <div class="listing-name" title=${s.key || s.packageId || ''}>${(String(s.label || s.key || s.packageId || ''))}</div>
-              <div><span class="poster-chips">
-                ${s.external ? html`<span class="poster-chip">${t('organisms.external') || 'external'}</span>` : null}
-                <span class="poster-chip">${t('organisms.src_' + s.type) || s.type}</span>
-              </span></div>
-              <div class="listing-doors"><button class="poster-icon poster-icon--small" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}>✕</button></div>
-            </div>`)}
-        </div>`}
-    </div>`;
+    <${List} cols="mark-name-tags-doors" keepCols empty=${t('organisms.noSources') || 'No sources yet'}>
+      ${sources.map(s => html`
+        <${ListRow} key=${s.id}>
+          <${Cell}>${SRC_ICON[s.type] || '•'}<//>
+          <${Name} title=${s.key || s.packageId || ''}>${(String(s.label || s.key || s.packageId || ''))}<//>
+          <${Cell} line>
+            ${s.external ? html`<${Mark} tone="dim">${t('organisms.external') || 'external'}<//>` : null}
+            <${Mark}>${t('organisms.src_' + s.type) || s.type}<//>
+          <//>
+          <${Doors}><${Icon} small label=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}>✕<//><//>
+        <//>`)}
+    <//>`;
 }

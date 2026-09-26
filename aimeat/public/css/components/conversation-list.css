@@ -1,0 +1,151 @@
+/**
+ * @file conversation-list.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The list of a person's conversations (components/ConversationList.js): the column, the
+ *   contact requests, the sections and their headings, a person's or an agent's group, one row with
+ *   its kind mark, date, Tags, subject, last message, unread count and archive square, the disclosure
+ *   of a folded row, and the selection line. The rows are the chat's rows (thread-list.css,
+ *   .poster-thread; Jouni's decision "Conversation list"); this sheet adds what Messages' rows have
+ *   on main. Reads only the tokens in theme.css and the shapes in poster.css; a page never styles it
+ *   from outside.
+ * @usage Linked from public/spa.html in the component block, after thread-list.css.
+ * @version-history
+ *   v1.0.1 — 2026-09-26 — The coral left edges read var(--shape-frame-heavy) (3px in AIMEAT), not a
+ *     literal (check:shape-tokens; fix pass).
+ *   v1.0.0 — 2026-09-26 — Initial, moved with their values from css/views/inbox.css and
+ *     inbox-poster.css (.inbox-list, -request*, -sec*, -chev, -conv-group*, -conv*, -fold-toggle,
+ *     -list-tools*, -conv-check); main's hovers put back. A picture is the Avatar (avatar.css).
+ */
+
+/* ── The column ── */
+.conversation-list {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.conversation-list-empty { padding: .7rem .75rem; }
+.conversation-list-heading { display: flex; align-items: center; gap: 6px; padding: .7rem .75rem .3rem; }
+
+/* ── A contact request (the first-contact gate) ── */
+.conversation-request {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: .7rem .75rem;
+  border-left: var(--shape-frame-heavy) solid var(--accent);
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-subtle);
+}
+.conversation-request-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.conversation-request-id { min-width: 0; }
+.conversation-request-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conversation-request-address { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conversation-request-preview {
+  color: var(--text-dim);
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.conversation-request-actions { display: flex; gap: 8px; }
+
+/* ── The selection line ── */
+.conversation-tools {
+  display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap;
+  padding: .45rem .75rem; border-bottom: 1px solid var(--border);
+}
+.conversation-list--selecting .conversation-tools {
+  justify-content: flex-start; position: sticky; top: 0; z-index: 2; background: var(--card-bg);
+}
+.conversation-tools-count { margin-right: auto; font-size: 12px; font-weight: 700; }
+
+/* ── Sections: every heading closes what is under it, and a closed heading still shows how many are
+   unread. The heading is the group heading (.poster-day-title); this keeps its place. ── */
+.conversation-section { display: flex; flex-direction: column; gap: 0; }
+.conversation-section-head {
+  display: flex; align-items: center; gap: .45rem; width: 100%; padding: .7rem .75rem .3rem;
+  background: none; border-top: 0; border-left: 0; border-right: 0; cursor: pointer; text-align: left; font-family: inherit;
+}
+.conversation-section-head:hover .conversation-section-name { color: var(--accent); }
+.conversation-section-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-section-head .poster-count { flex: none; }
+.conversation-section + .conversation-section > .conversation-section-head { border-top: 1px solid var(--border); }
+.conversation-chev { flex: none; transition: transform 120ms ease; }
+.conversation-chev.is-open { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .conversation-chev { transition: none; } }
+
+/* ── A person's or an agent's group: the heading closes it; the square beside it archives all of it,
+   shown under the pointer or on keyboard focus, and it takes no press while hidden. ── */
+.conversation-group { margin-bottom: 2px; }
+.conversation-group-bar { display: flex; align-items: center; gap: 4px; padding: 0 .5rem 0 .75rem; }
+.conversation-group-bar .poster-thread-person { flex: 1; min-width: 0; }
+.conversation-group-act { flex: none; opacity: 0; pointer-events: none; }
+.conversation-group-bar:hover .conversation-group-act, .conversation-group-act:focus-visible { opacity: 1; pointer-events: auto; }
+.conversation-group-pick { flex: none; }
+
+/* ── One row: the kind mark, the name line (name, Tags, date), the line under it (subject, last
+   message, unread count) and why it was archived; the archive square beside it. ── */
+.conversation-row { position: relative; }
+.conversation-row:not(.poster-thread--active):hover { background: var(--card-bg); }
+.conversation-row-open {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px;
+  padding: .6rem .75rem; background: none; border: 0; cursor: pointer; text-align: left; color: inherit; font: inherit;
+}
+.conversation-row--nested .conversation-row-open { padding-left: 1.6rem; }
+.conversation-row-mark { width: 1.4rem; flex: none; text-align: center; font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
+.conversation-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.conversation-row-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.conversation-row-name { flex: 1; min-width: 0; }
+.conversation-row-line .poster-chip, .conversation-row-line .poster-time, .conversation-row-line .poster-count { flex: none; white-space: nowrap; }
+.conversation-row-subject {
+  flex: none; max-width: 60%; font-family: var(--font-mono); font-size: 11px; color: var(--accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.conversation-row-preview { flex: 1; min-width: 0; }
+.conversation-row-why { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* On the open row everything on the sun is ink: grey or coral there does not read. */
+.poster-thread--active .conversation-row-subject,
+.poster-thread--active .conversation-row-why,
+.poster-thread--active .conversation-row-mark,
+.poster-thread--active .conversation-row-line .poster-time { color: var(--on-sun); }
+.poster-thread--active .conversation-row-line .poster-chip { border-color: var(--on-sun); color: var(--on-sun); }
+/* A row picked while selecting: the card ground and a coral edge. */
+.conversation-row--selected { background: var(--card-bg); box-shadow: var(--shape-frame-heavy) 0 0 var(--accent) inset; }
+.conversation-check {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border: var(--shape-frame) solid var(--shape-frame-colour); font-size: 12px; line-height: 1; color: var(--text);
+}
+/* The row's archive square is the chat's delete place (.poster-thread-del): it shows on the open row,
+   under the pointer and on keyboard focus, and takes no press while hidden, so a press beside the
+   date never archives. */
+/* It sits over the row's top right corner, as main placed it, so the row keeps the list's whole width. */
+.conversation-row > .conversation-act { position: absolute; top: 6px; right: 6px; pointer-events: none; }
+.conversation-row:hover > .conversation-act,
+.conversation-row.poster-thread--active > .conversation-act,
+.conversation-row > .conversation-act:focus-visible { opacity: 1; pointer-events: auto; }
+
+/* ── A folded row's disclosure, on the nesting rail under the row it belongs to ── */
+.conversation-fold { display: contents; }
+.conversation-fold-toggle {
+  display: block; width: 100%; text-align: left;
+  padding: 3px 8px 5px 18px; margin: 0;
+  background: none; border: none; cursor: pointer;
+  font-size: 11.5px; color: var(--text-dim); font-family: inherit;
+}
+.conversation-fold-toggle:hover { color: var(--accent); }
+
+/* No pointer to hover with: a group's square stays visible at a finger's size, and single rows are
+   archived by selecting them, which is the phone's way of acting on several things at once. */
+@media (hover: none) {
+  .conversation-group-act { opacity: 1; pointer-events: auto; width: 40px; height: 40px; }
+  .conversation-row > .conversation-act { display: none; }
+}
+/* A finger presses these, so they get a finger's target on a phone. */
+@media (max-width: 760px) {
+  .conversation-fold-toggle { min-height: 40px; padding-top: 8px; padding-bottom: 8px; }
+  .conversation-section-head, .conversation-tools .poster-action, .conversation-group-pick .poster-action { min-height: 40px; }
+}

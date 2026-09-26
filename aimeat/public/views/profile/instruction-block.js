@@ -2,19 +2,16 @@
  * @file instruction-block.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The copyable instruction block for one organism, in the three formats people
- *   actually paste into: CLAUDE.md, AGENTS.md, and the AI chat's own instructions field. Each
- *   format says where it goes, because "copy this" without "put it here" is where these die.
- *
- *   The block is GENERATED from the organism's real structure on the server (its id, its actual
- *   workspaces and their spaces), never from a template. That is the difference between an AI
- *   that knows where things live and one that asks or guesses.
- *
- *   Reused by the Hello MCP panel (step 5 of onboarding) and by the button on every organism, so
- *   the wording and the generation path cannot diverge between the two.
- * @structure InstructionBlock({ orgId }) — format tabs + block + copy + placement line
+ * @description The copyable instruction block for one organism, under the name the MCP tab, the
+ *   Hello MCP panel and every organism import it by. The block itself is the component
+ *   InstructionBlock (components/InstructionBlock.js): the three formats people paste into
+ *   (CLAUDE.md, AGENTS.md, the AI chat's own instructions field), each with where it goes,
+ *   generated from the organism's real structure on the server.
+ * @structure InstructionBlock({ orgId }) — re-exported from /components/InstructionBlock.js
  * @usage import { InstructionBlock } from '/views/profile/instruction-block.js';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The block moved to components/InstructionBlock.js with its markup; this
+ *     module keeps the name and the default export its callers import (page group G1a).
  *   v1.2.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
  *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
@@ -25,75 +22,7 @@
  *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
  *       removed from both locales. Same words on screen.
  */
-import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
-import htm from 'htm';
-import { t, getLocale } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { fetchInstructionBlock } from '/js/services/hello-mcp.js';
-import { swallowed } from '/js/swallowed.js';
+import { InstructionBlock } from '/components/InstructionBlock.js';
 
-const html = htm.bind(h);
-const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-
-const FORMATS = [
-  { id: 'chat_instructions', labelKey: 'instrBlock.fmt.chat', labelFallback: 'AI chat instructions', place: 'chatInstructions' },
-  { id: 'claude_md', labelKey: 'instrBlock.fmt.claude', labelFallback: 'CLAUDE.md', place: 'claudeMd' },
-  { id: 'agents_md', labelKey: 'instrBlock.fmt.agents', labelFallback: 'AGENTS.md', place: 'agentsMd' },
-];
-
-/** @param {{ orgId: string }} props */
-export function InstructionBlock({ orgId }) {
-  const [data, setData] = useState(null);
-  const [fmt, setFmt] = useState('chat_instructions');
-  const [failed, setFailed] = useState(false);
-
-  // The block is generated server-side in the caller's language, so a language switch has to
-  // refetch it. Without this, switching the portal to English left a Finnish block on screen and
-  // the placement lines around it in English.
-  const [lang, setLang] = useState(getLocale());
-  useEffect(() => {
-    const onLang = () => setLang(getLocale());
-    window.addEventListener('lang-change', onLang);
-    return () => window.removeEventListener('lang-change', onLang);
-  }, []);
-
-  useEffect(() => {
-    if (!orgId) { setData(null); return undefined; }
-    let cancelled = false;
-    setData(null); setFailed(false);
-    fetchInstructionBlock(orgId)
-      .then(d => { if (!cancelled) setData(d); })
-      .catch(err => { swallowed('instruction-block: fetch', err); if (!cancelled) setFailed(true); });
-    return () => { cancelled = true; };
-  }, [orgId, lang]);
-
-  if (failed) return html`<p class="ib-note">${tr('instrBlock.failed', 'Could not read this organism’s structure just now. Try again shortly.')}</p>`;
-  if (!data) return html`<p class="ib-note">${tr('instrBlock.loading', 'Reading the structure…')}</p>`;
-
-  const text = (data.blocks && data.blocks[fmt]) || '';
-  const active = FORMATS.find(f => f.id === fmt) || FORMATS[0];
-  const placement = (data.placement && data.placement[active.place]) || '';
-
-  return html`
-    <div class="ib">
-      <div class="ib-tabs">
-        ${FORMATS.map(f => html`
-          <button key=${f.id} type="button"
-            class=${'poster-tab' + (f.id === fmt ? ' is-on' : '')}
-            onClick=${() => setFmt(f.id)}>${tr(f.labelKey, f.labelFallback)}</button>`)}
-      </div>
-      <p class="ib-place">${placement}</p>
-      <pre class="ib-block">${text}</pre>
-      <div class="ib-actions">
-        <${CopyButton} text=${text} className="poster-action poster-action--small"
-          label=${tr('instrBlock.copy', 'Copy the block')}
-          copiedLabel=${tr('common.copied', 'Copied')} />
-        <span class="ib-meta">${tr('instrBlock.from', 'Generated from')} ${data.organism_name || data.organism_id}${
-          Array.isArray(data.workspaces) && data.workspaces.length
-            ? `, ${data.workspaces.length} ${tr('instrBlock.workspaces', 'workspaces')}` : ''}</span>
-      </div>
-    </div>`;
-}
-
+export { InstructionBlock };
 export default InstructionBlock;

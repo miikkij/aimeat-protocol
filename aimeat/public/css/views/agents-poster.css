@@ -10,6 +10,12 @@
  *   skin the connect guide and the older tab parts wear inside it. NOTE: linked in spa.html after
  *   organism.css (useViewCSS is a no-op).
  * @version-history
+ *   v1.38.0 -- 2026-09-26 -- The Agents page draws every part with a component (page group G1a): the
+ *     page's root sizes and its title's count stay (keyed on .og-agp, SettingsPage name "agp"); the
+ *     form, the connect guide's overrides (the guide draws its own look, Jouni's decision "MCP guide"),
+ *     the filter line, the table rows, the group headings, the opened agent (now components/OpenCard.js
+ *     and css/components/open-card.css) go; the rules only the design lab's samples still use stay,
+ *     marked as such.
  *   v1.37.0 -- 2026-09-26 -- Connect's field list head reads --shape-case-label and the label spacing (* 1.2, .12em) (a move: the AIMEAT values equal the old ones).
  *   v1.36.0 -- 2026-09-26 -- The commands and prompts in Connect are the Code block (css/components/code-block.css): their square-corner and ink rule goes (a unification: Jouni's decision "Code block").
  *   v1.35.0 -- 2026-09-26 -- The connect guide's install row keeps its own buttons: the rule that redrew its .btn-primary, .btn-ghost and .btn-outline as underlined words goes (a unification: Jouni's decision "MCP guide", the option classic).
@@ -59,122 +65,15 @@
 .og-agp.og { --poster-page-size: 2.8rem; --poster-section-size: 1.6rem; }
 .og-agp .og-title small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--text-dim); }
 .og-agp .og-sec-h .poster-action--quiet { margin-left: auto; }
-/* A folded section shows one line under its slab and nothing else: its lead (.og-lead); its place only. */
-.agp-folded { margin: 0; }
 
-/* ── 01 The two basic agents: the numbered list with a line under each name (IndexList, Jouni's
-   decision "Numbered list"); the tags under a name and the line of what an agent reaches under its
-   words keep their places ─────────────────────────────────────────────────────────────────────── */
+/* ── Kept for the design lab only (its samples still draw the old markup; the lead's pass):
+   the basic agents' numbered list, the dragged row's grip, the opened agent's row of chips.
+   The page itself draws these with components now (page group G1a). ─────────────────────── */
 .agp-basic-list { margin: .8rem 0 0; }
 .og-agp .agp-basic-list .poster-chips { margin-top: .3rem; }
 .og-agp .agp-basic-list .poster-index-line small { display: block; font-size: .8rem; margin-top: .15rem; }
-/* The sentence under the two agents is a lead (.og-lead); its place only. */
-.agp-basic-notice { margin: .8rem 0 0; }
-.agp-basic-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; margin-top: 1rem; }
-
-/* ── 02 The form: a label column, underlined fields ────────────────────────────────────────── */
-.agp-form { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr); gap: 1.1rem 1.5rem; align-items: start; margin-top: .4rem; }
-.agp-form-k { padding-top: .5rem; }
-/* The line under a label is the Hint (css/components/hint.css); its place only. */
-.agp-form-k .poster-hint { display: block; margin-top: .15rem; }
-.agp-form-v { min-width: 0; display: flex; flex-direction: column; gap: .6rem; }
-.agp-choices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; }
-.agp-form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1.4rem; padding-top: .6rem; }
-/* The agents the person's own agents have proposed, and the ones nothing is running: both are the
-   Listing; the proposal's typewriter line stays under its words; an agent to attach is the who cell. */
-.agp-waiting { margin-top: 1.4rem; padding-top: .8rem; }
-.agp-waiting-meta { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); margin-top: .3rem; }
-
-/* ── 03 Connect: the guide's own parts, lined up with the page ─────────────────────────────── */
-.agp-connect .ast-lead { margin: 0 0 .9rem; font-size: .95rem; line-height: 1.6; }
-.agp-connect .ast-tools { display: flex; gap: 1.4rem; row-gap: .8rem; flex-wrap: wrap; margin: 0 0 .9rem; }
-.agp-connect .ast-tool-reco { font-family: var(--font-mono); font-size: .65rem; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--accent); }
-.agp-connect .is-on .ast-tool-reco { color: var(--on-sun); }
-.agp-connect .ast-plans, .agp-connect .ast-warn, .agp-connect .ast-note { margin: .6rem 0 0; font-size: .85rem; line-height: 1.5; font-weight: 600; color: var(--text-dim); }
-.agp-connect .ast-warn { color: var(--accent); }
-/* The steps are the numbered list (IndexList, the guide takes `stepRows`; Jouni's decision "Numbered list"); their place only. */
-.agp-connect .ast-step-rows { margin: 1rem 0 0; }
-.agp-connect .ast-cmd { display: flex; align-items: center; gap: 1rem; margin: 1rem 0 0; }
-.agp-connect .ast-cmd-text { flex: 1 1 0; min-width: 0; margin: 0; font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.agp-connect .ast-params-head { font-size: .68rem; font-weight: 800; letter-spacing: calc(var(--shape-tracking-label) * 1.2); text-transform: var(--shape-case-label); color: var(--accent); margin-bottom: .8rem; }
-.agp-connect .ast-code { font-family: var(--font-mono); font-size: .82rem; background: var(--bg-surface); padding: 2px 6px; overflow-wrap: anywhere; }
-.agp-connect .ast-param-empty { font-style: italic; color: var(--text-muted); }
-/* "Official instructions" is the action link's more tone (Jouni's decision "Small link"); its place only. */
-.agp-connect .ast-docs { margin-top: .9rem; }
-.agp-connect-folds { margin-top: 1.6rem; }
-.agp-connect-folds .og-fold-sec { padding: 0; border-top: 0; }
-.agp-connect-folds .og-fold--toggle { border-bottom: 1px solid var(--border); }
-.agp-connect-folds .og-fold--toggle i { display: none; }
-.agp-connect-folds .og-fold-arrow { margin-left: auto; }
-.agp-connect-folds .og-fold-body { padding: .2rem 0 1.2rem; }
-.agp-connect-folds .poster-slab { margin-top: .2rem; }
-.agp-connect-folds .og-input { max-width: 24rem; }
-
-/* ── 04 The agents: the search, the quiet filter line, the table ───────────────────────────── */
-.agp-filters { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin: 0 0 1rem; }
-.agp-filters .poster-label { flex: none; }
-.agp-filters-groupby { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
-.agp-filters .select-field { width: auto; }
-/* The table is the Listing (css/components/listing.css), cut name-runs-access-last-doors: the
-   platform rides as a chip beside the name, because the main column beside the rail is 650px at
-   1280 and a sixth column left the name three characters. A closed row opens its agent when
-   pressed anywhere, and its name turns coral under the pointer or when the agent is in trouble. */
-.og-agp .listing-row.agp-row > div { cursor: pointer; }
-.agp-row:hover .agp-nm-text { color: var(--accent); }
-.agp-row--problem .agp-nm-text { color: var(--accent); }
-.og-agp .agp-row .listing-name .poster-chip { margin-left: .45rem; vertical-align: middle; }
-/* The unseen mark beside a name is the status dot (css/components/status-dot.css); its place only. */
-.og-agp .agp-row .listing-name .status-dot { margin: 0 0 0 .6rem; vertical-align: middle; }
-/* The heading over a group of agents is the Group heading (.poster-day-title); its row and place only. */
-.agp-group-head { display: flex; align-items: center; gap: .8rem; margin: 1.6rem 0 .4rem; padding: .6rem 0 .35rem; }
-.agp-group-empty { padding: .6rem 0; }
-.agp-group-bar { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin: 0 0 .6rem; }
-.agp-group-bar .poster-hint { margin: 0; }
 .og-agp .pf-agd-dnd-row { position: relative; }
 .og-agp .pf-agd-dnd-grip { position: absolute; left: -1.3rem; top: .6rem; }
-.og-agp .pf-agd-active { margin: 0 0 1.4rem; }
-
-/* ── The opened agent: masthead B ──────────────────────────────────────────────────────────── */
-.agp-card { padding: 1.1rem 0 1.5rem; border-bottom: 2px solid var(--text); margin-bottom: .6rem; }
-.agp-mast { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; cursor: pointer; }
-.agp-words { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
-.agp-title { overflow-wrap: anywhere; cursor: pointer; margin-bottom: 1rem; }
-.agp-title .agp-caret { font-family: var(--font-showroom-body); font-size: .8rem; color: var(--sun); margin-right: .6rem; vertical-align: middle; }
-.agp-id { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
 .agp-chips { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .agp-chips button.poster-chip { cursor: pointer; }
-/* Tags ride in the same row; the add field is an underline. */
 .agp-chips .pf-agd-tag-strip { display: contents; }
-.agp-chips .pf-agd-tag-add-input { width: 8rem; }
-/* The capabilities, opened from their chip: the row's whole width, under the chips. */
-.agp-caps { display: flex; flex-basis: 100%; flex-wrap: wrap; gap: .4rem; margin-top: .2rem; }
-.agp-side { display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; flex: none; }
-.agp-side .agp-host { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
-/* How it runs: one sentence and one door, or the switch when the door is open. */
-/* How it runs is the row (.poster-row, its two hairlines); its place and padding only. */
-.agp-runs { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.1rem; padding: .7rem 0; }
-.agp-runs .poster-label { flex: none; }
-.agp-runs .pf-agd-runmode { flex-basis: 100%; margin: .3rem 0 0; padding: 0; }
-.og-agp .pf-agd-runmode-label { display: none; }
-/* The status banner an agent carries while it is new, onboarding or in trouble. */
-.og-agp .pf-agd-zone2 { margin-top: 1rem; }
-.og-agp .pf-agd-zone2--production { display: none; }
-/* The tabs in three groups; the selected one on the sun. */
-.agp-nav { display: flex; gap: 0 2rem; flex-wrap: wrap; margin-top: 1rem; padding-bottom: .2rem; }
-.agp-nav-group { display: flex; flex-direction: column; gap: .5rem; padding: .4rem 0 .6rem; }
-.agp-tabs { display: flex; gap: .9rem; align-items: center; flex-wrap: wrap; row-gap: .6rem; }
-.agp-panel { padding-block: .4rem .6rem; margin-top: .4rem; }
-.og-agp .pf .pf-agd-tab-content, .og-agp .pf-agd-tab-content { padding: 0; min-height: 0; }
-
-@media (max-width: 1100px) {
-  .agp-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .agp-mast { flex-wrap: wrap; }
-  .agp-side { align-items: flex-start; }
-  .agp-nav { gap: 0 1.4rem; }
-}
-@media (max-width: 700px) {
-  .agp-form { grid-template-columns: 1fr; gap: .4rem 0; }
-  .agp-form-k { padding-top: .8rem; }
-  .agp-choices { grid-template-columns: 1fr; }
-  .agp-tabs { gap: .7rem; }
-}

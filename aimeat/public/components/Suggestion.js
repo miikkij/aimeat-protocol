@@ -6,9 +6,19 @@
  *   conversation, and the choices an agent offered in a fenced ```aimeat-choices block. Its look is
  *   css/components/suggestion.css; the catalogue entry is `suggestion`.
  * @structure Suggestions({ children }) · Suggestion({ disabled, onClick, children }) ·
- *   Choices({ options, onPick, disabled }) · choicesIn(text) · stripChoices(text)
+ *   Choices({ options, onPick, disabled, question, chosen, other }) · choicesIn(text) · stripChoices(text)
  * @usage html`<${Choices} options=${choicesIn(text)} onPick=${send} />`
+ *        html`<${Choices} question=${p.question} options=${p.options} onPick=${answer} disabled=${locked}
+ *          chosen=${answered} other=${{ label: t('x.other'), onPick: writeOther, chosen: otherChosen }} />`
+ *   `question`: the choices answer a question the agent asked (an agent's option-prompt in its
+ *   Messages tab): its words stand over them, `chosen` is the answer already given (coral, pressed,
+ *   still full while the others are greyed), `other` one more choice in italics that hands the
+ *   question to the typing box, and `disabled` greys them once a newer message has locked the question.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — Choices takes `question`, `chosen` and `other` (an agent's option-prompt
+ *     from its Messages tab), putting back main's markers the previous branch lost there: the chosen
+ *     answer in coral, "Other" in italics, a locked question's choices greyed. Additive: without
+ *     `question` the chat's choices draw as before.
  *   v1.1.0 — 2026-09-24 — `caps` removed: every suggestion reads as a sentence (Jouni's decision
  *     "Suggestion").
  *   v1.0.0 — 2026-09-23 — Choices, choicesIn and stripChoices moved out of views/chat/parts.js, and
@@ -78,7 +88,11 @@ export function Suggestion({ disabled, onClick, children }) {
  * per line. It survives any model and any version of goose, and a client that has never heard of it
  * shows a code block rather than breaking.
  */
-export function Choices({ options, onPick, disabled }) {
+export function Choices({ options, onPick, disabled, question, chosen, other }) {
+    if (question !== undefined && question !== null) {
+        return html`<${AskedChoices} question=${question} options=${options} onPick=${onPick}
+            disabled=${disabled} chosen=${chosen} other=${other} />`;
+    }
     if (!options || options.length === 0) return null;
     return html`
         <div class="poster-choices">
@@ -86,6 +100,28 @@ export function Choices({ options, onPick, disabled }) {
                 <button type="button" class="btn-outline poster-suggestion" key=${i}
                     disabled=${disabled} onClick=${() => onPick(opt)}>${opt}</button>`)}
             <span class="poster-choices-note">${tr('chat.choicesNote', 'or say something else')}</span>
+        </div>
+    `;
+}
+
+/**
+ * The choices under a question the agent asked: its words over them, the answer already given in
+ * coral and pressed, "Other" in italics (it hands the question to the typing box), all of them greyed
+ * once a newer message has locked the question.
+ */
+function AskedChoices({ question, options, onPick, disabled, chosen, other }) {
+    const cls = (on, extra) => ['btn-outline', 'poster-suggestion', extra, on && 'poster-suggestion--chosen'].filter(Boolean).join(' ');
+    return html`
+        <div class="poster-choices poster-choices--asked">
+            <p class="poster-choices-q">${question}</p>
+            ${(options || []).map((opt) => html`
+                <button type="button" class=${cls(chosen === opt)} key=${opt}
+                    aria-pressed=${chosen === opt ? 'true' : undefined}
+                    disabled=${disabled} onClick=${() => onPick(opt)}>${opt}</button>`)}
+            ${other ? html`
+                <button type="button" class=${cls(other.chosen, 'poster-suggestion--other')}
+                    aria-pressed=${other.chosen ? 'true' : undefined}
+                    disabled=${disabled} onClick=${() => other.onPick?.()}>${other.label}</button>` : null}
         </div>
     `;
 }

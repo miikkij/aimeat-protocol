@@ -1,0 +1,20 @@
+/**
+ * @file doc-view.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A document as a person reads it (components/DocView.js): the bar with its title and
+ *   tools, the facts under it, the text at a reading width, the framed text of the document's own
+ *   window (the raised box is poster.css's), and the editor's fallback of two columns (DocSplit).
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Moved out of views/profile.css (.pj-doc-toolbar, .pj-doc-vtitle, .pj-doc-meta,
+ *     .pj-doc-view and its reading width, .pj-doc-grid) and views/organism.css (the unframed text inside
+ *     a workspace page) under the component's own names (page migration G2b).
+ */
+
+.doc-view-bar { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: .4rem; }
+.doc-view-title { flex: 1; font-weight: 700; font-size: 1.05rem; color: var(--text); }
+.doc-view-facts { margin: 0 0 .5rem; }
+.doc-view-body--framed { padding: 1.4rem 1.8rem; margin: .4rem 0; }
+.doc-view-body .md-body { max-width: 78ch; }
+.doc-split { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+@media (max-width: 640px) { .doc-split { grid-template-columns: 1fr; } }

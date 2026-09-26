@@ -9,6 +9,14 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — .og-fold-sec--inner: a fold inside a part without its number (FoldSection
+ *     inner; the Agents page's .agp-connect-folds rules moved in), page group G1a.
+ *   v1.3.0 — 2026-09-26 — .og-fold-r--clip: a long detail cut with … (FoldSection clip; the MCP
+ *     page's .og-mcp .og-fold-r rule moved in) and .og-fold-sec--wrap: the detail under the title under
+ *     1100px (FoldSection wrap; the Offers page's rule moved in), page group G6.
+ *   v1.2.0 — 2026-09-26 — A row's own doors beside its button (.fold-row-line, .fold-row-doors), shown
+ *     while the pointer or the keyboard is on the row, as main's memory key groups did
+ *     (.mem-group-actions); drawn by FoldRow `doors` (page group G3).
  *   v1.1.0 — 2026-09-26 — The done tone, .og-fold--done: a finished step's number in green, a meaning (formerly calibrator-poster.css .cal-step.is-done).
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
  */
@@ -18,6 +26,14 @@
 .og-folds .og-fold:last-child { border-bottom: 0; }
 .og-fold i { font-family: var(--font-mono); font-size: .78rem; font-style: normal; color: var(--accent); flex: 0 0 4.2rem; }
 .og-fold-r { margin-left: auto; font-family: var(--font-mono); font-size: .75rem; font-weight: 500; color: var(--text-dim); white-space: nowrap; }
+/* A long detail cut with … on its one line (FoldSection clip; formerly the MCP page's own rule). */
+.og-fold-r--clip { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A folded section whose detail goes under its title on a narrower screen (FoldSection wrap;
+   formerly offers-poster.css .og-op .og-fold / .og-fold-r at 1100px). */
+@media (max-width: 1100px) {
+  .og-fold-sec--wrap > .og-fold { flex-wrap: wrap; row-gap: .35rem; }
+  .og-fold-sec--wrap > .og-fold > .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
+}
 .og-fold-arrow { font-family: var(--font-poster); font-size: 1.1rem; color: var(--text); margin-left: .6rem; }
 .og-fold--toggle { width: 100%; background: none; border: 0; border-bottom: 0; padding: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: 1.05rem; }
 .og-fold--toggle i { flex-basis: 2rem; }
@@ -26,9 +42,22 @@
 .og-fold--toggle:hover span:first-of-type { color: var(--accent); }
 .og-fold-sec.is-open .og-fold--toggle { margin-bottom: .9rem; }
 .og-fold-body { display: flex; flex-direction: column; gap: .8rem; }
+/* A fold inside a part, one of several under one rule (FoldSection inner; formerly agents-poster.css
+   .agp-connect-folds): no section rule and no number, a hairline under its row, the arrow at the end. */
+.og-sec.og-fold-sec--inner { padding: 0; border-top: 0; }
+.og-fold-sec--inner > .og-fold--toggle { border-bottom: 1px solid var(--border); padding: .8rem 0; }
+.og-fold-sec--inner > .og-fold--toggle i { display: none; }
+.og-fold-sec--inner > .og-fold--toggle .og-fold-arrow { margin-left: auto; }
+.og-fold-sec--inner > .og-fold-body { padding: .2rem 0 1.2rem; }
 .og-fold-name { font-weight: 700; min-width: 0; }
 .og-fold-door { font-size: .72rem; flex: none; }
 .og-fold--event { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .95rem; }
 .og-fold--event:hover b { color: var(--accent); }
 .og-fold--event b { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-fold-who { color: var(--text-dim); font-weight: 600; white-space: nowrap; }
+/* A row with its own doors: the line carries the rule, the row's button takes the room, and the
+   doors show while the pointer or the keyboard is on the line (main's .mem-group-actions). */
+.fold-row-line { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.fold-row-line > .og-fold { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.fold-row-doors { display: inline-flex; align-items: center; gap: .15rem; margin-left: .6rem; opacity: 0; transition: opacity .15s; }
+.fold-row-line:hover .fold-row-doors, .fold-row-line:focus-within .fold-row-doors { opacity: 1; }

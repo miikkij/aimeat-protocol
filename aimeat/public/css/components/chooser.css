@@ -9,6 +9,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.1 — 2026-09-27 — The setup guide's names inside the connect box follow the guide's own
+ *     (.ast-tools → .setup-guide-tools, .ast-code → .setup-guide-code); same look.
  *   v1.2.0 — 2026-09-24 — The panel and the framed box read the theme's shape values (a move).
  *   v1.1.0 — 2026-09-24 — The setup guide's tool tabs take the chooser's tab spacing.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
@@ -25,8 +27,8 @@
 .poster-chooser-status { justify-content: space-between; }
 .poster-chooser-connect { border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner-control); padding: 1rem; margin-block: 1rem; min-width: 0; }
 /* The setup guide's tools are tabs here (Jouni's decision "Choice"), spaced as the chooser's own tabs. */
-.poster-chooser-connect .ast-tools { flex-wrap: wrap; gap: .8rem; align-items: center; }
-.poster-chooser-connect .ast-code, .poster-chooser-connect pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.poster-chooser-connect .setup-guide-tools { flex-wrap: wrap; gap: .8rem; align-items: center; }
+.poster-chooser-connect .setup-guide-code, .poster-chooser-connect pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .poster-chooser-details { border-top: 1px solid var(--border); padding-block: 1rem; }
 .poster-chooser-details summary { cursor: pointer; min-height: 44px; font-weight: var(--font-poster-strong-weight); }
 .poster-chooser-result { overflow-wrap: anywhere; }

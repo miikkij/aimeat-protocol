@@ -1,0 +1,15 @@
+/**
+ * @file public/css/components/page-preview.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The page preview (components/PagePreview.js): the sandboxed frame that shows a web
+ *   page as it will look, the whole width of its raised box, 34rem high (24rem on a phone), on the
+ *   card ground. The values of main's .pf-prev-frame (Portfolio).
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial (page group G8), from views/portfolio-poster.css .pf-prev-frame.
+ */
+.page-preview-frame { display: block; width: 100%; height: 34rem; border: 0; background: var(--card-bg); }
+
+@media (max-width: 860px) {
+  .page-preview-frame { height: 24rem; }
+}

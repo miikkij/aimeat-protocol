@@ -1,0 +1,150 @@
+/**
+ * @file conversation-pane.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The messenger's frame (components/ConversationPane.js): the two panes, the open pane's
+ *   column and head, the "replying to" bar, the read-only line, the compose fields, a scrolling part
+ *   and a strip across the pane; on a phone one pane at a time with the way back, and the open one
+ *   over the whole screen. Reads only the tokens in theme.css and the shapes in poster.css; a page
+ *   never styles it from outside.
+ * @usage Linked from public/spa.html in the component block.
+ * @version-history
+ *   v1.0.1 — 2026-09-26 — The reply bar's left edge reads var(--shape-frame-heavy) (3px in AIMEAT), not
+ *     a literal (check:shape-tokens; fix pass).
+ *   v1.0.0 — 2026-09-26 — Initial, moved with their values from css/views/inbox.css and
+ *     inbox-poster.css (see ConversationPane.js).
+ */
+
+/* ── The two panes, their own scroll. The height is MEASURED (use-thread-ux.js publishes
+   --conversation-desk-avail); the old guess stays as the first paint's fallback. ── */
+.conversation-panes {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  height: var(--conversation-desk-avail, calc(100vh - 300px));
+  min-height: 320px;
+  overflow: hidden;
+  background: transparent;
+}
+.conversation-panes-side {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+}
+/* The way back: on a phone only. */
+.conversation-panes-back {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--card-bg);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ── The open pane's column. min-height:0 lets it keep to the panes' height instead of growing to
+   fit a long thread. The pane's width decides what its head shows (a container query). ── */
+.conversation-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; container-type: inline-size; container-name: thread; }
+.conversation-pane--empty { align-items: center; justify-content: center; }
+.conversation-pane-empty { text-align: center; color: var(--text-dim); font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+/* A page's column: its height follows its words, and the page head already says what the pane's
+   head would. */
+.conversation-pane--page { height: auto; }
+.conversation-pane--page > .conversation-head { display: none; }
+.conversation-pane--page .conversation-fields { padding: 0 0 .8rem; }
+
+/* ── The head: who and what on ONE line on a computer (the address is the name's tooltip); the
+   name never shrinks, the subject gives way. ── */
+.conversation-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: .6rem 1rem;
+  border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+  flex: none;
+}
+.conversation-head-id { min-width: 0; flex: 1; display: flex; align-items: baseline; gap: 8px; }
+.conversation-head-id > * { min-width: 0; }
+.conversation-head-name { flex: 0 0 auto; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conversation-head-subject { flex: 1 1 auto; font-family: var(--font-mono); font-size: 12px; color: var(--accent); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conversation-head-via { flex: none; font-size: 12px; color: var(--text-dim); margin-top: 1px; white-space: nowrap; }
+/* The address: in the page for anyone who needs it, out of the conversation's way. */
+.conversation-head-address { display: none; font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conversation-head-door { flex: none; white-space: nowrap; }
+.conversation-head-mark { font-size: 13px; line-height: 1; margin-right: 5px; }
+/* The ways on answer to the pane, not the window: a wide window can hold a narrow pane. */
+@container thread (max-width: 620px) {
+  .conversation-head-word { display: none; }
+  .conversation-head-mark { margin-right: 0; }
+  .conversation-head { gap: 6px; padding: 8px 10px; }
+}
+@container thread (max-width: 430px) {
+  .conversation-head-id .conversation-head-subject { display: none; }
+}
+
+/* ── Over and in the composer's place ── */
+.conversation-fields { padding: 12px 12px 0; }
+.conversation-replybar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--card-bg-alt);
+}
+.conversation-replybar-main {
+  flex: 1; min-width: 0; text-align: left; cursor: pointer;
+  border: none; border-left: var(--shape-frame-heavy) solid var(--accent);
+  background: transparent; padding: 2px 0 2px 8px;
+  font: inherit; color: inherit;
+}
+.conversation-replybar-label { display: block; font-size: 11px; font-weight: 600; color: var(--accent); }
+.conversation-replybar-text {
+  display: block; font-size: 12px; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.conversation-pane-note {
+  border-top: 1px solid var(--border-subtle);
+  padding: 12px 16px; color: var(--text-dim); font-size: 13px; text-align: center;
+}
+
+/* ── A scrolling part and a strip across the pane ── */
+.conversation-pane-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.conversation-strip { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border-subtle); }
+.conversation-strip--grey { padding: 10px 12px; background: var(--card-bg-alt); }
+
+/* ── A phone: one pane at a time, the way back over the open one, the open one over the whole screen
+   (the app's bar, menu and crumb are covered; the way back closes it). ── */
+@media (max-width: 760px) {
+  .conversation-panes { grid-template-columns: 1fr; height: var(--conversation-desk-avail, calc(100dvh - 168px)); min-height: 240px; }
+  .conversation-panes-side { border-right: none; }
+  .conversation-panes:not(.conversation-panes--open) > .conversation-pane { display: none; }
+  .conversation-panes:not(.conversation-panes--open) > .conversation-panes-side { height: 100%; }
+  .conversation-panes--open { grid-template-rows: auto minmax(0, 1fr); position: fixed; inset: 0; z-index: 1000; margin: 0; border-top: 0;
+    height: var(--conversation-avail, 100dvh); background: var(--bg, var(--card-bg)); }
+  .conversation-panes--open > .conversation-panes-side { display: none; }
+  .conversation-panes--open > .conversation-panes-back { display: inline-flex; }
+  body:has(.conversation-panes--open) { overflow: clip; }
+  body:has(.conversation-panes--open) .topnav { display: none; }
+  .conversation-head { padding: 10px 12px; gap: 8px; flex-wrap: wrap; row-gap: 2px; }
+  .conversation-fields { padding: 10px 10px 0; }
+  .conversation-head-word { display: none; }
+  /* The head's id column flattens into the head's line, and the subject, "via" and the address take
+     full lines under it (the subject at most two), so a long subject never eats half the screen. */
+  .conversation-head .conversation-head-id { display: contents; }
+  .conversation-head .conversation-head-name { flex: 1 1 0; min-width: 0; }
+  .conversation-head .conversation-head-subject,
+  .conversation-head .conversation-head-via,
+  .conversation-head .conversation-head-address { display: block; order: 1; flex: 0 0 100%; min-width: 0; margin-top: 0; }
+  .conversation-head .conversation-head-subject {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

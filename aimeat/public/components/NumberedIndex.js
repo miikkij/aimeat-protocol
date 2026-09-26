@@ -8,12 +8,15 @@
  *   it already runs, and its actions, in an opened record (poster.css .poster-record). Its look is
  *   css/components/numbered-index.css; the catalogue entry is `numbered-index`.
  * @structure NumberedIndex({ lead, label, tour, children, panel }) · IndexItem({ on, expanded, onClick, first, line, end, children }) ·
- *   IndexList({ steps, className, children }) · IndexStep({ line, end, children }) · IndexPanel({ what, steps, proof, children })
+ *   IndexList({ steps, className, children }) · IndexStep({ line, end, endWord, children }) · IndexPanel({ what, steps, proof, children })
  * @usage
  *   html`<${NumberedIndex} lead=${…} label=${…} tour=${{ href, label }} panel=${open && html`<${IndexPanel} …/>`}>
  *     ${items.map((i) => html`<${IndexItem} on=${…} expanded=${…} onClick=${…}>…<//>`)}
  *   <//>`
  * @version-history
+ *   v1.3.0 — 2026-09-26 — IndexStep `endWord`: the word before the arrow given as words, drawn as the
+ *     fold row's mono word at the right (the basic agents' "you have it"), so a page passes no class
+ *     (additive, G1a).
  *   v1.2.0 — 2026-09-26 — Two more tones and a cut (Jouni's decision "Numbered list"): `line`, a line
  *     under the name that says what it gives you; `first`, the one to do first, on the sun with every
  *     mark dark; IndexList, the rows under a page's own heading, and IndexStep, a row of a list of
@@ -81,10 +84,11 @@ export function IndexList({ steps = false, className = '', children }) {
 
 /**
  * One step of a list of steps: a numbered row that opens nothing.
- * @param {{ line?: any, end?: any, children?: any }} props
+ * @param {{ line?: any, end?: any, endWord?: any, children?: any }} props
  */
-export function IndexStep({ line, end, children }) {
-  return html`<li class="poster-index-item poster-index-item--step">${rowBody(children, line, end, true)}</li>`;
+export function IndexStep({ line, end, endWord, children }) {
+  const last = end || (endWord ? html`<span class="og-fold-r">${endWord}</span>` : null);
+  return html`<li class="poster-index-item poster-index-item--step">${rowBody(children, line, last, true)}</li>`;
 }
 
 /**

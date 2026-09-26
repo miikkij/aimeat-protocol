@@ -12,9 +12,14 @@
  *   In the three flat views every offer is a tile, and a tile is a link that opens the offer's page
  *   in a new tab through ?tab=offers&offer=<agent>/<id>, which offers-tab.js reads on a cold
  *   navigation. The chosen view is remembered in localStorage.
- * @structure MapPage · offerHref · tile · columnsView · gridView · tilesView · treeView
+ * @structure MapPage · offerHref
  * @usage import { MapPage } from './map-page.js';  html`<${MapPage} ctx=${ctx} />`
  * @version-history
+ *   v2.0.0 — 2026-09-26 — The four views are the OfferMap component (components/OfferMap.js, a special
+ *     view with its own sheet): the page passes the groups, the chart and what a press on the tree
+ *     does. The views' choice is the fold Tabs, the search the SearchLine, the tags data, the notes
+ *     Note. The page writes no class (page group G6). The grid's column cuts come back (main's
+ *     op-matrix--n1…n6; the previous branch had lost them).
  *   v1.5.0 — 2026-09-25 — A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
  *   v1.4.0 — 2026-09-25 — A framed box around one thing is the Object box (.poster-box; on a grey ground its copy tone), in the tone its look already was (Jouni's decision "Object box", a unification).
  *   v1.3.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
@@ -30,11 +35,13 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
-import { Mermaid } from '/components/Mermaid.js';
 import { buildMermaid, filterOffers, NEED_DISPLAY_ORDER } from '/js/services/offers-grouping.js';
+import { OfferMap } from '/components/OfferMap.js';
+import { SearchLine } from '/components/List.js';
+import { Tabs } from '/components/Tabs.js';
+import { Note } from '/components/Note.js';
 import { groupItems } from './model.js';
 import { c, agentMark, renderPage } from './frame.js';
-import { Hint } from '/components/Hint.js';
 
 const MODES = ['tree', 'columns', 'grid', 'tiles'];
 const MODE_KEY = 'aimeat.offers.map-view';
@@ -50,62 +57,6 @@ const readMode = () => {
 };
 const saveMode = (v) => { try { localStorage.setItem(MODE_KEY, v); } catch (err) { swallowed('map-page: mode', err); } };
 
-/** The small "opens elsewhere" mark in a tile's corner; a fresh node each time, Preact keeps them apart. */
-const outMark = () => html`<svg class="op-tile-out" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><path d="M14 4h6v6" /><path d="M20 4L10 14" /><path d="M18 14v6H4V6h6" /></svg>`;
-
-/** One offer as a link that opens its page in a new tab. A line tile sits in a grid row that already names the agent. */
-const tile = (it, { line = false, compact = false } = {}) => html`
-  <a class=${`op-tile ${line ? 'op-tile--line' : ''} ${compact ? 'op-tile--compact' : ''}`} key=${it.key} href=${offerHref(it)} target="_blank" rel="noopener" title=${it.offer.title}>
-    <span class="op-tile-t"><span>${it.offer.title}</span>${outMark()}</span>
-    ${line ? null : agentMark(it)}
-  </a>`;
-
-const groupHead = (g) => html`<div class="op-col-h poster-day-title"><span>${needLabel(g.key)}</span><em>${g.items.length}</em></div>`;
-
-/* ── Columns: one per need, side by side ───────────────────────────────────────────────────── */
-const columnsView = (groups) => html`
-  <div class="op-cols">
-    ${groups.map(g => html`<div class="op-col" key=${g.key}>${groupHead(g)}${g.items.map(it => tile(it))}</div>`)}
-  </div>`;
-
-/* ── Grid: a row per agent, a column per need ──────────────────────────────────────────────── */
-function gridView(groups, items) {
-  const order = new Map(groups.map((g, i) => [g.key, i]));
-  const byAgent = new Map();
-  for (const it of items) { if (!byAgent.has(it.agent)) byAgent.set(it.agent, []); byAgent.get(it.agent).push(it); }
-  const first = (list) => Math.min(...list.map(it => order.get(it.need) ?? 99));
-  const rows = [...byAgent.entries()].sort(([a, ai], [b, bi]) => first(ai) - first(bi) || a.localeCompare(b));
-  return html`
-    <div class=${`op-matrix op-matrix--n${groups.length}`}>
-      <div class="op-mx-head op-mx-head--agent poster-day-title">${c('colAgent')}</div>
-      ${groups.map(g => html`<div class="op-mx-head poster-day-title" key=${'h' + g.key}><span>${needLabel(g.key)}</span><em>${g.items.length}</em></div>`)}
-      ${rows.map(([agent, list]) => html`
-        <div class=${`op-mx-agent ${list[0].online ? '' : 'op-mx-agent--off'}`} key=${'a' + agent}>${agentMark(list[0])}</div>
-        ${groups.map(g => html`<div class="op-mx-cell" key=${agent + '/' + g.key}>${list.filter(it => it.need === g.key).map(it => tile(it, { line: true }))}</div>`)}`)}
-    </div>`;
-}
-
-/* ── Tiles: a block per need, wider the more it holds ──────────────────────────────────────── */
-const tilesView = (groups) => html`
-  <div class="op-blocks">
-    ${groups.map(g => html`<div class="op-block poster-box poster-box--copy" key=${g.key} style=${`--op-n:${g.items.length}`}>
-      ${groupHead(g)}
-      <div class="op-block-tiles">${g.items.map(it => tile(it, { compact: true }))}</div>
-    </div>`)}
-  </div>`;
-
-/* ── Tree: the Mermaid flowchart, a click opens the offer in place ─────────────────────────── */
-function treeView(ctx, groups) {
-  const src = buildMermaid(t('profile.tabs.offers'), groups.map(g => ({ label: needLabel(g.key), items: g.items })));
-  const onMapClick = (e) => {
-    const id = e.target?.closest?.('.node')?.id || '';
-    const leaf = /g(\d+)o(\d+)/.exec(id);
-    const it = leaf ? groups[+leaf[1]]?.items?.[+leaf[2]] : null;
-    if (it) ctx.pickView({ kind: 'offer', key: it.key });
-  };
-  return html`<div class="op-map" onClick=${onMapClick}><${Mermaid} chart=${src} /></div>`;
-}
-
 export function MapPage({ ctx }) {
   const [mode, setMode] = useState(readMode);
   const [q, setQ] = useState('');
@@ -113,23 +64,25 @@ export function MapPage({ ctx }) {
   const shown = filterOffers(m.items, q, needLabels());
   const groups = groupItems(shown, 'need');
   const pick = (v) => { setMode(v); saveMode(v); };
-  const doors = MODES.map(id => html`<button type="button" class=${`poster-tab poster-tab--fold ${mode === id ? 'is-on' : ''}`} key=${id} onClick=${() => pick(id)}>${t('profile.offers.mapView.' + id)}</button>`);
-  const chips = html`
-    <span class="poster-chip">${c('chipOffers', { n: m.items.length })}</span>
-    ${q.trim() ? html`<span class="poster-chip poster-chip--sun">${t('profile.offers.mapShown', { n: shown.length })}</span>` : null}`;
-  const body = !shown.length ? html`<p class="poster-quiet">${t('profile.offers.noMatch')}</p>`
-    : mode === 'tree' ? treeView(ctx, groups)
-    : mode === 'grid' ? html`<div class="op-map">${gridView(groups, shown)}</div>`
-    : mode === 'tiles' ? tilesView(groups)
-    : columnsView(groups);
+  // What the map draws: each need's label and its offers as tiles (title, address, agent's tag).
+  const mapGroups = groups.map(g => ({
+    key: g.key, label: needLabel(g.key),
+    items: g.items.map(it => ({ key: it.key, title: it.offer.title, href: offerHref(it), agent: it.agent, online: it.online, mark: agentMark(it) })),
+  }));
+  const chart = mode === 'tree' ? buildMermaid(t('profile.tabs.offers'), groups.map(g => ({ label: needLabel(g.key), items: g.items }))) : null;
+  const onPick = (gi, oi) => { const it = groups[gi]?.items?.[oi]; if (it) ctx.pickView({ kind: 'offer', key: it.key }); };
   return renderPage(ctx, {
-    id: 'map', crumbs: [c('map')], title: t('profile.offers.mapTitle'), chips, doors,
+    id: 'map', crumbs: [c('map')], title: t('profile.offers.mapTitle'),
+    marks: [
+      { label: c('chipOffers', { n: m.items.length }) },
+      q.trim() ? { label: t('profile.offers.mapShown', { n: shown.length }), tone: 'sun' } : null,
+    ],
+    actions: html`<${Tabs} tone="fold" kind="view" value=${mode} onSelect=${pick} items=${MODES.map(id => ({ value: id, label: t('profile.offers.mapView.' + id) }))} />`,
+    desc: t('profile.offers.mapDesc'),
     children: html`
-      <p class="og-desc og-desc--page">${t('profile.offers.mapDesc')}</p>
-      <div class="search-line op-map-search">
-        <input class="og-input" type="search" value=${q} placeholder=${t('profile.offers.mapSearch')} aria-label=${t('profile.offers.mapSearch')} onInput=${(e) => setQ(e.target.value)} />
-      </div>
-      ${body}
-      <${Hint}>${mode === 'tree' ? t('profile.offers.mapNote') : t('profile.offers.mapNoteTab')}<//>`,
+      <${SearchLine} value=${q} placeholder=${t('profile.offers.mapSearch')} label=${t('profile.offers.mapSearch')} onInput=${(e) => setQ(e.target.value)} />
+      ${!shown.length ? html`<${Note} kind="quiet">${t('profile.offers.noMatch')}<//>`
+        : html`<${OfferMap} mode=${mode} groups=${mapGroups} chart=${chart} onPick=${onPick} agentLabel=${c('colAgent')} />`}
+      <${Note}>${mode === 'tree' ? t('profile.offers.mapNote') : t('profile.offers.mapNoteTab')}<//>`,
   });
 }

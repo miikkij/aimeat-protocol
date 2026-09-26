@@ -8,6 +8,9 @@
  * @structure DEMOS · demoFor(id) · isLabOnly(id)
  * @usage import { demoFor } from './demos.js';
  * @version-history
+ *   v1.6.0 — 2026-09-27 — The demos of Settings & Controls on components: the kit, the fields, the page parts, the
+ *     list and the special views (demos-kit.js, demos-fields.js, demos-page-kit.js, demos-list.js,
+ *     demos-views-knowledge.js, demos-views-work.js).
  *   v1.5.0 — 2026-09-25 — The demos of Settings & Controls (demos-settings.js).
  *   v1.4.0 — 2026-09-24 — `theme:sampler`, the parts a theme changes most (Themes & Styles' preview).
  *   v1.3.0 — 2026-09-23 — `after:<id>`, each variant as it would look after the proposal; `solo`.
@@ -21,10 +24,20 @@ import { CONVERSATION_DEMOS } from './demos-conversation.js';
 import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
 import { SHELL_DEMOS } from './demos-shell.js';
 import { SETTINGS_DEMOS } from './demos-settings.js';
+import { KIT_DEMOS } from './demos-kit.js';
+import { FIELD_DEMOS } from './demos-fields.js';
+import { PAGE_KIT_DEMOS } from './demos-page-kit.js';
+import { LIST_DEMOS } from './demos-list.js';
+import { KNOWLEDGE_VIEW_DEMOS } from './demos-views-knowledge.js';
+import { WORK_VIEW_DEMOS } from './demos-views-work.js';
 import { SAMPLES, PROPOSALS } from './decision-samples.js';
 import { THEME_SAMPLER } from './theme-sampler.js';
 
-export const DEMOS = { ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHELL_DEMOS, ...SETTINGS_DEMOS, ...SHAPE_DEMOS };
+export const DEMOS = {
+  ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHELL_DEMOS, ...SETTINGS_DEMOS,
+  ...KIT_DEMOS, ...FIELD_DEMOS, ...PAGE_KIT_DEMOS, ...LIST_DEMOS, ...KNOWLEDGE_VIEW_DEMOS, ...WORK_VIEW_DEMOS,
+  ...SHAPE_DEMOS,
+};
 
 /**
  * A decision's variants as a demo: `decision:<id>`, one variant per sample, each measured. `solo`

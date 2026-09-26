@@ -1,0 +1,17 @@
+/**
+ * @file settings-page.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The two layouts of a Settings page that the page kit (tab-page.css, page-head.css)
+ *   did not have a name for (components/SettingsPage.js): the head of a page without a contents
+ *   rail, with the space under it the classic pages gave it (.mb-1, 1rem), and the side column that
+ *   stacks two rails (Memory's key space over the page's own; formerly .mp-side, .op-side,
+ *   .sc-side), where a rail does not stick. Reads no colour and no shape.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial (component plan C9, page parts).
+ */
+
+.settings-page-head { margin-bottom: 1rem; }
+.settings-page-side { display: flex; flex-direction: column; gap: 1rem; }
+.settings-page-side > .og-rail { position: static; }

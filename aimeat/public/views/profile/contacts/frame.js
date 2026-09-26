@@ -10,6 +10,7 @@
  * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
  * @usage import { c, renderPage, peopleRows } from './frame.js';
  * @version-history
+ *   v1.10.0 -- 2026-09-26 -- Every part is a kit component (List with its Lead, Name, Cell, Desc, Who, When and Doors; Mark; Action; SettingsPage with the crumb and the rail as data): the page passes data and writes no class. The people table's heading row is the List's head, as main drew it over the rows (page group G8).
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.8.0 -- 2026-09-26 -- The mark of a sender that is not a person is the avatar's agent tone (.poster-box--agent, css/poster.css), a unification: the look Contacts, Notifications, Email and MCP drew alike.
  *   v1.7.0 -- 2026-09-25 -- The three tables are the Listing (listing, listing-row and its name, words, who and doors cells, the mark in a cell of its own; the people table's heading row inside it), a unification: the look most tabs use.
@@ -32,6 +33,10 @@ import { t } from '/js/i18n.js';
 import { date as fmtDate, compare as fmtCompare } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { PresenceDot } from '/components/PresenceDot.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { List, Row, Lead, Name, Desc, Who, When, Cell, Doors } from '/components/List.js';
+import { Mark, Marks } from '/components/Mark.js';
+import { Action } from '/components/Action.js';
 
 export const c = (key, vars) => t('contacts.cover.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -71,95 +76,112 @@ export function sortPeople(rows) {
   });
 }
 
-const av = (r, agent) => html`<div><div class=${`ct-av poster-box poster-box--avatar ${agent ? 'poster-box--agent' : ''}`} aria-hidden="true">${initials(r)}</div></div>`;
-const tags = (r) => html`<span class="poster-chips">${r.relation ? html`<span class="poster-chip poster-chip--ink">${r.relation}</span>` : null}${(r.tags || []).map(x => html`<span class="poster-chip" key=${x}>${x}</span>`)}</span>`;
-const lastMsg = (r) => (r.last_message_at ? html`<b class="poster-time">${rel(r.last_message_at)}</b><small>${r.last_sender === r.contact_id ? '' : c('youWrote') + ' '}${r.last_message || ''}</small>` : html`<small>${c('noMessagesYet')}</small>`);
+/** The relation (yours: the ink tag) and the tags a person carries. */
+const tags = (r) => html`<${Marks}>${r.relation ? html`<${Mark} tone="ink">${r.relation}<//>` : null}${(r.tags || []).map(x => html`<${Mark} key=${x}>${x}<//>`)}<//>`;
+/** The last message: when, and its first words cut to one line; or that there is none yet. */
+const lastMsg = (r) => (r.last_message_at
+  ? html`<${When} clip at=${`${r.last_sender === r.contact_id ? '' : c('youWrote') + ' '}${r.last_message || ''}`}>${rel(r.last_message_at)}<//>`
+  : html`<${When}>${c('noMessagesYet')}<//>`);
 
-/** Rows of the people table, under its heading row: who, relation and tags, shared organisms, last message, the doors. */
+/** The people table, with its heading row: who, relation and tags, shared organisms, last message, the doors. */
 export function peopleRows(ctx, rows) {
-  return html`<div class="listing listing--cols listing--mark-name-tags-shared-last-doors">
-    <div class="listing-row listing-row--head"><div class="poster-label"></div><div class="poster-label">${c('colName')}</div><div class="poster-label">${c('colRelation')}</div><div class="poster-label">${c('colShared')}</div><div class="poster-label">${c('colLast')}</div><div class="poster-label"></div></div>
+  return html`<${List} cols="mark-name-tags-shared-last-doors" keepCols
+    head=${['', c('colName'), c('colRelation'), c('colShared'), c('colLast'), '']}>
     ${rows.map(r => html`
-      <div class="listing-row" key=${r.contact_id}>
-        ${av(r)}
-        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button>${isPerson(r) ? html` <${PresenceDot} ghii=${r.contact_id} />` : null}<small>${parts(r.contact_id).owner} · ${originWords(r)}</small></div>
-        <div>${tags(r)}</div>
-        <div><span class="ct-m">${(r.shared_organisms || []).length ? r.shared_organisms.map(o => o.name).join(' · ') : '·'}</span></div>
-        <div class="ct-last">${lastMsg(r)}</div>
-        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>
-      </div>`)}
-  </div>`;
+      <${Row} key=${r.contact_id}>
+        <${Lead} text=${initials(r)} />
+        <${Name} onOpen=${() => ctx.openPerson(r.contact_id)} after=${isPerson(r) ? html` <${PresenceDot} ghii=${r.contact_id} />` : null}
+          meta=${`${parts(r.contact_id).owner} · ${originWords(r)}`}>${nameOf(r)}<//>
+        <${Cell}>${tags(r)}<//>
+        <${Cell} meta>${(r.shared_organisms || []).length ? r.shared_organisms.map(o => o.name).join(' · ') : '·'}<//>
+        ${lastMsg(r)}
+        <${Doors}>
+          <${Action} small row soft onClick=${() => ctx.message(r.contact_id)}>${c('message')}<//>
+          <${Action} small row onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}<//>
+        <//>
+      <//>`)}
+  <//>`;
 }
 
-/** Rows of the people without an account: who, tags, the note, the invitation, the doors. */
+/** The people without an account: who, tags, the note, the invitation, the doors. */
 export function noAccountRows(ctx, rows) {
-  return html`<div class="listing listing--cols listing--mark-name-tags-note-state-doors">
+  return html`<${List} cols="mark-name-tags-note-state-doors" keepCols>
     ${rows.map(r => html`
-      <div class="listing-row" key=${r.contact_id}>
-        ${av(r)}
-        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button><small>${r.email || ''}</small></div>
-        <div>${tags(r)}</div>
-        <div class="listing-desc">${r.note || ''}</div>
-        <div><span class="ct-m">${r.invitation ? c('inviteSent', { when: day(r.invitation.created_at) }) : c('notInvited')}</span></div>
-        <div class="listing-doors">${r.invitation ? null : html`<button type="button" class="poster-action poster-action--small poster-action--row" disabled=${ctx.busy} onClick=${() => ctx.invite(r)}>${c('invite')}</button>`}<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>
-      </div>`)}
-  </div>`;
+      <${Row} key=${r.contact_id}>
+        <${Lead} text=${initials(r)} />
+        <${Name} onOpen=${() => ctx.openPerson(r.contact_id)} meta=${r.email || ''}>${nameOf(r)}<//>
+        <${Cell}>${tags(r)}<//>
+        <${Desc}>${r.note || ''}<//>
+        <${Cell} meta>${r.invitation ? c('inviteSent', { when: day(r.invitation.created_at) }) : c('notInvited')}<//>
+        <${Doors}>
+          ${r.invitation ? null : html`<${Action} small row disabled=${ctx.busy} onClick=${() => ctx.invite(r)}>${c('invite')}<//>`}
+          <${Action} small row soft onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}<//>
+        <//>
+      <//>`)}
+  <//>`;
 }
 
-/** Rows of the agents and apps: who, whose, last message, the doors. */
+/** The agents and apps: who, whose, last message, the doors. Their mark is the agent's, dashed. */
 export function agentRows(ctx, rows) {
-  return html`<div class="listing listing--cols listing--mark-name-who-last-doors">
-    ${rows.map(r => { const owner = ctx.personOf(r.owner); return html`
-      <div class="listing-row" key=${r.contact_id}>
-        ${av(r, true)}
-        <div class="listing-name"><span>${nameOf(r)}</span><small>${r.contact_id}</small></div>
-        <div class="listing-who">${r.owner === ctx.me ? c('yours') : owner ? html`<button type="button" class="og-tbl-go" onClick=${() => ctx.openPerson(owner.contact_id)}>${nameOf(owner)}</button>` : parts(r.contact_id).owner}<small>${kindWord(r.kind)}</small></div>
-        <div class="ct-last">${lastMsg(r)}</div>
-        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button>${r.owner === ctx.me ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openTab('agents')}>${c('open')}</button>` : owner ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openPerson(owner.contact_id)}>${c('open')}</button>` : null}</div>
-      </div>`; })}
-  </div>`;
+  return html`<${List} cols="mark-name-who-last-doors" keepCols>
+    ${rows.map(r => {
+      const owner = ctx.personOf(r.owner);
+      const whose = r.owner === ctx.me ? c('yours')
+        : owner ? html`<${Action} tone="text" onClick=${() => ctx.openPerson(owner.contact_id)}>${nameOf(owner)}<//>` : parts(r.contact_id).owner;
+      const open = r.owner === ctx.me ? () => ctx.openTab('agents') : owner ? () => ctx.openPerson(owner.contact_id) : null;
+      return html`
+      <${Row} key=${r.contact_id}>
+        <${Lead} text=${initials(r)} agent />
+        <${Name} meta=${r.contact_id}>${nameOf(r)}<//>
+        <${Who} sub=${kindWord(r.kind)}>${whose}<//>
+        ${lastMsg(r)}
+        <${Doors}>
+          <${Action} small row soft onClick=${() => ctx.message(r.contact_id)}>${c('message')}<//>
+          ${open ? html`<${Action} small row onClick=${open}>${c('open')}<//>` : null}
+        <//>
+      <//>`; })}
+  <//>`;
 }
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
+/** The crumb's steps: Contacts opens the cover once a page stands after it; every part after it is ink. */
 export function crumb(ctx, parts) {
-  return html`
-    <div class="og-crumb">
-      <span>${t('nav.profile')}</span><span>/</span>
-      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('contacts.title')}</button>` : html`<span class="og-crumb-here">${t('contacts.title')}</span>`}
-      ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
-    </div>`;
+  return [
+    t('nav.profile'),
+    parts.length ? { label: t('contacts.title'), onClick: () => ctx.pickView({ kind: 'cover' }) } : t('contacts.title'),
+    ...parts.map((p) => ({ label: p, here: true })),
+  ];
 }
 
+/** The sibling pages in the rail, as data (SettingsPage draws them → … →). */
 export function pageLinks(ctx) {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => ctx.openTab('messages')}><i>→</i>${t('profile.tabs.inbox')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => ctx.openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => ctx.openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>`;
+  return [
+    { onClick: () => ctx.openTab('messages'), label: t('profile.tabs.inbox') },
+    { onClick: () => ctx.openTab('organisms'), label: t('profile.tabs.organisms') },
+    { onClick: () => ctx.openTab('agents'), label: t('profile.tabs.agents') },
+  ];
 }
 
-export function renderPage(ctx, { crumbs, label = null, title, chips = null, doors = null, strip = null, rail = null, children }) {
+/**
+ * A page of Contacts (a person, a form): the crumb, the head with its label, tags and doors, the
+ * strip, and the rail that leads back to the cover, then `railGroups` (each { label, items }), then
+ * the sibling pages.
+ */
+export function renderPage(ctx, { crumbs, label = null, title, marks = [], doors = null, strip = null, railGroups = [], after = null, children }) {
   return html`
-    <div class="og og-ct og-page">
-      ${crumb(ctx, crumbs)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          ${label ? html`<div class="poster-label">${label}</div>` : null}
-          <h1 class="og-title poster-page-title ct-title--page">${title}</h1>
-          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${t('contacts.title')}</span>
-          <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
-          ${rail}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks(ctx)}
-        </nav>
-      </div>
-    </div>`;
+    <${SettingsPage} name="ct" page
+      crumb=${crumb(ctx, crumbs)}
+      label=${label}
+      title=${title}
+      marks=${marks}
+      actions=${doors}
+      strip=${strip}
+      rail=${{ title: c('railTitle'), groups: [
+        { label: t('contacts.title'), items: [{ back: true, key: 'back', label: c('backTo'), onClick: () => ctx.pickView({ kind: 'cover' }) }] },
+        ...railGroups.filter(Boolean),
+        { label: c('pages'), items: pageLinks(ctx).map((p) => ({ mark: '→', count: '→', ...p })) },
+      ] }}
+      after=${after}>
+      ${children}
+    <//>`;
 }

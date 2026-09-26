@@ -18,6 +18,11 @@
  *   html`<${PresenceDot} ghii=${peerGhii} />`            // list dot (self-fetch)
  *   html`<${PresenceDot} status="available" label />`    // controlled + label
  * @version-history
+ *   v1.1.1 — 2026-09-27 — The button draws its own class names: .pf-presence-pill-btn →
+ *     .presence-button, .pf-presence-pill-caret → .presence-button-caret (a move, same look).
+ *   v1.1.0 — 2026-09-26 — PresenceButton: the owner's own presence as a door with its caret (the
+ *     Settings overview's pill; its rules moved from profile.css to presence-dot.css; additive,
+ *     page group G8).
  *   v1.0.0 — 2026-06-19 — Initial presence indicator (shared store, label option).
  */
 import { h } from 'preact';
@@ -52,4 +57,16 @@ export function PresenceDot({ ghii, status, size = 'sm', label = false, title })
       ${label ? html`<span class="presence-label">${labelText}</span>` : null}
     </span>
   `;
+}
+
+/**
+ * The owner's own presence as a door (added by page group G8: the Settings overview's head): the
+ * dot with its word and a caret, a press opens the settings. Its look is presence-dot.css
+ * (.presence-button and its caret).
+ */
+export function PresenceButton({ status, title, onClick }) {
+  return html`<button type="button" class="presence-button" onClick=${onClick} title=${title}>
+    <${PresenceDot} status=${status} size="sm" label=${true} />
+    <span class="presence-button-caret" aria-hidden="true">⌄</span>
+  </button>`;
 }

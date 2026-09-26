@@ -13,6 +13,10 @@
  * @usage import { ContactPicker } from '/components/ContactPicker.js';
  *   <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} />
  * @version-history
+ *   v1.2.1 — 2026-09-27 — Draws its own class names (.cp-root → .contact-picker, every other .cp-* →
+ *     .contact-picker-*), and the input's small size is its own rule (.input-field.contact-picker-input,
+ *     the values of the page's .input-field.input-sm) in css/components/contact-picker.css (a move,
+ *     same look).
  *   v1.2.0 — 2026-08-17 — TARGET-063: saved PEOPLE (kind 'mail') are excluded by DEFAULT and only
  *     suggested where a host asks for them by name. Every surface this picker feeds grants access
  *     or sends a message, and a person with no account here can receive neither — suggesting them
@@ -125,30 +129,30 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
   };
 
   return html`
-    <div class="cp-root" ref=${rootRef}>
-      <input class="input-field input-sm cp-input" autofocus=${autofocus} disabled=${disabled}
+    <div class="contact-picker" ref=${rootRef}>
+      <input class="input-field contact-picker-input" autofocus=${autofocus} disabled=${disabled}
         placeholder=${placeholder || (t('contacts.pickerPlaceholder') || 'owner name, email, or pick a contact')}
         value=${value}
         onInput=${(e) => { onChange?.(e.target.value); setOpen(true); setHi(-1); }}
         onFocus=${() => { loadContacts(); setOpen(true); }}
         onKeyDown=${onKeyDown} />
       ${open && (suggestions.length || isEmail) ? html`
-        <div class="cp-drop">
+        <div class="contact-picker-drop">
           ${suggestions.map((s, i) => html`
-            <button type="button" class="cp-item ${i === hi ? 'cp-item-hi' : ''}" key=${s.id}
+            <button type="button" class="contact-picker-item ${i === hi ? 'contact-picker-item-hi' : ''}" key=${s.id}
               onMouseDown=${(e) => { e.preventDefault(); pick(s); }}>
-              <span class="cp-item-icon" aria-hidden="true">${KIND_ICON[s.kind] || '👤'}</span>
-              <span class="cp-item-label">${s.label}</span>
-              <span class="cp-item-id">${s.id}</span>
-              ${s.source === 'directory' ? html`<span class="cp-item-src">${t('contacts.fromDirectory') || 'directory'}</span>` : null}
+              <span class="contact-picker-item-icon" aria-hidden="true">${KIND_ICON[s.kind] || '👤'}</span>
+              <span class="contact-picker-item-label">${s.label}</span>
+              <span class="contact-picker-item-id">${s.id}</span>
+              ${s.source === 'directory' ? html`<span class="contact-picker-item-src">${t('contacts.fromDirectory') || 'directory'}</span>` : null}
             </button>`)}
           ${isEmail ? html`
-            <button type="button" class="cp-item cp-item-resolve" onMouseDown=${(e) => { e.preventDefault(); doResolve(); }}>
-              <span class="cp-item-icon" aria-hidden="true">${'✉'}</span>
-              <span class="cp-item-label">${resolveState === 'busy' ? (t('contacts.resolving') || 'Looking up…') : (t('contacts.resolveAction') || 'Look up this email')}</span>
+            <button type="button" class="contact-picker-item contact-picker-item-resolve" onMouseDown=${(e) => { e.preventDefault(); doResolve(); }}>
+              <span class="contact-picker-item-icon" aria-hidden="true">${'✉'}</span>
+              <span class="contact-picker-item-label">${resolveState === 'busy' ? (t('contacts.resolving') || 'Looking up…') : (t('contacts.resolveAction') || 'Look up this email')}</span>
             </button>` : null}
           ${resolveState && resolveState !== 'busy' && !resolveState.found ? html`
-            <div class="cp-item cp-item-miss">${t('contacts.resolveMiss') || 'No account with that email — you can send an email invitation instead.'}</div>` : null}
+            <div class="contact-picker-item contact-picker-item-miss">${t('contacts.resolveMiss') || 'No account with that email — you can send an email invitation instead.'}</div>` : null}
         </div>` : null}
     </div>`;
 }

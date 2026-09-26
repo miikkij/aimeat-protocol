@@ -9,6 +9,7 @@
  *   rendered black and unpositioned, 140px down the card instead of in its corner. A stylesheet
  *   nobody loads is not a stylesheet.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The line between two groups of rows (.card-menu-sep), for the Settings menus that had one.
  *   v1.3.0 — 2026-09-26 — The inline place: the dots in a line of words (Jouni's decision "Message").
  *   v1.2.0 — 2026-09-24 — The rows are the shared menu row.
  *   v1.1.0 — 2026-09-24 — The dots are the small icon button; the state fills stay here.
@@ -60,3 +61,6 @@
 .card-menu--from-start .card-menu-list { left: 0; right: auto; }
 /* The rows are the shared menu row (poster.css .poster-menu-row, Jouni's decision "Menu row"). */
 .card-menu-item { cursor: pointer; }
+/* A line between two groups of rows (an action item { divider: true }), as the Settings kebab
+   menu drew it (.pj-menu-sep). */
+.card-menu-sep { height: 1px; background: var(--border); margin: 0.25rem 0.3rem; }

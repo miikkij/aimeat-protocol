@@ -10,11 +10,10 @@
  *   aiTextFor · crumb · pageLinks
  * @usage import { x, shelfOf, statusWord, modelWord } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's sibling pages are data for SettingsPage (component
+ *     plan C9); this file writes no markup (page group G8).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Kirjastot-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 
 export const x = (key, vars) => t('libspage.' + key, vars);
@@ -68,15 +67,17 @@ export function aiTextFor(pack, detail) {
   return lines.join('\n');
 }
 
+/** The crumb's steps (SettingsPage draws them). */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('librariesTab.tabLabel')}</span></div>`;
+  return [t('nav.profile'), t('profile.landing.menuBuildShare'), t('librariesTab.tabLabel')];
 }
 
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The sibling pages in the rail, as data (SettingsPage draws them → … →). */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('extensions')}><i>→</i>${t('profile.tabs.extensions')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('appdev')}><i>→</i>${t('profile.tabs.appDev')}<em>→</em></button>
-    <a class="og-rail-link" href="https://design-book.apps.aimeat.io/" target="_blank" rel="noopener"><i>→</i>Design Book<em>→</em></a>`;
+  return [
+    { tab: 'apps', label: t('profile.tabs.apps') },
+    { tab: 'extensions', label: t('profile.tabs.extensions') },
+    { tab: 'appdev', label: t('profile.tabs.appDev') },
+    { href: 'https://design-book.apps.aimeat.io/', newTab: true, label: 'Design Book' },
+  ];
 }

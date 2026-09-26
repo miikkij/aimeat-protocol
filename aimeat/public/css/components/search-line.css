@@ -10,13 +10,28 @@
  *   Drawn as markup: <div class="search-line"><input class="og-input" …><small>12 of 40</small></div>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — .search-line--beside (SearchLine beside): the memory list's search and
+ *     filter lines side by side as main drew them (.pf .action-bar .search-bar); fix pass.
+ *   v1.1.0 — 2026-09-26 — A way on and its hint after the field keep their line (the Offers page's
+ *     AI search; page group G6).
  *   v1.0.0 — 2026-09-25 — Initial, with the values of the copies in the Settings tabs (xx-search).
  */
 
 .search-line { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
 .search-line .og-input { flex: 1 1 auto; min-width: 0; }
 .search-line small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+/* A way on and its hint after the field (SearchLine children: Offers' AI search; formerly
+   offers-poster.css .op-search .poster-action / .poster-hint). */
+.search-line > .poster-action { flex: none; }
+.search-line > .poster-hint { margin: 0; white-space: nowrap; }
+/* SearchLine beside: one of several lines standing side by side in a row, each growing up to 500px
+   (main's memory .pf .action-bar > .search-bar: flex 1, max-width 500px, no margin of its own). */
+.search-line--beside { flex: 1 1 16rem; max-width: 500px; margin: 0; }
 
 @media (max-width: 860px) {
   .search-line { flex-wrap: wrap; }
+}
+/* On a phone the lines stand under each other across the width (main's .pf .action-bar column). */
+@media (max-width: 600px) {
+  .search-line--beside { flex-basis: 100%; max-width: none; }
 }

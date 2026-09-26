@@ -11,6 +11,8 @@
  * @structure skillRow · skillOpen · loadingRow
  * @usage import { skillRow } from './rows.js';
  * @version-history
+ *   v1.18.0 -- 2026-09-26 -- On the component kit (page group G7): the opened panel's facts are the Facts (the copies and the links inside a value are the Action's link tone, main's coral crumb link), the agent picker is the Select, the Check and the Action, who may see it the Tabs, the SKILL.md the Box's folded tone with its "show all", the loading lines the Note and the List. The file writes no class.
+ *   v1.17.0 -- 2026-09-26 -- A skill's row, its opened panel with the doors at its foot, and the file list are the List component (components/List.js: Row, Name, Desc, Who, Doors, Panel, List); the doors are the Action, the copy door its copy (component plan C1).
  *   v1.16.0 -- 2026-09-26 -- "Pin to this version" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.15.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -38,8 +40,16 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
+import { Action } from '/components/Action.js';
+import { Code, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, Row, Name, Desc, Who, Num, Cell, Doors, Panel } from '/components/List.js';
 import { x, splitSkillMd, isOwn, whoOf, visibilityWord, sizeWord, dateWord, installLine, openTab } from './frame.js';
 
 function subLine(s) {
@@ -55,16 +65,16 @@ export function skillRow(ctx, s) {
   const open = ctx.expanded === s.ref;
   const who = whoOf(s, ctx);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${s.ref}>
-      <div class="listing-name">${s.name}<span class="poster-chip">v${s.version}</span><small class=${s.supersededBy ? 'is-warn' : ''}>${s.supersededBy ? `${x('who.replaced').toLowerCase()} · ${subLine(s)}` : subLine(s)}</small></div>
-      <div class="listing-desc">${s.description || ''}</div>
-      <div class="listing-who">${who.kind === 'app' ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => openTab('apps')}>${who.label}</button>` : who.label}<small>${who.sub}</small></div>
-      <div class="listing-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggle(s)}>${open ? x('close') : x('open')}</button>
-        <${CopyButton} text=${s.ref} className="poster-action poster-action--small poster-action--row poster-action--lower" label=${x('copyRef')} copiedLabel=${x('copied')} />
-      </div>
+    <${Row} key=${s.ref} open=${open}>
+      <${Name} tag=${'v' + s.version} warn=${!!s.supersededBy} meta=${s.supersededBy ? `${x('who.replaced').toLowerCase()} · ${subLine(s)}` : subLine(s)}>${s.name}<//>
+      <${Desc}>${s.description || ''}<//>
+      <${Who} sub=${who.sub}>${who.kind === 'app' ? html`<${Action} tone="more" onClick=${() => openTab('apps')}>${who.label}<//>` : who.label}<//>
+      <${Doors}>
+        <${Action} small row onClick=${() => ctx.toggle(s)}>${open ? x('close') : x('open')}<//>
+        <${Action} small row soft copy=${s.ref} copiedLabel=${x('copied')}>${x('copyRef')}<//>
+      <//>
       ${open ? skillOpen(ctx, s, who) : null}
-    </div>`;
+    <//>`;
 }
 
 function skillOpen(ctx, s, who) {
@@ -77,49 +87,48 @@ function skillOpen(ctx, s, who) {
   const full = !!ctx.fullText[s.ref];
   const picker = ctx.picker && ctx.picker.ref === s.ref ? ctx.picker : null;
   const publicIndex = s.scope === 'node' && s.visibility === 'public';
+  const doors = html`
+    <${Action} small copy=${s.ref} copiedLabel=${x('copied')}>${x('copyRef')}<//>
+    <${Action} small soft onClick=${() => ctx.download(s)}>${x('downloadZip')}<//>
+    ${own ? html`<${Action} small soft onClick=${() => ctx.edit(s)}>${x('edit')}<//>` : null}
+    ${own ? html`<${Action} small soft tone="danger" onClick=${() => ctx.remove(s)}>${x('remove')}<//>` : null}
+    <${Action} small soft onClick=${() => ctx.toggle(s)}>${x('close')}<//>`;
+  const detach = (a) => () => ctx.unlink(s, a.agent, a.agent && a.pin ? `${s.ref}@${a.pin}` : s.ref);
+  const copyLink = (text, label) => html`<${Action} tone="link" copy=${text} copiedLabel=${x('copied')}>${label}<//>`;
+  const whoValue = html`
+    ${who.kind === 'app' ? html`${x('who.appLong')} <${Action} tone="link" onClick=${() => openTab('apps')}>${ctx.apps?.[who.file] || who.file}<//>. ` : null}
+    ${who.kind === 'replaced' ? html`${x('who.replacedLong', { by: s.supersededBy })} ` : null}
+    ${who.kind === 'all' ? html`${x('who.allLong')} ` : null}
+    ${who.kind === 'ws' ? html`${x('who.wsLong')} ` : null}
+    ${who.kind === 'free' ? html`${x('who.freeLong')} ` : null}
+    ${who.agents.length ? html`${who.agents.length === 1 ? x('who.agentLong') : x('who.agentsLong', { n: who.agents.length })}:${who.agents.map((a, i) => html`<span key=${a.agent}>${i ? ', ' : ''}<${Action} tone="link" onClick=${() => openTab('agents')}>${a.agent}<//>${a.pin ? ` (@${a.pin})` : ''}${own || s.scope !== 'user' ? html` <${Action} tone="text" onClick=${detach(a)}>${x('detach')}<//>` : null}</span>`)}` : x('who.noAgents')}`;
+  const pickerDoors = picker ? html`
+    <${Select} fit value=${picker.selected} onChange=${(v) => ctx.pickAgent(v)} ariaLabel=${x('pickAgent')}
+      placeholder=${x('pickAgent')} options=${picker.agents.map((a) => [a, a])} />
+    <${Check} inline checked=${picker.pin} onChange=${(on) => ctx.pickPin(on)}>${x('pinToVersion', { v: s.version })}<//>
+    <${Action} small disabled=${!picker.selected || ctx.busy} onClick=${() => ctx.link(s)}>${x('attachDo')}<//>` : null;
+  const visDoors = own ? html`
+    <${Tabs} label=${x('vis.k')} value=${s.visibility} disabled=${ctx.busy} onSelect=${(v) => ctx.setVisibility(s, v)}
+      items=${['owner', 'members', 'public'].map((v) => ({ value: v, label: visibilityWord(v), disabled: s.visibility === v }))} />
+    <${Note} inline>${x('vis.change')}<//>` : null;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${s.description || ''}</p>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('ref')}</div><div class="facts-v"><code class="code-inline">${s.ref}</code> · <${CopyButton} text=${s.ref} className="og-crumb-link" label=${x('copy')} copiedLabel=${x('copied')} /><br /><code>${pinned}</code> · <${CopyButton} text=${pinned} className="og-crumb-link" label=${x('copyPinned')} copiedLabel=${x('copied')} /><small>${x('refSub')}</small></div>
-        <div class="facts-k poster-label">${x('version')}</div><div class="facts-v">${x('versionLine', { v: s.version, date: dateWord(s.updatedAt) })}${versions.length ? ` · ${x('versionsKept', { n: versions.length, from: versions[0].version, to: versions[versions.length - 1].version })}` : ''}<small>${d?.metadata?.aimeat_ref ? x('installedFrom', { ref: d.metadata.aimeat_ref }) : x('versionSub')}</small></div>
-        <div class="facts-k poster-label">${x('who.k')}</div><div class="facts-v">
-          ${who.kind === 'app' ? html`${x('who.appLong')} <button type="button" class="poster-action poster-action--more" onClick=${() => openTab('apps')}>${ctx.apps?.[who.file] || who.file}</button>. ` : null}
-          ${who.kind === 'replaced' ? html`${x('who.replacedLong', { by: s.supersededBy })} ` : null}
-          ${who.kind === 'all' ? html`${x('who.allLong')} ` : null}
-          ${who.kind === 'ws' ? html`${x('who.wsLong')} ` : null}
-          ${who.kind === 'free' ? html`${x('who.freeLong')} ` : null}
-          ${who.agents.length ? html`${who.agents.length === 1 ? x('who.agentLong') : x('who.agentsLong', { n: who.agents.length })}:${who.agents.map((a, i) => html`<span key=${a.agent}>${i ? ', ' : ''}<button type="button" class="poster-action poster-action--more" onClick=${() => openTab('agents')}>${a.agent}</button>${a.pin ? ` (@${a.pin})` : ''}${own || s.scope !== 'user' ? html` <button type="button" class="poster-action poster-action--text" onClick=${() => ctx.unlink(s, a.agent, a.agent && a.pin ? `${s.ref}@${a.pin}` : s.ref)}>${x('detach')}</button>` : null}</span>`)}` : x('who.noAgents')}
-          <small>${x('who.attachSub')} <button type="button" class="poster-action poster-action--more" onClick=${() => ctx.openPicker(s)}>${picker ? x('close') : x('attach')}</button></small>
-          ${picker ? html`<div class="sk-picker">
-            <select class="select-field" value=${picker.selected} onChange=${(e) => ctx.pickAgent(e.target.value)}>
-              <option value="">${x('pickAgent')}</option>
-              ${picker.agents.map((a) => html`<option key=${a} value=${a}>${a}</option>`)}
-            </select>
-            <label class="sk-check check-line"><input type="checkbox" checked=${picker.pin} onChange=${(e) => ctx.pickPin(e.target.checked)} /> ${x('pinToVersion', { v: s.version })}</label>
-            <button type="button" class="poster-action poster-action--small" disabled=${!picker.selected || ctx.busy} onClick=${() => ctx.link(s)}>${x('attachDo')}</button>
-          </div>` : null}
-        </div>
-        <div class="facts-k poster-label">${x('vis.k')}</div><div class="facts-v">${visibilityWord(s.visibility)}${publicIndex ? ` · ${x('vis.inIndex')}` : ''}<small>${x('vis.' + (s.visibility === 'workspace' ? 'workspaceSub' : s.visibility + 'Sub'))}</small>
-          ${own ? html`<div class="og-doors sk-vis">${['owner', 'members', 'public'].map((v) => html`<button type="button" key=${v} class=${`poster-tab ${s.visibility === v ? 'is-on' : ''}`} disabled=${ctx.busy || s.visibility === v} onClick=${() => ctx.setVisibility(s, v)}>${visibilityWord(v)}</button>`)}<span class="poster-hint">${x('vis.change')}</span></div>` : null}
-        </div>
-        <div class="facts-k poster-label">${x('files')}</div><div class="facts-v"><div class="listing listing--path-size sk-files">${(s.files || []).map((f) => html`<div class="listing-row" key=${f.path}><div><code class="code-inline">${f.path}</code></div><div class="sk-r">${sizeWord([f])}</div></div>`)}</div></div>
-        <div class="facts-k poster-label">${x('install')}</div><div class="facts-v"><code class="code-inline">${installLine(pinned)}</code> · <${CopyButton} text=${installLine(pinned)} className="og-crumb-link" label=${x('copy')} copiedLabel=${x('copied')} /><small>${x('installSub')} <button type="button" class="poster-action poster-action--more" onClick=${() => ctx.download(s)}>${x('downloadZip')}</button></small></div>
-      </div>
-      <span class="poster-label sk-mdlabel">SKILL.md</span>
-      ${!d ? html`<p class="poster-quiet sk-empty loading-mark">${t('common.loading')}</p>` : html`
-        <div class=${`sk-md poster-box ${full ? 'is-full' : ''}`}>
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${s.description || ''}<//>
+      <${Facts} rows=${[
+        { k: x('ref'), v: html`<${Code}>${s.ref}<//> · ${copyLink(s.ref, x('copy'))}<br /><${Code}>${pinned}<//> · ${copyLink(pinned, x('copyPinned'))}`, sub: x('refSub') },
+        { k: x('version'), v: `${x('versionLine', { v: s.version, date: dateWord(s.updatedAt) })}${versions.length ? ` · ${x('versionsKept', { n: versions.length, from: versions[0].version, to: versions[versions.length - 1].version })}` : ''}`,
+          sub: d?.metadata?.aimeat_ref ? x('installedFrom', { ref: d.metadata.aimeat_ref }) : x('versionSub') },
+        { k: x('who.k'), v: whoValue, sub: html`${x('who.attachSub')} <${Action} tone="link" onClick=${() => ctx.openPicker(s)}>${picker ? x('close') : x('attach')}<//>`, actions: pickerDoors },
+        { k: x('vis.k'), v: `${visibilityWord(s.visibility)}${publicIndex ? ` · ${x('vis.inIndex')}` : ''}`, sub: x('vis.' + (s.visibility === 'workspace' ? 'workspaceSub' : s.visibility + 'Sub')), actions: visDoors },
+        { k: x('files'), v: html`<${List} cols="path-size" keepCols dense>${(s.files || []).map((f) => html`<${Row} key=${f.path}><${Cell}><${Code}>${f.path}<//><//><${Num} dim>${sizeWord([f])}<//><//>`)}<//>` },
+        { k: x('install'), v: html`<${Code}>${installLine(pinned)}<//> · ${copyLink(installLine(pinned), x('copy'))}`, sub: html`${x('installSub')} <${Action} tone="link" onClick=${() => ctx.download(s)}>${x('downloadZip')}<//>` },
+      ]} />
+      <${Label} block>SKILL.md<//>
+      ${!d ? html`<${Note} kind="loading">${t('common.loading')}<//>` : html`
+        <${Box} folded=${!full} unfoldLabel=${x('showFull')} onUnfold=${() => ctx.showFull(s)}>
           <${Markdown} text=${body} />
-          ${!full ? html`<div class="sk-fade"><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.showFull(s)}>${x('showFull')}</button></div>` : null}
-        </div>`}
-      <div class="og-doors listing-open-doors">
-        <${CopyButton} text=${s.ref} className="poster-action poster-action--small" label=${x('copyRef')} copiedLabel=${x('copied')} />
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.download(s)}>${x('downloadZip')}</button>
-        ${own ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.edit(s)}>${x('edit')}</button>` : null}
-        ${own ? html`<button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" onClick=${() => ctx.remove(s)}>${x('remove')}</button>` : null}
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggle(s)}>${x('close')}</button>
-      </div>
-    </div>`;
+        <//>`}
+    <//>`;
 }
 
-export const loadingRow = () => html`<p class="poster-quiet sk-empty loading-mark">${t('common.loading')}</p>`;
+export const loadingRow = () => html`<${List} loading=${t('common.loading')} />`;

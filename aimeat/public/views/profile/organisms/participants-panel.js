@@ -8,6 +8,9 @@
  * @structure ParticipantsPanel
  * @usage import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
  * @version-history
+ *   v1.15.1 — 2026-09-26 — The creator and a contributor's role are green again, as main drew them
+ *     (.badge-success: Mark tone="fine"; fix pass).
+ *   v1.15.0 — 2026-09-26 — Every part is a kit component (page group G2a): the panel and the contract agents are the Box, the persons and their agents the People component (components/People.js, its own sheet), the access manager a Split with the List, the Select and the Loud action; the tags keep main's meanings as tones (creator and a contributor ink, where main drew them green). The page writes no class.
  *   v1.14.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.13.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.12.0 — 2026-09-25 — The access manager's requests and members are the Listing (css/components/listing.css), a unification: the look most tabs use.
@@ -48,6 +51,15 @@ import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf, adoptContractTask } from '/js/services/agents.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { Box } from '/components/Box.js';
+import { People, Person, AgentChips, AgentChip } from '/components/People.js';
+import { List, Row as ListRow, Name, Doors } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Select } from '/components/Select.js';
+import { SubHeading, HeadDesc } from '/components/SubHeading.js';
+import { Row, Split } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 
@@ -153,133 +165,119 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
   const doDecide = (requester, decision) => after(orgService.decideWorkspaceAccess(orgId, wsId, requester, decision));
   const pending = (access?.requests || []).filter(r => r.status === 'pending');
   const members = access?.members || [];
+  const retireHint = t('organisms.retireHint') || 'Stop this agent from working in THIS workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.';
+
+  /** One of the viewer's contract agents: its chip holds its state words and the one way on. */
+  const contractChip = (a) => {
+    const names = contractNamesOf(a);
+    // One control per advertised contract (a single unnamed one falls back to the bare
+    // marker). The agent does the rest — join, provision, complete the task.
+    const actions = names.length ? names : [''];
+    // "Legacy" = the agent appears in the record traces (it has worked here) but carries
+    // no engagement record yet — it started before contracts were first-class. Offer one
+    // agent-level Retire so it can be stopped; new adopts get precise per-contract chips.
+    const traceHere = owners.some(o => o.isSelf && (o.agents || []).some(ag => ag.isOwn && ag.name === a.name));
+    const engs = actions.map(c => engFor(a, c));
+    const hasAnyEng = engs.some(Boolean);
+    const activeCount = engs.filter(e => e?.state === 'active').length;
+    const retiredCount = engs.filter(e => e?.state === 'retired').length;
+    const legacyActive = traceHere && !hasAnyEng;
+    // Fully retired here: every advertised contract retired, none active — the one-click
+    // "Retire from here" outcome. Collapse to ONE agent-level chip instead of a per-contract
+    // "retired" row each, so contracts that never actually ran here don't read as history.
+    const allRetired = activeCount === 0 && retiredCount > 0 && retiredCount === actions.length;
+    const retiredAt = allRetired ? engs.filter(e => e?.state === 'retired').map(e => e.retiredAt).filter(Boolean).sort().slice(-1)[0] : null;
+    return html`
+      <${AgentChip} own key=${a.gaii} title=${a.gaii}>
+        ${'📜 '}${a.display_name || a.name}
+        ${legacyActive ? html`
+          <${Mark} kind="status" tone="fine" title=${t('organisms.contractActiveHint') || 'This agent already works in this workspace'}>${'✓ '}${t('organisms.contractActive') || 'active here'}<//>
+          <${Action} small disabled=${retireBusy === `${a.gaii}:*`} title=${retireHint}
+            onClick=${() => retireAll(a)}>${retireBusy === `${a.gaii}:*` ? '…' : (t('organisms.retire') || 'Retire')}<//>`
+          : allRetired ? html`
+          <${Mark} kind="status" tone="off" title=${t('organisms.retiredFromHereHint') || 'This agent is retired from this workspace — its loop skips it. Bring it back to let it work here again.'}>${'🚫 '}${t('organisms.retiredFromHere') || 'retired from here'} ${fmtDay(retiredAt)}<//>
+          <${Action} small disabled=${adoptBusy === `${a.gaii}:*`}
+            onClick=${() => readoptAll(a)}>${adoptBusy === `${a.gaii}:*` ? '…' : (t('organisms.bringBack') || 'Bring back')}<//>`
+          : actions.map(c => {
+            const eng = engFor(a, c);
+            const label = c || (t('organisms.bareContract') || 'contract');
+            const bkey = `${a.gaii}:${c}`;
+            if (eng?.state === 'active') return html`
+              <${Mark} key=${c + ':s'} kind="status" tone="fine">${'✓ '}${label}<//>
+              <${Action} key=${c + ':a'} small disabled=${retireBusy === bkey} title=${retireHint}
+                onClick=${() => retire(a, c)}>${retireBusy === bkey ? '…' : (t('organisms.retire') || 'Retire')}<//>`;
+            if (eng?.state === 'retired') return html`
+              <${Mark} key=${c + ':s'} kind="status" tone="off" title=${(t('organisms.retiredUntilHint') || 'Retired — this agent served here until this date. Its past work stays visible.')}>${label}${' · '}${t('organisms.retiredTag') || 'retired'} ${fmtDay(eng.retiredAt)}<//>
+              <${Action} key=${c + ':a'} small disabled=${adoptBusy === bkey}
+                onClick=${() => adopt(a, c)}>${adoptBusy === bkey ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}<//>`;
+            return html`
+              <${Action} small key=${c} disabled=${adoptBusy === bkey}
+                title=${t('organisms.adoptHint') || 'Queue a task for this agent to adopt its contract into THIS workspace (it provisions the spaces itself)'}
+                onClick=${() => adopt(a, c)}>
+                ${adoptBusy === bkey ? '…' : `${t('organisms.adoptContract') || 'Adopt'}${c ? ` ${c}` : ''}`}
+              <//>`;
+          })}
+      <//>`;
+  };
 
   return html`
-    <div class="pj-chart poster-box">
-      <div class="pj-chart-head">
-        <span class="pj-chart-title">${'👥 '}${t('organisms.participants') || 'Who works here'}</span>
-        <button class="poster-action poster-action--small" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
-      </div>
+    <${Box} name=${html`${'👥 '}${t('organisms.participants') || 'Who works here'}`}
+      end=${html`<${Action} small onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}<//>`}>
       ${show ? html`
-        <div class="pj-parts">
-          ${contractAgents.length ? html`
-            <div class="pj-contract-agents poster-box">
-              <div class="pj-access-title">${'📜 '}${t('organisms.contractAgents') || 'Your contract agents'}</div>
-              <div class="section-desc">${t('organisms.contractAgentsDesc') || 'These agents of yours advertise a workspace contract — they can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.'}</div>
-              <div class="pj-part-agents">
-                ${contractAgents.map(a => {
-                  const names = contractNamesOf(a);
-                  // One control per advertised contract (a single unnamed one falls back to the bare
-                  // marker). The agent does the rest — join, provision, complete the task.
-                  const actions = names.length ? names : [''];
-                  // "Legacy" = the agent appears in the record traces (it has worked here) but carries
-                  // no engagement record yet — it started before contracts were first-class. Offer one
-                  // agent-level Retire so it can be stopped; new adopts get precise per-contract chips.
-                  const traceHere = owners.some(o => o.isSelf && (o.agents || []).some(ag => ag.isOwn && ag.name === a.name));
-                  const engs = actions.map(c => engFor(a, c));
-                  const hasAnyEng = engs.some(Boolean);
-                  const activeCount = engs.filter(e => e?.state === 'active').length;
-                  const retiredCount = engs.filter(e => e?.state === 'retired').length;
-                  const legacyActive = traceHere && !hasAnyEng;
-                  // Fully retired here: every advertised contract retired, none active — the one-click
-                  // "Retire from here" outcome. Collapse to ONE agent-level chip instead of a per-contract
-                  // "retired" row each, so contracts that never actually ran here don't read as history.
-                  const allRetired = activeCount === 0 && retiredCount > 0 && retiredCount === actions.length;
-                  const retiredAt = allRetired ? engs.filter(e => e?.state === 'retired').map(e => e.retiredAt).filter(Boolean).sort().slice(-1)[0] : null;
-                  return html`
-                    <span class="pj-part-agent own" key=${a.gaii} title=${a.gaii}>
-                      ${'📜 '}${a.display_name || a.name}
-                      ${legacyActive ? html`
-                        <span class="poster-status poster-status--fine" title=${t('organisms.contractActiveHint') || 'This agent already works in this workspace'}>${'✓ '}${t('organisms.contractActive') || 'active here'}</span>
-                        <button class="poster-action poster-action--small pj-retire-btn" disabled=${retireBusy === `${a.gaii}:*`}
-                          title=${t('organisms.retireHint') || 'Stop this agent from working in THIS workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
-                          onClick=${() => retireAll(a)}>${retireBusy === `${a.gaii}:*` ? '…' : (t('organisms.retire') || 'Retire')}</button>`
-                        : allRetired ? html`
-                        <span class="poster-status poster-status--off" title=${t('organisms.retiredFromHereHint') || 'This agent is retired from this workspace — its loop skips it. Bring it back to let it work here again.'}>${'🚫 '}${t('organisms.retiredFromHere') || 'retired from here'} ${fmtDay(retiredAt)}</span>
-                        <button class="poster-action poster-action--small pj-adopt-btn" disabled=${adoptBusy === `${a.gaii}:*`}
-                          onClick=${() => readoptAll(a)}>${adoptBusy === `${a.gaii}:*` ? '…' : (t('organisms.bringBack') || 'Bring back')}</button>`
-                        : actions.map(c => {
-                          const eng = engFor(a, c);
-                          const label = c || (t('organisms.bareContract') || 'contract');
-                          const bkey = `${a.gaii}:${c}`;
-                          if (eng?.state === 'active') return html`
-                            <span class="pj-eng" key=${c}>
-                              <span class="poster-status poster-status--fine">${'✓ '}${label}</span>
-                              <button class="poster-action poster-action--small pj-retire-btn" disabled=${retireBusy === bkey}
-                                title=${t('organisms.retireHint') || 'Stop this agent from working in THIS workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
-                                onClick=${() => retire(a, c)}>${retireBusy === bkey ? '…' : (t('organisms.retire') || 'Retire')}</button>
-                            </span>`;
-                          if (eng?.state === 'retired') return html`
-                            <span class="pj-eng" key=${c}>
-                              <span class="poster-status poster-status--off" title=${(t('organisms.retiredUntilHint') || 'Retired — this agent served here until this date. Its past work stays visible.')}>${label}${' · '}${t('organisms.retiredTag') || 'retired'} ${fmtDay(eng.retiredAt)}</span>
-                              <button class="poster-action poster-action--small pj-adopt-btn" disabled=${adoptBusy === bkey}
-                                onClick=${() => adopt(a, c)}>${adoptBusy === bkey ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}</button>
-                            </span>`;
-                          return html`
-                            <button class="poster-action poster-action--small pj-adopt-btn" key=${c} disabled=${adoptBusy === bkey}
-                              title=${t('organisms.adoptHint') || 'Queue a task for this agent to adopt its contract into THIS workspace (it provisions the spaces itself)'}
-                              onClick=${() => adopt(a, c)}>
-                              ${adoptBusy === bkey ? '…' : `${t('organisms.adoptContract') || 'Adopt'}${c ? ` ${c}` : ''}`}
-                            </button>`;
-                        })}
-                    </span>`;
-                })}
-              </div>
-            </div>` : null}
-          <${Mermaid} chart=${orgService.buildParticipantsMermaid(data)} />
-          <div class="pj-parts-list">
-            ${owners.map((o, i) => html`<div class="pj-part-owner poster-box" key=${i}>
-              <div class="pj-part-human">
-                <span>${'👤 '}<strong>${(o.owner)}</strong></span>
-                ${o.isSelf ? html`<span class="poster-chip poster-chip--sun">${t('organisms.you') || 'you'}</span>` : null}
-                ${o.isCreator ? html`<span class="poster-chip">${t('organisms.creatorTag') || 'creator'}</span>` : null}
-                ${!o.isMember && !o.isSelf ? html`<span class="poster-chip poster-chip--coral">${t('organisms.guest') || 'guest'}</span>` : null}
-                ${!o.isLocalNode ? html`<span class="pj-part-node">${'🌐 '}${(o.node)}</span>` : null}
-                ${o.contributions ? html`<span class="poster-count poster-count--tally" title=${t('organisms.contributions') || 'contributions'}>${o.contributions}</span>` : null}
-              </div>
-              ${(o.agents || []).length ? html`<div class="pj-part-agents">
-                ${o.agents.map((a, j) => html`
-                  <span class="pj-part-agent ${a.isOwn ? 'own' : 'ghost'}" key=${j}
-                    title=${a.isOwn ? '' : (t('organisms.otherAgentHint') || 'Another owner’s agent — you see what it has done here, not its live status')}>
-                    ${'🤖 '}${(a.name)}<span class="poster-count poster-count--tally">${a.contributions}</span>
-                  </span>`)}
-              </div>` : null}
-            </div>`)}
-          </div>
-          ${isManager ? html`
-            <div class="pj-access">
-              <div class="pj-access-title">${t('organisms.manageAccess') || 'Manage who can work here'}</div>
-              ${pending.length || members.length ? html`<div class="listing listing--name-doors listing--cols">
-              ${pending.map(r => html`<div class="listing-row" key=${'req-' + r.requester}>
-                <div class="listing-name">${'🙋 '}<strong>${(r.requester)}</strong> <span class="pj-access-note">${t('organisms.requestedAccess') || 'requested access'}</span></div>
-                <div class="listing-doors">
-                  <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => doDecide(r.requester, 'contributor')}>${t('organisms.addAsContributor') || 'Add as contributor'}</button>
-                  <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => doDecide(r.requester, 'viewer')}>${t('organisms.addAsViewer') || 'as viewer'}</button>
-                  <button class="poster-action poster-action--small poster-action--row poster-action--danger" disabled=${busy} onClick=${() => doDecide(r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>
-                </div>
-              </div>`)}
-              ${members.map(m => html`<div class="listing-row" key=${'mem-' + m.owner}>
-                <div class="listing-name">${'👤 '}<strong>${(m.owner)}</strong> <span class="poster-chip">${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}</span></div>
-                <div class="listing-doors">
+        ${contractAgents.length ? html`
+          <${Box}>
+            <${SubHeading}>${'📜 '}${t('organisms.contractAgents') || 'Your contract agents'}<//>
+            <${HeadDesc}>${t('organisms.contractAgentsDesc') || 'These agents of yours advertise a workspace contract — they can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.'}<//>
+            <${AgentChips}>${contractAgents.map(contractChip)}<//>
+          <//>` : null}
+        <${Mermaid} chart=${orgService.buildParticipantsMermaid(data)} />
+        <${People}>
+          ${owners.map((o, i) => html`<${Person} key=${i} name=${o.owner} node=${o.isLocalNode ? null : o.node}
+            count=${o.contributions} countTitle=${t('organisms.contributions') || 'contributions'}
+            marks=${html`
+              ${o.isSelf ? html`<${Mark} tone="sun">${t('organisms.you') || 'you'}<//>` : null}
+              ${o.isCreator ? html`<${Mark} tone="fine">${t('organisms.creatorTag') || 'creator'}<//>` : null}
+              ${!o.isMember && !o.isSelf ? html`<${Mark} tone="coral">${t('organisms.guest') || 'guest'}<//>` : null}`}>
+            ${(o.agents || []).map((a, j) => html`
+              <${AgentChip} key=${j} own=${a.isOwn} ghost=${!a.isOwn} count=${a.contributions}
+                title=${a.isOwn ? '' : (t('organisms.otherAgentHint') || 'Another owner’s agent — you see what it has done here, not its live status')}>
+                ${'🤖 '}${(a.name)}
+              <//>`)}
+          <//>`)}
+        <//>
+        ${isManager ? html`
+          <${Split} gap="small">
+            <${SubHeading}>${t('organisms.manageAccess') || 'Manage who can work here'}<//>
+            ${pending.length || members.length ? html`<${List} cols="name-doors" keepCols>
+              ${pending.map(r => html`<${ListRow} key=${'req-' + r.requester}>
+                <${Name} after=${html` <${Note} kind="meta" inline>${t('organisms.requestedAccess') || 'requested access'}<//>`}>${'🙋 '}${(r.requester)}<//>
+                <${Doors}>
+                  <${Action} small row disabled=${busy} onClick=${() => doDecide(r.requester, 'contributor')}>${t('organisms.addAsContributor') || 'Add as contributor'}<//>
+                  <${Action} small row disabled=${busy} onClick=${() => doDecide(r.requester, 'viewer')}>${t('organisms.addAsViewer') || 'as viewer'}<//>
+                  <${Action} small row tone="danger" disabled=${busy} onClick=${() => doDecide(r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>
+                <//>
+              <//>`)}
+              ${members.map(m => html`<${ListRow} key=${'mem-' + m.owner}>
+                <${Name} tag=${html`<${Mark} tone=${m.role === 'contributor' ? 'fine' : undefined}>${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}<//>`}>${'👤 '}${(m.owner)}<//>
+                <${Doors}>
                   ${m.role === 'viewer'
-                    ? html`<button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => doGrant(m.owner, 'contributor')}>${t('organisms.makeContributor') || '→ can write'}</button>`
-                    : html`<button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => doGrant(m.owner, 'viewer')}>${t('organisms.makeViewer') || '→ read only'}</button>`}
-                  <button class="poster-action poster-action--small poster-action--row poster-action--danger" disabled=${busy} onClick=${() => doRevoke(m.owner)}>${t('organisms.remove') || 'Remove'}</button>
-                </div>
-              </div>`)}
-              </div>` : null}
-              <div class="pj-access-add">
-                <${ContactPicker} value=${grantee} onChange=${setGrantee} onSubmit=${(v) => doGrant(v, role)}
-                  kinds=${['ghii']}
-                  placeholder=${t('organisms.addMemberPlaceholder') || 'owner name (or owner@node / agent#owner@node)'} disabled=${busy} />
-                <select class="select-field" value=${role} onChange=${e => setRole(e.target.value)}>
-                  <option value="contributor">${t('organisms.roleContributor') || 'contributor (read + write)'}</option>
-                  <option value="viewer">${t('organisms.roleViewer') || 'viewer (read only)'}</option>
-                </select>
-                <button class="poster-slab poster-slab--control" disabled=${busy || !grantee.trim()} onClick=${() => doGrant(grantee, role)}>${'+ '}${t('organisms.addMember') || 'Add'}</button>
-              </div>
-              <div class="poster-hint">${t('organisms.accessHint') || 'Members can be a different account; their agents inherit the role. Viewers read; contributors read + write.'}</div>
-            </div>` : null}
-        </div>` : null}
-    </div>`;
+                    ? html`<${Action} small row disabled=${busy} onClick=${() => doGrant(m.owner, 'contributor')}>${t('organisms.makeContributor') || '→ can write'}<//>`
+                    : html`<${Action} small row disabled=${busy} onClick=${() => doGrant(m.owner, 'viewer')}>${t('organisms.makeViewer') || '→ read only'}<//>`}
+                  <${Action} small row tone="danger" disabled=${busy} onClick=${() => doRevoke(m.owner)}>${t('organisms.remove') || 'Remove'}<//>
+                <//>
+              <//>`)}
+            <//>` : null}
+            <${Row} wrap>
+              <${ContactPicker} value=${grantee} onChange=${setGrantee} onSubmit=${(v) => doGrant(v, role)}
+                kinds=${['ghii']}
+                placeholder=${t('organisms.addMemberPlaceholder') || 'owner name (or owner@node / agent#owner@node)'} disabled=${busy} />
+              <${Select} fit value=${role} onChange=${setRole} options=${[
+                ['contributor', t('organisms.roleContributor') || 'contributor (read + write)'],
+                ['viewer', t('organisms.roleViewer') || 'viewer (read only)'],
+              ]} />
+              <${Loud} control disabled=${busy || !grantee.trim()} onClick=${() => doGrant(grantee, role)}>${'+ '}${t('organisms.addMember') || 'Add'}<//>
+            <//>
+            <${Note}>${t('organisms.accessHint') || 'Members can be a different account; their agents inherit the role. Viewers read; contributors read + write.'}<//>
+          <//>` : null}` : null}
+    <//>`;
 }

@@ -11,6 +11,11 @@
  * @structure targetRow · targetOpen · personRow · revokedRow · groupRow · groupOpen · eventRow
  * @usage import { targetRow, groupRow, eventRow } from './rows.js';
  * @version-history
+ *   v1.12.0 — 2026-09-26 — On the component kit (page group G7): every row, cell, opened panel, the
+ *     grants and keys inside it and the access log are the List (components/List.js: Row, Name, Desc,
+ *     Who, Num, When, Cell, Doors, Panel, More; the marked person is the selected Row); the counts
+ *     are the Figure (components/Figure.js); the doors the Action; the row labels the Label; the
+ *     revoked lines of a target a small List. The page writes no class.
  *   v1.11.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 -- 2026-09-25 -- "And N more keys" under an opened group's keys is the Hint (components/Hint.js), a unification: the look most tabs use.
@@ -32,90 +37,107 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { CopyButton } from '/components/CopyButton.js';
-import { Hint } from '/components/Hint.js';
+import { List, Row, Name, Desc, Who, Num, When, Cell, Doors, Panel, More } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Figure } from '/components/Figure.js';
 import { x, n, whoOf, roleOf, roleWord, grantWords, grantsWord, groupWords, targetWords, targetOf, wsName, dateWord, timeWord, spanWord, restWords } from './frame.js';
 
 const doorWord = (open) => (open ? x('close') : x('open'));
+/** Lines under one another in a cell's small line. */
+const lines = (parts) => {
+  const on = parts.filter(Boolean);
+  return on.length ? on.map((p, i) => html`${i ? html`<br />` : null}${p}`) : undefined;
+};
+/** The since-cell of a target or a person: the first date with its arrow, then how many grants. */
+const sinceWords = (since, count) => html`${since ? `${dateWord(since)} →` : ''}<br />${grantsWord(count)}`;
+/** The open / close door at a row's end. */
+const toggleDoor = (open, onClick) => html`<${Doors}><${Action} small row onClick=${onClick}>${doorWord(open)}<//><//>`;
 
 /* ── 01: one target ───────────────────────────────────────────────────────────────────────────── */
 
 export function targetRow(ctx, row) {
   const open = ctx.openTarget === row.id;
+  const toggle = () => ctx.toggleTarget(row.id);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${row.id}>
-      <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleTarget(row.id)}>${row.title}</button><small>${row.sub}</small></div>
-      <div class="listing-desc">${row.words}</div>
-      <div class="poster-time"><span>${row.since ? `${dateWord(row.since)} →` : ''}<br /><span>${grantsWord(row.grants.length)}</span></span></div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggleTarget(row.id)}>${doorWord(open)}</button></div>
+    <${Row} key=${row.id} open=${open}>
+      <${Name} onOpen=${toggle} meta=${row.sub}>${row.title}<//>
+      <${Desc}>${row.words}<//>
+      <${When}>${sinceWords(row.since, row.grants.length)}<//>
+      ${toggleDoor(open, toggle)}
       ${open ? targetOpen(ctx, row) : null}
-    </div>`;
+    <//>`;
 }
 
-/** One grant as a row of the Listing; `lead` is the first cell (the workspace or the target), or null. */
+/** One grant as a row of the List; `lead` is the first cell (the workspace or the target), or null. */
 function grantLine(ctx, c, lead) {
   const g = grantWords(c, ctx.names);
   const by = c.metadata?.grantedBy;
+  const sub = lines([
+    c.purpose && g.role === 'read' && c.purpose !== 'general' ? c.purpose : null,
+    c.scope === 'federation' ? x('scope.federation') : null,
+    c.expires ? x('untilDate', { date: dateWord(c.expires) }) : null,
+  ]);
   return html`
-    <div class="listing-row" key=${c.id}>
+    <${Row} key=${c.id}>
       ${lead}
-      <div class="listing-who">${g.who.name} · ${roleWord(g.role)}${c.purpose && g.role === 'read' && c.purpose !== 'general' ? html`<small>${c.purpose}</small>` : null}${c.scope === 'federation' ? html`<small>${x('scope.federation')}</small>` : null}${c.expires ? html`<small>${x('untilDate', { date: dateWord(c.expires) })}</small>` : null}</div>
-      <div class="poster-time">${dateWord(c.granted_at)}</div>
-      <div>${by ? (by === ctx.session?.owner ? x('you') : by) : html`<span class="is-dim">${x('notRecorded')}</span>`}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--danger poster-action--lower" disabled=${ctx.busy === c.id} onClick=${() => ctx.revoke(c)}>${ctx.busy === c.id ? x('revoking') : x('revoke')}</button></div>
-    </div>`;
+      <${Who} sub=${sub}>${g.who.name} · ${roleWord(g.role)}<//>
+      <${When}>${dateWord(c.granted_at)}<//>
+      <${Cell} dim=${!by}>${by ? (by === ctx.session?.owner ? x('you') : by) : x('notRecorded')}<//>
+      <${Doors}><${Action} small row soft tone="danger" disabled=${ctx.busy === c.id} onClick=${() => ctx.revoke(c)}>${ctx.busy === c.id ? x('revoking') : x('revoke')}<//><//>
+    <//>`;
 }
 
 /** The target of a grant as the name cell of its row. */
 function targetCell(ctx, c) {
   const tw = targetWords(c.data_pattern, ctx.names);
-  return html`<div class="listing-name"><b>${tw.title}</b><small>${tw.sub}</small></div>`;
+  return html`<${Name} meta=${tw.sub}>${tw.title}<//>`;
 }
 
 function targetOpen(ctx, row) {
   const lead = row.kind === 'org' ? x('target.leadOrg', { org: row.title, n: row.grants.length, ws: row.workspaces.filter((w) => w.id).length }) : x('target.leadKey', { key: row.pattern, n: row.grants.length });
   const copy = row.grants.map((c) => `${targetWords(c.data_pattern, ctx.names).title} · ${targetWords(c.data_pattern, ctx.names).sub}\t${whoOf(c.recipient, ctx.names).name}\t${roleWord(roleOf(c))}\t${c.granted_at}\t${c.id}`).join('\n');
+  const revoked = row.revoked.slice(0, 5).map((c) => ({ key: c.id, words: `${whoOf(c.recipient, ctx.names).name} · ${roleWord(roleOf(c))}${row.kind === 'org' ? ` · ${targetWords(c.data_pattern, ctx.names).sub}` : ''} · ${spanWord(c.granted_at, c.revoked_at)}` }));
+  if (row.revoked.length > 5) revoked.push({ key: 'more', words: x('andMore', { n: row.revoked.length - 5 }) });
+  const doors = html`
+    ${row.kind === 'org' ? html`<${Action} small soft onClick=${() => ctx.openOrganisms()}>${x('target.openOrganism', { org: row.title })}<//>` : null}
+    <${Action} small soft onClick=${() => ctx.prefillGrant({ orgId: row.organism_id, wsId: row.workspaces[0]?.id || '', key: row.kind === 'key' ? row.pattern : '' })}>${x('target.grantMore')}<//>
+    <${Action} small soft copy=${copy}>${x('copyList')}<//>`;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${lead} ${x('target.roles')}</p>
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${lead} ${x('target.roles')}<//>
       ${row.kind === 'org' ? html`
-        <div class="listing listing--name-who-when-by-doors dw-sub">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.workspace')}</div><div class="poster-label">${x('col.whoWhat')}</div><div class="poster-label">${x('col.since')}</div><div class="poster-label">${x('col.gaveBy')}</div><div class="poster-label"></div></div>
-          ${row.workspaces.map((w) => w.grants.map((c, i) => grantLine(ctx, c, i === 0 ? html`<div class="listing-name"><b>${w.name}</b></div>` : html`<div></div>`)))}
-        </div>` : html`
-        <div class="listing listing--who-when-by-doors dw-sub">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.whoWhat')}</div><div class="poster-label">${x('col.since')}</div><div class="poster-label">${x('col.gaveBy')}</div><div class="poster-label"></div></div>
+        <${List} cols="name-who-when-by-doors" dense apart head=${[x('col.workspace'), x('col.whoWhat'), x('col.since'), x('col.gaveBy'), '']}>
+          ${row.workspaces.map((w) => w.grants.map((c, i) => grantLine(ctx, c, i === 0 ? html`<${Name}>${w.name}<//>` : html`<${Cell} />`)))}
+        <//>` : html`
+        <${List} cols="who-when-by-doors" dense apart head=${[x('col.whoWhat'), x('col.since'), x('col.gaveBy'), '']}>
           ${row.grants.map((c) => grantLine(ctx, c, null))}
-        </div>`}
+        <//>`}
       ${row.revoked.length ? html`
-        <span class="poster-label">${x('target.revokedHere', { n: row.revoked.length })}</span>
-        <div class="dw-para dw-revoked">${row.revoked.slice(0, 5).map((c) => html`<div key=${c.id}>${whoOf(c.recipient, ctx.names).name} · ${roleWord(roleOf(c))}${row.kind === 'org' ? ` · ${targetWords(c.data_pattern, ctx.names).sub}` : ''} · ${spanWord(c.granted_at, c.revoked_at)}</div>`)}${row.revoked.length > 5 ? html`<div>${x('andMore', { n: row.revoked.length - 5 })}</div>` : null}</div>` : null}
-      <div class="og-doors listing-open-doors">
-        ${row.kind === 'org' ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openOrganisms()}>${x('target.openOrganism', { org: row.title })}</button>` : null}
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.prefillGrant({ orgId: row.organism_id, wsId: row.workspaces[0]?.id || '', key: row.kind === 'key' ? row.pattern : '' })}>${x('target.grantMore')}</button>
-        <${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${copy} label=${x('copyList')} />
-      </div>
-    </div>`;
+        <${Label} block>${x('target.revokedHere', { n: row.revoked.length })}<//>
+        <${List} cols="name" small rows=${revoked} render=${(r) => html`<${Row} key=${r.key}><${Cell}>${r.words}<//><//>`} />` : null}
+    <//>`;
 }
 
 /* ── 01: one person, when the list is turned by people ───────────────────────────────────────── */
 
 export function personRow(ctx, p) {
   const open = ctx.openTarget === p.id;
+  const toggle = () => ctx.toggleTarget(p.id);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''} ${ctx.personFocus === p.name ? 'is-focus' : ''}`} key=${p.id}>
-      <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleTarget(p.id)}>${p.name}</button><small>${x('whoKind.' + p.kind)}</small></div>
-      <div class="listing-desc">${p.words}</div>
-      <div class="poster-time"><span>${p.since ? `${dateWord(p.since)} →` : ''}<br /><span>${grantsWord(p.grants.length)}</span></span></div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggleTarget(p.id)}>${doorWord(open)}</button></div>
+    <${Row} key=${p.id} open=${open} selected=${ctx.personFocus === p.name}>
+      <${Name} onOpen=${toggle} meta=${x('whoKind.' + p.kind)}>${p.name}<//>
+      <${Desc}>${p.words}<//>
+      <${When}>${sinceWords(p.since, p.grants.length)}<//>
+      ${toggleDoor(open, toggle)}
       ${open ? html`
-        <div class="listing-open poster-box poster-box--raised">
-          <div class="listing listing--name-who-when-by-doors dw-sub">
-            <div class="listing-row listing-row--head"><div class="poster-label">${x('col.target')}</div><div class="poster-label">${x('col.whoWhat')}</div><div class="poster-label">${x('col.since')}</div><div class="poster-label">${x('col.gaveBy')}</div><div class="poster-label"></div></div>
+        <${Panel}>
+          <${List} cols="name-who-when-by-doors" dense apart head=${[x('col.target'), x('col.whoWhat'), x('col.since'), x('col.gaveBy'), '']}>
             ${p.grants.map((c) => grantLine(ctx, c, targetCell(ctx, c)))}
-          </div>
-        </div>` : null}
-    </div>`;
+          <//>
+        <//>` : null}
+    <//>`;
 }
 
 /* ── 01: one revoked permission ──────────────────────────────────────────────────────────────── */
@@ -123,12 +145,12 @@ export function personRow(ctx, p) {
 export function revokedRow(ctx, c) {
   const tw = targetWords(c.data_pattern, ctx.names);
   return html`
-    <div class="listing-row" key=${c.id}>
-      <div class="listing-name">${tw.title}<small>${tw.sub}</small></div>
-      <div class="listing-desc">${whoOf(c.recipient, ctx.names).name} · ${roleWord(roleOf(c))}</div>
-      <div class="poster-time"><span>${spanWord(c.granted_at, c.revoked_at)}<br /><span>${x(c.status === 'expired' ? 'status.expired' : 'status.revoked')}</span></span></div>
-      <div class="listing-doors"></div>
-    </div>`;
+    <${Row} key=${c.id}>
+      <${Name} meta=${tw.sub}>${tw.title}<//>
+      <${Desc}>${whoOf(c.recipient, ctx.names).name} · ${roleWord(roleOf(c))}<//>
+      <${When}>${spanWord(c.granted_at, c.revoked_at)}<br />${x(c.status === 'expired' ? 'status.expired' : 'status.revoked')}<//>
+      <${Doors} />
+    <//>`;
 }
 
 /* ── 02: one group of the trail ──────────────────────────────────────────────────────────────── */
@@ -140,15 +162,16 @@ export function groupRow(ctx, g) {
   const open = ctx.openGroup === id;
   const w = groupWords(g, ctx.names);
   const denied = w.outcome === 'denied';
+  const toggle = () => ctx.toggleGroup(id);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${id}>
-      <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleGroup(id)}>${w.who.name}</button>${w.who.sub ? html`<small>${w.who.sub}</small>` : null}</div>
-      <div class="listing-desc dw-w">${w.what}${w.sub ? html`<small>${w.sub}</small>` : null}</div>
-      <div class=${`dw-n poster-stat-number poster-stat-number--small ${denied ? 'is-low' : 'is-good'}`}>${n(g.count)}<small>${x('outcome.' + w.outcome)}</small></div>
-      <div class="poster-time">${spanWord(g.first, g.last)}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggleGroup(id)}>${doorWord(open)}</button></div>
+    <${Row} key=${id} open=${open}>
+      <${Name} onOpen=${toggle} meta=${w.who.sub || undefined}>${w.who.name}<//>
+      <${Desc} sub=${w.sub || undefined}>${w.what}<//>
+      <${Num}><${Figure} small end tone=${denied ? 'notice' : 'fine'} n=${n(g.count)} sub=${x('outcome.' + w.outcome)} /><//>
+      <${When}>${spanWord(g.first, g.last)}<//>
+      ${toggleDoor(open, toggle)}
       ${open ? groupOpen(ctx, g, id, w) : null}
-    </div>`;
+    <//>`;
 }
 
 function groupOpen(ctx, g, id, w) {
@@ -163,28 +186,26 @@ function groupOpen(ctx, g, id, w) {
     if (t.kind === 'ws') return { name: wsName(ctx.names, t.organism_id, t.workspace_id), sub: key };
     return { name: key, sub: '' };
   };
+  const doors = html`
+    ${person && w.outcome === 'denied' ? html`<${Action} small onClick=${() => ctx.prefillGrant({ who: g.accessor_gaii, orgId: tg.organism_id || '', wsId: tg.kind === 'ws' ? targetOf(g.keys?.[0] || '').workspace_id || '' : '', key: tg.kind === 'key' ? tg.key : '' })}>${x('group.grantTo', { who: w.who.name })}<//>` : null}
+    ${person ? html`<${Action} small soft onClick=${() => ctx.showPerson(w.who.name)}>${x('group.seePermissions', { who: w.who.name })}<//>` : null}
+    ${!rows ? html`<${Action} small soft onClick=${() => ctx.loadGroupRows(g, id, false)}>${x('group.showRows')}<//>` : null}`;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${lead}</p>
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${lead}<//>
       ${g.keys?.length ? html`
-        <div class="listing listing--name-what dw-sub">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.key')}</div><div class="poster-label">${x('col.what')}</div></div>
-          ${g.keys.map((k) => { const kn = keyName(k); return html`<div class="listing-row" key=${k}><div class="listing-name"><b>${kn.name}</b>${kn.sub ? html`<small>${kn.sub}</small>` : null}</div><div>${tg.rest ? restWords(tg.rest) : ''}</div></div>`; })}
-        </div>
-        ${g.key_count > g.keys.length ? html`<${Hint}>${x('andMoreKeys', { n: g.key_count - g.keys.length })}<//>` : null}` : null}
+        <${List} cols="name-what" dense apart head=${[x('col.key'), x('col.what')]}>
+          ${g.keys.map((k) => { const kn = keyName(k); return html`<${Row} key=${k}><${Name} meta=${kn.sub || undefined}>${kn.name}<//><${Cell}>${tg.rest ? restWords(tg.rest) : ''}<//><//>`; })}
+        <//>
+        ${g.key_count > g.keys.length ? html`<${Note} kind="hint">${x('andMoreKeys', { n: g.key_count - g.keys.length })}<//>` : null}` : null}
       ${rows ? html`
-        <span class="poster-label">${x('group.rows', { n: n(rows.total) })}</span>
-        <div class="dw-grants dw-grants--rows">
-          <div class="dw-gh poster-label">${x('col.when')}</div><div class="dw-gh poster-label">${x('col.key')}</div><div class="dw-gh poster-label">${x('col.outcome')}</div>
-          ${rows.entries.map((e) => html`<div class="poster-time" key=${e.id}>${dateWord(e.timestamp)} ${timeWord(e.timestamp)}</div><div><code class="code-inline">${e.memory_key}</code></div><div>${x(e.allowed ? 'outcome.allowed' : 'outcome.denied')}</div>`)}
-        </div>
-        ${rows.entries.length < rows.total ? html`<div class="dw-more"><button type="button" class="poster-action poster-action--more" disabled=${rows.loading} onClick=${() => ctx.loadGroupRows(g, id, true)}>${rows.loading ? x('loading') : x('group.moreRows', { n: n(rows.total - rows.entries.length) })}</button></div>` : null}` : null}
-      <div class="og-doors listing-open-doors">
-        ${person && w.outcome === 'denied' ? html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.prefillGrant({ who: g.accessor_gaii, orgId: tg.organism_id || '', wsId: tg.kind === 'ws' ? targetOf(g.keys?.[0] || '').workspace_id || '' : '', key: tg.kind === 'key' ? tg.key : '' })}>${x('group.grantTo', { who: w.who.name })}</button>` : null}
-        ${person ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.showPerson(w.who.name)}>${x('group.seePermissions', { who: w.who.name })}</button>` : null}
-        ${!rows ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.loadGroupRows(g, id, false)}>${x('group.showRows')}</button>` : null}
-      </div>
-    </div>`;
+        <${Label} block>${x('group.rows', { n: n(rows.total) })}<//>
+        <${List} cols="when-name-state" dense head=${[x('col.when'), x('col.key'), x('col.outcome')]}>
+          ${rows.entries.map((e) => html`<${Row} key=${e.id}><${When}>${dateWord(e.timestamp)} ${timeWord(e.timestamp)}<//><${Cell}><${Code}>${e.memory_key}<//><//><${Cell}>${x(e.allowed ? 'outcome.allowed' : 'outcome.denied')}<//><//>`)}
+        <//>
+        ${rows.entries.length < rows.total ? html`<${More} disabled=${rows.loading} label=${rows.loading ? x('loading') : x('group.moreRows', { n: n(rows.total - rows.entries.length) })}
+          onMore=${() => ctx.loadGroupRows(g, id, true)} />` : null}` : null}
+    <//>`;
 }
 
 /* ── 02: one grant or revoke event ───────────────────────────────────────────────────────────── */
@@ -193,11 +214,11 @@ export function eventRow(ctx, ev) {
   const byYou = !ev.by || ev.by === ctx.session?.owner;
   const text = x(`event.${ev.kind}.${ev.role}`, { who: ev.who.name, target: `${ev.target.title} · ${ev.target.sub}` });
   return html`
-    <div class="listing-row" key=${`${ev.kind}|${ev.consent.id}`}>
-      <div class="listing-name">${byYou ? x('you') : ev.by}</div>
-      <div class="listing-desc">${text}</div>
-      <div class="dw-n is-good poster-stat-number poster-stat-number--small">1<small>${x('outcome.' + ev.kind)}</small></div>
-      <div class="poster-time">${dateWord(ev.at)} ${timeWord(ev.at)}</div>
-      <div class="listing-doors"></div>
-    </div>`;
+    <${Row} key=${`${ev.kind}|${ev.consent.id}`}>
+      <${Name}>${byYou ? x('you') : ev.by}<//>
+      <${Desc}>${text}<//>
+      <${Num}><${Figure} small end tone="fine" n="1" sub=${x('outcome.' + ev.kind)} /><//>
+      <${When}>${dateWord(ev.at)} ${timeWord(ev.at)}<//>
+      <${Doors} />
+    <//>`;
 }

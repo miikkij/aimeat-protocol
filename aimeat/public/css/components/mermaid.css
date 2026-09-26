@@ -1,0 +1,17 @@
+/**
+ * @file mermaid.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Mermaid diagram (components/Mermaid.js): the drawn chart centred and scrolling
+ *   sideways when it is wider than its place, its picture never wider than the place; when the chart
+ *   cannot be drawn, its source text in small grey letters on the dim ground.
+ *   NOTE: this file must be linked in spa.html, where profile.css is.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Moved unchanged out of css/views/profile.css under the component's own
+ *     names: .mmd → .mermaid-diagram, .mmd-fallback → .mermaid-fallback (a move: the same
+ *     declarations, the same selector shapes).
+ */
+
+.mermaid-diagram { overflow-x: auto; text-align: center; }
+.mermaid-diagram svg { max-width: 100%; height: auto; }
+.mermaid-fallback { font-size: 0.74rem; white-space: pre-wrap; color: var(--text-dim); background: var(--bg-dim); padding: 0.5rem; border-radius: 6px; overflow: auto; }

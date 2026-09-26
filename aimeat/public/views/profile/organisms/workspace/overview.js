@@ -9,6 +9,11 @@
  * @structure gotoEvent, openOvRec, gotoHit, renderWsSearchResults, openOvDoc, ovAddNew, renderObjectives
  * @usage import { gotoEvent, renderObjectives } from '/views/profile/organisms/workspace/overview.js';
  * @version-history
+ *   v2.7.0 — 2026-09-26 — Every part is a library component that takes data: a search's hits are a
+ *     List per space under its Group heading with the tally count (the name opens the hit, the snippet
+ *     under it); the objectives stand under their Group heading, each in the Object box with its
+ *     status marks in the head, its why as the Hint and its measures as Facts. The page writes no
+ *     class (page migration G2b).
  *   v2.6.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v2.5.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v2.4.0 — 2026-09-25 — An objective's measures are the Facts (css/components/facts.css), a unification: the look most tabs use. The tiles and their met/off edge go; the ✅ or ⚠️ after the value still says it, the target and "self-reported" are the grey line.
@@ -28,9 +33,13 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { LoadingLine } from '/views/profile/shared.js';
-import { QuietNote } from '/components/QuietNote.js';
 import * as orgService from '/js/services/organisms.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Space, Stack } from '/components/Layout.js';
+import { List, Row, Name, Group } from '/components/List.js';
 import { cap, kpiMeets, kpiTargetText } from './helpers.js';
 
 // Strip event → jump straight to the changed item in its space tab.
@@ -58,21 +67,20 @@ export function gotoHit(ctx, hit) {
 }
 export function renderWsSearchResults(ctx) {
   const { wsSearching, wsHits, wsT } = ctx;
-  if (wsSearching && !wsHits) return html`<${LoadingLine} text=${t('organisms.loading') || 'Loading...'} />`;
-  if (!wsHits || !wsHits.length) return html`<${QuietNote}>${t('search.noMatches') || 'No matches'}<//>`;
+  if (wsSearching && !wsHits) return html`<${Note} kind="loading">${t('organisms.loading') || 'Loading...'}<//>`;
+  if (!wsHits || !wsHits.length) return html`<${Note} kind="quiet">${t('search.noMatches') || 'No matches'}<//>`;
   const bySpace = {};
   for (const h of wsHits) (bySpace[h.space] = bySpace[h.space] || []).push(h);
-  return html`<div class="pj-search-results">
+  return html`<${Stack} gap="large" above="small">
     ${Object.entries(bySpace).map(([space, hits]) => html`
-      <div class="pj-search-group" key=${space}>
-        <div class="pj-search-group-head poster-day-title">${cap(wsT('type.' + space) || space)}<span class="poster-count poster-count--tally">${hits.length}</span></div>
-        ${hits.map(h => html`
-          <button class="pj-search-hit" key=${h.id} onClick=${() => gotoHit(ctx, h)}>
-            <span class="pj-search-hit-title">${h.title}</span>
-            <span class="pj-search-hit-snippet">${h.snippet}</span>
-          </button>`)}
+      <div key=${space}>
+        <${Group} title=${cap(wsT('type.' + space) || space)} count=${hits.length}>
+          <${List} cols="name">${hits.map(h => html`
+            <${Row} key=${h.id}><${Name} onOpen=${() => gotoHit(ctx, h)} desc=${h.snippet}>${h.title}<//><//>`)}
+          <//>
+        <//>
       </div>`)}
-  </div>`;
+  <//>`;
 }
 // A document opens on its space page.
 export function openOvDoc(ctx, ot, d) {
@@ -89,30 +97,25 @@ export function ovAddNew(ctx, ot, docMode) {
 export function renderObjectives(ctx) {
   const { wsObjectives } = ctx;
   return html`
-    <div class="pj-obj">
-      <div class="pj-obj-title poster-day-title">${t('organisms.objectivesTitle') || 'Objectives'}</div>
-      ${wsObjectives.map((o, oi) => html`
-        <div class="pj-obj-card poster-box" key=${o.id || oi}>
-          <div class="pj-obj-statement">
-            ${(o.statement || o.id)}
-            ${o.status === 'met' ? html`<span class="poster-status poster-status--fine">${t('organisms.objStatusMet') || 'met'}</span>` : null}
-            ${o.status === 'abandoned' ? html`<span class="poster-status poster-status--off">${t('organisms.objStatusAbandoned') || 'abandoned'}</span>` : null}
-          </div>
-          ${o.why ? html`<div class="pj-obj-why">${(o.why)}</div>` : null}
-          ${(o.kpis && o.kpis.length) ? html`
-            <div class="facts">
-              ${o.kpis.map((k, ki) => {
-                const ok = kpiMeets(k.current, k.target);
-                const tgt = kpiTargetText(k.target);
-                const unit = k.unit ? ` ${k.unit}` : '';
-                const val = (k.current === null || k.current === undefined) ? '—' : String(k.current);
-                return html`
-                  <span class="facts-k poster-label" key=${'k:' + (k.name || ki)}>${k.name}</span>
-                  <span class="facts-v" key=${k.name || ki}>${val}${unit}${ok === true ? ' ✅' : ok === false ? ' ⚠️' : ''}${tgt || k.computed === false ? html`<small>
-                    ${tgt ? html`<span>${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}</span>` : null}${tgt && k.computed === false ? ' · ' : null}${k.computed === false ? html`<span title=${t('organisms.kpiDeclaredHint') || 'Self-reported — not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}</span>` : null}
-                  </small>` : null}</span>`;
-              })}
-            </div>` : null}
-        </div>`)}
-    </div>`;
+    <${Space} above="medium" below="medium">
+      <${Group} title=${t('organisms.objectivesTitle') || 'Objectives'}>
+        ${wsObjectives.map((o, oi) => html`
+          <${Box} key=${o.id || oi} name=${(o.statement || o.id)} marks=${html`
+            ${o.status === 'met' ? html`<${Mark} kind="status" tone="fine">${t('organisms.objStatusMet') || 'met'}<//>` : null}
+            ${o.status === 'abandoned' ? html`<${Mark} kind="status" tone="off">${t('organisms.objStatusAbandoned') || 'abandoned'}<//>` : null}`}>
+            ${o.why ? html`<${Note}>${(o.why)}<//>` : null}
+            ${(o.kpis && o.kpis.length) ? html`<${Facts} rows=${o.kpis.map((k, ki) => {
+              const ok = kpiMeets(k.current, k.target);
+              const tgt = kpiTargetText(k.target);
+              const unit = k.unit ? ` ${k.unit}` : '';
+              const val = (k.current === null || k.current === undefined) ? '—' : String(k.current);
+              return {
+                key: k.name || ki, k: k.name,
+                v: `${val}${unit}${ok === true ? ' ✅' : ok === false ? ' ⚠️' : ''}`,
+                sub: tgt || k.computed === false ? html`${tgt ? html`<span>${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}</span>` : null}${tgt && k.computed === false ? ' · ' : null}${k.computed === false ? html`<span title=${t('organisms.kpiDeclaredHint') || 'Self-reported — not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}</span>` : null}` : undefined,
+              };
+            })} />` : null}
+          <//>`)}
+      <//>
+    <//>`;
 }

@@ -6,6 +6,11 @@
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the dialog's
+ *     width is its md size (the page's 620px override goes), the address is Code with the envelope as
+ *     the Icon link to the inbox thread, the presets are Tabs, "Advanced" a fold Tab, each area a
+ *     part under the heavy rule (Split heavy) with its row label and the "All" Filter that ticks the area, its permissions the
+ *     List's pick rows (the one always on cannot be unticked: pickOff), the notes Note.
  *   v1.14.0 — 2026-09-26 — A permission beside its check box is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.13.0 — 2026-09-26 — The scope dialog's permission groups stand under the section rule (.poster-row--thing) instead of their own 3px ink border (a unification: the look most tabs use).
  *   v1.12.0 — 2026-09-26 — A scope group's all switch is the Tab's filter tone (.poster-tab--filter, is-on while every permission of the group is ticked); .domain-toggle's rules go (a unification: Jouni's decision Tabs and filters).
@@ -41,17 +46,22 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { InboxLink } from '/components/InboxLink.js';
+import { inboxLinkHref } from '/components/InboxLink.js';
 import { Modal } from '/components/Modal.js';
 import {
   SCOPE_DOMAINS, SCOPE_TEMPLATES, NOT_IN_WILDCARD,
   wildcardScopes, bulkScopes, expandScopes, collapseScopes, detectTemplate, unknownScopes,
   templateLabel, domainLabel, permLabel,
 } from './scope-config.js';
-import { Hint } from '/components/Hint.js';
+import { Note } from '/components/Note.js';
+import { Action, Icon, Loud } from '/components/Action.js';
+import { Code, Label, Mark, Marks } from '/components/Mark.js';
+import { Tabs, Tab } from '/components/Tabs.js';
+import { List, Row as ListRow, Name, Cell, Filter } from '/components/List.js';
+import { Row, Space, Split } from '/components/Layout.js';
 
 // The envelope beside the agent's address: the door to its inbox thread.
-const MAIL_ICON = html`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 7l9 6 9-6"/></svg>`;
+const MAIL_ICON = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 7l9 6 9-6"/></svg>`;
 
 export default function ScopesModal({ agent, session, onSave, onCancel }) {
   const scopes = agent.default_scopes ?? ['*'];
@@ -105,91 +115,83 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
   const isReadOnly = !(session.roles?.includes('owner') || session.roles?.includes('operator'));
 
   return html`
-    <${Modal} open=${true} onClose=${onCancel} className="scope-modal" size="lg" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}
+    <${Modal} open=${true} onClose=${onCancel} size="md" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}
       footer=${isReadOnly ? html`
-        <button class="poster-action" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>` : html`
-        <button class="poster-action" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
-        <button class="poster-slab poster-slab--control" onClick=${handleSave} disabled=${saving}>
+        <${Action} onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}<//>` : html`
+        <${Action} onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}<//>
+        <${Loud} control onClick=${handleSave} disabled=${saving}>
           ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
-        </button>`}>
-        <div class="scope-agent-info"><code class="code-inline">${escHtml(agent.gaii || '')}</code>
-          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="poster-icon poster-icon--small scope-agent-msg">${MAIL_ICON}</${InboxLink}>` : null}
-        </div>
+        <//>`}>
+        <${Row} gap="medium" below="large">
+          <${Code}>${escHtml(agent.gaii || '')}<//>
+          ${agent.gaii ? html`<${Icon} small href=${inboxLinkHref(agent.gaii)} label=${t('inbox.messageThis')}>${MAIL_ICON}<//>` : null}
+        <//>
 
         ${isReadOnly ? html`
-          <p class="poster-hint mb-1">${t('profile.agents.scopeUi.readOnlyView')}</p>
-          <div class="scope-readonly-list">
-            ${scopes.map(s => html`<span class="poster-chip">${escHtml(s)}</span>`)}
-          </div>
+          <${Note}>${t('profile.agents.scopeUi.readOnlyView')}<//>
+          <${Marks}>
+            ${scopes.map(s => html`<${Mark} key=${s}>${escHtml(s)}<//>`)}
+          <//>
         ` : html`
-          <div class="scope-templates">
-            ${['readonly', 'standard', 'full'].map(tpl => html`
-              <button class="poster-tab ${currentTemplate === tpl ? 'is-on' : ''}"
-                      onClick=${() => applyTemplate(tpl)}>
-                ${templateLabel(tpl)}
-              </button>
-            `)}
-          </div>
+          <${Space} below="large">
+            <${Tabs} label=${t('profile.agents.scopeUi.scopeProfile')} value=${currentTemplate} onSelect=${applyTemplate}
+              items=${['readonly', 'standard', 'full'].map(tpl => ({ value: tpl, key: tpl, label: templateLabel(tpl) }))} />
+          <//>
 
-          <button type="button" class=${`poster-tab poster-tab--fold scope-advanced-toggle ${advanced ? 'is-on' : ''}`} aria-pressed=${advanced ? 'true' : 'false'} onClick=${() => setAdvanced(!advanced)}>
-            ${t('profile.agents.scopeUi.advanced')}
-          </button>
+          <${Space} below="large">
+            <${Tab} tone="fold" on=${advanced} pressed=${advanced} onClick=${() => setAdvanced(!advanced)}>
+              ${t('profile.agents.scopeUi.advanced')}
+            <//>
+          <//>
 
           ${advanced && html`
-            <div class="scope-domains">
-              ${SCOPE_DOMAINS.map(d => {
-                const allChecked = bulkScopes(d).every(s => checked.has(s));
-                const isCatalogue = d.key === 'catalogue';
-                return html`
-                  <div class="scope-domain poster-row--thing">
-                    <div class="scope-domain-header" onClick=${() => !isCatalogue && toggleDomain(d.key)}>
-                      <span class="poster-label domain-label">${domainLabel(d.key)}</span>
-                      ${!isCatalogue && html`<span class=${`poster-tab poster-tab--filter ${allChecked ? 'is-on' : ''}`}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}</span>`}
-                    </div>
+            ${SCOPE_DOMAINS.map(d => {
+              const allChecked = bulkScopes(d).every(s => checked.has(s));
+              const isCatalogue = d.key === 'catalogue';
+              return html`
+                <${Split} heavy key=${d.key}>
+                  <${Row} gap="small" justify="between" below="tight">
+                    <${Label}>${domainLabel(d.key)}<//>
+                    ${!isCatalogue && html`<${Filter} on=${allChecked} onClick=${() => toggleDomain(d.key)}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}<//>`}
+                  <//>
+                  <${List} cols="check-name-desc" keepCols dense>
                     ${d.permissions.map(p => {
                       const scope = `${d.key}:${p}`;
                       const isLocked = isCatalogue && p === 'read';
                       const isExtra = NOT_IN_WILDCARD.includes(scope);
                       return html`
-                        <div class="scope-row ${isLocked ? 'disabled' : ''}">
-                          <label class="check-line">
-                            <input type="checkbox"
-                              checked=${checked.has(scope) || isLocked}
-                              onChange=${() => !isLocked && toggleScope(scope)}
-                              disabled=${isLocked}
-                            />
-                            <span class="scope-friendly">${permLabel(p, d.key)}</span>
-                            <code class="code-inline">${scope}</code>
-                            ${isLocked && html`<span class="poster-chip">${t('profile.agents.scopeUi.alwaysOn')}</span>`}
-                            ${isExtra && html`<span class="poster-chip poster-chip--coral">${t('profile.agents.scopeUi.notInFullAccess')}</span>`}
-                          </label>
-                        </div>`;
+                        <${ListRow} key=${scope} picked=${checked.has(scope) || isLocked} pickOff=${isLocked}
+                          pickLabel=${permLabel(p, d.key)} onPick=${() => !isLocked && toggleScope(scope)}>
+                          <${Name}>${permLabel(p, d.key)}<//>
+                          <${Cell} line>
+                            <${Code}>${scope}<//>
+                            ${isLocked && html`<${Mark}>${t('profile.agents.scopeUi.alwaysOn')}<//>`}
+                            ${isExtra && html`<${Mark} tone="coral">${t('profile.agents.scopeUi.notInFullAccess')}<//>`}
+                          <//>
+                        <//>`;
                     })}
-                  </div>`;
-              })}
+                  <//>
+                <//>`;
+            })}
 
-              ${unknown.length > 0 && html`
-                <div class="scope-domain poster-row--thing">
-                  <div class="scope-domain-header">
-                    <span class="poster-label domain-label">${t('profile.agents.scopeUi.domainOther')}</span>
-                  </div>
-                  <${Hint}>${t('profile.agents.scopeUi.otherScopesHint')}<//>
+            ${unknown.length > 0 && html`
+              <${Split} heavy>
+                <${Label} block>${t('profile.agents.scopeUi.domainOther')}<//>
+                <${Note}>${t('profile.agents.scopeUi.otherScopesHint')}<//>
+                <${List} cols="check-name-desc" keepCols dense>
                   ${unknown.map(scope => html`
-                    <div class="scope-row">
-                      <label class="check-line">
-                        <input type="checkbox"
-                          checked=${checked.has(scope)}
-                          onChange=${() => toggleScope(scope)}
-                        />
-                        <code class="code-inline">${escHtml(scope)}</code>
-                      </label>
-                    </div>`)}
-                </div>
-              `}
-            </div>
+                    <${ListRow} key=${scope} picked=${checked.has(scope)} pickLabel=${scope} onPick=${() => toggleScope(scope)}>
+                      <${Name} code>${escHtml(scope)}<//>
+                      <${Cell} />
+                    <//>`)}
+                <//>
+              <//>
+            `}
           `}
 
-          <p class="poster-hint poster-row--thing scope-reconnect-note">${t('profile.agents.scopeUi.reconnectNote')}</p>
+          <${Split} heavy above="large">
+            <${Note}>${t('profile.agents.scopeUi.reconnectNote')}<//>
+          <//>
         `}
     <//>`;
 }

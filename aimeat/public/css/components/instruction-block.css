@@ -1,0 +1,59 @@
+/**
+ * @file css/components/instruction-block.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The organism's instruction block (components/InstructionBlock.js): the row of format
+ *   tabs, the line that says where the block goes, the block itself, and the copy door with the line
+ *   that says what it was generated from. The classic look on every page, the MCP page included
+ *   (Jouni's decision "MCP guide", the option classic). All colours are theme tokens.
+ * @structure .instruction-block · -tabs · -place · -text · -actions · -meta · -note
+ * @usage Linked from spa.html where hello-mcp.css was, before setup-guide.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Moved unchanged out of css/components/hello-mcp.css under the component's
+ *     own names (.ib → .instruction-block, .ib-tabs → -tabs, .ib-place → -place, .ib-block → -text,
+ *     .ib-actions → -actions, .ib-meta → -meta, .ib-note → -note). Left behind as dead: .ib-tab and
+ *     .ib-tab--active (the tabs are the library's Tabs since 2026-09-26) and the organism page's
+ *     wrapper .pj-org-instr and -lead (no file writes them). hello-mcp.css's history ends there.
+ */
+
+/* ── Instruction block (also used standalone on every organism) ── */
+.instruction-block { margin: 0.4rem 0 0; }
+
+.instruction-block-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.instruction-block-place {
+  margin: 0 0 0.45rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.instruction-block-text {
+  margin: 0 0 0.55rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.instruction-block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.instruction-block-meta { font-size: var(--text-caption); color: var(--text-muted); }
+.instruction-block-note { font-size: 0.8125rem; color: var(--text-dim); margin: 0.4rem 0; }

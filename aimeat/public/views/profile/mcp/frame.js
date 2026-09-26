@@ -9,12 +9,12 @@
  * @structure m · rel · day · toolLabel · initials · mayWord · buildRows · crumb · pageLinks · goTab
  * @usage import { m, buildRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (Crumb, Rail);
+ *     openTab is the Rail's (component plan C9).
  *   v1.0.0 — 2026-09-02 — Initial (design canvas "AIMEAT MCP-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { detectTemplate, expandScopes } from '/views/profile/agents/scope-model.js';
@@ -84,15 +84,17 @@ export function buildRows(agents, instances) {
   return [...agentRows, ...toolRows].sort((a, b) => Date.parse(b.when || 0) - Date.parse(a.when || 0));
 }
 
+/** The crumb's steps (components/Crumb.js): the last is the page you are on. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAutomation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.mcp')}</span></div>`;
+  return [t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.mcp')];
 }
 
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export const goTab = openTab;
+/** The sibling pages in the rail, as data (components/Rail.js): each is → … →. */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>
-    <a class="og-rail-link" href="/v1/chat"><i>→</i>${t('nav.chat')}<em>→</em></a>`;
+  return [
+    { tab: 'agents', label: t('profile.tabs.agents') },
+    { tab: 'organisms', label: t('profile.tabs.organisms') },
+    { href: '/v1/chat', label: t('nav.chat') },
+  ];
 }

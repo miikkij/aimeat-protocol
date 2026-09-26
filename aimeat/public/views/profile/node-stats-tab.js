@@ -5,6 +5,7 @@
  * @description Profile tab showing real-time node statistics including uptime,
  *   request counts, tunnel metrics, mailbox stats, and security counters.
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (FigureStrip lead, CardGrid of section Cards, Facts with the status code as the name's state, SubHeading, Note, Space): the page passes data and writes no class. Under the Nodes page head the sub-tab keeps its own name and line as a level-2 sub-heading (page group G8).
  *   v1.8.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.7.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.6.0 -- 2026-09-25 -- The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
@@ -26,6 +27,12 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { LoadingLine } from './shared.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts } from '/components/Facts.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Note } from '/components/Note.js';
+import { Space } from '/components/Layout.js';
 import { getNodeStats } from '/js/services/stats.js';
 import { num, dateTime as fmtDateTime, duration } from '/js/format.js';
 
@@ -40,14 +47,13 @@ function fmtBytes(b) {
   return (b / 1048576).toFixed(1) + ' MB';
 }
 
-// One figure of the figure strip (og-strip): the number and its word. The tones it once took were
-// drawn in ink by the poster skin, so the strip draws them as it draws every figure.
-function StatCard({ label, value }) {
-  return html`<div>
-    <b>${value}</b>
-    <span>${label}</span>
-  </div>`;
-}
+// One figure of the figure strip: the number and its word. The tones main gave them
+// (accent/success/purple/blue/warn/danger) were drawn in ink by the poster skin (.pf .stat-card-value
+// overrode them), so the strip draws them as it draws every figure.
+const fig = (label, value) => ({ n: value, label });
+
+// A status code's name is its state (2xx fine, 4xx attention, 5xx danger), as main coloured it.
+const codeState = (code) => (code.startsWith('2') ? 'fine' : code.startsWith('4') ? 'attention' : code.startsWith('5') ? 'danger' : undefined);
 
 export default function NodeStatsTab() {
   const [data, setData] = useState(null);
@@ -74,69 +80,59 @@ export default function NodeStatsTab() {
     } catch { setError(true); }
   }
 
-  if (error) return html`<div class="poster-page-title">${t('profile.nodeStats.title')}</div>
-    <p class="text-meta">${t('profile.nodeStats.error')}</p>`;
+  // Under the Nodes page head (Jouni's decision "Nodes page head") this sub-tab keeps its own name
+  // and line as a level-2 sub-heading: main showed them, and the Nodes head names the page, not it.
+  const head = html`<${SubHeading} level=${2} desc=${error ? null : t('profile.nodeStats.desc')}>${t('profile.nodeStats.title')}<//>`;
+  if (error) return html`${head}<${Note} kind="meta">${t('profile.nodeStats.error')}<//>`;
   if (!data) return html`<${LoadingLine} text=${t('profile.nodeStats.loading')} />`;
   const s = data;
+  const section = (title, items) => html`
+    <${Space} above="section"><${SubHeading} level=${3}>${title}<//><//>
+    <${FigureStrip} lead items=${items} />`;
   return html`
-    <div class="poster-page-title">${t('profile.nodeStats.title')}</div>
-    <div class="section-desc">${t('profile.nodeStats.desc')}</div>
+    ${head}
 
-    <div class="og-strip pf-figures">
-      <${StatCard} label=${t('profile.nodeStats.uptime')} value=${fmtUptime(s.uptime_seconds)} />
-      <${StatCard} label=${t('profile.nodeStats.requests')} value=${num(s.requests_total || 0)} />
-      <${StatCard} label=${t('profile.nodeStats.owners')} value=${s.active_owners || 0} />
-      <${StatCard} label=${t('profile.nodeStats.agents')} value=${s.active_agents || 0} />
-      <${StatCard} label=${t('profile.nodeStats.memoryWrites')} value=${num(s.memory_writes || 0)} />
-      <${StatCard} label=${t('profile.nodeStats.memoryReads')} value=${num(s.memory_reads || 0)} />
-    </div>
+    <${FigureStrip} lead items=${[
+      fig(t('profile.nodeStats.uptime'), fmtUptime(s.uptime_seconds)),
+      fig(t('profile.nodeStats.requests'), num(s.requests_total || 0)),
+      fig(t('profile.nodeStats.owners'), s.active_owners || 0),
+      fig(t('profile.nodeStats.agents'), s.active_agents || 0),
+      fig(t('profile.nodeStats.memoryWrites'), num(s.memory_writes || 0)),
+      fig(t('profile.nodeStats.memoryReads'), num(s.memory_reads || 0)),
+    ]} />
 
-    <div class="stat-two-col">
-      <div class="card p-1 poster-row--thing">
-        <h4 class="stat-panel-h4 sub-heading">${t('profile.nodeStats.requestsByMethod')}</h4>
-        ${s.requests_by_method ? html`<div class="facts">${Object.entries(s.requests_by_method).map(([m, c]) => html`
-            <span class="facts-k poster-label">${m}</span>
-            <span class="facts-v">${num(c)}</span>`)}</div>` : null}
-      </div>
-      <div class="card p-1 poster-row--thing">
-        <h4 class="stat-panel-h4 sub-heading">${t('profile.nodeStats.requestsByStatus')}</h4>
-        ${s.requests_by_status ? html`<div class="facts">${Object.entries(s.requests_by_status).map(([code, c]) => {
-          const tone = code.startsWith('2') ? 'fine' : code.startsWith('4') ? 'attention' : code.startsWith('5') ? 'danger' : '';
-          return html`
-            ${tone ? html`<span class="facts-k"><span class=${`poster-status poster-status--${tone}`}>${code}</span></span>` : html`<span class="facts-k poster-label">${code}</span>`}
-            <span class="facts-v">${num(c)}</span>`;
-        })}</div>` : null}
-      </div>
-    </div>
+    <${CardGrid} cols="two">
+      <${Card} tone="section" title=${t('profile.nodeStats.requestsByMethod')}>
+        ${s.requests_by_method ? html`<${Facts} rows=${Object.entries(s.requests_by_method).map(([m, c]) => ({ k: m, v: num(c) }))} />` : null}
+      <//>
+      <${Card} tone="section" title=${t('profile.nodeStats.requestsByStatus')}>
+        ${s.requests_by_status ? html`<${Facts} rows=${Object.entries(s.requests_by_status).map(([code, c]) => ({ k: code, state: codeState(code), v: num(c) }))} />` : null}
+      <//>
+    <//>
 
-    ${s.tunnel ? html`
-      <h3 class="stat-section-h3 sub-heading">${t('profile.nodeStats.tunnelTitle')}</h3>
-      <div class="og-strip pf-figures">
-        <${StatCard} label=${t('profile.nodeStats.tunnelActive')} value=${s.tunnel.connections_active} />
-        <${StatCard} label=${t('profile.nodeStats.tunnelTotal')} value=${s.tunnel.connections_total} />
-        <${StatCard} label=${t('profile.nodeStats.msgSent')} value=${num(s.tunnel.messages_sent_total || 0)} />
-        <${StatCard} label=${t('profile.nodeStats.msgReceived')} value=${num(s.tunnel.messages_received_total || 0)} />
-        <${StatCard} label=${t('profile.nodeStats.deliveryFails')} value=${s.tunnel.delivery_failures_total} />
-        <${StatCard} label=${t('profile.nodeStats.latencyAvg')} value=${(s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'} />
-        <${StatCard} label=${t('profile.nodeStats.latencyP95')} value=${(s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms'} />
-      </div>` : null}
+    ${s.tunnel ? section(t('profile.nodeStats.tunnelTitle'), [
+      fig(t('profile.nodeStats.tunnelActive'), s.tunnel.connections_active),
+      fig(t('profile.nodeStats.tunnelTotal'), s.tunnel.connections_total),
+      fig(t('profile.nodeStats.msgSent'), num(s.tunnel.messages_sent_total || 0)),
+      fig(t('profile.nodeStats.msgReceived'), num(s.tunnel.messages_received_total || 0)),
+      fig(t('profile.nodeStats.deliveryFails'), s.tunnel.delivery_failures_total),
+      fig(t('profile.nodeStats.latencyAvg'), (s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'),
+      fig(t('profile.nodeStats.latencyP95'), (s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms'),
+    ]) : null}
 
-    ${s.mailbox ? html`
-      <h3 class="stat-section-h3 sub-heading">${t('profile.nodeStats.mailboxTitle')}</h3>
-      <div class="og-strip pf-figures">
-        <${StatCard} label=${t('profile.nodeStats.mailboxItems')} value=${s.mailbox.items_total} />
-        <${StatCard} label=${t('profile.nodeStats.mailboxBytes')} value=${fmtBytes(s.mailbox.bytes_total)} />
-        <${StatCard} label=${t('profile.nodeStats.mailboxDelivered')} value=${num(s.mailbox.delivered_total || 0)} />
-        <${StatCard} label=${t('profile.nodeStats.mailboxExpired')} value=${s.mailbox.expired_total} />
-      </div>` : null}
+    ${s.mailbox ? section(t('profile.nodeStats.mailboxTitle'), [
+      fig(t('profile.nodeStats.mailboxItems'), s.mailbox.items_total),
+      fig(t('profile.nodeStats.mailboxBytes'), fmtBytes(s.mailbox.bytes_total)),
+      fig(t('profile.nodeStats.mailboxDelivered'), num(s.mailbox.delivered_total || 0)),
+      fig(t('profile.nodeStats.mailboxExpired'), s.mailbox.expired_total),
+    ]) : null}
 
-    <h3 class="stat-section-h3 sub-heading">${t('profile.nodeStats.securityTitle')}</h3>
-    <div class="og-strip pf-figures">
-      <${StatCard} label=${t('profile.nodeStats.authFailures')} value=${s.auth_failures_total || 0} />
-      <${StatCard} label=${t('profile.nodeStats.rateLimitHits')} value=${s.rate_limit_hits_total || 0} />
-      <${StatCard} label=${t('profile.nodeStats.scopeDenials')} value=${s.scope_denials_total || 0} />
-    </div>
+    ${section(t('profile.nodeStats.securityTitle'), [
+      fig(t('profile.nodeStats.authFailures'), s.auth_failures_total || 0),
+      fig(t('profile.nodeStats.rateLimitHits'), s.rate_limit_hits_total || 0),
+      fig(t('profile.nodeStats.scopeDenials'), s.scope_denials_total || 0),
+    ])}
 
-    <p class="poster-hint stat-footer">${t('profile.nodeStats.startedAt')}: ${fmtDateTime(s.started_at)}</p>
+    <${Space} above="large"><${Note}>${t('profile.nodeStats.startedAt')}: ${fmtDateTime(s.started_at)}<//><//>
   `;
 }

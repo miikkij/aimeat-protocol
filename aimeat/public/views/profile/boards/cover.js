@@ -11,6 +11,7 @@
  * @structure renderBoardsView · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- On the component kit (page group G7): the frame is the SettingsPage (tags, loud action, rail as data), the strip the FigureStrip, the fold tabs the Tab and Tabs, "show the rest" the More line, the own-board form the Fields with the Choice and the TextField, the app fold the Beside with the Code block, the folds the Section fold with the long line cut. The file writes no class.
  *   v1.13.0 -- 2026-09-26 -- The boards table's heading row is inside its Listing (boardRows with head), a unification: the look most tabs use.
  *   v1.12.0 -- 2026-09-26 -- The SDK example is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.11.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -39,12 +40,24 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Section } from '/components/Section.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { scrollToSection } from '/components/Rail.js';
 import { c, rel, who, bid, isAgentPost, crumb, boardRows, noticeRow, pageLinks } from './frame.js';
 import { renderBoard } from './board.js';
 import { renderNotice } from './notice.js';
 import { Hint } from '/components/Hint.js';
+import { Note } from '/components/Note.js';
+import { Code } from '/components/Mark.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Tab, Tabs } from '/components/Tabs.js';
+import { More } from '/components/List.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Fields } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Choice } from '/components/Choice.js';
+import { Stack, Beside } from '/components/Layout.js';
+import { SubHeading } from '/components/SubHeading.js';
 
 export function renderBoardsView(ctx) {
   const v = ctx.view;
@@ -79,82 +92,79 @@ function renderCover(ctx) {
   const myStanding = recent.map(r => r.authors?.[ctx.session?.ghii]).find(Boolean);
   const latest = recent[0];
   const ownBoards = ctx.boards.filter(b => ctx.isMine(b)).length;
-  const chip = (n, key, cls = '') => html`<span class=${`poster-chip ${cls}`}>${c(key, { n })}</span>`;
-  const strip = html`
-    <div class="og-strip">
-      <div><b class=${fresh ? 'og-strip-coral' : ''}>${fresh}</b><span>${c('stripNew')}</span><small>${c('stripNewSub')}</small></div>
-      <div>${latest ? html`<b>${rel(latest.post.created_at)}</b><span>${c('stripLatest')}</span><small>${ctx.boardById(latest.boardId)?.name} · ${who(latest.post.author_gaii).label} · "${latest.post.title}"</small>` : html`<b>·</b><span>${c('stripLatest')}</span><small>${c('noneYet')}</small>`}</div>
-      <div><b>${own.length}</b><span>${c('stripOwn')}</span><small>${own[0] ? `${own[0].post.title}` : c('stripOwnSub')}</small></div>
-      <div>${myStanding ? html`<b class="og-strip-coral">${myStanding.thanks || 0}</b><span>${c('stripThanks')}</span><small>${c('stripThanksSub', { n: myStanding.posts || 0 })}</small>` : html`<b>·</b><span>${c('stripThanks')}</span><small>${c('noneYet')}</small>`}</div>
-    </div>`;
+  const chip = (n, key, tone) => ({ label: c(key, { n }), tone });
+  const strip = html`<${FigureStrip} items=${[
+    { n: fresh, tone: fresh ? 'coral' : undefined, label: c('stripNew'), sub: c('stripNewSub') },
+    latest
+      ? { n: rel(latest.post.created_at), label: c('stripLatest'), sub: `${ctx.boardById(latest.boardId)?.name} · ${who(latest.post.author_gaii).label} · "${latest.post.title}"` }
+      : { n: '·', label: c('stripLatest'), sub: c('noneYet') },
+    { n: own.length, label: c('stripOwn'), sub: own[0] ? `${own[0].post.title}` : c('stripOwnSub') },
+    myStanding
+      ? { n: myStanding.thanks || 0, tone: 'coral', label: c('stripThanks'), sub: c('stripThanksSub', { n: myStanding.posts || 0 }) }
+      : { n: '·', label: c('stripThanks'), sub: c('noneYet') },
+  ]} />`;
+  const marks = [
+    chip(ctx.followed.length, 'chipFollowed'),
+    fresh ? chip(fresh, 'chipNew', 'coral') : null,
+    chip(ctx.others.length, 'chipPublic'),
+    ownBoards ? chip(ownBoards, 'chipOwn') : null,
+  ];
+  const openOwn = () => { ctx.setFold('own', true); scrollToSection('bp-own'); };
+  const actions = html`
+    <${Loud} onClick=${() => ctx.startNotice()}>${c('post')}<//>
+    <${Actions}><${Action} small onClick=${openOwn}>${c('ownBoard')}<//><//>`;
+  const sections = [
+    { id: 'bp-followed', num: '01', label: c('secFollowed'), count: ctx.followed.length },
+    { id: 'bp-recent', num: '02', label: c('secRecent'), count: recent.length },
+    { id: 'bp-public', num: '03', label: c('secPublic'), count: ctx.others.length },
+    { id: 'bp-own', num: '04', label: c('secOwn') },
+    { id: 'bp-app', num: '05', label: c('secApp') },
+  ];
   return html`
-    <div class="og og-bp">
-      ${crumb(ctx, [])}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('profile.tabs.boards')}</h1>
-          <div class="poster-chips">
-            ${chip(ctx.followed.length, 'chipFollowed')}${fresh ? chip(fresh, 'chipNew', 'poster-chip--coral') : null}${chip(ctx.others.length, 'chipPublic')}${ownBoards ? chip(ownBoards, 'chipOwn') : null}
-          </div>
-          <p class="og-desc">${c('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <button type="button" class="poster-slab" onClick=${() => ctx.startNotice()}>${c('post')}</button>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => { ctx.setFold('own', true); scrollTo('bp-own'); }}>${c('ownBoard')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secFollowed(ctx)}
-          ${secRecent(ctx, recent)}
-          ${secPublic(ctx)}
-          <${FoldSection} id="bp-own" num="04" title=${c('secOwn')} sub=${c('ownSub')} open=${ctx.folds.own} onToggle=${() => ctx.setFold('own', !ctx.folds.own)}>${ownBoardForm(ctx)}<//>
-          <${FoldSection} id="bp-app" num="05" title=${c('secApp')} sub=${c('appSub')} open=${ctx.folds.app} onToggle=${() => ctx.setFold('app', !ctx.folds.app)}>${secApp(ctx)}<//>
-        </div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${c('railTitle')}</span>
-          ${[['01', 'bp-followed', c('secFollowed'), ctx.followed.length], ['02', 'bp-recent', c('secRecent'), recent.length], ['03', 'bp-public', c('secPublic'), ctx.others.length], ['04', 'bp-own', c('secOwn'), ''], ['05', 'bp-app', c('secApp'), '']]
-            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="bp" crumb=${crumb(ctx, [])} title=${t('profile.tabs.boards')} marks=${marks} desc=${c('desc')}
+      actions=${actions} strip=${strip} railTitle=${c('railTitle')} sections=${sections} pagesLabel=${c('pages')} pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${secFollowed(ctx)}
+      ${secRecent(ctx, recent)}
+      ${secPublic(ctx)}
+      <${Section} fold clip id="bp-own" num="04" title=${c('secOwn')} sub=${c('ownSub')} open=${ctx.folds.own} onToggle=${() => ctx.setFold('own', !ctx.folds.own)}>${ownBoardForm(ctx)}<//>
+      <${Section} fold clip id="bp-app" num="05" title=${c('secApp')} sub=${c('appSub')} open=${ctx.folds.app} onToggle=${() => ctx.setFold('app', !ctx.folds.app)}>${secApp(ctx)}<//>
+    <//>`;
 }
 
 function secFollowed(ctx) {
   const list = ctx.onlyNew ? ctx.followed.filter(b => (ctx.pages[bid(b)]?.posts || []).some(p => new Date(p.created_at).getTime() > Date.now() - 864e5)) : ctx.followed;
-  const doors = html`<button type="button" class=${`poster-tab poster-tab--fold ${ctx.onlyNew ? 'is-on' : ''}`} onClick=${() => ctx.setOnlyNew(!ctx.onlyNew)}>${c('onlyNew')}</button>`;
+  const doors = html`<${Tab} tone="fold" on=${ctx.onlyNew} pressed=${!!ctx.onlyNew} onClick=${() => ctx.setOnlyNew(!ctx.onlyNew)}>${c('onlyNew')}<//>`;
+  const openDoor = (b) => html`<${Action} small onClick=${() => ctx.pickView({ kind: 'board', id: bid(b) })}>${c('open')}<//>`;
   return html`
     <${PageSection} id="bp-followed" num="01" title=${c('secFollowed')} count=${`${ctx.followed.length} · ${c('secFollowedSub')}`} doors=${doors} first>
-      ${ctx.loading && !ctx.boards.length ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>`
-        : !list.length ? html`<p class="poster-quiet">${ctx.followed.length ? c('emptyNew') : c('empty')}</p>`
-        : boardRows(ctx, list, (b) => html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.pickView({ kind: 'board', id: bid(b) })}>${c('open')}</button>`, { head: true })}
+      ${ctx.loading && !ctx.boards.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : !list.length ? html`<${Note} kind="quiet">${ctx.followed.length ? c('emptyNew') : c('empty')}<//>`
+        : boardRows(ctx, list, openDoor, { head: true })}
       <${Hint}>${c('followedHint')}<//>
     <//>`;
 }
 
 function secRecent(ctx, recent) {
   const shown = recent.filter(r => ctx.recentFilter === 'all' || (ctx.recentFilter === 'agents') === isAgentPost(r.post));
-  const doors = ['all', 'humans', 'agents'].map(f => html`<button type="button" key=${f} class=${`poster-tab poster-tab--fold ${ctx.recentFilter === f ? 'is-on' : ''}`} onClick=${() => ctx.setRecentFilter(f)}>${c(f)}</button>`);
+  const doors = html`<${Tabs} tone="fold" value=${ctx.recentFilter} onSelect=${(f) => ctx.setRecentFilter(f)}
+    items=${['all', 'humans', 'agents'].map((f) => ({ value: f, label: c(f) }))} />`;
   const limit = ctx.recentAll ? shown.length : 8;
+  const showRest = () => ctx.setRecentAll(true);
   return html`
     <${PageSection} id="bp-recent" num="02" title=${c('secRecent')} count=${c('secRecentSub')} doors=${doors}>
-      ${!shown.length ? html`<p class="poster-quiet">${c('emptyRecent')}</p>` : shown.slice(0, limit).map(r => noticeRow(ctx, r.boardId, r.post, r.authors, true))}
-      ${shown.length > limit ? html`<div class="og-doors bp-more"><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setRecentAll(true)}>${c('showRest', { n: shown.length - limit })}</button></div>` : null}
+      ${!shown.length ? html`<${Note} kind="quiet">${c('emptyRecent')}<//>` : shown.slice(0, limit).map(r => noticeRow(ctx, r.boardId, r.post, r.authors, true))}
+      ${shown.length > limit ? html`<${More} label=${c('showRest', { n: shown.length - limit })} onMore=${showRest} />` : null}
     <//>`;
 }
 
 function secPublic(ctx) {
   const list = ctx.publicAll ? ctx.others : ctx.others.slice(0, 8);
-  const doors = ctx.others.length > 8 && !ctx.publicAll ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setPublicAll(true)}>${c('showAll', { n: ctx.others.length })}</button>` : null;
+  const doors = ctx.others.length > 8 && !ctx.publicAll ? html`<${Action} tone="more" onClick=${() => ctx.setPublicAll(true)}>${c('showAll', { n: ctx.others.length })}<//>` : null;
+  const followDoor = (b) => html`<${Action} small onClick=${() => ctx.handleFollow(bid(b))}>${c('follow')}<//>`;
   return html`
     <${PageSection} id="bp-public" num="03" title=${c('secPublic')} count=${`${ctx.others.length} · ${c('secPublicSub')}`} doors=${doors}>
-      ${!list.length ? html`<p class="poster-quiet">${c('emptyPublic')}</p>`
-        : boardRows(ctx, list, (b) => html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.handleFollow(bid(b))}>${c('follow')}</button>`)}
+      ${!list.length ? html`<${Note} kind="quiet">${c('emptyPublic')}<//>` : boardRows(ctx, list, followDoor)}
     <//>`;
 }
 
@@ -162,25 +172,23 @@ function secPublic(ctx) {
 export function ownBoardForm(ctx) {
   const f = ctx.form;
   const set = (k, v) => ctx.setForm({ ...f, [k]: v });
-  const choice = (key, options) => html`<div class="pf-tabs">${options.map(([v, label]) => html`<button type="button" key=${v} class=${`poster-tab ${f[key] === v ? 'is-on' : ''}`} onClick=${() => set(key, v)}>${label}</button>`)}</div>`;
+  const choice = (key, label, hint, options) => html`<${Choice} label=${label} hint=${hint} value=${f[key]} onChange=${(v) => set(key, v)} options=${options} />`;
   return html`
-    <div class="og-fields bp-form">
-      <div class="og-field"><label class="poster-label" for="bp-f-name">${c('fName')}</label><input id="bp-f-name" class="og-input" value=${f.name} onInput=${e => set('name', e.target.value)} placeholder=${t('profile.boards.namePlaceholder')} /></div>
-      <div class="og-field"><label class="poster-label" for="bp-f-desc">${c('fDesc')}</label><input id="bp-f-desc" class="og-input" value=${f.description} onInput=${e => set('description', e.target.value)} placeholder=${t('profile.boards.descPlaceholder')} /></div>
-      <div class="og-fields--2">
-        <div class="og-field"><span class="poster-label">${c('fSees')}</span>${choice('visibility', [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}<span class="poster-hint">${f.visibility === 'public' ? c('seesAllHint') : f.visibility === 'shared' ? c('seesChosenHint') : c('seesMeHint')}</span></div>
-        <div class="og-field"><span class="poster-label">${c('fPosts')}</span>${choice('posting', [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}<span class="poster-hint">${c('postsHint')}</span></div>
-      </div>
-      <div class="og-fields--2">
-        <div class="og-field"><label class="poster-label" for="bp-f-cats">${c('fCategories')}</label><input id="bp-f-cats" class="og-input" value=${f.categories} onInput=${e => set('categories', e.target.value)} placeholder=${c('categoriesPlaceholder')} /><span class="poster-hint">${c('categoriesHint')}</span></div>
-        <div class="og-field"><span class="poster-label">${c('fLifetime')}</span>${choice('ttl', [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}<span class="poster-hint">${c('lifetimeHint')}</span></div>
-      </div>
-      ${f.visibility === 'public' ? html`<div class="og-field bp-field--narrow"><label class="poster-label" for="bp-f-price">${c('fPrice')}</label><input id="bp-f-price" class="og-input" type="number" min="0" step="1" value=${f.price} onInput=${e => set('price', e.target.value)} /><span class="poster-hint">${c('priceHint')}</span></div>` : null}
-      <div class="og-doors">
-        <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.creating || !f.name.trim()} onClick=${() => ctx.handleCreate()}>${c('create')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setFold('own', false)}>${t('profile.cancel')}</button>
-      </div>
-    </div>`;
+    <${Fields}>
+      <${TextField} id="bp-f-name" label=${c('fName')} value=${f.name} onInput=${(v) => set('name', v)} placeholder=${t('profile.boards.namePlaceholder')} />
+      <${TextField} id="bp-f-desc" label=${c('fDesc')} value=${f.description} onInput=${(v) => set('description', v)} placeholder=${t('profile.boards.descPlaceholder')} />
+      <${Fields} cols=${2}>
+        ${choice('visibility', c('fSees'), f.visibility === 'public' ? c('seesAllHint') : f.visibility === 'shared' ? c('seesChosenHint') : c('seesMeHint'), [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}
+        ${choice('posting', c('fPosts'), c('postsHint'), [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}
+        <${TextField} id="bp-f-cats" label=${c('fCategories')} hint=${c('categoriesHint')} value=${f.categories} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
+        ${choice('ttl', c('fLifetime'), c('lifetimeHint'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
+      <//>
+      ${f.visibility === 'public' ? html`<${TextField} id="bp-f-price" size="short" label=${c('fPrice')} hint=${c('priceHint')} type="number" min="0" step="1" value=${f.price} onInput=${(v) => set('price', v)} />` : null}
+      <${Actions}>
+        <${Loud} control disabled=${ctx.creating || !f.name.trim()} onClick=${() => ctx.handleCreate()}>${c('create')}<//>
+        <${Action} small soft onClick=${() => ctx.setFold('own', false)}>${t('profile.cancel')}<//>
+      <//>
+    <//>`;
 }
 
 const SDK_EXAMPLE = `const b = await AIMEAT.social.createBoard('My notices', { visibility: 'public',
@@ -190,17 +198,21 @@ const { posts, authors } = await AIMEAT.social.posts(b.id);   // works for a vis
 if (AIMEAT.social.signedIn()) await AIMEAT.social.subscribe(b.id, { filters: { categories: ['wanted'] } });`;
 
 function secApp(ctx) {
+  const copyExample = () => ctx.copy(SDK_EXAMPLE, c('copied'));
+  const openGuide = () => window.open('/docs/app-developer-ai-guide.md', '_blank', 'noopener');
+  const copyAgent = () => ctx.copy(ctx.agentPrompt(), c('copied'));
+  const side = html`
+    <${Stack} gap="medium">
+      <${SubHeading}>${c('agentTitle')}<//>
+      <${Note}>${c('agentText')}<//>
+      <${Actions}><${Action} small onClick=${copyAgent}>${c('copyAgent')}<//><//>
+    <//>`;
   return html`
-    <div class="bp-app">
-      <div class="bp-app-col">
-        <p class="poster-hint">${c('appText')}</p>
-        <pre class="code-block bp-code">${SDK_EXAMPLE}</pre>
-        <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copy(SDK_EXAMPLE, c('copied'))}>${c('copyExample')}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => window.open('/docs/app-developer-ai-guide.md', '_blank', 'noopener')}>${c('appGuide')} ↗</button></div>
-      </div>
-      <div class="bp-app-col">
-        <b class="sub-heading">${c('agentTitle')}</b>
-        <p class="poster-hint">${c('agentText')}</p>
-        <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copy(ctx.agentPrompt(), c('copied'))}>${c('copyAgent')}</button></div>
-      </div>
-    </div>`;
+    <${Beside} wide side=${side}>
+      <${Stack} gap="medium">
+        <${Note}>${c('appText')}<//>
+        <${Code} block>${SDK_EXAMPLE}<//>
+        <${Actions}><${Action} small onClick=${copyExample}>${c('copyExample')}<//><${Action} small soft onClick=${openGuide}>${c('appGuide')} ↗<//><//>
+      <//>
+    <//>`;
 }

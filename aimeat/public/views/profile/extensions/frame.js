@@ -11,11 +11,11 @@
  * @version-history
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Laajennukset-sivu", third round, plus
  *     the dependency map and kept versions; brief doc-mtkr34qa1dg1).
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (Crumb, Rail);
+ *     openTab is the Rail's (component plan C9, page group G6).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate, dateTime as fmtDateTime } from '/js/format.js';
 
 export const x = (key, vars) => t('extpage.' + key, vars);
@@ -57,16 +57,18 @@ export function cronWords(cron) {
 export const appName = (ref) => String(ref || '').split('/').pop().replace(/\.html?$/i, '');
 export const appUrlOf = (ref) => { const [owner, ...rest] = String(ref || '').split('/'); return rest.length ? `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(rest.join('/'))}?mode=inline` : null; };
 
+/** The crumb's steps (components/Crumb.js): the last is the page you are on. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.extensions')}</span></div>`;
+  return [t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.tabs.extensions')];
 }
 
-const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export const goTab = openTab;
+/** The sibling pages in the rail, as data (components/Rail.js): each is → … →. */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('scheduler')}><i>→</i>${t('profile.tabs.scheduler')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('libraries')}><i>→</i>${t('librariesTab.tabLabel')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('appdev')}><i>→</i>${t('profile.tabs.appDev')}<em>→</em></button>`;
+  return [
+    { tab: 'apps', label: t('profile.tabs.apps') },
+    { tab: 'scheduler', label: t('profile.tabs.scheduler') },
+    { tab: 'libraries', label: t('librariesTab.tabLabel') },
+    { tab: 'appdev', label: t('profile.tabs.appDev') },
+  ];
 }

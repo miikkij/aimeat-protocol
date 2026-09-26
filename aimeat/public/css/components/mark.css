@@ -1,0 +1,31 @@
+/**
+ * @file public/css/components/mark.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What the Mark component (components/Mark.js) needs beyond the library's mark shapes
+ *   in poster.css: the pointer on a tag that is a button (Mark with onClick, the visibility tag of
+ *   memory and documents; it was .pf .vis-pill).
+ * @version-history
+ *   v1.4.0 — 2026-09-26 — A tag's live square (.mark-live, .mark-live-dot), main's overview .pf-fed-dot; page group G8.
+ *   v1.3.0 — 2026-09-26 — A mark that explains itself in its tooltip (.mark-explains: the help pointer), main's Ecosystem .pf-eco-valid; page group G5.
+ *   v1.2.0 — 2026-09-26 — A tag with its presence (.mark-presence: the status dot after the name, the
+ *     coral .mark-away word): an agent's tag on the Offers pages, main's .op-agent; page group G6.
+ *   v1.1.0 — 2026-09-26 — The tag's fine tone (.poster-chip--fine): the green frame and words main's
+ *     .pf .badge-success drew (a knowledge hit in the Notebook, a step that goes to an agent); page
+ *     group G4.
+ *   v1.0.0 — 2026-09-26 — Initial (page group G8).
+ */
+.mark-button { cursor: pointer; }
+/* fine: a tag in the success colour, as main's .pf .badge-success drew it (page group G4). */
+.poster-chip.poster-chip--fine { border-color: var(--success); color: var(--success-fg); }
+/* presence: an agent's tag with its status dot after the name and, while away, the word in coral
+   (Mark presence/away; main's Offers .op-agent, page group G6). */
+.mark-presence { display: inline-flex; align-items: center; gap: .3rem; }
+.mark-away { font-style: normal; color: var(--accent); }
+/* explains: a mark whose tooltip says why takes the help pointer (Mark explains; main's Ecosystem
+   .pf-eco-valid, page group G5). */
+.mark-explains { cursor: help; }
+/* live: a small green square before the words, a connection that works (Mark live; main's Settings
+   overview .pf-fed-dot and its .pf-lp-info chips' inline-flex, page group G8). */
+.mark-live { display: inline-flex; align-items: center; gap: 6px; }
+.mark-live-dot { width: 8px; height: 8px; background: var(--success); flex: none; }

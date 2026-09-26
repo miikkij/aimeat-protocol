@@ -1,0 +1,21 @@
+/**
+ * @file people.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The People component's own rules (components/People.js): the column of persons, the
+ *   line of one person (name, tags, node, count), the row of agents under it, and one agent chip with
+ *   its own and ghost tones. The values are people-list.css's and agent-chip.css's (the .pj-part-*
+ *   rules of a workspace's People panel) under the component's own class names; the person's frame
+ *   is the Object box (components/Box.js). Colours and corners read the theme tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Initial: people-list.css and agent-chip.css values under the component's class names (page group G2a).
+ */
+
+.people { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.7rem; }
+.people-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.88rem; }
+.people-node { font-size: 0.74rem; color: var(--muted); }
+.agent-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; padding-left: 1.4rem; }
+.agent-chip { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; border: 1px solid var(--border); border-radius: var(--shape-corner-pill); padding: 0.12rem 0.5rem; }
+.agent-chip--own { border-color: var(--success); }
+.agent-chip--ghost { color: var(--muted); border-style: dashed; opacity: 0.65; }

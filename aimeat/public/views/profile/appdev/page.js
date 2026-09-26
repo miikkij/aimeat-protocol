@@ -8,10 +8,18 @@
  *   twenty rows at a time and a panel that opens under one; the template proposals; the platform's
  *   own registry, counts first and rows on demand; and how the page accrues. A person whose agents
  *   have filed nothing yet gets the same page with the empty sections saying what will appear.
- *   Pure render over the ctx bag; the rows are in rows.js.
+ *   Pure render over the ctx bag, made of the component kit (the page passes data and never a
+ *   class); the rows are in rows.js.
  * @structure renderPage · secStart · secLearned · secProposals · secCurated · secHow
  * @usage import { renderPage } from './appdev/page.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
+ *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip, the two
+ *     prompts and the three lists the List (the pitfall lists its state-name-who-doors cut; the flow
+ *     prompt, shown, the List's Panel), the tiers the List's tag-name cut, the filters Filters and
+ *     Filter, the search the SearchLine, "show more" the More line, how it accrues the Facts, the
+ *     copies Action and Loud with `copy`. The shared-count and curated-ready tags are the dim Tag
+ *     again (main's og-chip--dim, which the previous branch lost).
  *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.14.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.13.0 -- 2026-09-25 -- A filter's count is the Count (.poster-count, tally), a unification: Jouni's decision "Count".
@@ -41,12 +49,18 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num as fmtNum } from '/js/format.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name, Desc, Cell, Doors, Panel, Filters, Filter, SearchLine, More } from '/components/List.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Facts } from '/components/Facts.js';
 import { a, areaLabel, crumb, pageLinks, buildPromptFileUrl, catalogUrl } from './frame.js';
 import { learnedRow, proposalRow, curatedRow } from './rows.js';
-import { Hint } from '/components/Hint.js';
+
+/** One filter of a facet row: on or off, with its count. */
+const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
 
 export function renderPage(ctx) {
   const L = ctx.learned;                       // the current page of filed pitfalls, null while loading
@@ -56,67 +70,49 @@ export function renderPage(ctx) {
   const none = L && filed === 0;
   const proposals = ctx.proposals || [];
   const curatedTotal = ctx.curatedSummary?.total || 0;
-  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
+  const curatedFigure = { key: 'curated', n: curatedTotal, label: a('stripCurated'), sub: a('stripCuratedSub', { n: ctx.curatedSummary?.facets?.severity?.critical || 0 }) };
 
-  const strip = none ? html`
-    <div class="og-strip">
-      <div><b>0</b><span>${a('stripFiled')}</span><small>${a('stripNoneYet')}</small></div>
-      <div><b>0</b><span>${a('stripProposals')}</span><small>${a('stripNoneYet')}</small></div>
-      <div><b>${curatedTotal}</b><span>${a('stripCurated')}</span><small>${a('stripCuratedSub', { n: ctx.curatedSummary?.facets?.severity?.critical || 0 })}</small></div>
-      <div><b>${ctx.templates}</b><span>${a('stripTemplates')}</span><small>${a('stripTemplatesSub')}</small></div>
-    </div>` : html`
-    <div class="og-strip">
-      <div><b>${L ? filed : '…'}</b><span>${a('stripFiled')}</span><small>${L ? a('stripFiledSub', { models: Object.keys(scope.model || {}).length, apps: ctx.appsTaught, none: ctx.noApp }) : ''}</small></div>
-      <div><b class=${critical ? 'og-strip-coral' : ''}>${L ? critical : '…'}</b><span>${a('stripCritical')}</span><small>${criticalSub(ctx)}</small></div>
-      <div><b>${proposals.length}</b><span>${a('stripProposals')}</span><small>${proposals.length ? a('stripProposalsSub', { proven: proposals.filter((p) => (p.proofs || []).some((x) => x.verdict === 'pass')).length }) : a('stripNoneYet')}</small></div>
-      <div><b>${curatedTotal}</b><span>${a('stripCurated')}</span><small>${a('stripCuratedSub', { n: ctx.curatedSummary?.facets?.severity?.critical || 0 })}</small></div>
-    </div>`;
+  const strip = html`<${FigureStrip} items=${none ? [
+    { key: 'filed', n: 0, label: a('stripFiled'), sub: a('stripNoneYet') },
+    { key: 'proposals', n: 0, label: a('stripProposals'), sub: a('stripNoneYet') },
+    curatedFigure,
+    { key: 'templates', n: ctx.templates, label: a('stripTemplates'), sub: a('stripTemplatesSub') },
+  ] : [
+    { key: 'filed', n: L ? filed : '…', label: a('stripFiled'), sub: L ? a('stripFiledSub', { models: Object.keys(scope.model || {}).length, apps: ctx.appsTaught, none: ctx.noApp }) : '' },
+    { key: 'critical', n: L ? critical : '…', tone: critical ? 'coral' : undefined, label: a('stripCritical'), sub: criticalSub(ctx) },
+    { key: 'proposals', n: proposals.length, label: a('stripProposals'), sub: proposals.length ? a('stripProposalsSub', { proven: proposals.filter((p) => (p.proofs || []).some((x) => x.verdict === 'pass')).length }) : a('stripNoneYet') },
+    curatedFigure,
+  ]} />`;
 
-  const railItems = [
-    ['01', 'ad-start', a('secStart'), ''],
-    ['02', 'ad-learned', a('secLearned'), L ? filed : ''],
-    ['03', 'ad-proposals', a('secProposals'), proposals.length],
-    ['04', 'ad-curated', a('secCurated'), curatedTotal],
-    ['05', 'ad-how', a('secHow'), ''],
+  const marks = [
+    none ? { label: a('chipNone'), tone: 'coral' } : L ? { label: a('chipFiled', { n: filed }) } : null,
+    !none && critical ? { label: a('chipCritical', { n: critical }), tone: 'coral' } : null,
+    none ? { label: a('chipCuratedReady', { n: curatedTotal }), tone: 'dim' } : L ? { label: a('chipShared', { n: scope.shared?.shared || 0 }), tone: 'dim' } : null,
   ];
 
+  const actions = html`
+    <${Loud} control copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${a('flowSlab')}<//>
+    <${Actions}><${Action} small onClick=${() => ctx.goTab('apps')}>${a('appsDoor')}<//><//>`;
+
   return html`
-    <div class="og og-appdev">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('profile.tabs.appDev')}<small>${a('titleSub')}</small></h1>
-          <div class="poster-chips">
-            ${none ? chip(a('chipNone'), 'poster-chip--coral') : L ? chip(a('chipFiled', { n: filed })) : null}
-            ${!none && critical ? chip(a('chipCritical', { n: critical }), 'poster-chip--coral') : null}
-            ${none ? chip(a('chipCuratedReady', { n: curatedTotal })) : L ? chip(a('chipShared', { n: scope.shared?.shared || 0 })) : null}
-          </div>
-          <p class="og-desc">${none ? a('descEmpty') : a('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <${CopyButton} text=${ctx.flow} className="poster-slab poster-slab--control" label=${a('flowSlab')} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))} />
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.goTab('apps')}>${a('appsDoor')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secStart(ctx)}
-          ${secLearned(ctx, none)}
-          ${secProposals(ctx, proposals)}
-          ${secCurated(ctx, none)}
-          ${secHow(ctx, none)}
-        </div>
-        <nav class="og-rail" aria-label=${a('railTitle')}>
-          <span class="og-rail-label">${a('railTitle')}</span>
-          ${railItems.map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${a('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="appdev" crumb=${crumb()} title=${t('profile.tabs.appDev')} sub=${a('titleSub')} marks=${marks}
+      desc=${none ? a('descEmpty') : a('desc')} actions=${actions} strip=${strip}
+      railTitle=${a('railTitle')}
+      sections=${[
+        { id: 'ad-start', num: '01', label: a('secStart'), count: '' },
+        { id: 'ad-learned', num: '02', label: a('secLearned'), count: L ? filed : '' },
+        { id: 'ad-proposals', num: '03', label: a('secProposals'), count: proposals.length },
+        { id: 'ad-curated', num: '04', label: a('secCurated'), count: curatedTotal },
+        { id: 'ad-how', num: '05', label: a('secHow'), count: '' },
+      ]}
+      pagesLabel=${a('pages')} pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${secStart(ctx)}
+      ${secLearned(ctx, none)}
+      ${secProposals(ctx, proposals)}
+      ${secCurated(ctx, none)}
+      ${secHow(ctx, none)}
+    <//>`;
 }
 
 const sum = (m) => Object.values(m || {}).reduce((s, n) => s + n, 0);
@@ -137,35 +133,36 @@ function criticalSub(ctx) {
 function secStart(ctx) {
   const fmt = (n) => fmtNum(Number(n || 0));
   const item = (id) => ctx.openItems?.[id];
+  const flowShown = ctx.shown === 'flow';
   return html`
-    <${PageSection} id="ad-start" num="01" title=${a('secStart')} count=${a('secStartSub')} first>
-      <div class="listing listing--name-desc-doors">
-        <div class="listing-row">
-          <div class="listing-name">${a('flowTitle')}<small>${a('flowMeta', { n: fmt(ctx.flow ? ctx.flow.length : 0) })}</small></div>
-          <div class="listing-desc">${a('flowDesc')}</div>
-          <div class="listing-doors">
-            <${CopyButton} text=${ctx.flow} className="poster-action poster-action--small poster-action--row" label=${a('copy')} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))} />
-            <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.toggleShow('flow')}>${ctx.shown === 'flow' ? a('hide') : a('show')}</button>
-            <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${ctx.busy === 'item:flow'} onClick=${() => ctx.toggleOpenItem('flow')}>${item('flow') ? a('offWorklist') : a('toWorklist')}</button>
-          </div>
-        </div>
-        ${ctx.shown === 'flow' ? html`<div class="ad-open"><p>${ctx.flow}</p></div>` : null}
-        <div class="listing-row">
-          <div class="listing-name">${a('buildTitle')}<small>${ctx.buildLength ? a('buildMeta', { n: fmt(ctx.buildLength) }) : a('buildMetaShort')}</small></div>
-          <div class="listing-desc">${a('buildDesc')}</div>
-          <div class="listing-doors">
-            <button type="button" class="poster-action poster-action--small poster-action--row" disabled=${ctx.busy === 'build'} onMouseEnter=${ctx.prefetchBuild} onFocus=${ctx.prefetchBuild} onClick=${ctx.copyBuild}>${a('copy')}</button>
-            <a class="poster-action poster-action--small poster-action--row poster-action--lower" href=${buildPromptFileUrl()} download="aimeat-build-app.txt">${a('downloadFile')}</a>
-            <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${ctx.busy === 'item:build'} onClick=${() => ctx.toggleOpenItem('build')}>${item('build') ? a('offWorklist') : a('toWorklist')}</button>
-          </div>
-        </div>
-      </div>
-      <div class="ad-tier">
-        <b>T1</b><span>${a('tier1')}</span>
-        <b>T2</b><span>${a('tier2')}</span>
-        <b>T3</b><span>${a('tier3')}</span>
-      </div>
-      <${Hint}>${a('startHint', { templates: ctx.templates, packs: ctx.packs, proven: ctx.packsProven })} <a class="og-crumb-link" href=${catalogUrl()} target="_blank" rel="noopener">${t('profile.apps.launcherTitle')}</a><//>
+    <${Section} id="ad-start" num="01" title=${a('secStart')} count=${a('secStartSub')} first>
+      <${List} cols="name-desc-doors">
+        <${Row} open=${flowShown}>
+          <${Name} meta=${a('flowMeta', { n: fmt(ctx.flow ? ctx.flow.length : 0) })}>${a('flowTitle')}<//>
+          <${Desc}>${a('flowDesc')}<//>
+          <${Doors}>
+            <${Action} small row copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${a('copy')}<//>
+            <${Action} small row soft onClick=${() => ctx.toggleShow('flow')}>${flowShown ? a('hide') : a('show')}<//>
+            <${Action} small row soft disabled=${ctx.busy === 'item:flow'} onClick=${() => ctx.toggleOpenItem('flow')}>${item('flow') ? a('offWorklist') : a('toWorklist')}<//>
+          <//>
+          ${flowShown ? html`<${Panel} text=${ctx.flow} />` : null}
+        <//>
+        <${Row}>
+          <${Name} meta=${ctx.buildLength ? a('buildMeta', { n: fmt(ctx.buildLength) }) : a('buildMetaShort')}>${a('buildTitle')}<//>
+          <${Desc}>${a('buildDesc')}<//>
+          <${Doors}>
+            <${Action} small row disabled=${ctx.busy === 'build'} onMouseEnter=${ctx.prefetchBuild} onFocus=${ctx.prefetchBuild} onClick=${ctx.copyBuild}>${a('copy')}<//>
+            <${Action} small row soft href=${buildPromptFileUrl()} download="aimeat-build-app.txt">${a('downloadFile')}<//>
+            <${Action} small row soft disabled=${ctx.busy === 'item:build'} onClick=${() => ctx.toggleOpenItem('build')}>${item('build') ? a('offWorklist') : a('toWorklist')}<//>
+          <//>
+        <//>
+      <//>
+      <${List} cols="tag-name" keepCols dense apart>
+        <${Row}><${Cell} sign>T1<//><${Cell}>${a('tier1')}<//><//>
+        <${Row}><${Cell} sign>T2<//><${Cell}>${a('tier2')}<//><//>
+        <${Row}><${Cell} sign>T3<//><${Cell}>${a('tier3')}<//><//>
+      <//>
+      <${Note}>${a('startHint', { templates: ctx.templates, packs: ctx.packs, proven: ctx.packsProven })} <${Action} tone="link" href=${catalogUrl()} newTab>${t('profile.apps.launcherTitle')}<//><//>
     <//>`;
 }
 
@@ -175,41 +172,35 @@ function secLearned(ctx, none) {
   const L = ctx.learned;
   const F = ctx.filters;
   const scope = L?.facets || {};
-  const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--filter ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<span class="poster-count poster-count--tally">${n}</span></button>`;
   const areas = Object.entries(scope.category || {}).sort((p, q) => q[1] - p[1]);
   const shownAreas = ctx.allAreas ? areas : areas.slice(0, 7);
   const models = Object.entries(scope.model || {}).sort((p, q) => q[1] - p[1]);
   const rows = L?.pitfalls || [];
   const filed = sum(scope.status);
   return html`
-    <${PageSection} id="ad-learned" num="02" title=${a('secLearned')} count=${L ? filed : null}>
-      ${none ? html`<p class="poster-quiet ad-empty"><b>${a('learnedEmptyHead')}</b> ${a('learnedEmptyBody')}</p>` : !L ? html`<p class="poster-quiet ad-empty loading-mark">${t('common.loading')}</p>` : html`
-        <div class="ad-facets">
+    <${Section} id="ad-learned" num="02" title=${a('secLearned')} count=${L ? filed : null}>
+      ${none ? html`<${List} rows=${[]} empty=${html`<${Note} kind="quiet"><b>${a('learnedEmptyHead')}</b> ${a('learnedEmptyBody')}<//>`} />`
+        : !L ? html`<${List} loading=${t('common.loading')} />` : html`
+        <${Filters}>
           ${facet(!F.severity && F.status === 'active' && F.shared === undefined, a('facetAll'), scope.status?.active || 0, () => ctx.setFilters({ severity: '', status: 'active', shared: undefined }), 'all')}
           ${['critical', 'warn', 'info'].map((s) => facet(F.severity === s, a('facet.' + s), scope.severity?.[s] || 0, () => ctx.setFilters({ severity: F.severity === s ? '' : s }), s))}
           ${facet(F.shared === false, a('facetPrivate'), scope.shared?.private || 0, () => ctx.setFilters({ shared: F.shared === false ? undefined : false }), 'private')}
           ${facet(F.status === 'outdated', a('facetOutdated'), scope.status?.outdated || 0, () => ctx.setFilters({ status: F.status === 'outdated' ? 'active' : 'outdated' }), 'outdated')}
           ${L.community || F.includeShared ? facet(!!F.includeShared, a('communityMark'), L.community, () => ctx.setFilters({ includeShared: !F.includeShared }), 'community') : null}
-        </div>
-        <div class="ad-facets">
+        <//>
+        <${Filters}>
           ${shownAreas.map(([k, n]) => facet(F.category === k, areaLabel(k), n, () => ctx.setFilters({ category: F.category === k ? '' : k }), 'c' + k))}
-          ${areas.length > 7 && !ctx.allAreas ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setAllAreas(true)}>${a('moreAreas', { n: areas.length - 7 })}</button>` : null}
+          ${areas.length > 7 && !ctx.allAreas ? html`<${Action} tone="more" onClick=${() => ctx.setAllAreas(true)}>${a('moreAreas', { n: areas.length - 7 })}<//>` : null}
           ${models.map(([k, n]) => facet(F.model === k, k, n, () => ctx.setFilters({ model: F.model === k ? '' : k }), 'm' + k))}
-        </div>
-        <div class="search-line">
-          <input class="og-input" type="search" value=${ctx.q} placeholder=${a('searchPlaceholder')} aria-label=${a('searchPlaceholder')} onInput=${(e) => ctx.setQ(e.target.value)} />
-          <small>${a('searchOrder', { n: L.limit })}</small>
-        </div>
-        ${!rows.length ? html`<p class="poster-quiet ad-empty">${a('learnedNoMatch')}</p>` : html`
-          <div class="ad-pl">
-            <div class="ad-p ad-p--head"><div class="poster-label">${a('colSeverity')}</div><div class="poster-label">${a('colPitfall')}</div><div class="poster-label">${a('colAreaModel')}</div><div class="poster-label"></div></div>
-            ${rows.map((p) => learnedRow(ctx, p))}
-          </div>`}
-        <div class="more-line">
-          ${rows.length < L.total ? html`<button type="button" class="poster-action poster-action--more" disabled=${ctx.busy === 'more'} onClick=${ctx.loadMore}>${a('showMore', { n: Math.min(L.limit, L.total - rows.length) })}</button>` : null}
-          <small>${a('shownOf', { shown: rows.length, total: L.total })}</small>
-        </div>
-        <${Hint}>${a('learnedHint')}<//>`}
+        <//>
+        <${SearchLine} value=${ctx.q} placeholder=${a('searchPlaceholder')} onInput=${(e) => ctx.setQ(e.target.value)} note=${a('searchOrder', { n: L.limit })} />
+        <${List} cols="state-name-who-doors" keepCols empty=${a('learnedNoMatch')}
+          head=${[a('colSeverity'), a('colPitfall'), a('colAreaModel'), '']}>
+          ${rows.map((p) => learnedRow(ctx, p))}
+        <//>
+        <${More} label=${a('showMore', { n: Math.min(L.limit, L.total - rows.length) })} onMore=${rows.length < L.total ? ctx.loadMore : null}
+          disabled=${ctx.busy === 'more'} note=${a('shownOf', { shown: rows.length, total: L.total })} />
+        <${Note}>${a('learnedHint')}<//>`}
     <//>`;
 }
 
@@ -217,13 +208,11 @@ function secLearned(ctx, none) {
 
 function secProposals(ctx, proposals) {
   return html`
-    <${PageSection} id="ad-proposals" num="03" title=${a('secProposals')} count=${ctx.proposals ? proposals.length : null}>
-      ${!ctx.proposals ? html`<p class="poster-quiet ad-empty loading-mark">${t('common.loading')}</p>` : !proposals.length ? html`<p class="poster-quiet ad-empty">${a('proposalsEmpty')}</p>` : html`
-        <div class="ad-pl">
-          <div class="ad-p ad-p--head"><div class="poster-label">${a('colTier')}</div><div class="poster-label">${a('colTemplate')}</div><div class="poster-label">${a('colModelSource')}</div><div class="poster-label"></div></div>
-          ${proposals.map((p) => proposalRow(ctx, p))}
-        </div>`}
-      <${Hint}>${a('proposalsHint')}<//>
+    <${Section} id="ad-proposals" num="03" title=${a('secProposals')} count=${ctx.proposals ? proposals.length : null}>
+      <${List} cols="state-name-who-doors" keepCols loading=${ctx.proposals ? false : t('common.loading')} empty=${a('proposalsEmpty')}
+        head=${[a('colTier'), a('colTemplate'), a('colModelSource'), '']}
+        rows=${proposals} render=${(p) => proposalRow(ctx, p)} />
+      <${Note}>${a('proposalsHint')}<//>
     <//>`;
 }
 
@@ -233,26 +222,24 @@ function secCurated(ctx, none) {
   const S = ctx.curatedSummary;
   const C = ctx.curated;
   const F = ctx.curatedFilter;
-  const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`poster-tab poster-tab--filter ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<span class="poster-count poster-count--tally">${n}</span></button>`;
   const areas = Object.entries(S?.facets?.applies_to || {}).sort((p, q) => q[1] - p[1]);
   let rows = C?.pitfalls || [];
   if (F.severity) rows = rows.filter((p) => p.severity === F.severity);
   if (F.area) rows = rows.filter((p) => (p.appliesTo || []).includes(F.area));
-  const doors = S && !C ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'curated'} onClick=${ctx.loadCurated}>${a('showRows', { n: S.total })}</button>` : null;
+  const doors = S && !C ? html`<${Action} small soft disabled=${ctx.busy === 'curated'} onClick=${ctx.loadCurated}>${a('showRows', { n: S.total })}<//>` : null;
   return html`
-    <${PageSection} id="ad-curated" num="04" title=${a('secCurated')} count=${S ? S.total : null} doors=${doors}>
-      ${!S ? html`<p class="poster-quiet ad-empty loading-mark">${t('common.loading')}</p>` : html`
-        <div class="ad-facets">
+    <${Section} id="ad-curated" num="04" title=${a('secCurated')} count=${S ? S.total : null} doors=${doors}>
+      ${!S ? html`<${List} loading=${t('common.loading')} />` : html`
+        <${Filters}>
           ${facet(!F.severity, a('facetAll'), S.total, () => ctx.setCuratedFilter({ severity: '' }), 'all')}
           ${['critical', 'warn', 'info'].map((s) => facet(F.severity === s, a('facet.' + s), S.facets?.severity?.[s] || 0, () => ctx.setCuratedFilter({ severity: F.severity === s ? '' : s }), s))}
           ${areas.map(([k, n]) => facet(F.area === k, areaLabel(k), n, () => ctx.setCuratedFilter({ area: F.area === k ? '' : k }), 'c' + k))}
-        </div>
+        <//>
         ${C ? html`
-          <div class="ad-pl">
-            <div class="ad-p ad-p--head"><div class="poster-label">${a('colSeverity')}</div><div class="poster-label">${a('colPitfall')}</div><div class="poster-label">${a('colAreas')}</div><div class="poster-label"></div></div>
+          <${List} cols="state-name-who-doors" keepCols head=${[a('colSeverity'), a('colPitfall'), a('colAreas'), '']}>
             ${rows.map((p) => curatedRow(ctx, p))}
-          </div>` : null}`}
-      <${Hint}>${none ? a('curatedHintNew') : a('curatedHint')}<//>
+          <//>` : null}`}
+      <${Note}>${none ? a('curatedHintNew') : a('curatedHint')}<//>
     <//>`;
 }
 
@@ -260,12 +247,12 @@ function secCurated(ctx, none) {
 
 function secHow(ctx, none) {
   return html`
-    <${PageSection} id="ad-how" num="05" title=${a('secHow')} count=${null}>
-      <div class="facts facts--wide ad-kv">
-        <div class="facts-k poster-label">${a('how.before.k')}</div><div class="facts-v">${a('how.before.v')}<small>${a('how.before.s')}</small></div>
-        <div class="facts-k poster-label">${a('how.after.k')}</div><div class="facts-v">${a('how.after.v')}<small>${a('how.after.s')}</small></div>
-        <div class="facts-k poster-label">${a('how.you.k')}</div><div class="facts-v">${a('how.you.v')}<small>${a('how.you.s')}</small></div>
-      </div>
-      ${none ? null : html`<${Hint}>${ctx.learned?.community ? a('communityHint', { n: ctx.learned.community }) : a('communityNone')}<//>`}
+    <${Section} id="ad-how" num="05" title=${a('secHow')} count=${null}>
+      <${Facts} wide flush rows=${[
+        { k: a('how.before.k'), v: a('how.before.v'), sub: a('how.before.s') },
+        { k: a('how.after.k'), v: a('how.after.v'), sub: a('how.after.s') },
+        { k: a('how.you.k'), v: a('how.you.v'), sub: a('how.you.s') },
+      ]} />
+      ${none ? null : html`<${Note}>${ctx.learned?.community ? a('communityHint', { n: ctx.learned.community }) : a('communityNone')}<//>`}
     <//>`;
 }

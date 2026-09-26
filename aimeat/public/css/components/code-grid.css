@@ -1,0 +1,15 @@
+/**
+ * @file code-grid.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The grid of short codes (components/CodeGrid.js): the codes wrap as a grid on the copy
+ *   ground (.poster-box--copy in poster.css draws the ground and the frame). Reads no colour.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Moved from css/views/profile.css .pf .pf-2fa-codes (G3 page migration, a move).
+ */
+
+.poster-box.code-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: .35rem;
+  padding: .6rem; margin: 0 0 .5rem;
+}

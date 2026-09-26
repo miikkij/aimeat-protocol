@@ -1,0 +1,22 @@
+/**
+ * @file step-strip.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The strip of an automation's steps (components/StepStrip.js): small framed boxes in a
+ *   line that wraps, an arrow between the steps of a chain; a step's frame coral under the pointer,
+ *   green when its last run went through, coral on a coral-tinted ground when it failed. The frame
+ *   reads the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial, with the values of offer-lines.css .op-steps, .op-step, .op-arrow
+ *     (page group G6).
+ */
+
+.step-strip { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 0; margin-top: .6rem; }
+.step-strip-step { display: inline-flex; flex-direction: column; align-items: flex-start; max-width: 11rem; padding: .35rem .6rem; border: var(--shape-frame) solid var(--shape-frame-colour); background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-weight: 700; font-size: .78rem; line-height: 1.3; color: var(--text); }
+.step-strip-step small { font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.step-strip-step:hover { border-color: var(--accent); }
+.step-strip-step--done { border-color: var(--success, #10B981); }
+.step-strip-step--failed { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card-bg)); }
+/* The arrow wears the poster face through its markup (.poster-stat-number, poster.css); its size here. */
+.step-strip .step-strip-arrow { margin: 0; padding: 0 .35rem; font-size: 1rem; line-height: normal; color: var(--text-dim); }

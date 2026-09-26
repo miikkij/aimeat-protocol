@@ -12,6 +12,13 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.18.0 — 2026-09-26 — On the component kit (page group G7): the rows, their cells and the opened
+ *     panel are List (Row, Name with its dot and version tag, Desc keeping four lines with the part
+ *     tags under them, Who, Doors, Panel), the part tables dense Lists, the facts Facts, the install
+ *     field TextField box, private or public Tabs, "needs from this node" the Box's edge tone; the
+ *     doors are Action. Put back from main: the jump to a package and "apply the update" are the
+ *     coral word inside the line (main's og-crumb-link), not the more tone. The row's open door says
+ *     whether the row is open (aria-expanded). The rows write no class.
  *   v1.17.0 -- 2026-09-26 -- A dashed field box is on the page's ground: Packages' install row is the Field row, the decision rule editor loses its grey (a unification: Jouni's decision "Dashed field box").
  *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -43,11 +50,40 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Action } from '/components/Action.js';
+import { Code, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextField } from '/components/TextField.js';
+import { List, Row, Name, Desc, Who, Cell, Doors, Panel } from '/components/List.js';
 import { x, partWord, partTab, partCounts, categoryWord, listingWord, dateWord, versionDate, agentTextFor, openTab } from './frame.js';
 
-const dot = (on) => html`<i class=${`status-dot ${on ? 'status-dot--active' : 'status-dot--inactive'}`} aria-hidden="true"></i>`;
-const partChips = (list) => html`<span class="pk-parts">${partCounts(list).map(([type, n]) => html`<span key=${type} class="poster-chip">${partWord(type)}${n > 1 ? ` ×${n}` : ''}</span>`)}</span>`;
+/** The kinds of part a package carries, as tags under its description ("app", "extension ×2"). */
+const partTags = (list) => partCounts(list).map(([type, n]) => `${partWord(type)}${n > 1 ? ` ×${n}` : ''}`);
+const appHref = (ctx, registeredAs) => `/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(registeredAs)}?mode=inline`;
+
+/** The field an install is named in, with its door, on the dashed field box. */
+function installField(ctx, key, label, onInstall) {
+  return html`<${TextField} box value=${label} placeholder=${x('labelPlaceholder')} ariaLabel=${x('installK')}
+    onInput=${(v) => ctx.setInstallLabel(key, v)}
+    actions=${html`<${Action} small disabled=${ctx.busy} onClick=${onInstall}>${ctx.busy === key ? x('installing') : x('install')}<//>`} />`;
+}
+
+/** The parts of an offered or own package, as a table in its opened panel. */
+function partList(components) {
+  return html`
+    <${Label} block>${x('partsCount', { n: components.length })}<//>
+    <${List} cols="kind-name-desc" dense apart>
+      ${components.map((c) => html`
+        <${Row} key=${c.id}>
+          <${Cell}><${Code}>${partWord(c.type)}<//><//>
+          <${Name} meta=${c.id}>${c.label || c.id}<//>
+          <${Desc}>${(c.dependencies || []).length ? x('needs', { list: c.dependencies.join(', ') }) : ''}<//>
+        <//>`)}
+    <//>`;
+}
 
 /* ── An installed package ─────────────────────────────────────────────────────────────────────── */
 
@@ -57,52 +93,62 @@ export function instanceRow(ctx, inst) {
   const app = comps.find((c) => c.type === 'app');
   const source = ctx.offerByGroup[inst.packageGroupId] || ctx.ownByGroup[inst.packageGroupId] || null;
   const running = inst.status === 'installed';
+  const jump = () => ctx.jumpTo(inst.packageGroupId);
+  const toggle = () => ctx.toggle('i:' + inst.id, inst);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${inst.id}>
-      <div class="listing-name">${dot(running)}${inst.label || inst.packageGroupId.split('::')[0]}<span class="poster-chip">${versionDate(inst.packageVersion)}</span><small>${[running ? x('running') : x('status.' + inst.status), x('partsN', { n: comps.length }), x('installedOn', { date: dateWord(inst.installedAt) })].join(' · ')}</small></div>
-      <div class="listing-desc"><span class="pk-desc">${source?.description || x('instanceDesc')}</span>${partChips(comps)}</div>
-      <div class="listing-who">${x('fromPackage')} <button type="button" class="poster-action poster-action--more" onClick=${() => ctx.jumpTo(inst.packageGroupId)}>${source?.title || inst.packageGroupId.split('::')[0]}</button><small>${source ? (ctx.ownByGroup[inst.packageGroupId] ? x('ownPublication') : source.system ? x('bySystem') : x('byAuthor', { author: source.author })) : x('packageGone')}${source?.version && source.version !== inst.packageVersion ? ` · ${x('newerVersion')}` : ''}</small></div>
-      <div class="listing-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggle('i:' + inst.id, inst)}>${open ? x('close') : x('open')}</button>
-        ${app ? html`<a class="poster-action poster-action--small poster-action--row poster-action--lower" href=${`/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(app.registeredAs)}?mode=inline`} target="_blank" rel="noopener">${x('openApp')}</a>` : null}
-      </div>
+    <${Row} key=${inst.id} open=${open}>
+      <${Name} dot=${running ? 'active' : 'inactive'} tag=${versionDate(inst.packageVersion)}
+        meta=${[running ? x('running') : x('status.' + inst.status), x('partsN', { n: comps.length }), x('installedOn', { date: dateWord(inst.installedAt) })].join(' · ')}>${inst.label || inst.packageGroupId.split('::')[0]}<//>
+      <${Desc} lines=${4} marks=${partTags(comps)}>${source?.description || x('instanceDesc')}<//>
+      <${Who} sub=${`${source ? (ctx.ownByGroup[inst.packageGroupId] ? x('ownPublication') : source.system ? x('bySystem') : x('byAuthor', { author: source.author })) : x('packageGone')}${source?.version && source.version !== inst.packageVersion ? ` · ${x('newerVersion')}` : ''}`}>
+        ${x('fromPackage')} <${Action} tone="link" onClick=${jump}>${source?.title || inst.packageGroupId.split('::')[0]}<//>
+      <//>
+      <${Doors}>
+        <${Action} small row expanded=${open} onClick=${toggle}>${open ? x('close') : x('open')}<//>
+        ${app ? html`<${Action} small row soft href=${appHref(ctx, app.registeredAs)} newTab>${x('openApp')}<//>` : null}
+      <//>
       ${open ? instanceOpen(ctx, inst, comps, app, source) : null}
-    </div>`;
+    <//>`;
 }
 
 function instanceOpen(ctx, inst, comps, app, source) {
   const upd = ctx.updates[inst.id];
   const customized = comps.filter((c) => c.customized).length;
+  const apply = () => ctx.applyUpdate(inst, upd);
+  const close = () => ctx.toggle('i:' + inst.id, inst);
+  const doors = html`
+    ${app ? html`<${Action} small href=${appHref(ctx, app.registeredAs)} newTab>${x('openApp')}<//>` : null}
+    <${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.checkUpdate(inst)}>${x('checkUpdate')}<//>
+    <${Action} small soft copy=${comps.map((c) => `${c.type} ${c.registeredAs}`).join('\n')} copiedLabel=${x('copied')}>${x('copyNames')}<//>
+    <${Action} small soft tone="danger" onClick=${() => ctx.removeInstance(inst)}>${x('removeInstance')}<//>
+    <${Action} small soft onClick=${close}>${x('close')}<//>`;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${x('instanceLead', { date: dateWord(inst.installedAt), name: source?.title || inst.packageGroupId.split('::')[0], version: inst.packageVersion })} ${customized ? x('instanceCustomized', { n: customized }) : x('instanceUntouched', { n: comps.length })}</p>
-      <span class="poster-label">${x('partsLabel')}</span>
-      <div class="listing listing--kind-name-who-doors pk-comp">
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${x('instanceLead', { date: dateWord(inst.installedAt), name: source?.title || inst.packageGroupId.split('::')[0], version: inst.packageVersion })} ${customized ? x('instanceCustomized', { n: customized }) : x('instanceUntouched', { n: comps.length })}<//>
+      <${Label} block>${x('partsLabel')}<//>
+      <${List} cols="kind-name-who-doors" dense apart>
         ${comps.map((c) => html`
-          <div class="listing-row" key=${c.componentId}>
-            <div><code>${partWord(c.type)}</code></div>
-            <div class="listing-name">${c.componentId}<small>${c.registeredAs}</small></div>
-            <div class="listing-who">${x('partOn.' + partTab(c.type))}${c.customized ? html`<small class="is-warn">${x('partCustomized', { date: dateWord(c.customizedAt) })}</small>` : html`<small>${x('partUntouched')}</small>`}</div>
-            <div class="listing-doors">${c.type === 'app' ? html`<a class="poster-action poster-action--small poster-action--row poster-action--lower" href=${`/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(c.registeredAs)}?mode=inline`} target="_blank" rel="noopener">${x('open')}</a>` : html`<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => openTab(partTab(c.type))}>${partTab(c.type) === 'memory' ? x('inspect') : x('manage')}</button>`}</div>
-          </div>`)}
-      </div>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('updateK')}</div><div class="facts-v">${!upd ? x('updateUnknown') : upd.checking ? x('updateChecking') : upd.error ? upd.error : upd.updateAvailable ? x('updateAvailable', { version: versionDate(upd.latestVersion) }) : x('updateNone')}<small>${
+          <${Row} key=${c.componentId}>
+            <${Cell}><${Code}>${partWord(c.type)}<//><//>
+            <${Name} meta=${c.registeredAs}>${c.componentId}<//>
+            <${Who} warn=${!!c.customized} sub=${c.customized ? x('partCustomized', { date: dateWord(c.customizedAt) }) : x('partUntouched')}>${x('partOn.' + partTab(c.type))}<//>
+            <${Doors}>${c.type === 'app'
+              ? html`<${Action} small row soft href=${appHref(ctx, c.registeredAs)} newTab>${x('open')}<//>`
+              : html`<${Action} small row soft onClick=${() => openTab(partTab(c.type))}>${partTab(c.type) === 'memory' ? x('inspect') : x('manage')}<//>`}<//>
+          <//>`)}
+      <//>
+      <${Facts} rows=${[
+        {
+          k: x('updateK'),
+          v: !upd ? x('updateUnknown') : upd.checking ? x('updateChecking') : upd.error ? upd.error : upd.updateAvailable ? x('updateAvailable', { version: versionDate(upd.latestVersion) }) : x('updateNone'),
           // Said before the button rather than after: a part this owner has edited is NOT updated,
           // and knowing that beforehand is the difference between pressing a button and being
           // surprised by it.
-          customized ? x('updateKeepsYours', { n: customized }) : x('updateSub')
-        }${upd?.updateAvailable ? html` <button type="button" class="poster-action poster-action--more" disabled=${ctx.busy} onClick=${() => ctx.applyUpdate(inst, upd)}>${x('applyUpdate')}</button>` : null}</small></div>
-        <div class="facts-k poster-label">${x('forAgentK')}</div><div class="facts-v">${x('forAgentInstance')}<small>${x('forAgentInstanceSub')}</small></div>
-      </div>
-      <div class="og-doors listing-open-doors">
-        ${app ? html`<a class="poster-action poster-action--small" href=${`/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(app.registeredAs)}?mode=inline`} target="_blank" rel="noopener">${x('openApp')}</a>` : null}
-        <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.checkUpdate(inst)}>${x('checkUpdate')}</button>
-        <${CopyButton} text=${comps.map((c) => `${c.type} ${c.registeredAs}`).join('\n')} className="poster-action poster-action--small poster-action--lower" label=${x('copyNames')} copiedLabel=${x('copied')} />
-        <button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" onClick=${() => ctx.removeInstance(inst)}>${x('removeInstance')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggle('i:' + inst.id, inst)}>${x('close')}</button>
-      </div>
-    </div>`;
+          sub: html`${customized ? x('updateKeepsYours', { n: customized }) : x('updateSub')}${upd?.updateAvailable ? html` <${Action} tone="link" disabled=${ctx.busy} onClick=${apply}>${x('applyUpdate')}<//>` : null}`,
+        },
+        { k: x('forAgentK'), v: x('forAgentInstance'), sub: x('forAgentInstanceSub') },
+      ]} />
+    <//>`;
 }
 
 /* ── A package on offer ───────────────────────────────────────────────────────────────────────── */
@@ -112,17 +158,20 @@ export function offerRow(ctx, o) {
   const open = ctx.expanded === key;
   const installed = ctx.instances.filter((i) => i.packageGroupId === o.group).length;
   const sub = [o.remote ? x('fromNode', { node: o.sourceNode }) : o.system ? x('bySystem') : x('byAuthor', { author: o.author }), categoryWord(o.category)].filter(Boolean).join(' · ');
+  const toggle = () => ctx.toggle(key, o);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${key} id=${'pk-row-' + (o.group || '').replace(/[^a-z0-9]/gi, '-')}>
-      <div class="listing-name">${o.title}${o.version ? html`<span class="poster-chip">${versionDate(o.version)}</span>` : null}<small>${sub}</small></div>
-      <div class="listing-desc"><span class="pk-desc">${o.description}</span>${o.components.length ? partChips(o.components) : null}</div>
-      <div class="listing-who">${installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : x('installYours')}<small>${[o.components.length ? x('partsN', { n: o.components.length }) : '', o.listing?.installCount ? (o.listing.installCount === 1 ? x('installOne') : x('installsN', { n: o.listing.installCount })) : '', o.listing?.featured ? x('featured') : ''].filter(Boolean).join(' · ') || x('noInstallsYet')}</small></div>
-      <div class="listing-doors">
-        ${o.group ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggle(key, o)}>${open ? x('close') : x('install')}</button>` : null}
-        <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.toggle(key, o)}>${open ? x('close') : x('open')}</button>
-      </div>
+    <${Row} key=${key} open=${open} id=${'pk-row-' + (o.group || '').replace(/[^a-z0-9]/gi, '-')}>
+      <${Name} tag=${o.version ? versionDate(o.version) : null} meta=${sub}>${o.title}<//>
+      <${Desc} lines=${4} marks=${o.components.length ? partTags(o.components) : null}>${o.description}<//>
+      <${Who} sub=${[o.components.length ? x('partsN', { n: o.components.length }) : '', o.listing?.installCount ? (o.listing.installCount === 1 ? x('installOne') : x('installsN', { n: o.listing.installCount })) : '', o.listing?.featured ? x('featured') : ''].filter(Boolean).join(' · ') || x('noInstallsYet')}>
+        ${installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : x('installYours')}
+      <//>
+      <${Doors}>
+        ${o.group ? html`<${Action} small row expanded=${open} onClick=${toggle}>${open ? x('close') : x('install')}<//>` : null}
+        <${Action} small row soft expanded=${open} onClick=${toggle}>${open ? x('close') : x('open')}<//>
+      <//>
       ${open ? offerOpen(ctx, o, key) : null}
-    </div>`;
+    <//>`;
 }
 
 /**
@@ -147,42 +196,31 @@ function expectsOf(o) {
   if (lines.length === 0) return null;
 
   return html`
-    <div class="poster-panel pk-expects">
-      <span class="poster-label">${x('expectsLabel')}</span>
-      ${lines.map((line, i) => html`<p key=${i} class="og-lead">${line}</p>`)}
-    </div>`;
+    <${Box} tone="edge">
+      <${Label} block>${x('expectsLabel')}<//>
+      ${lines.map((line, i) => html`<${Note} key=${i} kind="lead">${line}<//>`)}
+    <//>`;
 }
 
 function offerOpen(ctx, o, key) {
   const inst = ctx.installForm && ctx.installForm.key === key ? ctx.installForm : { label: '' };
   const l = o.listing;
+  const close = () => ctx.toggle(key, o);
+  const doors = html`
+    ${o.group ? html`<${Action} small soft onClick=${() => ctx.download(o.group, o.name)}>${x('downloadZip')}<//>` : null}
+    <${Action} small soft copy=${agentTextFor(o)} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
+    <${Action} small soft onClick=${close}>${x('close')}<//>`;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${o.description}</p>
-      ${o.components.length ? html`
-        <span class="poster-label">${x('partsCount', { n: o.components.length })}</span>
-        <div class="listing listing--kind-name-desc pk-comp">
-          ${o.components.map((c) => html`
-            <div class="listing-row" key=${c.id}>
-              <div><code>${partWord(c.type)}</code></div>
-              <div class="listing-name">${c.label || c.id}<small>${c.id}</small></div>
-              <div class="listing-desc">${(c.dependencies || []).length ? x('needs', { list: c.dependencies.join(', ') }) : ''}</div>
-            </div>`)}
-        </div>` : null}
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${o.description}<//>
+      ${o.components.length ? partList(o.components) : null}
       ${expectsOf(o)}
-      <div class="facts">
-        <div class="facts-k poster-label">${x('makerK')}</div><div class="facts-v">${o.remote ? x('makerRemote', { node: o.sourceNode }) : o.system ? x('makerSystem') : x('makerAuthor', { author: o.author })}<small>${[o.version ? x('versionOf', { date: versionDate(o.version) }) : '', categoryWord(o.category) ? x('categoryOf', { c: categoryWord(o.category) }) : '', o.tags.length ? x('tagsOf', { tags: o.tags.join(', ') }) : ''].filter(Boolean).join(' · ')}</small></div>
-        ${l && (l.installCount || l.reviewCount) ? html`<div class="facts-k poster-label">${x('galleryK')}</div><div class="facts-v">${[l.installCount ? x('installsN', { n: l.installCount }) : '', l.reviewCount ? x('reviewsN', { n: l.reviewCount, rating: Number(l.rating || 0).toFixed(1) }) : ''].filter(Boolean).join(' · ')}</div>` : null}
-        ${o.group ? html`<div class="facts-k poster-label">${x('installK')}</div><div class="facts-v">
-          <div class="field-row pk-inst"><input class="og-input" value=${inst.label} placeholder=${x('labelPlaceholder')} onInput=${(e) => ctx.setInstallLabel(key, e.target.value)} /><button type="button" class="poster-action poster-action--small" disabled=${ctx.busy} onClick=${() => ctx.install(o, inst.label)}>${ctx.busy === key ? x('installing') : x('install')}</button></div>
-          <small>${x('installSub')}</small></div>` : null}
-      </div>
-      <div class="og-doors listing-open-doors">
-        ${o.group ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.download(o.group, o.name)}>${x('downloadZip')}</button>` : null}
-        <${CopyButton} text=${agentTextFor(o)} className="poster-action poster-action--small poster-action--lower" label=${x('copyAgent')} copiedLabel=${x('copied')} />
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggle(key, o)}>${x('close')}</button>
-      </div>
-    </div>`;
+      <${Facts} rows=${[
+        { k: x('makerK'), v: o.remote ? x('makerRemote', { node: o.sourceNode }) : o.system ? x('makerSystem') : x('makerAuthor', { author: o.author }), sub: [o.version ? x('versionOf', { date: versionDate(o.version) }) : '', categoryWord(o.category) ? x('categoryOf', { c: categoryWord(o.category) }) : '', o.tags.length ? x('tagsOf', { tags: o.tags.join(', ') }) : ''].filter(Boolean).join(' · ') },
+        l && (l.installCount || l.reviewCount) && { k: x('galleryK'), v: [l.installCount ? x('installsN', { n: l.installCount }) : '', l.reviewCount ? x('reviewsN', { n: l.reviewCount, rating: Number(l.rating || 0).toFixed(1) }) : ''].filter(Boolean).join(' · ') },
+        o.group && { k: x('installK'), v: installField(ctx, key, inst.label, () => ctx.install(o, inst.label)), sub: x('installSub') },
+      ]} />
+    <//>`;
 }
 
 /* ── One of the owner's own publications ──────────────────────────────────────────────────────── */
@@ -193,62 +231,61 @@ export function ownRow(ctx, p) {
   const installed = ctx.instances.filter((i) => i.packageGroupId === p.packageGroupId).length;
   const listing = ctx.listingByGroup[p.packageGroupId];
   const state = p.templateStatus || listing?.status;
+  const toggle = () => ctx.toggle(key, p);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${key} id=${'pk-row-' + p.packageGroupId.replace(/[^a-z0-9]/gi, '-')}>
-      <div class="listing-name">${p.name}<span class="poster-chip">${versionDate(p.version)}</span><small>${[x('partsN', { n: (p.components || []).length }), categoryWord(p.category), dateWord(p.updatedAt || p.createdAt)].filter(Boolean).join(' · ')}</small></div>
-      <div class="listing-desc"><span class="pk-desc">${p.description || ''}</span>${partChips(p.components)}</div>
-      <div class="listing-who">${p.visibility === 'public' ? x('vis.public') : x('vis.private')}<small>${[
+    <${Row} key=${key} open=${open} id=${'pk-row-' + p.packageGroupId.replace(/[^a-z0-9]/gi, '-')}>
+      <${Name} tag=${versionDate(p.version)} meta=${[x('partsN', { n: (p.components || []).length }), categoryWord(p.category), dateWord(p.updatedAt || p.createdAt)].filter(Boolean).join(' · ')}>${p.name}<//>
+      <${Desc} lines=${4} marks=${partTags(p.components)}>${p.description || ''}<//>
+      <${Who} sub=${[
         p.status === 'published' ? '' : x('statusWord.' + p.status),
         state ? listingWord(state) : x('notInGallery'),
         installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : '',
-      ].filter(Boolean).join(' · ')}</small></div>
-      <div class="listing-doors">
+      ].filter(Boolean).join(' · ')}>${p.visibility === 'public' ? x('vis.public') : x('vis.private')}<//>
+      <${Doors}>
         ${p.status === 'published' ? null
           // A draft cannot be installed by anybody, including its author, so the door that changes
           // that leads the row and the usual open door steps back to quiet.
-          : html`<button type="button" class="poster-action poster-action--small poster-action--row" disabled=${!!ctx.busy} onClick=${() => ctx.publishOwn(p)}>${x('publishIt')}</button>`}
-        <button type="button" class=${`poster-action poster-action--small poster-action--row${p.status === 'published' ? '' : ' poster-action--lower'}`} onClick=${() => ctx.toggle(key, p)}>${open ? x('close') : x('open')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.download(p.packageGroupId, p.name)}>${x('downloadZip')}</button>
-      </div>
+          : html`<${Action} small row disabled=${!!ctx.busy} onClick=${() => ctx.publishOwn(p)}>${x('publishIt')}<//>`}
+        <${Action} small row soft=${p.status !== 'published'} expanded=${open} onClick=${toggle}>${open ? x('close') : x('open')}<//>
+        <${Action} small row soft onClick=${() => ctx.download(p.packageGroupId, p.name)}>${x('downloadZip')}<//>
+      <//>
       ${open ? ownOpen(ctx, p, key, listing, state, installed) : null}
-    </div>`;
+    <//>`;
 }
 
 function ownOpen(ctx, p, key, listing, state, installed) {
   const inst = ctx.installForm && ctx.installForm.key === key ? ctx.installForm : { label: '' };
   const versions = ctx.versions[p.packageGroupId];
+  const busy = !!ctx.busy;
+  const close = () => ctx.toggle(key, p);
+  const doors = html`
+    <${Action} small soft onClick=${() => ctx.download(p.packageGroupId, p.name)}>${x('downloadZip')}<//>
+    <${Action} small soft copy=${agentTextFor({ title: p.name, group: p.packageGroupId, description: p.description || '', components: p.components || [] })} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
+    <${Action} small soft tone="danger" onClick=${() => ctx.archive(p)}>${x('archive')}<//>
+    <${Action} small soft onClick=${close}>${x('close')}<//>`;
+  // Private or public: the chosen one is on and cannot be pressed again, as main's doors were.
+  const visibility = html`
+    <${Tabs} label=${x('vis.k')} value=${p.visibility} onSelect=${(v) => ctx.setVisibility(p, v)}
+      items=${[
+        { value: 'private', label: x('vis.private'), disabled: busy || p.visibility === 'private' },
+        { value: 'public', label: x('vis.public'), disabled: busy || p.visibility === 'public' },
+      ]} />
+    ${p.status === 'published' && !state ? html`<${Action} small soft disabled=${busy} onClick=${() => ctx.propose(p)}>${x('propose')}<//>` : null}`;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${p.description || ''}</p>
-      <span class="poster-label">${x('partsCount', { n: (p.components || []).length })}</span>
-      <div class="listing listing--kind-name-desc pk-comp">
-        ${(p.components || []).map((c) => html`
-          <div class="listing-row" key=${c.id}>
-            <div><code>${partWord(c.type)}</code></div>
-            <div class="listing-name">${c.label || c.id}<small>${c.id}</small></div>
-            <div class="listing-desc">${(c.dependencies || []).length ? x('needs', { list: c.dependencies.join(', ') }) : ''}</div>
-          </div>`)}
-      </div>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('versionsK')}</div><div class="facts-v">${versions ? x('versionsLine', { n: versions.length, latest: versionDate(p.version) }) : x('versionsLoading')}<small>${x('versionsSub')}</small></div>
-        <div class="facts-k poster-label">${x('vis.k')}</div><div class="facts-v">${p.visibility === 'public' ? x('vis.publicLong') : x('vis.privateLong')}<small>${state ? listingWord(state) : x('notInGalleryLong')}${p.rejectionReason || listing?.rejectionReason ? html` · ${x('rejectedBecause', { reason: p.rejectionReason || listing.rejectionReason })}` : null}</small>
-          <div class="og-doors pk-vis">
-            <button type="button" class=${`poster-tab ${p.visibility === 'private' ? 'is-on' : ''}`} disabled=${ctx.busy || p.visibility === 'private'} onClick=${() => ctx.setVisibility(p, 'private')}>${x('vis.private')}</button>
-            <button type="button" class=${`poster-tab ${p.visibility === 'public' ? 'is-on' : ''}`} disabled=${ctx.busy || p.visibility === 'public'} onClick=${() => ctx.setVisibility(p, 'public')}>${x('vis.public')}</button>
-            ${p.status === 'published' && !state ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy} onClick=${() => ctx.propose(p)}>${x('propose')}</button>` : null}
-          </div>
-        </div>
-        <div class="facts-k poster-label">${x('installK')}</div><div class="facts-v">
-          <div class="field-row pk-inst"><input class="og-input" value=${inst.label} placeholder=${x('labelPlaceholder')} onInput=${(e) => ctx.setInstallLabel(key, e.target.value)} /><button type="button" class="poster-action poster-action--small" disabled=${ctx.busy} onClick=${() => ctx.install({ group: p.packageGroupId, title: p.name }, inst.label)}>${ctx.busy === key ? x('installing') : x('install')}</button></div>
-          <small>${installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) + ' · ' : ''}${x('installOwnSub')}</small></div>
-      </div>
-      <div class="og-doors listing-open-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.download(p.packageGroupId, p.name)}>${x('downloadZip')}</button>
-        <${CopyButton} text=${agentTextFor({ title: p.name, group: p.packageGroupId, description: p.description || '', components: p.components || [] })} className="poster-action poster-action--small poster-action--lower" label=${x('copyAgent')} copiedLabel=${x('copied')} />
-        <button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" onClick=${() => ctx.archive(p)}>${x('archive')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggle(key, p)}>${x('close')}</button>
-      </div>
-    </div>`;
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${p.description || ''}<//>
+      ${partList(p.components || [])}
+      <${Facts} rows=${[
+        { k: x('versionsK'), v: versions ? x('versionsLine', { n: versions.length, latest: versionDate(p.version) }) : x('versionsLoading'), sub: x('versionsSub') },
+        {
+          k: x('vis.k'),
+          v: p.visibility === 'public' ? x('vis.publicLong') : x('vis.privateLong'),
+          sub: html`${state ? listingWord(state) : x('notInGalleryLong')}${p.rejectionReason || listing?.rejectionReason ? html` · ${x('rejectedBecause', { reason: p.rejectionReason || listing.rejectionReason })}` : null}`,
+          actions: visibility,
+        },
+        { k: x('installK'), v: installField(ctx, key, inst.label, () => ctx.install({ group: p.packageGroupId, title: p.name }, inst.label)), sub: `${installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) + ' · ' : ''}${x('installOwnSub')}` },
+      ]} />
+    <//>`;
 }
 
-export const loadingRow = () => html`<p class="poster-quiet pk-empty loading-mark">${t('common.loading')}</p>`;
+export const loadingRow = () => html`<${List} loading=${t('common.loading')} />`;

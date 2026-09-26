@@ -20,6 +20,11 @@
  * @structure SAMPLES — { [decisionId]: [{ id, measure, solo?, render(), after }] } · PROPOSALS — { [decisionId]: { measure, render() } }
  * @usage import { SAMPLES, PROPOSALS } from './decision-samples.js';
  * @version-history
+ *   v3.10.1 — 2026-09-27 — The setup guide's classic tool buttons in "Choice" wear the guide's own
+ *     names (.setup-guide-tools, -tool, -tool--active, -reco; formerly .ast-*), the same rules.
+ *   v3.10.0 — 2026-09-27 — The profile menu's count is the Mark's waiting count, the prompt card's
+ *     menu rows are the library's menu row (.poster-menu-row) and the pattern tiles are measured on
+ *     the tiles SwatchPicker draws now (the catalogue pass).
  *   v3.9.0 — 2026-09-26 — The last round of Settings (decision-samples-final.js) spread in.
  *   v3.8.0 — 2026-09-25 — The conflicts round's samples, helpers and proposal pictures moved to
  *     decision-samples-conflicts.js unchanged and spread in here (the file neared the 800-line
@@ -72,6 +77,7 @@ import { SwatchPicker } from '/components/SwatchPicker.js';
 import { GooseCredit } from '/components/Credit.js';
 import { ArchiveMore } from '/components/ArchiveSection.js';
 import { ConversationJump } from '/components/ConversationFrame.js';
+import { Mark } from '/components/Mark.js';
 import { CLOSE_ICON } from '/js/dialog.js';
 import { WrapperPair } from './demos-steps.js';
 // The conflicts round of Settings & Controls, spread into SAMPLES and PROPOSALS below.
@@ -104,6 +110,8 @@ const tabs = (...names) => row(names.map((n, i) => html`<button type="button" cl
 const prompt = () => html`<${PromptCard} label="Remember something" prompt="Tell me in the language I use with you…" className="poster-action" copyLabel="Copy prompt" copiedLabel="Copied" />`;
 const result = () => inTurn(html`<${ResultCards} cards=${[{ kind: 'page', title: 'Team page', url: '#' }]} />`);
 const waiting = () => html`<${WaitingNote} title="Waiting for your agent to knock.">The next move is in your AI chat.<//>`;
+/** The prompt card's opened menu, its rows as PromptCard draws them (the menu opens only on a press). */
+const promptMenu = (...labels) => html`<div class="poster-prompt-menu">${labels.map((l) => html`<button type="button" key=${l} class="poster-menu-row">${l}</button>`)}</div>`;
 
 export const SAMPLES = {
   tag: [
@@ -134,8 +142,9 @@ export const SAMPLES = {
       after: after('.dl-status', () => row(html`${status('fine', 'per day')} ${status('danger', 'per day')} ${status('off', 'quiet')}`)) },
   ],
   count: [
-    { id: 'count-coral', measure: '.side-menu-count', solo: '.side-menu-count, .open-items-count', render: () => row(html`<span class="side-menu-count">3</span> <span class="open-items-count">5</span>`),
-      after: after('.poster-count', () => row(html`<span class="poster-count poster-count--waiting">3</span> <span class="poster-count poster-count--waiting">5</span>`)) },
+    // The profile menu and the open items draw the waiting count today (SideMenuItem, the Mark's count).
+    { id: 'count-coral', measure: '.poster-count', solo: '.poster-count', render: () => row(html`<${Mark} kind="count" tone="waiting">3<//> <${Mark} kind="count" tone="waiting">5<//>`),
+      after: after('.poster-count', () => row(html`<${Mark} kind="count" tone="waiting">3<//> <${Mark} kind="count" tone="waiting">5<//>`)) },
     { id: 'count-bell', measure: '.notif-badge', render: () => row(html`<span class="poster-specimen-anchor"><span class="notif-badge">7</span></span>`),
       after: after('.poster-count', () => row(html`<span class="poster-specimen-anchor"><span class="poster-count poster-count--waiting poster-count--small">7</span></span>`)) },
     { id: 'count-morsels', measure: '.brand-morsels', render: () => row(html`<span class="brand-morsels">1000</span>`), after: 'same' },
@@ -262,9 +271,9 @@ export const SAMPLES = {
       after: after('.poster-icon', () => row(html`<button type="button" class="poster-icon poster-icon--small card-menu-dots card-menu-dots--open">⋯</button>`)) },
   ],
   choice: [
-    { id: 'setup-tools', measure: '.ast-tool--active', solo: '.ast-tool', render: () => html`<div class="poster-chooser"><div class="ast-tools" role="tablist"><button type="button" class="ast-tool ast-tool--active">claude.ai <span class="ast-tool-reco">recommended</span></button><button type="button" class="ast-tool">Claude Desktop</button><button type="button" class="ast-tool">ChatGPT</button></div></div>`,
-      after: after('.poster-tab', () => row(html`<button type="button" class="poster-tab is-on">claude.ai <span class="ast-tool-reco">recommended</span></button> <button type="button" class="poster-tab">Claude Desktop</button> <button type="button" class="poster-tab">ChatGPT</button>`)) },
-    { id: 'pattern-choice', measure: '.poster-settings-pattern-choice.active', solo: '.poster-settings-pattern-choice', render: () => html`<${SwatchPicker} title="Background" choices=${[{ value: 'off', label: 'Off', active: false }, { value: 'pixels', label: 'Pixel grid', active: true }, { value: 'hearts', label: 'Hearts', active: false }]} onChoose=${noop} />`,
+    { id: 'setup-tools', measure: '.setup-guide-tool--active', solo: '.setup-guide-tool', render: () => html`<div class="poster-chooser"><div class="setup-guide-tools" role="tablist"><button type="button" class="setup-guide-tool setup-guide-tool--active">claude.ai <span class="setup-guide-reco">recommended</span></button><button type="button" class="setup-guide-tool">Claude Desktop</button><button type="button" class="setup-guide-tool">ChatGPT</button></div></div>`,
+      after: after('.poster-tab', () => row(html`<button type="button" class="poster-tab is-on">claude.ai <span class="setup-guide-reco">recommended</span></button> <button type="button" class="poster-tab">Claude Desktop</button> <button type="button" class="poster-tab">ChatGPT</button>`)) },
+    { id: 'pattern-choice', measure: '.poster-tab--tile.is-on', solo: '.poster-tab--tile', render: () => html`<${SwatchPicker} title="Background" choices=${[{ value: 'off', label: 'Off', active: false }, { value: 'pixels', label: 'Pixel grid', active: true }, { value: 'hearts', label: 'Hearts', active: false }]} onChoose=${noop} />`,
       after: after('.poster-tab', () => row(html`<button type="button" class="poster-tab">Off</button> <button type="button" class="poster-tab is-on">Pixel grid</button> <button type="button" class="poster-tab">Hearts</button>`)) },
     { id: 'start-page', measure: '.seg-btn.active', solo: '.seg-btn', render: () => html`<div class="seg start-page-seg" role="radiogroup"><button type="button" class="seg-btn active">Home</button><button type="button" class="seg-btn">Settings & controls</button></div>`,
       after: after('.poster-tab', () => tabs('Home', 'Settings & controls')) },
@@ -276,11 +285,12 @@ export const SAMPLES = {
       after: after('.poster-suggestion', () => html`<div class="poster-conversation-welcome"><${Suggestions}><${Suggestion} onClick=${noop}>Make my welcome page<//><${Suggestion} onClick=${noop}>Take something off my plate<//><//></div>`) },
   ],
   'menu-row': [
-    { id: 'prompt-menu', measure: '.poster-prompt-menu-item', render: () => html`<div class="poster-prompt-menu"><button type="button" class="btn-ghost poster-prompt-menu-item">Save as my own</button><button type="button" class="btn-ghost poster-prompt-menu-item">Give it to my agent</button></div>`, after: 'same' },
+    // The prompt card opens its menu only on a press, so its rows are drawn with the markup PromptCard gives them.
+    { id: 'prompt-menu', measure: '.poster-menu-row', render: () => promptMenu('Save as my own', 'Give it to my agent'), after: 'same' },
     { id: 'card-menu', measure: '.card-menu-item', render: () => html`<div class="card-menu"><div class="card-menu-list" role="menu"><button type="button" class="card-menu-item">Open</button><button type="button" class="card-menu-item">Add to my list</button></div></div>`,
-      after: after('.poster-prompt-menu-item', () => html`<div class="poster-prompt-menu"><button type="button" class="btn-ghost poster-prompt-menu-item">Open</button><button type="button" class="btn-ghost poster-prompt-menu-item">Add to my list</button></div>`) },
+      after: after('.poster-menu-row', () => promptMenu('Open', 'Add to my list')) },
     { id: 'notif-action', measure: '.notif-action-btn', render: () => html`<div class="notif-actions"><button type="button" class="notif-action-btn btn-primary">Approve</button> <button type="button" class="notif-action-btn btn-ghost">Open</button></div>`,
-      after: after('.poster-prompt-menu-item', () => html`<div class="poster-prompt-menu"><button type="button" class="btn-ghost poster-prompt-menu-item">Approve</button><button type="button" class="btn-ghost poster-prompt-menu-item">Open</button></div>`) },
+      after: after('.poster-menu-row', () => promptMenu('Approve', 'Open')) },
   ],
   'small-link': [
     { id: 'ai-more', measure: '.poster-ai-notice-more', render: () => row(html`<button type="button" class="btn-ghost poster-ai-notice-more">What does that mean?</button>`),

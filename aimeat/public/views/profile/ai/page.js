@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.26.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Facts with a value left to the model grey; Meter; List; More; Box; Tabs; TextField, Select, Check; Label; Note; Action; Layout): the page passes data and writes no class. The key field stays hidden with no eye, kept out of password managers, as on main (page group G8).
  *   v1.25.0 -- 2026-09-26 -- The provider's radio dots and the retry check box carry the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.24.0 -- 2026-09-26 -- The figure on the budget bar is the Meter's figure (.poster-meter-figure), the Wallet meter's look (a unification: the lead's ruling on a figure written on a meter).
  *   v1.23.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -53,93 +54,92 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts, FactLine } from '/components/Facts.js';
+import { Meter } from '/components/Figure.js';
+import { List, More } from '/components/List.js';
+import { Box } from '/components/Box.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Row as Line } from '/components/Layout.js';
 import { x, ROLES, money, compact, dateWord, crumb, pageLinks } from './frame.js';
 import { roleRow, appRow } from './rows.js';
 import { Hint } from '/components/Hint.js';
 
 const SHOWN = 8;
-const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
-const msg = (m) => (m ? html`<small class=${`form-message ${m.error ? 'form-message--error' : ''}`}>${m.text}</small>` : null);
+/** The line a form says after it acted; a refusal in its error tone. */
+const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 
 export function renderPage(ctx) {
   const s = ctx.settings;
   const loading = !s;
   const chosen = ROLES.filter((r) => s?.[r.field]).length;
-  const rail = [
-    ['01', 'ai-connection', x('secConnection'), ''],
-    ['02', 'ai-models', x('secModels'), s ? `${chosen} / ${ROLES.length}` : ''],
-    ['03', 'ai-budget', x('secBudget'), ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : ''],
-    ['04', 'ai-params', x('secParams'), ''],
-    ['05', 'ai-consumers', x('secConsumers'), ''],
-  ];
   return html`
-    <div class="og og-ai">
-      ${crumb()}
-      ${mast(ctx)}
-      ${strip(ctx)}
-      <div class="og-grid">
-        <div class="og-main">
-          ${loading ? html`<p class="poster-quiet ai-empty loading-mark">${x('loading')}</p>` : html`
-            ${secConnection(ctx)}
-            ${secModels(ctx, chosen)}
-            ${secBudget(ctx)}
-            ${secParams(ctx)}
-            ${secConsumers(ctx)}`}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${rail.map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks(ctx.navigate)}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="ai"
+      crumb=${crumb()}
+      ...${mast(ctx)}
+      strip=${strip(ctx)}
+      railTitle=${x('railTitle')}
+      sections=${[
+        { id: 'ai-connection', num: '01', label: x('secConnection'), count: '' },
+        { id: 'ai-models', num: '02', label: x('secModels'), count: s ? `${chosen} / ${ROLES.length}` : '' },
+        { id: 'ai-budget', num: '03', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
+        { id: 'ai-params', num: '04', label: x('secParams'), count: '' },
+        { id: 'ai-consumers', num: '05', label: x('secConsumers'), count: '' },
+      ]}
+      pagesLabel=${x('pages')}
+      pages=${pageLinks(ctx.navigate)}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${loading ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
+        ${secConnection(ctx)}
+        ${secModels(ctx, chosen)}
+        ${secBudget(ctx)}
+        ${secParams(ctx)}
+        ${secConsumers(ctx)}`}
+    <//>`;
 }
 
+/** The head: the title, its tags and line, the loud action and the doors, as SettingsPage props. */
 function mast(ctx) {
   const s = ctx.settings;
   const keyed = ctx.keyed;
-  const chips = !s ? [] : keyed
-    ? [chip(s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), 'poster-chip--sun'), chip(x('provider.' + (s.provider || 'openrouter'))), ctx.models.length ? chip(x('chipModels', { n: ctx.models.length })) : null, ctx.usage ? chip(x('chipBudget', { n: money(ctx.usage.daily_budget_usd) })) : null]
-    : [chip(x('chipNoKey'), 'poster-chip--coral'), ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? chip(x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) })) : null, chip(x('provider.openrouter'))];
+  const marks = !s ? [] : keyed
+    ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.models.length ? { label: x('chipModels', { n: ctx.models.length }) } : null, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
+    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) }) } : null, { label: x('provider.openrouter') }];
   const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x('descNoKey', { host: ctx.host, n: money(ctx.chat?.allowance_remaining_usd || 0) });
-  return html`
-    <div class="og-mast">
-      <div class="og-mast-words">
-        <h1 class="og-title poster-page-title">${t('profile.generator.openrouter.title')}<small>${x('titleSub')}</small></h1>
-        <div class="poster-chips">${chips}</div>
-        <p class="og-desc">${desc}</p>
-      </div>
-      <div class="og-mast-actions">
-        ${keyed
-          ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}</button>`
-          : html`<a class="poster-slab" href="https://openrouter.ai/keys" target="_blank" rel="noopener">${x('getKey')}</a>`}
-        <div class="og-doors">
-          ${keyed ? html`<a class="poster-action poster-action--small" href="https://openrouter.ai/keys" target="_blank" rel="noopener">${x('getKeyShort')}</a>` : null}
-          <a class="poster-action poster-action--small poster-action--lower" href="https://openrouter.ai/credits" target="_blank" rel="noopener">${x('credits')}</a>
-        </div>
-      </div>
-    </div>`;
+  const loud = keyed
+    ? html`<${Loud} control disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>`
+    : html`<${Loud} href="https://openrouter.ai/keys" newTab>${x('getKey')}<//>`;
+  return {
+    title: t('profile.generator.openrouter.title'), sub: x('titleSub'), marks, desc,
+    actions: html`${loud}<${Actions}>
+      ${keyed ? html`<${Action} small href="https://openrouter.ai/keys" newTab>${x('getKeyShort')}<//>` : null}
+      <${Action} small soft href="https://openrouter.ai/credits" newTab>${x('credits')}<//>
+    <//>`,
+  };
 }
 
 function strip(ctx) {
   const s = ctx.settings;
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!s) return html`<div class="og-strip"><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div></div>`;
+  if (!s) return html`<${FigureStrip} loading=${4} />`;
   const chosen = ROLES.filter((role) => s[role.field]);
   const payer = ctx.keyed ? x('stripOwnKey') : ctx.host;
-  return html`
-    <div class="og-strip">
-      <div><b class="og-strip-coral">${payer}</b><span>${x('stripPays')}</span><small>${ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x('stripAllowance', { n: money(ctx.chat.allowance_remaining_usd || 0) }) : '')}</small></div>
-      <div><b>${u ? money(u.spent_today_usd) : '…'}</b><span>${x('stripToday')}</span><small>${u ? x('stripTodaySub', { n: money(u.daily_budget_usd) }) : ''}</small></div>
-      <div><b>${r ? money(r.cost) : '…'}</b><span>${x('stripMonth')}</span><small>${r ? x('stripMonthSub', { calls: r.calls, apps: r.apps.length }) : ''}</small></div>
-      <div><b>${chosen.length} / ${ROLES.length}</b><span>${x('stripRoles')}</span><small>${chosen.length ? chosen.map((role) => x('role.' + role.id).toLowerCase()).join(' · ') : x('stripRolesNone')}</small></div>
-    </div>`;
+  return html`<${FigureStrip} items=${[
+    { key: 'pays', n: payer, tone: 'coral', label: x('stripPays'),
+      sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x('stripAllowance', { n: money(ctx.chat.allowance_remaining_usd || 0) }) : '') },
+    { key: 'today', n: u ? money(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('stripTodaySub', { n: money(u.daily_budget_usd) }) : '' },
+    { key: 'month', n: r ? money(r.cost) : '…', label: x('stripMonth'), sub: r ? x('stripMonthSub', { calls: r.calls, apps: r.apps.length }) : '' },
+    { key: 'roles', n: `${chosen.length} / ${ROLES.length}`, label: x('stripRoles'), sub: chosen.length ? chosen.map((role) => x('role.' + role.id).toLowerCase()).join(' · ') : x('stripRolesNone') },
+  ]} />`;
 }
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -149,34 +149,25 @@ function secConnection(ctx) {
   const d = ctx.conn;   // the draft: provider, baseUrl, apiKey
   const isOr = d.provider === 'openrouter';
   const count = ctx.keyed ? x('secConnectionSub', { provider: x('provider.' + (s.provider || 'openrouter')) }) : x('secConnectionNone');
+  const providers = html`
+    ${['openrouter', 'lmstudio', 'custom'].map((p) => html`<${Check} radio inline name="ai-provider" key=${p} checked=${d.provider === p} onChange=${() => ctx.setProvider(p)}>${x('providerChoice.' + p)}<//>`)}
+    ${!isOr ? html`<${TextField} box type="url" value=${d.baseUrl} placeholder="https://…/v1" ariaLabel=${x('baseUrl')} onInput=${(v) => ctx.setConn({ baseUrl: v })} />` : null}`;
+  const keyDoors = ctx.keyed ? html`
+    <${Action} small soft disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>
+    <${Action} small soft disabled=${ctx.busy === 'models'} onClick=${() => ctx.loadModels()}>${ctx.busy === 'models' ? x('loading') : x('refreshModels')}<//>
+    ${s.hasApiKey ? html`<${Action} small soft tone="danger" onClick=${() => ctx.removeKey()}>${x('removeKey')}<//>` : null}` : null;
+  const key = html`
+    <${TextField} box unmanaged value=${d.apiKey} placeholder=${s.hasApiKey ? x('keyMasked') : 'sk-or-v1-…'} ariaLabel=${x('keyLabel')}
+      onInput=${(v) => ctx.setConn({ apiKey: v })}
+      actions=${html`<${Action} small disabled=${ctx.busy === 'conn'} onClick=${() => ctx.saveConnection()}>${x('save')}<//>`} />
+    ${msg(ctx.connMsg)}`;
   return html`
     <${PageSection} id="ai-connection" num="01" title=${x('secConnection')} count=${count} first=${true}>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('providerLabel')}</div>
-        <div class="facts-v">
-          <div class="ai-radios">
-            ${['openrouter', 'lmstudio', 'custom'].map((p) => html`<label class="ai-radio check-line" key=${p}><input type="radio" name="ai-provider" checked=${d.provider === p} onChange=${() => ctx.setProvider(p)} />${x('providerChoice.' + p)}</label>`)}
-          </div>
-          ${!isOr ? html`<div class="field-row"><input class="og-input" type="url" value=${d.baseUrl} placeholder="https://…/v1" aria-label=${x('baseUrl')} onInput=${(e) => ctx.setConn({ baseUrl: e.target.value })} /></div>` : null}
-          <small>${x('providerHint')}</small>
-        </div>
-        <div class="facts-k poster-label">${x('keyLabel')}</div>
-        <div class="facts-v">
-          <div class="field-row">
-            <input class="og-input" type="password" autocomplete="off" data-1p-ignore data-lpignore="true" value=${d.apiKey} placeholder=${s.hasApiKey ? x('keyMasked') : 'sk-or-v1-…'} aria-label=${x('keyLabel')} onInput=${(e) => ctx.setConn({ apiKey: e.target.value })} />
-            <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'conn'} onClick=${() => ctx.saveConnection()}>${x('save')}</button>
-          </div>
-          ${msg(ctx.connMsg)}
-          <small>${s.hasApiKey ? x('keyStoredHint') : x('keyHint')}</small>
-          ${ctx.keyed ? html`
-            <div class="og-doors">
-              <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}</button>
-              <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'models'} onClick=${() => ctx.loadModels()}>${ctx.busy === 'models' ? x('loading') : x('refreshModels')}</button>
-              ${s.hasApiKey ? html`<button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" onClick=${() => ctx.removeKey()}>${x('removeKey')}</button>` : null}
-            </div>` : null}
-        </div>
-      </div>
-      ${!ctx.keyed ? html`<p class="poster-quiet ai-empty"><b>${x('noKeyLead')}</b> ${x('noKeyBody', { host: ctx.host })}</p>` : null}
+      <${Facts} rows=${[
+        { k: x('providerLabel'), v: providers, sub: x('providerHint') },
+        { k: x('keyLabel'), v: key, sub: s.hasApiKey ? x('keyStoredHint') : x('keyHint'), actions: keyDoors },
+      ]} />
+      ${!ctx.keyed ? html`<${Note} kind="quiet"><b>${x('noKeyLead')}</b> ${x('noKeyBody', { host: ctx.host })}<//>` : null}
     <//>`;
 }
 
@@ -185,11 +176,10 @@ function secConnection(ctx) {
 function secModels(ctx, chosen) {
   return html`
     <${PageSection} id="ai-models" num="02" title=${x('secModels')} count=${x('secModelsSub', { n: chosen, total: ROLES.length })}>
-      ${ctx.modelsError ? html`<small class="form-message form-message--error">${ctx.modelsError}</small>` : null}
-      <div class="listing listing--name-who-desc-doors">
-        <div class="listing-row listing-row--head"><div class="poster-label">${x('colRole')}</div><div class="poster-label">${x('colModel')}</div><div class="poster-label">${x('colWhat')}</div><div class="poster-label"></div></div>
+      ${ctx.modelsError ? html`<${Note} kind="message" error>${ctx.modelsError}<//>` : null}
+      <${List} cols="name-who-desc-doors" head=${[x('colRole'), x('colModel'), x('colWhat'), '']}>
         ${ROLES.map((role) => roleRow(ctx, role))}
-      </div>
+      <//>
       ${msg(ctx.modelsMsg)}
       <${Hint}>${x('hintUnits')}<//>
       <${Hint}>${ctx.keyed ? x('hintModels') : x('hintModelsNoKey')}<//>
@@ -201,7 +191,7 @@ function secModels(ctx, chosen) {
 function secBudget(ctx) {
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!u) return html`<${PageSection} id="ai-budget" num="03" title=${x('secBudget')} count=${null}><p class="poster-quiet ai-empty loading-mark">${x('loading')}</p><//>`;
+  if (!u) return html`<${PageSection} id="ai-budget" num="03" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
   const budget = Number(u.daily_budget_usd) || 0;
   const spent = Number(u.spent_today_usd) || 0;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
@@ -210,40 +200,36 @@ function secBudget(ctx) {
   const shown = ctx.showAllApps ? rows : rows.slice(0, SHOWN);
   const editing = ctx.capsEditing;
   const history = ctx.history;
+  const budgetDoors = ctx.budgetEditing
+    ? html`<${TextField} box type="number" size="short" min="0" max="1000" step="0.10" value=${ctx.budgetDraft} ariaLabel=${x('dailyBudget')}
+        onInput=${(v) => ctx.setBudgetDraft(v)}
+        actions=${html`<${Action} small disabled=${ctx.busy === 'budget'} onClick=${() => ctx.saveBudget()}>${x('save')}<//><${Action} small soft onClick=${() => ctx.setBudgetEditing(false)}>${x('cancel')}<//>`} />`
+    : html`<${Actions}><${Action} small soft onClick=${() => ctx.setBudgetEditing(true)}>${x('changeBudget')}<//><//>`;
+  const budgetValue = html`
+    <${FactLine} sub=${x('dailyBudgetSub', { def: money(ctx.aiSettings?.defaults?.daily_budget_usd ?? 1), month: r ? money(r.cost) : money(0), perDay: money(perDay) })}>${x('dailyBudgetBody', { n: money(budget), today: money(spent) })}<//>
+    <${Meter} quota pct=${pct} figure=${`${money(spent)} / ${money(budget)} · ${pct} %`} />
+    ${budgetDoors}
+    ${msg(ctx.budgetMsg)}`;
+  const capDoors = editing
+    ? html`<${Loud} control disabled=${ctx.busy === 'caps'} onClick=${() => ctx.saveCaps()}>${x('saveCaps')}<//><${Action} small soft onClick=${() => ctx.setCapsEditing(false)}>${x('cancel')}<//>`
+    : html`<${Action} small soft onClick=${() => ctx.setCapsEditing(true)}>${x('setCaps')}<//>`;
   return html`
     <${PageSection} id="ai-budget" num="03" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('dailyBudget')}</div>
-        <div class="facts-v">
-          ${x('dailyBudgetBody', { n: money(budget), today: money(spent) })}
-          <small>${x('dailyBudgetSub', { def: money(ctx.aiSettings?.defaults?.daily_budget_usd ?? 1), month: r ? money(r.cost) : money(0), perDay: money(perDay) })}</small>
-          <div class=${`ai-bar poster-box poster-box--meter poster-box--quota ${pct >= 90 ? 'is-full' : ''}`}><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width=${pct} height="100" /></svg><span class="poster-meter-figure">${money(spent)} / ${money(budget)} · ${pct} %</span></div>
-          ${ctx.budgetEditing ? html`
-            <div class="field-row">
-              <input class="og-input ai-num" type="number" min="0" max="1000" step="0.10" value=${ctx.budgetDraft} aria-label=${x('dailyBudget')} onInput=${(e) => ctx.setBudgetDraft(e.target.value)} />
-              <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'budget'} onClick=${() => ctx.saveBudget()}>${x('save')}</button>
-              <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setBudgetEditing(false)}>${x('cancel')}</button>
-            </div>` : html`<div class="og-doors"><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setBudgetEditing(true)}>${x('changeBudget')}</button></div>`}
-          ${msg(ctx.budgetMsg)}
-        </div>
-        <div class="facts-k poster-label">${x('monthLabel')}</div>
-        <div class="facts-v">${r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone')}<small>${x('monthSub')}</small></div>
-      </div>
+      <${Facts} rows=${[
+        { k: x('dailyBudget'), v: budgetValue },
+        { k: x('monthLabel'), v: r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone'), sub: x('monthSub') },
+      ]} />
       ${rows.length ? html`
-        <span class="poster-label ai-spent-label">${x('whatSpent', { shown: shown.length, total: rows.length })}</span>
-        <div class="listing listing--cols listing--name-n-n-cap-n ai-apps">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('colApp')}</div><div class="poster-label listing-n">${x('colMonth')}</div><div class="poster-label listing-n">${x('colToday')}</div><div class="poster-label listing-n">${x('colCap')}</div><div class="poster-label listing-n">${x('colCalls')}</div></div>
+        <${Label} block>${x('whatSpent', { shown: shown.length, total: rows.length })}<//>
+        <${List} cols="name-n-n-cap-n" keepCols apart head=${[x('colApp'), { label: x('colMonth'), num: true }, { label: x('colToday'), num: true }, { label: x('colCap'), num: true }, { label: x('colCalls'), num: true }]}>
           ${shown.map((row) => appRow(ctx, row, editing))}
-        </div>
-        <div class="more-line ai-more">
-          ${rows.length > SHOWN ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.setShowAllApps(!ctx.showAllApps)}>${ctx.showAllApps ? x('showFewer') : x('showAllApps', { n: rows.length })}</button>` : null}
-          ${editing
-            ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'caps'} onClick=${() => ctx.saveCaps()}>${x('saveCaps')}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setCapsEditing(false)}>${x('cancel')}</button>`
-            : html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setCapsEditing(true)}>${x('setCaps')}</button>`}
+        <//>
+        <${More} wrap label=${ctx.showAllApps ? x('showFewer') : x('showAllApps', { n: rows.length })} onMore=${rows.length > SHOWN ? () => ctx.setShowAllApps(!ctx.showAllApps) : null}>
+          ${capDoors}
           <small>${editing ? x('capsEditingHint') : x('capsHint')}</small>
-        </div>
+        <//>
         ${msg(ctx.capsMsg)}
-        <${Hint}>${x('hintCaps')}<//>` : html`<p class="poster-quiet ai-empty">${x('noSpend')}</p>`}
+        <${Hint}>${x('hintCaps')}<//>` : html`<${Note} kind="quiet">${x('noSpend')}<//>`}
       ${history && Array.isArray(history.days) && history.days.length ? chart(ctx, history, r) : null}
     <//>`;
 }
@@ -256,13 +242,13 @@ function chart(ctx, history, r) {
   const datasets = apps.map((app, i) => ({ label: app, data: history.days.map((d) => pick((d.per_app && d.per_app[app]) || {})), backgroundColor: colorForIndex(i) }));
   const yFormat = metric === 'tokens' ? ((v) => compact(v)) : metric === 'seconds' ? ((v) => `${Math.round(v)} s`) : ((v) => money(v));
   return html`
-    <div class="ai-chart poster-box">
-      <div class="ai-chart-head">
-        <small class="poster-hint">${x('chartTitle', { n: history.days.length, first: dateWord(r.first), last: dateWord(r.last) })}${r.maxDay ? ` · ${x('chartMax', { n: money(r.maxDay.cost), date: dateWord(r.maxDay.date) })}` : ''}</small>
-        <span class="ai-metric">${['cost', 'tokens', 'seconds'].map((k) => html`<button type="button" key=${k} class=${`poster-tab poster-tab--filter ${metric === k ? 'is-on' : ''}`} onClick=${() => ctx.setMetric(k)}>${x('metric.' + k)}</button>`)}</span>
-      </div>
+    <${Box}>
+      <${Line} justify="between" wrap gap="large" below="small">
+        <${Note} inline>${x('chartTitle', { n: history.days.length, first: dateWord(r.first), last: dateWord(r.last) })}${r.maxDay ? ` · ${x('chartMax', { n: money(r.maxDay.cost), date: dateWord(r.maxDay.date) })}` : ''}<//>
+        <${Tabs} tone="filter" value=${metric} onSelect=${(k) => ctx.setMetric(k)} items=${['cost', 'tokens', 'seconds'].map((k) => ({ value: k, label: x('metric.' + k) }))} />
+      <//>
       <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${200} legend=${false} yFormat=${yFormat} />
-    </div>`;
+    <//>`;
 }
 
 /* ── 04 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -272,37 +258,38 @@ function secParams(ctx) {
   const p = ctx.params;   // the draft while editing
   const e = ctx.paramsEditing;
   const count = [s.temperature != null ? x('tempShort', { n: s.temperature }) : '', s.temperature == null && s.top_p == null && s.max_tokens == null ? x('allDefaults') : ''].filter(Boolean).join(' · ');
-  const field = (key, min, max, step) => html`<input class="og-input ai-num" type="number" min=${min} max=${max} step=${step} value=${p[key]} placeholder=${x('default')} aria-label=${x('param.' + key)} onInput=${(ev) => ctx.setParams({ [key]: ev.target.value })} />`;
+  const field = (key, min, max, step) => html`<${TextField} type="number" size="short" min=${min} max=${max} step=${step} value=${p[key]} placeholder=${x('default')} ariaLabel=${x('param.' + key)} onInput=${(v) => ctx.setParams({ [key]: v })} />`;
+  // A value left to the model is said in grey (main's .is-unset): the Facts' missing value.
+  const reasoningSet = s.reasoning && (s.reasoning.enabled === false || s.reasoning.effort);
+  const retry = e
+    ? html`<${Line} wrap gap="medium">
+        <${Check} inline checked=${p.autoRetry} onChange=${(on) => ctx.setParams({ autoRetry: on })}>${x('retryOn')}<//>
+        ${p.autoRetry ? html`<${Note} inline>${x('retryMax')}<//>${field('maxRetries', 1, 10, 1)}` : null}
+      <//>`
+    : (s.autoRetry ? x('retryBody', { n: s.maxRetries || 3 }) : x('retryOff'));
+  const reasoning = e
+    ? html`<${Select} fit ariaLabel=${x('param.reasoning')} value=${p.reasoning} onChange=${(v) => ctx.setParams({ reasoning: v })}
+        options=${['', 'off', 'low', 'medium', 'high'].map((k) => [k, x('reasoning.' + (k || 'default'))])} />`
+    : (s.reasoning && s.reasoning.enabled === false
+      ? x('reasoningOff')
+      : s.reasoning && s.reasoning.effort
+        ? x('reasoningOn', { level: x('reasoning.' + s.reasoning.effort) })
+        : x('modelDefault'));
   return html`
     <${PageSection} id="ai-params" num="04" title=${x('secParams')} count=${count}>
-      <p class="og-lead">${x('paramsIntro')}</p>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('param.temperature')}</div>
-        <div class="facts-v">${e ? field('temperature', 0, 2, 0.1) : (s.temperature != null ? x('tempBody', { n: s.temperature }) : html`<span class="is-unset">${x('modelDefault')}</span>`)}<small>${x('tempSub')}</small></div>
-        <div class="facts-k poster-label">${x('param.top_p')}</div>
-        <div class="facts-v">${e ? field('top_p', 0, 1, 0.05) : (s.top_p != null ? String(s.top_p) : html`<span class="is-unset">${x('modelDefault')}</span>`)}<small>${x('topPSub')}</small></div>
-        <div class="facts-k poster-label">${x('param.max_tokens')}</div>
-        <div class="facts-v">${e ? field('max_tokens', 256, 128000, 256) : (s.max_tokens != null ? x('tokensN', { n: compact(s.max_tokens) }) : html`<span class="is-unset">${x('modelDefault')}</span>`)}<small>${x('maxTokensSub')}</small></div>
-        <div class="facts-k poster-label">${x('param.retry')}</div>
-        <div class="facts-v">${e
-          ? html`<div class="ai-inline"><label class="ai-check check-line"><input type="checkbox" checked=${p.autoRetry} onChange=${(ev) => ctx.setParams({ autoRetry: ev.target.checked })} />${x('retryOn')}</label>${p.autoRetry ? html`<label>${x('retryMax')} ${field('maxRetries', 1, 10, 1)}</label>` : null}</div>`
-          : (s.autoRetry ? x('retryBody', { n: s.maxRetries || 3 }) : x('retryOff'))}<small>${x('retrySub')}</small></div>
-        <div class="facts-k poster-label">${x('param.reasoning')}</div>
-        <div class="facts-v">${e
-          ? html`<select class="select-field ai-num" aria-label=${x('param.reasoning')} value=${p.reasoning} onChange=${(ev) => ctx.setParams({ reasoning: ev.target.value })}>
-              ${['', 'off', 'low', 'medium', 'high'].map((k) => html`<option key=${k} value=${k}>${x('reasoning.' + (k || 'default'))}</option>`)}
-            </select>`
-          : (s.reasoning && s.reasoning.enabled === false
-            ? x('reasoningOff')
-            : s.reasoning && s.reasoning.effort
-              ? x('reasoningOn', { level: x('reasoning.' + s.reasoning.effort) })
-              : html`<span class="is-unset">${x('modelDefault')}</span>`)}<small>${x('reasoningSub')}</small></div>
-      </div>
-      <div class="og-doors">
+      <${Note} kind="lead">${x('paramsIntro')}<//>
+      <${Facts} rows=${[
+        { k: x('param.temperature'), v: e ? field('temperature', 0, 2, 0.1) : (s.temperature != null ? x('tempBody', { n: s.temperature }) : x('modelDefault')), missing: !e && s.temperature == null, sub: x('tempSub') },
+        { k: x('param.top_p'), v: e ? field('top_p', 0, 1, 0.05) : (s.top_p != null ? String(s.top_p) : x('modelDefault')), missing: !e && s.top_p == null, sub: x('topPSub') },
+        { k: x('param.max_tokens'), v: e ? field('max_tokens', 256, 128000, 256) : (s.max_tokens != null ? x('tokensN', { n: compact(s.max_tokens) }) : x('modelDefault')), missing: !e && s.max_tokens == null, sub: x('maxTokensSub') },
+        { k: x('param.retry'), v: retry, sub: x('retrySub') },
+        { k: x('param.reasoning'), v: reasoning, missing: !e && !reasoningSet, sub: x('reasoningSub') },
+      ]} />
+      <${Actions}>
         ${e
-          ? html`<button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'params'} onClick=${() => ctx.saveParams()}>${x('save')}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setParamsEditing(false)}>${x('cancel')}</button>`
-          : html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.setParamsEditing(true)}>${x('change')}</button>`}
-      </div>
+          ? html`<${Action} small disabled=${ctx.busy === 'params'} onClick=${() => ctx.saveParams()}>${x('save')}<//><${Action} small soft onClick=${() => ctx.setParamsEditing(false)}>${x('cancel')}<//>`
+          : html`<${Action} small onClick=${() => ctx.setParamsEditing(true)}>${x('change')}<//>`}
+      <//>
       ${msg(ctx.paramsMsg)}
     <//>`;
 }
@@ -314,15 +301,15 @@ function secConsumers(ctx) {
   const chat = ctx.chat;
   return html`
     <${PageSection} id="ai-consumers" num="05" title=${x('secConsumers')} count=${null}>
-      <p class="og-lead">${x('consumersIntro')}</p>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('consumer.apps')}</div><div class="facts-v">${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}</div>
-        <div class="facts-k poster-label">${x('consumer.agents')}</div><div class="facts-v">${x('consumerAgentsBody')}</div>
-        <div class="facts-k poster-label">${x('consumer.media')}</div><div class="facts-v">${x('consumerMediaBody')}</div>
-        <div class="facts-k poster-label">${x('consumer.chat')}</div><div class="facts-v">${chat
+      <${Note} kind="lead">${x('consumersIntro')}<//>
+      <${Facts} rows=${[
+        { k: x('consumer.apps'), v: `${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}` },
+        { k: x('consumer.agents'), v: x('consumerAgentsBody') },
+        { k: x('consumer.media'), v: x('consumerMediaBody') },
+        { k: x('consumer.chat'), v: chat
           ? (chat.pays === 'node' ? x('consumerChatNode', { host: ctx.host, model: chat.model || '' }) : chat.pays === 'own' ? x('consumerChatOwn') : x('consumerChatAllowance', { n: money(chat.allowance_remaining_usd || 0) }))
-          : x('consumerChatUnknown')}<small>${x('consumerChatSub')}</small></div>
-        <div class="facts-k poster-label">${x('consumer.agentRule')}</div><div class="facts-v">${x('consumerAgentRuleBody')}</div>
-      </div>
+          : x('consumerChatUnknown'), sub: x('consumerChatSub') },
+        { k: x('consumer.agentRule'), v: x('consumerAgentRuleBody') },
+      ]} />
     <//>`;
 }

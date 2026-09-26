@@ -10,15 +10,32 @@
  *   tokens in one list, in words, with the base package said once, and the token form as a fold);
  *   03 your accounts at other services; 04 the secrets an extension may use without seeing them;
  *   05 sharing groups; 06 your addresses for an AI; 07 how your AI reads this page. Pure render
- *   over the ctx bag; the rows are rows.js.
+ *   over the ctx bag; the rows are rows.js. Every part is a component that takes data
+ *   (components/SettingsPage, Section, List, Box, Facts, FigureStrip, Roads, the Field family,
+ *   Action, Mark, Note); this file writes no class.
  *
  *   SECRETS SIT WITH THE ACCOUNTS, not with the keys. Both sections answer the same question — a
  *   credential of the person's that something else uses without ever holding it — while section 02
  *   answers the opposite one, which is what a key of THIS account may do.
- * @structure renderPage · mast · strip · secSignIn · secKeys · tokenFold · secAccounts · secSecrets ·
- *   secretFold · secGroups · secAddresses · secRoads
+ *
+ *   THE KEPT SECTIONS DRAW NO HEADING OF THEIR OWN HERE. The two-step and passkey panels, the
+ *   accounts, the MCP servers, the sharing groups and what is shared with you are components of
+ *   their own that carry a heading and an intro for when they stand alone. Here the page's section
+ *   or the sign-in row above them already says both, so each is given `inRow` and leaves them out
+ *   (until 2026-09-26 a page rule, .ac-kept and .ac-panel, hid them after they were drawn).
+ * @structure renderPage · marks · mastActions · strip · secretTile · secSignIn · secKeys ·
+ *   tokenFold · secAccounts · secMcp · secSecrets · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.27.0 -- 2026-09-26 -- Every part is a component that takes data, and the file writes no class
+ *     (component plan, page group G3): the frame is SettingsPage, the sections Section (the two forms
+ *     its fold), the strip FigureStrip, the sign-in rows one List whose rows carry their panel or
+ *     block under them (Row below), the keys and the secrets List rows, the filters Tabs in their
+ *     filter tone with the count as the tally, the "why" boxes and the recovery key Box (the key a
+ *     blurred Code), the forms the Field family, the addresses Facts with the copy beside the value,
+ *     the two roads Roads. Put back from main: the tag that counts nothing yet (the sessions tag,
+ *     "not on this device") in its dim tone. The kept sections are given `inRow` instead of being
+ *     hidden by .ac-kept and .ac-panel.
  *   v1.26.0 -- 2026-09-26 -- The ready-made request and the new token are the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.25.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.24.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -67,10 +84,23 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Section } from '/components/Section.js';
+import { scrollToSection } from '/components/Rail.js';
+import { Tabs } from '/components/Tabs.js';
+import { Space } from '/components/Layout.js';
+import { List, Row, Name, Doors, More } from '/components/List.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Mark, Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
+import { Facts } from '/components/Facts.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure } from '/components/Figure.js';
+import { Roads, Road } from '/components/Roads.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Choice } from '/components/Choice.js';
 import { TwoFactorSection } from '../security-tab/two-factor.js';
 import { PasskeysSection } from '../security-tab/passkeys.js';
 import { ConnectionsSection } from '../access-tab/connections.js';
@@ -79,10 +109,9 @@ import { SharingGroupsSection } from '../access-tab/sharing-groups.js';
 import { SharesIncomingSection } from '../access-tab/shares-incoming.js';
 import { x, n, dateWord, crumb, pageLinks, FILTERS, filterRows, scopeSentence } from './frame.js';
 import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
-import { Hint } from '/components/Hint.js';
 
-const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
-const msg = (m) => (m ? html`<small class=${`form-message ${m.error ? 'form-message--error' : ''}`}>${m.text}</small>` : null);
+/** The line a form says after it acted ({ text, error } or nothing). */
+const msg = (m) => (m ? html`<${Note} kind="message" error=${m.error}>${m.text}<//>` : null);
 
 export function renderPage(ctx) {
   const ov = ctx.ov;
@@ -97,66 +126,61 @@ export function renderPage(ctx) {
     ['08', 'ac-roads', x('rail.ai'), ''],
   ];
   return html`
-    <div class="og og-ac">
-      ${crumb()}
-      ${mast(ctx)}
-      ${strip(ctx)}
-      <div class="og-grid">
-        <div class="og-main">
-          ${!ov ? html`<p class=${`poster-quiet ac-empty${ctx.failed ? '' : ' loading-mark'}`}>${ctx.failed ? x('loadFailed') : x('loading')}</p>` : html`
-            ${secSignIn(ctx)}
-            ${secKeys(ctx)}
-            ${secAccounts(ctx)}
-            ${secMcp(ctx)}
-            ${secSecrets(ctx)}
-            ${secGroups(ctx)}
-            ${secAddresses(ctx)}
-            ${secRoads()}`}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${rail.map(([num, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${num}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks(ctx.isOperator)}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="ac"
+      crumb=${crumb()}
+      title=${t('profile.tabs.access')} sub=${x('titleSub')}
+      marks=${marks(ctx)}
+      desc=${x('desc')}
+      actions=${mastActions(ctx)}
+      strip=${strip(ctx)}
+      railTitle=${x('railTitle')}
+      sections=${rail.map(([num, id, label, count]) => ({ id, num, label, count }))}
+      pagesLabel=${x('pages')}
+      pages=${pageLinks(ctx.isOperator)}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${!ov ? html`<${Note} kind=${ctx.failed ? 'quiet' : 'loading'}>${ctx.failed ? x('loadFailed') : x('loading')}<//>` : html`
+        ${secSignIn(ctx)}
+        ${secKeys(ctx)}
+        ${secAccounts(ctx)}
+        ${secMcp(ctx)}
+        ${secSecrets(ctx)}
+        ${secGroups(ctx)}
+        ${secAddresses(ctx)}
+        ${secRoads()}`}
+    <//>`;
 }
 
-function mast(ctx) {
+/** The mast's tags: apps (on the sun), two-step (coral while off), tokens and accounts, sessions (dim). */
+function marks(ctx) {
+  const ov = ctx.ov;
+  if (!ov) return [];
+  const s = ov.sign_in;
+  return [
+    { label: x('chipApps', { n: ov.appGrants.total }), tone: 'sun' },
+    s.two_factor.enabled ? { label: x('chipTwoStepOn') } : { label: x('chipTwoStepOff'), tone: 'coral' },
+    { label: x('chipTokensAccounts', { tokens: ov.accessTokens.total, accounts: ov.connections?.connections?.length || 0 }) },
+    { label: x('chipSessions', { n: s.sessions.mine.total }), tone: 'dim' },
+  ];
+}
+
+/** The one loud action (a passkey while there is none, a new token after that) and the doors under it. */
+function mastActions(ctx) {
   const ov = ctx.ov;
   const s = ov?.sign_in;
-  const chips = !ov ? [] : [
-    chip(x('chipApps', { n: ov.appGrants.total }), 'poster-chip--sun'),
-    s.two_factor.enabled ? chip(x('chipTwoStepOn')) : chip(x('chipTwoStepOff'), 'poster-chip--coral'),
-    chip(x('chipTokensAccounts', { tokens: ov.accessTokens.total, accounts: ov.connections?.connections?.length || 0 })),
-    chip(x('chipSessions', { n: s.sessions.mine.total })),
-  ];
   const wantPasskey = ov && s.passkeys.available && s.passkeys.count === 0 && ctx.passkeysSupported && !s.managed_by;
   return html`
-    <div class="og-mast">
-      <div class="og-mast-words">
-        <h1 class="og-title poster-page-title">${t('profile.tabs.access')}<small>${x('titleSub')}</small></h1>
-        <div class="poster-chips">${chips}</div>
-        <p class="og-desc">${x('desc')}</p>
-      </div>
-      <div class="og-mast-actions">
-        ${wantPasskey
-          ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'passkey'} onClick=${() => ctx.addPasskeyNow()}>${ctx.busy === 'passkey' ? x('working') : x('slabPasskey')}</button><small class="poster-hint poster-hint--slab">${x('slabPasskeyHint')}</small>`
-          : html`<button type="button" class="poster-slab" onClick=${() => ctx.toggleForm(true)}>${x('slabToken')}</button><small class="poster-hint poster-hint--slab">${x('slabTokenHint')}</small>`}
-        <div class="og-doors">
-          ${wantPasskey ? html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.toggleForm(true)}>${x('doorNewToken')}</button>` : null}
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => scrollTo('ac-roads')}>${x('doorToAi')}</button>
-        </div>
-      </div>
-    </div>`;
+    ${wantPasskey
+      ? html`<${Loud} control disabled=${ctx.busy === 'passkey'} onClick=${() => ctx.addPasskeyNow()}>${ctx.busy === 'passkey' ? x('working') : x('slabPasskey')}<//><${Note} kind="hint" slab inline>${x('slabPasskeyHint')}<//>`
+      : html`<${Loud} onClick=${() => ctx.toggleForm(true)}>${x('slabToken')}<//><${Note} kind="hint" slab inline>${x('slabTokenHint')}<//>`}
+    <${Actions}>
+      ${wantPasskey ? html`<${Action} small onClick=${() => ctx.toggleForm(true)}>${x('doorNewToken')}<//>` : null}
+      <${Action} small soft onClick=${() => scrollToSection('ac-roads')}>${x('doorToAi')}<//>
+    <//>`;
 }
 
 function strip(ctx) {
   const ov = ctx.ov;
-  if (!ov) return html`<div class="og-strip"><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div></div>`;
+  if (!ov) return html`<${FigureStrip} loading=${5} />`;
   const s = ov.sign_in;
   const apps = ctx.rows.filter((r) => r.kind === 'app');
   const tokens = ctx.rows.filter((r) => r.kind === 'token');
@@ -165,22 +189,20 @@ function strip(ctx) {
   const tokenSub = tokens.length
     ? [tokens.filter((r) => r.token.grant_operator).length ? x('stripTokensOperator', { n: tokens.filter((r) => r.token.grant_operator).length }) : '', tokens.filter((r) => r.token.grant_owner).length ? x('stripTokensOwner', { n: tokens.filter((r) => r.token.grant_owner).length }) : '', tokens.filter((r) => !r.token.expires_at).length ? x('stripTokensNoExpiry', { n: tokens.filter((r) => !r.token.expires_at).length }) : x('stripTokensAllExpire')].filter(Boolean).join(' · ')
     : x('stripTokensNone');
-  return html`
-    <div class="og-strip">
-      <div><b>${n(ov.appGrants.total)}</b><span>${x('stripApps')}</span><small>${ov.appGrants.total ? x('stripAppsSub', { day, unused: x('unusedN', { n: unused, days: 30 }), base: ctx.baseHolders }) : x('stripAppsNone')}</small></div>
-      <div><b>${n(ov.accessTokens.total)}</b><span>${x('stripTokens')}</span><small>${tokenSub}</small></div>
-      ${secretTile(ctx)}
-      <div>${s.two_factor.enabled ? html`<b class="is-good">${x('twoStep.onWord')}</b>` : html`<b class="is-low">${x('twoStep.offWord')}</b>`}<span>${x('stripTwoStep')}</span><small>${x('stripTwoStepSub', { passkeys: s.passkeys.count, password: s.has_password ? x('passwordSet') : x('passwordNone') })}</small></div>
-      <div><b>${n(s.sessions.mine.total)}</b><span>${x('stripSessions')}</span><small>${x('stripSessionsSub', { devices: s.sessions.mine.by_device.length, agents: s.sessions.agents.total })}</small></div>
-    </div>`;
+  return html`<${FigureStrip} wrap items=${[
+    { key: 'apps', n: n(ov.appGrants.total), label: x('stripApps'), sub: ov.appGrants.total ? x('stripAppsSub', { day, unused: x('unusedN', { n: unused, days: 30 }), base: ctx.baseHolders }) : x('stripAppsNone') },
+    { key: 'tokens', n: n(ov.accessTokens.total), label: x('stripTokens'), sub: tokenSub },
+    secretTile(ctx),
+    { key: 'twoStep', n: s.two_factor.enabled ? x('twoStep.onWord') : x('twoStep.offWord'), tone: s.two_factor.enabled ? 'fine' : 'notice', label: x('stripTwoStep'), sub: x('stripTwoStepSub', { passkeys: s.passkeys.count, password: s.has_password ? x('passwordSet') : x('passwordNone') }) },
+    { key: 'sessions', n: n(s.sessions.mine.total), label: x('stripSessions'), sub: x('stripSessionsSub', { devices: s.sessions.mine.by_device.length, agents: s.sessions.agents.total }) },
+  ]} />`;
 }
 
-/** The strip's third tile: how many secrets are kept, and how many of them anything names. */
+/** The strip's third figure: how many secrets are kept, and how many of them anything names. */
 function secretTile(ctx) {
   const list = ctx.secrets || [];
   const used = list.filter((s) => (s.usedBy || []).length).length;
-  return html`
-    <div><b>${n(list.length)}</b><span>${x('stripSecrets')}</span><small>${list.length ? x('stripSecretsSub', { used, spare: list.length - used }) : x('stripSecretsNone')}</small></div>`;
+  return { key: 'secrets', n: n(list.length), label: x('stripSecrets'), sub: list.length ? x('stripSecretsSub', { used, spare: list.length - used }) : x('stripSecretsNone') };
 }
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -190,29 +212,37 @@ function secSignIn(ctx) {
   const s = ov.sign_in;
   const tf = s.two_factor;
   const sub = [s.has_password ? x('passwordSet') : x('passwordNone'), tf.enabled ? x('twoStep.onShort') : x('twoStep.offShort'), x('passkeysN', { n: s.passkeys.count })].join(' · ');
-  // Each row is a Listing of its own: a panel or a block that belongs to it sits between the
-  // listings, and the row it follows is open (no rule between the row and its panel).
-  const row = (name, subText, right, extra = '') => html`
-    <div class="listing listing--name-state"><div class=${`listing-row ${extra}`}><div class="listing-name"><b>${name}</b><small>${subText}</small></div><div class="listing-doors">${right}</div></div></div>`;
+  // One list of sign-in rows. A panel or a block that belongs to a row stands under it (Row below),
+  // so the row and its panel read as one thing and the rule falls under the panel.
+  const row = (key, name, subText, doors, below) => html`
+    <${Row} key=${key} below=${below || null}><${Name} meta=${subText}>${name}<//><${Doors}>${doors}<//><//>`;
+  const state = (fine, words) => html`<${Mark} kind="status" tone=${fine ? 'fine' : 'attention'}>${words}<//>`;
   return html`
-    <${PageSection} id="ac-signin" num="01" title=${x('secSignIn')} count=${sub} first=${true}>
-      <p class="og-lead">${tf.enabled || s.passkeys.count ? x('signInIntroOn') : x('signInIntro')}</p>
-      ${s.managed_by ? html`<div class="ac-why poster-box"><b>${t('profile.security.managedTitle')}</b> ${t('profile.security.managedDesc').replace('{name}', s.managed_by.name)}</div>` : null}
-      <div class="ac-rows">
-        ${row(x('row.password'), s.has_password ? x('row.passwordSet') : x('row.passwordNone'), html`<span class=${`poster-status ${s.has_password ? 'poster-status--fine' : 'poster-status--attention'}`}>${s.has_password ? x('inUse') : x('none')}</span>`)}
-        ${!s.managed_by && s.passkeys.available ? html`
-          ${row(x('row.passkeys'), s.passkeys.count ? x('row.passkeysN', { n: s.passkeys.count }) : x('row.passkeysNone'), html`<span class=${`poster-status ${s.passkeys.count ? 'poster-status--fine' : 'poster-status--attention'}`}>${x('devicesN', { n: s.passkeys.count })}</span>`, 'is-open')}
-          <div class="ac-panel"><${PasskeysSection} showToast=${ctx.showToast} /></div>` : null}
-        ${!s.managed_by && tf.available ? html`
-          ${row(x('row.twoStep'), tf.enabled ? x('row.twoStepOn', { n: tf.backup_codes_left }) : tf.pending ? x('row.twoStepPending') : x('row.twoStepOff'), html`<span class=${`poster-status ${tf.enabled ? 'poster-status--fine' : 'poster-status--attention'}`}>${tf.enabled ? x('twoStep.onShort') : x('twoStep.offShort')}</span>`, 'is-open')}
-          <div class="ac-panel"><${TwoFactorSection} twoFactor=${tf} managed=${!!s.managed_by} showToast=${ctx.showToast} onChanged=${() => ctx.load()} /></div>` : null}
-        ${row(x('row.sessions'), x('row.sessionsSub', { mine: s.sessions.mine.total, agents: s.sessions.agents.total }), html`<span class="ac-n poster-stat-number poster-stat-number--small">${n(s.sessions.mine.total)}</span>${s.sessions.mine.total > 1 ? html`<button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'sessions'} onClick=${() => ctx.signOutOthers()}>${x('doorSignOutOthers')}</button>` : null}`, 'is-open')}
-        ${s.sessions.mine.total ? sessionsBlock(ctx) : null}
-        ${row(x('row.federation'), ctx.fed.all ? x('row.federationAll') : ctx.fed.nodes.length ? x('row.federationList', { n: ctx.fed.nodes.length }) : x('row.federationNone'), html`<span class="poster-chip">${ctx.fed.all ? x('fed.allChip') : x('fed.listChip', { n: ctx.fed.nodes.length })}</span><button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'fed'} onClick=${() => ctx.toggleFedAll()}>${ctx.fed.all ? x('fed.restrict') : x('fed.allowAll')}</button>`, 'is-open')}
-        ${federationBlock(ctx)}
-        ${row(x('row.recovery'), ctx.ownerKey ? x('row.recoveryHere') : x('row.recoveryNotHere'), ctx.ownerKey ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setKeyShown(!ctx.keyShown)}>${ctx.keyShown ? x('hide') : x('show')}</button><${CopyButton} className="poster-action poster-action--small" text=${ctx.ownerKey} label=${x('copy')} onCopied=${() => ctx.showToast(x('keyCopied'))} />` : html`<span class="poster-status poster-status--off">${x('notHere')}</span>`, ctx.ownerKey ? 'is-open' : '')}
-        ${ctx.ownerKey ? html`<div class="ac-keybox poster-box"><div><b>${x('recovery.title')}</b> ${x('recovery.body')}<br /><code class=${ctx.keyShown ? 'is-shown' : ''}>${ctx.ownerKey}</code></div></div>` : null}
-      </div>
+    <${Section} id="ac-signin" num="01" title=${x('secSignIn')} count=${sub} first=${true}>
+      <${Note} kind="lead">${tf.enabled || s.passkeys.count ? x('signInIntroOn') : x('signInIntro')}<//>
+      ${s.managed_by ? html`<${Box}><b>${t('profile.security.managedTitle')}</b> ${t('profile.security.managedDesc').replace('{name}', s.managed_by.name)}<//>` : null}
+      <${List} cols="name-state">
+        ${row('password', x('row.password'), s.has_password ? x('row.passwordSet') : x('row.passwordNone'), state(s.has_password, s.has_password ? x('inUse') : x('none')))}
+        ${!s.managed_by && s.passkeys.available
+          ? row('passkeys', x('row.passkeys'), s.passkeys.count ? x('row.passkeysN', { n: s.passkeys.count }) : x('row.passkeysNone'), state(s.passkeys.count, x('devicesN', { n: s.passkeys.count })),
+            html`<${PasskeysSection} inRow showToast=${ctx.showToast} />`)
+          : null}
+        ${!s.managed_by && tf.available
+          ? row('twoStep', x('row.twoStep'), tf.enabled ? x('row.twoStepOn', { n: tf.backup_codes_left }) : tf.pending ? x('row.twoStepPending') : x('row.twoStepOff'), state(tf.enabled, tf.enabled ? x('twoStep.onShort') : x('twoStep.offShort')),
+            html`<${TwoFactorSection} inRow twoFactor=${tf} managed=${!!s.managed_by} showToast=${ctx.showToast} onChanged=${() => ctx.load()} />`)
+          : null}
+        ${row('sessions', x('row.sessions'), x('row.sessionsSub', { mine: s.sessions.mine.total, agents: s.sessions.agents.total }),
+          html`<${Figure} small n=${n(s.sessions.mine.total)} />${s.sessions.mine.total > 1 ? html`<${Action} small disabled=${ctx.busy === 'sessions'} onClick=${() => ctx.signOutOthers()}>${x('doorSignOutOthers')}<//>` : null}`,
+          s.sessions.mine.total ? sessionsBlock(ctx) : null)}
+        ${row('federation', x('row.federation'), ctx.fed.all ? x('row.federationAll') : ctx.fed.nodes.length ? x('row.federationList', { n: ctx.fed.nodes.length }) : x('row.federationNone'),
+          html`<${Mark}>${ctx.fed.all ? x('fed.allChip') : x('fed.listChip', { n: ctx.fed.nodes.length })}<//><${Action} small disabled=${ctx.busy === 'fed'} onClick=${() => ctx.toggleFedAll()}>${ctx.fed.all ? x('fed.restrict') : x('fed.allowAll')}<//>`,
+          federationBlock(ctx))}
+        ${row('recovery', x('row.recovery'), ctx.ownerKey ? x('row.recoveryHere') : x('row.recoveryNotHere'),
+          ctx.ownerKey
+            ? html`<${Action} small soft onClick=${() => ctx.setKeyShown(!ctx.keyShown)}>${ctx.keyShown ? x('hide') : x('show')}<//><${Action} small copy=${ctx.ownerKey} onCopied=${() => ctx.showToast(x('keyCopied'))}>${x('copy')}<//>`
+            : html`<${Mark} tone="dim">${x('notHere')}<//>`,
+          ctx.ownerKey ? html`<${Box}><b>${x('recovery.title')}</b> ${x('recovery.body')}<br /><${Code} blurred=${!ctx.keyShown}>${ctx.ownerKey}<//><//>` : null)}
+      <//>
     <//>`;
 }
 
@@ -225,30 +255,28 @@ function secKeys(ctx) {
   const shown = list.slice(0, ctx.shownKeys);
   const counts = Object.fromEntries(FILTERS.map((f) => [f, filterRows(all, f).length]));
   const unused = counts.unused;
+  const more = list.length > shown.length;
   return html`
-    <${PageSection} id="ac-keys" num="02" title=${x('secKeys')} count=${x('secKeysSub', { apps: ov.appGrants.total, tokens: ov.accessTokens.total })}>
-      <p class="og-lead">${x('keysIntro')}</p>
+    <${Section} id="ac-keys" num="02" title=${x('secKeys')} count=${x('secKeysSub', { apps: ov.appGrants.total, tokens: ov.accessTokens.total })}>
+      <${Note} kind="lead">${x('keysIntro')}<//>
       ${all.length ? html`
-        <div class="ac-filters">
-          ${FILTERS.map((f) => html`<button type="button" key=${f} class=${`poster-tab poster-tab--filter ${ctx.filter === f ? 'is-on' : f === 'unused' && counts[f] ? 'poster-tab--attention' : ''}`} onClick=${() => ctx.setFilter(f)}>${x('filter.' + f, { days: 30 })} · ${counts[f]}</button>`)}
-        </div>
-        <div class="listing listing--name-desc-when-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.who')}</div><div class="poster-label">${x('col.may')}</div><div class="poster-label">${x('col.last')}</div><div class="poster-label"></div></div>
+        <${Tabs} tone="filter" value=${ctx.filter} onSelect=${(f) => ctx.setFilter(f)}
+          items=${FILTERS.map((f) => ({ value: f, label: x('filter.' + f, { days: 30 }), count: counts[f], attention: f === 'unused' && counts[f] > 0 && ctx.filter !== f }))} />
+        <${List} cols="name-desc-when-doors" head=${[x('col.who'), x('col.may'), x('col.last'), '']}>
           ${shown.map((r) => keyRow(ctx, r))}
-        </div>
-        ${list.length > shown.length || unused ? html`<div class="ac-more">
-          ${list.length > shown.length ? html`<button type="button" class="poster-action poster-action--more" onClick=${() => ctx.showMoreKeys()}>${x('moreKeys', { n: list.length - shown.length })}</button>` : null}
-          ${unused ? html`<button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" disabled=${ctx.busy === 'unused'} onClick=${() => ctx.revokeUnused()}>${x('revokeUnused', { n: unused, days: 30 })}</button>` : null}
-        </div>` : null}
-        ${ctx.baseHolders ? html`<div class="ac-why poster-box"><b>${x('whyBaseTitle')}</b> ${x('whyBase', { n: ctx.baseHolders, total: ov.appGrants.total })} ${ov.base_package.map(scopeSentence).join('; ')}.</div>` : null}`
-      : html`<p class="poster-quiet ac-empty"><b>${x('keysEmptyTitle')}</b> ${x('keysEmptyBody')}</p>`}
-      ${tokenFold(ctx)}
+        <//>
+        ${more || unused ? html`
+          <${More} label=${x('moreKeys', { n: list.length - shown.length })} onMore=${more ? () => ctx.showMoreKeys() : null}>
+            ${unused ? html`<${Action} small soft tone="danger" disabled=${ctx.busy === 'unused'} onClick=${() => ctx.revokeUnused()}>${x('revokeUnused', { n: unused, days: 30 })}<//>` : null}
+          <//>` : null}
+        ${ctx.baseHolders ? html`<${Box}><b>${x('whyBaseTitle')}</b> ${x('whyBase', { n: ctx.baseHolders, total: ov.appGrants.total })} ${ov.base_package.map(scopeSentence).join('; ')}.<//>` : null}`
+      : html`<${Note} kind="quiet"><b>${x('keysEmptyTitle')}</b> ${x('keysEmptyBody')}<//>`}
+      <${Space} above="large">${tokenFold(ctx)}<//>
     <//>`;
 }
 
-function opt(ctx, field, value, label, cls = '') {
-  return html`<button type="button" class=${`poster-tab poster-tab--tile ${ctx.form[field] === value ? 'is-on' : ''} ${cls}`} onClick=${() => ctx.setForm({ [field]: value })}>${label}</button>`;
-}
+/** One answer of the token form's tile rows; a risky one (acting as the owner, never expiring) in the attention tone. */
+const opt = (value, label, attention) => ({ value, label, attention: !!attention });
 
 function tokenFold(ctx) {
   const f = ctx.form;
@@ -257,40 +285,36 @@ function tokenFold(ctx) {
   const ready = !!f.label.trim() && (!scoped || chosen.length > 0);
   const created = ctx.created;
   return html`
-    <div class="ac-form-gap">
-    <${FoldSection} id="ac-token" num="" title=${x('form.title')} sub=${created ? x('form.subCreated') : ''} open=${f.open} onToggle=${() => ctx.toggleForm()}>
+    <${Section} fold id="ac-token" num="" title=${x('form.title')} sub=${created ? x('form.subCreated') : ''} open=${f.open} onToggle=${() => ctx.toggleForm()}>
       ${created ? html`
-        <div class="ac-open ac-token-created">
-          <span class="poster-label">${x('created.title')}</span>
-          <p class="og-lead">${x('created.once')}</p>
-          <div class="ac-token code-block"><code class="code-inline">${created.token}</code><${CopyButton} className="poster-action poster-action--small" text=${created.token} label=${x('copy')} onCopied=${() => ctx.showToast(x('created.copied'))} /></div>
-          <div class="listing listing--name-state"><div class="listing-row is-open"><div class="listing-name"><b>${x('created.prompt')}</b><small>${x('created.promptSub')}</small></div><div class="listing-doors"><${CopyButton} className="poster-action poster-action--small poster-action--row" text=${created.prompt} label=${x('created.copyPrompt')} onCopied=${() => ctx.showToast(x('created.promptCopied'))} /></div></div></div>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.clearCreated()}>${x('created.done')}</button></div>
-        </div>` : null}
-      <p class="og-lead">${x('form.intro')}</p>
-      <div class="ac-form">
-        <span class="poster-label">${x('form.name')}</span>
-        <div><input class="og-input" type="text" maxlength="120" value=${f.label} placeholder=${x('form.namePlaceholder')} onInput=${(e) => ctx.setForm({ label: e.target.value })} /><${Hint}>${x('form.nameHint')}<//></div>
-        <span class="poster-label">${x('form.level')}</span>
-        <div>
-          <div class="ac-opts">${opt(ctx, 'level', 'scoped', x('level.scopedOpt'))}${opt(ctx, 'level', 'owner', x('level.ownerOpt'), 'poster-tab--attention')}${ctx.isOperator ? opt(ctx, 'level', 'operator', x('level.operatorOpt'), 'poster-tab--attention') : null}</div>
-          ${scoped ? html`<div class="ac-opts">${ctx.tokenScopes.map((s) => html`<button type="button" key=${s} class=${`poster-tab poster-tab--tile ${f.scopes[s] ? 'is-on' : ''}`} onClick=${() => ctx.toggleScope(s)}>${scopeSentence(s)}</button>`)}</div>` : null}
-          <${Hint}>${scoped ? x('form.levelHintScoped') : f.level === 'owner' ? x('level.ownerText') : x('level.operatorText')}<//>
-        </div>
-        <span class="poster-label">${x('form.expiry')}</span>
-        <div>
-          <div class="ac-opts">${opt(ctx, 'expiry', '86400', x('expiry.day'))}${opt(ctx, 'expiry', '604800', x('expiry.week'))}${opt(ctx, 'expiry', '2592000', x('expiry.month'))}${opt(ctx, 'expiry', '', x('expiry.never'), 'poster-tab--attention')}</div>
-          <${Hint}>${x('form.expiryHint')}<//>
-        </div>
-        <span></span>
-        <div class="ac-submit">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${!ready || ctx.busy === 'token'} onClick=${() => ctx.createToken()}>${ctx.busy === 'token' ? x('form.making') : x('form.make')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleForm(false)}>${x('cancel')}</button>
+        <${Space} below="large">
+          <${Label} block>${x('created.title')}<//>
+          <${Note} kind="lead">${x('created.once')}<//>
+          <${Code} block>${created.token}<//>
+          <${Actions}><${Action} small copy=${created.token} onCopied=${() => ctx.showToast(x('created.copied'))}>${x('copy')}<//><//>
+          <${List} cols="name-state">
+            <${Row}><${Name} meta=${x('created.promptSub')}>${x('created.prompt')}<//><${Doors}><${Action} small row copy=${created.prompt} onCopied=${() => ctx.showToast(x('created.promptCopied'))}>${x('created.copyPrompt')}<//><//><//>
+          <//>
+          <${Actions}><${Action} small soft onClick=${() => ctx.clearCreated()}>${x('created.done')}<//><//>
+        <//>` : null}
+      <${Note} kind="lead">${x('form.intro')}<//>
+      <${Fields}>
+        <${TextField} label=${x('form.name')} hint=${x('form.nameHint')} maxLength=${120} value=${f.label} placeholder=${x('form.namePlaceholder')} onInput=${(v) => ctx.setForm({ label: v })} />
+        <${Field} group label=${x('form.level')} hint=${scoped ? x('form.levelHintScoped') : f.level === 'owner' ? x('level.ownerText') : x('level.operatorText')}>
+          <${Tabs} tone="tile" label=${x('form.level')} value=${f.level} onSelect=${(v) => ctx.setForm({ level: v })}
+            items=${[opt('scoped', x('level.scopedOpt')), opt('owner', x('level.ownerOpt'), true), ctx.isOperator ? opt('operator', x('level.operatorOpt'), true) : null]} />
+          ${scoped ? html`<${Tabs} tone="tile" kind="toggle" value=${chosen} onSelect=${(s) => ctx.toggleScope(s)}
+            items=${ctx.tokenScopes.map((s) => ({ value: s, label: scopeSentence(s) }))} />` : null}
+        <//>
+        <${Choice} tone="tile" label=${x('form.expiry')} hint=${x('form.expiryHint')} value=${f.expiry} onChange=${(v) => ctx.setForm({ expiry: v })}
+          options=${[opt('86400', x('expiry.day')), opt('604800', x('expiry.week')), opt('2592000', x('expiry.month')), opt('', x('expiry.never'), true)]} />
+        <${FormActions}>
+          <${Loud} control disabled=${!ready || ctx.busy === 'token'} onClick=${() => ctx.createToken()}>${ctx.busy === 'token' ? x('form.making') : x('form.make')}<//>
+          <${Action} small soft onClick=${() => ctx.toggleForm(false)}>${x('cancel')}<//>
           ${msg(ctx.formMsg)}
-        </div>
-      </div>
-    <//>
-    </div>`;
+        <//>
+      <//>
+    <//>`;
 }
 
 /* ── 03, 04 and 06: the sections that keep their components ──────────────────────────────────── */
@@ -299,9 +323,9 @@ function secAccounts(ctx) {
   const c = ctx.ov.connections;
   const count = c?.connections?.length || 0;
   return html`
-    <${PageSection} id="ac-accounts" num="03" title=${x('secAccounts')} count=${c?.enabled ? x('secAccountsSub', { n: count, providers: c.providers.length }) : x('secAccountsOff')}>
-      <p class="og-lead">${x('accountsIntro')}</p>
-      ${c?.enabled ? html`<div class="ac-kept"><${ConnectionsSection} showToast=${ctx.showToast} /></div>` : html`<p class="poster-quiet ac-empty">${x('accountsOffBody')}</p>`}
+    <${Section} id="ac-accounts" num="03" title=${x('secAccounts')} count=${c?.enabled ? x('secAccountsSub', { n: count, providers: c.providers.length }) : x('secAccountsOff')}>
+      <${Note} kind="lead">${x('accountsIntro')}<//>
+      ${c?.enabled ? html`<${ConnectionsSection} inRow showToast=${ctx.showToast} />` : html`<${Note} kind="quiet">${x('accountsOffBody')}<//>`}
     <//>`;
 }
 
@@ -312,13 +336,13 @@ function secAccounts(ctx) {
  * other services" until 2026-09-16, which on a server without outside accounts put them directly
  * under "not enabled on this server", and the kept-component rule hid their own title. An MCP server
  * is a set of tools, not an account, and it does not follow the accounts switch, so it gets its own
- * number, title and count. The section supplies the title and intro; `.ac-kept` hides the panel's own.
+ * number, title and count. The section supplies the title and intro; `inRow` leaves out the panel's own.
  */
 function secMcp(ctx) {
   return html`
-    <${PageSection} id="ac-mcp" num="04" title=${x('secMcp')} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
-      <p class="og-lead">${x('mcpIntro')}</p>
-      <div class="ac-kept ac-mcp"><${McpServersSection} showToast=${ctx.showToast} /></div>
+    <${Section} id="ac-mcp" num="04" title=${x('secMcp')} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
+      <${Note} kind="lead">${x('mcpIntro')}<//>
+      <${McpServersSection} inRow showToast=${ctx.showToast} />
     <//>`;
 }
 
@@ -332,17 +356,16 @@ function secMcp(ctx) {
 function secSecrets(ctx) {
   const list = ctx.secrets || [];
   return html`
-    <${PageSection} id="ac-secrets" num="05" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
-      <p class="og-lead">${x('secretsIntro')}</p>
-      ${ctx.secretsFailed ? html`<p class="poster-quiet ac-empty">${x('secrets.loadFailed')}</p>` : null}
+    <${Section} id="ac-secrets" num="05" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
+      <${Note} kind="lead">${x('secretsIntro')}<//>
+      ${ctx.secretsFailed ? html`<${Note} kind="quiet">${x('secrets.loadFailed')}<//>` : null}
       ${list.length ? html`
-        <div class="listing listing--name-who-when-doors ac-secrets">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('secrets.colName')}</div><div class="poster-label">${x('secrets.colUsedBy')}</div><div class="poster-label">${x('secrets.colSet')}</div><div class="poster-label"></div></div>
+        <${List} cols="name-who-when-doors" head=${[x('secrets.colName'), x('secrets.colUsedBy'), x('secrets.colSet'), '']}>
           ${list.map((s) => secretRow(ctx, s))}
-        </div>`
-      : (!ctx.secretsFailed ? html`<p class="poster-quiet ac-empty"><b>${x('secrets.emptyTitle')}</b> ${x('secrets.emptyBody')}</p>` : null)}
-      <div class="ac-why poster-box"><b>${x('secrets.whoTitle')}</b> ${x('secretsWho')}</div>
-      ${secretFold(ctx)}
+        <//>`
+      : (!ctx.secretsFailed ? html`<${Note} kind="quiet"><b>${x('secrets.emptyTitle')}</b> ${x('secrets.emptyBody')}<//>` : null)}
+      <${Box}><b>${x('secrets.whoTitle')}</b> ${x('secretsWho')}<//>
+      <${Space} above="large">${secretFold(ctx)}<//>
     <//>`;
 }
 
@@ -350,23 +373,21 @@ function secSecrets(ctx) {
 function secretFold(ctx) {
   const f = ctx.secretForm;
   const ready = !!f.name.trim() && !!f.value;
+  const busy = ctx.busy === 'secret:' + f.name.trim();
   return html`
-    <div class="ac-form-gap">
-    <${FoldSection} id="ac-secret-add" num="" title=${x('secrets.addTitle')} open=${f.open} onToggle=${() => ctx.toggleSecretForm()}>
-      <div class="ac-form">
-        <span class="poster-label">${x('secrets.name')}</span>
-        <div><input class="og-input" type="text" maxlength="64" autocomplete="off" spellcheck="false" value=${f.name} placeholder=${x('secrets.namePlaceholder')} onInput=${(e) => ctx.setSecretForm({ name: e.target.value })} /><${Hint}>${x('secrets.nameHint')}<//></div>
-        <span class="poster-label">${x('secrets.value')}</span>
-        <div><input class="og-input" type="password" autocomplete="new-password" spellcheck="false" value=${f.value} placeholder=${x('secrets.valuePlaceholder')} onInput=${(e) => ctx.setSecretForm({ value: e.target.value })} /><${Hint}>${x('secrets.valueHint')}<//></div>
-        <span></span>
-        <div class="ac-submit">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${!ready || ctx.busy === 'secret:' + f.name.trim()} onClick=${() => ctx.writeSecret(f.name.trim(), f.value, false)}>${ctx.busy === 'secret:' + f.name.trim() ? x('secrets.saving') : x('secrets.save')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleSecretForm(false)}>${x('cancel')}</button>
+    <${Section} fold id="ac-secret-add" num="" title=${x('secrets.addTitle')} open=${f.open} onToggle=${() => ctx.toggleSecretForm()}>
+      <${Fields}>
+        <${TextField} label=${x('secrets.name')} hint=${x('secrets.nameHint')} maxLength=${64} autoComplete="off" spellCheck=${false}
+          value=${f.name} placeholder=${x('secrets.namePlaceholder')} onInput=${(v) => ctx.setSecretForm({ name: v })} />
+        <${TextField} label=${x('secrets.value')} hint=${x('secrets.valueHint')} type="password" autoComplete="new-password" spellCheck=${false}
+          value=${f.value} placeholder=${x('secrets.valuePlaceholder')} onInput=${(v) => ctx.setSecretForm({ value: v })} />
+        <${FormActions}>
+          <${Loud} control disabled=${!ready || busy} onClick=${() => ctx.writeSecret(f.name.trim(), f.value, false)}>${busy ? x('secrets.saving') : x('secrets.save')}<//>
+          <${Action} small soft onClick=${() => ctx.toggleSecretForm(false)}>${x('cancel')}<//>
           ${msg(ctx.secretMsg)}
-        </div>
-      </div>
-    <//>
-    </div>`;
+        <//>
+      <//>
+    <//>`;
 }
 
 /* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -374,12 +395,10 @@ function secretFold(ctx) {
 function secGroups(ctx) {
   const groups = ctx.ov.groups?.groups || [];
   return html`
-    <${PageSection} id="ac-groups" num="06" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
-      <p class="og-lead">${x('groupsIntro')}</p>
-      <div class="ac-kept">
-        <${SharingGroupsSection} showToast=${ctx.showToast} initial=${ctx.ov.groups} />
-        <${SharesIncomingSection} />
-      </div>
+    <${Section} id="ac-groups" num="06" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
+      <${Note} kind="lead">${x('groupsIntro')}<//>
+      <${SharingGroupsSection} inRow showToast=${ctx.showToast} initial=${ctx.ov.groups} />
+      <${SharesIncomingSection} inRow />
     <//>`;
 }
 
@@ -396,15 +415,15 @@ function secAddresses(ctx) {
     ['key', ov.publicKey || '', ov.publicKey ? x('addr.keySub', { n: ov.publicKey.length }) : x('addr.keyNone')],
   ];
   return html`
-    <${PageSection} id="ac-addresses" num="07" title=${x('secAddresses')} count=${x('secAddressesSub')}>
-      <p class="og-lead">${x('addressesIntro')}</p>
-      <div class="facts">
-        ${rows.map(([k, v, sub]) => html`
-          <div class="facts-k poster-label" key=${'k' + k}>${x('addr.' + k)}</div>
-          <div class="facts-v" key=${'v' + k}>${v ? html`<code class="code-inline">${v}</code>` : null}<small>${sub}</small>${v ? html`<${CopyButton} className="poster-action poster-action--small" text=${v} label=${x('copy')} onCopied=${() => ctx.showToast(x('copied'))} />` : null}</div>`)}
-        <div class="facts-k poster-label">${x('addr.session')}</div>
-        <div class="facts-v">${cur ? x('addr.sessionValue', { date: dateWord(cur.expires_at), days: days ?? '' }) : x('addr.sessionNone')}<small>${x('addr.sessionSub')}</small></div>
-      </div>
+    <${Section} id="ac-addresses" num="07" title=${x('secAddresses')} count=${x('secAddressesSub')}>
+      <${Note} kind="lead">${x('addressesIntro')}<//>
+      <${Facts} rows=${[
+        ...rows.map(([k, v, sub]) => ({
+          key: k, k: x('addr.' + k), v, mono: true, sub,
+          action: v ? html`<${Action} small copy=${v} onCopied=${() => ctx.showToast(x('copied'))}>${x('copy')}<//>` : null,
+        })),
+        { key: 'session', k: x('addr.session'), v: cur ? x('addr.sessionValue', { date: dateWord(cur.expires_at), days: days ?? '' }) : x('addr.sessionNone'), sub: x('addr.sessionSub') },
+      ]} />
     <//>`;
 }
 
@@ -413,19 +432,12 @@ function secAddresses(ctx) {
 function secRoads() {
   const ask = x('roadAskPrompt');
   return html`
-    <${PageSection} id="ac-roads" num="08" title=${x('secRoads')}>
-      <div class="ac-roads">
-        <div class="ac-road poster-box poster-box--raised">
-          <span class="poster-label">${x('roadAskTitle')}</span>
-          <p>${x('roadAskBody')}</p>
-          <pre class="code-block">${ask}</pre>
-          <div class="og-doors"><${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${ask} label=${x('copyPrompt')} /></div>
-        </div>
-        <div class="ac-road poster-box">
-          <span class="poster-label">${x('roadAgentTitle')}</span>
-          <p>${x('roadAgentBody')}</p>
-          <small>aimeat_access_list · aimeat_connection_list · aimeat_group_list · aimeat_consent_list · ${x('roadAgentScope')}</small>
-        </div>
-      </div>
+    <${Section} id="ac-roads" num="08" title=${x('secRoads')}>
+      <${Roads} wide>
+        <${Road} lead name=${x('roadAskTitle')} text=${x('roadAskBody')} code=${ask}
+          doors=${html`<${Action} small soft copy=${ask}>${x('copyPrompt')}<//>`} />
+        <${Road} name=${x('roadAgentTitle')} text=${x('roadAgentBody')}
+          meta=${`aimeat_access_list · aimeat_connection_list · aimeat_group_list · aimeat_consent_list · ${x('roadAgentScope')}`} />
+      <//>
     <//>`;
 }

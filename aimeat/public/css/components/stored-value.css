@@ -1,0 +1,16 @@
+/**
+ * @file stored-value.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A stored value, read (components/StoredValue.js): a text as prose that keeps its line
+ *   breaks, and the value as written in the Code block (css/components/code-block.css), which here
+ *   keeps no margin and scrolls after 60% of the window. Moved from css/views/memory.css (.mp-prose,
+ *   .mp-raw). Reads no colour and no shape.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial: moved from memory.css (.mp-prose, .mp-raw), page group G3.
+ */
+
+.stored-value-prose { font-size: 1rem; line-height: 1.65; max-width: 68ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.stored-value-prose .md-body, .stored-value-prose .markdown { white-space: normal; }
+.stored-value-raw.code-block { margin: 0; max-height: 60vh; overflow: auto; }

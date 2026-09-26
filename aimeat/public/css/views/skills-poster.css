@@ -10,6 +10,7 @@
  *   with the editor, and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.21.0 -- 2026-09-26 -- The page is on the component kit (page group G7): its rules go (the SKILL.md fold is the Box's folded tone in box.css); only the design lab's sample rules stay.
  *   v1.20.0 -- 2026-09-26 -- A road's title reads --shape-case-heading and the label spacing (* .2, .02em) (a move: the AIMEAT values equal the old ones).
  *   v1.19.0 -- 2026-09-26 -- "Pin to this version" is the Check line: its size goes, its row stays (a unification: Jouni's decision "Check line").
  *   v1.18.0 -- 2026-09-26 -- The request for an agent is the Code block (css/components/code-block.css): .sk-pre goes (a unification: Jouni's decision "Code block").
@@ -38,48 +39,11 @@
  *   v1.0.0 — 2026-09-03 — Initial (replaces the .pf-skl-* rules in profile.css).
  */
 
-.og-skills .og-strip b.is-coral { color: var(--accent); }
-.sk-empty { margin: 0; padding: .3rem 0 .6rem; }
-.is-warn { color: var(--accent); }
-
-/* ── Filters and the search line ───────────────────────────────────────────────────────────── */
-.sk-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
-
-/* ── The shelves: the Listing (css/components/listing.css); a tag beside a skill's name ────── */
-.og-skills .listing-name .poster-chip { margin-left: .45rem; vertical-align: middle; }
-.sk-mdlabel { display: block; margin-top: .9rem; }
-
-/* ── The facts under an opened row: the Facts (css/components/facts.css); what sits in a value ── */
-.sk-vis { margin-top: .4rem; align-items: center; }
-.sk-vis .poster-hint { margin: 0; }
-.sk-picker { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .5rem; }
-.sk-picker .og-input, .sk-picker .select-field { max-width: 18rem; }
-.sk-check { display: inline-flex; align-items: center; gap: .4rem; }
-.sk-files { font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; }
-.sk-files .sk-r { text-align: right; color: var(--text-dim); }
-
-/* ── The SKILL.md with a fold ──────────────────────────────────────────────────────────────── */
-.sk-md { position: relative; margin: .4rem 0 0; padding: .8rem 1rem; max-height: 22rem; overflow: hidden; font-size: .9rem; line-height: 1.6; }
-.sk-md.is-full { max-height: none; }
-.sk-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 6rem; background: linear-gradient(to bottom, transparent, var(--card-bg) 70%); }
-.sk-fade .poster-action { position: absolute; left: 1rem; bottom: .8rem; }
-
-/* ── The two roads to a new skill ──────────────────────────────────────────────────────────── */
-.sk-roads { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: .6rem; }
-/* A road is the Object box (.poster-box); the lead road is its raised tone (.poster-box--raised). */
+/* The Skills page draws nothing of its own any more: every part is a component (page group G7).
+   What stays is only for the design lab's samples (views/design-lab/decision-samples-conflicts.js
+   draws .sk-road, .sk-road-t and .sk-rule as markup); these rules die when the lab moves. */
 .sk-road { margin: 0; padding: .9rem 1rem 1rem; min-width: 0; }
 .sk-road-t { display: block; margin-bottom: .4rem; font-family: var(--font-display, var(--font-heading)); font-size: 1.05rem; text-transform: var(--shape-case-heading); letter-spacing: calc(var(--shape-tracking-label) * .2); color: var(--text); }
-.sk-editor { width: 100%; box-sizing: border-box; margin: .3rem 0 .6rem; }
-.sk-editor-doors { align-items: center; }
-
-/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
 .sk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; }
 .sk-rule .poster-label { display: block; margin-bottom: .3rem; }
 .sk-rule .og-lead { margin-bottom: .6rem; }
-.og-skills .facts--wide .code-inline { margin-top: .3rem; }
-
-/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .sk-roads { grid-template-columns: 1fr; }
-  .sk-picker .og-input, .sk-picker .select-field { max-width: none; width: 100%; }
-}

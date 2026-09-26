@@ -1,0 +1,23 @@
+/**
+ * @file task-graph.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The order of a crew's tasks as a picture (components/TaskGraph.js): each task a grey
+ *   box in a thin frame with its id in bold typewriter and its agent in small grey words under it, a
+ *   coral arrow from a task to each task that reads it, the danger frame on a task with a problem; it
+ *   scrolls sideways when it is wider than its place. Inline SVG. It has no corner, no 2px or 3px
+ *   frame, no shadow and no letter case, so it reads no shape token.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Moved out of css/components/crew-dag.css with its values; the classes lose
+ *     the page prefix and the .pf scope (pf-agd-crew-dag → task-graph), page group G1a.
+ */
+
+.task-graph { overflow-x: auto; margin-top: 0.5rem; }
+.task-graph svg { display: block; max-width: 100%; height: auto; }
+.task-graph-node rect { fill: var(--card-bg-alt); stroke: var(--border); stroke-width: 1; }
+.task-graph-node--problem rect { stroke: var(--danger); stroke-width: 1.5; }
+.task-graph-id { font-size: 12px; font-weight: 600; fill: var(--text); font-family: var(--font-mono, monospace); }
+.task-graph-agent { font-size: 11px; fill: var(--text-dim); }
+.task-graph-edge { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.task-graph-arrow { fill: var(--accent); }

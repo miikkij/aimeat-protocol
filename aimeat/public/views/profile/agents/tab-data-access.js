@@ -5,6 +5,15 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   v1.36.1 -- 2026-09-26 -- A stored value scrolls after 300px again, as main's
+ *     .pf-agd-memory-preview did (Code scroll="medium"; fix pass).
+ *   v1.36.0 -- 2026-09-26 -- Onto the components: the sections are the section Card in a CardGrid, the
+ *     lists the List, the forms TextField / Select / TextArea with their actions, a stored key the
+ *     FoldRow (its arrow → / ↓ where main drew ▶ / ▼, the kit's fold arrow: a unification), the value the
+ *     scrolling Code block, the pictures the ImageStrip, the scope the Box. The file writes no class.
+ *     Put back from main: an area's access and a key's visibility in their colours again (read and
+ *     write, public: the fine status; read only, private, owner: the attention status; main's
+ *     pf-agd-area-perm--rw / --ro), and a memory prefix or key in the typewriter face again.
  *   v1.35.0 -- 2026-09-26 -- A stored value is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.34.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.33.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -73,6 +82,18 @@ import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Box } from '/components/Box.js';
+import { List, Row, Name, Desc, Cell, Doors, Panel } from '/components/List.js';
+import { Folds, FoldRow } from '/components/Folds.js';
+import { Action, Actions, Loud, Icon } from '/components/Action.js';
+import { Mark, Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { Row as Line, Space } from '/components/Layout.js';
+import { ImageStrip } from '/components/ImageDeliverable.js';
 
 const html = htm.bind(h);
 
@@ -460,7 +481,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   }
 
   if (loading) {
-    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
+    return html`<${Note} kind="loading">${t('profile.loading')}<//>`;
   }
 
   const hasTags = tags.length > 0;
@@ -480,260 +501,212 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   if (!hasTags && !hasAreas && !hasResources && !hasKeys && !addingTag && !addingArea && !addingPackage && !addingKey) {
     return html`
       <div>
-        <div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
-        <div class="pf-agd-form-actions">
-          <button class="poster-action poster-action--small" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
-          <button class="poster-action poster-action--small" onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
-          <button class="poster-action poster-action--small" onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
-          <button class="poster-action poster-action--small" onClick=${() => setAddingKey(true)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
-        </div>
+        <${Note} kind="quiet">${t('profile.agents.detail.empty.data_access')}<//>
+        <${Actions}>
+          <${Action} small onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}<//>
+          <${Action} small onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}<//>
+          <${Action} small onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}<//>
+          <${Action} small onClick=${() => setAddingKey(true)}>+ ${t('profile.agents.detail.data_access.addKey')}<//>
+        <//>
         <${ConfirmUI} />
       </div>
     `;
   }
 
+  // "none" beside a section's name while it holds nothing (main v1.6.0: an empty section is one line).
+  const none = (empty) => (empty ? html`<${Note} kind="quiet" inline>${t('profile.agents.detail.data_access.noneInline') || 'none'}<//>` : null);
+  // The head of a section: "none" while empty, then its way to add.
+  const headDoors = (empty, door) => html`<${Line} gap="medium" wrap>${none(empty)}${door}<//>`;
+  // Read and write (and a public key) in the fine colour, read only (a private or owner key) in the
+  // attention colour: main's pf-agd-area-perm--rw / --ro.
+  const accessTone = (writable) => (writable ? 'fine' : 'attention');
+  const permOptions = [
+    ['read+write', t('profile.agents.detail.data_access.permReadWrite')],
+    ['read', t('profile.agents.detail.data_access.permReadOnly')],
+  ];
+  // One memory area's form (add, or edit in place): the prefix, then its words, access and doors in one row.
+  const areaForm = ({ key, setKey, desc, setDesc, perm, setPerm, onSave, saveLabel, onCancel }) => html`
+    <${TextField} value=${key} onInput=${setKey} placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')}
+      actions=${html`
+        <${TextField} value=${desc} onInput=${setDesc} placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
+        <${Select} fit value=${perm} onChange=${setPerm} options=${permOptions} />
+        <${Loud} control onClick=${onSave}>${saveLabel}<//>
+        <${Action} small onClick=${onCancel}>${t('common.cancel')}<//>`} />`;
+
   return html`
-    <div class="pf-agd-card-grid">
+    <div>
+    <${CardGrid} cols="sections">
       <!-- SHARED TAGS -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
-          ${tags.length === 0 && !addingTag && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="poster-action poster-action--small" onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
-        </div>
-        ${addingTag && html`
-          <div class="pf-agd-form-field pf-agd-tag-input-row">
-            <input class="og-input" type="text" value=${newTag} onInput=${(e) => setNewTag(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
-                   onKeyDown=${(e) => e.key === 'Enter' && handleAddTag()} />
-            <button class="poster-slab poster-slab--control" onClick=${handleAddTag}>${t('common.add')}</button>
-          </div>
-        `}
-        ${tags.length > 0 && html`<div class="listing listing--cols listing--name-desc-doors">${tags.map(tag => {
+      <${Card} tone="section" title=${t('profile.agents.detail.data_access.sharedTagsTitle')}
+        aside=${headDoors(tags.length === 0 && !addingTag,
+          html`<${Action} small onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}<//>`)}>
+        ${addingTag && html`<${Space} below="small">
+          <${TextField} value=${newTag} onInput=${setNewTag} onEnter=${handleAddTag}
+            placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
+            actions=${html`<${Loud} control onClick=${handleAddTag}>${t('common.add')}<//>`} />
+        <//>`}
+        ${tags.length > 0 && html`<${List} cols="name-desc-doors" keepCols>${tags.map(tag => {
           const shared = getSharedWith(tag);
           return html`
-            <div key=${tag} class="listing-row">
-              <div class="listing-name"><span class="poster-chip">[${tag}]</span></div>
-              <div class="listing-desc"><code class="code-inline pf-agd-tag-prefix">agents.tag.${tag}.*</code>
-                ${shared.length > 0
+            <${Row} key=${tag}>
+              <${Name}><${Mark}>[${tag}]<//><//>
+              <${Desc}><${Code}>agents.tag.${tag}.*<//> ${shared.length > 0
                   ? `${t('profile.agents.detail.data_access.with')}: ${shared.map(a => a.name).join(', ')}`
                   : t('profile.agents.detail.data_access.onlyYou')}
-              </div>
-              <div class="listing-doors"><button class="poster-icon poster-icon--small" onClick=${() => handleRemoveTag(tag)}>x</button></div>
-            </div>
+              <//>
+              <${Doors}><${Icon} small onClick=${() => handleRemoveTag(tag)}>x<//><//>
+            <//>
           `;
-        })}</div>`}
-        ${(tags.length > 0 || addingTag) && html`<div class="poster-hint pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>`}
-      </div>
+        })}<//>`}
+        ${(tags.length > 0 || addingTag) && html`<${Note}>${t('profile.agents.detail.data_access.tagsHelp')}<//>`}
+      <//>
 
 
       <!-- MEMORY AREAS -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
-          ${!hasAreas && !addingArea && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="poster-action poster-action--small" onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
-        </div>
-        ${addingArea && html`
-          <div class="pf-agd-area-form">
-            <input class="og-input" type="text" value=${newAreaKey} onInput=${(e) => setNewAreaKey(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
-            <input class="og-input" type="text" value=${newAreaDesc} onInput=${(e) => setNewAreaDesc(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
-            <select class="select-field" value=${newAreaPerm} onChange=${(e) => setNewAreaPerm(e.target.value)}>
-              <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
-              <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
-            </select>
-            <button class="poster-slab poster-slab--control" onClick=${handleAddArea}>${t('profile.agents.detail.data_access.addArea')}</button>
-            <button class="poster-action poster-action--small" onClick=${() => setAddingArea(false)}>${t('common.cancel')}</button>
-          </div>
-        `}
-        ${hasAreas ? html`<div class="listing listing--cols listing--name-desc-state-doors">${memoryAreas.map((area, idx) => (
+      <${Card} tone="section" title=${t('profile.agents.detail.data_access.memoryAreasTitle')}
+        aside=${headDoors(!hasAreas && !addingArea,
+          html`<${Action} small onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}<//>`)}>
+        ${addingArea && html`<${Space} below="small">${areaForm({
+          key: newAreaKey, setKey: setNewAreaKey, desc: newAreaDesc, setDesc: setNewAreaDesc,
+          perm: newAreaPerm, setPerm: setNewAreaPerm, onSave: handleAddArea,
+          saveLabel: t('profile.agents.detail.data_access.addArea'), onCancel: () => setAddingArea(false),
+        })}<//>`}
+        ${hasAreas ? html`<${List} cols="name-desc-state-doors" keepCols>${memoryAreas.map((area, idx) => (
           editingAreaIdx === idx ? html`
-            <div key=${'edit-' + idx} class="listing-row is-open"><div class="listing-open poster-box poster-box--raised"><div class="pf-agd-area-form">
-              <input class="og-input" type="text" value=${editAreaKey} onInput=${(e) => setEditAreaKey(e.target.value)}
-                     placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
-              <input class="og-input" type="text" value=${editAreaDesc} onInput=${(e) => setEditAreaDesc(e.target.value)}
-                     placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
-              <select class="select-field" value=${editAreaPerm} onChange=${(e) => setEditAreaPerm(e.target.value)}>
-                <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
-                <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
-              </select>
-              <button class="poster-slab poster-slab--control" onClick=${() => handleSaveArea(idx)}>${t('common.save')}</button>
-              <button class="poster-action poster-action--small" onClick=${cancelEditArea}>${t('common.cancel')}</button>
-            </div></div></div>
+            <${Row} key=${'edit-' + idx} open><${Panel}>${areaForm({
+              key: editAreaKey, setKey: setEditAreaKey, desc: editAreaDesc, setDesc: setEditAreaDesc,
+              perm: editAreaPerm, setPerm: setEditAreaPerm, onSave: () => handleSaveArea(idx),
+              saveLabel: t('common.save'), onCancel: cancelEditArea,
+            })}<//><//>
           ` : html`
-            <div key=${area.key_prefix || area.key || idx} class="listing-row">
-              <div class="listing-name">${area.key_prefix || area.key || area}</div>
-              <div class="listing-desc">${area.description || ''}</div>
-              <div><span class="poster-chip">
+            <${Row} key=${area.key_prefix || area.key || idx}>
+              <${Name} asKey>${area.key_prefix || area.key || area}<//>
+              <${Desc}>${area.description || ''}<//>
+              <${Cell}><${Mark} kind="status" tone=${accessTone(area.access !== 'read')}>
                 ${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}
-              </span></div>
-              <div class="listing-doors">
-                <button class="poster-action poster-action--small poster-action--row" onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}</button>
-                <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}</button>
-              </div>
-            </div>
+              <//><//>
+              <${Doors}>
+                <${Action} small row onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}<//>
+                <${Action} small row tone="danger" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}<//>
+              <//>
+            <//>
           `
-        ))}</div>` : null}
-      </div>
+        ))}<//>` : null}
+      <//>
 
       <!-- KNOWLEDGE PACKAGES -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
-          ${!hasResources && !addingPackage && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="poster-action poster-action--small" onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
-        </div>
-        ${addingPackage && html`
-          <div class="pf-agd-area-form">
-            <input class="og-input" type="text" value=${newPkgName} onInput=${(e) => setNewPkgName(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.packageNamePlaceholder')} />
-            <input class="og-input" type="text" value=${newPkgDesc} onInput=${(e) => setNewPkgDesc(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.packageDescPlaceholder')} />
-            <button class="poster-slab poster-slab--control" onClick=${handleLinkPackage}>${t('profile.agents.detail.data_access.linkPackage')}</button>
-            <button class="poster-action poster-action--small" onClick=${() => setAddingPackage(false)}>${t('common.cancel')}</button>
-          </div>
-        `}
-        ${hasResources ? html`<div class="listing listing--cols listing--name-desc-doors">${resources.map(res => html`
-          <div key=${res.url || res.name || res} class="listing-row">
-            <div class="listing-name">${res.name || res.url || res}</div>
-            <div class="listing-desc">${res.description || ''}</div>
-            <div class="listing-doors">${(res.documentCount || res.count) ? html`<span class="poster-count poster-count--tally">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}</span>` : ''}</div>
-          </div>
-        `)}</div>` : null}
-      </div>
+      <${Card} tone="section" title=${t('profile.agents.detail.data_access.knowledgeTitle')}
+        aside=${headDoors(!hasResources && !addingPackage,
+          html`<${Action} small onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}<//>`)}>
+        ${addingPackage && html`<${Space} below="small">
+          <${TextField} value=${newPkgName} onInput=${setNewPkgName} placeholder=${t('profile.agents.detail.data_access.packageNamePlaceholder')}
+            actions=${html`
+              <${TextField} value=${newPkgDesc} onInput=${setNewPkgDesc} placeholder=${t('profile.agents.detail.data_access.packageDescPlaceholder')} />
+              <${Loud} control onClick=${handleLinkPackage}>${t('profile.agents.detail.data_access.linkPackage')}<//>
+              <${Action} small onClick=${() => setAddingPackage(false)}>${t('common.cancel')}<//>`} />
+        <//>`}
+        ${hasResources ? html`<${List} cols="name-desc-doors" keepCols>${resources.map(res => html`
+          <${Row} key=${res.url || res.name || res}>
+            <${Name}>${res.name || res.url || res}<//>
+            <${Desc}>${res.description || ''}<//>
+            <${Doors}>${(res.documentCount || res.count) ? html`<${Mark} kind="count" tone="tally">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}<//>` : ''}<//>
+          <//>
+        `)}<//>` : null}
+      <//>
 
       <!-- SKILLS (registry refs — distinct from knowledge packages) -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.skillsTitle')}</span>
-          ${skillLinks.length === 0 && !addingSkill && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="poster-action poster-action--small" onClick=${openSkillPicker}>+ ${t('profile.agents.detail.data_access.linkSkill')}</button>
-        </div>
-        ${addingSkill && html`
-          <div class="pf-agd-area-form">
-            ${skillLibrary === null ? html`<span class="poster-quiet loading-mark">${t('common.loading') || '...'}</span>` : html`
-              <select class="select-field" value=${selectedSkillRef} onChange=${(e) => setSelectedSkillRef(e.target.value)}>
-                ${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? []), ...(skillLibrary.workspace ?? [])]
-                  .filter(s => !skillLinks.some(l => l.ref === s.ref))
-                  .map(s => html`<option key=${s.ref} value=${s.ref}>${s.name} (${s.scope}) — ${s.description.slice(0, 60)}</option>`)}
-              </select>
-              <button class="poster-slab poster-slab--control" disabled=${!selectedSkillRef} onClick=${handleLinkSkill}>${t('profile.agents.detail.data_access.linkSkill')}</button>
-            `}
-            <button class="poster-action poster-action--small" onClick=${() => setAddingSkill(false)}>${t('common.cancel')}</button>
-          </div>
-        `}
-        ${skillLinks.length > 0 && html`<div class="listing listing--cols listing--name-desc-doors">${skillLinks.map(link => html`
-          <div key=${link.ref} class="listing-row">
-            <div class="listing-name">${link.name}</div>
-            <div class="listing-desc">${link.description || link.ref}</div>
-            <div class="listing-doors">
-              <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}</button>
-            </div>
-          </div>
-        `)}</div>`}
-        ${skillLinks.length > 0 && html`<div class="poster-hint pf-agd-help-text">${t('profile.agents.detail.data_access.skillsHelp')}</div>`}
-      </div>
+      <${Card} tone="section" title=${t('profile.agents.detail.data_access.skillsTitle')}
+        aside=${headDoors(skillLinks.length === 0 && !addingSkill,
+          html`<${Action} small onClick=${openSkillPicker}>+ ${t('profile.agents.detail.data_access.linkSkill')}<//>`)}>
+        ${addingSkill && html`<${Space} below="small"><${Line} wrap>
+          ${skillLibrary === null ? html`<${Note} kind="loading" inline>${t('common.loading') || '...'}<//>` : html`
+            <${Select} fit value=${selectedSkillRef} onChange=${setSelectedSkillRef}
+              options=${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? []), ...(skillLibrary.workspace ?? [])]
+                .filter(s => !skillLinks.some(l => l.ref === s.ref))
+                .map(s => [s.ref, `${s.name} (${s.scope}) — ${s.description.slice(0, 60)}`])} />
+            <${Loud} control disabled=${!selectedSkillRef} onClick=${handleLinkSkill}>${t('profile.agents.detail.data_access.linkSkill')}<//>
+          `}
+          <${Action} small onClick=${() => setAddingSkill(false)}>${t('common.cancel')}<//>
+        <//><//>`}
+        ${skillLinks.length > 0 && html`<${List} cols="name-desc-doors" keepCols>${skillLinks.map(link => html`
+          <${Row} key=${link.ref}>
+            <${Name}>${link.name}<//>
+            <${Desc}>${link.description || link.ref}<//>
+            <${Doors}>
+              <${Action} small row tone="danger" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}<//>
+            <//>
+          <//>
+        `)}<//>`}
+        ${skillLinks.length > 0 && html`<${Note}>${t('profile.agents.detail.data_access.skillsHelp')}<//>`}
+      <//>
 
       <!-- STORED MEMORY KEYS -->
-      <div class="pf-agd-data-section pf-agd-card pf-agd-card--full poster-row--thing">
-          <div class="pf-agd-section-header">
-            <span class="pf-agd-section-title sub-heading">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
-            ${!hasKeys && !addingKey && html`<span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-            <div class="pf-agd-keys-controls">
-              ${hasKeys && html`
-                <label class="poster-label">${t('profile.agents.detail.data_access.sortBy')}</label>
-                <select class="select-field" value=${keySortField} onChange=${(e) => setKeySortField(e.target.value)}>
-                  <option value="updated">${t('profile.agents.detail.data_access.sortUpdated')}</option>
-                  <option value="created">${t('profile.agents.detail.data_access.sortCreated')}</option>
-                </select>
-                <button class="poster-icon poster-icon--small" title=${keySortDir === 'desc' ? t('profile.agents.detail.data_access.sortNewestFirst') : t('profile.agents.detail.data_access.sortOldestFirst')}
-                        onClick=${() => setKeySortDir(keySortDir === 'desc' ? 'asc' : 'desc')}>
-                  ${keySortDir === 'desc' ? '↓' : '↑'}
-                </button>
-              `}
-              <button class="poster-action poster-action--small" onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
-            </div>
-          </div>
-          ${addingKey && html`
-            <div class="pf-agd-area-form pf-agd-keyadd-form">
-              <input class="og-input" type="text" value=${newKeyName} onInput=${(e) => setNewKeyName(e.target.value)}
-                     placeholder=${t('profile.agents.detail.data_access.keyNamePlaceholder')} />
-              <select class="select-field" value=${newKeyVis} onChange=${(e) => setNewKeyVis(e.target.value)}>
-                <option value="private">private</option>
-                <option value="owner">owner</option>
-                <option value="public">public</option>
-              </select>
-              <textarea class="og-textarea pf-agd-memory-edit" value=${newKeyValue}
-                        onInput=${(e) => setNewKeyValue(e.target.value)}
-                        placeholder=${t('profile.agents.detail.data_access.keyValuePlaceholder')}
-                        disabled=${creatingKey}></textarea>
-              <div class="pf-agd-memory-actions">
-                <button class="poster-slab poster-slab--control" disabled=${creatingKey || !newKeyName.trim()} onClick=${handleCreateKey}>
-                  ${creatingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
-                </button>
-                <button class="poster-action poster-action--small" disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}</button>
-              </div>
-            </div>
+      <${Card} tone="section" wide title=${t('profile.agents.detail.data_access.storedKeysTitle')}
+        aside=${headDoors(!hasKeys && !addingKey, html`
+          ${hasKeys && html`
+            <${Label}>${t('profile.agents.detail.data_access.sortBy')}<//>
+            <${Select} fit ariaLabel=${t('profile.agents.detail.data_access.sortBy')} value=${keySortField} onChange=${setKeySortField}
+              options=${[['updated', t('profile.agents.detail.data_access.sortUpdated')], ['created', t('profile.agents.detail.data_access.sortCreated')]]} />
+            <${Icon} small label=${keySortDir === 'desc' ? t('profile.agents.detail.data_access.sortNewestFirst') : t('profile.agents.detail.data_access.sortOldestFirst')}
+                    onClick=${() => setKeySortDir(keySortDir === 'desc' ? 'asc' : 'desc')}>
+              ${keySortDir === 'desc' ? '↓' : '↑'}
+            <//>
           `}
-          ${sortedKeys.map(mk => html`
-            <div key=${mk.key}>
-              <button type="button" class="og-fold og-fold--event" aria-expanded=${expandedKey === mk.key} onClick=${() => toggleExpandKey(mk)}>
-                <b class="pf-agd-key-name">${mk.key}</b>
-                <span class="poster-time pf-agd-key-meta">
-                  ${mk.createdAt ? html`<span title=${fmtDateTime(mk.createdAt)}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}</span>` : ''}
-                  ${mk.updatedAt ? html`<span title=${fmtDateTime(mk.updatedAt)}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}</span>` : ''}
-                </span>
-                <span class="poster-chip">${mk.visibility}</span>
-                <span class="og-fold-arrow">${expandedKey === mk.key ? '↓' : '→'}</span>
-              </button>
-              ${expandedKey === mk.key && html`
-                <div class="pf-agd-memory-detail">
+          <${Action} small onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}<//>`)}>
+          ${addingKey && html`<${Space} below="small"><${Fields}>
+            <${TextField} value=${newKeyName} onInput=${setNewKeyName}
+              placeholder=${t('profile.agents.detail.data_access.keyNamePlaceholder')} />
+            <${Select} value=${newKeyVis} onChange=${setNewKeyVis} options=${['private', 'owner', 'public']} />
+            <${TextArea} rows=${5} value=${newKeyValue} onInput=${setNewKeyValue}
+              placeholder=${t('profile.agents.detail.data_access.keyValuePlaceholder')}
+              disabled=${creatingKey} />
+            <${FormActions}>
+              <${Loud} control disabled=${creatingKey || !newKeyName.trim()} onClick=${handleCreateKey}>
+                ${creatingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
+              <//>
+              <${Action} small disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}<//>
+            <//>
+          <//><//>`}
+          <${Folds}>${sortedKeys.map(mk => html`
+            <${FoldRow} key=${mk.key} name=${mk.key} isKey open=${expandedKey === mk.key} onClick=${() => toggleExpandKey(mk)}
+              right=${html`${mk.createdAt ? html`<${Mark} kind="time" title=${fmtDateTime(mk.createdAt)}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}<//> ` : ''}${
+                mk.updatedAt ? html`<${Mark} kind="time" title=${fmtDateTime(mk.updatedAt)}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}<//> ` : ''}${
+                html`<${Mark} kind="status" tone=${accessTone(mk.visibility === 'public')}>${mk.visibility}<//>`}`}
+              body=${expandedKey === mk.key ? html`
+                <${Space} above="tight" below="small">
                   ${editingKey === mk.key ? html`
-                    <textarea class="og-textarea pf-agd-memory-edit" value=${editValue}
-                              onInput=${(e) => setEditValue(e.target.value)}
-                              disabled=${savingKey}></textarea>
-                    <div class="pf-agd-memory-actions">
-                      <button class="poster-slab poster-slab--control" disabled=${savingKey} onClick=${() => handleSaveKey(mk)}>
+                    <${TextArea} rows=${5} value=${editValue} onInput=${setEditValue} disabled=${savingKey} />
+                    <${FormActions}>
+                      <${Loud} control disabled=${savingKey} onClick=${() => handleSaveKey(mk)}>
                         ${savingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
-                      </button>
-                      <button class="poster-action poster-action--small" disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}</button>
-                    </div>
+                      <//>
+                      <${Action} small disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}<//>
+                    <//>
                   ` : html`
-                    ${(() => {
-                      const imgs = extractImageUrls(expandedValue);
-                      return imgs.length ? html`
-                        <div class="imgd-strip">
-                          ${imgs.map(u => html`
-                            <a key=${u} href=${u} target="_blank" rel="noopener noreferrer"
-                               class="imgd" title=${t('profile.agents.detail.data_access.openImageFull')}>
-                              <img class="imgd-thumb" src=${u} loading="lazy"
-                                   alt=${t('profile.agents.detail.data_access.imagePreviewAlt')} />
-                            </a>
-                          `)}
-                        </div>
-                      ` : null;
-                    })()}
-                    <pre class="code-block pf-agd-memory-preview">${expandedValue}</pre>
-                    <div class="pf-agd-memory-actions">
-                      <button class="poster-action poster-action--small" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}</button>
-                      <button class="poster-action poster-action--small poster-action--danger" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}</button>
-                    </div>
+                    <${ImageStrip} images=${extractImageUrls(expandedValue).map(u => ({
+                      url: u,
+                      alt: t('profile.agents.detail.data_access.imagePreviewAlt'),
+                      title: t('profile.agents.detail.data_access.openImageFull'),
+                    }))} />
+                    <${Code} block scroll="medium">${expandedValue}<//>
+                    <${FormActions}>
+                      <${Action} small onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}<//>
+                      <${Action} small tone="danger" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}<//>
+                    <//>
                   `}
-                </div>
-              `}
-            </div>
-          `)}
-      </div>
+                <//>
+              ` : null} />
+          `)}<//>
+      <//>
+    <//>
 
       <!-- EFFECTIVE SCOPE SUMMARY -->
-      <div class="pf-agd-scope-summary poster-box pf-agd-card--full">
-        ${t('profile.agents.detail.data_access.effectiveScope')}:\n${
+      <${Box}>
+        <${Code} block>${`${t('profile.agents.detail.data_access.effectiveScope')}:\n${
           [...memoryAreas.map(a => a.key_prefix || a.key || a), ...tags.map(tag => `agents.tag.${tag}.*`), 'agents.shared.index'].join(', ')
-        }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
-        <div class="poster-hint pf-agd-scope-footer">${t('profile.agents.detail.data_access.scopeFooter')}</div>
-      </div>
+        }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}`}<//>
+        <${Note}>${t('profile.agents.detail.data_access.scopeFooter')}<//>
+      <//>
 
       <${ConfirmUI} />
     </div>

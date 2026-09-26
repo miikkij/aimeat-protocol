@@ -12,9 +12,15 @@
  *   where it was asked. PUT /v1/openrouter/settings is a partial update, so per-section saving needs
  *   no server change.
  * @structure OpenRouterSettings (container + state) · SttTestPanel · ParamsSection ·
- *   openrouter/model-picker.js · openrouter/pricing.js · openrouter/budget-panel.js
+ *   components/ModelPicker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v3.19.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the panel
+ *     (Box), its sections (Card section), the fields (TextField, Select, Check radios in a Field group, the
+ *     model pickers from components/ModelPicker.js, which replaces openrouter/model-picker.js), the ways on
+ *     (Loud, Action, Actions), the messages and hints (Note), the roles' fold (Tab fold, open state kept here as
+ *     the details element's was), the status (Mark). The API key keeps main's look: typed hidden with no eye,
+ *     password managers kept out (TextField unmanaged). The page writes no class.
  *   v3.18.0 -- 2026-09-26 -- The provider's radio dots and the retry check box carry the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v3.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v3.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -70,9 +76,21 @@ import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { swallowed } from '/js/swallowed.js';
-import { ModelPicker } from './openrouter/model-picker.js';
+import { ModelPicker } from '/components/ModelPicker.js';
 import { AiAppsBudgetPanel } from './openrouter/budget-panel.js';
 import { FoldSection } from '/components/FoldSection.js';
+import { Box } from '/components/Box.js';
+import { Card } from '/components/Card.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Tab } from '/components/Tabs.js';
+import { Row, Stack, Space, Split } from '/components/Layout.js';
+import { Spinner } from '/components/Spinner.js';
 
 /** Language hints offered for transcription. Auto-detect is first and is the right answer for
  *  mixed-language speech; a hint measurably helps when the language is known. */
@@ -312,152 +330,129 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
   const pickerProps = { models, isOpenRouter, disabled: !keyed };
 
   return html`
-    <div class="pf-or-wrapper">
+    <${Space} below="large">
       <${FoldSection} num="" title=${t('profile.openrouter.title')} open=${!collapsed} onToggle=${() => setCollapsed(!collapsed)}
-        sub=${html`<span class=${`poster-status ${hasApiKey ? 'poster-status--fine' : 'poster-status--off'}`}>${hasApiKey ? t('profile.openrouter.statusReady') : t('profile.openrouter.statusNoKey')}</span>`}>
-        <div class="pf-or-panel poster-box">
+        sub=${html`<${Mark} kind="status" tone=${hasApiKey ? 'fine' : 'off'}>${hasApiKey ? t('profile.openrouter.statusReady') : t('profile.openrouter.statusNoKey')}<//>`}>
+        <${Box}>
 
           <!-- ── 0. Why an own key — the motivation the panel never carried. A brand-new person
                arrives here from the chat's payer line without knowing what OpenRouter is; the
                three sentences answer why, what it costs, and what to pick first. -->
           ${!hasApiKey && html`
-            <section class="pf-or-section poster-row--thing pf-or-why">
-              <p class="og-lead">${t('profile.openrouter.whyLead')}</p>
-              <p class="poster-hint">${t('profile.openrouter.whyCost')}</p>
-              <p class="poster-hint">${t('profile.openrouter.whyModel')}</p>
-            </section>`}
+            <${Card} tone="section">
+              <${Note} kind="lead">${t('profile.openrouter.whyLead')}<//>
+              <${Note}>${t('profile.openrouter.whyCost')}<//>
+              <${Note}>${t('profile.openrouter.whyModel')}<//>
+            <//>`}
 
           <!-- ── 1. Connection ───────────────────────────────── -->
-          <section class="pf-or-section poster-row--thing">
-            <h4 class="pf-or-section-title">${t('profile.openrouter.section.connection')}</h4>
-
-            <div class="pf-or-field">
-              <label class="poster-label pf-or-label">${t('profile.openrouter.provider')}</label>
-              <div class="pf-or-radio-group">
+          <${Card} tone="section" title=${t('profile.openrouter.section.connection')}>
+            <${Fields}>
+              <${Field} label=${t('profile.openrouter.provider')} group>
                 ${['openrouter', 'lmstudio', 'custom'].map(p => html`
-                  <label class="pf-or-radio-label check-line" key=${p}>
-                    <input type="radio" name="ai-provider" value=${p} checked=${provider === p}
-                      onChange=${() => {
-                        setProvider(p);
-                        if (p === 'lmstudio') setBaseUrl('http://localhost:1234/v1');
-                        else if (p === 'openrouter') setBaseUrl('');
-                      }} />
-                    ${t('profile.openrouter.provider_' + p)}
-                  </label>`)}
-              </div>
-            </div>
+                  <${Check} radio key=${p} name="ai-provider" value=${p} checked=${provider === p}
+                    onChange=${() => {
+                      setProvider(p);
+                      if (p === 'lmstudio') setBaseUrl('http://localhost:1234/v1');
+                      else if (p === 'openrouter') setBaseUrl('');
+                    }}>${t('profile.openrouter.provider_' + p)}<//>`)}
+              <//>
 
-            ${!isOpenRouter && html`
-              <div class="pf-or-field">
-                <label class="poster-label pf-or-label">${t('profile.openrouter.baseUrl')}</label>
-                <input type="url" class="og-input" value=${baseUrl}
+              ${!isOpenRouter && html`
+                <${TextField} type="url" label=${t('profile.openrouter.baseUrl')} value=${baseUrl}
                   placeholder=${t('profile.openrouter.baseUrl_hint')}
-                  onInput=${e => setBaseUrl(e.target.value)} />
-              </div>`}
+                  onInput=${setBaseUrl} />`}
 
-            <div class="pf-or-field">
-              <label class="poster-label pf-or-label">${t('profile.openrouter.apiKey')}</label>
-              <div class="pf-or-key-row">
-                <input type="password" autocomplete="off" data-1p-ignore data-lpignore="true"
-                  class="og-input pf-or-key-input"
+              <${Stack}>
+                <${TextField} unmanaged label=${t('profile.openrouter.apiKey')}
                   placeholder=${hasApiKey ? t('profile.openrouter.apiKeyMasked') : t('profile.openrouter.apiKeyPlaceholder')}
-                  value=${apiKey} onInput=${e => setApiKey(e.target.value)} />
-                <button class="poster-slab poster-slab--control" onClick=${saveKey} disabled=${savingKey}>
-                  ${savingKey ? '…' : t('profile.openrouter.saveKey')}
-                </button>
-                ${hasApiKey && html`
-                  <button class="poster-action poster-action--small" onClick=${handleTest} disabled=${testing}>
-                    ${testing ? html`<span class="spinner"></span>` : ''}${t('profile.openrouter.testConnection')}
-                  </button>
-                  <button class="poster-action poster-action--small poster-action--danger" onClick=${handleDelete}>
-                    ${t('profile.openrouter.delete')}
-                  </button>`}
-              </div>
-              ${connMsg && html`<div class=${`form-message ${connMsg.error ? 'form-message--error' : ''}`}>${connMsg.text}</div>`}
-              ${isOpenRouter && html`
-                <div class="pf-or-links">
-                  <a class="poster-action poster-action--small poster-action--lower" href="https://openrouter.ai/keys" target="_blank" rel="noopener">${t('profile.openrouter.getKeyLink')} ↗</a>
-                  <a class="poster-action poster-action--small poster-action--lower" href="https://openrouter.ai/credits" target="_blank" rel="noopener">${t('profile.openrouter.creditsLink')} ↗</a>
-                </div>`}
-            </div>
-          </section>
+                  value=${apiKey} onInput=${setApiKey}
+                  actions=${html`
+                    <${Loud} control onClick=${saveKey} disabled=${savingKey}>
+                      ${savingKey ? '…' : t('profile.openrouter.saveKey')}
+                    <//>
+                    ${hasApiKey && html`
+                      <${Action} small onClick=${handleTest} disabled=${testing}>
+                        ${testing ? html`<${Spinner} />` : ''}${t('profile.openrouter.testConnection')}
+                      <//>
+                      <${Action} small tone="danger" onClick=${handleDelete}>
+                        ${t('profile.openrouter.delete')}
+                      <//>`}`} />
+                ${connMsg && html`<${Note} kind="message" error=${connMsg.error}>${connMsg.text}<//>`}
+                ${isOpenRouter && html`
+                  <${Actions}>
+                    <${Action} small soft href="https://openrouter.ai/keys" newTab>${t('profile.openrouter.getKeyLink')} ↗<//>
+                    <${Action} small soft href="https://openrouter.ai/credits" newTab>${t('profile.openrouter.creditsLink')} ↗<//>
+                  <//>`}
+              <//>
+            <//>
+          <//>
 
           <!-- ── 2. Models ───────────────────────────────────── -->
-          <section class="pf-or-section poster-row--thing">
-            <h4 class="pf-or-section-title">${t('profile.openrouter.section.models')}</h4>
-            <div class="pf-or-models-head">
-              <button type="button" class="poster-action poster-action--small" onClick=${loadModels}
-                      disabled=${modelsLoading || !keyed}>
+          <${Card} tone="section" title=${t('profile.openrouter.section.models')}>
+            <${Row} wrap below="medium">
+              <${Action} small onClick=${loadModels} disabled=${modelsLoading || !keyed}>
                 ${t('profile.openrouter.modelsRefresh')}${models.length ? ` (${models.length})` : ''}
-              </button>
-              <span class=${modelsError ? 'form-message form-message--error' : 'poster-hint'}>
-                ${modelsError || t('profile.openrouter.modelsHint')}
-              </span>
-            </div>
+              <//>
+              ${modelsError
+                ? html`<${Note} kind="message" error>${modelsError}<//>`
+                : html`<${Note} inline>${t('profile.openrouter.modelsHint')}<//>`}
+            <//>
 
-            ${modelsLoading ? html`<div class="poster-quiet loading-mark pf-or-loading">${t('profile.loading')}</div>` : html`
-              <div class="pf-or-field">
-                <label class="poster-label pf-or-label">${t('profile.openrouter.model.default')}</label>
-                <${ModelPicker} ...${pickerProps} value=${model} onChange=${setModel} modality="chat"
-                  allowCustom=${!isOpenRouter} />
-              </div>
+            ${modelsLoading ? html`<${Note} kind="loading">${t('profile.loading')}<//>` : html`
+              <${Fields}>
+                <${ModelPicker} ...${pickerProps} label=${t('profile.openrouter.model.default')}
+                  value=${model} onChange=${setModel} modality="chat" allowCustom=${!isOpenRouter} />
 
-              <details class="pf-or-roles" onToggle=${(e) => setRolesOpen(e.currentTarget.open)}>
-                <summary class=${`poster-tab poster-tab--fold pf-or-roles-summary ${rolesOpen ? 'is-on' : ''}`}>${t('profile.openrouter.model.rolesSummary')}</summary>
-                <div class="pf-or-field">
-                  <label class="poster-label pf-or-label">${t('profile.openrouter.model.reasoning')}</label>
-                  <${ModelPicker} ...${pickerProps} value=${reasoningModel} onChange=${setReasoningModel}
-                    modality="chat" allowNone=${true} allowCustom=${!isOpenRouter} />
-                  <span class="poster-hint">${t('profile.openrouter.model.reasoning_hint')}</span>
-                </div>
-                <div class="pf-or-field">
-                  <label class="poster-label pf-or-label">${t('profile.openrouter.model.execution')}</label>
-                  <${ModelPicker} ...${pickerProps} value=${executionModel} onChange=${setExecutionModel}
-                    modality="chat" allowNone=${true} allowCustom=${!isOpenRouter} />
-                  <span class="poster-hint">${t('profile.openrouter.model.execution_hint')}</span>
-                </div>
-              </details>
+                <${Stack}>
+                  <${Tab} tone="fold" on=${rolesOpen} expanded=${rolesOpen}
+                    onClick=${() => setRolesOpen(o => !o)}>${t('profile.openrouter.model.rolesSummary')}<//>
+                  ${rolesOpen && html`
+                    <${Fields}>
+                      <${ModelPicker} ...${pickerProps} label=${t('profile.openrouter.model.reasoning')}
+                        hint=${t('profile.openrouter.model.reasoning_hint')}
+                        value=${reasoningModel} onChange=${setReasoningModel}
+                        modality="chat" allowNone=${true} allowCustom=${!isOpenRouter} />
+                      <${ModelPicker} ...${pickerProps} label=${t('profile.openrouter.model.execution')}
+                        hint=${t('profile.openrouter.model.execution_hint')}
+                        value=${executionModel} onChange=${setExecutionModel}
+                        modality="chat" allowNone=${true} allowCustom=${!isOpenRouter} />
+                    <//>`}
+                <//>
 
-              <div class="pf-or-field">
-                <label class="poster-label pf-or-label">${t('profile.openrouter.model.vision')}</label>
-                <${ModelPicker} ...${pickerProps} value=${visionModel} onChange=${setVisionModel}
+                <${ModelPicker} ...${pickerProps} label=${t('profile.openrouter.model.vision')}
+                  hint=${t('profile.openrouter.model.vision_hint')}
+                  value=${visionModel} onChange=${setVisionModel}
                   modality="vision" allowNone=${true} allowCustom=${!isOpenRouter}
                   noneLabel=${t('profile.openrouter.model.visionNone')} />
-                <span class="poster-hint">${t('profile.openrouter.model.vision_hint')}</span>
-              </div>
+              <//>
 
-              <div class="pf-or-field pf-or-stt">
-                <label class="poster-label pf-or-label">${t('profile.openrouter.model.stt')}</label>
-                ${sttModels.length === 0 && keyed
-                  ? html`<div class="poster-hint">${t('profile.openrouter.stt.listEmpty')}</div>` : null}
-                <${ModelPicker} models=${sttModels} isOpenRouter=${isOpenRouter} disabled=${!keyed}
-                  value=${sttModel} onChange=${setSttModel} modality="transcription" allowNone=${true}
-                  allowCustom=${!isOpenRouter} noneLabel=${t('profile.openrouter.model.sttNone')} />
-                <span class="poster-hint">${t('profile.openrouter.model.stt_hint')}</span>
+              <${Split}>
+                <${Fields}>
+                  ${sttModels.length === 0 && keyed
+                    ? html`<${Note}>${t('profile.openrouter.stt.listEmpty')}<//>` : null}
+                  <${ModelPicker} models=${sttModels} isOpenRouter=${isOpenRouter} disabled=${!keyed}
+                    label=${t('profile.openrouter.model.stt')} hint=${t('profile.openrouter.model.stt_hint')}
+                    value=${sttModel} onChange=${setSttModel} modality="transcription" allowNone=${true}
+                    allowCustom=${!isOpenRouter} noneLabel=${t('profile.openrouter.model.sttNone')} />
 
-                <div class="pf-or-inline-field">
-                  <label class="poster-label pf-or-label pf-or-label--inline">${t('profile.openrouter.stt.language')}</label>
-                  <select class="select-field pf-or-select--sm" value=${sttLanguage}
-                          onChange=${e => setSttLanguage(e.target.value)}>
-                    ${STT_LANGS.map(code => html`
-                      <option key=${code || 'auto'} value=${code}>
-                        ${code ? t('profile.openrouter.stt.lang_' + code) : t('profile.openrouter.stt.languageAuto')}
-                      </option>`)}
-                  </select>
-                  <span class="poster-hint">${t('profile.openrouter.stt.language_hint')}</span>
-                </div>
+                  <${Select} fit label=${t('profile.openrouter.stt.language')}
+                    hint=${t('profile.openrouter.stt.language_hint')}
+                    value=${sttLanguage} onChange=${setSttLanguage}
+                    options=${STT_LANGS.map(code => [code, code ? t('profile.openrouter.stt.lang_' + code) : t('profile.openrouter.stt.languageAuto')])} />
 
-                <${SttTestPanel} sttModel=${sttModel} sttLanguage=${sttLanguage} />
-              </div>
+                  <${SttTestPanel} sttModel=${sttModel} sttLanguage=${sttLanguage} />
+                <//>
+              <//>
             `}
 
-            <div class="pf-or-actions">
-              <button class="poster-slab poster-slab--control" onClick=${saveModels} disabled=${savingModels}>
+            <${FormActions}>
+              <${Loud} control onClick=${saveModels} disabled=${savingModels}>
                 ${savingModels ? '…' : t('profile.openrouter.saveModels')}
-              </button>
-              ${modelsMsg && html`<span class=${`form-message ${modelsMsg.error ? 'form-message--error' : ''}`}>${modelsMsg.text}</span>`}
-            </div>
-          </section>
+              <//>
+              ${modelsMsg && html`<${Note} kind="message" error=${modelsMsg.error}>${modelsMsg.text}<//>`}
+            <//>
+          <//>
 
           <!-- ── 3. Parameters ───────────────────────────────── -->
           <${ParamsSection}
@@ -470,13 +465,12 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
 
           <!-- ── 4. Budget ───────────────────────────────────── -->
           ${hasApiKey && html`
-            <section class="pf-or-section poster-row--thing">
-              <h4 class="pf-or-section-title">${t('profile.openrouter.section.budget')}</h4>
+            <${Card} tone="section" title=${t('profile.openrouter.section.budget')}>
               <${AiAppsBudgetPanel} />
-            </section>`}
-        </div><//>
+            <//>`}
+        <//><//>
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
 }
 
 /**
@@ -509,28 +503,28 @@ function SttTestPanel({ sttModel, sttLanguage }) {
   }
 
   return html`
-    <div class="pf-or-stt-test">
-      <div class="pf-or-stt-test-head">
-        <${VoiceRecorder} maxSeconds=${30} disabled=${busy || !sttModel}
-          label=${t('profile.openrouter.stt.test')} className="poster-action poster-action--small"
+    <${Stack}>
+      <${Row} wrap>
+        <${VoiceRecorder} small maxSeconds=${30} disabled=${busy || !sttModel}
+          label=${t('profile.openrouter.stt.test')}
           onRecorded=${(file) => run(file)} />
-        ${busy ? html`<span class="poster-hint">${t('profile.openrouter.stt.testing')}</span>` : null}
-        ${!sttModel ? html`<span class="poster-hint">${t('profile.openrouter.stt.testNeedsModel')}</span>` : null}
-      </div>
-      ${error ? html`<div class="form-message form-message--error">${error}</div>` : null}
+        ${busy ? html`<${Note} inline>${t('profile.openrouter.stt.testing')}<//>` : null}
+        ${!sttModel ? html`<${Note} inline>${t('profile.openrouter.stt.testNeedsModel')}<//>` : null}
+      <//>
+      ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${result ? html`
-        <div class="pf-or-stt-result poster-box">
-          <div class="pf-or-stt-text">${result.text || t('profile.openrouter.stt.testSilent')}</div>
-          <div class="pf-or-stt-meta">
+        <${Box} tone="row">
+          ${result.text || t('profile.openrouter.stt.testSilent')}
+          <${Note} kind="meta">
             ${t('profile.openrouter.stt.measured', {
               seconds: (Number(result.seconds) || 0).toFixed(1),
               cost: (Number(result.usage?.cost_usd) || 0).toFixed(6),
             })}
             ${result.usage?.cost_exact === false
-              ? html` <span class="poster-hint">${t('profile.openrouter.stt.costNotReported')}</span>` : null}
-          </div>
-        </div>` : null}
-    </div>`;
+              ? html` <${Note} inline>${t('profile.openrouter.stt.costNotReported')}<//>` : null}
+          <//>
+        <//>` : null}
+    <//>`;
 }
 
 /** Sampling parameters. Collapsed by default: most owners never touch them, and four rarely-used
@@ -543,55 +537,34 @@ function ParamsSection({
   return html`
     <${FoldSection} num="" title=${t('profile.openrouter.section.params')} open=${open} onToggle=${() => setOpen(o => !o)}>
 
-        <div class="pf-or-field">
-          <label class="pf-or-checkbox check-line">
-            <input type="checkbox" checked=${autoRetry} onChange=${e => setAutoRetry(e.target.checked)} />
-            ${t('profile.openrouter.autoRetry')}
-          </label>
-        </div>
+      <${Fields}>
+        <${Check} checked=${autoRetry} onChange=${setAutoRetry}>${t('profile.openrouter.autoRetry')}<//>
 
         ${autoRetry && html`
-          <div class="pf-or-field">
-            <label class="poster-label pf-or-label">${t('profile.openrouter.maxRetries')}</label>
-            <input type="number" class="og-input pf-or-input-sm" min="1" max="10" value=${maxRetries}
-              onInput=${e => setMaxRetries(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))} />
-          </div>`}
+          <${TextField} type="number" size="short" label=${t('profile.openrouter.maxRetries')} min="1" max="10" value=${maxRetries}
+            onInput=${v => setMaxRetries(Math.min(10, Math.max(1, parseInt(v) || 1)))} />`}
 
-        <div class="pf-or-field">
-          <label class="poster-label pf-or-label">${t('profile.openrouter.temperature')}</label>
-          <div class="pf-or-param-row">
-            <input type="number" class="og-input pf-or-input-sm" min="0" max="2" step="0.1"
-              placeholder=${t('profile.openrouter.paramDefault')} value=${temperature}
-              onInput=${e => setTemperature(e.target.value)} />
-            <span class="poster-hint">${t('profile.openrouter.temperature_hint')}</span>
-          </div>
-        </div>
+        <${TextField} type="number" size="short" label=${t('profile.openrouter.temperature')}
+          hint=${t('profile.openrouter.temperature_hint')} min="0" max="2" step="0.1"
+          placeholder=${t('profile.openrouter.paramDefault')} value=${temperature}
+          onInput=${setTemperature} />
 
-        <div class="pf-or-field">
-          <label class="poster-label pf-or-label">${t('profile.openrouter.topP')}</label>
-          <div class="pf-or-param-row">
-            <input type="number" class="og-input pf-or-input-sm" min="0" max="1" step="0.05"
-              placeholder=${t('profile.openrouter.paramDefault')} value=${topP}
-              onInput=${e => setTopP(e.target.value)} />
-            <span class="poster-hint">${t('profile.openrouter.topP_hint')}</span>
-          </div>
-        </div>
+        <${TextField} type="number" size="short" label=${t('profile.openrouter.topP')}
+          hint=${t('profile.openrouter.topP_hint')} min="0" max="1" step="0.05"
+          placeholder=${t('profile.openrouter.paramDefault')} value=${topP}
+          onInput=${setTopP} />
 
-        <div class="pf-or-field">
-          <label class="poster-label pf-or-label">${t('profile.openrouter.maxTokens')}</label>
-          <div class="pf-or-param-row">
-            <input type="number" class="og-input pf-or-input-sm" min="256" max="128000" step="256"
-              placeholder=${t('profile.openrouter.paramDefault')} value=${maxTokens}
-              onInput=${e => setMaxTokens(e.target.value)} />
-            <span class="poster-hint">${t('profile.openrouter.maxTokens_hint')}</span>
-          </div>
-        </div>
+        <${TextField} type="number" size="short" label=${t('profile.openrouter.maxTokens')}
+          hint=${t('profile.openrouter.maxTokens_hint')} min="256" max="128000" step="256"
+          placeholder=${t('profile.openrouter.paramDefault')} value=${maxTokens}
+          onInput=${setMaxTokens} />
+      <//>
 
-        <div class="pf-or-actions">
-          <button class="poster-slab poster-slab--control" onClick=${onSave} disabled=${saving}>
-            ${saving ? '…' : t('profile.openrouter.saveParams')}
-          </button>
-          ${message && html`<span class=${`form-message ${message.error ? 'form-message--error' : ''}`}>${message.text}</span>`}
-        </div>
+      <${FormActions}>
+        <${Loud} control onClick=${onSave} disabled=${saving}>
+          ${saving ? '…' : t('profile.openrouter.saveParams')}
+        <//>
+        ${message && html`<${Note} kind="message" error=${message.error}>${message.text}<//>`}
+      <//>
     <//>`;
 }

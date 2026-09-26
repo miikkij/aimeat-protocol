@@ -1,0 +1,163 @@
+/**
+ * @file css/components/setup-guide.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The per-tool setup guide and the instructions dialog (components/SetupGuide.js): the
+ *   tool picker, the steps, the command, the field table, the notes and the dialog's "where it goes"
+ *   part. The classic look on every page, the MCP page included (Jouni's decision "MCP guide", the
+ *   option classic). All colours are theme tokens.
+ * @structure .setup-guide · -lead · -tools · -tool · -reco · -plans · -warn · -note · -steps · -cmd ·
+ *   -cmd-text · -params · -params-head · -param · -param-label · -param-value · -param-empty ·
+ *   -param-note · -code · -label · -select · -where · -where-head · -where-path · -modal
+ * @usage Linked from spa.html where hello-mcp.css was, after instruction-block.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Moved unchanged out of css/components/hello-mcp.css (v1.5.0) under the
+ *     component's own names: every .ast-* is .setup-guide-*, .ast itself .setup-guide, and
+ *     .ast-tool-reco .setup-guide-reco. hello-mcp.css's history ends there.
+ */
+
+/* ── Per-tool setup guide + the instructions dialog ── */
+.setup-guide { margin: 0.2rem 0 0.4rem; }
+
+.setup-guide-lead {
+  margin: 0 0 0.6rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.setup-guide-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.7rem;
+}
+.setup-guide-tool {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-semibold);
+  font-family: inherit;
+  cursor: pointer;
+}
+.setup-guide-tool--active { border-color: var(--accent); color: var(--accent); }
+/* K2: the tool we point a first-timer at carries a small text badge, never an icon. */
+.setup-guide-reco {
+  font-size: 0.6875rem;
+  font-weight: var(--weight-semibold);
+  color: var(--accent);
+  text-transform: var(--shape-case-label);
+  letter-spacing: calc(var(--shape-tracking-label) * .3);
+}
+/* On a tab it takes the tab's own text colour, which stays readable on the sun of the chosen tab
+   (coral on the sun is not; Jouni's decision "Choice"). */
+.poster-tab .setup-guide-reco { color: inherit; }
+
+.setup-guide-plans, .setup-guide-warn, .setup-guide-note {
+  margin: 0 0 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.setup-guide-warn {
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--warn);
+  background: var(--bg-dim);
+  border-radius: var(--radius-xs);
+}
+
+.setup-guide-steps {
+  margin: 0 0 0.7rem;
+  padding-left: 1.3rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.setup-guide-steps li { margin-bottom: 0.4rem; }
+
+.setup-guide-cmd { margin: 0 0 0.7rem; }
+.setup-guide-cmd-text {
+  margin: 0 0 0.4rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-small);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.setup-guide-params {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.7rem;
+  background: var(--bg-card);
+}
+.setup-guide-params-head {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  text-transform: var(--shape-case-label);
+  letter-spacing: calc(var(--shape-tracking-label) * .6);
+  color: var(--text-muted);
+  margin-bottom: 0.45rem;
+}
+.setup-guide-param { padding: 0.35rem 0; border-top: 1px solid var(--border-subtle, var(--border)); }
+.setup-guide-param:first-of-type { border-top: 0; padding-top: 0; }
+.setup-guide-param-label { font-size: 0.8125rem; font-weight: var(--weight-bold); color: var(--text); }
+.setup-guide-param-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+.setup-guide-param-empty { font-size: 0.8125rem; font-style: italic; color: var(--text-muted); }
+.setup-guide-param-note { margin-top: 0.2rem; font-size: 0.78rem; line-height: 1.5; color: var(--text-dim); }
+
+.setup-guide-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-small);
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0.15rem 0.4rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* "Official instructions" is the action link's more tone (poster.css, Jouni's decision "Small link"). */
+
+.setup-guide-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: var(--weight-semibold);
+  color: var(--text-dim);
+  margin: 0.5rem 0 0.25rem;
+}
+.setup-guide-select { margin-bottom: 0.6rem; }
+
+.setup-guide-where {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+.setup-guide-where-head {
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+.setup-guide-where-path {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.setup-guide-modal { max-width: 720px; }

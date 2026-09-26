@@ -10,6 +10,13 @@
  * @structure secAgents · secBuild · UploadForm · buildAgentAuthoringPrompt · skillPrompt
  * @usage import { secAgents, secBuild } from './build.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): Section,
+ *     the agents and skills Facts (wide) with their Marks, the actions Action (the copies with
+ *     `copy`), the crew editor the aside Note with a Select and a TextArea, the upload label a
+ *     Label, the hints Note. The page writes no class.
+ *   v1.17.0 -- 2026-09-26 -- The upload form is the Field family's components (Fields, FileDrop plain,
+ *     TextArea, TextField secret, FormActions): the page passes words and values; the eye that shows
+ *     the access code is the TextField's own (component plan C5, the family's proof).
  *   2026-09-26 — The upload form's access code is typed hidden, with an eye inside the field that
  *     shows it.
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -33,10 +40,17 @@ import { h } from 'preact';
 import htm from 'htm';
 import { useState, useRef } from 'preact/hooks';
 const html = htm.bind(h);
-import { CopyButton } from '/components/CopyButton.js';
-import { PageSection } from '/components/PageSection.js';
+import { Section } from '/components/Section.js';
 import { a, nameOf, appRef, goTab } from './frame.js';
-import { Hint } from '/components/Hint.js';
+import { Note } from '/components/Note.js';
+import { Facts } from '/components/Facts.js';
+import { Mark, Marks, Label } from '/components/Mark.js';
+import { Space } from '/components/Layout.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { FileDrop } from '/components/FileDrop.js';
+import { Action, Actions } from '/components/Action.js';
 
 /* ── 04 · Agents and skills ───────────────────────────────────────────────────────────────────── */
 
@@ -49,44 +63,45 @@ export function secAgents(ctx) {
   const withSkill = apps.filter((x) => (bound[appRef(x)] || []).length).length;
   const picked = apps.find((x) => x.filename === ctx.agentPick) || null;
   return html`
-    <${PageSection} id="ap-agents" num="04" title=${a('secAgents')} count=${null}>
-      <div class="facts facts--wide ap-kv">
-        <div class="facts-k poster-label">${a('agentsLabel')}</div>
-        <div class="facts-v">
-          ${withAgents.length ? a('agentsSome', { n: withAgents.length }) : a('agentsNone')}
-          <small>${a('agentsNote')}</small>
-          ${withAgents.length ? html`<div class="poster-chips ap-skl">${withAgents.map((x) => html`<span class="poster-chip" key=${appRef(x)}>${nameOf(x)} · ${x.manifest.cortex.agents.length}</span>`)}</div>` : null}
-        </div>
-        <div class="facts-k poster-label">${a('skillsLabel')}</div>
-        <div class="facts-v">
-          ${pairs.length ? a('skillsCount', { apps: withSkill, skills: pairs.length }) : a('skillsNone')}
-          <small>${a('skillsNote', { n: apps.length - withSkill })}</small>
-          ${pairs.length ? html`<div class="poster-chips ap-skl">${pairs.slice(0, 8).map((p) => html`<span class="poster-chip" key=${p.skill}>${p.skill} → ${p.app}</span>`)}${pairs.length > 8 ? html`<span class="poster-chip">${a('more', { n: pairs.length - 8 })}</span>` : null}</div>` : null}
-        </div>
-      </div>
-      <div class="og-doors ap-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => goTab('skills')}>${a('skillsDoor')}</button>
-        <${CopyButton} text=${skillPrompt(apps)} className="poster-action poster-action--small poster-action--lower" label=${a('skillPromptDoor')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setAgentEditorOpen(!ctx.agentEditorOpen)}>${ctx.agentEditorOpen ? a('agentEditClose') : a('agentEditOpen')}</button>
-      </div>
+    <${Section} id="ap-agents" num="04" title=${a('secAgents')} count=${null}>
+      <${Facts} wide flush rows=${[
+        {
+          k: a('agentsLabel'),
+          v: withAgents.length ? a('agentsSome', { n: withAgents.length }) : a('agentsNone'),
+          sub: a('agentsNote'),
+          actions: withAgents.length ? html`<${Marks}>${withAgents.map((x) => html`<${Mark} key=${appRef(x)}>${nameOf(x)} · ${x.manifest.cortex.agents.length}<//>`)}<//>` : null,
+        },
+        {
+          k: a('skillsLabel'),
+          v: pairs.length ? a('skillsCount', { apps: withSkill, skills: pairs.length }) : a('skillsNone'),
+          sub: a('skillsNote', { n: apps.length - withSkill }),
+          actions: pairs.length ? html`<${Marks}>${pairs.slice(0, 8).map((p) => html`<${Mark} key=${p.skill}>${p.skill} → ${p.app}<//>`)}${pairs.length > 8 ? html`<${Mark}>${a('more', { n: pairs.length - 8 })}<//>` : null}<//>` : null,
+        },
+      ]} />
+      <${Space} above="medium">
+        <${Actions}>
+          <${Action} small soft onClick=${() => goTab('skills')}>${a('skillsDoor')}<//>
+          <${Action} small soft copy=${skillPrompt(apps)} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))}>${a('skillPromptDoor')}<//>
+          <${Action} small soft onClick=${() => ctx.setAgentEditorOpen(!ctx.agentEditorOpen)}>${ctx.agentEditorOpen ? a('agentEditClose') : a('agentEditOpen')}<//>
+        <//>
+      <//>
       ${ctx.agentEditorOpen ? html`
-        <div class="ap-panel poster-aside">
-          <p class="og-lead">${a('agentEditHint')}</p>
-          <label class="ap-field">
-            <span class="poster-label">${a('agentEditPick')}</span>
-            <select class="select-field" value=${ctx.agentPick} onChange=${(e) => ctx.pickAgentApp(e.target.value)}>
-              <option value="">–</option>
-              ${apps.map((x) => html`<option key=${x.filename} value=${x.filename}>${nameOf(x)}${x.manifest?.cortex?.agents?.length ? ` · ${x.manifest.cortex.agents.length}` : ''}</option>`)}
-            </select>
-          </label>
-          ${picked ? html`
-            <textarea class="og-textarea ap-json" rows="12" spellcheck="false" value=${ctx.agentJson} onInput=${(e) => ctx.setAgentJson(e.target.value)}></textarea>
-            <div class="og-doors ap-doors">
-              <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'agents'} onClick=${() => ctx.saveAgents(picked)}>${a('agentEditSave')}</button>
-              <${CopyButton} text=${ctx.agentPromptFor(picked)} className="poster-action poster-action--small poster-action--lower" label=${a('agentEditCopy')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))} />
-            </div>
-            <${Hint}>${a('agentClearHint')}<//>` : null}
-        </div>` : null}
+        <${Space} above="small">
+          <${Note} kind="aside">
+            <${Note} kind="lead">${a('agentEditHint')}<//>
+            <${Select} label=${a('agentEditPick')} value=${ctx.agentPick} onChange=${(v) => ctx.pickAgentApp(v)} placeholder="–"
+              options=${apps.map((x) => [x.filename, `${nameOf(x)}${x.manifest?.cortex?.agents?.length ? ` · ${x.manifest.cortex.agents.length}` : ''}`])} />
+            ${picked ? html`
+              <${Space} above="medium"><${TextArea} rows=${12} spellCheck=${false} value=${ctx.agentJson} onInput=${(v) => ctx.setAgentJson(v)} /><//>
+              <${Space} above="medium">
+                <${Actions}>
+                  <${Action} small disabled=${ctx.busy === 'agents'} onClick=${() => ctx.saveAgents(picked)}>${a('agentEditSave')}<//>
+                  <${Action} small soft copy=${ctx.agentPromptFor(picked)} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))}>${a('agentEditCopy')}<//>
+                <//>
+              <//>
+              <${Note}>${a('agentClearHint')}<//>` : null}
+          <//>
+        <//>` : null}
     <//>`;
 }
 
@@ -94,17 +109,17 @@ export function secAgents(ctx) {
 
 export function secBuild(ctx, { formOnly, num }) {
   return html`
-    <${PageSection} id="ap-build" num=${num} title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
+    <${Section} id="ap-build" num=${num} title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
       ${formOnly ? null : html`
-        <div class="og-doors ap-doors ap-doors--top">
-          <${CopyButton} text=${ctx.buildPrompt} className="poster-action poster-action--small" label=${a('promptDoor')} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
-          <a class="poster-action poster-action--small" href="/v1/aimeat-os" target="_blank" rel="noopener">${a('guideDoor')}</a>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => goTab('appdev')}>${a('appdevDoor')}</button>
-        </div>
-        <${Hint}>${a('buildHint')}<//>
-        <span class="poster-label ap-form-label">${a('uploadLabel')}</span>`}
+        <${Actions}>
+          <${Action} small copy=${ctx.buildPrompt} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))}>${a('promptDoor')}<//>
+          <${Action} small href="/v1/aimeat-os" newTab>${a('guideDoor')}<//>
+          <${Action} small soft onClick=${() => goTab('appdev')}>${a('appdevDoor')}<//>
+        <//>
+        <${Note}>${a('buildHint')}<//>
+        <${Space} above="section" below="medium"><${Label} block>${a('uploadLabel')}<//><//>`}
       <${UploadForm} onUpload=${ctx.upload} busy=${ctx.busy === 'upload'} />
-      <${Hint}>${a('uploadHint')}<//>
+      <${Note}>${a('uploadHint')}<//>
     <//>`;
 }
 
@@ -116,35 +131,24 @@ function UploadForm({ onUpload, busy }) {
   const fileRef = useRef(null);
   const shotRef = useRef(null);
   const [desc, setDesc] = useState('');
+  // The access code is typed hidden; the eye inside the field shows it (Jouni, 2026-09-26). The
+  // TextField's `secret` owns the eye, and hides the code again once the form empties it.
   const [code, setCode] = useState('');
-  // The access code is typed hidden; the eye inside the field shows it (Jouni, 2026-09-26).
-  const [showCode, setShowCode] = useState(false);
   const [roadmap, setRoadmap] = useState('');
+  const send = async () => {
+    const ok = await onUpload({ file: fileRef.current?.files?.[0], description: desc, screenshot: shotRef.current?.files?.[0], accessCode: code, roadmap });
+    if (ok) { setDesc(''); setCode(''); setRoadmap(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
+  };
   return html`
-    <div class="ap-form">
-      <label class="ap-field"><span class="poster-label">${a('fileLabel')}</span><input type="file" class="og-input ap-file" ref=${fileRef} accept=".html,.htm" /></label>
-      <label class="ap-field"><span class="poster-label">${a('shotLabel')}</span><input type="file" class="og-input ap-file" ref=${shotRef} accept="image/*" /></label>
-      <label class="ap-field ap-field--wide"><span class="poster-label">${a('descLabel')}</span><textarea class="og-textarea" rows="2" maxLength="2000" placeholder=${a('descPlaceholder')} value=${desc} onInput=${(e) => setDesc(e.target.value)}></textarea></label>
-      <label class="ap-field"><span class="poster-label">${a('codeLabel')}</span>
-        <span class="ap-secret">
-          <input class="og-input" type=${showCode ? 'text' : 'password'} autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder=${a('codePlaceholder')} value=${code} onInput=${(e) => setCode(e.target.value)} />
-          <button type="button" class="ap-secret-eye" aria-pressed=${showCode ? 'true' : 'false'} aria-label=${showCode ? a('codeHide') : a('codeShow')} title=${showCode ? a('codeHide') : a('codeShow')} onClick=${() => setShowCode((s) => !s)}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-              <path d="M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7S4.5 16.5 2 12z" /><circle cx="12" cy="12" r="3" />
-              ${showCode ? html`<path d="M4 4l16 16" />` : null}
-            </svg>
-          </button>
-        </span>
-      </label>
-      <label class="ap-field ap-field--wide"><span class="poster-label">${a('roadPublishLabel')}</span><textarea class="og-textarea" rows="2" maxLength="600" value=${roadmap} onInput=${e => setRoadmap(e.target.value)} /></label>
-      <p class="poster-hint ap-field--wide">${a('roadPublishHint')}</p>
-      <div class="ap-field ap-field--send">
-        <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${async () => {
-          const ok = await onUpload({ file: fileRef.current?.files?.[0], description: desc, screenshot: shotRef.current?.files?.[0], accessCode: code, roadmap });
-          if (ok) { setDesc(''); setCode(''); setShowCode(false); setRoadmap(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
-        }}>${a('publishFile')}</button>
-      </div>
-    </div>`;
+    <${Fields} cols=${2}>
+      <${FileDrop} plain label=${a('fileLabel')} accept=".html,.htm" inputRef=${fileRef} />
+      <${FileDrop} plain label=${a('shotLabel')} accept="image/*" inputRef=${shotRef} />
+      <${TextArea} wide label=${a('descLabel')} rows=${2} maxLength="2000" placeholder=${a('descPlaceholder')} value=${desc} onInput=${setDesc} />
+      <${TextField} secret label=${a('codeLabel')} placeholder=${a('codePlaceholder')} value=${code} onInput=${setCode}
+        showLabel=${a('codeShow')} hideLabel=${a('codeHide')} />
+      <${TextArea} wide label=${a('roadPublishLabel')} hint=${a('roadPublishHint')} rows=${2} maxLength="600" value=${roadmap} onInput=${setRoadmap} />
+    <//>
+    <${FormActions} end><${Action} small disabled=${busy} onClick=${send}>${a('publishFile')}<//><//>`;
 }
 
 /**

@@ -12,6 +12,7 @@
  *   import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
  *   html`<${SkillsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />`
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the panel is the Section (its title, and New skill as its door), the editor the TextArea with FormActions and the Note, the skills the List (the version a tag, the description under the name, the ways at the end; View opens the row's panel with the ref, the front matter and the body in the Box's copy tone). The page writes no class.
  *   v1.8.0 -- 2026-09-26 -- A skill's front matter is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.6.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -39,7 +40,16 @@ import { Markdown } from '/components/Markdown.js';
 import { splitSkillMd } from '/views/profile/skills-tab.js';
 import * as skillsService from '/js/services/skills.js';
 
-import { QuietNote } from '/components/QuietNote.js';
+import { Section } from '/components/Section.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { Stack } from '/components/Layout.js';
+import { TextArea } from '/components/TextField.js';
+import { FormActions } from '/components/Field.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Code } from '/components/Mark.js';
+import { Box } from '/components/Box.js';
+import { List, Row as ListRow, Name, Doors } from '/components/List.js';
 const html = htm.bind(h);
 
 const WS_SKILL_TEMPLATE = `---
@@ -120,68 +130,56 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
     showToast(t('skills.refCopied') || 'Skill ref copied — link it to an agent from its Data Access tab');
   };
 
-  return html`
-    <div class="pj-section pf-skl poster-row--thing">
-      <div class="pf-skl-section-header">
-        <span class="pf-skl-section-title">${t('skills.wsPanelTitle') || 'Workspace skills'}</span>
-        <button class="poster-slab poster-slab--control" onClick=${() => { setEditorMd(WS_SKILL_TEMPLATE); setEditorOpen(!editorOpen); }}>
-          + ${t('skills.newSkill') || 'New skill'}
-        </button>
-      </div>
-      <div class="section-desc">${t('skills.wsPanelDesc') || 'SKILL.md expertise shared with every member and agent of this workspace. Skills travel with workspace exports and templates, and show up in the AI overview map. Link one to an agent by ref from the agent’s Data Access tab.'}</div>
+  const zip = async (skill) => {
+    try {
+      await skillsService.downloadSkillZip(skill.name, { scope: 'workspace', organism: orgId, ws: wsId });
+      showToast(t('skills.zipDownloaded') || 'Skill ZIP downloaded');
+    } catch (err) {
+      showToast((t('skills.zipFailed') || 'Download failed') + ': ' + err.message, true);
+    }
+  };
+  /** A skill's opened view: its ref, the front matter as code and the body as the Markdown reader. */
+  const detail = (skill) => {
+    const { frontmatter, body } = splitSkillMd(expandedSkill.fileContents?.['SKILL.md']);
+    return html`
+      <${Code}>${skill.ref}<//>
+      ${frontmatter && html`<${Code} block>${frontmatter}<//>`}
+      <${Box} tone="copy"><${Markdown} text=${body} /><//>`;
+  };
 
+  return html`
+    <${Section} first title=${t('skills.wsPanelTitle') || 'Workspace skills'}
+      doors=${html`<${Loud} control onClick=${() => { setEditorMd(WS_SKILL_TEMPLATE); setEditorOpen(!editorOpen); }}>+ ${t('skills.newSkill') || 'New skill'}<//>`}>
+      <${HeadDesc}>${t('skills.wsPanelDesc') || 'SKILL.md expertise shared with every member and agent of this workspace. Skills travel with workspace exports and templates, and show up in the AI overview map. Link one to an agent by ref from the agent’s Data Access tab.'}<//>
       ${editorOpen && html`
-        <div class="pf-skl-editor">
-          <textarea class="og-textarea" rows="18" value=${editorMd}
-                    onInput=${(e) => setEditorMd(e.target.value)}></textarea>
-          <div class="pf-skl-editor-actions">
-            <button class="poster-slab poster-slab--control" disabled=${publishing} onClick=${handlePublish}>
+        <${Stack} below="large">
+          <${TextArea} rows=${18} value=${editorMd} onInput=${setEditorMd} />
+          <${FormActions}>
+            <${Loud} control disabled=${publishing} onClick=${handlePublish}>
               ${publishing ? (t('skills.publishing') || 'Publishing…') : (t('skills.publish') || 'Publish')}
-            </button>
-            <button class="poster-action poster-action--small" onClick=${() => setEditorOpen(false)}>${t('common.cancel')}</button>
-          </div>
-          <div class="poster-hint">${t('skills.editorHint') || ''}</div>
-        </div>
+            <//>
+            <${Action} small onClick=${() => setEditorOpen(false)}>${t('common.cancel')}<//>
+          <//>
+          <${Note}>${t('skills.editorHint') || ''}<//>
+        <//>
       `}
 
-      ${loading ? html`<div class="poster-quiet pj-empty loading-mark">${t('organisms.loading') || 'Loading…'}</div>` : (
-        skills.length === 0
-          ? html`<${QuietNote}>${t('skills.wsEmpty') || 'No workspace skills yet — publish the first one.'}<//>`
-          : skills.map(skill => html`
-              <div key=${skill.ref} class="pf-skl-row">
-                <div class="pf-skl-row-main">
-                  <span class="pf-skl-name">${skill.name}</span>
-                  <span class="pf-skl-version">v${skill.version}</span>
-                  <span class="pf-skl-actions">
-                    <button class="poster-action poster-action--small" title=${t('skills.zipHint') || ''} onClick=${async () => {
-                      try {
-                        await skillsService.downloadSkillZip(skill.name, { scope: 'workspace', organism: orgId, ws: wsId });
-                        showToast(t('skills.zipDownloaded') || 'Skill ZIP downloaded');
-                      } catch (err) {
-                        showToast((t('skills.zipFailed') || 'Download failed') + ': ' + err.message, true);
-                      }
-                    }}>${t('skills.zipBtn') || '⤓ .zip'}</button>
-                    <button class="poster-action poster-action--small" onClick=${() => copyRef(skill)}>${t('skills.copyRef') || 'Copy ref'}</button>
-                    <button class="poster-action poster-action--small" onClick=${() => handleToggleView(skill)}>
-                      ${expanded === skill.ref ? (t('skills.hide') || 'Hide') : (t('skills.view') || 'View')}
-                    </button>
-                    <button class="poster-action poster-action--small" onClick=${() => handleEdit(skill)}>${t('common.edit') || 'Edit'}</button>
-                  </span>
-                </div>
-                <div class="pf-skl-desc">${skill.description}</div>
-                ${expanded === skill.ref && expandedSkill && (() => {
-                  const { frontmatter, body } = splitSkillMd(expandedSkill.fileContents?.['SKILL.md']);
-                  return html`
-                    <div class="pf-skl-detail">
-                      <div class="pf-skl-detail-ref">${skill.ref}</div>
-                      ${frontmatter && html`<pre class="code-block">${frontmatter}</pre>`}
-                      <div class="pf-skl-body-md poster-box poster-box--copy"><${Markdown} text=${body} /></div>
-                    </div>
-                  `;
-                })()}
-              </div>
-            `)
-      )}
-    </div>
+      <${List} cols="name-doors" loading=${loading ? (t('organisms.loading') || 'Loading…') : false}
+        empty=${t('skills.wsEmpty') || 'No workspace skills yet — publish the first one.'}>
+        ${skills.map(skill => html`
+          <${ListRow} key=${skill.ref} open=${expanded === skill.ref && !!expandedSkill}
+            panel=${expanded === skill.ref && expandedSkill ? detail(skill) : null}>
+            <${Name} tag=${'v' + skill.version} desc=${skill.description}>${skill.name}<//>
+            <${Doors}>
+              <${Action} small title=${t('skills.zipHint') || ''} onClick=${() => zip(skill)}>${t('skills.zipBtn') || '⤓ .zip'}<//>
+              <${Action} small onClick=${() => copyRef(skill)}>${t('skills.copyRef') || 'Copy ref'}<//>
+              <${Action} small expanded=${expanded === skill.ref} onClick=${() => handleToggleView(skill)}>
+                ${expanded === skill.ref ? (t('skills.hide') || 'Hide') : (t('skills.view') || 'View')}
+              <//>
+              <${Action} small onClick=${() => handleEdit(skill)}>${t('common.edit') || 'Edit'}<//>
+            <//>
+          <//>`)}
+      <//>
+    <//>
   `;
 }

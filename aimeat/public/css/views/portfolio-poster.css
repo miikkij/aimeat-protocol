@@ -9,6 +9,7 @@
  *   three roads to a changed page with the paste field, and the rule box an AI gets.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- The page's parts are kit components (page group G8): .pf-empty, .pf-file (FileDrop hidden), .is-warn (other sheets keep theirs), the facts' doors and state words (Facts actions, Tinted), .pf-prev* (PagePreview, page-preview.css), .pf-roads, .pf-road*, .pf-req (Roads), .pf-paste* (TextArea), .pf-rule* (Box, Label) and their phone lines go.
  *   v1.13.0 -- 2026-09-26 -- A road's title reads --shape-case-heading and the label spacing (* .2, .02em) (a move: the AIMEAT values equal the old ones).
  *   v1.12.0 -- 2026-09-26 -- The requests to paste are the Code block (css/components/code-block.css): their look goes, their place stays (a unification: Jouni's decision "Code block").
  *   v1.11.0 -- 2026-09-25 -- Dead declarations removed: .pf-paste's face, size and line height (the Text area's, linked later with the same weight, always won), a move.
@@ -30,42 +31,5 @@
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 
+/* A door in the head's Actions row or under a fact is not underlined. */
 .og-portfolio .og-doors > a { text-decoration: none; }
-.pf-empty { margin: 0; padding: .3rem 0 .8rem; }
-.pf-file { display: none; }
-.is-warn { color: var(--accent); }
-
-/* ── Addresses and who can see it: the Facts (css/components/facts.css); a value's doors under
-   it, and the state word in its colour ───────────────────────────────────────────────────────── */
-.og-portfolio .facts-v .og-doors { margin-top: .3rem; }
-.og-portfolio .facts-v b.is-on { color: var(--success-fg); }
-.og-portfolio .facts-v b.is-off { color: var(--accent); }
-
-/* ── The page row (css/components/page-row.css), and the preview under it ──────────────────── */
-.pf-prev { margin: .8rem 0 .4rem; padding: 0; }
-.pf-prev-frame { display: block; width: 100%; height: 34rem; border: 0; background: var(--card-bg); }
-.pf-prev-doors { margin-top: .6rem; }
-
-/* ── The three roads to a changed page ─────────────────────────────────────────────────────── */
-.pf-roads { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 1.2rem; margin-top: .6rem; }
-.pf-road { margin: 0; padding: .9rem 1rem 1rem; min-width: 0; font-size: .88rem; line-height: 1.55; color: var(--text); display: flex; flex-direction: column; }
-.pf-road p { margin: 0 0 .6rem; }
-/* A road is the Object box (.poster-box); the lead road is its raised tone (.poster-box--raised). */
-.pf-road-t { display: block; margin-bottom: .4rem; font-family: var(--font-display, var(--font-heading)); font-size: 1.05rem; text-transform: var(--shape-case-heading); letter-spacing: calc(var(--shape-tracking-label) * .2); color: var(--text); }
-.pf-road .og-doors { margin-top: auto; padding-top: .6rem; align-items: center; }
-/* The request to paste is the Code block (css/components/code-block.css); its place only. */
-.pf-req.code-block { margin: 0 0 .6rem; }
-.pf-paste { width: 100%; box-sizing: border-box; min-height: 6rem; margin: 0 0 .3rem; resize: vertical; }
-.pf-paste-meta { display: block; margin-bottom: .3rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-
-/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
-.pf-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; font-size: .9rem; line-height: 1.6; }
-.pf-rule .poster-label { display: block; margin-bottom: .3rem; }
-.pf-rule .og-lead { margin-bottom: .5rem; }
-.pf-rule .og-doors { margin-top: .7rem; }
-
-/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .pf-prev-frame { height: 24rem; }
-  .pf-roads { grid-template-columns: 1fr; }
-}

@@ -1,0 +1,39 @@
+/**
+ * @file peek.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A text shown three ways (components/Peek.js): its first line cut with an ellipsis, its
+ *   top 9rem under a fade, or all of it. The values are the Notebook note's (.pf-nb-note-text, its
+ *   --peek cut and fade, .pf-nb-note-line in css/views/notebook.css), moved unchanged. Reads colours
+ *   from the theme tokens only; no corner, frame, shadow or case of its own.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial (page group G4, the notebook).
+ */
+
+.peek {
+  color: var(--text);
+  word-break: break-word;
+}
+.peek-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-dim, var(--text));
+}
+.peek--peek {
+  max-height: 9rem;
+  overflow: hidden;
+  position: relative;
+}
+.peek--peek::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5rem;
+  background: linear-gradient(transparent, var(--bg-dim, var(--card)));
+  pointer-events: none;
+}

@@ -7,19 +7,21 @@
  *   falls under each version. Moved unchanged out of css/views/libraries-poster.css (Libraries, an
  *   opened library's "Changes" value), where it is the only place it is drawn (UI consolidation
  *   phase 5, a move).
- *   Drawn as markup: <div class="lb-cl"><div class="m">1.1.0</div><div class="m">2026-09-20</div>
- *   <div>what changed</div>…</div>.
+ *   Drawn by components/ChangeLog.js: <div class="changelog"><div class="m">1.1.0</div>
+ *   <div class="m">2026-09-20</div><div>what changed</div>…</div>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
  *   v1.0.0 — 2026-09-25 — Initial: the rules of .lb-cl, moved unchanged from libraries-poster.css.
+ *   v1.1.0 — 2026-09-27 — The component's own name: .lb-cl is .changelog (a move: the same
+ *     declarations, the same selector shapes).
  */
 
-.lb-cl { display: grid; grid-template-columns: minmax(6rem, 10rem) 6.5rem minmax(0, 1fr); gap: 0 .8rem; font-size: .85rem; line-height: 1.5; }
-.lb-cl > div { padding: .3rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.lb-cl .m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.changelog { display: grid; grid-template-columns: minmax(6rem, 10rem) 6.5rem minmax(0, 1fr); gap: 0 .8rem; font-size: .85rem; line-height: 1.5; }
+.changelog > div { padding: .3rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.changelog .m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
 
 @media (max-width: 860px) {
-  .lb-cl { grid-template-columns: 1fr; }
-  .lb-cl > div { border-bottom: 0; padding: .1rem 0; }
-  .lb-cl > div:nth-child(3n) { border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+  .changelog { grid-template-columns: 1fr; }
+  .changelog > div { border-bottom: 0; padding: .1rem 0; }
+  .changelog > div:nth-child(3n) { border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
 }

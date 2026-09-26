@@ -13,6 +13,7 @@
  *   secFirst · secAgent
  * @usage import { renderPage } from './portfolio/page.js';
  * @version-history
+ *   v1.18.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip, rail and hidden file field as data; FigureStrip; Facts with the state words Tinted; List with the page's Thumb; PagePreview; Roads; TextArea; FileDrop; Box; Label; Code; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.17.0 -- 2026-09-26 -- The requests to paste are the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -43,14 +44,25 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Facts } from '/components/Facts.js';
+import { Tinted } from '/components/Figure.js';
+import { Box } from '/components/Box.js';
+import { Roads, Road } from '/components/Roads.js';
+import { List, Row, Thumb, Name, Doors } from '/components/List.js';
+import { PagePreview } from '/components/PagePreview.js';
+import { TextArea } from '/components/TextField.js';
+import { FileDrop } from '/components/FileDrop.js';
+import { Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
 import { x, apexUrl, dateWord, timeWord, writtenBy, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
 
-const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
-const copyDoor = (text, label, onCopied) => html`<${CopyButton} text=${text} label=${label} copiedLabel=${t('common.copied')} className="poster-action poster-action--small" onCopied=${onCopied} />`;
+const copyDoor = (text, label, onCopied) => html`<${Action} small copy=${text} copiedLabel=${t('common.copied')} onCopied=${onCopied}>${label}<//>`;
+const openDoor = (href, words, soft = true) => html`<${Action} small soft=${soft} href=${href} newTab>${words}<//>`;
 
 export function renderPage(ctx) {
   const d = ctx.data;            // null while loading
@@ -65,64 +77,52 @@ export function renderPage(ctx) {
       : [['01', 'pf-addresses', x('secAddresses'), ctx.standaloneUrl ? '2' : '1'], ['02', 'pf-visibility', x('secVisibility'), ''], ['03', 'pf-page', x('secPage'), d?.html ? x('kb', { n: d.html.size_kb }) : ''], ['04', 'pf-change', x('secChange'), ''], ['05', 'pf-ai', x('secAi'), '']];
 
   return html`
-    <div class="og og-portfolio">
-      ${crumb()}
-      ${mast(ctx, state)}
-      ${strip(ctx, state)}
-      <div class="og-grid">
-        <div class="og-main">
-          ${state === 'loading' ? html`<p class="poster-quiet pf-empty loading-mark">${x('loading')}</p>` : null}
-          ${state === 'none' ? secFirst(ctx) : null}
-          ${state === 'on' ? secAddresses(ctx) : null}
-          ${state === 'on' || state === 'off' ? secVisibility(ctx, state) : null}
-          ${state === 'on' || state === 'off' ? secPage(ctx, state) : null}
-          ${state === 'on' || state === 'off' ? secChange(ctx) : null}
-          ${state !== 'loading' ? secAgent(ctx, state) : null}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${rail.map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks(ctx.navigate)}
-        </nav>
-      </div>
-      <input type="file" accept=".html,.htm,text/html" class="pf-file" ref=${ctx.fileRef} onChange=${(e) => ctx.readFile(e)} />
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="portfolio"
+      crumb=${crumb()}
+      ...${mast(ctx, state)}
+      strip=${strip(ctx, state)}
+      railTitle=${x('railTitle')}
+      sections=${rail.map(([num, id, label, count]) => ({ id, num, label, count }))}
+      pagesLabel=${x('pages')}
+      pages=${pageLinks(ctx.navigate)}
+      after=${html`
+        <${FileDrop} hidden accept=".html,.htm,text/html" inputRef=${ctx.fileRef} onChange=${(e) => ctx.readFile(e)} />
+        <${ctx.ConfirmUI} />`}>
+      ${state === 'loading' ? html`<${Note} kind="loading">${x('loading')}<//>` : null}
+      ${state === 'none' ? secFirst(ctx) : null}
+      ${state === 'on' ? secAddresses(ctx) : null}
+      ${state === 'on' || state === 'off' ? secVisibility(ctx, state) : null}
+      ${state === 'on' || state === 'off' ? secPage(ctx, state) : null}
+      ${state === 'on' || state === 'off' ? secChange(ctx) : null}
+      ${state !== 'loading' ? secAgent(ctx, state) : null}
+    <//>`;
 }
 
+/** The head: the title, its tags and line, the loud action and the doors, as SettingsPage props. */
 function mast(ctx, state) {
   const d = ctx.data;
   const cfg = d?.config;
   const others = Math.max(0, (ctx.members ?? 0) - (state === 'on' ? 1 : 0));
-  const chips = state === 'on'
-    ? [chip(x('chipPublic'), 'poster-chip--sun'), cfg?.seoIndex ? chip(x('chipSearch')) : chip(x('chipNoSearch')), chip(x('chipShowcase')), chip(`${x('kb', { n: d.html.size_kb })} · ${dateWord(d.html.stored_at)}`)]
+  const marks = state === 'on'
+    ? [{ label: x('chipPublic'), tone: 'sun' }, { label: cfg?.seoIndex ? x('chipSearch') : x('chipNoSearch') }, { label: x('chipShowcase') }, { label: `${x('kb', { n: d.html.size_kb })} · ${dateWord(d.html.stored_at)}` }]
     : state === 'off'
-      ? [chip(x('chipOff'), 'poster-chip--coral'), chip(x('chipStored', { n: d.html.size_kb })), cfg?.seoIndex ? chip(x('chipSearchAllowed')) : null]
+      ? [{ label: x('chipOff'), tone: 'coral' }, { label: x('chipStored', { n: d.html.size_kb }) }, cfg?.seoIndex ? { label: x('chipSearchAllowed') } : null]
       : state === 'none'
-        ? [chip(x('chipNone'), 'poster-chip--coral'), ctx.members != null ? chip(x('chipOthers', { n: others })) : null]
+        ? [{ label: x('chipNone'), tone: 'coral' }, ctx.members != null ? { label: x('chipOthers', { n: others }) } : null]
         : [];
   const desc = state === 'on' ? x('desc') : state === 'off' ? x('descOff', { date: dateWord(cfg?.updatedAt || cfg?.unpublishedAt) || dateWord(d?.html?.stored_at) }) : state === 'none' ? x('descNone') : '';
-  return html`
-    <div class="og-mast">
-      <div class="og-mast-words">
-        <h1 class="og-title poster-page-title">${t('portfolio.tabLabel')}<small>${x('titleSub')}</small></h1>
-        <div class="poster-chips">${chips}</div>
-        <p class="og-desc">${desc}</p>
-      </div>
-      <div class="og-mast-actions">
-        ${state === 'off'
-          ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}</button>`
-          : state === 'none'
-            ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'mat'} onClick=${() => ctx.copyMatPrompt()}>${x('makeMat')}</button>`
-            : html`<button type="button" class="poster-slab" onClick=${() => ctx.copyAiRequest()}>${x('askAi')}</button>`}
-        <div class="og-doors">
-          ${state === 'on' ? html`<a class="poster-action poster-action--small" href=${apexUrl(ctx.ownerName)} target="_blank" rel="noopener">${x('openPage')}</a>` : null}
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.navigate('/v1/portfolio')}>${x('builder')}</button>
-        </div>
-      </div>
-    </div>`;
+  const loud = state === 'off'
+    ? html`<${Loud} control disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}<//>`
+    : state === 'none'
+      ? html`<${Loud} control disabled=${ctx.busy === 'mat'} onClick=${() => ctx.copyMatPrompt()}>${x('makeMat')}<//>`
+      : html`<${Loud} onClick=${() => ctx.copyAiRequest()}>${x('askAi')}<//>`;
+  return {
+    title: t('portfolio.tabLabel'), sub: x('titleSub'), marks, desc,
+    actions: html`${loud}<${Actions}>
+      ${state === 'on' ? openDoor(apexUrl(ctx.ownerName), x('openPage'), false) : null}
+      <${Action} small soft onClick=${() => ctx.navigate('/v1/portfolio')}>${x('builder')}<//>
+    <//>`,
+  };
 }
 
 function strip(ctx, state) {
@@ -130,47 +130,45 @@ function strip(ctx, state) {
   const cfg = d?.config;
   const m = ctx.members;
   const others = m == null ? null : Math.max(0, m - (state === 'on' ? 1 : 0));
-  if (state === 'loading') return html`<div class="og-strip"><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div></div>`;
+  if (state === 'loading') return html`<${FigureStrip} loading=${4} />`;
   if (state === 'none') {
-    return html`
-      <div class="og-strip">
-        <div><b>0</b><span>${x('stripPages')}</span><small>${x('stripPagesNone')}</small></div>
-        <div><b>${m ?? '…'}</b><span>${x('stripShowcase')}</span><small>${x('stripShowcaseNone')}</small></div>
-        <div><b>${ctx.standaloneUrl ? 2 : 1}</b><span>${x('stripAddressesReady')}</span><small>${ctx.standaloneUrl ? x('stripAddressesSub') : x('stripAddressOne')}</small></div>
-        <div><b>3</b><span>${x('stripRoads')}</span><small>${x('stripRoadsSub')}</small></div>
-      </div>`;
+    return html`<${FigureStrip} items=${[
+      { key: 'pages', n: 0, label: x('stripPages'), sub: x('stripPagesNone') },
+      { key: 'showcase', n: m ?? '…', label: x('stripShowcase'), sub: x('stripShowcaseNone') },
+      { key: 'addresses', n: ctx.standaloneUrl ? 2 : 1, label: x('stripAddressesReady'), sub: ctx.standaloneUrl ? x('stripAddressesSub') : x('stripAddressOne') },
+      { key: 'roads', n: 3, label: x('stripRoads'), sub: x('stripRoadsSub') },
+    ]} />`;
   }
   if (state === 'off') {
-    return html`
-      <div class="og-strip">
-        <div><b class="og-strip-coral">${x('stripOff')}</b><span>${x('stripOffLabel')}</span><small>${x('stripOffSub')}</small></div>
-        <div><b>${dateWord(d.html.stored_at)}</b><span>${x('stripPublished')}</span><small>${x('kb', { n: d.html.size_kb })}${cfg?.designStyle ? ` · ${x('style.' + cfg.designStyle) || cfg.designStyle}` : ''}</small></div>
-        <div><b>${others ?? '…'}</b><span>${x('stripShowcase')}</span><small>${x('stripShowcaseOff')}</small></div>
-        <div><b>${ctx.standaloneUrl ? 2 : 1}</b><span>${x('stripAddresses')}</span><small>${x('stripAddressesOff')}</small></div>
-      </div>`;
+    return html`<${FigureStrip} items=${[
+      { key: 'off', n: x('stripOff'), tone: 'coral', label: x('stripOffLabel'), sub: x('stripOffSub') },
+      { key: 'published', n: dateWord(d.html.stored_at), label: x('stripPublished'), sub: `${x('kb', { n: d.html.size_kb })}${cfg?.designStyle ? ` · ${x('style.' + cfg.designStyle) || cfg.designStyle}` : ''}` },
+      { key: 'showcase', n: others ?? '…', label: x('stripShowcase'), sub: x('stripShowcaseOff') },
+      { key: 'addresses', n: ctx.standaloneUrl ? 2 : 1, label: x('stripAddresses'), sub: x('stripAddressesOff') },
+    ]} />`;
   }
-  return html`
-    <div class="og-strip">
-      <div><b>${dateWord(d.html.stored_at)}</b><span>${x('stripPublished')}</span><small>${[timeWord(d.html.stored_at), x('kb', { n: d.html.size_kb }), cfg?.designStyle ? x('style.' + cfg.designStyle) : ''].filter(Boolean).join(' · ')}</small></div>
-      <div><b class="og-strip-coral">${x('stripPublic')}</b><span>${x('stripPublicLabel')}</span><small>${cfg?.seoIndex ? x('stripSearchOn') : x('stripSearchOff')}</small></div>
-      <div><b>${m ?? '…'}</b><span>${x('stripShowcase')}</span><small>${others != null ? x('stripShowcaseSub', { n: others }) : ''}</small></div>
-      <div><b>${ctx.standaloneUrl ? 2 : 1}</b><span>${x('stripAddresses')}</span><small>${ctx.standaloneUrl ? x('stripAddressesSub') : x('stripAddressOne')}</small></div>
-    </div>`;
+  return html`<${FigureStrip} items=${[
+    { key: 'published', n: dateWord(d.html.stored_at), label: x('stripPublished'), sub: [timeWord(d.html.stored_at), x('kb', { n: d.html.size_kb }), cfg?.designStyle ? x('style.' + cfg.designStyle) : ''].filter(Boolean).join(' · ') },
+    { key: 'public', n: x('stripPublic'), tone: 'coral', label: x('stripPublicLabel'), sub: cfg?.seoIndex ? x('stripSearchOn') : x('stripSearchOff') },
+    { key: 'showcase', n: m ?? '…', label: x('stripShowcase'), sub: others != null ? x('stripShowcaseSub', { n: others }) : '' },
+    { key: 'addresses', n: ctx.standaloneUrl ? 2 : 1, label: x('stripAddresses'), sub: ctx.standaloneUrl ? x('stripAddressesSub') : x('stripAddressOne') },
+  ]} />`;
 }
 
 function secAddresses(ctx) {
   const url = apexUrl(ctx.ownerName);
   const badgeOn = ctx.data.config?.showBadge !== false;
+  const copied = () => ctx.toast(x('copiedAddress'));
+  const own = ctx.standaloneUrl;
   return html`
-    <${PageSection} id="pf-addresses" num="01" title=${x('secAddresses')} count=${ctx.standaloneUrl ? '2' : '1'} first=${true}>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('addressNode')}</div>
-        <div class="facts-v">${url}<small>${x('addressNodeSub')}</small><div class="og-doors">${copyDoor(url, t('common.copy'), () => ctx.toast(x('copiedAddress')))}<a class="poster-action poster-action--small poster-action--lower" href=${url} target="_blank" rel="noopener">${x('open')}</a></div></div>
-        ${ctx.standaloneUrl ? html`
-          <div class="facts-k poster-label">${x('addressOwn')}</div>
-          <div class="facts-v">${ctx.standaloneUrl}<small>${x('addressOwnSub')} ${badgeOn ? x('badgeOn') : x('badgeOff')}</small><div class="og-doors">${copyDoor(ctx.standaloneUrl, t('common.copy'), () => ctx.toast(x('copiedAddress')))}<a class="poster-action poster-action--small poster-action--lower" href=${ctx.standaloneUrl} target="_blank" rel="noopener">${x('open')}</a><button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'badge'} onClick=${() => ctx.setBadge(!badgeOn)}>${badgeOn ? x('hideBadge') : x('showBadge')}</button></div></div>` : null}
-      </div>
-      <${Hint}>${ctx.standaloneUrl ? x('hintAddresses') : x('hintAddressOne')}<//>
+    <${PageSection} id="pf-addresses" num="01" title=${x('secAddresses')} count=${own ? '2' : '1'} first=${true}>
+      <${Facts} rows=${[
+        { k: x('addressNode'), v: url, sub: x('addressNodeSub'),
+          actions: html`${copyDoor(url, t('common.copy'), copied)}${openDoor(url, x('open'))}` },
+        own && { k: x('addressOwn'), v: own, sub: `${x('addressOwnSub')} ${badgeOn ? x('badgeOn') : x('badgeOff')}`,
+          actions: html`${copyDoor(own, t('common.copy'), copied)}${openDoor(own, x('open'))}<${Action} small soft disabled=${ctx.busy === 'badge'} onClick=${() => ctx.setBadge(!badgeOn)}>${badgeOn ? x('hideBadge') : x('showBadge')}<//>` },
+      ]} />
+      <${Hint}>${own ? x('hintAddresses') : x('hintAddressOne')}<//>
     <//>`;
 }
 
@@ -178,20 +176,24 @@ function secVisibility(ctx, state) {
   const cfg = ctx.data.config || {};
   const off = state === 'off';
   const others = Math.max(0, (ctx.members ?? 1) - (off ? 0 : 1));
+  // A state word in its colour: on in the fine colour, off in coral (main's b.is-on / b.is-off).
+  const said = (tone, word, rest) => html`<${Tinted} strong tone=${tone}>${word}<//> ${rest}`;
+  const webDoor = off
+    ? html`<${Loud} control disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}<//>`
+    : html`<${Action} small soft tone="danger" disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(false)}>${x('unpublish')}<//>`;
+  const search = off
+    ? said(undefined, x('visSearchOffWeb'), cfg.seoIndex ? x('visSearchOffWebAllowed') : x('visSearchOffWebDenied'))
+    : cfg.seoIndex ? said('fine', x('visSearchOn'), x('visSearchOnSub')) : said(undefined, x('visSearchOff'), x('visSearchOffSub'));
   return html`
     <${PageSection} id="pf-visibility" num="02" title=${x('secVisibility')} count=${x('secVisibilitySub')} first=${off}>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('visWeb')}</div>
-        <div class="facts-v">${off ? html`<b class="is-off">${x('visWebOff')}</b> ${x('visWebOffSub')}` : html`<b class="is-on">${x('visWebOn')}</b> ${x('visWebOnSub')}`}<small>${x('visWebHint')}</small><div class="og-doors">${off
-          ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(true)}>${x('republish')}</button>`
-          : html`<button type="button" class="poster-action poster-action--small poster-action--danger poster-action--lower" disabled=${ctx.busy === 'enable'} onClick=${() => ctx.setEnabled(false)}>${x('unpublish')}</button>`}</div></div>
-        <div class="facts-k poster-label">${x('visSearch')}</div>
-        <div class="facts-v">${off
-          ? html`<b>${x('visSearchOffWeb')}</b> ${cfg.seoIndex ? x('visSearchOffWebAllowed') : x('visSearchOffWebDenied')}`
-          : cfg.seoIndex ? html`<b class="is-on">${x('visSearchOn')}</b> ${x('visSearchOnSub')}` : html`<b>${x('visSearchOff')}</b> ${x('visSearchOffSub')}`}<small>${x('visSearchHint')}</small>${off ? null : html`<div class="og-doors"><button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === 'seo'} onClick=${() => ctx.setSeo(!cfg.seoIndex)}>${cfg.seoIndex ? x('searchOff') : x('searchOn')}</button></div>`}</div>
-        <div class="facts-k poster-label">${x('visShowcase')}</div>
-        <div class="facts-v">${off ? html`<b>${x('visShowcaseOff')}</b> ${x('visShowcaseOffSub')}` : html`<b class="is-on">${x('visShowcaseOn')}</b> ${x('visShowcaseOnSub', { n: others })}`}<small>${x('visShowcaseHint')}</small><div class="og-doors"><a class="poster-action poster-action--small poster-action--lower" href="/v1/members" target="_blank" rel="noopener">${x('openShowcase')}</a></div></div>
-      </div>
+      <${Facts} rows=${[
+        { k: x('visWeb'), v: off ? said('notice', x('visWebOff'), x('visWebOffSub')) : said('fine', x('visWebOn'), x('visWebOnSub')),
+          sub: x('visWebHint'), actions: webDoor },
+        { k: x('visSearch'), v: search, sub: x('visSearchHint'),
+          actions: off ? null : html`<${Action} small soft disabled=${ctx.busy === 'seo'} onClick=${() => ctx.setSeo(!cfg.seoIndex)}>${cfg.seoIndex ? x('searchOff') : x('searchOn')}<//>` },
+        { k: x('visShowcase'), v: off ? said(undefined, x('visShowcaseOff'), x('visShowcaseOffSub')) : said('fine', x('visShowcaseOn'), x('visShowcaseOnSub', { n: others })),
+          sub: x('visShowcaseHint'), actions: openDoor('/v1/members', x('openShowcase')) },
+      ]} />
     <//>`;
 }
 
@@ -201,38 +203,39 @@ function secPage(ctx, state) {
   const title = ctx.title || x('untitled');
   const by = writtenBy(cfg, ctx.ai);
   const choices = [cfg.designStyle ? x('style.' + cfg.designStyle) : '', cfg.portfolioType ? x('type.' + cfg.portfolioType) : '', (cfg.authGates || []).length ? x('gatesN', { n: cfg.authGates.length }) : x('gatesNone')].filter(Boolean);
+  const on = state === 'on';
   return html`
     <${PageSection} id="pf-page" num="03" title=${x('secPage')} count=${x('kb', { n: d.html.size_kb })}>
-      <div class="pf-pg">
-        <div class="pf-thumb" aria-hidden="true"><i></i><i></i></div>
-        <div class="pf-pg-words"><b>${title}</b><small>${[x('publishedOn', { date: dateWord(d.html.stored_at), time: timeWord(d.html.stored_at) }), x('kb', { n: d.html.size_kb }), choices.slice(0, 2).join(', ')].filter(Boolean).join(' · ')}</small></div>
-        <div class="pf-pg-go">
-          <button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.togglePreview()}>${ctx.previewOpen ? x('hidePreview') : x('preview')}</button>
-          ${state === 'on' ? html`<a class="poster-action poster-action--small poster-action--row poster-action--lower" href=${apexUrl(ctx.ownerName)} target="_blank" rel="noopener">${x('open')}</a>` : null}
-        </div>
-      </div>
+      <${List} cols="mark-name-doors">
+        <${Row} key="page">
+          <${Thumb} />
+          <${Name} meta=${[x('publishedOn', { date: dateWord(d.html.stored_at), time: timeWord(d.html.stored_at) }), x('kb', { n: d.html.size_kb }), choices.slice(0, 2).join(', ')].filter(Boolean).join(' · ')}>${title}<//>
+          <${Doors}>
+            <${Action} small row onClick=${() => ctx.togglePreview()}>${ctx.previewOpen ? x('hidePreview') : x('preview')}<//>
+            ${on ? html`<${Action} small row soft href=${apexUrl(ctx.ownerName)} newTab>${x('open')}<//>` : null}
+          <//>
+        <//>
+      <//>
       ${ctx.previewOpen ? html`
-        <div class="pf-prev poster-box poster-box--raised">
-          ${ctx.pageHtml ? html`<iframe class="pf-prev-frame" title=${title} sandbox="allow-scripts" srcdoc=${ctx.previewDoc()}></iframe>` : html`<p class="poster-quiet pf-empty loading-mark">${x('loading')}</p>`}
-        </div>
+        <${PagePreview} title=${title} srcdoc=${ctx.pageHtml ? ctx.previewDoc() : null} loadingLabel=${x('loading')} />
         <${Hint}>${x('previewHint')}<//>
-        <div class="og-doors pf-prev-doors">
-          ${state === 'on' ? html`<a class="poster-action poster-action--small" href=${apexUrl(ctx.ownerName)} target="_blank" rel="noopener">${x('open')}</a>` : null}
-          ${state === 'on' && ctx.standaloneUrl ? html`<a class="poster-action poster-action--small poster-action--lower" href=${ctx.standaloneUrl} target="_blank" rel="noopener">${x('ownAddress')}</a>` : null}
-        </div>` : null}
-      <div class="facts">
-        <div class="facts-k poster-label">${x('writer')}</div><div class="facts-v">${by.main}<small>${by.sub}</small></div>
-        <div class="facts-k poster-label">${x('choices')}</div><div class="facts-v">${choices.length ? choices.join(', ') : x('choicesNone')}<small>${x('choicesSub')}</small></div>
-        <div class="facts-k poster-label">${x('size')}</div><div class="facts-v">${x('sizeOf', { n: d.html.size_kb, max: ctx.maxKb })}<small>${x('sizeSub')}</small></div>
-        <div class="facts-k poster-label">${x('storage')}</div><div class="facts-v">${x('storageIn')} <code class="code-inline">portfolio/index.html</code><small>${x('storageSub')}</small></div>
-      </div>
+        <${Actions}>
+          ${on ? openDoor(apexUrl(ctx.ownerName), x('open'), false) : null}
+          ${on && ctx.standaloneUrl ? openDoor(ctx.standaloneUrl, x('ownAddress')) : null}
+        <//>` : null}
+      <${Facts} rows=${[
+        { k: x('writer'), v: by.main, sub: by.sub },
+        { k: x('choices'), v: choices.length ? choices.join(', ') : x('choicesNone'), sub: x('choicesSub') },
+        { k: x('size'), v: x('sizeOf', { n: d.html.size_kb, max: ctx.maxKb }), sub: x('sizeSub') },
+        { k: x('storage'), v: html`${x('storageIn')} <${Code}>portfolio/index.html<//>`, sub: x('storageSub') },
+      ]} />
     <//>`;
 }
 
 function secChange(ctx) {
   return html`
     <${PageSection} id="pf-change" num="04" title=${x('secChange')} count=${x('secChangeSub')}>
-      <p class="og-lead">${x('changeIntro')}</p>
+      <${Note} kind="lead">${x('changeIntro')}<//>
       ${roads(ctx, true)}
     <//>`;
 }
@@ -241,72 +244,55 @@ function roads(ctx, hasPage) {
   const filled = !!(ctx.paste || '').trim();
   const kb = Math.ceil(new TextEncoder().encode(ctx.paste || '').length / 1024);
   const tooBig = kb > ctx.maxKb;
+  const importDoors = filled
+    ? html`<${Loud} control disabled=${ctx.busy === 'publish' || tooBig} onClick=${() => ctx.publishPaste()}>${x('publish')}<//><${Action} small soft onClick=${() => ctx.setPaste('')}>${x('clear')}<//>`
+    : html`<${Action} small onClick=${() => ctx.pickFile()}>${x('chooseFile')}<//>`;
+  // The size line under the pasted page: grey while it fits, the refusal when it is too large.
+  const size = !filled ? {} : tooBig
+    ? { message: x('pasteTooBig', { n: kb, max: ctx.maxKb }), error: true }
+    : { hint: x('pasteSize', { n: kb, max: ctx.maxKb }) };
   return html`
-    <div class="pf-roads">
-      <div class="pf-road poster-box poster-box--raised">
-        <span class="pf-road-t">${x('roadAi')}</span>
-        <p>${hasPage ? x('roadAiBody') : x('roadAiBodyNew')}</p>
-        <pre class="code-block pf-req">${ctx.aiRequestText()}</pre>
-        <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copyAiRequest()}>${x('copyRequest')}</button></div>
-      </div>
-      <div class="pf-road poster-box">
-        <span class="pf-road-t">${x('roadBuilder')}</span>
-        <p>${hasPage ? x('roadBuilderBody') : x('roadBuilderBodyNew')}</p>
-        <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.navigate('/v1/portfolio')}>${x('openBuilder')}</button></div>
-      </div>
-      <div class="pf-road poster-box">
-        <span class="pf-road-t">${x('roadImport')}</span>
-        <p>${x('roadImportBody', { max: ctx.maxKb })}</p>
-        <textarea class="og-textarea pf-paste" rows="6" placeholder=${x('pastePlaceholder')} aria-label=${x('roadImport')} value=${ctx.paste} onInput=${(e) => ctx.setPaste(e.target.value)}></textarea>
-        ${filled ? html`<small class=${`pf-paste-meta ${tooBig ? 'is-warn' : ''}`}>${tooBig ? x('pasteTooBig', { n: kb, max: ctx.maxKb }) : x('pasteSize', { n: kb, max: ctx.maxKb })}</small>` : null}
-        <div class="og-doors">
-          ${filled
-            ? html`<button type="button" class="poster-slab poster-slab--control" disabled=${ctx.busy === 'publish' || tooBig} onClick=${() => ctx.publishPaste()}>${x('publish')}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setPaste('')}>${x('clear')}</button>`
-            : html`<button type="button" class="poster-action poster-action--small" onClick=${() => ctx.pickFile()}>${x('chooseFile')}</button>`}
-        </div>
-      </div>
-    </div>`;
+    <${Roads} cols="three" wide>
+      <${Road} lead name=${x('roadAi')} text=${hasPage ? x('roadAiBody') : x('roadAiBodyNew')} code=${ctx.aiRequestText()}
+        doors=${html`<${Action} small onClick=${() => ctx.copyAiRequest()}>${x('copyRequest')}<//>`} />
+      <${Road} name=${x('roadBuilder')} text=${hasPage ? x('roadBuilderBody') : x('roadBuilderBodyNew')}
+        doors=${html`<${Action} small onClick=${() => ctx.navigate('/v1/portfolio')}>${x('openBuilder')}<//>`} />
+      <${Road} name=${x('roadImport')} text=${x('roadImportBody', { max: ctx.maxKb })} doors=${importDoors}>
+        <${TextArea} rows=${6} placeholder=${x('pastePlaceholder')} ariaLabel=${x('roadImport')} value=${ctx.paste}
+          onInput=${(v) => ctx.setPaste(v)} ...${size} />
+      <//>
+    <//>`;
 }
 
 function secFirst(ctx) {
+  const mat = ctx.matPrompt ? `${ctx.matPrompt.slice(0, 420)}${ctx.matPrompt.length > 420 ? '…' : ''}` : null;
   return html`
     <${PageSection} id="pf-first" num="01" title=${x('secFirst')} count=${x('secFirstSub')} first=${true}>
-      <p class="poster-quiet pf-empty"><b>${x('emptyNone')}</b> ${x('emptyNoneSub')}</p>
-      <div class="pf-roads">
-        <div class="pf-road poster-box poster-box--raised">
-          <span class="pf-road-t">${x('roadMat')}</span>
-          <p>${x('roadMatBody')}</p>
-          ${ctx.matPrompt ? html`<pre class="code-block pf-req">${ctx.matPrompt.slice(0, 420)}${ctx.matPrompt.length > 420 ? '…' : ''}</pre>` : null}
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'mat'} onClick=${() => ctx.copyMatPrompt()}>${x('copyRequest')}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.navigate('/v1/home')}>${x('goHome')}</button></div>
-        </div>
-        <div class="pf-road poster-box">
-          <span class="pf-road-t">${x('roadAi')}</span>
-          <p>${x('roadAiBodyNew')}</p>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copyAiRequest()}>${x('copyRequest')}</button></div>
-        </div>
-        <div class="pf-road poster-box">
-          <span class="pf-road-t">${x('roadBuilder')}</span>
-          <p>${x('roadBuilderBodyNew')}</p>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.navigate('/v1/portfolio')}>${x('openBuilder')}</button></div>
-        </div>
-      </div>
+      <${Note} kind="quiet"><b>${x('emptyNone')}</b> ${x('emptyNoneSub')}<//>
+      <${Roads} cols="three" wide>
+        <${Road} lead name=${x('roadMat')} text=${x('roadMatBody')} code=${mat}
+          doors=${html`<${Action} small disabled=${ctx.busy === 'mat'} onClick=${() => ctx.copyMatPrompt()}>${x('copyRequest')}<//><${Action} small soft onClick=${() => ctx.navigate('/v1/home')}>${x('goHome')}<//>`} />
+        <${Road} name=${x('roadAi')} text=${x('roadAiBodyNew')}
+          doors=${html`<${Action} small onClick=${() => ctx.copyAiRequest()}>${x('copyRequest')}<//>`} />
+        <${Road} name=${x('roadBuilder')} text=${x('roadBuilderBodyNew')}
+          doors=${html`<${Action} small onClick=${() => ctx.navigate('/v1/portfolio')}>${x('openBuilder')}<//>`} />
+      <//>
     <//>`;
 }
 
 function secAgent(ctx, state) {
   return html`
     <${PageSection} id="pf-ai" num="05" title=${x('secAi')} count=${null}>
-      <p class="og-lead">${x('aiIntro')}</p>
-      <div class="pf-rule poster-box">
-        <span class="poster-label">${x('ruleLabel')}</span>
-        <p class="og-lead">${x('ruleBody')}</p>
-        <code class="code-inline">GET ${apexUrl(ctx.ownerName)}</code> → <code class="code-inline">aimeat_portfolio_publish { html }</code> · ${x('ruleNoMcp')} <code>PUT /v1/portfolio/upload { html }</code>
-        <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copyRule()}>${x('copyRule')}</button></div>
-      </div>
-      <div class="facts">
-        <div class="facts-k poster-label">${x('aiDoes')}</div><div class="facts-v">${x('aiDoesBody')}<small>${x('aiDoesSub', { max: ctx.maxKb })}</small></div>
-        <div class="facts-k poster-label">${x('aiNot')}</div><div class="facts-v">${x('aiNotBody')}<small>${x('aiNotSub')}</small></div>
-        <div class="facts-k poster-label">${x('aiAddress')}</div><div class="facts-v">${state === 'none' ? x('aiAddressBodyNew') : x('aiAddressBody')}</div>
-      </div>
+      <${Note} kind="lead">${x('aiIntro')}<//>
+      <${Box} doors=${html`<${Action} small onClick=${() => ctx.copyRule()}>${x('copyRule')}<//>`}>
+        <${Label} block>${x('ruleLabel')}<//>
+        <${Note} kind="lead">${x('ruleBody')}<//>
+        <${Code}>GET ${apexUrl(ctx.ownerName)}<//> → <${Code}>aimeat_portfolio_publish { html }<//> · ${x('ruleNoMcp')} <${Code}>PUT /v1/portfolio/upload { html }<//>
+      <//>
+      <${Facts} rows=${[
+        { k: x('aiDoes'), v: x('aiDoesBody'), sub: x('aiDoesSub', { max: ctx.maxKb }) },
+        { k: x('aiNot'), v: x('aiNotBody'), sub: x('aiNotSub') },
+        { k: x('aiAddress'), v: state === 'none' ? x('aiAddressBodyNew') : x('aiAddressBody') },
+      ]} />
     <//>`;
 }

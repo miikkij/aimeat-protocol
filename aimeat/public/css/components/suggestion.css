@@ -8,6 +8,9 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The choices under a question an agent asked (.poster-choices--asked,
+ *     .poster-choices-q, .poster-suggestion--chosen, --other): main's chosen, Other and locked markers
+ *     from an agent's Messages tab, put back; additive.
  *   v1.2.0 — 2026-09-26 — The line under a suggestion reads --shape-frame-heavy and --shape-rule-colour, as the action link's does (a move: the AIMEAT values equal the old ones).
  *   v1.1.0 — 2026-09-24 — The starters' capitals (--caps) removed (Jouni's decision "Suggestion").
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
@@ -42,3 +45,14 @@
 }
 /* The choices are .poster-suggestion (above). */
 .poster-choices-note { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-dim); }
+/* The choices under a question the agent asked (Choices `question`: an agent's option-prompt). The
+   question over them; the answer given in coral and full while a locked question's other choices are
+   greyed; "Other" in italics. Main's markers (css/views/agents-detail.css .agd-msg-prompt-q,
+   -option--chosen, -option--other, -option:disabled). */
+.poster-choices-q { flex-basis: 100%; margin: 0; font-size: .85rem; font-weight: var(--weight-semibold); color: var(--text); }
+.poster-choices--asked .poster-suggestion:disabled { cursor: default; opacity: .6; }
+.poster-choices--asked .poster-suggestion:disabled:hover { color: var(--text); border-color: var(--shape-rule-colour); }
+.poster-choices--asked .poster-suggestion--chosen,
+.poster-choices--asked .poster-suggestion--chosen:disabled,
+.poster-choices--asked .poster-suggestion--chosen:disabled:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
+.poster-suggestion--other { font-style: italic; }

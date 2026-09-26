@@ -7,6 +7,13 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v2.20.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the task is the
+ *     List's row that opens on a press (the eye is the Icon before the name, the blurred name and the
+ *     coral open name are the Name's options), the record is the List's Panel with its own title and
+ *     status, the to-dos are a List with the Tick (the environment tag dim again, as on main:
+ *     og-chip--dim), the parts sit under the heavy rule (Split heavy) with their row label and tally, the details
+ *     are Facts, the memory entries the FoldRows, the rating the Stars, and the actions two Actions
+ *     rows with what cannot be undone at the far right.
  *   v2.19.0 — 2026-09-26 — A task's description is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   v2.18.0 — 2026-09-26 — An opened task's "What happened" is the home's Timeline (components/Timeline.js): the time, a dot for the kind (trouble, made, the agent's work), one line with the event and its message; the three-column table goes (a unification: Jouni's decision "Activity log").
  *   v2.17.0 — 2026-09-26 — A rated task's stars are the library's Rating stars in the shown tone (css/components/rating-stars.css): the stars not given in --text-dim instead of --border (a unification: Jouni's decision "Rating stars").
@@ -59,8 +66,7 @@ import {
   isTaskBlurred,
   setTaskBlurred,
   statusLabel,
-  statusChipClass,
-  todoTick,
+  statusTone,
   formatScopeEntry,
   todoProgress,
   EyeIcon,
@@ -68,6 +74,14 @@ import {
   TaskMemoryEntry,
 } from './task-item-parts.js';
 import { TimelineList, TimelineRow } from '/components/Timeline.js';
+import { Row as ListRow, Name, Cell, When, Doors, Panel, Tick, List } from '/components/List.js';
+import { Action, Actions, Icon, Loud } from '/components/Action.js';
+import { Mark, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Facts, FactLine } from '/components/Facts.js';
+import { Folds } from '/components/Folds.js';
+import { Stars } from '/components/Stars.js';
+import { Row, Split, Space } from '/components/Layout.js';
 
 /** The Timeline's dot for a task event: a failure is trouble, a thing written or installed is made,
  *  the rest is the agent's work. */
@@ -361,208 +375,160 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
     totalMinutes > 0 && tOr('profile.agents.tasks.aboutMinutes', 'about {n} min', { n: totalMinutes }),
   ].filter(Boolean).join(' · ');
 
-  // A fresh vnode per call: the closed row and the open record both show the chip at once.
-  const statusChip = () => html`<span class=${`poster-status agt-status ${statusChipClass(status)}`}>${statusLabel(status)}</span>`;
-  const stars = Math.max(0, Math.min(5, Math.round(rating?.stars || 0)));
+  // A fresh vnode per call: the closed row and the open record both show the status at once.
+  const statusChip = () => html`<${Mark} kind="status" tone=${statusTone(status)}>${statusLabel(status)}<//>`;
   // The log part only appears once there is a log, a fetch in flight, or a recorded emptiness.
   const showLog = loadingEvents || (events && (events.length > 0 || !isQueued));
+  // One part of the open record: the heavy rule over it, its row label, and a tally at the right.
+  // The actions at the record's foot keep what cannot be undone at the far right.
+  const part = (label, tally, body) => html`
+    <${Split} heavy above="large" gap="small">
+      <${Row} wrap justify="between">
+        <${Label}>${label}<//>
+        ${tally ? html`<${Mark} kind="count" tone="tally">${tally}<//>` : null}
+      <//>
+      ${body}
+    <//>`;
+  const envWord = (td) => (td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent'));
+  const lines = (list) => (Array.isArray(list) ? list : [list]).map((x, i) => html`<${FactLine} key=${i}>${x}<//>`);
 
   return html`
-    <div class=${`listing-row agt-row ${expanded ? 'is-open' : ''}`} onClick=${handleExpand}>
-      <div class="listing-name" ref=${taskRef}>
-        <button
-          type="button"
-          class="poster-icon poster-icon--small agt-eye"
-          onClick=${handleToggleBlur}
-          title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}
-          aria-pressed=${blurred}
-        ><${EyeIcon} hidden=${blurred} /></button>
-        <span class=${`agt-nm-t ${blurred ? 'is-hidden' : ''} ${expanded ? 'is-open' : ''}`}>${task.title || task.id}</span>
-      </div>
-      <div><span class="poster-count poster-count--tally">${progress || ''}</span></div>
-      <div class="poster-time">${task.createdAt ? timeAgo(task.createdAt) : ''}</div>
-      <div>${statusChip()}</div>
+    <${ListRow} open=${expanded} onToggle=${handleExpand}>
+      <${Name} nameRef=${taskRef} blurred=${blurred} attention=${expanded}
+        before=${html`<${Icon} small pressed=${blurred} onClick=${handleToggleBlur}
+          label=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}><${EyeIcon} hidden=${blurred} /><//>`}>${task.title || task.id}<//>
+      <${Cell}><${Mark} kind="count" tone="tally">${progress || ''}<//><//>
+      <${When}>${task.createdAt ? timeAgo(task.createdAt) : ''}<//>
+      <${Cell}>${statusChip()}<//>
 
       ${expanded && html`
-        <div class="listing-open poster-box poster-box--raised">
-          <div class="agt-record-h">
-            <h3 class="poster-record-title poster-record-title--small agt-record-title">${task.title || task.id}</h3>
-            ${statusChip()}
-          </div>
-          ${task.description && html`<div class="agt-desc"><${Markdown} text=${task.description} small /></div>`}
-          ${stamps && html`<span class="agt-m agt-stamps poster-time">${stamps}</span>`}
+        <${Panel} title=${task.title || task.id} mark=${statusChip()}>
+          ${task.description && html`<${Markdown} text=${task.description} small />`}
+          ${stamps && html`<div><${Mark} kind="time">${stamps}<//></div>`}
 
-          ${hasTodos && html`
-            <div class="agt-part poster-row--thing">
-              <div class="agt-part-h">
-                <span class="poster-label">
-                  ${t('profile.agents.tasks.todoLabel')} · ${tOr('profile.agents.tasks.todoCount', '{done} of {total}', { done: doneTodos, total: todos.length })}
-                </span>
-                ${planLine && html`<span class="poster-count poster-count--tally">${planLine}</span>`}
-              </div>
-              ${todos.map((td, i) => {
-                const tick = todoTick(td.status || 'pending');
-                return html`
-                  <div class="agt-todo" key=${td.id || i}>
-                    <span class=${`agt-tick ${tick.cls}`}>${tick.glyph}</span>
-                    <div class="agt-todo-b">
-                      <b>${td.title}</b>
-                      <span class="poster-chip">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
-                      ${td.description && html`<div class="agt-sub">${td.description}</div>`}
-                      ${td.environmentReason && html`<div class="agt-sub">${td.environmentReason}</div>`}
-                      ${td.verification && html`<div class="agt-sub">${td.verification}</div>`}
-                    </div>
-                    <div class="agt-todo-r">
-                      ${td.estimateMinutes && html`<span class="poster-count poster-count--tally">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
-                      ${td.completedAt && html`<span class="agt-m poster-time">${formatDateTime(td.completedAt)}</span>`}
-                    </div>
-                  </div>
-                `;
-              })}
+          ${hasTodos && part(
+            `${t('profile.agents.tasks.todoLabel')} · ${tOr('profile.agents.tasks.todoCount', '{done} of {total}', { done: doneTodos, total: todos.length })}`,
+            planLine,
+            html`
+              <${List} cols="mark-name-doors" keepCols>
+                ${todos.map((td, i) => html`
+                  <${ListRow} key=${td.id || i}>
+                    <${Tick} state=${td.status || 'pending'} />
+                    <${Name} tag=${html`<${Mark} tone="dim">${envWord(td)}<//>`}
+                      desc=${[td.description, td.environmentReason, td.verification]}>${td.title}<//>
+                    <${Doors}>
+                      ${td.estimateMinutes && html`<${Mark} kind="count" tone="tally">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}<//>`}
+                      ${td.completedAt && html`<${Mark} kind="time">${formatDateTime(td.completedAt)}<//>`}
+                    <//>
+                  <//>
+                `)}
+              <//>
               ${outdatedTodos.length > 0 && html`
-                <div class="agt-history">
-                  <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }} aria-expanded=${showOutdated}>
-                    ${t('profile.agents.tasks.outdatedTodos')}<span class="poster-count poster-count--tally">${outdatedTodos.length}</span>
-                  </button>
-                  ${showOutdated && outdatedTodos.map((td, i) => html`
-                    <div class="agt-todo agt-todo--old" key=${td.id || 'old-' + i}>
-                      <span class="agt-tick"></span>
-                      <div class="agt-todo-b">
-                        <b>${td.title}</b>
-                        ${td.description && html`<div class="agt-sub">${td.description}</div>`}
-                      </div>
-                    </div>
-                  `)}
-                </div>
+                <${Actions}>
+                  <${Action} small soft expanded=${showOutdated} onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }}>
+                    ${t('profile.agents.tasks.outdatedTodos')} <${Mark} kind="count" tone="tally">${outdatedTodos.length}<//>
+                  <//>
+                <//>
+                ${showOutdated && html`
+                  <${List} cols="mark-name-doors" keepCols>
+                    ${outdatedTodos.map((td, i) => html`
+                      <${ListRow} key=${td.id || 'old-' + i} faded>
+                        <${Tick} state="none" />
+                        <${Name} desc=${td.description}>${td.title}<//>
+                        <${Cell} />
+                      <//>
+                    `)}
+                  <//>
+                `}
               `}
-            </div>
-          `}
+            `)}
 
-          ${!hasTodos && isQueued && html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.builder.waitingTodos')}</div>`}
-          ${isRevisionRequested && html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.revisionWaiting')}</div>`}
+          ${!hasTodos && isQueued && html`<${Note} kind="quiet">${t('profile.agents.tasks.builder.waitingTodos')}<//>`}
+          ${isRevisionRequested && html`<${Note} kind="quiet">${t('profile.agents.tasks.revisionWaiting')}<//>`}
 
-          ${showLog && html`
-            <div class="agt-part poster-row--thing">
-              <div class="agt-part-h">
-                <span class="poster-label">${tOr('profile.agents.tasks.whatHappened', 'What happened')}</span>
-              </div>
-              ${loadingEvents && html`<div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div>`}
-              ${events && events.length > 0 && html`
-                <${TimelineList}>
-                  ${events.map(ev => html`
-                    <${TimelineRow} key=${ev.id || ev.timestamp} category=${eventDot(ev.type)}
-                      when=${ev.timestamp ? timeAgo(ev.timestamp) : ''}
-                      text=${[ev.type, ev.message].filter(Boolean).join(': ')} />
-                  `)}
+          ${showLog && part(tOr('profile.agents.tasks.whatHappened', 'What happened'), null, html`
+            ${loadingEvents && html`<${Note} kind="loading" />`}
+            ${events && events.length > 0 && html`
+              <${TimelineList}>
+                ${events.map(ev => html`
+                  <${TimelineRow} key=${ev.id || ev.timestamp} category=${eventDot(ev.type)}
+                    when=${ev.timestamp ? timeAgo(ev.timestamp) : ''}
+                    text=${[ev.type, ev.message].filter(Boolean).join(': ')} />
+                `)}
+              <//>
+            `}
+            ${events && events.length === 0 && !isQueued && html`<${Note} kind="quiet">${t('profile.agents.tasks.noEventsRecorded')}<//>`}
+          `)}
+
+          ${hasDetails && part(tOr('profile.agents.tasks.detailsLabel', 'Details'), null, html`
+            <${Facts} rows=${[
+              task.deliverableKey && {
+                k: t('profile.agents.tasks.deliverable'), v: task.deliverableKey, mono: true,
+                action: html`<${Action} small soft onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>${t('profile.agents.tasks.viewDeliverable')}<//>`,
+              },
+              hasScope && { k: t('profile.agents.detail.tasks.scope'), v: Array.isArray(task.scope) ? lines(task.scope.map(formatScopeEntry)) : formatScopeEntry(task.scope) },
+              hasRules && { k: t('profile.agents.detail.tasks.rules'), v: Array.isArray(task.rules) ? lines(task.rules) : task.rules },
+            ]} />
+            ${deliverable && html`
+              ${deliverable.loading
+                ? html`<${Note} kind="loading" />`
+                : deliverable.notFound
+                  ? html`<${Note} kind="quiet">${t('profile.agents.tasks.deliverableGone')}<//>`
+                  : html`<${Space} above="medium"><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /><//>`}
+            `}
+          `)}
+
+          ${taskMemory && part(t('profile.agents.tasks.memory.show'), null, taskMemory.loading
+            ? html`<${Note} kind="loading" />`
+            : taskMemory.items.length === 0
+              ? html`<${Note} kind="quiet">${t('profile.agents.tasks.memory.none')}<//>`
+              : html`<${Folds}>${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}<//>`)}
+
+          ${rating && part(t('profile.agents.tasks.rate.rated'), null, html`
+            <${Row} wrap align="baseline" gap="large">
+              <${Stars} value=${rating.stars} />
+              <${Note} kind="meta" mono inline>${t(`profile.agents.detail.quality.contexts.${rating.context}`)}<//>
+              ${rating.comment && html`<${Note} inline>${rating.comment}<//>`}
+            <//>
+          `)}
+
+          <${Row} wrap justify="between" gap="large" above="large">
+            <${Actions}>
+              ${task.triage !== 'kept' && html`
+                <${Action} small onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}<//>
+              `}
+              ${task.triage !== 'archived' && html`
+                <${Action} small onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}<//>
+              `}
+              ${task.triage && html`
+                <${Action} small onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}<//>
+              `}
+              <${Action} small onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
+                ${t('profile.agents.tasks.memory.show')}
+              <//>
+              ${isDone && html`
+                <${Action} small onClick=${handleOpenRate}>
+                  ${rating ? t('profile.agents.tasks.rate.rerate') : t('profile.agents.tasks.rate.button')}
                 <//>
               `}
-              ${events && events.length === 0 && !isQueued && html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>`}
-            </div>
-          `}
-
-          ${hasDetails && html`
-            <div class="agt-part poster-row--thing">
-              <div class="agt-part-h">
-                <span class="poster-label">${tOr('profile.agents.tasks.detailsLabel', 'Details')}</span>
-              </div>
-              <div class="facts">
-                ${task.deliverableKey && html`
-                  <span class="facts-k poster-label">${t('profile.agents.tasks.deliverable')}</span>
-                  <span class="facts-v">
-                    <code class="code-inline">${task.deliverableKey}</code>
-                    <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
-                      ${t('profile.agents.tasks.viewDeliverable')}
-                    </button>
-                  </span>
-                `}
-                ${hasScope && html`
-                  <span class="facts-k poster-label">${t('profile.agents.detail.tasks.scope')}</span>
-                  <span class="facts-v">
-                    ${Array.isArray(task.scope)
-                      ? task.scope.map((s, i) => html`<div key=${i}>${formatScopeEntry(s)}</div>`)
-                      : formatScopeEntry(task.scope)}
-                  </span>
-                `}
-                ${hasRules && html`
-                  <span class="facts-k poster-label">${t('profile.agents.detail.tasks.rules')}</span>
-                  <span class="facts-v">
-                    ${Array.isArray(task.rules) ? task.rules.map(r => html`<div key=${r}>${r}</div>`) : task.rules}
-                  </span>
-                `}
-              </div>
-              ${deliverable && html`
-                ${deliverable.loading
-                  ? html`<div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div>`
-                  : deliverable.notFound
-                    ? html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.deliverableGone')}</div>`
-                    : html`<div class="agt-preview"><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /></div>`}
+              ${canRequestChanges && html`
+                <${Action} small onClick=${handleOpenRevision}>${t('profile.agents.tasks.requestChanges')}<//>
               `}
-            </div>
-          `}
-
-          ${taskMemory && html`
-            <div class="agt-part poster-row--thing">
-              <div class="agt-part-h">
-                <span class="poster-label">${t('profile.agents.tasks.memory.show')}</span>
-              </div>
-              ${taskMemory.loading
-                ? html`<div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div>`
-                : taskMemory.items.length === 0
-                  ? html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.memory.none')}</div>`
-                  : html`
-                    <div class="pf-agd-task-memory-list">
-                      ${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}
-                    </div>
-                  `}
-            </div>
-          `}
-
-          ${rating && html`
-            <div class="agt-part poster-row--thing">
-              <div class="agt-part-h">
-                <span class="poster-label">${t('profile.agents.tasks.rate.rated')}</span>
-              </div>
-              <div class="agt-rating">
-                <span class="op-stars op-stars--shown" role="img" aria-label=${`${stars}/5`}>${[1, 2, 3, 4, 5].map(n => html`<span key=${n} class=${`op-star${n <= stars ? ' on' : ''}`} aria-hidden="true">★</span>`)}</span>
-                <span class="agt-m">${t(`profile.agents.detail.quality.contexts.${rating.context}`)}</span>
-                ${rating.comment && html`<span class="agt-rating-note">${rating.comment}</span>`}
-              </div>
-            </div>
-          `}
-
-          <div class="agt-actions">
-            ${task.triage !== 'kept' && html`
-              <button type="button" class="poster-action poster-action--small" onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}</button>
-            `}
-            ${task.triage !== 'archived' && html`
-              <button type="button" class="poster-action poster-action--small" onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}</button>
-            `}
-            ${task.triage && html`
-              <button type="button" class="poster-action poster-action--small" onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}</button>
-            `}
-            <button type="button" class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
-              ${t('profile.agents.tasks.memory.show')}
-            </button>
-            ${isDone && html`
-              <button type="button" class="poster-action poster-action--small" onClick=${handleOpenRate}>
-                ${rating ? t('profile.agents.tasks.rate.rerate') : t('profile.agents.tasks.rate.button')}
-              </button>
-            `}
-            ${canRequestChanges && html`
-              <button type="button" class="poster-action poster-action--small" onClick=${handleOpenRevision}>${t('profile.agents.tasks.requestChanges')}</button>
-            `}
-            ${canStart && html`
-              <button type="button" class="poster-slab poster-slab--control" onClick=${handleStart} disabled=${starting}>
-                ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
-              </button>
-            `}
-            ${(isActive || task.status === 'stalled') && html`
-              <button type="button" class="poster-action poster-action--small poster-action--danger agt-act-end" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
-            `}
-            ${canDelete && html`
-              <button type="button" class="poster-action poster-action--small poster-action--danger agt-act-end" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
-            `}
-          </div>
+              ${canStart && html`
+                <${Loud} control onClick=${handleStart} disabled=${starting}>
+                  ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
+                <//>
+              `}
+            <//>
+            <${Actions}>
+              ${(isActive || task.status === 'stalled') && html`
+                <${Action} small tone="danger" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}<//>
+              `}
+              ${canDelete && html`
+                <${Action} small tone="danger" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}<//>
+              `}
+            <//>
+          <//>
           <${ConfirmUI} />
           <${RequestChangesModal}
             open=${showRevisionModal}
@@ -577,8 +543,8 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
             submitting=${sendingRate}
             existing=${rating}
           />
-        </div>
+        <//>
       `}
-    </div>
+    <//>
   `;
 }

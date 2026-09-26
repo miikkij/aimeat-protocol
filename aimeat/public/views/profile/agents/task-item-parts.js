@@ -7,6 +7,11 @@
  *   the request-changes modal and the memory-entry viewer (JSON tree, image, markdown). Pure
  *   extraction from ./task-item.js so that file stays under the 800-line limit.
  * @version-history
+ *   v1.7.0 -- 2026-09-26 -- The parts are components that take data (page group G1a): statusTone gives
+ *     the Status's tone (was statusChipClass), the to-do's tick is the List's Tick (todoTick goes),
+ *     the eye carries its size and stroke itself, the request-changes dialog is Note, TextArea,
+ *     Action and Loud, and a memory entry is the FoldRow with its value in a scrolling copy box, the
+ *     JSON tree being the library's JsonView (this file's copy of it goes).
  *   v1.6.0 -- 2026-09-26 -- A Markdown memory value is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   v1.5.0 -- 2026-09-25 -- A task memory entry's row, which opens its value in place, is the folded row (og-fold og-fold--event, the arrow for the caret), a unification: the look most tabs use.
  *   v1.4.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
@@ -26,7 +31,13 @@ import { Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import { swallowed } from '/js/swallowed.js';
-import { Hint } from '/components/Hint.js';
+import { parseValue, JsonNode } from '/components/JsonView.js';
+import { FoldRow } from '/components/Folds.js';
+import { Box } from '/components/Box.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud } from '/components/Action.js';
+import { TextArea } from '/components/TextField.js';
 
 // Per-browser "blur the title" preference. Used when screen-recording the tab
 // so sensitive task titles can be hidden without affecting other viewers or
@@ -59,22 +70,14 @@ export function statusLabel(status) {
   return val !== key ? val : status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-/** Which Status tone a task wears: fine when done, danger when failed, attention while it runs,
- *  off for everything else. */
-export function statusChipClass(status) {
-  if (status === 'done') return 'poster-status--fine';
-  if (status === 'failed') return 'poster-status--danger';
-  if (status === 'active') return 'poster-status--attention';
-  return 'poster-status--off';
-}
-
-/** The tick box for one to-do: its modifier class and the glyph inside it. */
-export function todoTick(status) {
-  if (status === 'done') return { cls: 'agt-tick--done', glyph: '✓' };
-  if (status === 'failed') return { cls: 'agt-tick--failed', glyph: '✗' };
-  if (status === 'active') return { cls: 'agt-tick--active', glyph: '→' };
-  if (status === 'skipped' || status === 'outdated') return { cls: '', glyph: '' };
-  return { cls: 'agt-tick--pending', glyph: '' };
+/** Which Status tone a task wears (components/Mark.js kind="status"): fine when done, danger when
+ *  failed, attention while it runs, off for everything else. A to-do's tick is the List's Tick,
+ *  which draws ✓ ✗ → from the to-do's own status. */
+export function statusTone(status) {
+  if (status === 'done') return 'fine';
+  if (status === 'failed') return 'danger';
+  if (status === 'active') return 'attention';
+  return 'off';
 }
 
 // Render one task scope entry as readable text. Scope is an array whose entries
@@ -106,7 +109,7 @@ export function todoProgress(todos) {
  *  struck through when it is hidden. */
 export function EyeIcon({ hidden }) {
   return html`
-    <svg viewBox="0 0 24 24" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"></path>
       <circle cx="12" cy="12" r="3"></circle>
       ${hidden && html`<path d="M3 3l18 18"></path>`}
@@ -128,91 +131,45 @@ export function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
   }
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}
     footer=${html`
-      <button class="poster-action" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="poster-slab poster-slab--control" onClick=${handleSend} disabled=${submitting || !message.trim()}>
+      <${Action} onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}<//>
+      <${Loud} control onClick=${handleSend} disabled=${submitting || !message.trim()}>
         ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
-      </button>`}>
-    <${Hint}>${t('profile.agents.tasks.requestChangesHelp')}<//>
-    <textarea
-      class="og-textarea pf-agd-revision-textarea"
+      <//>`}>
+    <${Note}>${t('profile.agents.tasks.requestChangesHelp')}<//>
+    <${TextArea}
+      ariaLabel=${t('profile.agents.tasks.requestChangesTitle')}
       placeholder=${t('profile.agents.tasks.requestChangesPlaceholder')}
       value=${message}
-      onInput=${e => setMessage(e.target.value)}
+      onInput=${setMessage}
       rows=${6}
-    ></textarea>
+    />
   <//>`;
 }
 
-// Parse a memory value into structured JSON when possible. Returns { json } for
-// objects (or strings that parse as JSON), or { raw } for plain text/markdown.
-function parseMemoryValue(value) {
-  if (value === null || value === undefined) return { raw: '' };
-  if (typeof value === 'object') return { json: value };
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed && (trimmed[0] === '{' || trimmed[0] === '[')) {
-      try { return { json: JSON.parse(trimmed) }; }
-      // eslint-disable-next-line aimeat/no-silent-catch -- not JSON after all -- show raw
-      catch { /* not JSON after all -- show raw */ }
-    }
-    return { raw: value };
-  }
-  return { raw: String(value) };
-}
-
-// Recursive structured JSON renderer: objects/arrays become indented key/value
-// rows, primitives get type-coloured values. Far easier to scan than raw JSON.
-function JsonNode({ value }) {
-  if (value === null) return html`<span class="pf-agd-json-null">null</span>`;
-  const kind = typeof value;
-  if (kind === 'string') return html`<span class="pf-agd-json-str">${value}</span>`;
-  if (kind === 'number') return html`<span class="pf-agd-json-num">${value}</span>`;
-  if (kind === 'boolean') return html`<span class="pf-agd-json-bool">${value ? 'true' : 'false'}</span>`;
-  const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v]) : Object.entries(value || {});
-  if (entries.length === 0) return html`<span class="pf-agd-json-empty">${Array.isArray(value) ? '[ ]' : '{ }'}</span>`;
-  return html`
-    <div class="pf-agd-json-block">
-      ${entries.map(([k, v]) => {
-        const nested = v !== null && typeof v === 'object';
-        return html`
-          <div class=${`pf-agd-json-row ${nested ? 'pf-agd-json-row--nested' : ''}`} key=${k}>
-            <span class="pf-agd-json-key">${k}</span>
-            <${JsonNode} value=${v} />
-          </div>
-        `;
-      })}
-    </div>
-  `;
-}
-
-// One collapsible memory entry. Header (key + JSON badge) toggles the body, which
-// renders a structured JSON view when the value is JSON, raw text otherwise.
+// One collapsible memory entry: the fold row (components/Folds.js) with the key and a JSON or IMG tag
+// opens its value in place, which is the structured JSON view (components/JsonView.js: objects and
+// arrays as indented key/value rows, primitives in their type's colour) when the value is JSON, a
+// thumbnail when it is an image, and Markdown otherwise; a long value scrolls in its box.
 export function TaskMemoryEntry({ entry }) {
-  const [open, setOpen] = useState(false);
-  const { json, raw } = parseMemoryValue(entry.value);
+  const { json, raw } = parseValue(entry.value);
   const isJson = json !== undefined;
   // A memory value that IS an image (a /v1/pub URL string, or a { url, mime:image/* } object such as
   // crews.image-maker.images.<id>) renders as a thumbnail instead of a JSON/text blob.
   const image = detectImage(isJson ? json : raw, entry.key);
+  const body = html`
+    <${Box} tone="copy" scroll>
+      ${image
+        ? html`<${ImageView} desc=${image} />`
+        : isJson
+          ? html`<${JsonNode} value=${json} />`
+          // Non-JSON values (e.g. an agent's latest_output) are usually
+          // markdown — render them formatted via the shared safe Markdown
+          // component instead of raw text.
+          : html`<${Markdown} text=${raw} small />`}
+    <//>`;
   return html`
-    <div class="pf-agd-task-memory-entry">
-      <button class="og-fold og-fold--event" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-expanded=${open}>
-        <b class="pf-agd-task-memory-key">${entry.key}</b>
-        ${image ? html`<span class="poster-chip">IMG</span>` : isJson && html`<span class="poster-chip">JSON</span>`}
-        <span class="og-fold-arrow">${open ? '↓' : '→'}</span>
-      </button>
-      ${open && html`
-        <div class="pf-agd-task-memory-body">
-          ${image
-            ? html`<${ImageView} desc=${image} />`
-            : isJson
-              ? html`<${JsonNode} value=${json} />`
-              // Non-JSON values (e.g. an agent's latest_output) are usually
-              // markdown — render them formatted via the shared safe Markdown
-              // component instead of raw text.
-              : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} small /></div>`}
-        </div>
-      `}
-    </div>
+    <${FoldRow} name=${entry.key} body=${body} onClick=${(e) => e.stopPropagation()}>
+      ${image ? html`<${Mark}>IMG<//>` : isJson && html`<${Mark}>JSON<//>`}
+    <//>
   `;
 }

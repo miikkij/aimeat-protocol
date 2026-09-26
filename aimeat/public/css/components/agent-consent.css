@@ -1,0 +1,64 @@
+/**
+ * @file agent-consent.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The agent-approval consent panel (components/AgentConsent.js), in its two places: the
+ *   Settings Agents tab (.agent-consent--inline, inside the Settings scope root .pf) and the home's
+ *   agent step (.agent-consent--step, inside .poster-step). A rule scoped to .pf draws only in
+ *   Settings, as it did before the move; the unscoped ones draw in both places.
+ *   NOTE: this file must be linked in spa.html after views/profile.css and before
+ *   views/profile-poster.css, whose .pf .card still decides the card's padding and bottom margin.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Moved unchanged under the component's own names: from views/profile.css
+ *     (.pf .agent-cta and its p, .pf .flex-row, .pf .text-caption, .pf .mb-1, .pf .mb-half, .pf .p-1,
+ *     .pf .mt-1, .pf .pf-device-code, .agc-preset-desc, .agc-boundary), views/profile-poster.css (the
+ *     section shape of .pf .agent-cta) and components/step-card.css (.poster-step .agc-step,
+ *     .agc-explain and the head row's wrap). Where two utilities stood on one element, their
+ *     declarations stand in one rule; where they set the same property, the value that won stands.
+ *     The section group's "border-radius: 0" stays behind, as nothing gives the panel a corner.
+ */
+
+/* ── The panel ── */
+/* Settings: .agent-cta (margin-bottom 1.5rem) with .mb-1 (margin-bottom 1rem, later, so it won). */
+.pf .agent-consent--inline { margin-bottom: 1rem; }
+.pf .agent-consent--inline p { font-size: .9rem; color: var(--text-dim, #6B7280); margin-bottom: .75rem; }
+
+/* ── One request ── */
+/* .flex-row with .mb-half: the badge and the countdown. */
+.pf .agent-consent-head { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+/* .flex-row: the scope choices. */
+.pf .agent-consent-choices { display: flex; gap: .5rem; align-items: center; }
+/* .text-caption */
+.pf .agent-consent-caption { font-size: .85rem; color: var(--text-dim, #6B7280); }
+/* .text-caption with .mb-half: a field's label. */
+.pf .agent-consent-label { font-size: .85rem; color: var(--text-dim, #6B7280); margin-bottom: .5rem; }
+/* .mb-half: a field. */
+.pf .agent-consent-field { margin-bottom: .5rem; }
+/* .p-1 with .mt-1: the card (profile-poster.css .pf .card, later, still decides its padding). */
+.pf .agent-consent-card { padding: 1rem; }
+/* .flex-row with .mt-1: approve and refuse. */
+.pf .agent-consent-actions { display: flex; gap: .5rem; align-items: center; margin-top: 1rem; }
+.pf .agent-consent-card { margin-top: 1rem; }
+/* .pf-device-code: the code the agent showed. */
+.pf .agent-consent-code { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: .15em; }
+
+/* Both places (formerly unscoped in views/profile.css). */
+.agent-consent-preset-desc { margin: 0.35rem 0 0; line-height: 1.45; }
+.agent-consent-boundary { margin: 0.6rem 0 0; padding-left: 1.1rem; line-height: 1.45; }
+.agent-consent-boundary li { margin-bottom: 0.2rem; }
+
+/* ── The home's agent step (formerly in components/step-card.css) ── */
+.poster-step .agent-consent--step { margin-top: 1.25rem; }
+.poster-step .agent-consent-explain { margin: 0.5rem 0 0 0.8rem; line-height: 1.5; }
+/* The badge + countdown row is one line at tab width and two on a phone. Without this it broke
+   between "Expires in:" and the clock, which reads as a rendering fault rather than a wrap.
+   Scoped to the step variant so the profile tab keeps the row it has always had. */
+.poster-step .agent-consent--step .agent-consent-card > .agent-consent-head:first-child { flex-wrap: wrap; row-gap: 0.35rem; }
+.poster-step .agent-consent--step .agent-consent-card > .agent-consent-head:first-child .agent-consent-caption { white-space: nowrap; }
+
+/* ── Settings: the panel is a section under the heavy rule (formerly profile-poster.css's section
+      group, .pf .agent-cta). The group's "border-radius: 0" stays behind: no rule gives this panel
+      a corner, so it drew nothing here. ── */
+.pf .agent-consent--inline {
+  background: none; border-right: 0; border-bottom: 0; border-left: 0; box-shadow: none; padding: 1rem 0 1.25rem;
+}

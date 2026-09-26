@@ -1,0 +1,39 @@
+/**
+ * @file text-field.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The typed fields' own options (components/TextField.js): a short field (a number, a
+ *   time) and a medium one (a name, a tag); a secret field with the eye inside its right end that
+ *   shows what is typed; a many-line field that grows with what is typed. The fields themselves are
+ *   the Text field (.og-input) and the Text area (.og-textarea) in css/components/form-fields.css.
+ *   Reads only the theme's tokens.
+ *   Drawn by components/TextField.js; a page never writes these.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.1 — 2026-09-26 — The eye's focus ring reads var(--shape-frame) (2px in AIMEAT), not a literal
+ *     (check:shape-tokens; fix pass).
+ *   v1.0.0 — 2026-09-26 — Initial. The secret field's eye moved unchanged out of apps-poster.css
+ *     (.ap-secret, .ap-secret-eye: views/profile/apps/build.js UploadForm); the short width is the
+ *     middle of the page copies (5rem to 10rem: wp-num, pf-or-input-sm, wp-field--narrow,
+ *     pf-agd-tag-add-input, bp-field--narrow), the medium width ct-in--short's (component plan C5).
+ */
+
+.text-field--short { max-width: 8rem; }
+.text-field--medium { max-width: 16rem; }
+
+/* The secret: typed hidden, the eye inside the field's right end. The padding rule names the element
+   and three classes' worth, so it outranks profile-poster.css's `.pf input[type=password]` padding
+   reset (0,2,1), which otherwise put the typed code under the eye. */
+.text-field-secret { position: relative; display: block; }
+.text-field-secret input.og-input[type] { padding-right: 2.75rem; }
+.text-field-eye {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 2.5rem; height: 2.1rem; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer;
+}
+.text-field-eye:hover { color: var(--accent); }
+.text-field-eye:focus-visible { outline: var(--shape-frame) solid var(--accent); outline-offset: 2px; }
+.text-field-eye:disabled { opacity: .45; cursor: default; }
+
+/* Growing: the height follows what is typed (set by the component), so no scroll bar until the cap. */
+.text-area--grow { overflow-y: auto; }

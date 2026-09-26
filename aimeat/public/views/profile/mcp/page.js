@@ -5,10 +5,16 @@
  * @description The MCP page in the poster face (design canvas "AIMEAT MCP-sivu", direction A): the
  *   mast and the strip, the AIs connected here as rows (what each may do, when it last spoke, open
  *   it, disconnect it), the connect and instructions sections from their own files, the
- *   suggestions switch, and the rail. Pure render over the ctx bag.
+ *   suggestions switch, and the rail. Pure render over the ctx bag, made of the component kit: the
+ *   page passes data and never a class.
  * @structure renderPage · secRows · secSuggest
  * @usage import { renderPage } from './mcp/page.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
+ *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip, the connected
+ *     AIs the List (the mark the Avatar through Lead, the coral word of an AI that may do everything
+ *     a Tinted notice word), the actions Action/Loud, the hints and empty lines Note, the suggestions
+ *     setting a Row of the Sub-heading with its hint beside the Switch. The page writes no class.
  *   v1.14.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.12.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -36,93 +42,89 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { PageSection } from '/components/PageSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tinted } from '/components/Figure.js';
+import { List, Row, Name, Who, Doors, Lead } from '/components/List.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Row as Line, Stack } from '/components/Layout.js';
+import { Switch } from '/components/Switch.js';
+import { scrollToSection } from '/components/Rail.js';
 import { m, rel, day, initials, mayWord, crumb, pageLinks, goTab } from './frame.js';
 import { secConnect } from './connect.js';
 import { secInstructions } from './instructions.js';
-import { Hint } from '/components/Hint.js';
-import { Switch } from '/components/Switch.js';
 
 export function renderPage(ctx) {
   const rows = ctx.rows;
   const proven = !!ctx.proof?.passed;
   const latest = rows[0] || null;
   const on = ctx.proactive ? ctx.proactive.enabled !== false : true;
-  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
+  const p = ctx.proactive;
 
-  const strip = html`
-    <div class="og-strip">
-      <div><b>${rows.length}</b><span>${m('stripAis')}</span><small>${rows.length ? rows.slice(0, 4).map((r) => r.tool).join(', ') : m('stripNone')}</small></div>
-      <div><b class="og-strip-coral">${proven ? m('stripProven') : m('stripNotYet')}</b><span>${proven ? m('stripProofOk') : m('stripProofPending')}</span><small>${proven ? m('stripProvenSub', { date: day(ctx.proof.at) }) : m('stripNotYetSub')}</small></div>
-      <div><b>${latest ? rel(latest.when) : '–'}</b><span>${m('stripLast')}</span><small>${latest ? `${latest.tool} · ${latest.name}` : m('stripLastNone')}</small></div>
-      <div><b class="og-strip-coral">${on ? m('on') : m('off')}</b><span>${m('stripSuggest')}</span><small>${ctx.proactive?.available_here === false ? m('stripSuggestOperator') : ctx.proactive?.set_by === 'ai' ? m('stripSuggestByAi') : ctx.proactive?.set_by === 'person' ? m('stripSuggestByYou') : m('stripSuggestDefault')}</small></div>
-    </div>`;
+  const strip = html`<${FigureStrip} items=${[
+    { key: 'ais', n: rows.length, label: m('stripAis'), sub: rows.length ? rows.slice(0, 4).map((r) => r.tool).join(', ') : m('stripNone') },
+    { key: 'proof', n: proven ? m('stripProven') : m('stripNotYet'), tone: 'coral', label: proven ? m('stripProofOk') : m('stripProofPending'), sub: proven ? m('stripProvenSub', { date: day(ctx.proof.at) }) : m('stripNotYetSub') },
+    { key: 'last', n: latest ? rel(latest.when) : '–', label: m('stripLast'), sub: latest ? `${latest.tool} · ${latest.name}` : m('stripLastNone') },
+    { key: 'suggest', n: on ? m('on') : m('off'), tone: 'coral', label: m('stripSuggest'), sub: p?.available_here === false ? m('stripSuggestOperator') : p?.set_by === 'ai' ? m('stripSuggestByAi') : p?.set_by === 'person' ? m('stripSuggestByYou') : m('stripSuggestDefault') },
+  ]} />`;
+
+  const marks = [
+    rows.length ? { label: m('chipCount', { n: rows.length }) } : { label: m('chipNone'), tone: 'coral' },
+    proven ? { label: m('chipProven', { date: day(ctx.proof.at) }), tone: 'sun' } : { label: m('chipUnproven'), tone: 'coral' },
+    { label: on ? m('chipSuggestOn') : m('chipSuggestOff') },
+  ];
+
+  // One loud action per page: while the connection is unproven, that action is the proof's copy button in section 02.
+  const actions = html`
+    ${proven ? html`<${Loud} onClick=${() => scrollToSection('mcp-connect')}>${m('connectDoor')}<//>` : null}
+    <${Actions}><${Action} small onClick=${() => goTab('agents')}>${m('agentsDoor')}<//><//>`;
 
   return html`
-    <div class="og og-mcp">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('profile.tabs.mcp')}<small>${m('titleSub')}</small></h1>
-          <div class="poster-chips">
-            ${rows.length ? chip(m('chipCount', { n: rows.length })) : chip(m('chipNone'), 'poster-chip--coral')}
-            ${proven ? chip(m('chipProven', { date: day(ctx.proof.at) }), 'poster-chip--sun') : chip(m('chipUnproven'), 'poster-chip--coral')}
-            ${chip(on ? m('chipSuggestOn') : m('chipSuggestOff'))}
-          </div>
-          <p class="og-desc">${m('desc')} ${proven ? m('descProven') : m('descNew')}</p>
-        </div>
-        <div class="og-mast-actions">
-          ${/* One loud action per page: while the connection is unproven, that action is the proof's copy button in section 02. */''}
-          ${proven ? html`<button type="button" class="poster-slab" onClick=${() => scrollTo('mcp-connect')}>${m('connectDoor')}</button>` : null}
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => goTab('agents')}>${m('agentsDoor')}</button></div>
-        </div>
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${secRows(ctx, rows)}
-          ${secConnect(ctx, proven)}
-          ${secInstructions(ctx)}
-          ${secSuggest(ctx, on)}
-        </div>
-        <nav class="og-rail" aria-label=${m('railTitle')}>
-          <span class="og-rail-label">${m('railTitle')}</span>
-          ${[['01', 'mcp-rows', m('secRows'), rows.length], ['02', 'mcp-connect', m('secConnect'), ''], ['03', 'mcp-instr', m('secInstructions'), ''], ['04', 'mcp-suggest', m('secSuggest'), on ? m('on') : m('off')]]
-            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${m('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} sub=${m('titleSub')} marks=${marks}
+      desc=${`${m('desc')} ${proven ? m('descProven') : m('descNew')}`} actions=${actions} strip=${strip}
+      railTitle=${m('railTitle')}
+      sections=${[
+        { id: 'mcp-rows', num: '01', label: m('secRows'), count: rows.length },
+        { id: 'mcp-connect', num: '02', label: m('secConnect'), count: '' },
+        { id: 'mcp-instr', num: '03', label: m('secInstructions'), count: '' },
+        { id: 'mcp-suggest', num: '04', label: m('secSuggest'), count: on ? m('on') : m('off') },
+      ]}
+      pagesLabel=${m('pages')} pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${secRows(ctx, rows)}
+      ${secConnect(ctx, proven)}
+      ${secInstructions(ctx)}
+      ${secSuggest(ctx, on)}
+    <//>`;
 }
 
 function secRows(ctx, rows) {
   return html`
-    <${PageSection} id="mcp-rows" num="01" title=${m('secRows')} count=${rows.length} first
-      doors=${html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => goTab('agents')}>${m('allAgents')}</button>`}>
-      ${ctx.agents === null ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>`
-        : !rows.length ? html`<p class="poster-quiet mc-empty"><b>${m('emptyRowsHead')}</b> ${m('emptyRows')}</p>` : html`
-        <div class="listing listing--cols listing--mark-name-who-when-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label" aria-hidden="true"></div><div class="poster-label">${m('colAi')}</div><div class="poster-label">${m('colMay')}</div><div class="poster-label">${m('colWhen')}</div><div class="poster-label"></div></div>
-          ${rows.map((r) => {
-            const may = r.agent ? mayWord(r.agent) : null;
-            return html`
-            <div class="listing-row" key=${r.id}>
-              <div><div class=${`mc-av poster-box poster-box--avatar poster-box--small ${r.kind === 'tool' && r.gone ? 'poster-box--agent' : ''}`} aria-hidden="true">${r.gone ? '?' : initials(r.tool)}</div></div>
-              <div class="listing-name">${r.tool}<small>${r.name || m('agentNone')}</small></div>
-              <div class="listing-who">${may ? html`<b class=${may.full ? 'mc-coral' : ''}>${may.word}</b><small>${may.note}</small>` : html`<b>${m('agentGone')}</b><small>${m('agentGoneNote')}</small>`}</div>
-              <div class="listing-who"><b>${r.when ? rel(r.when) : m('neverUsed')}</b><small>${m('since', { date: day(r.since) })}</small></div>
-              <div class="listing-doors">
-                ${r.agent ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openAgent(r)}>${m('open')}</button>` : null}
-                <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${ctx.busy === r.id} onClick=${() => ctx.disconnect(r)}>${r.gone ? m('removeRow') : m('disconnect')}</button>
-              </div>
-            </div>`;
-          })}
-        </div>`}
-      <${Hint}>${m('rowsHint')}<//>
+    <${Section} id="mcp-rows" num="01" title=${m('secRows')} count=${rows.length} first
+      doors=${html`<${Action} small soft onClick=${() => goTab('agents')}>${m('allAgents')}<//>`}>
+      <${List} cols="mark-name-who-when-doors" keepCols loading=${ctx.agents === null ? t('common.loading') : false}
+        head=${['', m('colAi'), m('colMay'), m('colWhen'), '']}
+        empty=${html`<${Note} kind="quiet"><b>${m('emptyRowsHead')}</b> ${m('emptyRows')}<//>`}
+        rows=${rows} render=${(r) => {
+          const may = r.agent ? mayWord(r.agent) : null;
+          return html`
+            <${Row} key=${r.id}>
+              <${Lead} text=${r.gone ? '?' : initials(r.tool)} agent=${r.kind === 'tool' && r.gone} />
+              <${Name} meta=${r.name || m('agentNone')}>${r.tool}<//>
+              ${may
+                ? html`<${Who} sub=${may.note}>${may.full ? html`<${Tinted} strong tone="notice">${may.word}<//>` : html`<b>${may.word}</b>`}<//>`
+                : html`<${Who} sub=${m('agentGoneNote')}><b>${m('agentGone')}</b><//>`}
+              <${Who} sub=${m('since', { date: day(r.since) })}><b>${r.when ? rel(r.when) : m('neverUsed')}</b><//>
+              <${Doors}>
+                ${r.agent ? html`<${Action} small row onClick=${() => ctx.openAgent(r)}>${m('open')}<//>` : null}
+                <${Action} small row soft disabled=${ctx.busy === r.id} onClick=${() => ctx.disconnect(r)}>${r.gone ? m('removeRow') : m('disconnect')}<//>
+              <//>
+            <//>`;
+        }} />
+      <${Note}>${m('rowsHint')}<//>
     <//>`;
 }
 
@@ -130,14 +132,14 @@ function secSuggest(ctx, on) {
   const p = ctx.proactive;
   const operatorOff = p?.available_here === false;
   return html`
-    <${PageSection} id="mcp-suggest" num="04" title=${m('secSuggest')} count=${null}>
-      <div class="mc-setting">
-        <div class="mc-setting-words">
-          <b class="sub-heading">${m('suggestTitle')}</b>
-          <p class="poster-hint">${m('suggestDesc')}${p?.set_by === 'ai' ? html` <span class="mc-by">${t('profile.mcp.proactiveSetByAi')}</span>` : null}</p>
-          ${operatorOff ? html`<p class="poster-hint mc-by">${t('profile.mcp.proactiveOperatorOff')}</p>` : null}
-        </div>
+    <${Section} id="mcp-suggest" num="04" title=${m('secSuggest')} count=${null}>
+      <${Line} gap="section" align="start" justify="between" wrap>
+        <${Stack} gap="none">
+          <${SubHeading}>${m('suggestTitle')}<//>
+          <${Note}>${m('suggestDesc')}${p?.set_by === 'ai' ? html` <${Tinted} tone="notice">${t('profile.mcp.proactiveSetByAi')}<//>` : null}<//>
+          ${operatorOff ? html`<${Note}><${Tinted} tone="notice">${t('profile.mcp.proactiveOperatorOff')}<//><//>` : null}
+        <//>
         ${operatorOff || !p ? null : html`<${Switch} on=${on} ariaLabel=${m('suggestTitle')} onToggle=${() => ctx.setProactiveEnabled(!on)} />`}
-      </div>
+      <//>
     <//>`;
 }

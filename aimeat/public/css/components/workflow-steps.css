@@ -5,27 +5,32 @@
  * @description A workflow's steps, one per row with a rule under it: the number in coral typewriter,
  *   the step's name in bold with its agent in typewriter under it, what it takes and gives in grey
  *   (the memory key in typewriter), and on the right its state and what was seen, a line each; on a
- *   narrow screen the state goes under the words. Drawn only by the Workflows page (a workflow and
- *   one of its runs); moved here unchanged with its class names (UI consolidation phase 5, a move).
- *   Drawn as markup by views/profile/workflows/detail.js and run.js.
+ *   narrow screen the state goes under the words. Drawn by components/WorkflowSteps.js (the Workflows
+ *   page: a workflow and one of its runs), with its own class names (.workflow-steps-*).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — The component's own class names (.wp-step → .workflow-steps-step, .wp-step-n →
+ *     .workflow-steps-num, .wp-step-body → .workflow-steps-body, .wp-sig → .workflow-steps-line,
+ *     .wp-sig--key → .workflow-steps-line--key, .wp-step-st → .workflow-steps-state); every declaration
+ *     and selector shape kept (Jouni: components draw only their own class names, a move).
+ *   v1.1.0 — 2026-09-26 — Drawn by components/WorkflowSteps.js; the state is the Status (a span, as the
+ *     Mark draws it), so the line rule reads the lines only and the Status keeps its own box (page group G5).
  *   v1.0.0 — 2026-09-25 — Moved out of workflows-poster.css (UI consolidation phase 5, a move).
  */
 
-.wp-step { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) minmax(0, 11rem); gap: 0 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); align-items: start; }
-.wp-step-n { font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; color: var(--accent); }
-.wp-step-body { min-width: 0; }
-.wp-step-body > b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
-.wp-step-body > b small { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
-.wp-sig { margin-top: .3rem; font-size: .84rem; line-height: 1.5; color: var(--text-dim); max-width: 70ch; overflow-wrap: anywhere; }
-.wp-sig--key { font-family: var(--font-mono); font-size: .72rem; }
-.wp-step-st { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.55; color: var(--text-dim); }
-.wp-step-st span { display: block; }
+.workflow-steps-step { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) minmax(0, 11rem); gap: 0 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); align-items: start; }
+.workflow-steps-num { font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; color: var(--accent); }
+.workflow-steps-body { min-width: 0; }
+.workflow-steps-body > b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+.workflow-steps-body > b small { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.workflow-steps-line { margin-top: .3rem; font-size: .84rem; line-height: 1.5; color: var(--text-dim); max-width: 70ch; overflow-wrap: anywhere; }
+.workflow-steps-line--key { font-family: var(--font-mono); font-size: .72rem; }
+.workflow-steps-state { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.55; color: var(--text-dim); }
+.workflow-steps-state > span:not(.poster-status) { display: block; }
 
 @media (max-width: 900px) {
-  .wp-step { grid-template-columns: 2rem minmax(0, 1fr); }
-  .wp-step-st { grid-column: 2; text-align: left; }
-  .wp-step-st b { margin-right: .6rem; }
-  .wp-step-st span { display: inline; margin-right: .6rem; }
+  .workflow-steps-step { grid-template-columns: 2rem minmax(0, 1fr); }
+  .workflow-steps-state { grid-column: 2; text-align: left; }
+  .workflow-steps-state > .poster-status { margin-right: .6rem; }
+  .workflow-steps-state > span:not(.poster-status) { display: inline; margin-right: .6rem; }
 }

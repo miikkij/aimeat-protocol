@@ -9,6 +9,7 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (QuestionDesk, List with its Row, Cell, Name, Desc and Doors, Figure, Found, SettingsPage with its crumb and rail as data): the page passes data and writes no class (page group G8).
  *   v1.11.0 -- 2026-09-26 -- The rows of entries are the Listing (listing, listing-row and its head row, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.10.0 -- 2026-09-26 -- The line under an entry's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -33,7 +34,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { Hint } from '/components/Hint.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { QuestionDesk } from '/components/QuestionDesk.js';
+import { List, Row, Name, Desc, Cell, Doors, Found } from '/components/List.js';
+import { Figure } from '/components/Figure.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
 
 export const c = (key, vars) => t('discover.cover.' + key, vars);
 // The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
@@ -50,13 +56,13 @@ export const kindName = (type) => t('discover.type.' + type) || type;
 export const kindSub = (type) => c('kindSub.' + type);
 export const SCOPES = ['own', 'public', 'shared'];
 
-/** Split a text at the query words and mark them; plain strings when there is no query. */
+/** Split a text at the query words and mark them (the List's Found); plain strings when there is no query. */
 export function hl(text, words) {
   const s = String(text || '');
   if (!words.length || !s) return s;
   const re = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'ig');
   const parts = s.split(re);
-  return parts.map((p, i) => (i % 2 ? html`<mark key=${i}>${p}</mark>` : p));
+  return parts.map((p, i) => (i % 2 ? html`<${Found} key=${i}>${p}<//>` : p));
 }
 
 export const placeOf = (e) => (e.place ? `${e.place.organism} › ${e.place.workspace}${e.segment && e.type === 'document' ? ` › ${e.segment}` : ''}` : (e.segment && e.type !== 'memory' ? e.segment : ''));
@@ -64,65 +70,67 @@ export const placeOf = (e) => (e.place ? `${e.place.organism} › ${e.place.work
 /** The search desk: the field, the scope beside it with a count per scope, one hint. */
 export function desk(ctx) {
   const count = (s) => { const f = ctx.facets[s]; if (!f) return ''; return (s === 'public' && f.types.some(x => x.count >= 50)) ? `${num(f.total)}+` : num(f.total); };
-  return html`
-    <div class="dv-desk poster-row--thing">
-      <input type="search" class="dv-field" value=${ctx.q} placeholder=${ctx.scope === 'public' ? c('askPublic') : c('ask')}
-        onInput=${(e) => ctx.setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') ctx.submit(); }} />
-      <div class="pf-tabs dv-scope">
-        ${SCOPES.map(s => html`<button type="button" key=${s} class=${`poster-tab ${ctx.scope === s ? 'is-on' : ''}`} onClick=${() => ctx.setScope(s)}>${t('discover.scope.' + s)}<i>${count(s) || (s === ctx.scope ? '…' : '')}</i></button>`)}
-      </div>
-      <${Hint}>${!ctx.facets[ctx.scope] ? html`<span class="loading-mark">${c('loading')}</span>` : ctx.query ? c('hintResults') : c('hint')}<//>
-    </div>`;
+  const hint = !ctx.facets[ctx.scope] ? html`<${Note} kind="loading" inline>${c('loading')}<//>` : ctx.query ? c('hintResults') : c('hint');
+  return html`<${QuestionDesk}
+    value=${ctx.q}
+    placeholder=${ctx.scope === 'public' ? c('askPublic') : c('ask')}
+    onInput=${(v) => ctx.setQ(v)}
+    onEnter=${() => ctx.submit()}
+    scopes=${SCOPES.map(s => ({ value: s, key: s, label: t('discover.scope.' + s), count: count(s) || (s === ctx.scope ? '…' : '') }))}
+    scope=${ctx.scope}
+    onScope=${(s) => ctx.setScope(s)}
+    hint=${hint} />`;
 }
 
-/** The rows of entries (Listing rows): when, what (with the words marked), kind and place, a door. */
+/** The rows of entries (List rows): when, what (with the words marked), kind and place, a door. */
 export function entryCells(ctx, list, { words = [], time = true } = {}) {
-  return list.map((e, i) => html`
-    <div class="listing-row" key=${'e' + i}>
-      ${time ? html`<div class="dv-at poster-stat-number poster-stat-number--small">${hhmm(new Date(e.updatedAt))}<small>${dayLabel(new Date(e.updatedAt))}</small></div>` : null}
-      <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => openEntry(ctx, e)}>${hl(e.title || e.id, words)}</button>${e.description ? html`<small class="listing-meta">${hl(e.description, words)}</small>` : null}</div>
-      <div class="listing-desc"><b>${kindName(e.type)}</b>${placeOf(e) ? ` · ${placeOf(e)}` : ''}${!time ? ` · ${rel(e.updatedAt)}` : ''}</div>
-      <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => openEntry(ctx, e)}>${c('open')}</button></div>
-    </div>`);
+  return list.map((e, i) => {
+    const open = () => openEntry(ctx, e);
+    const at = new Date(e.updatedAt);
+    return html`
+    <${Row} key=${'e' + i}>
+      ${time ? html`<${Cell}><${Figure} small n=${hhmm(at)} sub=${dayLabel(at)} /><//>` : null}
+      <${Name} onOpen=${open} clip=${time ? true : 2} meta=${e.description ? hl(e.description, words) : null}>${hl(e.title || e.id, words)}<//>
+      <${Desc}><b>${kindName(e.type)}</b>${placeOf(e) ? ` · ${placeOf(e)}` : ''}${!time ? ` · ${rel(e.updatedAt)}` : ''}<//>
+      <${Doors}><${Action} small row onClick=${open}>${c('open')}<//><//>
+    <//>`;
+  });
 }
-/** The Listing of entries; with `time: false` the hits' cut (no when column), with `head` its heading row. */
+/** The List of entries; with `time: false` the hits' cut (no when column), with `head` its heading row. */
 export function entryRows(ctx, list, opts = {}) {
   const hits = opts.time === false;
-  return html`<div class=${`listing listing--cols dv-rows ${hits ? 'listing--name-where-doors dv-rows--hits' : 'listing--when-name-where-doors'}`}>${opts.head ? rowsHead() : null}${entryCells(ctx, list, opts)}</div>`;
+  return html`<${List} keepCols cols=${hits ? 'name-where-doors' : 'when-name-where-doors'}
+    head=${opts.head ? [c('colWhen'), c('colWhat'), c('colKindPlace'), ''] : null}>${entryCells(ctx, list, opts)}<//>`;
 }
-const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colWhen')}</div><div class="poster-label">${c('colWhat')}</div><div class="poster-label">${c('colKindPlace')}</div><div class="poster-label"></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
+/** The crumb's steps: Discover opens the cover once a page stands after it; every part after it is ink. */
 export function crumb(ctx, parts) {
-  return html`
-    <div class="og-crumb">
-      <span>${t('nav.profile')}</span><span>/</span>
-      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('discover.title')}</button>` : html`<span class="og-crumb-here">${t('discover.title')}</span>`}
-      ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
-    </div>`;
+  return [
+    t('nav.profile'),
+    parts.length ? { label: t('discover.title'), onClick: () => ctx.pickView({ kind: 'cover' }) } : t('discover.title'),
+    ...parts.map((p) => ({ label: p, here: true })),
+  ];
 }
 
-export function renderPage(ctx, { crumbs, title, chips = null, doors = null, rail = null, children }) {
+/**
+ * A page of Discover (results, a kind, a place): the crumb, the head with its tags and doors, the
+ * desk, and the rail that leads back to the cover and then `railGroup` (a labelled group of items).
+ */
+export function renderPage(ctx, { crumbs, title, marks = [], doors = null, railGroup = null, children }) {
   return html`
-    <div class="og og-dv og-page">
-      ${crumb(ctx, crumbs)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title dv-title--page">${title}</h1>
-          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      ${desk(ctx)}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${t('discover.title')}</span>
-          <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
-          ${rail}
-        </nav>
-      </div>
-    </div>`;
+    <${SettingsPage} name="dv" page
+      crumb=${crumb(ctx, crumbs)}
+      title=${title}
+      marks=${marks}
+      actions=${doors ? html`<${Actions}>${doors}<//>` : null}
+      strip=${desk(ctx)}
+      rail=${{ title: c('railTitle'), groups: [
+        { label: t('discover.title'), items: [{ back: true, key: 'back', label: c('backTo'), onClick: () => ctx.pickView({ kind: 'cover' }) }] },
+        railGroup,
+      ].filter(Boolean) }}>
+      ${children}
+    <//>`;
 }
 
 /**

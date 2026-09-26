@@ -11,6 +11,8 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-26 -- buildBreadcrumb returns the crumb's steps as data for the library's Crumb
+ *     (components/Crumb.js); the module writes no markup (page migration G2b).
  *   v1.3.0 -- 2026-09-25 -- The breadcrumb shown while a workspace loads is the crumb trail (.og-crumb, css/components/crumb-trail.css), as every page head draws it (a unification: the look most tabs use).
  *   v1.2.0 — 2026-08-29 — openGroup and scrollToSpace removed with the tab block (cover.js opens a space
  *     as a page; a group is a table on the cover).
@@ -19,29 +21,23 @@
  *       is not a loss: it only fired when navigator.clipboard rejected, exactly the case the shared
  *       helper handles by falling back to execCommand and succeeding.
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
 import { cap, PRIMARY_FIELD } from './helpers.js';
 
 // Same breadcrumb pattern as the organism home: Organisms / {org} / {workspace} — both ancestors
-// are links, so the list is one click away from inside a workspace too.
+// are links, so the list is one click away from inside a workspace too. The steps are data for the
+// library's Crumb (components/Crumb.js); the last plain step is the page you are on.
 export function buildBreadcrumb(ctx) {
   const { onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws } = ctx;
-  return html`
-    <div class="og-crumb">
-      <button type="button" class="og-crumb-link" onClick=${onBackToList || onBack}>${t('organisms.title') || 'Organisms'}</button>
-      <span>/</span>
-      <button type="button" class="og-crumb-link" onClick=${onBack}>${(org.name || org.id || '')}</button>
-      <span>/</span>
-      ${showSettings ? html`
-        <button type="button" class="og-crumb-link" onClick=${() => guardWsDirty(() => setShowSettings(false))}>${(wsName || ws?.manifest?.name || '…')}</button>
-        <span>/</span>
-        <span class="og-crumb-here">${t('organisms.settings') || 'Settings'}</span>
-      ` : html`<span class="og-crumb-here">${(wsName || ws?.manifest?.name || '…')}</span>`}
-    </div>`;
+  const name = wsName || ws?.manifest?.name || '…';
+  return [
+    { label: t('organisms.title') || 'Organisms', onClick: onBackToList || onBack },
+    { label: org.name || org.id || '', onClick: onBack },
+    ...(showSettings
+      ? [{ label: name, onClick: () => guardWsDirty(() => setShowSettings(false)) }, t('organisms.settings') || 'Settings']
+      : [name]),
+  ];
 }
 
 // Build the whole derived view-model for a loaded workspace. `loadShare` stays in the parent (it is

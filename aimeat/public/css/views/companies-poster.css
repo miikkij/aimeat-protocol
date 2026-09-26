@@ -8,6 +8,7 @@
  *   rows on the cover, the facts grid with its consequences, the front-page choice row, the edit
  *   and SMTP grids, the events rows and the chat roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- The pages' parts are kit components (page group G8): the strip's coral figure (FigureStrip notice), the row mark .co-av (List Lead), .co-create (TextField actions), a missing detail (Facts missing), .co-edit and .co-smtp (Fields cols 2, Check), .co-form-doors (FormActions), .co-choice (Choice), .co-front-ctl (Layout Row), .co-file (FileDrop button) and their phone lines go. The address preview is AddressPreview.js on its own sheet.
  *   v1.11.0 -- 2026-09-25 -- "No organisms yet" is the quiet sentence (.poster-quiet), a unification: Jouni's decision "Empty line". The rule of .co-hint goes; the file picker's label keeps its place (display block, margin .6rem above) on .co-file.
  *   v1.10.0 -- 2026-09-25 -- The details not all filled in are the Status (attention), a unification: Jouni's decision "Status". The rule of .co-warn goes.
  *   v1.9.0 -- 2026-09-25 -- What the front page shows is a choice: the Tab (.poster-tab), a unification: Jouni's decision "Choice". The joined buttons' rules go, the row takes the tabs' gap; the unused .og-door.on rule goes (no Companies door has it).
@@ -24,48 +25,6 @@
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 
-.og-co .og-strip b.og-coral { color: var(--accent); }
 .og-co .poster-quiet { margin: 0; }
 .og-co .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-co .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* ── The company rows on the cover: the Listing (css/components/listing.css) ────────────────── */
-.og-co .co-av { width: 2.2rem; height: 2.2rem; }
-
-/* ── Register a company ─────────────────────────────────────────────────────────────────────── */
-.co-create { display: flex; gap: 1rem; align-items: flex-end; }
-.co-create .co-field { flex: 1; min-width: 0; }
-.co-create .og-input { width: 100%; box-sizing: border-box; }
-/* The address a name gets is the Address preview (css/components/address-preview.css). */
-
-/* ── The registered details: the Facts (css/components/facts.css); a missing one in grey italics ── */
-.og-co .facts-v.miss { color: var(--text-dim); font-style: italic; }
-
-/* The edit form over the same grid: label over input, two columns. */
-.co-edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem 1.6rem; }
-.co-edit label { display: block; min-width: 0; }
-.co-edit label span { display: block; margin-bottom: .25rem; }
-.co-edit .og-input { width: 100%; box-sizing: border-box; }
-.co-form-doors { margin-top: 1rem; }
-
-/* ── The front page choice ──────────────────────────────────────────────────────────────────── */
-/* The choice is the Tab (.poster-tab); its row takes the tabs' gap where the joined look had none. */
-.co-choice { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; }
-.co-front-ctl { margin-top: .8rem; display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
-.co-front-ctl .og-input, .co-front-ctl .select-field { min-width: 16rem; }
-.co-file { display: block; margin: .6rem 0 0; }
-.co-file input[type='file'] { display: none; }
-
-/* ── The SMTP grid (in the fold) ────────────────────────────────────────────────────────────── */
-.co-smtp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem 1.6rem; }
-.co-smtp label { display: block; min-width: 0; }
-.co-smtp label span { display: block; margin-bottom: .25rem; }
-.co-smtp .og-input { width: 100%; box-sizing: border-box; }
-.co-smtp .co-check { display: flex; align-items: center; gap: .6rem; }
-.co-smtp .co-check span { margin-bottom: 0; }
-
-/* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .co-edit, .co-smtp { grid-template-columns: 1fr; }
-  .co-create { flex-direction: column; align-items: stretch; }
-}

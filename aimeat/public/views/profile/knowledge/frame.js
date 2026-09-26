@@ -5,11 +5,15 @@
  * @description What the Knowledge cover, the package page and the public library share: the words a
  *   package is described in (kind, maturity, synthesis, visibility, a relation), what a manifest
  *   adds up to (entries, public entries, references and how many are verified), which group a
- *   package belongs to (drafts, published, datasets), the rows of a packages table, the crumb and
- *   the page frame with its rail.
- * @structure c · words · pkgId · statsOf · groupOf · packageRows · crumb · renderPage · entryText
- * @usage import { renderPage, packageRows, statsOf } from './frame.js';
+ *   package belongs to (drafts, published, datasets), a row of a packages table and its heads, the
+ *   crumb's steps, the rail's sibling pages and a package's page frame (SettingsPage).
+ * @structure c · words · pkgId · statsOf · groupOf · packageHead · packageRow · crumb · pageLinks · renderPage · entryText
+ * @usage import { renderPage, packageRow, packageHead, statsOf } from './frame.js';
  * @version-history
+ *   v1.10.0 -- 2026-09-26 -- On the component kit (page group G7): a packages row is the List's Row
+ *     (Name that opens the package, Desc, When, Doors with the Action); the crumb returns its steps
+ *     and pageLinks its items as data; a package's page is the SettingsPage (page, the rail as data:
+ *     Knowledge with the way back, the page's groups, the sibling pages). No class is written here.
  *   v1.9.0 -- 2026-09-26 -- The packages table is the Listing (listing, listing-row and its head row, name, words and doors cells; a group's heading inside it; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.8.0 -- 2026-09-26 -- The line under a package's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -30,6 +34,9 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Action, Actions } from '/components/Action.js';
+import { Row, Name, Desc, When, Doors } from '/components/List.js';
 
 export const c = (key, vars) => t('knowledge.cover.' + key, vars);
 // The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
@@ -94,61 +101,49 @@ export function entryText(data) {
   return JSON.stringify(data, null, 2);
 }
 
-/** Rows of a packages table: name and its line, entries, sharing, changed, a door. */
-export function packageRows(ctx, list, { head = false, label = null } = {}) {
-  return html`<div class="listing listing--cols listing--name-count-words-when-doors">
-    ${head ? rowsHead() : null}
-    ${label}
-    ${list.map(pkg => { const m = manifestOf(pkg); const s = statsOf(m); const id = pkgId(pkg); return html`
-      <div class="listing-row" key=${id}>
-        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'package', id })}>${m.name || c('untitled')}</button><small class="listing-meta">${subOf(m)}</small></div>
-        <div class="listing-desc"><b>${s.entries}</b> ${c('entriesWord', { n: s.entries })}${s.refs ? html`<br />${c('refsVerified', { v: s.verified, n: s.refs })}` : null}</div>
-        <div class="listing-desc">${sharingWords(m, !!ctx.fedConsents?.[id]).join(' · ')}</div>
-        <div class="poster-time">${rel(m.updated || pkg.updated_at || pkg.updatedAt)}</div>
-        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'package', id })}>${c('open')}</button></div>
-      </div>`; })}
-  </div>`;
+/** The column heads of a packages table: the package, its entries, its sharing, when it changed, the door. */
+export const packageHead = () => [c('colPackage'), c('colEntries'), c('colSharing'), c('colChanged'), ''];
+
+/** One row of a packages table (a List with cols="name-count-words-when-doors"): name and its line, entries, sharing, changed, a door. */
+export function packageRow(ctx, pkg) {
+  const m = manifestOf(pkg); const s = statsOf(m); const id = pkgId(pkg);
+  const open = () => ctx.pickView({ kind: 'package', id });
+  return html`
+    <${Row} key=${id}>
+      <${Name} onOpen=${open} meta=${subOf(m)}>${m.name || c('untitled')}<//>
+      <${Desc}><b>${s.entries}</b> ${c('entriesWord', { n: s.entries })}${s.refs ? html`<br />${c('refsVerified', { v: s.verified, n: s.refs })}` : null}<//>
+      <${Desc}>${sharingWords(m, !!ctx.fedConsents?.[id]).join(' · ')}<//>
+      <${When}>${rel(m.updated || pkg.updated_at || pkg.updatedAt)}<//>
+      <${Doors}><${Action} small row onClick=${open}>${c('open')}<//><//>
+    <//>`;
 }
-const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colPackage')}</div><div class="poster-label">${c('colEntries')}</div><div class="poster-label">${c('colSharing')}</div><div class="poster-label">${c('colChanged')}</div><div class="poster-label"></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
+/** The crumb's steps: Settings / Knowledge / the parts (each in ink: the page you are on). */
 export function crumb(ctx, parts) {
-  return html`
-    <div class="og-crumb">
-      <span>${t('nav.profile')}</span><span>/</span>
-      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('knowledge.tabLabel')}</button>` : html`<span class="og-crumb-here">${t('knowledge.tabLabel')}</span>`}
-      ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
-    </div>`;
+  const name = t('knowledge.tabLabel');
+  return [t('nav.profile'), parts.length ? { label: name, onClick: () => ctx.pickView({ kind: 'cover' }) } : name,
+    ...parts.map((p) => ({ label: p, here: true }))];
 }
 
+/** The rail's sibling pages, as data: the public library (a new window, ↗) and Discover. */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener')}><i>→</i>${c('library')}<em>↗</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'discover' } }))}><i>→</i>${t('discover.title')}<em>→</em></button>`;
+  return [
+    { onClick: () => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener'), label: c('library'), count: '↗' },
+    { tab: 'discover', label: t('discover.title') },
+  ];
 }
 
-export function renderPage(ctx, { crumbs, title, chips = null, doors = null, strip = null, rail = null, children }) {
-  return html`
-    <div class="og og-kp og-page">
-      ${crumb(ctx, crumbs)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title kp-title--page">${title}</h1>
-          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${t('knowledge.tabLabel')}</span>
-          <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
-          ${rail}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+/**
+ * A package's page: the crumb, the head (`marks` as Mark data, `doors`), the strip, the sections,
+ * and the rail: Knowledge with the way back, the page's own groups (`railGroups`), the sibling pages.
+ */
+export function renderPage(ctx, { crumbs, title, marks = null, doors = null, strip = null, railGroups = [], children }) {
+  return html`<${SettingsPage} name="kp" page crumb=${crumb(ctx, crumbs)} title=${title} marks=${marks || undefined}
+    actions=${doors ? html`<${Actions}>${doors}<//>` : null} strip=${strip}
+    rail=${{ title: c('railTitle'), groups: [
+      { label: t('knowledge.tabLabel'), items: [{ back: true, key: 'back', label: c('backTo'), onClick: () => ctx.pickView({ kind: 'cover' }) }] },
+      ...railGroups,
+      { label: c('pages'), items: pageLinks().map((p) => ({ mark: '→', count: '→', ...p })) },
+    ] }}>${children}<//>`;
 }

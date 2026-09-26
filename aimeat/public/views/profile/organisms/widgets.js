@@ -8,6 +8,8 @@
  * @structure StructureOverview
  * @usage import { StructureOverview } from '/views/profile/organisms/widgets.js';
  * @version-history
+ *   v1.6.1 — 2026-09-26 — The map scrolls after 32rem again, as on main (Box scroll="page"; fix pass).
+ *   v1.6.0 — 2026-09-26 — Every part is a kit component (page group G2a): the map stands in the Box's scroll cut (it scrolled after 32rem, now after the Box's 24rem), the loading line is the Note, the empty line the section description (HeadDesc). The page writes no class.
  *   v1.5.0 — 2026-09-26 — The structure map is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   v1.4.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.3.0 — 2026-09-26 — The structure overview opens under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
@@ -22,9 +24,11 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { LoadingLine } from '/views/profile/shared.js';
 import { Markdown } from '/components/Markdown.js';
 import { FoldSection } from '/components/FoldSection.js';
+import { Box } from '/components/Box.js';
+import { Note } from '/components/Note.js';
+import { HeadDesc } from '/components/SubHeading.js';
 
 /** Collapsible OKF-style structure-overview panel. A button that, on first expand, lazy-loads a
  *  deterministic Markdown structure map (server projection — never persisted) and renders it via the
@@ -56,15 +60,13 @@ export function StructureOverview({ load, label, defaultOpen }) {
     if (next) await fetchMd();
   };
   return html`
-    <div class="pj-struct-overview">
-      <${FoldSection} num="" title=${label} open=${open} onToggle=${toggle}>
-        <div class="pj-struct-body poster-box">
-          ${busy
-            ? html`<${LoadingLine} text=${t('organisms.loading') || 'Loading...'} />`
-            : (md
-              ? html`<${Markdown} text=${md} small />`
-              : html`<div class="section-desc">${t('organisms.structEmpty') || 'No structure to show yet.'}</div>`)}
-        </div>
+    <${FoldSection} num="" title=${label} open=${open} onToggle=${toggle}>
+      <${Box} scroll="page">
+        ${busy
+          ? html`<${Note} kind="loading">${t('organisms.loading') || 'Loading...'}<//>`
+          : (md
+            ? html`<${Markdown} text=${md} small />`
+            : html`<${HeadDesc}>${t('organisms.structEmpty') || 'No structure to show yet.'}<//>`)}
       <//>
-    </div>`;
+    <//>`;
 }

@@ -13,6 +13,7 @@
  *   - SchedulerTab (default) — state, the two loads, the action handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v2.2.0 -- 2026-09-26 -- The loading line is the Note's loading kind; the page writes no class (page group G5).
  *   v2.1.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Ajastimen sivu", direction A). The
  *     seven-column week grid and the wall of cards are replaced by the cover; a schedule opens as a
@@ -33,6 +34,7 @@ import { t } from '/js/i18n.js';
 import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules, getSchedulerTab, listScheduleOccurrences, getScheduleDetail, setScheduleEnabled, triggerSchedule, deleteSchedule } from '/js/services/schedules.js';
 import { swallowed } from '/js/swallowed.js';
+import { Note } from '/components/Note.js';
 import { buildModel, startOfDay } from './scheduler/model.js';
 import { renderSchedulerView } from './scheduler/cover.js';
 export { CreateForm } from './scheduler/create-form.js';
@@ -142,7 +144,7 @@ export default function SchedulerTab({ showToast }) {
     run(async () => { await deleteSchedule(s.id); showToast?.(t('profile.scheduler.cancelled')); setView({ kind: 'cover' }); });
   };
 
-  if (loading) return html`<div class="poster-quiet loading-mark sch-loading">${t('profile.scheduler.loading')}</div>`;
+  if (loading) return html`<${Note} kind="loading">${t('profile.scheduler.loading')}<//>`;
 
   const ctx = {
     showToast, loadData, error, agents, model, internal: data.agentInternal || [], reloadTick, occLoading,

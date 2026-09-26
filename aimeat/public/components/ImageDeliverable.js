@@ -29,6 +29,8 @@
  *     deliverable.format:"json") as a key/value tree via the shared JsonNode, instead of raw JSON in
  *     a <pre>. Plain-string / image paths unchanged. Pairs with deliverable.format:"json".
  *   v1.1.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
+ *   v1.2.0 -- 2026-09-26 -- A descriptor may carry `title`, the link's tooltip when it differs from the
+ *     picture's alt (the agent's stored value: "open the full image"); additive, by page group G1b.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -173,8 +175,9 @@ export function ImageView({ desc }) {
   if (!src) return html`<div class="imgd imgd--loading">${t('imageDeliverable.loading')}</div>`;
   // For authed images the href opens the same blob; for anon, the original URL.
   const href = authed ? src : url;
+  // A descriptor's own `title` names the link when the page says it apart from the picture's alt.
   return html`
-    <a class="imgd" href=${href} target="_blank" rel="noopener noreferrer" title=${alt || t('imageDeliverable.open')}>
+    <a class="imgd" href=${href} target="_blank" rel="noopener noreferrer" title=${desc?.title || alt || t('imageDeliverable.open')}>
       <img class="imgd-thumb" src=${src} alt=${alt} loading="lazy" onError=${() => setFailed(true)} />
     </a>`;
 }

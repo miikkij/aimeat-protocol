@@ -15,6 +15,9 @@
  *   buildOrganismMindmap / buildWorkspaceMindmap (chart-type aware, used here + by the timeline)
  * @usage import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
  * @version-history
+ *   v1.8.0 — 2026-09-26 — The map is the library's MindMap (components/MindMap.js: its options row, the
+ *     clickable diagram and the hint, as data); the fold around it is the FoldSection, and the page
+ *     writes no class (page migration G2b).
  *   v1.7.0 — 2026-09-26 — The map's three options are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.6.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.5.0 — 2026-09-26 — The map opens under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
@@ -34,7 +37,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Mermaid } from '/components/Mermaid.js';
+import { MindMap } from '/components/MindMap.js';
 import { FoldSection } from '/components/FoldSection.js';
 
 /** Sanitize a label for a Mermaid quoted flowchart string. */
@@ -263,49 +266,31 @@ export function StructureMindmap({ scope, graph, onNavigate, label, storageKey, 
     ? (scope === 'organism' ? buildOrganismMindmap(graph, opts) : buildWorkspaceMindmap(graph, opts))
     : '';
 
-  const onMapClick = (e) => {
+  // A pressed node: a mind map's nodes resolve by their words, a flowchart's by the id of the node.
+  const onNode = ({ text, id, inNode }) => {
     if (opts.chartType === 'mindmap') {
-      const g = e.target?.closest?.('.mindmap-node, [class*="mindmap"], g');
-      const target = resolveMindmapClick(scope, graph, (g?.textContent) || e.target?.textContent || '');
+      const target = resolveMindmapClick(scope, graph, text);
       if (target) onNavigate?.(target);
     } else {
-      const node = e.target?.closest?.('.node');
-      if (!node) return;
-      const target = resolveFlowchartClick(scope, graph, node.id || '');
+      if (!inNode) return;
+      const target = resolveFlowchartClick(scope, graph, id);
       if (target) onNavigate?.(target);
     }
   };
 
   const lbl = label || (scope === 'organism' ? (t('mindmap.titleOrg') || 'Organism map') : (t('mindmap.titleWs') || 'Workspace map'));
+  const options = [
+    { kind: 'select', key: 'chart', label: t('mindmap.chart') || 'Chart', value: opts.chartType, onChange: (v) => set({ chartType: v }),
+      options: CHART_TYPES.map(c => [c.key, t(c.label) || c.fallback]) },
+    { kind: 'select', key: 'level', label: t('mindmap.level') || 'Level', value: opts.level, onChange: (v) => set({ level: v }),
+      options: LEVELS.map(l => [l.key, t(l.label) || l.fallback]) },
+    scope === 'organism' ? { kind: 'check', key: 'users', label: t('mindmap.showUsers') || 'Users', checked: opts.showUsers, onChange: (on) => set({ showUsers: on }) } : null,
+    { kind: 'check', key: 'activity', label: t('mindmap.showActivity') || 'Activity', checked: opts.showActivity, onChange: (on) => set({ showActivity: on }) },
+    { kind: 'check', key: 'heat', label: t('mindmap.heatmap') || 'Heatmap', checked: opts.heatmap, onChange: (on) => set({ heatmap: on }) },
+  ];
 
   return html`
-    <div class="pj-mindmap">
-      <${FoldSection} num="" title=${lbl} open=${open} onToggle=${() => setOpen(o => !o)}>
-        <div class="pj-mindmap-body poster-box">
-          <div class="pj-mindmap-opts">
-            <label class="pj-mm-opt">
-              <span>${t('mindmap.chart') || 'Chart'}</span>
-              <select class="select-field" value=${opts.chartType} onChange=${e => set({ chartType: e.target.value })}>
-                ${CHART_TYPES.map(c => html`<option value=${c.key}>${t(c.label) || c.fallback}</option>`)}
-              </select>
-            </label>
-            <label class="pj-mm-opt">
-              <span>${t('mindmap.level') || 'Level'}</span>
-              <select class="select-field" value=${opts.level} onChange=${e => set({ level: e.target.value })}>
-                ${LEVELS.map(l => html`<option value=${l.key}>${t(l.label) || l.fallback}</option>`)}
-              </select>
-            </label>
-            ${scope === 'organism' ? html`
-              <label class="pj-mm-check check-line"><input type="checkbox" checked=${opts.showUsers} onChange=${e => set({ showUsers: e.target.checked })} /> ${t('mindmap.showUsers') || 'Users'}</label>
-            ` : null}
-            <label class="pj-mm-check check-line"><input type="checkbox" checked=${opts.showActivity} onChange=${e => set({ showActivity: e.target.checked })} /> ${t('mindmap.showActivity') || 'Activity'}</label>
-            <label class="pj-mm-check check-line"><input type="checkbox" checked=${opts.heatmap} onChange=${e => set({ heatmap: e.target.checked })} /> ${t('mindmap.heatmap') || 'Heatmap'}</label>
-          </div>
-          <div class="pj-mindmap-canvas of-mapwrap--clickable" onClick=${onMapClick}>
-            <${Mermaid} chart=${src} />
-          </div>
-          <div class="poster-hint">${t('mindmap.clickHint') || 'Click a node to open it.'}</div>
-        </div>
-      <//>
-    </div>`;
+    <${FoldSection} num="" title=${lbl} open=${open} onToggle=${() => setOpen(o => !o)}>
+      <${MindMap} chart=${src} options=${options} onNode=${onNode} hint=${t('mindmap.clickHint') || 'Click a node to open it.'} />
+    <//>`;
 }

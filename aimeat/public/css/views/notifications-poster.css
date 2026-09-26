@@ -8,6 +8,7 @@
  *   table, the sender rows with the switch, the device cards, the quiet-hours form, the three
  *   roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- The page's parts are kit components (page group G8): the inbox rows, the sender marks and a muted sender (List When, Who, Name, Lead, Mark), the groups' indent (List under in the edge Box), the devices (framed Cards: current, off), the quiet hours' row and fields (Fields, Switch, TextField, Choice), the more line and their phone lines go; .og-door--coral had no user left.
  *   v1.14.0 -- 2026-09-26 -- The groups under AIMEAT's sender row are the Panel (.poster-panel, its sun edge), a unification: the look the library carries for a part set apart by the sun.
  *   v1.13.0 -- 2026-09-26 -- The dashed avatar is the avatar's agent tone in css/poster.css (.poster-box--agent); its rule here goes.
  *   v1.12.0 -- 2026-09-25 -- The ways to do one thing are the library's How roads (css/components/how-roads.css), moved unchanged with their class names (UI consolidation phase 5, a move).
@@ -28,47 +29,7 @@
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-nt .og-door--coral { color: var(--accent); border-bottom-color: var(--accent); }
 .og-nt .poster-quiet { margin: 0; }
 .og-nt .poster-hint { display: block; }
 .og-nt .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-nt .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.og-nt .nt-more { margin-top: .8rem; }
-
-/* ── The switch is the library's (css/components/switch.css); "muted" stands in its place ─────── */
-.nt-muted { min-width: 5.2rem; text-align: right; }
-
-/* ── The inbox ──────────────────────────────────────────────────────────────────────────────── */
-
-/* ── Senders: the Listing (css/components/listing.css) ───────────────────────────────────────── */
-/* The mark is a whole box of its own here: the contacts rule is scoped to its own rows. */
-.og-nt .nt-av { width: 2.2rem; height: 2.2rem; }
-/* The groups under AIMEAT's row are the Panel (.poster-panel, its sun edge); their indent only. */
-.nt-groups { margin: 0 0 .4rem 1.6rem; padding-left: 1rem; }
-.nt-empty-senders { padding: .7rem 0; }
-
-/* ── Devices ────────────────────────────────────────────────────────────────────────────────── */
-.nt-dev { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.nt-dev-card { margin: 0; padding: .8rem .9rem; font-size: .85rem; line-height: 1.5; display: flex; flex-direction: column; gap: .3rem; }
-.nt-dev-card.this { border-color: var(--accent); }
-.nt-dev-card.dim { border-style: dashed; color: var(--text-dim); }
-.nt-dev-card b { font-weight: 800; font-size: .95rem; color: var(--text); }
-.nt-dev-card.dim b { color: var(--text-dim); }
-.nt-dev-card small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-.nt-dev-card .og-doors { margin-top: auto; padding-top: .4rem; flex-wrap: wrap; }
-.nt-select { max-width: 12rem; }
-
-/* ── Quiet hours and the roads ──────────────────────────────────────────────────────────────── */
-.nt-kv { margin-top: .2rem; }
-.nt-quiet-row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
-.nt-time { width: 7rem; }
-.nt-tz { width: 12rem; }
-.nt-dash { color: var(--text-dim); }
-.nt-choice { margin-bottom: .2rem; }
-.nt-form-doors { margin-top: 1rem; }
-
-/* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .nt-dev { grid-template-columns: 1fr; }
-  .nt-groups { margin-left: .4rem; }
-}

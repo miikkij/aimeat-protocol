@@ -8,6 +8,10 @@
  * @structure WorkspaceComments
  * @usage import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
  * @version-history
+ *   v1.10.0 — 2026-09-26 — No class written: the heading is the Group heading, the empty and loading lines HeadDesc, the replying-to line the meta Note, the fields TextField and TextArea.
+ *   v1.9.0 — 2026-09-26 — A comment is the Message component's comment tone and the thread its Thread
+ *     (components/Message.js, css/components/message.css): the same frame, head line, reply edge and
+ *     form, given as data; the ways on are the kit (Action, Loud). comments.css has no user left.
  *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.7.0 — 2026-09-26 — When a comment was written is the Timestamp (.poster-time), not the tiny words (.pj-mini), a unification: Jouni's decision "Timestamp".
  *   v1.6.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
@@ -36,6 +40,12 @@ import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { getSession } from '/js/services/auth.js';
+import { Message, Thread, ThreadForm } from '/components/Message.js';
+import { Action, Loud } from '/components/Action.js';
+import { Group } from '/components/List.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { Note } from '/components/Note.js';
+import { TextField, TextArea } from '/components/TextField.js';
 
 /**
  * Comment thread on one workspace object (record or document). Targeted by orgId+ws+space+instanceId.
@@ -92,32 +102,27 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
 
   const list = comments || [];
   return html`
-    <div class="pj-comments">
-      <div class="detail-label poster-day-title">${(t('organisms.commentsHeading') || 'Comments') + (list.length ? ` (${list.length})` : '')}</div>
-      ${comments === null ? html`<div class="section-desc">…</div>` : null}
-      ${comments !== null && list.length === 0 ? html`<div class="section-desc">${t('organisms.noComments') || 'No comments yet.'}</div>` : null}
-      ${list.map(c => html`
-        <div class="pj-comment ${c.parentId ? 'pj-comment-reply' : ''}" key=${c.id}>
-          <div class="pj-comment-head">
-            <b>${(c.author || '?')}</b>
-            ${c.parentId ? html`<span class="pj-mini"> · ${t('organisms.inReply') || 'reply'}</span>` : null}
-            ${c.anchor?.quote ? html`<span class="pj-mini"> · “${(String(c.anchor.quote).slice(0, 80))}”</span>` : null}
-            ${c.anchor?.section ? html`<span class="pj-mini"> · §${(c.anchor.section)}</span>` : null}
-            <span class="poster-time"> · ${c.createdAt ? dt(c.createdAt) : ''}</span>
-          </div>
-          <div class="pj-comment-body">${(c.body || '')}</div>
-          <div class="pj-comment-actions">
-            <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}</button>
-            ${mine(c.author) ? html`<button class="poster-action poster-action--small" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}</button>` : null}
-          </div>
-        </div>
-      `)}
-      <div class="pj-comment-compose">
-        ${replyTo ? html`<div class="pj-mini">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <button class="poster-action poster-action--small" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}</button></div>` : null}
-        <input class="og-input" placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${(e) => setAnchorQuote(e.target.value)} />
-        <textarea class="og-textarea" rows="2" placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${(e) => setBody(e.target.value)}></textarea>
-        <button class="poster-slab poster-slab--control" disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}</button>
-      </div>
-    </div>
+    <${Thread} tone="comments">
+      <${Group} title=${(t('organisms.commentsHeading') || 'Comments') + (list.length ? ` (${list.length})` : '')} />
+      ${comments === null ? html`<${HeadDesc}>…<//>` : null}
+      ${comments !== null && list.length === 0 ? html`<${HeadDesc}>${t('organisms.noComments') || 'No comments yet.'}<//>` : null}
+      ${list.map(c => html`<${Message} key=${c.id} tone="comment" reply=${!!c.parentId}
+        who=${c.author || '?'}
+        whoNote=${[
+          c.parentId ? (t('organisms.inReply') || 'reply') : null,
+          c.anchor?.quote ? `“${String(c.anchor.quote).slice(0, 80)}”` : null,
+          c.anchor?.section ? `§${c.anchor.section}` : null,
+        ]}
+        time=${c.createdAt ? dt(c.createdAt) : ''} body=${c.body || ''} plain
+        actions=${html`
+          <${Action} small disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}<//>
+          ${mine(c.author) ? html`<${Action} small disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}<//>` : null}`} />`)}
+      <${ThreadForm}>
+        ${replyTo ? html`<${Note} kind="meta">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <${Action} small onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}<//><//>` : null}
+        <${TextField} placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${setAnchorQuote} />
+        <${TextArea} rows=${2} placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${setBody} />
+        <${Loud} control disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}<//>
+      <//>
+    <//>
   `;
 }

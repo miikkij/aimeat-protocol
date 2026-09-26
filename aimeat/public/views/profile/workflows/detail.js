@@ -9,9 +9,12 @@
  *   a fold in words; the prompt as a fold. Run opens the confirmation (what will happen, how long,
  *   what it spends, where it starts) before anything starts; Check now answers on the page and
  *   starts nothing.
- * @structure renderDetail · confirmPanel · checkPanel · stepBlock · runsTable · settingsFold
+ * @structure renderDetail · confirmPanel · checkPanel · stepItem · runsTable · settingsFold
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   v1.18.1 -- 2026-09-26 -- The verdict's "open the run" stands at the right of its words again, as
+ *     main's .wp-verdict drew it (Box beside; fix pass).
+ *   v1.18.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head's tags are Marks as data (main's grey notify, skip-done and parallel tags come back as the dim Mark, main's og-chip--dim), the verdict, the confirmation and the check note the Box (the verdict's frame in its tone), the steps the WorkflowSteps, the runs the List (the run's word a Tinted word in its tone), the settings the Facts with their doors under the Split, the rail's agents and keys plain lines. stepBlock becomes stepItem (a step as the component's data).
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.15.0 -- 2026-09-26 -- The hairline over a part of the panel is the split (.og-split), a unification: the line Workflows and Boards drew alike.
@@ -45,9 +48,20 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { c, loc, rel, day, durationWords, minutesWords, triggerWords, kindWords, signalWords, stepWord, stepTone, runWord, runTone, toneStatus, verdictOf, stepTitle, stepAgents, renderPage } from './frame.js';
+import { scrollToSection } from '/components/Rail.js';
+import { Facts } from '/components/Facts.js';
+import { Box } from '/components/Box.js';
+import { List, Row, When, Cell, Desc, Doors } from '/components/List.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Tab } from '/components/Tabs.js';
+import { Note } from '/components/Note.js';
+import { Split } from '/components/Layout.js';
+import { WorkflowSteps } from '/components/WorkflowSteps.js';
+import { c, loc, rel, day, durationWords, minutesWords, triggerWords, kindWords, signalWords, stepWord, stepTone, runWord, runTone, toneStatus, runTint, verdictOf, stepTitle, stepAgents, renderPage } from './frame.js';
 import { Hint } from '/components/Hint.js';
+
+/** The verdict's frame: a run that went wrong needs a look, one that waits waits. */
+export const verdictTone = (tone) => (tone === 'bad' ? 'attention' : tone === 'wait' ? 'waiting' : undefined);
 
 export function renderDetail(ctx, item) {
   const def = item.def;
@@ -62,44 +76,47 @@ export function renderDetail(ctx, item) {
   const resolvedOf = (stepId) => (last?.resolved || d?.blueprintResolved || []).find(r => r.stepId === stepId);
   const title = loc(def.title) || id;
 
-  const chips = html`
-    <span class="poster-chip">${triggerWords(def.trigger)}</span>
-    <span class="poster-chip">${c('stepsN', { n: def.steps.length })}</span>
-    ${agents.size ? html`<span class="poster-chip">${c('agentsN', { n: agents.size })}</span>` : null}
-    ${gates.length ? html`<span class="poster-chip">${c('gatesN', { n: gates.length })}</span>` : null}
-    ${last ? html`<span class=${toneStatus(runTone(last.status))}>${c('lastRunChip', { word: runWord(last.status).toLowerCase(), when: rel(last.startedAt) })}</span>` : null}
-    ${def.notify_on_finish ? html`<span class="poster-chip">${c('chipNotify')}</span>` : null}
-    ${def.skip_done ? html`<span class="poster-chip">${c('chipSkipDone')}</span>` : null}
-    ${def.parallel ? html`<span class="poster-chip">${c('chipParallel')}</span>` : null}`;
+  const marks = [
+    { label: triggerWords(def.trigger) },
+    { label: c('stepsN', { n: def.steps.length }) },
+    agents.size ? { label: c('agentsN', { n: agents.size }) } : null,
+    gates.length ? { label: c('gatesN', { n: gates.length }) } : null,
+    last ? { kind: 'status', tone: toneStatus(runTone(last.status)), label: c('lastRunChip', { word: runWord(last.status).toLowerCase(), when: rel(last.startedAt) }) } : null,
+    def.notify_on_finish ? { label: c('chipNotify'), tone: 'dim' } : null,
+    def.skip_done ? { label: c('chipSkipDone'), tone: 'dim' } : null,
+    def.parallel ? { label: c('chipParallel'), tone: 'dim' } : null,
+  ];
   const doors = html`
-    <button type="button" class="poster-slab" onClick=${() => ctx.openConfirm(id)}>${c('run')}</button>
-    <button type="button" class="poster-action poster-action--small" disabled=${ctx.checking === id} onClick=${() => ctx.handleCheck(id)}>${c('checkNow')}</button>
-    <button type="button" class="poster-action poster-action--small" onClick=${() => ctx.pickView({ kind: 'edit', id })}>${t('profile.workflows.edit')}</button>
-    <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => { ctx.setFold('prompt', true); scrollTo('wp-prompt'); }}>${c('promptToChat')}</button>`;
-  const rail = html`
-    <hr />
-    <span class="og-rail-label">${c('railAgents')}</span>
-    ${[...agents].map(a => { const red = last && def.steps.some(s => (Array.isArray(s.agent) ? s.agent.includes(a) : s.agent === a) && ['output-red', 'timed-out', 'agent-offline'].includes(last.steps?.[s.id]?.state)); return html`<span class="og-rail-link wp-rail-static" key=${a}><i>→</i>${a}${red ? html`<em>!</em>` : null}</span>`; })}
-    ${d?.blueprint?.nodes?.length ? html`<hr /><span class="og-rail-label">${c('railWrites')}</span>${[...new Set(d.blueprint.nodes.flatMap(n => n.writes))].slice(0, 6).map(k => html`<span class="og-rail-link wp-rail-static wp-rail-key" key=${k}><i>→</i>${k}</span>`)}` : null}`;
+    <${Loud} onClick=${() => ctx.openConfirm(id)}>${c('run')}<//>
+    <${Action} small disabled=${ctx.checking === id} onClick=${() => ctx.handleCheck(id)}>${c('checkNow')}<//>
+    <${Action} small onClick=${() => ctx.pickView({ kind: 'edit', id })}>${t('profile.workflows.edit')}<//>
+    <${Action} small soft onClick=${() => { ctx.setFold('prompt', true); scrollToSection('wp-prompt'); }}>${c('promptToChat')}<//>`;
+  const railGroups = [
+    { label: c('railAgents'), items: [...agents].map(a => {
+      const red = last && def.steps.some(s => (Array.isArray(s.agent) ? s.agent.includes(a) : s.agent === a) && ['output-red', 'timed-out', 'agent-offline'].includes(last.steps?.[s.id]?.state));
+      return { key: a, plain: true, mark: '→', label: a, count: red ? '!' : undefined };
+    }) },
+    d?.blueprint?.nodes?.length ? { label: c('railWrites'), items: [...new Set(d.blueprint.nodes.flatMap(n => n.writes))].slice(0, 6).map(k => ({ key: k, plain: true, code: true, mark: '→', label: k })) } : null,
+  ].filter(Boolean);
 
   return renderPage(ctx, {
-    crumbs: [title], title, chips, doors, rail,
+    crumbs: [title], title, marks, doors, railGroups, desc: loc(def.description) || null,
     children: html`
-      ${loc(def.description) ? html`<p class="og-desc og-desc--page">${loc(def.description)}</p>` : null}
       ${ctx.confirm?.id === id ? confirmPanel(ctx, item) : null}
       ${ctx.checks[id] ? checkPanel(ctx, item) : null}
-      ${last ? html`<div class=${`wp-verdict poster-box wp-verdict--${v.tone}`}><div><b>${v.head}</b><span>${v.sub}</span></div><div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.pickView({ kind: 'run', id, runId: last.runId })}>${c('openRun')}</button></div></div>` : null}
-      <${PageSection} id="wp-steps" num="01" title=${c('secSteps')} count=${`${def.steps.length} · ${c('secStepsSub')}`} doors=${html`<button type="button" class=${`poster-tab poster-tab--fold ${ctx.showKeys ? 'is-on' : ''}`} aria-pressed=${ctx.showKeys ? 'true' : 'false'} onClick=${() => ctx.setShowKeys(!ctx.showKeys)}>${c('showKeys')}</button>`} first>
-        ${def.steps.map((s, i) => stepBlock(ctx, s, i, resolvedOf(s.id), last?.steps?.[s.id]))}
+      ${last ? html`<${Box} tone=${verdictTone(v.tone)} name=${v.head} beside
+        doors=${html`<${Action} small onClick=${() => ctx.pickView({ kind: 'run', id, runId: last.runId })}>${c('openRun')}<//>`}><${Note}>${v.sub}<//><//>` : null}
+      <${PageSection} id="wp-steps" num="01" title=${c('secSteps')} count=${`${def.steps.length} · ${c('secStepsSub')}`} doors=${html`<${Tab} tone="fold" on=${ctx.showKeys} pressed=${ctx.showKeys} onClick=${() => ctx.setShowKeys(!ctx.showKeys)}>${c('showKeys')}<//>`} first>
+        <${WorkflowSteps} steps=${def.steps.map((s, i) => stepItem(ctx, s, i, resolvedOf(s.id), last?.steps?.[s.id]))} />
         <${Hint}>${c('stepsHint')}<//>
       <//>
-      <${PageSection} id="wp-runs" num="02" title=${c('secRuns')} count=${ctx.runsTab === 'checks' ? c('checksN', { n: d?.checkCount ?? checks.length }) : c('runsN', { n: d?.runCount ?? runs.length })} doors=${html`<button type="button" class=${`poster-tab poster-tab--fold ${ctx.runsTab !== 'checks' ? 'is-on' : ''}`} onClick=${() => ctx.setRunsTab('runs')}>${c('runsWord')}</button><button type="button" class=${`poster-tab poster-tab--fold ${ctx.runsTab === 'checks' ? 'is-on' : ''}`} onClick=${() => ctx.setRunsTab('checks')}>${c('checksWord', { n: d?.checkCount ?? checks.length })}</button>`}>
+      <${PageSection} id="wp-runs" num="02" title=${c('secRuns')} count=${ctx.runsTab === 'checks' ? c('checksN', { n: d?.checkCount ?? checks.length }) : c('runsN', { n: d?.runCount ?? runs.length })} doors=${html`<${Tab} tone="fold" on=${ctx.runsTab !== 'checks'} onClick=${() => ctx.setRunsTab('runs')}>${c('runsWord')}<//><${Tab} tone="fold" on=${ctx.runsTab === 'checks'} onClick=${() => ctx.setRunsTab('checks')}>${c('checksWord', { n: d?.checkCount ?? checks.length })}<//>`}>
         ${runsTable(ctx, item, ctx.runsTab === 'checks' ? checks : runs)}
       <//>
-      <${FoldSection} id="wp-settings" num="03" title=${c('secSettings')} sub=${c('settingsSub')} open=${ctx.folds.settings} onToggle=${() => ctx.setFold('settings', !ctx.folds.settings)}>${settingsFold(ctx, item)}<//>
-      <${FoldSection} id="wp-prompt" num="04" title=${c('promptToChat')} sub=${c('promptSub')} open=${ctx.folds.prompt} onToggle=${() => ctx.setFold('prompt', !ctx.folds.prompt)}>
-        <p class="og-lead wp-prose">${c('promptImproveBody')}</p>
-        <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.copyPrompt('improve-mcp', id)}>${c('copyImprove')}</button><button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.copyPrompt('create-chat')}>${c('copyChatVersion')}</button></div>
+      <${FoldSection} clip id="wp-settings" num="03" title=${c('secSettings')} sub=${c('settingsSub')} open=${ctx.folds.settings} onToggle=${() => ctx.setFold('settings', !ctx.folds.settings)}>${settingsFold(ctx, item)}<//>
+      <${FoldSection} clip id="wp-prompt" num="04" title=${c('promptToChat')} sub=${c('promptSub')} open=${ctx.folds.prompt} onToggle=${() => ctx.setFold('prompt', !ctx.folds.prompt)}>
+        <${Note} kind="lead">${c('promptImproveBody')}<//>
+        <${Actions}><${Action} small onClick=${() => ctx.copyPrompt('improve-mcp', id)}>${c('copyImprove')}<//><${Action} small soft onClick=${() => ctx.copyPrompt('create-chat')}>${c('copyChatVersion')}<//><//>
       <//>
       <${ctx.ConfirmUI} />`,
   });
@@ -110,25 +127,22 @@ function confirmPanel(ctx, item) {
   const def = item.def;
   const p = ctx.confirm.preflight;
   const title = loc(def.title) || def.id;
-  const kv = (k, v) => html`<div class="facts-k poster-label">${k}</div><div class="facts-v">${v}</div>`;
   return html`
-    <div class="wp-confirm poster-box poster-box--raised">
-      <h3>${c('confirmTitle', { name: title })}</h3>
-      ${!p ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>` : html`
-        <div class="facts">
-          ${kv(c('confirmWhat'), p.agents.length ? c('confirmWhatAgents', { n: p.willRun.length, agents: p.agents.join(', ') }) : c('confirmWhatNoAgents', { n: p.willRun.length }))}
-          ${kv(c('confirmHowLong'), p.lastRun?.durationMs ? c('confirmHowLongBoth', { last: durationWords(p.lastRun.durationMs), max: minutesWords(p.maxMinutes) }) : c('confirmHowLongMax', { max: minutesWords(p.maxMinutes) }))}
-          ${kv(c('confirmSpends'), c('confirmSpendsBody'))}
-          ${p.skipDone && p.steps.some(s => s.willSkip) ? kv(c('confirmSkips'), c('confirmSkipsBody', { steps: p.steps.filter(s => s.willSkip).map(s => stepTitle(def.steps.find(d => d.id === s.id)) || s.id).join(', ') })) : null}
-          ${kv(c('confirmVars'), Object.entries(p.vars).filter(([k]) => k !== 'run').map(([k, v]) => `${k} = ${v}`).join(' · ') || c('confirmVarsNone'))}
-        </div>
-        <div class="og-doors">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, false)}>${c('runNow')}</button>
-          <button type="button" class="poster-action poster-action--small" disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, true)}>${c('runSandbox')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.closeConfirm()}>${t('profile.cancel')}</button>
-        </div>
-        <${Hint}>${c('confirmHint')}<//>`}
-    </div>`;
+    <${Box} tone="raised" name=${c('confirmTitle', { name: title })}
+      doors=${p ? html`
+        <${Loud} control disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, false)}>${c('runNow')}<//>
+        <${Action} small disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, true)}>${c('runSandbox')}<//>
+        <${Action} small soft onClick=${() => ctx.closeConfirm()}>${t('profile.cancel')}<//>` : null}>
+      ${!p ? html`<${Note} kind="loading">${t('common.loading')}<//>` : html`
+        <${Facts} rows=${[
+          { k: c('confirmWhat'), v: p.agents.length ? c('confirmWhatAgents', { n: p.willRun.length, agents: p.agents.join(', ') }) : c('confirmWhatNoAgents', { n: p.willRun.length }) },
+          { k: c('confirmHowLong'), v: p.lastRun?.durationMs ? c('confirmHowLongBoth', { last: durationWords(p.lastRun.durationMs), max: minutesWords(p.maxMinutes) }) : c('confirmHowLongMax', { max: minutesWords(p.maxMinutes) }) },
+          { k: c('confirmSpends'), v: c('confirmSpendsBody') },
+          p.skipDone && p.steps.some(s => s.willSkip) && { k: c('confirmSkips'), v: c('confirmSkipsBody', { steps: p.steps.filter(s => s.willSkip).map(s => stepTitle(def.steps.find(x => x.id === s.id)) || s.id).join(', ') }) },
+          { k: c('confirmVars'), v: Object.entries(p.vars).filter(([k]) => k !== 'run').map(([k, val]) => `${k} = ${val}`).join(' · ') || c('confirmVarsNone') },
+        ]} />`}
+      ${p ? html`<${Hint}>${c('confirmHint')}<//>` : null}
+    <//>`;
 }
 
 /** What Check now found in memory, on the page, starting nothing. */
@@ -137,16 +151,15 @@ function checkPanel(ctx, item) {
   const ch = ctx.checks[def.id];
   const words = def.steps.map(s => `${stepTitle(s)}: ${stepWord(ch.steps?.[s.id]?.state).toLowerCase()}`);
   return html`
-    <div class="wp-note wp-note--check">
-      <b>${c('checkTitle', { when: rel(ch.at) })}</b>
-      <span>${words.join(' · ')}</span>
-      <span class="poster-hint">${c('checkHint')}</span>
-      <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.dismissCheck(def.id)}>${c('close')}</button>
-    </div>`;
+    <${Box} tone="attention" name=${c('checkTitle', { when: rel(ch.at) })}
+      end=${html`<${Action} small soft onClick=${() => ctx.dismissCheck(def.id)}>${c('close')}<//>`}>
+      ${words.join(' · ')}
+      <${Note}>${c('checkHint')}<//>
+    <//>`;
 }
 
-/** One step: what it does, who does it, what must be there and how the node sees it produced, and the last run's state. */
-export function stepBlock(ctx, step, i, resolved, runStep) {
+/** One step, as WorkflowSteps' data: what it does, who does it, what must be there and how the node sees it produced, and the last run's state. */
+export function stepItem(ctx, step, i, resolved, runStep) {
   const agents = stepAgents(step, resolved);
   const who = step.action?.kind === 'human-input' ? c('you') : agents.length ? `${agents.join(', ')}${step.offer ? ` · ${step.offer}` : ''}` : kindWords(step);
   const input = resolved?.required_to_function;
@@ -154,50 +167,48 @@ export function stepBlock(ctx, step, i, resolved, runStep) {
   const inputWords = step.action?.kind === 'human-input' ? c('gateWords', { q: step.action.question?.prompt || '' }) : input && input !== 'none' ? c('needs', { what: signalWords(input) }) : c('noInputNeeded');
   const outputWords = resolved?.success_signal ? c('producedWhen', { what: signalWords(resolved.success_signal) }) : '';
   const state = runStep?.state;
-  const tone = stepTone(state);
   const observed = runStep?.outputObserved || runStep?.inputObserved;
   const obs = observed ? ctx.observedWords(observed) : '';
-  return html`
-    <div class="wp-step" key=${step.id}>
-      <div class="wp-step-n">${String(i + 1).padStart(2, '0')}</div>
-      <div class="wp-step-body">
-        <b>${stepTitle(step)}<small>${step.id} · ${who}</small></b>
-        <div class="wp-sig">${after}. ${inputWords} ${outputWords}</div>
-        ${ctx.showKeys && resolved?.deliverableKey ? html`<div class="wp-sig wp-sig--key">${c('writesKey', { key: resolved.deliverableKey })}</div>` : null}
-      </div>
-      <div class="wp-step-st">${state ? html`<b class=${toneStatus(tone)}>${stepWord(state)}</b>${obs ? html`<span>${obs}</span>` : null}${runStep?.attempt ? html`<span>${c('attemptsN', { n: runStep.attempt + 1 })}</span>` : null}` : html`<b class="poster-status poster-status--off">${c('notRunYet')}</b>`}</div>
-    </div>`;
+  return {
+    key: step.id, num: String(i + 1).padStart(2, '0'), title: stepTitle(step), sub: `${step.id} · ${who}`,
+    lines: [`${after}. ${inputWords} ${outputWords}`, ctx.showKeys && resolved?.deliverableKey ? { text: c('writesKey', { key: resolved.deliverableKey }), code: true } : null],
+    state: state ? { word: stepWord(state), tone: toneStatus(stepTone(state)) } : { word: c('notRunYet'), tone: 'off' },
+    notes: state ? [obs, runStep?.attempt ? c('attemptsN', { n: runStep.attempt + 1 }) : null] : [],
+  };
 }
 
 function runsTable(ctx, item, list) {
-  if (ctx.detailLoading && !list.length) return html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>`;
-  if (!list.length) return html`<p class="poster-quiet">${ctx.runsTab === 'checks' ? c('noChecks') : t('profile.workflows.noRuns')}</p>`;
   return html`
-    <div class="listing listing--cols listing--when-state-desc-doors">
+    <${List} cols="when-state-desc-doors" keepCols loading=${ctx.detailLoading && !list.length ? t('common.loading') : false}
+      empty=${ctx.runsTab === 'checks' ? c('noChecks') : t('profile.workflows.noRuns')}>
       ${list.slice(0, 20).map(r => { const v = verdictOf(r); return html`
-        <div class="listing-row" key=${r.runId}>
-          <div class="wp-m poster-time">${rel(r.startedAt)}</div>
-          <div class=${`wp-m wp-m--${v.tone}`}><b>${runWord(r.status)}</b></div>
-          <div class="wp-m wp-m--sub">${v.head}${r.mode === 'full-sandbox' ? ` · ${c('sandboxRun')}` : ''}</div>
-          <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'run', id: item.def.id, runId: r.runId })}>${c('open')}</button></div>
-        </div>`; })}
-    </div>`;
+        <${Row} key=${r.runId}>
+          <${When}>${rel(r.startedAt)}<//>
+          <${Cell} meta>${runTint(v.tone, runWord(r.status))}<//>
+          <${Desc}>${v.head}${r.mode === 'full-sandbox' ? ` · ${c('sandboxRun')}` : ''}<//>
+          <${Doors}><${Action} small row onClick=${() => ctx.pickView({ kind: 'run', id: item.def.id, runId: r.runId })}>${c('open')}<//><//>
+        <//>`; })}
+    <//>`;
 }
 
 function settingsFold(ctx, item) {
   const def = item.def;
-  const row = (k, v) => html`<div class="facts-k poster-label">${k}</div><div class="facts-v">${v}</div>`;
   return html`
-    <div class="facts">
-      ${row(c('setTrigger'), triggerWords(def.trigger))}
-      ${row(c('setVars'), (def.vars || []).length ? def.vars.map(v => `${v.name} = ${v.default ?? ''}${loc(v.description) ? ` (${loc(v.description)})` : ''}`).join(' · ') : c('confirmVarsNone'))}
-      ${row(c('setNotify'), def.notify_on_finish ? c('yes') : c('no'))}
-      ${row(c('setSkipDone'), def.skip_done ? c('yes') : c('no'))}
-      ${row(c('setFresh'), def.fresh ? c('yes') : c('no'))}
-      ${row(c('setParallel'), def.parallel ? c('yes') : c('no'))}
-      ${row(c('setOnFail'), c('onFailInspect'))}
-      ${row(c('setLlm'), def.llm?.approved ? c('yes') : c('no'))}
-      ${row(c('setCreated'), `${day(def.createdAt)}${def.createdBy ? ` · ${String(def.createdBy).split('@')[0]}` : ''}`)}
-    </div>
-    <div class="og-doors og-split wp-danger-row"><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.pickView({ kind: 'edit', id: def.id })}>${t('profile.workflows.edit')}</button><button type="button" class="poster-action poster-action--small poster-action--danger" onClick=${() => ctx.handleDelete(def.id)}>${c('deleteWorkflow')}</button></div>`;
+    <${Facts} rows=${[
+      { k: c('setTrigger'), v: triggerWords(def.trigger) },
+      { k: c('setVars'), v: (def.vars || []).length ? def.vars.map(v => `${v.name} = ${v.default ?? ''}${loc(v.description) ? ` (${loc(v.description)})` : ''}`).join(' · ') : c('confirmVarsNone') },
+      { k: c('setNotify'), v: def.notify_on_finish ? c('yes') : c('no') },
+      { k: c('setSkipDone'), v: def.skip_done ? c('yes') : c('no') },
+      { k: c('setFresh'), v: def.fresh ? c('yes') : c('no') },
+      { k: c('setParallel'), v: def.parallel ? c('yes') : c('no') },
+      { k: c('setOnFail'), v: c('onFailInspect') },
+      { k: c('setLlm'), v: def.llm?.approved ? c('yes') : c('no') },
+      { k: c('setCreated'), v: `${day(def.createdAt)}${def.createdBy ? ` · ${String(def.createdBy).split('@')[0]}` : ''}` },
+    ]} />
+    <${Split} pad="medium">
+      <${Actions}>
+        <${Action} small onClick=${() => ctx.pickView({ kind: 'edit', id: def.id })}>${t('profile.workflows.edit')}<//>
+        <${Action} small tone="danger" onClick=${() => ctx.handleDelete(def.id)}>${c('deleteWorkflow')}<//>
+      <//>
+    <//>`;
 }

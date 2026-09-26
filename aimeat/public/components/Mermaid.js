@@ -6,9 +6,14 @@
  *   Mermaid build (public/lib/mermaid/, MIT) only when a chart is first shown — it's ~3MB, so it
  *   must never be in the initial bundle. securityLevel:'strict' (no click handlers, sanitised). On
  *   any load/parse error it falls back to showing the raw source in a <pre> so nothing is lost.
+ *   Its look is css/components/mermaid.css (.mermaid-diagram, .mermaid-fallback).
  * @structure Mermaid({ chart }) — chart is the Mermaid source string.
  * @usage import { Mermaid } from '/components/Mermaid.js';  html`<${Mermaid} chart=${src} />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — Draws its own names: .mmd is .mermaid-diagram and .mmd-fallback is
+ *     .mermaid-fallback; the rules moved with them out of css/views/profile.css into
+ *     css/components/mermaid.css (a move). Not .mermaid: that is the name the Mermaid library itself
+ *     looks for.
  *   v1.1.0 — 2026-07-02 — suppressErrorRendering: mermaid v11 otherwise injects its "Syntax error
  *     in text" bomb SVG into <body> on parse failure even though render() rejects; the component's
  *     own raw-source fallback already covers the error UX.
@@ -59,6 +64,6 @@ export function Mermaid({ chart }) {
     return () => { cancelled = true; };
   }, [chart]);
 
-  if (err) return html`<pre class="mmd-fallback">${chart}</pre>`;
-  return html`<div class="mmd" ref=${ref}></div>`;
+  if (err) return html`<pre class="mermaid-fallback">${chart}</pre>`;
+  return html`<div class="mermaid-diagram" ref=${ref}></div>`;
 }

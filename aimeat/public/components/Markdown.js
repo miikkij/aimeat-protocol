@@ -15,7 +15,8 @@
  *   spans (code, bold, italic, links). This is presentation-only — never use
  *   rendered content for any trust or routing decision.
  * @structure
- *   - Markdown ({ text, onWikiLink, small }) -> vnode tree wrapped in a div.md-body (.md-body--small when small)
+ *   - Markdown ({ text, onWikiLink, small, scroll }) -> vnode tree wrapped in a div.md-body (.md-body--small when small,
+ *     .md-body--scroll when scroll)
  *   - sanitizeHref(url) -> safe href or null
  *   - sanitizeImgSrc(url) -> safe <img> src or null (also permits blob: object URLs)
  * @usage
@@ -41,6 +42,8 @@
  *     document is clickable without [label](url) syntax. Trailing sentence punctuation is trimmed.
  *   v1.7.0 -- 2026-09-26 -- `small`: the reader's small cut (.md-body--small) for a small place in
  *     Settings, the headings a step larger than the words (Jouni's decision "Small reader").
+ *   v1.8.0 -- 2026-09-26 -- `scroll`: a long document in a tab keeps a reading width (760px) and
+ *     scrolls inside after 60% of the window (.md-body--scroll; was agents-detail.css .pf-agd-readme).
  */
 import { h } from 'preact';
 import { Mermaid } from './Mermaid.js';
@@ -408,12 +411,14 @@ function parseBlocks(src, onWikiLink) {
 }
 
 /**
- * @param {{ text: string, onWikiLink?: Function, small?: boolean }} props `small` draws the small cut
+ * @param {{ text: string, onWikiLink?: Function, small?: boolean, scroll?: boolean }} props `small` draws the small cut
  *   (.md-body--small): a small place in Settings, where the headings are only a step larger than the words.
+ *   `scroll` keeps a reading width and scrolls inside (.md-body--scroll).
  */
-export function Markdown({ text, onWikiLink, small = false }) {
+export function Markdown({ text, onWikiLink, small = false, scroll = false }) {
   const src = typeof text === 'string' ? text : '';
-  return h('div', { class: small ? 'md-body md-body--small' : 'md-body' }, parseBlocks(src, onWikiLink));
+  const cls = ['md-body', small && 'md-body--small', scroll && 'md-body--scroll'].filter(Boolean).join(' ');
+  return h('div', { class: cls }, parseBlocks(src, onWikiLink));
 }
 
 export default Markdown;

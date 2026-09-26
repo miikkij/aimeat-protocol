@@ -32,6 +32,8 @@
  *       the whole app. Rounded cards, gradients and glows are replaced by 2px and 3px ink frames,
  *       hard offset shadows and the sun for selection. The panel classes CapTabs and the upload
  *       section render into keep their names and take the same face.
+ *   v2.1.1 -- 2026-09-27 -- .dv-field keeps the underline, padding and size that Discover's question
+ *       field gave it by the shared name; that field is .question-desk-field now.
  */
 
 /* ── Frame ─────────────────────────────────────────────────────────────────────────────────── */
@@ -185,6 +187,9 @@
 .dv-tab-content { padding: .75rem 0 0; }
 .dv-panel-desc { font-size: .82rem; color: var(--text-dim); margin: 0 0 .75rem; }
 .dv-field { margin-bottom: .75rem; }
+/* The look Discover's question field gave this block by the shared name .dv-field until that field
+   took its own name (.question-desk-field, 2026-09-27); kept here so this panel does not change. */
+.dv-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); background: transparent; padding: .5rem 0; font: inherit; font-size: 1.35rem; color: var(--text); }
 .dv-field-label { font-size: .8rem; color: var(--text-dim); margin-bottom: .25rem; }
 .dv-code-row { display: flex; align-items: center; gap: .5rem; }
 .dv-code { font-size: .78rem; background: var(--code-bg); border: 2px solid var(--text); padding: .4rem .6rem; user-select: all; flex: 1; word-break: break-all; font-family: var(--font-mono); }

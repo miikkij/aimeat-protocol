@@ -9,14 +9,14 @@
  *   agentTextFor · crumb · pageLinks · openTab
  * @usage import { x, joinOffers } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — On the component kit (page group G7): the crumb and the rail's sibling pages
+ *     are data (components/Crumb.js, Rail.js draw them); openTab is Rail.js's.
  *   v1.1.0 — 2026-09-05 — An offer carries its `manifest`, which is where a composed package records
  *     what the installing side must already have.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Paketit-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { openTab } from '/components/Rail.js';
 import { date as fmtDate } from '/js/format.js';
 
 export const x = (key, vars) => t('pkpage.' + key, vars);
@@ -97,15 +97,14 @@ export function agentTextFor(o) {
   ].join('\n');
 }
 
-export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.packages')}</span></div>`;
-}
+/** The crumb's steps (components/Crumb.js): Settings / Build and share / Packages, the last one here. */
+export const crumb = () => [t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.tabs.packages')];
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
-export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('extensions')}><i>→</i>${t('profile.tabs.extensions')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('memory')}><i>→</i>${t('profile.tabs.memory')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('skills')}><i>→</i>${t('skills.tabLabel')}<em>→</em></button>`;
-}
+export { openTab };
+/** The sibling pages in the rail, → … → (components/Rail.js opens each one's tab). */
+export const pageLinks = () => [
+  { tab: 'apps', label: t('profile.tabs.apps') },
+  { tab: 'extensions', label: t('profile.tabs.extensions') },
+  { tab: 'memory', label: t('profile.tabs.memory') },
+  { tab: 'skills', label: t('skills.tabLabel') },
+];

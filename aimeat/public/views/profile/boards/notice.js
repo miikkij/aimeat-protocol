@@ -10,6 +10,8 @@
  * @structure renderNotice · replyBlock · toolsFold
  * @usage import { renderNotice } from './notice.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- On the component kit (page group G7): the crumb, the tags, the way back and the rail are data (the poster's standing is the rail's note line), the doors the Loud and Action, the reply row the Beside under the heavy rule with the TextArea and its send slab, the tools the Actions, the fold the Section fold. The notice's text and its replies stay the conversation family's. The file writes no class.
+ *   v1.11.0 -- 2026-09-26 -- A reply is the Message component's board tone, the notice's text the BoardNoticeText (components/Message.js, BoardNotice.js): the same markup and look, given as data.
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.8.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
@@ -34,18 +36,26 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Section } from '/components/Section.js';
+import { scrollToSection } from '/components/Rail.js';
 import { c, rel, day, who, bid, leftWords, standingWords, renderPage } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { TextArea } from '/components/TextField.js';
+import { Beside } from '/components/Layout.js';
+import { BoardNoticeText } from '/components/BoardNotice.js';
+import { Message } from '/components/Message.js';
 
 export function renderNotice(ctx, b, postId) {
   const boardId = bid(b);
   const n = ctx.openNotice;
   const post = n?.post?.id === postId ? n.post : null;
-  const back = html`<button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'board', id: boardId })}><i>←</i>${c('backToBoard')}</button>`;
+  const toBoard = () => ctx.pickView({ kind: 'board', id: boardId });
+  const back = { back: true, label: c('backToBoard'), onClick: toBoard };
+  const boardStep = { label: b.name, onClick: toBoard };
   if (!post) {
-    return renderPage(ctx, { crumbs: [html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'board', id: boardId })}>${b.name}</button>`, '…'], title: b.name, back, children: html`<p class="poster-quiet bp-loading loading-mark">${t('common.loading')}</p>` });
+    return renderPage(ctx, { crumbs: [boardStep, '…'], title: b.name, back, children: html`<${Note} kind="loading">${t('common.loading')}<//>` });
   }
   const w = who(post.author_gaii);
   const me = ctx.session?.owner || '';
@@ -57,59 +67,66 @@ export function renderNotice(ctx, b, postId) {
   const standing = post.author || authors[post.author_gaii];
   const others = (ctx.pages[boardId]?.posts || []).filter(p => p.id !== post.id && (post.category ? p.category === post.category : true)).slice(0, 4);
 
-  const chips = html`
-    <span class="poster-chip">${w.label}</span>
-    <span class="poster-chip">${rel(post.created_at)}</span>
-    <span class="poster-chip poster-chip--sun">${leftWords(post.ttl_expires_at)}</span>
-    <span class="poster-chip">${c('repliesN', { n: replies.length })}</span>
-    <span class=${`poster-chip ${thanks ? 'poster-chip--coral' : ''}`}>${c('thanksN', { n: thanks })}</span>
-    ${(post.tags || []).slice(0, 4).map(tag => html`<span class="poster-chip" key=${tag}>${tag}</span>`)}`;
+  const marks = [
+    { label: w.label },
+    { label: rel(post.created_at), tone: 'dim' },
+    { label: leftWords(post.ttl_expires_at), tone: 'sun' },
+    { label: c('repliesN', { n: replies.length }) },
+    { label: c('thanksN', { n: thanks }), tone: thanks ? 'coral' : 'dim' },
+    ...(post.tags || []).slice(0, 4).map((tag) => ({ label: tag, key: tag, tone: 'dim' })),
+  ];
+  const thank = () => ctx.handleThank(boardId, post.id);
+  const report = () => ctx.handleReport(post.id);
   const doors = html`
-    <button type="button" class="poster-slab poster-slab--control" disabled=${thanked || ctx.thanking} onClick=${() => ctx.handleThank(boardId, post.id)}>${thanked ? c('thanked') : c('thank')}</button>
-    <button type="button" class="poster-action poster-action--small" onClick=${() => scrollTo('bp-reply')}>${c('reply')}</button>
-    <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.handleReport(post.id)}>${c('report')}</button>`;
-  const rail = html`
-    <hr />
-    <span class="og-rail-label">${c('poster')}</span>
-    <span class="og-rail-link bp-rail-static on"><i>→</i>${w.label}</span>
-    <div class="bp-rail-note">${standingWords(standing)}${standing?.since ? html`<br />${c('since', { d: day(standing.since) })}` : null}</div>
-    ${others.length ? html`<hr /><span class="og-rail-label">${post.category ? c('sameTopic') : c('alsoOnBoard')}</span>${others.map(p => html`<button type="button" key=${p.id} class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'notice', boardId, postId: p.id })}><i>→</i>${p.title}<em>${leftWords(p.ttl_expires_at)}</em></button>`)}` : null}`;
+    <${Loud} control disabled=${thanked || ctx.thanking} onClick=${thank}>${thanked ? c('thanked') : c('thank')}<//>
+    <${Action} small onClick=${() => scrollToSection('bp-reply')}>${c('reply')}<//>
+    <${Action} small soft onClick=${report}>${c('report')}<//>`;
+  const openOther = (p) => () => ctx.pickView({ kind: 'notice', boardId, postId: p.id });
+  const rail = [
+    { label: c('poster'), items: [
+      { still: true, mark: '→', label: w.label, key: 'poster' },
+      { note: true, key: 'standing', label: html`${standingWords(standing)}${standing?.since ? html`<br />${c('since', { d: day(standing.since) })}` : null}` },
+    ] },
+    others.length ? { label: post.category ? c('sameTopic') : c('alsoOnBoard'), items: others.map((p) => ({ key: p.id, mark: '→', label: p.title, count: leftWords(p.ttl_expires_at), onClick: openOther(p) })) } : null,
+  ].filter(Boolean);
+  const sendReply = () => ctx.handleReply(boardId, post.id);
 
   return renderPage(ctx, {
-    crumbs: [html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'board', id: boardId })}>${b.name}</button>`, post.title],
+    crumbs: [boardStep, post.title],
     label: `${post.category || (w.agent ? c('byAgent') : c('noticeWord'))} · ${b.name}`,
-    title: post.title, chips, doors, rail, back,
+    title: post.title, marks, doors, rail, back,
+    after: html`<${ctx.ConfirmUI} />`,
     children: html`
-      <p class="bp-notice-text">${post.body}</p>
+      <${BoardNoticeText}>${post.body}<//>
       <${PageSection} id="bp-replies" num="01" title=${c('secReplies')} count=${replies.length}>
-        ${!replies.length ? html`<p class="poster-quiet">${c('noReplies')}</p>` : replies.map(r => replyBlock(ctx, r, authors))}
-        <div class="bp-composer bp-composer--reply poster-row--thing" id="bp-reply">
-          <div class="og-field bp-composer-main"><label class="poster-label" for="bp-reply-body">${c('reply')}</label><textarea id="bp-reply-body" class="og-textarea" rows="2" value=${ctx.replyText} onInput=${e => ctx.setReplyText(e.target.value)} placeholder=${c('replyPlaceholder')}></textarea></div>
-          <div class="og-doors"><button type="button" class="poster-slab poster-slab--control" disabled=${ctx.replying || !ctx.replyText.trim()} onClick=${() => ctx.handleReply(boardId, post.id)}>${c('send')}</button></div>
-        </div>
+        ${!replies.length ? html`<${Note} kind="quiet">${c('noReplies')}<//>` : replies.map(r => replyBlock(ctx, r, authors))}
+        <${Beside} id="bp-reply" align="end" rule above="large" pad="large"
+          side=${html`<${Actions}><${Loud} control disabled=${ctx.replying || !ctx.replyText.trim()} onClick=${sendReply}>${c('send')}<//><//>`}>
+          <${TextArea} id="bp-reply-body" label=${c('reply')} rows=${2} value=${ctx.replyText} onInput=${(v) => ctx.setReplyText(v)} placeholder=${c('replyPlaceholder')} />
+        <//>
         <${Hint}>${c('replyHint')}<//>
       <//>
-      ${canManage ? html`<${FoldSection} id="bp-tools" num="02" title=${c('tools')} sub=${c('toolsSub')} open=${ctx.folds.tools} onToggle=${() => ctx.setFold('tools', !ctx.folds.tools)}>${toolsFold(ctx, boardId, post)}<//>` : null}
-      <${ctx.ConfirmUI} />`,
+      ${canManage ? html`<${Section} fold clip id="bp-tools" num="02" title=${c('tools')} sub=${c('toolsSub')} open=${ctx.folds.tools} onToggle=${() => ctx.setFold('tools', !ctx.folds.tools)}>${toolsFold(ctx, boardId, post)}<//>` : null}`,
   });
 }
 
 function replyBlock(ctx, r, authors) {
   const w = who(r.author_gaii);
-  return html`
-    <div class="bp-reply" key=${r.id}>
-      <div class="bp-who"><b>${w.label}</b>${authors?.[r.author_gaii] ? ` · ${standingWords(authors[r.author_gaii])}` : ''} · ${rel(r.created_at)}</div>
-      <p>${r.body}</p>
-    </div>`;
+  return html`<${Message} key=${r.id} tone="board" who=${w.label}
+    whoNote=${authors?.[r.author_gaii] ? standingWords(authors[r.author_gaii]) : null}
+    time=${rel(r.created_at)} body=${r.body} plain />`;
 }
 
 function toolsFold(ctx, boardId, post) {
+  const resolve = () => ctx.handleResolve(boardId, post.id);
+  const extend = (hours) => () => ctx.handleExtend(boardId, post.id, hours);
+  const remove = () => ctx.handleDeletePost(boardId, post.id);
   return html`
-    <div class="og-doors bp-tools">
-      <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.updating} onClick=${() => ctx.handleResolve(boardId, post.id)}>${c('resolve')}</button>
-      <button type="button" class="poster-action poster-action--small" disabled=${ctx.updating} onClick=${() => ctx.handleExtend(boardId, post.id, 168)}>${c('extend7')}</button>
-      <button type="button" class="poster-action poster-action--small" disabled=${ctx.updating} onClick=${() => ctx.handleExtend(boardId, post.id, 720)}>${c('extend30')}</button>
-      <button type="button" class="poster-action poster-action--small poster-action--danger" disabled=${ctx.updating} onClick=${() => ctx.handleDeletePost(boardId, post.id)}>${c('deleteNotice')}</button>
-    </div>
+    <${Actions}>
+      <${Loud} control disabled=${ctx.updating} onClick=${resolve}>${c('resolve')}<//>
+      <${Action} small disabled=${ctx.updating} onClick=${extend(168)}>${c('extend7')}<//>
+      <${Action} small disabled=${ctx.updating} onClick=${extend(720)}>${c('extend30')}<//>
+      <${Action} small tone="danger" disabled=${ctx.updating} onClick=${remove}>${c('deleteNotice')}<//>
+    <//>
     <${Hint}>${c('toolsHint')}<//>`;
 }

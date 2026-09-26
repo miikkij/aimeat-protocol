@@ -9,9 +9,18 @@
  *   schedules with their last runs, limits, state, kept versions, the apps that use it. A cortex
  *   row: name and version, what it gives an app, its API, who loads it. Opened: the script tag
  *   pinned to the current version, the API surface, the prompt, the parts, visibility, versions.
+ *   Made of the component kit: the rows pass data and never a class.
  * @structure extRow · extOpen · cortexRow · cortexOpen
  * @usage import { extRow, cortexRow } from './rows.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): a row is
+ *     the List's Row (the status dot and the version tag are the Name's `dot` and `tag`), who uses it
+ *     the typewriter Cell with its bold head word (main's .ex-me: ink, grey when nothing is seen), the
+ *     opened row the List's Panel with its doors, the action table a List of the id-desc-doors cut,
+ *     the test a Box with the typewriter Text area, the facts Facts (the copies are Action
+ *     links with `copy`, a schedule's lines FactLine with the coral "not in the scheduler"; the test
+ *     box is the Box's field tone, Jouni's "Dashed field box", which kept Extensions' look), the
+ *     instances and parts Marks, the new-instance field a TextField with its actions.
  *   v1.14.0 -- 2026-09-26 -- A test's answer and a library's API are the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.13.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -36,22 +45,33 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { List, Row, Name, Desc, Cell, Doors, Panel } from '/components/List.js';
+import { Action, Actions } from '/components/Action.js';
+import { Mark, Marks, Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Facts, FactLine } from '/components/Facts.js';
+import { Box } from '/components/Box.js';
+import { TextField, TextArea } from '/components/TextField.js';
 import { x, day, when, kindOf, cronWords, appName, appUrlOf } from './frame.js';
 
-const dot = (active) => html`<i class=${`status-dot ${active ? 'status-dot--active' : 'status-dot--inactive'}`} aria-hidden="true"></i>`;
+/** A copy inside a fact's grey line: the coral link that says it copied. */
+const copyLink = (text, label) => html`<${Action} tone="link" copy=${text} copiedLabel=${x('copied')}>${label}<//>`;
+/** The apps that use a thing, each a link to the app, and how many more. */
+const appLinks = (used) => html`${(used.app_names || []).map((ref) => html`<${Action} tone="link" key=${ref} href=${appUrlOf(ref)} newTab>${appName(ref)}<//> `)}${(used.apps || 0) > (used.app_names || []).length ? x('usedMore', { n: used.apps - used.app_names.length }) : ''}`;
 
-function usedLine(ext) {
+/** Who uses an extension: apps, a clock, or nothing visible, as the typewriter cell's head and words. */
+function usedCell(ext, ids) {
   const u = ext.used_by || {};
   const kind = kindOf(ext);
+  const sub = html`${ids.slice(0, 4).join(' · ')}${ids.length > 4 ? ` · +${ids.length - 4}` : ''}`;
   if (kind === 'apps') {
     const names = (u.app_names || []).map(appName);
     const more = (u.apps || 0) - names.length;
     const parts = [names.join(', '), more > 0 ? x('usedMore', { n: more }) : '', u.cortexes ? x('usedCortexes', { n: u.cortexes }) : ''].filter(Boolean);
-    return html`<b>${x('usedBy')}</b>${parts.join(' · ')}`;
+    return html`<${Cell} meta head=${x('usedBy')} sub=${sub}>${parts.join(' · ')}<//>`;
   }
-  if (kind === 'background') return html`<b>${x('kindBackground')}</b>${(ext.schedules || []).map((s) => cronWords(s.cron)).join(' · ')}`;
-  return html`<b class="is-dim">${x('kindUnseen')}</b>${x('kindUnseenSub')}`;
+  if (kind === 'background') return html`<${Cell} meta head=${x('kindBackground')} sub=${sub}>${(ext.schedules || []).map((s) => cronWords(s.cron)).join(' · ')}<//>`;
+  return html`<${Cell} meta head=${x('kindUnseen')} headDim sub=${sub}>${x('kindUnseenSub')}<//>`;
 }
 
 export function extRow(ctx, ext) {
@@ -61,18 +81,19 @@ export function extRow(ctx, ext) {
   const busy = ctx.busy === 'ext:' + ext.name;
   const ids = (ext.actions || []).map((a) => a.id);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${'ext:' + ext.name}>
-      <div class="listing-name">${dot(active)}${ext.name}<span class="poster-chip">v${ext.version || '?'}</span><small>${active ? x('stateActive') : x('stateOff')} · ${x('actionsN', { n: ext.actionCount ?? ids.length })}${own ? '' : ' · ' + x('ownedBy', { owner: ext.installedBy || ext.author || '' })}</small></div>
-      <div class="listing-desc">${ext.description || ''}</div>
-      <div><span class="ex-me">${usedLine(ext)}<small>${ids.slice(0, 4).join(' · ')}${ids.length > 4 ? ` · +${ids.length - 4}` : ''}</small></span></div>
-      <div class="listing-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggleExt(ext)}>${open ? x('close') : x('open')}</button>
+    <${Row} key=${'ext:' + ext.name} open=${open}>
+      <${Name} dot=${active ? 'active' : 'inactive'} tag=${'v' + (ext.version || '?')}
+        meta=${`${active ? x('stateActive') : x('stateOff')} · ${x('actionsN', { n: ext.actionCount ?? ids.length })}${own ? '' : ' · ' + x('ownedBy', { owner: ext.installedBy || ext.author || '' })}`}>${ext.name}<//>
+      <${Desc}>${ext.description || ''}<//>
+      ${usedCell(ext, ids)}
+      <${Doors}>
+        <${Action} small row onClick=${() => ctx.toggleExt(ext)}>${open ? x('close') : x('open')}<//>
         ${own ? html`
-          <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${busy} onClick=${() => (active ? ctx.deactivateExt(ext) : ctx.activateExt(ext))}>${active ? x('deactivate') : x('activate')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${busy} onClick=${() => ctx.removeExt(ext)}>${x('remove')}</button>` : null}
-      </div>
+          <${Action} small row soft disabled=${busy} onClick=${() => (active ? ctx.deactivateExt(ext) : ctx.activateExt(ext))}>${active ? x('deactivate') : x('activate')}<//>
+          <${Action} small row soft disabled=${busy} onClick=${() => ctx.removeExt(ext)}>${x('remove')}<//>` : null}
+      <//>
       ${open ? extOpen(ctx, ext, own) : null}
-    </div>`;
+    <//>`;
 }
 
 function schemaWords(schema) {
@@ -82,10 +103,26 @@ function schemaWords(schema) {
   return Object.entries(props).filter(([k]) => !['type', 'required', 'properties'].includes(k)).map(([k, v]) => `${k}${req.has(k) ? '*' : ''}: ${(v && typeof v === 'object' && v.type) || '?'}`).join(', ');
 }
 
+/** What an opened row shows while its details load, or when they could not be read. */
+function waitPanel(d) {
+  if (!d) return html`<${Panel}><${Note} kind="loading">${t('common.loading')}<//><//>`;
+  return html`<${Panel}><${Note} kind="quiet">${d.error}<//><//>`;
+}
+
+/** The test of one action: its input, the run, what it answered. */
+function testBox(ctx, ext, test) {
+  return html`
+    <${Box} tone="field">
+      <${Label} block>${x('testTitle', { action: test.actionId })}<//>
+      <${TextArea} code rows=${3} value=${test.input} onInput=${(v) => ctx.setTestInput(v)} />
+      <${Actions}><${Action} small disabled=${test.running} onClick=${() => ctx.runTest(ext)}>${x('run')}<//><${Note} inline>${x('testHint')}${test.elapsed ? ` · ${test.elapsed} ms` : ''}<//><//>
+      ${test.result ? html`<${Label} block>${test.result.ok ? x('testOk') : x('testFail')}<//><${Code} block scroll>${test.result.text}<//>` : null}
+    <//>`;
+}
+
 function extOpen(ctx, ext, own) {
   const d = ctx.details['ext:' + ext.name];
-  if (!d) return html`<div class="listing-open poster-box poster-box--raised"><p class="poster-quiet ex-empty loading-mark">${t('common.loading')}</p></div>`;
-  if (d.error) return html`<div class="listing-open poster-box poster-box--raised"><p class="poster-quiet ex-empty">${d.error}</p></div>`;
+  if (!d || d.error) return waitPanel(d);
   const active = ext.status === 'active';
   const base = `${ctx.nodeUrl}/v1/ext/${encodeURIComponent(ext.name)}`;
   const firstAction = (d.actions || [])[0]?.id || 'action';
@@ -96,41 +133,51 @@ function extOpen(ctx, ext, own) {
   const cfgKeys = Object.keys(d.config || {}).filter((k) => !k.startsWith('__'));
   const test = ctx.test && ctx.test.ext === ext.name ? ctx.test : null;
   const used = ext.used_by || {};
+  const instances = ctx.instances[ext.name] || [];
+  const doors = own ? html`
+    <${Action} small onClick=${() => (active ? ctx.deactivateExt(ext) : ctx.activateExt(ext))}>${active ? x('deactivate') : x('activate')}<//>
+    <${Action} small soft onClick=${() => ctx.removeExt(ext)}>${x('removeExt')}<//>` : null;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${ext.description || ''}</p>
-      <span class="poster-label">${x('actions')}</span>
-      <div class="listing listing--id-desc-doors ex-act">
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${ext.description || ''}<//>
+      <${Label} block>${x('actions')}<//>
+      <${List} cols="id-desc-doors">
         ${(d.actions || []).map((a) => html`
-          <div class="listing-row" key=${a.id}>
-            <div class="listing-name"><code class="code-inline">${a.id}</code><small>${a.method || 'POST'}</small></div>
-            <div class="listing-desc">${a.description || ''}<small>${x('inputOutput', { input: schemaWords(a.inputSchema || a.input) || x('nothing'), output: schemaWords(a.outputSchema || a.output) || x('nothing') })}</small></div>
-            <div class="listing-doors">${active && own ? html`<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.toggleTest(ext, a)}>${test && test.actionId === a.id ? x('close') : x('test')}</button>` : null}</div>
-          </div>`)}
-      </div>
-      ${test ? html`
-        <div class="ex-test">
-          <span class="poster-label">${x('testTitle', { action: test.actionId })}</span>
-          <textarea class="og-textarea ex-test-in" rows="3" value=${test.input} onInput=${(e) => ctx.setTestInput(e.target.value)}></textarea>
-          <div class="og-doors"><button type="button" class="poster-action poster-action--small" disabled=${test.running} onClick=${() => ctx.runTest(ext)}>${x('run')}</button><span class="poster-hint">${x('testHint')}${test.elapsed ? ` · ${test.elapsed} ms` : ''}</span></div>
-          ${test.result ? html`<span class="poster-label">${test.result.ok ? x('testOk') : x('testFail')}</span><pre class="code-block ex-out">${test.result.text}</pre>` : null}
-        </div>` : null}
-      <div class="facts">
-        <div class="facts-k poster-label">${x('address')}</div><div class="facts-v"><code class="code-inline">${address}</code><small>${x('addressSub')} · <${CopyButton} text=${base + '/'} className="og-crumb-link" label=${x('copyAddress')} copiedLabel=${x('copied')} /></small></div>
-        <div class="facts-k poster-label">${x('fromApp')}</div><div class="facts-v"><code class="code-inline">${example}</code><small>${x('fromAppSub')} · <${CopyButton} text=${example} className="og-crumb-link" label=${x('copyExample')} copiedLabel=${x('copied')} /></small></div>
-        <div class="facts-k poster-label">${x('usedBy')}</div><div class="facts-v">${(used.apps || 0) + (used.cortexes || 0) ? html`${(used.app_names || []).map((ref) => html`<a class="og-crumb-link" key=${ref} href=${appUrlOf(ref)} target="_blank" rel="noopener">${appName(ref)}</a> `)}${(used.apps || 0) > (used.app_names || []).length ? x('usedMore', { n: used.apps - used.app_names.length }) : ''}${(used.cortex_names || []).length ? html`<small>${x('usedCortexList', { list: used.cortex_names.join(', ') })}</small>` : null}` : html`${x('usedNone')}<small>${x('usedNoneSub')}</small>`}</div>
-        <div class="facts-k poster-label">${x('memoryArea')}</div><div class="facts-v"><code class="code-inline">ext:${ext.name}</code><small>${x('memoryAreaSub')}</small></div>
-        <div class="facts-k poster-label">${x('instances')}</div><div class="facts-v">${ext.instances?.supported ? html`${(ctx.instances[ext.name] || []).length ? (ctx.instances[ext.name] || []).map((i) => html`<span class="poster-chip" key=${i.id}>${i.id} · ${i.status}</span> `) : x('instancesNone')}<small>${x('instancesSub')}</small>${own && active ? html`<div class="ex-inst"><input class="og-input" placeholder=${x('instanceIdPlaceholder')} value=${ctx.newInstanceId} onInput=${(e) => ctx.setNewInstanceId(e.target.value)} /><button type="button" class="poster-action poster-action--small" onClick=${() => ctx.createInstance(ext)}>${x('createInstance')}</button>${(ctx.instances[ext.name] || []).map((i) => html`<button type="button" class="poster-action poster-action--small poster-action--lower" key=${'x' + i.id} onClick=${() => ctx.deleteInstance(ext, i.id)}>${x('deleteInstance', { id: i.id })}</button>`)}</div>` : null}` : html`${x('instancesUnsupported')}<small>${x('instancesSub')}</small>`}</div>
-        <div class="facts-k poster-label">${x('settings')}</div><div class="facts-v">${cfgKeys.length ? cfgKeys.map((k) => `${k} = ${typeof d.config[k] === 'object' ? JSON.stringify(d.config[k]) : String(d.config[k])}`).join(' · ') : x('settingsNone')}<small>${x('settingsSub')}</small></div>
-        <div class="facts-k poster-label">${x('schedules')}</div><div class="facts-v">${schedules.length ? schedules.map((s) => { const job = jobs.find((j) => j.actionId === s.action && j.cron === s.cron); return html`<div key=${s.id}>${s.action} · ${cronWords(s.cron)}${job ? html`<small>${x('lastRun', { at: when(job.lastRunAt), result: job.lastRunResult === 'success' ? x('runOk') : x('runFail'), n: job.runCount || 0 })}</small>` : html`<small class="is-coral">${x('notInScheduler')}</small>`}</div>`; }) : x('schedulesNone')}</div>
-        <div class="facts-k poster-label">${x('limits')}</div><div class="facts-v">${x('limitsLine', { mb: d.limits?.memoryMb ?? '?', s: Math.round((d.limits?.timeoutMs ?? 0) / 1000), calls: d.limits?.maxApiCalls ?? '?' })}<small>${x('requires', { list: (d.requiredApis || []).join(', ') || x('nothing') })}</small></div>
-        <div class="facts-k poster-label">${x('state')}</div><div class="facts-v">${active ? x('stateActive') : x('stateOff')} · ${x('installedOn', { date: day(ext.installedAt) })}${ext.activatedAt ? ` · ${x('activatedOn', { date: day(ext.activatedAt) })}` : ''}<small>${x('versionsLine', { current: ext.version, list: (d.versions || []).map((v) => v.version).join(', ') })}</small></div>
-      </div>
-      ${own ? html`<div class="og-doors listing-open-doors">
-        <button type="button" class="poster-action poster-action--small" onClick=${() => (active ? ctx.deactivateExt(ext) : ctx.activateExt(ext))}>${active ? x('deactivate') : x('activate')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.removeExt(ext)}>${x('removeExt')}</button>
-      </div>` : null}
-    </div>`;
+          <${Row} key=${a.id}>
+            <${Name} code meta=${a.method || 'POST'}>${a.id}<//>
+            <${Desc} sub=${x('inputOutput', { input: schemaWords(a.inputSchema || a.input) || x('nothing'), output: schemaWords(a.outputSchema || a.output) || x('nothing') })}>${a.description || ''}<//>
+            <${Doors}>${active && own ? html`<${Action} small row soft onClick=${() => ctx.toggleTest(ext, a)}>${test && test.actionId === a.id ? x('close') : x('test')}<//>` : null}<//>
+          <//>`)}
+      <//>
+      ${test ? testBox(ctx, ext, test) : null}
+      <${Facts} rows=${[
+        { k: x('address'), v: address, mono: true, sub: html`${x('addressSub')} · ${copyLink(base + '/', x('copyAddress'))}` },
+        { k: x('fromApp'), v: example, mono: true, sub: html`${x('fromAppSub')} · ${copyLink(example, x('copyExample'))}` },
+        (used.apps || 0) + (used.cortexes || 0)
+          ? { k: x('usedBy'), v: appLinks(used), sub: (used.cortex_names || []).length ? x('usedCortexList', { list: used.cortex_names.join(', ') }) : undefined }
+          : { k: x('usedBy'), v: x('usedNone'), sub: x('usedNoneSub') },
+        { k: x('memoryArea'), v: `ext:${ext.name}`, mono: true, sub: x('memoryAreaSub') },
+        ext.instances?.supported
+          ? {
+            k: x('instances'),
+            v: instances.length ? html`<${Marks}>${instances.map((i) => html`<${Mark} key=${i.id}>${i.id} · ${i.status}<//>`)}<//>` : x('instancesNone'),
+            sub: x('instancesSub'),
+            actions: own && active ? html`<${TextField} placeholder=${x('instanceIdPlaceholder')} value=${ctx.newInstanceId} onInput=${(v) => ctx.setNewInstanceId(v)}
+              actions=${html`<${Action} small onClick=${() => ctx.createInstance(ext)}>${x('createInstance')}<//>${instances.map((i) => html`<${Action} small soft key=${'x' + i.id} onClick=${() => ctx.deleteInstance(ext, i.id)}>${x('deleteInstance', { id: i.id })}<//>`)}`} />` : null,
+          }
+          : { k: x('instances'), v: x('instancesUnsupported'), sub: x('instancesSub') },
+        { k: x('settings'), v: cfgKeys.length ? cfgKeys.map((k) => `${k} = ${typeof d.config[k] === 'object' ? JSON.stringify(d.config[k]) : String(d.config[k])}`).join(' · ') : x('settingsNone'), sub: x('settingsSub') },
+        {
+          k: x('schedules'),
+          v: schedules.length ? schedules.map((s) => {
+            const job = jobs.find((j) => j.actionId === s.action && j.cron === s.cron);
+            return html`<${FactLine} key=${s.id} sub=${job ? x('lastRun', { at: when(job.lastRunAt), result: job.lastRunResult === 'success' ? x('runOk') : x('runFail'), n: job.runCount || 0 }) : x('notInScheduler')} subTone=${job ? undefined : 'notice'}>${s.action} · ${cronWords(s.cron)}<//>`;
+          }) : x('schedulesNone'),
+        },
+        { k: x('limits'), v: x('limitsLine', { mb: d.limits?.memoryMb ?? '?', s: Math.round((d.limits?.timeoutMs ?? 0) / 1000), calls: d.limits?.maxApiCalls ?? '?' }), sub: x('requires', { list: (d.requiredApis || []).join(', ') || x('nothing') }) },
+        { k: x('state'), v: `${active ? x('stateActive') : x('stateOff')} · ${x('installedOn', { date: day(ext.installedAt) })}${ext.activatedAt ? ` · ${x('activatedOn', { date: day(ext.activatedAt) })}` : ''}`, sub: x('versionsLine', { current: ext.version, list: (d.versions || []).map((v) => v.version).join(', ') }) },
+      ]} />
+    <//>`;
 }
 
 export function cortexRow(ctx, cx) {
@@ -141,45 +188,49 @@ export function cortexRow(ctx, cx) {
   const used = cx.used_by || {};
   const types = (cx.component_types || []).map((k) => x('part.' + k) || k);
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${'cx:' + cx.name}>
-      <div class="listing-name">${dot(cx.status === 'active')}${cx.name}<span class="poster-chip">v${cx.version || '?'}</span><small>${isPublic ? x('public') : x('private')} · ${types.join(' + ')}${own ? '' : ' · ' + x('ownedBy', { owner: cx.installed_by || '' })}</small></div>
-      <div class="listing-desc">${cx.description || ''}</div>
-      <div><span class="ex-me">${(used.apps || 0) ? html`<b>${x('usedBy')}</b>${(used.app_names || []).map(appName).join(', ')}${(used.apps || 0) > (used.app_names || []).length ? ' · ' + x('usedMore', { n: used.apps - used.app_names.length }) : ''}` : html`<b class="is-dim">${x('usedNoApp')}</b>`}</span></div>
-      <div class="listing-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggleCortex(cx)}>${open ? x('close') : x('open')}</button>
+    <${Row} key=${'cx:' + cx.name} open=${open}>
+      <${Name} dot=${cx.status === 'active' ? 'active' : 'inactive'} tag=${'v' + (cx.version || '?')}
+        meta=${`${isPublic ? x('public') : x('private')} · ${types.join(' + ')}${own ? '' : ' · ' + x('ownedBy', { owner: cx.installed_by || '' })}`}>${cx.name}<//>
+      <${Desc}>${cx.description || ''}<//>
+      ${(used.apps || 0)
+        ? html`<${Cell} meta head=${x('usedBy')}>${(used.app_names || []).map(appName).join(', ')}${(used.apps || 0) > (used.app_names || []).length ? ' · ' + x('usedMore', { n: used.apps - used.app_names.length }) : ''}<//>`
+        : html`<${Cell} meta head=${x('usedNoApp')} headDim />`}
+      <${Doors}>
+        <${Action} small row onClick=${() => ctx.toggleCortex(cx)}>${open ? x('close') : x('open')}<//>
         ${own ? html`
-          <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${busy} onClick=${() => ctx.toggleVisibility(cx)}>${isPublic ? x('makePrivate') : x('publish')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${busy} onClick=${() => ctx.removeCortex(cx)}>${x('remove')}</button>` : null}
-      </div>
+          <${Action} small row soft disabled=${busy} onClick=${() => ctx.toggleVisibility(cx)}>${isPublic ? x('makePrivate') : x('publish')}<//>
+          <${Action} small row soft disabled=${busy} onClick=${() => ctx.removeCortex(cx)}>${x('remove')}<//>` : null}
+      <//>
       ${open ? cortexOpen(ctx, cx, own) : null}
-    </div>`;
+    <//>`;
 }
 
 function cortexOpen(ctx, cx, own) {
   const d = ctx.details['cx:' + cx.name];
-  if (!d) return html`<div class="listing-open poster-box poster-box--raised"><p class="poster-quiet ex-empty loading-mark">${t('common.loading')}</p></div>`;
-  if (d.error) return html`<div class="listing-open poster-box poster-box--raised"><p class="poster-quiet ex-empty">${d.error}</p></div>`;
+  if (!d || d.error) return waitPanel(d);
   const comps = d.components || [];
   const libs = comps.filter((c) => c.type === 'lib');
   const prompts = comps.filter((c) => c.type === 'prompt');
   const tag = (lib) => `<script src="${ctx.nodeUrl}/v1/cortex/${encodeURIComponent(cx.name)}@${cx.version}/libs/${encodeURIComponent(lib.filename)}"></script>`;
   const used = cx.used_by || {};
+  const doors = own ? html`
+    <${Action} small onClick=${() => (cx.status === 'active' ? ctx.deactivateCortex(cx) : ctx.activateCortex(cx))}>${cx.status === 'active' ? x('deactivate') : x('activate')}<//>
+    <${Action} small soft onClick=${() => ctx.removeCortex(cx)}>${x('removeCortex')}<//>` : null;
   return html`
-    <div class="listing-open poster-box poster-box--raised">
-      <p class="og-lead">${cx.description || ''}</p>
-      <div class="facts">
-        ${libs.map((lib) => html`
-          <div class="facts-k poster-label" key=${'k' + lib.filename}>${x('intoApp')}</div><div class="facts-v" key=${'v' + lib.filename}><code class="code-inline">${tag(lib)}</code><small>${x('intoAppSub')} · <${CopyButton} text=${tag(lib)} className="og-crumb-link" label=${x('copyTag')} copiedLabel=${x('copied')} /></small></div>
-          ${lib.api_surface ? html`<div class="facts-k poster-label" key=${'ak' + lib.filename}>${x('api')}</div><div class="facts-v" key=${'av' + lib.filename}><pre class="code-block ex-api">${lib.api_surface}</pre><small>${x('apiSub')} · <${CopyButton} text=${lib.api_surface} className="og-crumb-link" label=${x('copyApi')} copiedLabel=${x('copied')} /></small></div>` : null}`)}
-        ${prompts.map((p) => html`<div class="facts-k poster-label" key=${'pk' + p.name}>${x('prompt')}</div><div class="facts-v" key=${'pv' + p.name}>${p.name} · ${x('chars', { n: (p._content || '').length })}<small>${x('promptSub')} · <${CopyButton} text=${p._content || ''} className="og-crumb-link" label=${x('copyPrompt')} copiedLabel=${x('copied')} /></small></div>`)}
-        <div class="facts-k poster-label">${x('parts')}</div><div class="facts-v">${comps.map((c) => html`<span class="poster-chip" key=${c.type + (c.name || c.filename || '')}>${x('part.' + c.type) || c.type} ${c.name || c.filename || c.key_pattern || ''}</span> `)}</div>
-        <div class="facts-k poster-label">${x('usedBy')}</div><div class="facts-v">${(used.apps || 0) ? html`${(used.app_names || []).map((ref) => html`<a class="og-crumb-link" key=${ref} href=${appUrlOf(ref)} target="_blank" rel="noopener">${appName(ref)}</a> `)}${(used.apps || 0) > (used.app_names || []).length ? x('usedMore', { n: used.apps - used.app_names.length }) : ''}` : html`${x('usedNoApp')}<small>${x('usedNoAppSub')}</small>`}</div>
-        <div class="facts-k poster-label">${x('visibility')}</div><div class="facts-v">${cx.visibility === 'public' ? x('publicLong') : x('privateLong')}</div>
-        <div class="facts-k poster-label">${x('state')}</div><div class="facts-v">${cx.status === 'active' ? x('stateActive') : x('stateOff')} · ${x('installedOn', { date: day(cx.installed_at) })} · ${cx.author || cx.installed_by || ''}${d.license ? ` · ${d.license}` : ''}<small>${x('versionsLine', { current: cx.version, list: (d.versions || []).map((v) => v.version).join(', ') })}</small></div>
-      </div>
-      ${own ? html`<div class="og-doors listing-open-doors">
-        <button type="button" class="poster-action poster-action--small" onClick=${() => (cx.status === 'active' ? ctx.deactivateCortex(cx) : ctx.activateCortex(cx))}>${cx.status === 'active' ? x('deactivate') : x('activate')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.removeCortex(cx)}>${x('removeCortex')}</button>
-      </div>` : null}
-    </div>`;
+    <${Panel} doors=${doors}>
+      <${Note} kind="lead">${cx.description || ''}<//>
+      <${Facts} rows=${[
+        ...libs.flatMap((lib) => [
+          { key: 'k' + lib.filename, k: x('intoApp'), v: tag(lib), mono: true, sub: html`${x('intoAppSub')} · ${copyLink(tag(lib), x('copyTag'))}` },
+          lib.api_surface && { key: 'a' + lib.filename, k: x('api'), v: html`<${Code} block>${lib.api_surface}<//>`, sub: html`${x('apiSub')} · ${copyLink(lib.api_surface, x('copyApi'))}` },
+        ]),
+        ...prompts.map((p) => ({ key: 'p' + p.name, k: x('prompt'), v: `${p.name} · ${x('chars', { n: (p._content || '').length })}`, sub: html`${x('promptSub')} · ${copyLink(p._content || '', x('copyPrompt'))}` })),
+        { k: x('parts'), v: html`<${Marks}>${comps.map((c) => html`<${Mark} key=${c.type + (c.name || c.filename || '')}>${x('part.' + c.type) || c.type} ${c.name || c.filename || c.key_pattern || ''}<//>`)}<//>` },
+        (used.apps || 0)
+          ? { k: x('usedBy'), v: appLinks(used) }
+          : { k: x('usedBy'), v: x('usedNoApp'), sub: x('usedNoAppSub') },
+        { k: x('visibility'), v: cx.visibility === 'public' ? x('publicLong') : x('privateLong') },
+        { k: x('state'), v: `${cx.status === 'active' ? x('stateActive') : x('stateOff')} · ${x('installedOn', { date: day(cx.installed_at) })} · ${cx.author || cx.installed_by || ''}${d.license ? ` · ${d.license}` : ''}`, sub: x('versionsLine', { current: cx.version, list: (d.versions || []).map((v) => v.version).join(', ') }) },
+      ]} />
+    <//>`;
 }

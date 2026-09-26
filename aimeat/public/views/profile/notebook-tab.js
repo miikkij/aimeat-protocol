@@ -11,6 +11,13 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- Every part is a component that takes data: the page frame (SettingsPage),
+ *     the sections (Section), the capture box (TextArea, Loud, Note, Check), the scope tabs (Tabs bar),
+ *     the search and filter lines (SearchLine with the sort Select in it), the hits (List), the notes
+ *     (List of NoteCard rows). The file writes no class. A knowledge hit's tag is green again, as
+ *     main's success badge drew it (Mark tone fine); nothing else changes on screen but the kit's
+ *     spaces (page group G4). Fix: the delete question is drawn as a component (<ConfirmUI />); it
+ *     was placed as a bare function, which Preact skips, so Delete asked nothing and did nothing.
  *   v1.15.0 -- 2026-09-26 -- The three trust settings are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.13.0 -- 2026-09-26 -- The librarian's hits are the Listing (css/components/listing.css, name-desc-who-doors): the title with its key as the typewriter line under it, the producer and snippet as the words, the tag, Open (a unification: the look most tabs use).
@@ -53,8 +60,17 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { LoadingLine } from './shared.js';
-import { PageSection } from '/components/PageSection.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Section } from '/components/Section.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, Row as ListRow, Name, Desc, Who, Doors, SearchLine } from '/components/List.js';
+import { Row, Stack } from '/components/Layout.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
 import * as memoryService from '/js/services/memory.js';
 import { getNotebookSettings, saveNotebookSettings } from '/js/services/notebook.js';
 import { listOrganisms } from '/js/services/organisms.js';
@@ -236,105 +252,92 @@ export default function NotebookTab({ session, showToast, onStats }) {
     });
   }
 
+  // A hit's home as its tag: knowledge in the success colour (main's success badge), an organism
+  // document and a personal note as the plain tag (main's info and plain badges drew alike here).
+  const hitTag = (hit) => (hit.kind === 'knowledge'
+    ? html`<${Mark} tone="fine">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}<//>`
+    : hit.organismId
+      ? html`<${Mark}>${escHtml(orgNames[hit.organismId] || hit.organismId)}<//>`
+      : html`<${Mark}>${t('profile.notebook.personalNote')}<//>`);
+
   const renderHit = (hit) => html`
-    <div class="listing-row" key=${hit.key}>
-      <div class="listing-name">${escHtml(hit.title || hit.key)}<small title=${hit.key}>${escHtml(hit.key)}</small></div>
-      <div class="listing-desc">
+    <${ListRow} key=${hit.key}>
+      <${Name} title=${hit.key} meta=${escHtml(hit.key)}>${escHtml(hit.title || hit.key)}<//>
+      <${Desc}>
         ${searchScope === 'public' && html`<div>${t('profile.notebook.producer')}: ${escHtml(producerLabel(hit.producer))}</div>`}
         ${hit.snippet && escHtml(hit.snippet)}
-      </div>
-      <div class="listing-who">${hit.kind === 'knowledge'
-          ? html`<span class="poster-chip">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}</span>`
-          : hit.organismId
-            ? html`<span class="poster-chip">${escHtml(orgNames[hit.organismId] || hit.organismId)}</span>`
-            : html`<span class="poster-chip">${t('profile.notebook.personalNote')}</span>`}</div>
-      <div class="listing-doors">${canOpen(hit) && html`<button class="poster-action poster-action--small poster-action--row" onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}</button>`}</div>
-    </div>
+      <//>
+      <${Who}>${hitTag(hit)}<//>
+      <${Doors}>${canOpen(hit) && html`<${Action} small row onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}<//>`}<//>
+    <//>
   `;
 
+  const setting = (key, words) => html`
+    <${Check} inline checked=${settings[key]} onChange=${() => toggleSetting(key)}>${words}<//>`;
+
   return html`
-    ${ConfirmUI}
-    <div class="og">
-    <div class="mb-1">
-      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuInformation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.notebook')}</span></div>
-      <div class="og-mast"><div class="og-mast-words">
-        <div class="og-title poster-page-title">${t('profile.notebook.title')}</div>
-        <div class="og-desc">${t('profile.notebook.desc')}</div>
-      </div></div>
-    </div>
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.notebook')]}
+      title=${t('profile.notebook.title')} desc=${t('profile.notebook.desc')}
+      after=${html`<${ConfirmUI} />`}>
 
-    <div class="pf-nb-capture">
-      <textarea class="og-textarea pf-nb-textarea" rows="4"
+    <${Stack} gap="medium" below="section">
+      <${TextArea} rows=${4}
         placeholder=${t('profile.notebook.capturePlaceholder')}
-        value=${draft} onInput=${e => setDraft(e.target.value)}></textarea>
-      <div class="pf-nb-capture-actions">
-        <button class="poster-slab poster-slab--control" disabled=${!draft.trim() || saving} onClick=${handleCapture}>
+        value=${draft} onInput=${setDraft} />
+      <${Row} wrap gap="medium">
+        <${Loud} control disabled=${!draft.trim() || saving} onClick=${handleCapture}>
           ${saving ? '…' : t('profile.notebook.captureBtn')}
-        </button>
-        <span class="text-meta-sm">${t('profile.notebook.captureHint')}</span>
-      </div>
-      <div class="pf-nb-settings">
-        <span class="text-meta-sm">${t('profile.notebook.trustTitle')}</span>
-        <label class="pf-nb-toggle check-line"><input type="checkbox" checked=${settings.autoDetectIntent} onChange=${() => toggleSetting('autoDetectIntent')} /> ${t('profile.notebook.autoDetect')}</label>
-        <label class="pf-nb-toggle check-line"><input type="checkbox" checked=${settings.autoRunPlan} onChange=${() => toggleSetting('autoRunPlan')} /> ${t('profile.notebook.autoRun')}</label>
-        <label class="pf-nb-toggle check-line"><input type="checkbox" checked=${settings.autoDistribute} onChange=${() => toggleSetting('autoDistribute')} /> ${t('profile.notebook.autoDistribute')}</label>
-      </div>
-    </div>
-
-    <${PageSection} title=${t('profile.notebook.librarianTitle')}>
-    <div class="og-lead">${t('profile.notebook.librarianDesc')}</div>
-    <div class="sub-tabs poster-row--thing pf-nb-scope">
-      <button class="poster-tab ${searchScope === 'own' ? 'is-on' : ''}" onClick=${() => pickScope('own')}>${t('profile.notebook.scopeOwn')}</button>
-      <button class="poster-tab ${searchScope === 'public' ? 'is-on' : ''}" onClick=${() => pickScope('public')}>${t('profile.notebook.scopePublic')}</button>
-    </div>
-    <div class="action-bar">
-      <div class="search-line pf-nb-search">
-        <input type="text" class="og-input" placeholder=${t('profile.notebook.searchPlaceholder')}
-          value=${query} onInput=${e => setQuery(e.target.value)}
-          onKeyDown=${e => e.key === 'Enter' && handleSearch()} />
-        <button class="poster-slab" onClick=${handleSearch}>${t('profile.notebook.searchBtn')}</button>
-      </div>
-    </div>
-    ${searching && html`<${LoadingLine} text=${t('profile.notebook.searching')} />`}
-    ${!searching && hits !== null && html`
-      ${hits.length === 0
-        ? html`<div class="poster-quiet">${t('profile.notebook.noHits')}</div>`
-        : html`
-          <div class="text-meta-sm mb-half">${(t('profile.notebook.hitsCount') || '{n} results').replace('{n}', String(hits.length))}</div>
-          <div class="listing listing--name-desc-who-doors">${hits.map(renderHit)}</div>
-        `}
-    `}
+        <//>
+        <${Note} kind="meta" inline>${t('profile.notebook.captureHint')}<//>
+      <//>
+      <${Row} wrap gap="medium">
+        <${Note} kind="meta" inline>${t('profile.notebook.trustTitle')}<//>
+        ${setting('autoDetectIntent', t('profile.notebook.autoDetect'))}
+        ${setting('autoRunPlan', t('profile.notebook.autoRun'))}
+        ${setting('autoDistribute', t('profile.notebook.autoDistribute'))}
+      <//>
     <//>
 
-    <${PageSection} title=${t('profile.notebook.inboxTitle')}>
+    <${Section} title=${t('profile.notebook.librarianTitle')}>
+      <${Note} kind="lead">${t('profile.notebook.librarianDesc')}<//>
+      <${Tabs} bar kind="view" value=${searchScope} onSelect=${pickScope} items=${[
+        { value: 'own', label: t('profile.notebook.scopeOwn') },
+        { value: 'public', label: t('profile.notebook.scopePublic') },
+      ]} />
+      <${SearchLine} text placeholder=${t('profile.notebook.searchPlaceholder')}
+        value=${query} onInput=${e => setQuery(e.target.value)} onEnter=${handleSearch}>
+        <${Loud} onClick=${handleSearch}>${t('profile.notebook.searchBtn')}<//>
+      <//>
+      ${searching && html`<${Note} kind="loading">${t('profile.notebook.searching')}<//>`}
+      ${!searching && hits !== null && html`
+        ${hits.length > 0 && html`<${Note} kind="meta">${(t('profile.notebook.hitsCount') || '{n} results').replace('{n}', String(hits.length))}<//>`}
+        <${List} cols="name-desc-who-doors" apart empty=${t('profile.notebook.noHits')} rows=${hits} render=${renderHit} />
+      `}
+    <//>
+
+    <${Section} title=${t('profile.notebook.inboxTitle')}>
     ${inbox === null
-      ? html`<${LoadingLine} text=${t('profile.notebook.inboxLoading')} />`
+      ? html`<${Note} kind="loading">${t('profile.notebook.inboxLoading')}<//>`
       : inbox.length === 0
-        ? html`<div class="poster-quiet">${t('profile.notebook.inboxEmpty')}</div>`
+        ? html`<${Note} kind="quiet">${t('profile.notebook.inboxEmpty')}<//>`
         : html`
-          <div class="action-bar pf-nb-inbox-bar">
-            <div class="search-line pf-nb-search">
-              <input type="text" class="og-input" placeholder=${t('profile.notebook.filterPlaceholder')}
-                value=${inboxFilter} onInput=${e => setInboxFilter(e.target.value)} />
-              ${inboxFilter && html`<button class="poster-icon poster-icon--small" onClick=${() => setInboxFilter('')}>✕</button>`}
-            </div>
-            <select class="select-field pf-nb-sort" value=${inboxSort} onChange=${e => setInboxSort(e.target.value)}>
-              <option value="new">${t('profile.notebook.sortNew')}</option>
-              <option value="old">${t('profile.notebook.sortOld')}</option>
-            </select>
-          </div>
-          ${visibleInbox().length === 0
-            ? html`<div class="poster-quiet">${t('profile.notebook.noMatch')}</div>`
-            : html`<div class="pf-nb-inbox">
-              ${visibleInbox().map(note => html`
-                <${NoteCard} key=${note.key} note=${note} showToast=${showToast} orgNames=${orgNames}
-                  settings=${settings} autoEnrich=${settings.autoDetectIntent && autoEnrichKey === note.key}
-                  onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />
-              `)}
-            </div>`}
+          <${SearchLine} text placeholder=${t('profile.notebook.filterPlaceholder')}
+            value=${inboxFilter} onInput=${e => setInboxFilter(e.target.value)}
+            onClear=${() => setInboxFilter('')}>
+            <${Select} fit value=${inboxSort} onChange=${v => setInboxSort(v)}
+              options=${[['new', t('profile.notebook.sortNew')], ['old', t('profile.notebook.sortOld')]]} />
+          <//>
+          <${List} cols="name" empty=${t('profile.notebook.noMatch')}>
+            ${visibleInbox().map(note => html`
+              <${NoteCard} key=${note.key} note=${note} showToast=${showToast} orgNames=${orgNames}
+                settings=${settings} autoEnrich=${settings.autoDetectIntent && autoEnrichKey === note.key}
+                onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />
+            `)}
+          <//>
         `
     }
     <//>
-    </div>
+    <//>
   `;
 }

@@ -10,10 +10,16 @@
  *   04 everything you own as one file, with what is inside; 05 how your AI uses the wallet. A
  *   wallet that lives on another server shows one box. Pure render over the ctx bag; the rows are
  *   rows.js.
- * @structure renderPage · federated · mast · strip · secTargets · secTrail · secGrant · secExport ·
+ * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport ·
  *   secRoads
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.21.0 — 2026-09-26 — On the component kit (page group G7): the frame, crumb, head, rail and
+ *     strip are SettingsPage and FigureStrip; the sections are Section (a fold for 03); the filters
+ *     are Tabs in the filter tone with the one at the end a Filter; the lists are List; the grant
+ *     form is Field, Choice, Select and TextField with FormActions; the boxes are Box and SettingBox;
+ *     what the export holds is CardGrid; the two roads are Roads; the tags keep main's dim tone
+ *     (Mark tone="dim", og-chip--dim on main). The page writes no class.
  *   v1.20.0 -- 2026-09-26 -- The ready-made request is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.19.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.18.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -48,103 +54,92 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { ContactPicker } from '/components/ContactPicker.js';
-import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Section } from '/components/Section.js';
+import { scrollToSection } from '/components/Rail.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, Filter, More } from '/components/List.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Box, SettingBox } from '/components/Box.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Roads, Road } from '/components/Roads.js';
+import { Row as Line } from '/components/Layout.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { Choice } from '/components/Choice.js';
+import { Select } from '/components/Select.js';
+import { TextField } from '/components/TextField.js';
 import { x, n, crumb, pageLinks, whoOf } from './frame.js';
 import { targetRow, personRow, revokedRow, groupRow, eventRow, groupId } from './rows.js';
-import { Hint } from '/components/Hint.js';
 
-const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
-const msg = (m) => (m ? html`<small class=${`form-message ${m.error ? 'form-message--error' : ''}`}>${m.text}</small>` : null);
+const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 
 export function renderPage(ctx) {
   if (ctx.federated) return federated(ctx);
   const ov = ctx.ov;
-  const rail = [
-    ['01', 'dw-targets', x('secTargets'), ov ? String(ctx.active.length) : ''],
-    ['02', 'dw-trail', x('secTrail'), ov ? n(ctx.deniedCount) : ''],
-    ['03', 'dw-grant', x('secGrant'), ov ? `${ctx.active.length} / ${ctx.quota}` : ''],
-    ['04', 'dw-export', x('secExport'), ov ? n(ov.permSummary.total_memory_keys) : ''],
-    ['05', 'dw-roads', x('secRoads'), ''],
+  const sections = [
+    { id: 'dw-targets', num: '01', label: x('secTargets'), count: ov ? String(ctx.active.length) : '' },
+    { id: 'dw-trail', num: '02', label: x('secTrail'), count: ov ? n(ctx.deniedCount) : '' },
+    { id: 'dw-grant', num: '03', label: x('secGrant'), count: ov ? `${ctx.active.length} / ${ctx.quota}` : '' },
+    { id: 'dw-export', num: '04', label: x('secExport'), count: ov ? n(ov.permSummary.total_memory_keys) : '' },
+    { id: 'dw-roads', num: '05', label: x('secRoads'), count: '' },
   ];
   return html`
-    <div class="og og-dw">
-      ${crumb()}
-      ${mast(ctx)}
-      ${strip(ctx)}
-      <div class="og-grid">
-        <div class="og-main">
-          ${!ov ? html`<p class=${`poster-quiet dw-empty${ctx.failed ? '' : ' loading-mark'}`}>${ctx.failed ? x('loadFailed') : x('loading')}</p>` : html`
-            ${secTargets(ctx)}
-            ${secTrail(ctx)}
-            ${secGrant(ctx)}
-            ${secExport(ctx)}
-            ${secRoads()}`}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${rail.map(([num, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${num}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-      <${ctx.ConfirmUI} />
-    </div>`;
+    <${SettingsPage} name="dw" crumb=${crumb()} ...${head(ctx)} strip=${strip(ctx)}
+      railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${!ov ? (ctx.failed ? html`<${Note} kind="quiet">${x('loadFailed')}<//>` : html`<${Note} kind="loading">${x('loading')}<//>`) : html`
+        ${secTargets(ctx)}
+        ${secTrail(ctx)}
+        ${secGrant(ctx)}
+        ${secExport(ctx)}
+        ${secRoads()}`}
+    <//>`;
 }
 
 function federated(ctx) {
   return html`
-    <div class="og og-dw">
-      ${crumb()}
-      <div class="og-mast"><div class="og-mast-words"><h1 class="og-title poster-page-title">${t('profile.tabs.dataWallet')}<small>${x('titleSub')}</small></h1><p class="og-desc">${x('desc')}</p></div></div>
-      <div class="og-box og-box--solid dw-box poster-aside poster-aside--small poster-aside--irreversible"><span class="poster-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
-    </div>`;
+    <${SettingsPage} name="dw" crumb=${crumb()} title=${t('profile.tabs.dataWallet')} sub=${x('titleSub')} desc=${x('desc')}>
+      <${SettingBox} label=${x('federatedLabel')} irreversible>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}<//>
+    <//>`;
 }
 
-function mast(ctx) {
+/** The mast as SettingsPage's head props: title, the tags, the words, the grant slab and its doors. */
+function head(ctx) {
   const ov = ctx.ov;
   const ps = ov?.permSummary;
-  const chips = !ov ? [] : [
-    chip(x('chipOwn', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) }), 'poster-chip--sun'),
-    chip(x('chipGrants', { active: ctx.active.length, revoked: ctx.revokedList.length })),
-    ctx.deniedCount ? chip(x('chipDenied', { n: n(ctx.deniedCount), days: ctx.days }), 'poster-chip--coral') : chip(x('chipQuiet', { days: ctx.days })),
-    ctx.expiring ? chip(x('chipExpiring', { n: ctx.expiring })) : chip(x('chipNoExpiry')),
+  const marks = !ov ? [] : [
+    { label: x('chipOwn', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) }), tone: 'sun' },
+    { label: x('chipGrants', { active: ctx.active.length, revoked: ctx.revokedList.length }) },
+    ctx.deniedCount ? { label: x('chipDenied', { n: n(ctx.deniedCount), days: ctx.days }), tone: 'coral' } : { label: x('chipQuiet', { days: ctx.days }), tone: 'dim' },
+    ctx.expiring ? { label: x('chipExpiring', { n: ctx.expiring }), tone: 'dim' } : { label: x('chipNoExpiry'), tone: 'dim' },
   ];
-  return html`
-    <div class="og-mast">
-      <div class="og-mast-words">
-        <h1 class="og-title poster-page-title">${t('profile.tabs.dataWallet')}<small>${x('titleSub')}</small></h1>
-        <div class="poster-chips">${chips}</div>
-        <p class="og-desc">${x('desc')}</p>
-      </div>
-      <div class="og-mast-actions">
-        <button type="button" class="poster-slab" onClick=${() => ctx.toggleForm(true)}>${x('grantSlab')}</button>
-        <small class="poster-hint poster-hint--slab">${x('grantSlabHint')}</small>
-        <div class="og-doors">
-          <button type="button" class="poster-action poster-action--small" disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => scrollTo('dw-roads')}>${x('toAi')}</button>
-        </div>
-      </div>
-    </div>`;
+  const actions = html`
+    <${Loud} onClick=${() => ctx.toggleForm(true)}>${x('grantSlab')}<//>
+    <${Note} kind="hint" slab inline>${x('grantSlabHint')}<//>
+    <${Actions}>
+      <${Action} small disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}<//>
+      <${Action} small soft onClick=${() => scrollToSection('dw-roads')}>${x('toAi')}<//>
+    <//>`;
+  return { title: t('profile.tabs.dataWallet'), sub: x('titleSub'), marks, desc: x('desc'), actions };
 }
 
 function strip(ctx) {
   const ov = ctx.ov;
-  if (!ov) return html`<div class="og-strip"><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div></div>`;
+  if (!ov) return html`<${FigureStrip} loading=${4} />`;
   const ps = ov.permSummary;
   const kinds = ctx.kinds;
   const kindWords = ['person', 'orgMembers', 'company', 'node', 'domain', 'agent', 'all'].filter((k) => kinds[k]).map((k) => x('kindN.' + k, { n: kinds[k] })).join(' · ');
-  return html`
-    <div class="og-strip">
-      <div><b>${n(ps.total_memory_keys)}</b><span>${x('stripKeys')}</span><small>${x('stripKeysSub', { files: n(ps.total_storage_files) })}</small></div>
-      <div><b>${ctx.active.length}</b><span>${x('stripGrants')}</span><small>${kindWords || x('stripNoGrants')}</small></div>
-      <div>${ctx.deniedCount ? html`<b class="is-low">${n(ctx.deniedCount)}</b><span>${x('stripDenied', { days: ctx.days })}</span><small>${x('stripDeniedSub', { groups: ctx.deniedGroups })}</small>` : html`<b class="is-dim">·</b><span>${x('stripDenied', { days: ctx.days })}</span><small>${x('stripQuietSub')}</small>`}</div>
-      <div><b>${ctx.revokedList.length}</b><span>${x('stripRevoked')}</span><small>${ctx.revokedList.length ? x('stripRevokedSub', { swapped: ctx.swapped, removed: ctx.revokedList.length - ctx.swapped }) : x('stripRevokedNone')}</small></div>
-    </div>`;
+  return html`<${FigureStrip} wrap items=${[
+    { n: n(ps.total_memory_keys), label: x('stripKeys'), sub: x('stripKeysSub', { files: n(ps.total_storage_files) }) },
+    { n: ctx.active.length, label: x('stripGrants'), sub: kindWords || x('stripNoGrants') },
+    ctx.deniedCount
+      ? { n: n(ctx.deniedCount), tone: 'notice', label: x('stripDenied', { days: ctx.days }), sub: x('stripDeniedSub', { groups: ctx.deniedGroups }) }
+      : { n: '·', tone: 'dim', label: x('stripDenied', { days: ctx.days }), sub: x('stripQuietSub') },
+    { n: ctx.revokedList.length, label: x('stripRevoked'), sub: ctx.revokedList.length ? x('stripRevokedSub', { swapped: ctx.swapped, removed: ctx.revokedList.length - ctx.swapped }) : x('stripRevokedNone') },
+  ]} />`;
 }
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -155,29 +150,27 @@ function secTargets(ctx) {
   const list = f === 'orgs' ? ctx.targets.filter((r) => r.kind === 'org') : f === 'keys' ? ctx.targets.filter((r) => r.kind === 'key') : ctx.targets;
   const shown = ctx.personFocus && f === 'people' ? ctx.people.filter((p) => p.name === ctx.personFocus).concat(ctx.people.filter((p) => p.name !== ctx.personFocus)) : ctx.people;
   return html`
-    <${PageSection} id="dw-targets" num="01" title=${x('secTargets')} count=${x('secTargetsSub', { n: ctx.active.length, targets: ctx.targets.length })} first=${true}>
-      <p class="og-lead">${x('targetsIntro')}</p>
+    <${Section} id="dw-targets" num="01" title=${x('secTargets')} count=${x('secTargetsSub', { n: ctx.active.length, targets: ctx.targets.length })} first=${true}>
+      <${Note} kind="lead">${x('targetsIntro')}<//>
       ${ctx.active.length || ctx.revokedList.length ? html`
-        <div class="dw-filters">
-          ${filters.map(([id, k]) => html`<button type="button" key=${id} class=${`poster-tab poster-tab--filter ${f === id ? 'is-on' : ''}`} onClick=${() => ctx.setFilter(id)}>${x('filter.' + id)} · ${k}</button>`)}
-          <button type="button" class=${`poster-tab poster-tab--filter dw-filters-r ${f === 'people' ? 'is-on' : ''}`} onClick=${() => ctx.setFilter('people')}>${x('filter.people')} · ${ctx.people.length}</button>
-        </div>` : null}
+        <${Tabs} tone="filter" value=${f} onSelect=${(v) => ctx.setFilter(v)}
+          items=${filters.map(([id, k]) => ({ value: id, label: x('filter.' + id), count: k }))}>
+          <${Filter} end on=${f === 'people'} count=${ctx.people.length} onClick=${() => ctx.setFilter('people')}>${x('filter.people')}<//>
+        <//>` : null}
       ${f === 'revoked' ? html`
-        ${ctx.revokedList.length ? html`<div class="listing listing--cols listing--name-desc-span-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.target')}</div><div class="poster-label">${x('col.whoWhat')}</div><div class="poster-label">${x('col.span')}</div><div class="poster-label"></div></div>
+        <${List} cols="name-desc-span-doors" keepCols head=${[x('col.target'), x('col.whoWhat'), x('col.span'), '']} empty=${x('noRevoked')}>
           ${ctx.revokedList.map((c) => revokedRow(ctx, c))}
-        </div>` : html`<p class="poster-quiet dw-empty">${x('noRevoked')}</p>`}`
+        <//>`
       : f === 'people' ? html`
-        ${ctx.people.length ? html`<div class="listing listing--cols listing--name-desc-since-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.who')}</div><div class="poster-label">${x('col.reaches')}</div><div class="poster-label">${x('col.since')}</div><div class="poster-label"></div></div>
+        <${List} cols="name-desc-since-doors" keepCols head=${[x('col.who'), x('col.reaches'), x('col.since'), '']} empty=${x('noGrants')}>
           ${shown.map((p) => personRow(ctx, p))}
-        </div>` : html`<p class="poster-quiet dw-empty">${x('noGrants')}</p>`}`
+        <//>`
       : html`
-        ${list.length ? html`<div class="listing listing--cols listing--name-desc-since-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.target')}</div><div class="poster-label">${x('col.whoWhat')}</div><div class="poster-label">${x('col.since')}</div><div class="poster-label"></div></div>
+        <${List} cols="name-desc-since-doors" keepCols head=${[x('col.target'), x('col.whoWhat'), x('col.since'), '']}
+          empty=${html`<${Note} kind="quiet"><b>${x('noGrantsTitle')}</b> ${x('noGrantsBody')}<//>`}>
           ${list.map((r) => targetRow(ctx, r))}
-        </div>` : html`<p class="poster-quiet dw-empty"><b>${x('noGrantsTitle')}</b> ${x('noGrantsBody')}</p>`}`}
-      <div class="dw-why poster-box"><b>${x('howTitle')}</b> ${x('howBody')}</div>
+        <//>`}
+      <${Box}><b>${x('howTitle')}</b> ${x('howBody')}<//>
     <//>`;
 }
 
@@ -187,28 +180,28 @@ function secTrail(ctx) {
   const ov = ctx.ov;
   const items = ctx.trail;
   const shown = items.slice(0, ctx.shownTrail);
+  const events = ctx.trailFilter === 'events';
   return html`
-    <${PageSection} id="dw-trail" num="02" title=${x('secTrail')} count=${x('secTrailSub', { days: ctx.days, denied: n(ctx.deniedCount), events: ctx.events.length })}>
-      <p class="og-lead">${x('trailIntro')}</p>
-      <div class="dw-filters">
-        ${[7, 30, 90].map((d) => html`<button type="button" key=${d} class=${`poster-tab poster-tab--filter ${ctx.days === d ? 'is-on' : ''}`} disabled=${ctx.reloading} onClick=${() => ctx.setDays(d)}>${x('daysN', { n: d })}${ctx.days === d ? ` · ${n(ov.audit.total)}` : ''}</button>`)}
-        <button type="button" class=${`poster-tab poster-tab--filter dw-filters-r ${ctx.trailFilter === 'events' ? 'is-on' : ''}`} onClick=${() => ctx.setTrailFilter(ctx.trailFilter === 'events' ? 'all' : 'events')}>${x('filter.eventsOnly')} · ${ctx.events.length}</button>
-      </div>
-      ${items.length ? html`
-        <div class="listing listing--cols listing--name-desc-count-when-doors">
-          <div class="listing-row listing-row--head"><div class="poster-label">${x('col.who')}</div><div class="poster-label">${x('col.what')}</div><div class="dw-n poster-label">${x('col.times')}</div><div class="poster-label">${x('col.when')}</div><div class="poster-label"></div></div>
-          ${shown.map((it) => (it.kind === 'group' ? groupRow(ctx, it.group) : eventRow(ctx, it.event)))}
-        </div>
-        ${items.length > shown.length ? html`<div class="dw-more"><button type="button" class="poster-action poster-action--more" onClick=${() => ctx.showMoreTrail()}>${x('moreRows', { n: items.length - shown.length })}</button></div>` : null}`
-      : html`<p class="poster-quiet dw-empty"><b>${x('trailEmptyTitle')}</b> ${x('trailEmptyBody')}</p>`}
-      ${ctx.manifestShare >= 0.5 && ctx.deniedCount >= 20 ? html`<div class="dw-why poster-box"><b>${x('meaningTitle')}</b> ${x('meaningManifest', { n: n(ctx.manifestDenied), total: n(ctx.deniedCount) })}</div>` : null}
+    <${Section} id="dw-trail" num="02" title=${x('secTrail')} count=${x('secTrailSub', { days: ctx.days, denied: n(ctx.deniedCount), events: ctx.events.length })}>
+      <${Note} kind="lead">${x('trailIntro')}<//>
+      <${Tabs} tone="filter" value=${ctx.days} disabled=${ctx.reloading} onSelect=${(d) => ctx.setDays(d)}
+        items=${[7, 30, 90].map((d) => ({ value: d, label: x('daysN', { n: d }), count: ctx.days === d ? n(ov.audit.total) : undefined }))}>
+        <${Filter} end on=${events} count=${ctx.events.length} onClick=${() => ctx.setTrailFilter(events ? 'all' : 'events')}>${x('filter.eventsOnly')}<//>
+      <//>
+      <${List} cols="name-desc-count-when-doors" keepCols head=${[x('col.who'), x('col.what'), { label: x('col.times'), num: true }, x('col.when'), '']}
+        empty=${html`<${Note} kind="quiet"><b>${x('trailEmptyTitle')}</b> ${x('trailEmptyBody')}<//>`}>
+        ${shown.map((it) => (it.kind === 'group' ? groupRow(ctx, it.group) : eventRow(ctx, it.event)))}
+      <//>
+      ${items.length > shown.length ? html`<${More} label=${x('moreRows', { n: items.length - shown.length })} onMore=${() => ctx.showMoreTrail()} />` : null}
+      ${ctx.manifestShare >= 0.5 && ctx.deniedCount >= 20 ? html`<${Box}><b>${x('meaningTitle')}</b> ${x('meaningManifest', { n: n(ctx.manifestDenied), total: n(ctx.deniedCount) })}<//>` : null}
     <//>`;
 }
 
 /* ── 03 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function opt(ctx, field, value, label) {
-  return html`<button type="button" class=${`poster-tab ${ctx.form[field] === value ? 'is-on' : ''}`} onClick=${() => ctx.setForm({ [field]: value })}>${label}</button>`;
+/** One of the form's choices: a row of answers that sets one field of the form. */
+function opt(ctx, field, label, options) {
+  return html`<${Choice} ariaLabel=${label} value=${ctx.form[field]} options=${options} onChange=${(v) => ctx.setForm({ [field]: v })} />`;
 }
 
 function secGrant(ctx) {
@@ -218,54 +211,40 @@ function secGrant(ctx) {
   const canWrite = f.what === 'ws';
   const whoIsPicker = f.whoKind === 'contact';
   const ready = (whoIsPicker ? !!f.who.trim() : true) && (f.what === 'key' ? !!f.key.trim() : !!f.orgId && (f.what !== 'ws' || !!f.wsId)) && !!f.why.trim();
+  const whoHint = f.whoKind === 'all' ? x('form.whoAllHint') : f.whoKind === 'orgMembers' ? x('form.whoOrgMembersHint') : f.whoKind === 'nodeUsers' ? x('form.whoNodeUsersHint') : x('form.whoHint');
+  const whatHint = f.what === 'key' ? x('form.keyHint') : f.what === 'ws' ? x('form.wsHint') : x('form.orgHint');
   return html`
-    <${FoldSection} id="dw-grant" num="03" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
-      <p class="og-lead">${x('grantIntro')}</p>
-      <div class="dw-form">
-        <span class="poster-label">${x('form.who')}</span>
-        <div>
-          <div class="dw-opts">${opt(ctx, 'whoKind', 'contact', x('form.whoContact'))}${opt(ctx, 'whoKind', 'orgMembers', x('form.whoOrgMembers'))}${opt(ctx, 'whoKind', 'nodeUsers', x('form.whoNodeUsers'))}${opt(ctx, 'whoKind', 'all', x('form.whoAll'))}</div>
+    <${Section} fold id="dw-grant" num="03" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
+      <${Note} kind="lead">${x('grantIntro')}<//>
+      <${Fields}>
+        <${Field} label=${x('form.who')} hint=${whoHint} group>
+          ${opt(ctx, 'whoKind', x('form.who'), [['contact', x('form.whoContact')], ['orgMembers', x('form.whoOrgMembers')], ['nodeUsers', x('form.whoNodeUsers')], ['all', x('form.whoAll')]])}
           ${whoIsPicker ? html`<${ContactPicker} value=${f.who} onChange=${(v) => ctx.setForm({ who: v })} valueMode="full" placeholder=${x('form.whoPlaceholder')} />` : null}
-          <${Hint}>${f.whoKind === 'all' ? x('form.whoAllHint') : f.whoKind === 'orgMembers' ? x('form.whoOrgMembersHint') : f.whoKind === 'nodeUsers' ? x('form.whoNodeUsersHint') : x('form.whoHint')}<//>
-        </div>
-        <span class="poster-label">${x('form.what')}</span>
-        <div>
-          <div class="dw-opts">${opt(ctx, 'what', 'ws', x('form.whatWs'))}${opt(ctx, 'what', 'org', x('form.whatOrg'))}${opt(ctx, 'what', 'key', x('form.whatKey'))}</div>
-          ${f.what === 'key' ? html`<input class="og-input" type="text" value=${f.key} placeholder="portfolio/contact*" onInput=${(e) => ctx.setForm({ key: e.target.value })} /><${Hint}>${x('form.keyHint')}<//>` : html`
-            <select class="select-field" value=${f.orgId} onChange=${(e) => ctx.setForm({ orgId: e.target.value, wsId: '' })}>
-              <option value="">${ctx.orgs.length ? x('form.pickOrg') : x('form.noOrgs')}</option>
-              ${ctx.orgs.map((o) => html`<option key=${o.id} value=${o.id}>${o.name}</option>`)}
-            </select>
-            ${f.what === 'ws' ? html`<select class="select-field dw-workspace-select" value=${f.wsId} disabled=${!f.orgId} onChange=${(e) => ctx.setForm({ wsId: e.target.value })}>
-              <option value="">${!f.orgId ? x('form.pickOrgFirst') : wsList.length ? x('form.pickWs') : x('form.noWs')}</option>
-              ${wsList.map((w) => html`<option key=${w.id} value=${w.id}>${w.name}</option>`)}
-            </select>` : null}
-            <${Hint}>${f.what === 'ws' ? x('form.wsHint') : x('form.orgHint')}<//>`}
-        </div>
-        <span class="poster-label">${x('form.may')}</span>
-        <div>
-          <div class="dw-opts">${opt(ctx, 'may', 'read', x('form.mayRead'))}${canWrite ? opt(ctx, 'may', 'write', x('form.mayWrite')) : null}</div>
-          <${Hint}>${x('form.mayHint')}<//>
-        </div>
-        <span class="poster-label">${x('form.why')}</span>
-        <div><input class="og-input" type="text" value=${f.why} placeholder=${x('form.whyPlaceholder')} onInput=${(e) => ctx.setForm({ why: e.target.value })} /></div>
-        <span class="poster-label">${x('form.scope')}</span>
-        <div>
-          <div class="dw-opts">${opt(ctx, 'scope', 'private', x('form.scopePrivate'))}${opt(ctx, 'scope', 'federation', x('form.scopeFederation'))}</div>
-          <${Hint}>${x('form.scopeHint')}<//>
-        </div>
-        <span class="poster-label">${x('form.until')}</span>
-        <div>
-          <div class="dw-opts">${opt(ctx, 'untilKind', 'never', x('form.untilNever'))}${opt(ctx, 'untilKind', 'date', x('form.untilDate'))}</div>
-          ${f.untilKind === 'date' ? html`<input class="og-input" type="date" value=${f.until} onInput=${(e) => ctx.setForm({ until: e.target.value })} />` : null}
-        </div>
-        <span></span>
-        <div class="dw-submit">
-          <button type="button" class="poster-slab poster-slab--control" disabled=${!ready || ctx.busy === 'grant'} onClick=${() => ctx.submitGrant()}>${ctx.busy === 'grant' ? x('granting') : x('grantSlab')}</button>
-          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleForm(false)}>${x('cancel')}</button>
+        <//>
+        <${Field} label=${x('form.what')} hint=${whatHint} group>
+          ${opt(ctx, 'what', x('form.what'), [['ws', x('form.whatWs')], ['org', x('form.whatOrg')], ['key', x('form.whatKey')]])}
+          ${f.what === 'key' ? html`<${TextField} ariaLabel=${x('form.whatKey')} value=${f.key} placeholder="portfolio/contact*" onInput=${(v) => ctx.setForm({ key: v })} />` : html`
+            <${Select} ariaLabel=${x('form.whatOrg')} value=${f.orgId} placeholder=${ctx.orgs.length ? x('form.pickOrg') : x('form.noOrgs')}
+              options=${ctx.orgs.map((o) => [o.id, o.name])} onChange=${(v) => ctx.setForm({ orgId: v, wsId: '' })} />
+            ${f.what === 'ws' ? html`<${Select} ariaLabel=${x('form.whatWs')} value=${f.wsId} disabled=${!f.orgId}
+              placeholder=${!f.orgId ? x('form.pickOrgFirst') : wsList.length ? x('form.pickWs') : x('form.noWs')}
+              options=${wsList.map((w) => [w.id, w.name])} onChange=${(v) => ctx.setForm({ wsId: v })} />` : null}`}
+        <//>
+        <${Choice} label=${x('form.may')} hint=${x('form.mayHint')} value=${f.may} onChange=${(v) => ctx.setForm({ may: v })}
+          options=${[['read', x('form.mayRead')], canWrite ? ['write', x('form.mayWrite')] : null].filter(Boolean)} />
+        <${TextField} label=${x('form.why')} value=${f.why} placeholder=${x('form.whyPlaceholder')} onInput=${(v) => ctx.setForm({ why: v })} />
+        <${Choice} label=${x('form.scope')} hint=${x('form.scopeHint')} value=${f.scope} onChange=${(v) => ctx.setForm({ scope: v })}
+          options=${[['private', x('form.scopePrivate')], ['federation', x('form.scopeFederation')]]} />
+        <${Field} label=${x('form.until')} group>
+          ${opt(ctx, 'untilKind', x('form.until'), [['never', x('form.untilNever')], ['date', x('form.untilDate')]])}
+          ${f.untilKind === 'date' ? html`<${TextField} type="date" ariaLabel=${x('form.untilDate')} value=${f.until} onInput=${(v) => ctx.setForm({ until: v })} />` : null}
+        <//>
+        <${FormActions}>
+          <${Loud} control disabled=${!ready || ctx.busy === 'grant'} onClick=${() => ctx.submitGrant()}>${ctx.busy === 'grant' ? x('granting') : x('grantSlab')}<//>
+          <${Action} small soft onClick=${() => ctx.toggleForm(false)}>${x('cancel')}<//>
           ${msg(ctx.formMsg)}
-        </div>
-      </div>
+        <//>
+      <//>
     <//>`;
 }
 
@@ -286,13 +265,15 @@ function secExport(ctx) {
     ['flags', x('export.flagsSub')],
   ];
   return html`
-    <${PageSection} id="dw-export" num="04" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
-      <p class="og-lead">${x('exportIntro', { mb })}</p>
-      <div class="item-grid">${items.map(([k, sub]) => html`<div key=${k}><b>${x('export.' + k)}</b><small>${sub}</small></div>`)}</div>
-      <div class="dw-export poster-box">
-        <button type="button" class="poster-slab poster-slab--control" disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}</button>
-        <div>${x('exportBody', { file: ctx.exportName })} ${msg(ctx.exportMsg)}</div>
-      </div>
+    <${Section} id="dw-export" num="04" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
+      <${Note} kind="lead">${x('exportIntro', { mb })}<//>
+      <${CardGrid}>${items.map(([k, sub]) => html`<${Card} key=${k} name=${x('export.' + k)} meta=${sub} />`)}<//>
+      <${Box}>
+        <${Line} gap="large" wrap>
+          <${Loud} control disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}<//>
+          <span>${x('exportBody', { file: ctx.exportName })} ${msg(ctx.exportMsg)}</span>
+        <//>
+      <//>
     <//>`;
 }
 
@@ -301,20 +282,13 @@ function secExport(ctx) {
 function secRoads() {
   const ask = x('roadAskPrompt');
   return html`
-    <${PageSection} id="dw-roads" num="05" title=${x('secRoads')}>
-      <div class="dw-roads">
-        <div class="dw-road poster-box poster-box--raised">
-          <span class="poster-label">${x('roadAskTitle')}</span>
-          <p>${x('roadAskBody')}</p>
-          <pre class="code-block">${ask}</pre>
-          <div class="og-doors"><${CopyButton} className="poster-action poster-action--small poster-action--lower" text=${ask} label=${x('copyPrompt')} /></div>
-        </div>
-        <div class="dw-road poster-box">
-          <span class="poster-label">${x('roadAgentTitle')}</span>
-          <p>${x('roadAgentBody')}</p>
-          <small>aimeat_consent_list · aimeat_consent_grant · aimeat_consent_revoke · ${x('roadAgentScope')}</small>
-        </div>
-      </div>
+    <${Section} id="dw-roads" num="05" title=${x('secRoads')}>
+      <${Roads} wide>
+        <${Road} lead name=${x('roadAskTitle')} text=${x('roadAskBody')} code=${ask}
+          doors=${html`<${Action} small soft copy=${ask}>${x('copyPrompt')}<//>`} />
+        <${Road} name=${x('roadAgentTitle')} text=${x('roadAgentBody')}
+          meta=${`aimeat_consent_list · aimeat_consent_grant · aimeat_consent_revoke · ${x('roadAgentScope')}`} />
+      <//>
     <//>`;
 }
 

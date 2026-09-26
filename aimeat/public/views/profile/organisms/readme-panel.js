@@ -12,6 +12,7 @@
  * @structure ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind })
  * @usage import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
  * @version-history
+ *   v1.7.0 — 2026-09-26 — Every part is a kit component (page group G2a): the README is the Box (the editor's title and ways in its head, the Edit README way at its foot), the field the TextArea, the ways the Action (the AI prompt's copy is the Action's copy) and the Loud action, the lines the section description (HeadDesc). The page writes no class.
  *   v1.6.0 — 2026-09-26 — An organism's README and its draft are the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
  *   v1.5.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.4.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -34,8 +35,12 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
+import { Box } from '/components/Box.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { TextArea } from '/components/TextField.js';
+import { HeadDesc } from '/components/SubHeading.js';
+import { Row } from '/components/Layout.js';
 
 /** Build a ready copy-paste prompt for an AI chat to write the README, seeded with the structure. */
 function buildAiPrompt(kind, name, seed) {
@@ -80,42 +85,35 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
 
   if (editing) {
     return html`
-      <div class="pj-readme poster-box pj-readme-edit">
-        <div class="pj-readme-bar">
-          <strong>${t('readme.editTitle') || 'Edit README'}</strong>
-          <div class="pj-readme-actions">
-            <button class="poster-action poster-action--small" onClick=${() => setPreview(p => !p)}>${preview ? (t('readme.write') || 'Write') : (t('readme.preview') || 'Preview')}</button>
-            ${aiPromptSeed !== undefined ? html`<${CopyButton} text=${buildAiPrompt(kind, name, aiPromptSeed)} className="poster-action poster-action--small"
-              label=${t('readme.generateAi') || 'Generate with AI'} onCopied=${markCopied} />` : null}
-            <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => { setDraft(markdown || ''); setEditing(false); }}>${t('common.cancel') || 'Cancel'}</button>
-            <button class="poster-slab poster-slab--control" disabled=${busy} onClick=${save}>${busy ? (t('common.saving') || 'Saving…') : (t('common.save') || 'Save')}</button>
-          </div>
-        </div>
+      <${Box} name=${t('readme.editTitle') || 'Edit README'} end=${html`<${Actions}>
+          <${Action} small onClick=${() => setPreview(p => !p)}>${preview ? (t('readme.write') || 'Write') : (t('readme.preview') || 'Preview')}<//>
+          ${aiPromptSeed !== undefined ? html`<${Action} small copy=${buildAiPrompt(kind, name, aiPromptSeed)} onCopied=${markCopied}>${t('readme.generateAi') || 'Generate with AI'}<//>` : null}
+          <${Action} small disabled=${busy} onClick=${() => { setDraft(markdown || ''); setEditing(false); }}>${t('common.cancel') || 'Cancel'}<//>
+          <${Loud} control disabled=${busy} onClick=${save}>${busy ? (t('common.saving') || 'Saving…') : (t('common.save') || 'Save')}<//>
+        <//>`}>
         ${preview
-          ? html`<div class="pj-readme-body"><${Markdown} text=${draft} small /></div>`
-          : html`<textarea class="og-textarea" rows="14" value=${draft} placeholder=${t('readme.placeholder') || '# Title\n\nDescribe what this is about. Mermaid diagrams are allowed.'} onInput=${e => setDraft(e.target.value)}></textarea>`}
-        ${copied ? html`<div class="section-desc">${t('readme.pasteBack') || 'Prompt copied — run it in your AI chat, then paste the Markdown result here.'}</div>` : null}
-      </div>`;
+          ? html`<${Markdown} text=${draft} small />`
+          : html`<${TextArea} rows=${14} value=${draft} placeholder=${t('readme.placeholder') || '# Title\n\nDescribe what this is about. Mermaid diagrams are allowed.'} onInput=${setDraft} />`}
+        ${copied ? html`<${HeadDesc}>${t('readme.pasteBack') || 'Prompt copied — run it in your AI chat, then paste the Markdown result here.'}<//>` : null}
+      <//>`;
   }
 
   if (!markdown) {
     if (!canEdit) return null;   // nothing to show and can't add → render nothing
     return html`
-      <div class="pj-readme poster-box pj-readme-empty">
-        <div class="section-desc">${t('readme.emptyHint') || 'No description yet. Add a README so people (and agents) know what this is about.'}</div>
-        <div class="pj-readme-actions">
-          <button class="poster-action poster-action--small" onClick=${() => { setDraft(''); setEditing(true); }}>${t('readme.write') || 'Write'}</button>
-          ${aiPromptSeed !== undefined ? html`<button class="poster-action poster-action--small" onClick=${() => { setDraft(''); setEditing(true); setTimeout(openEditorAndCopy, 0); }}>${t('readme.generateAi') || 'Generate with AI'}</button>` : null}
-        </div>
-      </div>`;
+      <${Box}>
+        <${Row} wrap justify="between" gap="medium">
+          <${HeadDesc}>${t('readme.emptyHint') || 'No description yet. Add a README so people (and agents) know what this is about.'}<//>
+          <${Actions}>
+            <${Action} small onClick=${() => { setDraft(''); setEditing(true); }}>${t('readme.write') || 'Write'}<//>
+            ${aiPromptSeed !== undefined ? html`<${Action} small onClick=${() => { setDraft(''); setEditing(true); setTimeout(openEditorAndCopy, 0); }}>${t('readme.generateAi') || 'Generate with AI'}<//>` : null}
+          <//>
+        <//>
+      <//>`;
   }
 
   return html`
-    <div class="pj-readme poster-box">
-      <div class="pj-readme-body"><${Markdown} text=${markdown} small /></div>
-      ${canEdit ? html`
-        <div class="pj-readme-actions">
-          <button class="poster-action poster-action--small" onClick=${() => { setDraft(markdown); setEditing(true); }}>${t('readme.edit') || 'Edit README'}</button>
-        </div>` : null}
-    </div>`;
+    <${Box} doors=${canEdit ? html`<${Action} small onClick=${() => { setDraft(markdown); setEditing(true); }}>${t('readme.edit') || 'Edit README'}<//>` : null}>
+      <${Markdown} text=${markdown} small />
+    <//>`;
 }

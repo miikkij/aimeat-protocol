@@ -3,12 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Workflows page in the poster face (wp- prefix; design canvas "AIMEAT Työnkulkujen
- *   sivu", direction A). The shared parts (crumb, masthead, strip, sections, folds, rail, fields,
- *   choices) come from organism.css's og- rules; this file carries what workflows add: the
- *   workflows table, a step as a row with its check in words and its state, the verdict band, the
- *   confirmation panel, the question block, the check note, the runs table, the three roads and the
- *   paste box, the words list, and the form's rows. NOTE: this file must be linked in spa.html.
+ *   sivu", direction A). Every part of the page is a component with its own sheet now (the page frame,
+ *   the List, the Box, the Roads, the Field family, the WorkflowSteps); this file keeps only the page's
+ *   title size (keyed on its root, .og-wp, which SettingsPage name="wp" draws) and the question box's
+ *   rules that the design lab's conflict sample still draws (.wp-ask). NOTE: this file must be linked
+ *   in spa.html.
  * @version-history
+ *   v1.27.0 -- 2026-09-26 -- The page's parts are components (page group G5): the workflows and runs tables are the List (the run's word a Tinted word: .wp-m and its tones go), the verdict, the confirmation and the check note the Box (.wp-verdict, .wp-confirm, .wp-note go), the roads the Roads (.wp-roads, .wp-road go), the paste box and the form the Field family (.wp-paste, .wp-form, .wp-inline-fields, .wp-var-row, .wp-check, .wp-choice--tight, .wp-num, .wp-field--narrow go), the rail's lines the Rail's plain, code and notice lines (.wp-words, .wp-rail-static, .wp-rail-key, .wp-bad go), a fold's long detail the FoldSection's clip (.og-wp .og-fold-r goes), the record the Code block's tall cut (.wp-code goes), the danger row the Split (.wp-danger-row goes); the page-wide tweaks of the quiet line, the hint, the label and the choice go (the look most pages have). .wp-ask stays for the design lab's sample.
  *   v1.26.0 -- 2026-09-26 -- The workflows table is the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of wp-rows, wp-nm and wp-doors2 go (the narrow-screen columns move to its cut, listing--cols); the last run's word and what happened keep the runs table's cells.
  *   v1.25.0 -- 2026-09-26 -- The line under a workflow's name is the Listing's (.listing-meta): its rule goes (a unification: Jouni's decision "Meta line").
  *   v1.24.0 -- 2026-09-26 -- "Wait for an answer" is the Check line: its size and colour go, its row and place stay (a unification: Jouni's decision "Check line").
@@ -43,86 +44,11 @@
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-wp .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
-.og-wp .poster-quiet { margin: 0; }
-.og-wp .poster-hint { display: block; }
-.og-wp .og-field .poster-hint { margin-top: .2rem; }
-/* A fold's paragraph is the lead (.og-lead); here it keeps margin 0 in the fold's own gap. */
-.og-wp .wp-prose { margin: 0; }
-.og-wp .wp-bad { color: var(--accent); }
+/* A workflow's, a run's and the form's page: the page title's measured size. */
 .og-wp.og-page { --poster-page-size: 2.1rem; }
-.og-wp .og-rail-link.on { color: var(--accent); }
-.og-wp .wp-rail-static { cursor: default; }
-.og-wp .wp-rail-key { font-family: var(--font-mono); font-size: .72rem; text-transform: none; }
-.og-wp .poster-label:where(:not(div)) { display: block; }
-.og-wp .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
-.og-wp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The last doors under their hairline are the split (.og-split, page-section.css); their space only. */
-.og-wp .wp-danger-row { margin-top: .8rem; padding-top: .8rem; }
 
-/* tones */
-.wp-m--ok b { color: var(--success-fg, #1f8f5a); }
-.wp-m--bad b { color: var(--accent); }
-.wp-m--wait b { color: var(--warning-fg, #b8860b); }
-
-/* ── The workflows table ────────────────────────────────────────────────────────────────────── */
-/* The workflows table and the runs table are the Listing (css/components/listing.css); the last run's
-   word and what happened keep the runs table's cells (.wp-m). */
-.og-wp .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-.wp-m { line-height: 1.5; }
-.wp-m:where(:not(.poster-time)) { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-.wp-m b { color: var(--text); font-weight: 500; }
-.wp-m--sub { font-family: inherit; font-size: .8rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
-
-/* ── A step ─────────────────────────────────────────────────────────────────────────────────── */
-
-/* ── The verdict, the confirmation, the check note, the question ────────────────────────────── */
-.wp-verdict { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: center; padding: 1rem 1.1rem; margin: 1.2rem 0 0; }
-.wp-verdict--bad { border-color: var(--accent); }
-.wp-verdict--wait { border-color: var(--sun); }
-.wp-verdict b { display: block; font-size: 1.05rem; font-weight: 800; line-height: 1.35; color: var(--text); }
-.wp-verdict span { display: block; margin-top: .25rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
-.wp-confirm { margin: 1.2rem 0 0; padding: 1.2rem 1.4rem; }
-.wp-confirm h3 { margin: 0; font-size: 1.3rem; font-weight: 800; line-height: 1.25; color: var(--text); }
-.wp-confirm .og-doors { margin-top: 1rem; }
-.wp-note { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .3rem 1rem; align-items: start; margin-top: .9rem; padding: .8rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text); }
-.wp-note b { grid-column: 1; font-weight: 800; }
-.wp-note > span { grid-column: 1; }
-.wp-note .poster-action { grid-column: 2; grid-row: 1; }
-.wp-note--check { border-color: var(--accent); }
-/* A question waiting for the person is the Object box on the page's ground, its answers the Tab (Jouni's decision "Question box"). */
+/* The question box as the design lab's conflict sample still draws it (decision-samples-conflicts.js). */
 .wp-ask { padding: 1rem 1.2rem; margin: .8rem 0 0; }
 .wp-ask b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.35; }
 .wp-ask p { margin: .3rem 0 .7rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
-.wp-ask-other { margin-top: .6rem; max-width: 30rem; }
 .wp-ask .og-doors { margin-top: .8rem; }
-
-/* ── The roads, the paste box, the words ────────────────────────────────────────────────────── */
-.wp-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-/* A road is the Choice tile (.poster-choice), the chosen one on the sun. */
-.wp-road { display: flex; flex-direction: column; gap: .35rem; }
-.wp-road p { margin: 0; }
-.wp-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
-.wp-road .og-doors { margin-top: auto; padding-top: .4rem; }
-.wp-road.on .wp-road-k, .wp-road.on .poster-action { color: var(--on-sun); border-bottom-color: var(--on-sun); }
-.wp-paste { margin-top: .9rem; display: flex; flex-direction: column; gap: .5rem; }
-/* "How to read this page" is the Facts (css/components/facts.css). The rail's lines of checks and
-   states stay: a list in the dark contents rail, drawn on two pages of this tab only. */
-.wp-words { display: grid; gap: .35rem 1rem; line-height: 1.5; }
-.wp-words .code-inline { margin-left: .3rem; }
-.wp-words--rail { grid-template-columns: minmax(0, 1fr); padding: .3rem 0 0 .4rem; font-size: .78rem; color: var(--text-dim); }
-/* A run's record is the Code block (css/components/code-block.css); its place and height only. */
-.wp-code.code-block { margin: 0; max-height: 32rem; overflow: auto; }
-
-/* ── The form ───────────────────────────────────────────────────────────────────────────────── */
-.wp-form .og-fields--2 { gap: 1.1rem 1.6rem; }
-.wp-inline-fields { display: grid; grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-top: .6rem; }
-.wp-field--narrow .og-input { max-width: 8rem; }
-.wp-var-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: .8rem; align-items: end; margin-top: .5rem; }
-.wp-check { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; }
-.wp-choice--tight { margin-top: .5rem; align-items: center; }
-.wp-num { width: 5rem; margin-left: .6rem; }
-
-@media (max-width: 900px) {
-  .wp-verdict, .wp-note, .wp-roads, .wp-inline-fields, .wp-var-row, .wp-form .og-fields--2 { grid-template-columns: minmax(0, 1fr); }
-}

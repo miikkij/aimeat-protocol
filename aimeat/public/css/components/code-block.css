@@ -8,9 +8,31 @@
  *   boards, portfolio), taken as the one look for this kind (UI consolidation phase 5).
  *   Drawn as markup: <pre class="code-block">…</pre> · <code class="code-inline">…</code>.
  *   NOTE: this file must be linked in spa.html.
+ *   .code-block--scroll: a long block (a service's schema) scrolls inside after 200px.
+ *   .code-block--tall: a prompt to copy (the MCP page's) scrolls inside only after 24rem.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The scroll sizes .code-block--scroll-medium / -large / -page (300px, 400px,
+ *     32rem; Code block scroll="…"), main's caps in the agent tabs and the workflow run (fix pass).
+ *   v1.4.0 — 2026-09-26 — .code-block--added / --removed (Code block change), from the Apps page's
+ *     .ap-code--add / --del (page group G6).
+ *   v1.3.0 — 2026-09-26 — .code-inline--blurred (Code blurred), from main's .ac-keybox code (page group G3).
+ *   v1.2.0 — 2026-09-26 — The tall cut (Code block tall), from the MCP page's .mc-code (page group G6).
+ *   v1.1.0 — 2026-09-26 — The scroll cut (Code block scroll), from main's .svc-detail-code (page group G4).
  *   v1.0.0 — 2026-09-25 — Initial, with the values of sk-pre and the inline code of the opened panels.
  */
 
 .code-block { margin: .5rem 0 .7rem; padding: .6rem .8rem; background: var(--bg-dim); font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.code-block--scroll { max-height: 200px; overflow-y: auto; }
+/* The scroll sizes (Code block scroll="medium" | "large" | "page"): main's caps for an agent's stored
+   value and config preview (300px), a crew's try output (400px) and a workflow's run record (32rem). */
+.code-block--scroll-medium { max-height: 300px; }
+.code-block--scroll-large { max-height: 400px; }
+.code-block--scroll-page { max-height: 32rem; }
+.code-block--tall { max-height: 24rem; overflow-y: auto; }
+/* The lines a draft adds (green) or removes (coral): a heavy edge on the left (Code block change;
+   formerly apps-poster.css .ap-code--add / --del). */
+.code-block--added { border-left: 6px solid var(--success-fg); }
+.code-block--removed { border-left: 6px solid var(--accent); }
 .code-inline { display: inline-block; max-width: 100%; margin: .1rem 0; padding: .1rem .35rem; background: var(--bg-dim); font-family: var(--font-mono); font-size: .74rem; overflow-wrap: anywhere; }
+/* A secret shown blurred until the person asks to see it (the recovery key on the Access page). */
+.code-inline--blurred { filter: blur(4px); transition: filter .2s; }

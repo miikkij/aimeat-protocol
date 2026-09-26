@@ -7,9 +7,27 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.1.2 — 2026-09-27 — The button's own names: .pf-presence-pill-btn → .presence-button,
+ *     .pf-presence-pill-caret → .presence-button-caret (a move: the declarations and the selector
+ *     shape are unchanged).
+ *   v1.1.1 — 2026-09-26 — The presence button's corner reads var(--shape-corner-control) (0 in AIMEAT),
+ *     not a literal (check:shape-tokens; fix pass).
+ *   v1.1.0 — 2026-09-26 —The presence button (PresenceButton: .pf-presence-pill-btn and its caret),
+ *     moved unchanged from views/profile.css (page group G8).
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1324-1353), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
+
+/* ── The presence button (PresenceDot.js PresenceButton): the owner's own presence as a door in the
+      Settings overview's head, moved unchanged from views/profile.css ── */
+.pf .presence-button {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: none;
+  color: var(--text); border-radius: var(--shape-corner-control); padding: 0;
+  cursor: pointer; font: inherit; font-weight: 800; font-size: .85rem;
+}
+.pf .presence-button:hover { border-color: var(--accent, #E8564A); background: var(--surface, var(--card)); }
+.pf .presence-button-caret { font-size: .7rem; color: var(--text-dim, #9CA3AF); margin-left: 2px; }
 
 /* ── Presence indicator (canonical) ──
    Backed by /components/PresenceDot.js. A small availability dot (+ optional

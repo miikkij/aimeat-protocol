@@ -12,6 +12,13 @@
  * @structure keyRow · keyOpen · secretRow · sessionsBlock · federationBlock
  * @usage import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- Every part is a component that takes data, and the file writes no class
+ *     (component plan, page group G3): a key and a secret are List rows (Name, Desc, Who, When, Doors)
+ *     with the opened Panel, an opened key's rights a dense List (a base package's line dim), the
+ *     spending ceiling and the replaced value a TextField with its actions, the sessions a dense List
+ *     under their row (name-n-when), the servers allowed to verify you a dense List under their row
+ *     and the TextField that adds one. Put back from main as tones: a key's time in coral when it is
+ *     unused (When warn), "used by nothing" dim (Tinted dim), a host's label kept whole (Tinted whole).
  *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.14.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
@@ -41,7 +48,12 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { x, n, dateWord, timeWord, rightGroups } from './frame.js';
-import { Hint } from '/components/Hint.js';
+import { List, Row, Name, Desc, Who, Num, When, Cell, Doors, Panel } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Figure, Tinted } from '/components/Figure.js';
+import { TextField } from '/components/TextField.js';
 
 const doorWord = (open) => (open ? x('close') : x('open'));
 
@@ -54,49 +66,51 @@ const dotted = (s) => s.split(' · ').map((part, i) => html`${i ? ' · ' : ''}${
 
 export function keyRow(ctx, row) {
   const open = ctx.openKey === row.id;
-  const last = row.last ? html`${dateWord(row.last)}<br />${timeWord(row.last)}` : html`<span>${x('neverUsed')}</span>`;
+  const last = row.last ? html`${dateWord(row.last)}<br />${timeWord(row.last)}` : x('neverUsed');
   const words = row.words.length ? row.words.join(', ') : x('nothing');
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${row.id}>
-      <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleKey(row.id)}>${row.name}</button><small class=${row.subLow ? 'is-warn' : ''}>${dotted(row.sub)}</small></div>
-      <div class="listing-desc">${row.level?.low ? html`<b>${words}</b>` : words}${row.base ? html` · ${x('baseTag')}` : null}${row.canSpend ? html` · <b>${row.spendCap == null ? x('spendNoLimitShort') : x('spendCapShort', { cap: n(row.spendCap) })}</b>` : null}</div>
-      <div class=${`poster-time ${row.lastLow ? 'is-low' : ''}`}><span>${last}${row.lastLow && row.idle != null ? html`<br /><span>${x('unusedDays', { n: row.idle })}</span>` : null}</span></div>
-      <div class="listing-doors">
-        ${row.kind === 'app' ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.toggleKey(row.id)}>${doorWord(open)}</button>` : null}
-        <button type="button" class=${`poster-action poster-action--small poster-action--row${row.level?.low ? ' poster-action--danger' : ''}`} disabled=${ctx.busy === row.id} onClick=${() => ctx.revokeKey(row)}>${ctx.busy === row.id ? x('revoking') : x('revoke')}</button>
-      </div>
+    <${Row} key=${row.id} open=${open}>
+      <${Name} onOpen=${() => ctx.toggleKey(row.id)} meta=${dotted(row.sub)} warn=${row.subLow}>${row.name}<//>
+      <${Desc}>${row.level?.low ? html`<b>${words}</b>` : words}${row.base ? html` · ${x('baseTag')}` : null}${row.canSpend ? html` · <b>${row.spendCap == null ? x('spendNoLimitShort') : x('spendCapShort', { cap: n(row.spendCap) })}</b>` : null}<//>
+      <${When} warn=${row.lastLow}>${last}${row.lastLow && row.idle != null ? html`<br />${x('unusedDays', { n: row.idle })}` : null}<//>
+      <${Doors}>
+        ${row.kind === 'app' ? html`<${Action} small row expanded=${open} onClick=${() => ctx.toggleKey(row.id)}>${doorWord(open)}<//>` : null}
+        <${Action} small row tone=${row.level?.low ? 'danger' : undefined} disabled=${ctx.busy === row.id} onClick=${() => ctx.revokeKey(row)}>${ctx.busy === row.id ? x('revoking') : x('revoke')}<//>
+      <//>
       ${open && row.kind === 'app' ? keyOpen(ctx, row) : null}
-    </div>`;
+    <//>`;
 }
 
 function keyOpen(ctx, row) {
   const groups = rightGroups(row.scopes, ctx.basePackage);
   const minutes = Math.max(1, Math.round((ctx.ov?.access_ttl_seconds || 900) / 60));
   const canTake = (g) => groups.length > 1 || g.scopes.length < row.scopes.length;
+  const busy = ctx.busy === row.id;
   return html`
-    <div class="listing-open poster-box poster-box--raised ac-open">
-      <p class="og-lead">${x('open.lead', { name: row.name })} ${x('open.applies', { min: minutes })}</p>
-      <div class="listing listing--label-words-doors ac-rights">
-        ${groups.map((g) => html`<div class="listing-row" key=${g.id}>
-          <div class=${`ac-rk poster-label ${g.base ? 'is-dim' : ''}`}>${g.label}</div>
-          <div class=${`ac-rw ${g.base ? 'is-dim' : ''}`}><span>${g.text}${g.base ? html`<br /><small class="is-dim">${x('open.baseSub', { n: ctx.baseHolders })}</small>` : null}</span></div>
-          <div class="listing-doors">${canTake(g) ? html`<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${ctx.busy === row.id} onClick=${() => ctx.takeAway(row, g)}>${x('open.takeAway')}</button>` : html`<span class="poster-hint">${x('open.lastRight')}</span>`}</div>
-        </div>`)}
-      </div>
+    <${Panel} doors=${html`
+      <${Action} small tone="danger" disabled=${busy} onClick=${() => ctx.revokeKey(row)}>${x('open.revokeAll')}<//>
+      ${row.grant?.app_origin ? html`<${Action} small soft href=${row.grant.app_origin} newTab>${x('open.openApp')}<//>` : null}
+      <${Note} inline>${x('open.revokeHint')}<//>`}>
+      <${Note} kind="lead">${x('open.lead', { name: row.name })} ${x('open.applies', { min: minutes })}<//>
+      <${List} cols="label-words-doors" dense apart>
+        ${groups.map((g) => html`
+          <${Row} key=${g.id}>
+            <${Cell} dim=${g.base}><${Label}>${g.label}<//><//>
+            ${g.base ? html`<${Desc} sub=${x('open.baseSub', { n: ctx.baseHolders })}>${g.text}<//>` : html`<${Cell}>${g.text}<//>`}
+            <${Doors}>${canTake(g)
+              ? html`<${Action} small row soft disabled=${busy} onClick=${() => ctx.takeAway(row, g)}>${x('open.takeAway')}<//>`
+              : html`<${Note} inline>${x('open.lastRight')}<//>`}<//>
+          <//>`)}
+      <//>
       ${row.canSpend ? html`
-        <span class="poster-label">${x('spend.title')}</span>
-        <p class="poster-hint ac-spend-summary">${row.spendCap == null ? x('spend.noLimit') : x('spend.used', { spent: n(row.spent), cap: n(row.spendCap) })}</p>
-        <div class="ac-spend">
-          <input class="og-input" type="number" min="0" step="1" inputmode="numeric" placeholder=${x('spend.placeholder')} value=${ctx.spendDraft[row.id] ?? ''} onInput=${(e) => ctx.setSpendDraft(row.id, e.target.value)} />
-          <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === row.id} onClick=${() => ctx.setSpendCap(row, ctx.spendDraft[row.id])}>${x('spend.set')}</button>
-          ${row.spent > 0 ? html`<button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${ctx.busy === row.id} onClick=${() => ctx.setSpendCap(row, null, true)}>${x('spend.reset')}</button>` : null}
-        </div>` : null}
-      <div class="og-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--danger" disabled=${ctx.busy === row.id} onClick=${() => ctx.revokeKey(row)}>${x('open.revokeAll')}</button>
-        ${row.grant?.app_origin ? html`<a class="poster-action poster-action--small poster-action--lower" href=${row.grant.app_origin} target="_blank" rel="noopener">${x('open.openApp')}</a>` : null}
-        <span class="poster-hint">${x('open.revokeHint')}</span>
-      </div>
-    </div>`;
+        <${Label} block>${x('spend.title')}<//>
+        <${Note}>${row.spendCap == null ? x('spend.noLimit') : x('spend.used', { spent: n(row.spent), cap: n(row.spendCap) })}<//>
+        <${TextField} type="number" size="short" min="0" step="1" inputMode="numeric" ariaLabel=${x('spend.title')}
+          placeholder=${x('spend.placeholder')} value=${ctx.spendDraft[row.id] ?? ''} onInput=${(v) => ctx.setSpendDraft(row.id, v)}
+          actions=${html`
+            <${Action} small disabled=${busy} onClick=${() => ctx.setSpendCap(row, ctx.spendDraft[row.id])}>${x('spend.set')}<//>
+            ${row.spent > 0 ? html`<${Action} small soft disabled=${busy} onClick=${() => ctx.setSpendCap(row, null, true)}>${x('spend.reset')}<//>` : null}`} />` : null}
+    <//>`;
 }
 
 /* ── 04: one secret ─────────────────────────────────────────────────────────────────────────── */
@@ -116,19 +130,16 @@ export function secretRow(ctx, row) {
   const hosts = Array.isArray(row.hosts) ? row.hosts : [];
   const replaced = row.updatedAt && row.updatedAt !== row.setAt ? row.updatedAt : null;
   return html`
-    <div class=${`listing-row ${open ? 'is-open' : ''}`} key=${row.name}>
-      <div class="listing-name"><b>${row.name}</b><small>${'{{secret:' + row.name + '}}'}</small></div>
-      <div class="listing-who">
-        <span>${used.length ? used.join(', ') : html`<span class="is-dim">${x('secrets.usedByNone')}</span>`}</span>
-        <small>${hosts.length ? secretHostLine(hosts) : x('secrets.notBound')}</small>
-      </div>
-      <div class="poster-time"><span>${dateWord(row.setAt)}<br /><span>${replaced ? x('secrets.colReplaced') + ' ' + dateWord(replaced) : x('secrets.neverReplaced')}</span></span></div>
-      <div class="listing-doors">
-        <button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openReplace(row.name)}>${open ? x('close') : x('secrets.replace')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--row poster-action--danger" disabled=${busy} onClick=${() => ctx.deleteSecret(row)}>${x('secrets.delete')}</button>
-      </div>
+    <${Row} key=${row.name} open=${open}>
+      <${Name} meta=${'{{secret:' + row.name + '}}'}>${row.name}<//>
+      <${Who} sub=${hosts.length ? secretHostLine(hosts) : x('secrets.notBound')}>${used.length ? used.join(', ') : html`<${Tinted} tone="dim">${x('secrets.usedByNone')}<//>`}<//>
+      <${When}>${dateWord(row.setAt)}<br />${replaced ? x('secrets.colReplaced') + ' ' + dateWord(replaced) : x('secrets.neverReplaced')}<//>
+      <${Doors}>
+        <${Action} small row expanded=${open} onClick=${() => ctx.openReplace(row.name)}>${open ? x('close') : x('secrets.replace')}<//>
+        <${Action} small row tone="danger" disabled=${busy} onClick=${() => ctx.deleteSecret(row)}>${x('secrets.delete')}<//>
+      <//>
       ${open ? secretReplace(ctx, row, busy) : null}
-    </div>`;
+    <//>`;
 }
 
 /**
@@ -143,8 +154,10 @@ function secretHostLine(hosts) {
   const host = (h) => {
     const parts = h.split('.');
     const labels = parts.length > 1 ? [...parts.slice(0, -2), parts.slice(-2).join('.')] : parts;
+    // Each label is kept whole (Tinted whole: never broken inside, not at its hyphen), so the line
+    // breaks only at the <wbr /> between labels.
     return labels.map((part, i) =>
-      html`<span class="ac-shost-h">${part}${i < labels.length - 1 ? '.' : ''}</span>${i < labels.length - 1 ? html`<wbr />` : null}`);
+      html`<${Tinted} whole>${part}${i < labels.length - 1 ? '.' : ''}<//>${i < labels.length - 1 ? html`<wbr />` : null}`);
   };
   return html`${before}${hosts.map((h, i) => html`${i ? ', ' : ''}${host(h)}`)}${after}`;
 }
@@ -152,17 +165,17 @@ function secretHostLine(hosts) {
 /** The one field that writes a value, on the row it belongs to. It is never filled from the server. */
 function secretReplace(ctx, row, busy) {
   return html`
-    <div class="listing-open poster-box poster-box--raised ac-open">
-      <span class="poster-label">${x('secrets.replaceTitle', { name: row.name })}</span>
-      <p class="og-lead">${x('secrets.replaceHint')}</p>
-      <div class="ac-swrite">
-        <input class="og-input" type="password" autocomplete="new-password" spellcheck="false" placeholder=${x('secrets.valuePlaceholder')} value=${ctx.replaceValue} onInput=${(e) => ctx.setReplaceValue(e.target.value)} />
-        <button type="button" class="poster-action poster-action--small" disabled=${busy || !ctx.replaceValue} onClick=${() => ctx.writeSecret(row.name, ctx.replaceValue, true)}>${busy ? x('secrets.saving') : x('secrets.replaceSave')}</button>
-        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.openReplace(row.name)}>${x('cancel')}</button>
-      </div>
-      ${ctx.secretMsg ? html`<small class=${`form-message ${ctx.secretMsg.error ? 'form-message--error' : ''}`}>${ctx.secretMsg.text}</small>` : null}
-      <${Hint}>${x('secrets.valueHint')}<//>
-    </div>`;
+    <${Panel}>
+      <${Label} block>${x('secrets.replaceTitle', { name: row.name })}<//>
+      <${Note} kind="lead">${x('secrets.replaceHint')}<//>
+      <${TextField} type="password" autoComplete="new-password" spellCheck=${false} ariaLabel=${x('secrets.value')}
+        placeholder=${x('secrets.valuePlaceholder')} value=${ctx.replaceValue} onInput=${(v) => ctx.setReplaceValue(v)}
+        actions=${html`
+          <${Action} small disabled=${busy || !ctx.replaceValue} onClick=${() => ctx.writeSecret(row.name, ctx.replaceValue, true)}>${busy ? x('secrets.saving') : x('secrets.replaceSave')}<//>
+          <${Action} small soft onClick=${() => ctx.openReplace(row.name)}>${x('cancel')}<//>`} />
+      ${ctx.secretMsg ? html`<${Note} kind="message" error=${ctx.secretMsg.error}>${ctx.secretMsg.text}<//>` : null}
+      <${Note}>${x('secrets.valueHint')}<//>
+    <//>`;
 }
 
 /* ── 01: the open sessions ──────────────────────────────────────────────────────────────────── */
@@ -171,18 +184,22 @@ export function sessionsBlock(ctx) {
   const s = ctx.ov.sign_in.sessions;
   const devices = s.mine.by_device;
   const agents = s.agents;
+  const at = (iso) => (iso ? `${dateWord(iso)} ${timeWord(iso)}` : '');
   return html`
-    <div class="ac-devices">
-      <div class="ac-dh poster-label">${x('col.device')}</div><div class="ac-dh poster-label ac-dn">${x('col.sessions')}</div><div class="ac-dh poster-label">${x('col.lastUsed')}</div>
+    <${List} cols="name-n-when" keepCols dense under head=${[x('col.device'), { label: x('col.sessions'), num: true }, x('col.lastUsed')]}>
       ${devices.map((d) => html`
-        <div key=${'d' + (d.label || '')}><b>${d.label || x('deviceUnknown')}</b>${s.mine.current && (s.mine.current.device_label ?? null) === d.label ? html`<small>${x('thisDeviceAmong')}</small>` : null}</div>
-        <div class="ac-dn poster-stat-number poster-stat-number--small" key=${'n' + (d.label || '')}>${n(d.count)}</div>
-        <div key=${'l' + (d.label || '')}>${d.last_used_at ? `${dateWord(d.last_used_at)} ${timeWord(d.last_used_at)}` : ''}</div>`)}
+        <${Row} key=${'d' + (d.label || '')}>
+          <${Name} meta=${s.mine.current && (s.mine.current.device_label ?? null) === d.label ? x('thisDeviceAmong') : null}>${d.label || x('deviceUnknown')}<//>
+          <${Num}><${Figure} small n=${n(d.count)} /><//>
+          <${When}>${at(d.last_used_at)}<//>
+        <//>`)}
       ${agents.total ? html`
-        <div><b>${x('agentsRow', { n: agents.distinct })}</b><small>${agents.by_agent.slice(0, 6).map((a) => a.name).join(', ')}${agents.by_agent.length > 6 ? ` +${agents.by_agent.length - 6}` : ''}</small></div>
-        <div class="ac-dn poster-stat-number poster-stat-number--small">${n(agents.total)}</div>
-        <div>${agents.by_agent[0]?.last_used_at ? `${dateWord(agents.by_agent[0].last_used_at)} ${timeWord(agents.by_agent[0].last_used_at)}` : ''}</div>` : null}
-    </div>`;
+        <${Row} key="agents">
+          <${Name} meta=${`${agents.by_agent.slice(0, 6).map((a) => a.name).join(', ')}${agents.by_agent.length > 6 ? ` +${agents.by_agent.length - 6}` : ''}`}>${x('agentsRow', { n: agents.distinct })}<//>
+          <${Num}><${Figure} small n=${n(agents.total)} /><//>
+          <${When}>${at(agents.by_agent[0]?.last_used_at)}<//>
+        <//>` : null}
+    <//>`;
 }
 
 /* ── 01: the servers that may verify this identity ─────────────────────────────────────────── */
@@ -190,11 +207,15 @@ export function sessionsBlock(ctx) {
 export function federationBlock(ctx) {
   const fed = ctx.fed;
   return html`
-    ${fed.nodes.length ? html`<div class="listing listing--cols listing--name-desc-doors ac-fed-nodes">${fed.nodes.map((c) => html`
-      <div class="listing-row" key=${c.id}><div class="listing-name">${c.recipient.replace('node:', '')}</div><div class="listing-desc">${dateWord(c.granted_at)}</div><div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" disabled=${fed.all || ctx.busy === c.id} onClick=${() => ctx.removeFedNode(c)}>${x('fed.remove')}</button></div></div>`)}</div>` : null}
-    <div class="ac-fed">
-      <input class="og-input" type="text" placeholder=${x('fed.addPlaceholder')} disabled=${fed.all} value=${ctx.fedInput} onInput=${(e) => ctx.setFedInput(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && ctx.addFedNode()} />
-      <button type="button" class="poster-action poster-action--small" disabled=${fed.all || ctx.busy === 'fed' || !ctx.fedInput.trim()} onClick=${() => ctx.addFedNode()}>${x('fed.add')}</button>
-      <span class="poster-hint">${fed.all ? x('fed.allHint') : x('fed.listHint')}</span>
-    </div>`;
+    ${fed.nodes.length ? html`<${List} cols="name-desc-doors" keepCols dense under>${fed.nodes.map((c) => html`
+      <${Row} key=${c.id}>
+        <${Name} asKey>${c.recipient.replace('node:', '')}<//>
+        <${Desc}>${dateWord(c.granted_at)}<//>
+        <${Doors}><${Action} small row soft disabled=${fed.all || ctx.busy === c.id} onClick=${() => ctx.removeFedNode(c)}>${x('fed.remove')}<//><//>
+      <//>`)}<//>` : null}
+    <${TextField} placeholder=${x('fed.addPlaceholder')} ariaLabel=${x('fed.addPlaceholder')} disabled=${fed.all} value=${ctx.fedInput}
+      onInput=${(v) => ctx.setFedInput(v)} onEnter=${() => ctx.addFedNode()}
+      actions=${html`
+        <${Action} small disabled=${fed.all || ctx.busy === 'fed' || !ctx.fedInput.trim()} onClick=${() => ctx.addFedNode()}>${x('fed.add')}<//>
+        <${Note} inline>${fed.all ? x('fed.allHint') : x('fed.listHint')}<//>`} />`;
 }

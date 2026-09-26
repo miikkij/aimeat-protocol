@@ -10,6 +10,7 @@
  *   and the fine-tuning fields.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.22.0 -- 2026-09-26 -- The page's parts are kit components (page group G8): .ai-empty, .is-warn (other sheets keep theirs), the radios and the checks (Check), .ai-num (TextField short), .ai-inline (Layout Row), .is-unset (Facts missing, Tinted dim), .ai-stt-result (Box row), the bar (Meter), .ai-spent-label (Label block), .ai-apps (List apart), .ai-cap, .ai-more (More wrap), the chart's box and head (Box, Layout Row, Tabs filter) and the empty phone block go.
  *   v1.21.0 -- 2026-09-26 -- The radio dots' and the retry box's words are the Check line: their size, weight and colour go, their row stays (a unification: Jouni's decision "Check line").
  *   v1.20.0 -- 2026-09-26 -- The figure on the budget bar is the Meter's figure (.poster-meter-figure, the Wallet meter's look): .74rem and .6rem in become .72rem and .5rem; its line height stays (a unification: the lead's ruling on a figure written on a meter).
  *   v1.19.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
@@ -41,49 +42,5 @@
  */
 
 .og-ai .og-doors > a { text-decoration: none; }
-.ai-empty { margin: 0; padding: .3rem 0 .8rem; }
-.is-warn { color: var(--accent); }
-
-/* ── The connection, the budget, fine-tuning, the consumers: the Facts (css/components/facts.css);
-   the doors under a value, and what sits in a value (the choices, the key field, the bar) ────── */
+/* The doors under a fact's value keep main's space above them. */
 .og-ai .facts-v .og-doors { margin-top: .6rem; }
-.ai-radios { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; }
-.ai-radio { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; }
-.ai-radio input { accent-color: var(--text); width: 1rem; height: 1rem; margin: 0; }
-.ai-num { width: 7rem; }
-.ai-inline { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
-.ai-inline label { font-size: .85rem; color: var(--text-dim); }
-.ai-check { display: inline-flex; align-items: center; gap: .5rem; }
-.ai-check input { accent-color: var(--text); width: 1rem; height: 1rem; margin: 0; }
-
-/* ── The model rows: the Listing (css/components/listing.css); a role with no model says so in grey */
-.og-ai .listing-who .is-unset { color: var(--text-dim); font-weight: 400; }
-
-/* ── The picker under an opened row: the library's Model picker (css/components/model-picker.css) ── */
-.ai-stt-result { margin: .6rem 0 0; padding: .6rem .75rem; font-size: .88rem; line-height: 1.5; }
-.og-ai .ai-stt-result small { display: block; margin-top: .2rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-
-/* ── The budget bar and the app table ──────────────────────────────────────────────────────── */
-/* The budget bar is the quota meter (css/poster.css .poster-box--meter.poster-box--quota, is-full
-   from 90 %); the figure written on it is the Meter's figure (.poster-meter-figure). Its place, its
-   height and the figure's line height stay here. */
-.ai-bar { position: relative; height: 1.6rem; margin-top: .5rem; overflow: hidden; }
-.ai-bar svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.ai-bar .poster-meter-figure { line-height: 1.6rem; }
-.ai-spent-label { display: block; }
-/* The app table is the Listing; its figures are the Listing's figure cells (.listing-n), the cap an
-   input or a figure. */
-.ai-apps { margin-top: .6rem; }
-/* The cap field is the Text field; here it keeps its width, its padding and its place at the right. */
-.ai-apps .ai-cap .og-input { justify-self: end; width: 5.5rem; padding: .15rem .4rem; text-align: right; }
-/* The line under the app table is the More line (css/components/more-line.css); it keeps its wrap. */
-.ai-more { flex-wrap: wrap; }
-.ai-chart { margin: .6rem 0 0; padding: .6rem .6rem .2rem; }
-.ai-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .4rem; flex-wrap: wrap; }
-/* The line over the chart is the Hint (css/components/hint.css); its place in the head only. */
-.ai-chart-head .poster-hint { margin: 0; }
-.ai-metric { display: flex; gap: .3rem; }
-
-/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-}

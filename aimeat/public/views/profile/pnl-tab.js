@@ -9,6 +9,7 @@
  *   No forecasts: only the truth of the bookings. Live: re-fetches on the
  *   aimeat-live-update event when the finance domain ticks.
  * @version-history
+ *   v1.16.0 — 2026-09-26 — Every part is a kit component (SettingsPage, List with its number cells, FigureStrip with the result's fine or danger tone, section Card, TextField, Loud, Action, Note, Layout): the page passes data and writes no class (page group G8).
  *   v1.15.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.14.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.13.0 — 2026-09-25 — The P&L result and the overview's commerce, AI spend and agent ledger figures are the figure strip (.og-strip); a profit keeps its green as the fine tone and a loss its red as the danger tone (a unification: the look most tabs use).
@@ -43,6 +44,14 @@ import { LoadingLine } from './shared.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import { Hint } from '/components/Hint.js';
 import { PageSection } from '/components/PageSection.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { List, Row, Name, Num, Cell, Doors } from '/components/List.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud } from '/components/Action.js';
+import { TextField } from '/components/TextField.js';
+import { Row as Line, Space } from '/components/Layout.js';
 
 function euros(minor) {
   const sign = minor < 0 ? '\u2212' : '';
@@ -68,23 +77,22 @@ function sourceLabel(source) {
 function LineTable({ titleKey, lines, totalMinor }) {
   return html`
     <${PageSection} title=${t(titleKey)}>
-      ${lines.length === 0 && html`<p class="poster-quiet pf-pnl-empty">${t('profile.pnl.empty')}</p>`}
-      ${lines.length > 0 && html`
-        <div class="listing listing--cols listing--name-n-n">
+      <${List} cols="name-n-n" keepCols empty=${t('profile.pnl.empty')}>
+        ${lines.length > 0 && html`
             ${lines.map(line => html`
-              <div class="listing-row" key=${line.source}>
-                <div class="listing-name">${sourceLabel(line.source)}</div>
-                <div class="listing-desc listing-n">${line.count} ${t('profile.pnl.count')}</div>
-                <div class="listing-n">${euros(line.amountMinor)}</div>
-              </div>
+              <${Row} key=${line.source}>
+                <${Name}>${sourceLabel(line.source)}<//>
+                <${Num} quiet>${line.count} ${t('profile.pnl.count')}<//>
+                <${Num}>${euros(line.amountMinor)}<//>
+              <//>
             `)}
-            <div class="listing-row">
-              <div class="listing-name">${t('profile.pnl.total')}</div>
-              <div></div>
-              <div class="listing-name listing-n">${euros(totalMinor)}</div>
-            </div>
-        </div>
-      `}
+            <${Row} key="total">
+              <${Name}>${t('profile.pnl.total')}<//>
+              <${Cell} />
+              <${Num} strong>${euros(totalMinor)}<//>
+            <//>
+        `}
+      <//>
     <//>
   `;
 }
@@ -138,35 +146,26 @@ function AccountantAccess({ showToast }) {
 
   return html`
     <${PageSection} title=${t('profile.pnl.accountantTitle')}>
-      <p class="og-lead">${t('profile.pnl.accountantDesc')}</p>
+      <${Note} kind="lead">${t('profile.pnl.accountantDesc')}<//>
 
-      ${accountants.length === 0
-        ? html`<p class="poster-quiet pf-pnl-note">${t('profile.pnl.accountantNone')}</p>`
-        : html`
-          <div class="listing listing--name-doors pf-acc-list">
+      <${List} cols="name-doors" apart empty=${t('profile.pnl.accountantNone')}>
             ${accountants.map((who) => html`
-              <div class="listing-row" key=${who}>
-                <div class="listing-name">${who}</div>
-                <div class="listing-doors">
-                <button class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => revoke(who)}>
+              <${Row} key=${who}>
+                <${Name}>${who}<//>
+                <${Doors}>
+                <${Action} small row disabled=${busy} onClick=${() => revoke(who)}>
                   ${t('profile.pnl.accountantRevoke')}
-                </button>
-                </div>
-              </div>
+                <//>
+                <//>
+              <//>
             `)}
-          </div>
-        `}
+      <//>
 
-      <div class="pf-pnl-controls">
-        <label class="pf-acc-field">
-          <span class="poster-label">${t('profile.pnl.accountantName')}</span>
-          <input class="og-input" value=${name} placeholder=${t('profile.pnl.accountantPlaceholder')}
-                 onInput=${(e) => setName(e.target.value)} />
-        </label>
-        <button class="poster-slab poster-slab--control" disabled=${busy || !name.trim()} onClick=${grant}>
-          ${t('profile.pnl.accountantGrant')}
-        </button>
-      </div>
+      <${Space} above="medium" below="large">
+        <${TextField} label=${t('profile.pnl.accountantName')} value=${name} placeholder=${t('profile.pnl.accountantPlaceholder')}
+          onInput=${setName}
+          actions=${html`<${Loud} control disabled=${busy || !name.trim()} onClick=${grant}>${t('profile.pnl.accountantGrant')}<//>`} />
+      <//>
       <${Hint}>${t('profile.pnl.accountantHint')}<//>
     <//>
   `;
@@ -205,62 +204,54 @@ export function PnlTab({ showToast }) {
   }, [from, to, load]);
 
   return html`
-    <div class="pf-pnl og">
-      <div class="mb-1">
-        <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBusiness')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.pnl')}</span></div>
-        <div class="og-mast"><div class="og-mast-words">
-          <h2 class="og-title poster-page-title">${t('profile.pnl.title')}</h2>
-          <p class="og-desc">${t('profile.pnl.desc')}</p>
-        </div></div>
-      </div>
+    <${SettingsPage} name="pnl"
+      crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.pnl')]}
+      title=${t('profile.pnl.title')}
+      desc=${t('profile.pnl.desc')}>
 
-      <div class="pf-pnl-controls">
-        <label><span class="poster-label">${t('profile.pnl.from')}</span>
-          <input class="og-input" type="month" value=${from} onChange=${(e) => setFrom(e.target.value)} />
-        </label>
-        <label><span class="poster-label">${t('profile.pnl.to')}</span>
-          <input class="og-input" type="month" value=${to} onChange=${(e) => setTo(e.target.value)} />
-        </label>
-        <button class="poster-slab" onClick=${() => load(from, to)}>${t('profile.pnl.show')}</button>
-      </div>
+      <${Line} gap="medium" align="end" wrap below="large">
+        <${TextField} type="month" label=${t('profile.pnl.from')} value=${from} onChange=${setFrom} />
+        <${TextField} type="month" label=${t('profile.pnl.to')} value=${to} onChange=${setTo} />
+        <${Loud} onClick=${() => load(from, to)}>${t('profile.pnl.show')}<//>
+      <//>
 
       ${loading && html`<${LoadingLine} />`}
-      ${error && html`<p class="form-message form-message--error">${error}</p>`}
+      ${error && html`<${Note} kind="message" error>${error}<//>`}
 
       ${report && !loading && html`
-        <div class="pf-pnl-grid">
+        <${CardGrid} cols="two">
           <${LineTable} titleKey="profile.pnl.income" lines=${report.income} totalMinor=${report.totalIncomeMinor} />
           <${LineTable} titleKey="profile.pnl.expenses" lines=${report.expenses} totalMinor=${report.totalExpenseMinor} />
-        </div>
+        <//>
 
-        <div class="og-strip pf-pnl-result">
-          <div>
-            <b class=${report.resultMinor >= 0 ? 'og-strip-fine' : 'og-strip-danger'}>${euros(report.resultMinor)}</b>
-            <span>${t('profile.pnl.result')}</span>
-            <small>${t('profile.pnl.vatPayable')}: ${euros(report.vatPayableMinor)}</small>
-          </div>
-        </div>
+        <${FigureStrip} items=${[{
+          // A positive result in the fine colour, a loss in the danger colour (main's pos / neg).
+          n: euros(report.resultMinor),
+          tone: report.resultMinor >= 0 ? 'fine' : 'danger',
+          label: t('profile.pnl.result'),
+          sub: `${t('profile.pnl.vatPayable')}: ${euros(report.vatPayableMinor)}`,
+        }]} />
 
-        <div class="card pf-pnl-block poster-row--thing">
-          <div class="listing listing--cols listing--name-n-n">
+        <${Card} tone="section">
+          <${List} cols="name-n-n" keepCols>
               ${report.transferCount > 0 && html`
-                <div class="listing-row">
-                  <div class="listing-name">${t('profile.pnl.transfers')}</div>
-                  <div class="listing-desc listing-n">${report.transferCount} ${t('profile.pnl.count')}</div>
-                  <div class="listing-n">${euros(report.transferMinor)}</div>
-                </div>
+                <${Row} key="transfers">
+                  <${Name}>${t('profile.pnl.transfers')}<//>
+                  <${Num} quiet>${report.transferCount} ${t('profile.pnl.count')}<//>
+                  <${Num}>${euros(report.transferMinor)}<//>
+                <//>
               `}
-              <div class="listing-row">
-                <div class="listing-name">${t('profile.pnl.aiCost')}</div>
-                <div class="listing-desc listing-n"></div>
-                <div class="listing-n">$${report.aiCostUsd.toFixed(4)}</div>
-              </div>
-          </div>
+              <${Row} key="ai">
+                <${Name}>${t('profile.pnl.aiCost')}<//>
+                <${Num} quiet />
+                <${Num}>$${report.aiCostUsd.toFixed(4)}<//>
+              <//>
+          <//>
           <${Hint}>${t('profile.pnl.aiCostNote')}<//>
-        </div>
+        <//>
       `}
 
       <${AccountantAccess} showToast=${showToast} />
-    </div>
+    <//>
   `;
 }

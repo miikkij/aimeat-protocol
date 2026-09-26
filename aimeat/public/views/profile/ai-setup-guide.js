@@ -2,18 +2,22 @@
  * @file ai-setup-guide.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The two surfaces built on the per-tool setup table: McpSetupGuide (how to attach
- *   this node to a given AI tool) and InstructionsDialog (the instruction block plus, for the
- *   tool the reader actually uses, the exact place to paste it).
+ * @description The two surfaces built on the per-tool setup table, under the names the Agents tab,
+ *   the MCP tab, the overview and the home import them by: McpSetupGuide (how to attach this node to
+ *   a given AI tool) and InstructionsDialog (the instruction block plus, for the tool the reader
+ *   actually uses, the exact place to paste it). Both are the component components/SetupGuide.js.
  *
- *   Both are tool-pickers rather than one generic set of steps, because the generic version is
- *   where people fall off: "add a custom connector" is not actionable if your tool calls it
- *   something else or keeps it behind a switch you have not turned on. Every tool carries a link
- *   to its vendor's own documentation, so a reader who does not believe the steps can check them
- *   rather than take our word.
- * @structure McpSetupGuide({ installClassName }) · InstructionsDialog({ open, onClose })
+ *   McpSetupGuide takes the component's named options (`poster`, `asideInstall`, `facts`,
+ *   `stepRows`). It also still reads the older class props its callers pass until they move
+ *   (tabClass / activeClass: the poster tab row; installClassName: the attention note's frame round
+ *   the install row), as those same options: nothing a caller writes restyles the guide.
+ * @structure McpSetupGuide({ poster, asideInstall, facts, stepRows }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   v2.7.0 -- 2026-09-26 -- The guide and the dialog moved to components/SetupGuide.js with their markup
+ *     (the tool tabs, the copy doors and the field table are the library's Tabs, Action and Facts);
+ *     this module keeps the names its callers import and maps the old class props to named options
+ *     (page group G1a).
  *   v2.6.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v2.5.0 -- 2026-09-26 -- McpSetupGuide takes `stepRows`: the steps are then the numbered list's rows (IndexList), as the MCP tab and the Agents tab draw them (a unification: Jouni's decision "Numbered list"). Without it the part's classic list stays, as the home draws it.
  *   v2.4.0 -- 2026-09-25 -- McpSetupGuide takes `facts`: the field table is then the Facts (css/components/facts.css), a unification: the look most tabs use. Without it the classic rows stay, for the pages that have not moved.
@@ -37,197 +41,21 @@
  *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
-import { Modal } from '/components/Modal.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { useAiTools } from '/views/profile/ai-tool-setup.js';
-import { InstructionBlock } from '/views/profile/instruction-block.js';
-import { McpInstallRow } from '/components/McpInstall.js';
-import { IndexList, IndexStep } from '/components/NumberedIndex.js';
-import { getOrganismsTab } from '/js/services/organisms.js';
-import { swallowed } from '/js/swallowed.js';
+import { SetupGuide, InstructionsDialog } from '/components/SetupGuide.js';
 
 const html = htm.bind(h);
-const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-
-const LAST_TOOL_KEY = 'aimeat.setup.tool';
-const rememberedTool = () => {
-  // eslint-disable-next-line aimeat/no-silent-catch -- blocked storage means "no remembered choice", which is the same answer as an empty slot; the caller falls back to the first tool either way
-  try { return localStorage.getItem(LAST_TOOL_KEY) || ''; } catch { return ''; }
-};
-
-const pickTool = (tools, id) => tools.find(x => x.id === id) || tools[0];
-
-function ToolPicker({ tools, value, onPick, tabClass = 'ast-tool', activeClass = 'ast-tool--active' }) {
-  return html`
-    <div class="ast-tools" role="tablist">
-      ${tools.map(tool => html`
-        <button key=${tool.id} type="button" role="tab" aria-selected=${tool.id === value}
-          class=${tabClass + (tool.id === value ? ' ' + activeClass : '')}
-          onClick=${() => onPick(tool.id)}>${tool.label}${tool.recommended
-            ? html` <span class="ast-tool-reco">${tr('setup.recommendedBadge', 'recommended')}</span>` : null}</button>`)}
-    </div>`;
-}
-
-/** One field's value: the text with its copy door, or "leave empty". */
-function paramValue(v) {
-  return v
-    ? html`<code class="ast-code">${v}</code> <${CopyButton} text=${v} className="poster-action poster-action--small"
-        label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />`
-    : html`<span class="ast-param-empty">${tr('setup.leaveEmpty', 'leave empty')}</span>`;
-}
 
 /**
- * The parameter table: every field the tool's form asks for, and what to put in it. With `facts`
- * the pairs are the Facts part (css/components/facts.css): the field's name as the row label, the
- * value on the right, its note as the grey line under it.
+ * How to attach this node to one AI tool. The older props tabClass (any value: the poster tab row)
+ * and installClassName (any value: the install row in the attention note's frame) read as the
+ * component's named options.
+ * @param {{ poster?: boolean, asideInstall?: boolean, facts?: boolean, stepRows?: boolean,
+ *   tabClass?: string, activeClass?: string, installClassName?: string }} [props]
  */
-function Params({ params, facts = false }) {
-  if (!params?.length) return null;
-  if (facts) {
-    return html`
-      <div class="ast-params">
-        <div class="ast-params-head">${tr('setup.paramsTitle', 'What to put in each field')}</div>
-        <div class="facts">
-          ${params.map((prm, i) => html`
-            <div class="facts-k poster-label" key=${'k' + i}>${prm.label}</div>
-            <div class="facts-v" key=${'v' + i}>${paramValue(prm.value)}${prm.note ? html`<small>${prm.note}</small>` : null}</div>`)}
-        </div>
-      </div>`;
-  }
-  return html`
-    <div class="ast-params">
-      <div class="ast-params-head">${tr('setup.paramsTitle', 'What to put in each field')}</div>
-      ${params.map((prm, i) => {
-        const v = prm.value;
-        return html`
-          <div class="ast-param" key=${i}>
-            <div class="ast-param-label">${prm.label}</div>
-            <div class="ast-param-value">
-              ${v
-                ? html`<code class="ast-code">${v}</code><${CopyButton} text=${v} className="poster-action poster-action--small"
-                    label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />`
-                : html`<span class="ast-param-empty">${tr('setup.leaveEmpty', 'leave empty')}</span>`}
-            </div>
-            ${prm.note ? html`<div class="ast-param-note">${prm.note}</div>` : null}
-          </div>`;
-      })}
-    </div>`;
+export function McpSetupGuide({ poster, asideInstall, facts = false, stepRows = false, tabClass, installClassName } = {}) {
+  return html`<${SetupGuide} poster=${!!(poster || tabClass)} asideInstall=${!!(asideInstall || installClassName)}
+    facts=${facts} stepRows=${stepRows} />`;
 }
 
-/**
- * How to attach this node to one AI tool: the steps as things to click or type, every field value,
- * and the vendor's own page. `tabClass` / `activeClass`: the tool tabs' classes, so a poster-face
- * page can hand in its own shared tab (poster-tab / is-on) instead of restyling .ast-tool from
- * outside. `facts`: the field table as the Facts part instead of the classic ruled rows.
- * `stepRows`: the steps as the numbered list's rows (IndexList) instead of the part's classic list.
- * @param {{ installClassName?: string, tabClass?: string, activeClass?: string, facts?: boolean, stepRows?: boolean }} [props]
- */
-export function McpSetupGuide({ installClassName = '', tabClass, activeClass, facts = false, stepRows = false } = {}) {
-  const tools = useAiTools();
-  const [toolId, setToolId] = useState(rememberedTool);
-  const pick = (id) => {
-    setToolId(id);
-    // eslint-disable-next-line aimeat/no-silent-catch -- storage blocked only costs the remembered choice
-    try { localStorage.setItem(LAST_TOOL_KEY, id); } catch { /* the choice just does not persist */ }
-  };
-  if (!tools) return html`<p class="ast-note">${tr('setup.loadingTools', 'Reading the setup instructions from this node…')}</p>`;
-  if (!tools.length) return html`<p class="ast-note">${tr('setup.toolsFailed', 'Could not read the setup instructions just now. The connect page has the same steps.')}</p>`;
-  const tool = pickTool(tools, toolId);
-  const cmd = tool.mcp.command || null;
-
-  return html`
-    <div class="ast">
-      <p class="ast-lead">${tr('setup.pickTool', 'Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}</p>
-      <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} tabClass=${tabClass} activeClass=${activeClass} />
-
-      <!-- The short way in comes first, and removes none of the steps below it: a one-click link is
-           blocked on a managed machine and does nothing where the client is not installed. -->
-      <${McpInstallRow} tool=${tool} className=${installClassName} />
-
-      ${tool.mcp.plans ? html`<p class="ast-plans">${tool.mcp.plans}</p>` : null}
-      ${tool.mcp.warn ? html`<p class="ast-warn">${tool.mcp.warn}</p>` : null}
-
-      ${stepRows
-        ? html`<${IndexList} steps className="ast-step-rows">${tool.mcp.steps.map((step, i) => html`<${IndexStep} key=${i}>${step}<//>`)}<//>`
-        : html`<ol class="ast-steps">
-            ${tool.mcp.steps.map((step, i) => html`<li key=${i}>${step}</li>`)}
-          </ol>`}
-
-      ${cmd ? html`
-        <div class="ast-cmd">
-          <pre class="ast-cmd-text">${cmd}</pre>
-          <${CopyButton} text=${cmd} className="poster-action poster-action--small"
-            label=${tr('setup.copyCmd', 'Copy the command')} copiedLabel=${tr('common.copied', 'Copied')} />
-        </div>` : null}
-
-      <${Params} params=${tool.mcp.params} facts=${facts} />
-
-      ${tool.mcp.note ? html`<p class="ast-note">${tool.mcp.note}</p>` : null}
-
-      <a class="poster-action poster-action--more ast-docs" href=${tool.mcp.docs} target="_blank" rel="noopener">
-        ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →
-      </a>
-    </div>`;
-}
-
-/**
- * The instruction block plus where to paste it. Opened from the profile card, so it answers the
- * two questions that arrive together: what do I paste, and where does it go in MY tool.
- */
-export function InstructionsDialog({ open, onClose }) {
-  const tools = useAiTools();
-  const [toolId, setToolId] = useState(rememberedTool);
-  const [orgs, setOrgs] = useState(null);
-  const [orgId, setOrgId] = useState('');
-
-  useEffect(() => {
-    if (!open) return undefined;
-    let cancelled = false;
-    getOrganismsTab()
-      .then(tab => {
-        if (cancelled) return;
-        const arr = (tab && tab.mine) || [];
-        setOrgs(arr);
-        setOrgId(prev => prev || (arr[0] ? arr[0].id : ''));
-      })
-      .catch(err => { swallowed('ai-setup-guide: organisms', err); if (!cancelled) setOrgs([]); });
-    return () => { cancelled = true; };
-  }, [open]);
-
-  const pick = (id) => {
-    setToolId(id);
-    // eslint-disable-next-line aimeat/no-silent-catch -- storage blocked only costs the remembered choice
-    try { localStorage.setItem(LAST_TOOL_KEY, id); } catch { /* the choice just does not persist */ }
-  };
-  const tool = tools && tools.length ? pickTool(tools, toolId) : null;
-
-  return html`
-    <${Modal} open=${open} onClose=${onClose} className="ast-modal"
-      title=${tr('setup.instrTitle', 'AI chat instructions')}>
-      <p class="ast-lead">${tr('setup.instrLead', 'Paste this into your AI’s instructions and every conversation starts already knowing your structure. You stop re-explaining it, the AI stops guessing where things go, your agents write into the same places so they can build on each other’s work, and the same context stops being re-sent as tokens in every chat.')}</p>
-
-      ${orgs === null ? html`<p class="ast-note">${tr('setup.loadingOrgs', 'Reading your organisms…')}</p>`
-        : orgs.length === 0 ? html`<p class="ast-note">${tr('setup.noOrgs', 'You have no organism yet, and the block is generated from one. Create it first: the Hello MCP step on the MCP tab has a ready prompt for it.')}</p>`
-        : html`
-          ${orgs.length > 1 ? html`
-            <label class="ast-label" for="ast-org">${tr('setup.whichOrg', 'Which organism?')}</label>
-            <select id="ast-org" class="select-field ast-select" value=${orgId} onChange=${(e) => setOrgId(e.target.value)}>
-              ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
-            </select>` : null}
-          <${InstructionBlock} orgId=${orgId} />`}
-
-      ${tool ? html`
-        <div class="ast-where">
-          <div class="ast-where-head">${tr('setup.whereTitle', 'Where it goes in your tool')}</div>
-          <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} tabClass="poster-tab" activeClass="is-on" />
-          <p class="ast-where-path">${tool.instructions.where}</p>
-          ${tool.instructions.docs ? html`
-            <a class="poster-action poster-action--more ast-docs" href=${tool.instructions.docs} target="_blank" rel="noopener">
-              ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →
-            </a>` : null}
-        </div>` : null}
-    <//>`;
-}
+export { InstructionsDialog };

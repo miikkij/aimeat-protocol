@@ -9,6 +9,7 @@
  *   last message; the three roads; the person form and the facts list; the together list; a
  *   message; the organism chooser box. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- The pages' parts are kit components (page group G8): the tables' marks, names, typewriter cells and last messages (List Lead, Name, Cell meta, When), the search, the more line, the coral and grey words (TextField, More, Tinted, Facts missing), the roads (Roads), the person form and its rows (Fields, Choice, TagInput, Beside), the facts' doors (Facts actions), the links, "together", the messages and the organism box (List, Box) and their phone lines go.
  *   v1.16.0 -- 2026-09-26 -- "Where" and what you share with a person are the Listing (css/components/listing.css, cut name-name), a unification: the look most tabs use. The grid, cells, name and phone column of ct-where go; the line's leading stays.
  *   v1.15.0 -- 2026-09-26 -- The line under each place in "Where" is the Listing's (.listing-meta): its body face, size and colour go, its leading stays (a unification: Jouni's decision "Meta line").
  *   v1.14.0 -- 2026-09-26 -- The dashed avatar is the avatar's agent tone in css/poster.css (.poster-box--agent); its rule here goes.
@@ -36,68 +37,7 @@
 
 .og-ct .poster-quiet { margin: 0; }
 .og-ct .poster-hint { display: block; }
-.og-ct .ct-kv .poster-hint, .og-ct .ct-form .poster-hint { margin-top: .2rem; }
-.og-ct .ct-prose { margin: 0 0 .6rem; }
-.og-ct .ct-bad { color: var(--accent); }
-.og-ct .ct-dim { color: var(--text-dim); }
-/* The blinking mark before "Loading" is the Loading mark (css/components/loading-mark.css). */
 .og-ct.og-page { --poster-page-size: 2.1rem; }
 .og-ct .poster-label:where(:not(div)) { display: block; }
 .og-ct .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-ct .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.og-ct .ct-search { margin: 0 0 .8rem; max-width: 26rem; }
-.og-ct .ct-more { margin-top: .8rem; }
-
-/* ── The tables: the Listing (css/components/listing.css) ──────────────────────────────────── */
-/* The mark is a whole box of its own; an agent's or an app's is the avatar's agent tone
-   (.poster-box--agent, css/poster.css). */
-.og-ct .ct-av { width: 2.2rem; height: 2.2rem; }
-.og-ct .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-/* The shared organisms and the invitation: a typewriter line. */
-.og-ct .ct-m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-/* The last message: when, and its first words cut to one line. */
-.og-ct .ct-last b { font-weight: 500; }
-.og-ct .ct-last small { font-size: .76rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* ── The roads and the form ─────────────────────────────────────────────────────────────────── */
-.ct-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.ct-road { display: flex; flex-direction: column; gap: .35rem; padding: .9rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text-dim); cursor: pointer; }
-.ct-road.on { border-color: var(--accent); }
-.ct-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
-.ct-road p { margin: 0; }
-.ct-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
-.ct-road .og-doors { margin-top: auto; padding-top: .4rem; }
-.ct-form-wrap { margin-top: 1.2rem; }
-.ct-addrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6rem; margin-top: .5rem; }
-.ct-addrow > :first-child { flex: 1 1 18rem; min-width: 0; }
-.ct-kv { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: .55rem 1rem; align-items: start; margin-top: .6rem; }
-.ct-kv .k { padding-top: .35rem; }
-.ct-kv .v { font-size: .92rem; line-height: 1.5; color: var(--text); min-width: 0; }
-.og-ct .facts-v .og-doors { margin-top: .3rem; }
-.ct-form .og-input, .ct-form .og-textarea { width: 100%; box-sizing: border-box; }
-.ct-form .ct-in--short { max-width: 16rem; margin-top: .35rem; }
-.ct-form .poster-chips { margin-bottom: .2rem; }
-.ct-form .poster-chip { cursor: pointer; }
-.ct-linkrow { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) auto; gap: .5rem; align-items: center; margin-bottom: .4rem; }
-.ct-form-doors { margin-top: 1rem; }
-.ct-choice { margin-bottom: .2rem; }
-/* A person's links are the small link (.poster-action--more); here they keep their gap. */
-.og-ct .ct-link { margin-right: .8rem; }
-
-/* ── Together, messages, the box ────────────────────────────────────────────────────────────── */
-/* "Where" and what you share with a person are the Listing (css/components/listing.css, two names
-   to a line); the line under a name is the Listing's (.listing-meta), its leading only. */
-.ct-where small { line-height: 1.45; }
-.ct-msg { padding: .6rem 0; border-bottom: 1px solid var(--border); font-size: .92rem; line-height: 1.5; color: var(--text); }
-.ct-msg small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-.ct-box { margin: 0 0 1.2rem; padding: .9rem 1rem; }
-.ct-box .poster-label { display: block; margin-bottom: .4rem; }
-.ct-box .og-doors { flex-wrap: wrap; }
-
-/* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .ct-roads { grid-template-columns: 1fr; }
-  .ct-kv { grid-template-columns: 1fr; gap: .25rem 0; }
-  .ct-kv .k { padding-top: .5rem; }
-  .ct-linkrow { grid-template-columns: 1fr; }
-}

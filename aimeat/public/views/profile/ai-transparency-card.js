@@ -23,6 +23,7 @@
  *   import { AiTransparencyCard } from './ai-transparency-card.js';
  *   html`<${AiTransparencyCard} />`
  * @version-history
+ *   v1.14.0 — 2026-09-26 — Every part is a kit component (FigureStrip flush with the warn tone above zero, BoxList and BoxLine for the unlabelled records, the apps and the logging policy, SubHeading, Note, Action, Layout): the card writes no class (page group G8).
  *   v1.13.0 — 2026-09-26 — A row's line beside its name is the Listing's typewriter line (.listing-meta); a time keeps the Timestamp (a unification: Jouni's decision "Meta line").
  *   v1.12.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.11.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -52,11 +53,20 @@ import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
 import { FoldSection } from '/components/FoldSection.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { BoxList, BoxLine } from '/components/Box.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
+import { Space, Touch } from '/components/Layout.js';
 
 /** `2026-08-01T18:42:00Z` → `2026-08-01 18:42`, in the reader's locale-neutral short form. */
 function shortTime(iso) {
   return String(iso ?? '').slice(0, 16).replace('T', ' ');
 }
+
+/** A small heading inside the card, with main's space above it. */
+const sub = (words) => html`<${Space} above="large"><${SubHeading} level=${4}>${words}<//><//>`;
 
 export function AiTransparencyCard() {
   const [collapsed, setCollapsed] = useState(true);
@@ -103,71 +113,60 @@ export function AiTransparencyCard() {
 
   const unlabelled = report?.unlabelled ?? 0;
 
-  return html`
-    <div class="pf-card pf-aitr">
-      <${FoldSection} num="" title=${t('aiTransparencyMine.title')} lead=${t('aiTransparencyMine.desc')} open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
-        <div class="pf-aitr-body">
-          ${loading && html`<p class="poster-quiet loading-mark">${t('aiTransparencyMine.loading')}</p>`}
-          ${error && html`<p class="form-message form-message--error">${error}</p>`}
+  // Touch: every control in this card is a thumb's target, as main's .pf-aitr made it.
+  return html`<${Touch}>
+    <${FoldSection} num="" title=${t('aiTransparencyMine.title')} lead=${t('aiTransparencyMine.desc')} open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
+      ${loading && html`<${Note} kind="loading">${t('aiTransparencyMine.loading')}<//>`}
+      ${error && html`<${Note} kind="message" error>${error}<//>`}
 
-          ${report && html`
-            <div class="og-strip">
-              <div><b class=${unlabelled > 0 ? 'og-strip-warn' : ''}>${unlabelled}</b><span>${t('aiTransparencyMine.unlabelled')}</span></div>
-              <div><b>${report.labelled ?? 0}</b><span>${t('aiTransparencyMine.labelled')}</span></div>
-              <div><b>${report.public_total ?? 0}</b><span>${t('aiTransparencyMine.publicTotal')}</span></div>
-              <div><b>${report.total ?? 0}</b><span>${t('aiTransparencyMine.total')}</span></div>
-            </div>
+      ${report && html`
+        <${FigureStrip} flush items=${[
+          // The "public and unlabelled" figure changes colour only when it is ABOVE zero: a
+          // compliance surface that is always red teaches people to stop looking at it.
+          { key: 'unlabelled', n: unlabelled, tone: unlabelled > 0 ? 'warn' : undefined, label: t('aiTransparencyMine.unlabelled') },
+          { key: 'labelled', n: report.labelled ?? 0, label: t('aiTransparencyMine.labelled') },
+          { key: 'public', n: report.public_total ?? 0, label: t('aiTransparencyMine.publicTotal') },
+          { key: 'total', n: report.total ?? 0, label: t('aiTransparencyMine.total') },
+        ]} />
 
-            <${Hint}>${t('aiTransparencyMine.scopeNote')}<//>
+        <${Hint}>${t('aiTransparencyMine.scopeNote')}<//>
 
-            ${unlabelled > 0 && html`
-              <p class="og-lead">${t('aiTransparencyMine.unlabelledHelp')}</p>
-              <ul class="pf-aitr-list">
-                ${(report.unlabelled_detail?.items ?? []).map(item => html`
-                  <li key=${item.id} class="pf-aitr-row poster-box">
-                    <span class="pf-aitr-row-main">${item.pipeline || t('aiTransparencyMine.unknownSource')}</span>
-                    <span class="pf-aitr-row-meta poster-time">${shortTime(item.generated_at)}</span>
-                    ${item.record_url && html`
-                      <a class="poster-action poster-action--more" href=${item.record_url} target="_blank" rel="noopener noreferrer">
-                        ${t('aiTransparencyMine.openRecord')}
-                      </a>`}
-                  </li>`)}
-              </ul>
-              ${report.unlabelled_detail
-                && report.unlabelled_detail.shown < report.unlabelled_detail.total
-                && html`<p class="poster-hint">
-                  ${t('aiTransparencyMine.showingOf', {
-                    shown: String(report.unlabelled_detail.shown),
-                    total: String(report.unlabelled_detail.total),
-                  })}
-                </p>`}
-            `}
+        ${unlabelled > 0 && html`
+          <${Note} kind="lead">${t('aiTransparencyMine.unlabelledHelp')}<//>
+          <${BoxList}>
+            ${(report.unlabelled_detail?.items ?? []).map(item => html`
+              <${BoxLine} key=${item.id} name=${item.pipeline || t('aiTransparencyMine.unknownSource')} time=${shortTime(item.generated_at)}>
+                ${item.record_url && html`<${Action} tone="more" href=${item.record_url} newTab noReferrer>${t('aiTransparencyMine.openRecord')}<//>`}
+              <//>`)}
+          <//>
+          ${report.unlabelled_detail
+            && report.unlabelled_detail.shown < report.unlabelled_detail.total
+            && html`<${Hint}>
+              ${t('aiTransparencyMine.showingOf', {
+                shown: String(report.unlabelled_detail.shown),
+                total: String(report.unlabelled_detail.total),
+              })}
+            <//>`}
+        `}
 
-            ${(report.apps_declaring_generation_with_gap ?? []).length > 0 && html`
-              <h4 class="pf-aitr-sub sub-heading">${t('aiTransparencyMine.appsWithGap')}</h4>
-              <ul class="pf-aitr-list">
-                ${report.apps_declaring_generation_with_gap.map(a => html`
-                  <li key=${a.owner + '/' + a.filename} class="pf-aitr-row poster-box">
-                    <span class="pf-aitr-row-main">${a.filename}</span>
-                    <span class="pf-aitr-row-meta listing-meta">${a.gap}</span>
-                  </li>`)}
-              </ul>`}
-          `}
+        ${(report.apps_declaring_generation_with_gap ?? []).length > 0 && html`
+          ${sub(t('aiTransparencyMine.appsWithGap'))}
+          <${BoxList}>
+            ${report.apps_declaring_generation_with_gap.map(a => html`<${BoxLine} key=${a.owner + '/' + a.filename} name=${a.filename} meta=${a.gap} />`)}
+          <//>`}
+      `}
 
-          ${policy && html`
-            <h4 class="pf-aitr-sub sub-heading">${t('aiTransparencyMine.policyTitle')}</h4>
-            <${Hint}>${policy.why}<//>
-            <ul class="pf-aitr-list">
-              ${(policy.records ?? []).map(r => html`
-                <li key=${r.what} class="pf-aitr-policy poster-box">
-                  <span class="pf-aitr-row-main">${r.what}</span>
-                  <span class="pf-aitr-row-meta listing-meta">${t('aiTransparencyMine.retention')}: ${r.retention}</span>
-                  <span class="pf-aitr-row-meta listing-meta">${t('aiTransparencyMine.neverContains')}: ${r.never_contains}</span>
-                </li>`)}
-            </ul>
-            <${Hint}>${policy.note}<//>`}
-        </div><//>
-    </div>`;
+      ${policy && html`
+        ${sub(t('aiTransparencyMine.policyTitle'))}
+        <${Hint}>${policy.why}<//>
+        <${BoxList}>
+          ${(policy.records ?? []).map(r => html`
+            <${BoxLine} key=${r.what} column name=${r.what}
+              meta=${[`${t('aiTransparencyMine.retention')}: ${r.retention}`, `${t('aiTransparencyMine.neverContains')}: ${r.never_contains}`]} />`)}
+        <//>
+        <${Hint}>${policy.note}<//>`}
+    <//>
+  <//>`;
 }
 
 export default AiTransparencyCard;

@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.1 — 2026-09-27 — The agent consent panel's rules inside a step (.agc-step, .agc-explain, the
+ *     head row's wrap) moved unchanged to css/components/agent-consent.css under its own names.
  *   v1.2.0 — 2026-09-24 — The frames, corner, open shadow and title case read the theme's shape values
  *     (a move).
  *   v1.1.0 — 2026-09-23 — The done and limit looks and branch B's "way" block deleted (Jouni's
@@ -38,13 +40,7 @@
 .poster-step--open .poster-step-num { border-color: var(--text); background: var(--sun); color: var(--text); }
 .poster-step-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: var(--shape-case-heading); margin: 0; }
 .poster-step-lede { color: var(--text-dim); font-size: 0.98rem; line-height: 1.55; margin: 0 0 1.1rem; }
-.poster-step .agc-step { margin-top: 1.25rem; }
-.poster-step .agc-explain { margin: 0.5rem 0 0 0.8rem; line-height: 1.5; }
-/* The badge + countdown row is one line at tab width and two on a phone. Without this it broke
-   between "Expires in:" and the clock, which reads as a rendering fault rather than a wrap.
-   Scoped to the step variant so the profile tab keeps the row it has always had. */
-.poster-step .agc-step .agc-card > .flex-row:first-child { flex-wrap: wrap; row-gap: 0.35rem; }
-.poster-step .agc-step .agc-card > .flex-row:first-child .text-caption { white-space: nowrap; }
+/* The agent consent panel inside a step is css/components/agent-consent.css. */
 @media (max-width: 560px) {
   .poster-step { padding: 1rem 1rem; }
 }

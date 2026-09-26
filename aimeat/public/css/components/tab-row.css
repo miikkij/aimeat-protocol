@@ -1,0 +1,23 @@
+/**
+ * @file tab-row.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The row a set of tabs stands in (components/Tabs.js). The tabs are .poster-tab
+ *   (poster.css); this lays them out only. The plain row takes the values of the Settings pages'
+ *   own row, .pf-tabs (profile-poster.css; 32 rows in 16 files): one line that wraps, .4rem between
+ *   lines and .9rem between tabs. The filter row takes the values six of the nine facet rows had
+ *   (.sk-facets, .ad-facets, .cp-facets, .ex-facets, .lb-facets, .pk-facets; the other three,
+ *   .ac-filters, .dw-filters, .wal-filters, had .5rem and .2rem 0 .8rem). Reads no colour and no
+ *   shape. The row under a page head is .tab-row--bar with .poster-row--thing.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.1 — 2026-09-27 — The row under a page head wears only .tab-row--bar (with the heavy rule);
+ *     the page's .pf .sub-tabs rules are gone from profile.css and profile-poster.css.
+ *   v1.0.0 — 2026-09-26 — Initial (component plan C9, page parts).
+ */
+
+.tab-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; min-width: 0; }
+.tab-row--filter { display: flex; align-items: stretch; gap: .45rem; margin: .6rem 0 .3rem; }
+/* The row right under a page head (with the heavy rule of .poster-row--thing): the values the
+   page's .pf .sub-tabs had in profile-poster.css and profile.css. */
+.tab-row--bar { display: flex; align-items: center; gap: .4rem .9rem; padding: 0; margin-bottom: 1.2rem; }

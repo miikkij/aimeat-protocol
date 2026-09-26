@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   v1.18.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the page frame
+ *     (SettingsPage), the view tabs (Tabs bar), the list and its opening rows (List, Row, Panel), the details
+ *     (Facts; a schema the Code block that scrolls after 200px, as main's did), the tags (Mark), the ways on
+ *     (Action, Loud, Icon), the publish form (Card section, TextField, TextArea, Select, FormActions). The page
+ *     writes no class.
  *   v1.17.0 -- 2026-09-26 -- A service's schema is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -44,8 +49,19 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { LoadingLine } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, Row, Name, Desc, Doors, Panel } from '/components/List.js';
+import { Facts } from '/components/Facts.js';
+import { Mark, Marks, Code } from '/components/Mark.js';
+import { Action, Loud, Icon } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Card } from '/components/Card.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Space } from '/components/Layout.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
@@ -64,39 +80,36 @@ function fmtDate(s) {
   return s ? fmtDateTime(s) : null;
 }
 
-/** Render a JSON schema as a compact preview */
-function SchemaPreview({ schema, label }) {
+/** A JSON schema as a compact preview: one Facts row, or none when the schema is empty. */
+function schemaRow(schema, label) {
   if (!schema || typeof schema !== 'object' || Object.keys(schema).length === 0) return null;
   let preview;
   try { preview = JSON.stringify(schema, null, 2); } catch (err) { swallowed('services-tab', err); preview = String(schema); }
-  return html`
-    <span class="facts-k poster-label">${label}</span>
-    <div class="facts-v"><pre class="code-block svc-detail-code">${preview}</pre></div>`;
+  return { k: label, v: html`<${Code} block scroll>${preview}<//>` };
 }
 
-/** Expandable service card used in both My Services and Catalogue */
+/** Expandable service row used in both My Services and Catalogue */
 function ServiceCard({ svc, expanded, onToggle, actions }) {
   const displayName = svc.display_name || svc.displayName || svc.name || '';
   const category = svc.category || '';
   const priceMorsels = svc.price_morsels ?? svc.pricing?.base_morsels ?? svc.pricing?.baseMorsels ?? 0;
 
   return html`
-    <div class=${`listing-row svc-row ${expanded ? 'is-open' : ''}`} onClick=${(e) => { if (!e.target.closest?.('.listing-open')) onToggle(); }}>
-      <div class="listing-name">${escHtml(displayName)}</div>
-      <div class="listing-desc">${escHtml(svc.description || '')}${svc.owner ? html` │ ${escHtml(svc.owner)}` : ''}</div>
-      <div class="listing-doors">
-        <span class="poster-chips">
-          ${category && html`<span class="poster-chip">${escHtml(category)}</span>`}
-          <span class="poster-chip">${priceMorsels ? priceMorsels + ' \u2764\uFE0F' : t('profile.services.free')}</span>
-        </span>
-        <button type="button" class="poster-icon poster-icon--small">${expanded ? '\u25BC' : '\u25B6'}</button>
-      </div>
+    <${Row} open=${expanded} onToggle=${onToggle}>
+      <${Name}>${escHtml(displayName)}<//>
+      <${Desc}>${escHtml(svc.description || '')}${svc.owner ? html` │ ${escHtml(svc.owner)}` : ''}<//>
+      <${Doors}>
+        <${Marks}>
+          ${category && html`<${Mark}>${escHtml(category)}<//>`}
+          <${Mark}>${priceMorsels ? priceMorsels + ' ❤️' : t('profile.services.free')}<//>
+        <//>
+        <${Icon} small expanded=${!!expanded}>${expanded ? '▼' : '▶'}<//>
+      <//>
       ${expanded && html`
-        <div class="listing-open poster-box poster-box--raised">
+        <${Panel} doors=${actions}>
           <${ServiceDetail} svc=${svc} />
-          ${actions && html`<div class="og-doors listing-open-doors">${actions}</div>`}
-        </div>`}
-    </div>`;
+        <//>`}
+    <//>`;
 }
 
 /** Detail panel shown when a service card is expanded */
@@ -120,8 +133,9 @@ function ServiceDetail({ svc }) {
     return () => { cancelled = true; };
   }, [svcId]);
 
-  if (loading) return html`<div onClick=${e => e.stopPropagation()}><${LoadingLine} text=${t('common.loading')} /></div>`;
-  if (error_) return html`<div onClick=${e => e.stopPropagation()}><div class="form-message form-message--error">${error_}</div></div>`;
+  // A click inside the opened panel never folds the row: the Row ignores clicks in its Panel.
+  if (loading) return html`<${Note} kind="loading">${t('common.loading')}<//>`;
+  if (error_) return html`<${Note} kind="message" error>${error_}<//>`;
 
   // Merge local svc data with fetched detail (detail may have more fields)
   const d = detail ? { ...svc, ...detail } : svc;
@@ -137,35 +151,17 @@ function ServiceDetail({ svc }) {
   const estimatedTime = d.estimated_time_seconds || d.estimatedTimeSeconds || null;
   const providerGaii = d.provider_gaii || d.providerGaii || '';
 
-  return html`
-    <div class="facts" onClick=${e => e.stopPropagation()}>
-      ${description && html`
-        <span class="facts-k poster-label">${t('profile.services.descLabel')}</span>
-        <span class="facts-v">${escHtml(description)}</span>`}
-      ${providerGaii && html`
-        <span class="facts-k poster-label">${t('profile.services.provider')}</span>
-        <span class="facts-v"><code class="code-inline">${escHtml(providerGaii)}</code></span>`}
-      <span class="facts-k poster-label">${t('profile.services.priceLabel')}</span>
-      <span class="facts-v">${priceMorsels} morsels${priceUnit ? ' / ' + priceUnit : ''}</span>
-      ${webhookUrl && html`
-        <span class="facts-k poster-label">${t('profile.services.webhookLabel')}</span>
-        <span class="facts-v"><code class="code-inline">${escHtml(webhookUrl)}</code></span>`}
-      ${estimatedTime && html`
-        <span class="facts-k poster-label">${t('profile.services.estTime')}</span>
-        <span class="facts-v">${estimatedTime}s</span>`}
-      ${tags.length > 0 && html`
-        <span class="facts-k poster-label">Tags</span>
-        <div class="facts-v">
-          <span class="poster-chips">
-            ${tags.map(tag => html`<span class="poster-chip">${escHtml(tag)}</span>`)}
-          </span>
-        </div>`}
-      <${SchemaPreview} schema=${inputSchema} label="Input schema" />
-      <${SchemaPreview} schema=${outputSchema} label="Output schema" />
-      ${createdAt && html`
-        <span class="facts-k poster-label">Created</span>
-        <span class="facts-v">${fmtDate(createdAt)}</span>`}
-    </div>`;
+  return html`<${Facts} rows=${[
+    description && { k: t('profile.services.descLabel'), v: escHtml(description) },
+    providerGaii && { k: t('profile.services.provider'), v: escHtml(providerGaii), mono: true },
+    { k: t('profile.services.priceLabel'), v: `${priceMorsels} morsels${priceUnit ? ' / ' + priceUnit : ''}` },
+    webhookUrl && { k: t('profile.services.webhookLabel'), v: escHtml(webhookUrl), mono: true },
+    estimatedTime && { k: t('profile.services.estTime'), v: `${estimatedTime}s` },
+    tags.length > 0 && { k: 'Tags', v: html`<${Marks}>${tags.map(tag => html`<${Mark} key=${tag}>${escHtml(tag)}<//>`)}<//>` },
+    schemaRow(inputSchema, 'Input schema'),
+    schemaRow(outputSchema, 'Output schema'),
+    createdAt && { k: 'Created', v: fmtDate(createdAt) },
+  ]} />`;
 }
 
 export default function ServicesTab({ session, showToast, onStats }) {
@@ -235,57 +231,58 @@ export default function ServicesTab({ session, showToast, onStats }) {
   }
 
   const renderMyServices = () => {
-    if (!myServices) return html`<${LoadingLine} text=${t('profile.services.loading')} />`;
+    if (!myServices) return html`<${List} loading=${t('profile.services.loading')} />`;
     return html`
-      <button class="poster-slab mb-1" onClick=${() => setShowPubForm(!showPubForm)}>${t('profile.services.publishBtn')}</button>
+      <${Space} below="large"><${Loud} onClick=${() => setShowPubForm(!showPubForm)}>${t('profile.services.publishBtn')}<//><//>
       ${showPubForm && html`<${PublishForm} onPublish=${publishService} onCancel=${() => setShowPubForm(false)} />`}
-      ${myServices.length === 0
-        ? html`<div class="poster-quiet">${t('profile.services.empty')}</div>`
-        : html`<div class="listing listing--name-desc-doors">${myServices.map(s => {
-            const svcId = s.id || s.action_id;
-            return html`<${ServiceCard}
-              svc=${s}
-              expanded=${!!expandedMine[svcId]}
-              onToggle=${() => toggleMineExpand(svcId)}
-              actions=${html`<button class="poster-action poster-action--small poster-action--danger" onClick=${() => unpublishService(svcId)}>${t('profile.delete')}</button>`}
-            />`;
-          })}</div>`
-      }`;
+      <${List} cols="name-desc-doors" empty=${t('profile.services.empty')}>
+        ${myServices.map(s => {
+          const svcId = s.id || s.action_id;
+          return html`<${ServiceCard}
+            key=${svcId}
+            svc=${s}
+            expanded=${!!expandedMine[svcId]}
+            onToggle=${() => toggleMineExpand(svcId)}
+            actions=${html`<${Action} small tone="danger" onClick=${() => unpublishService(svcId)}>${t('profile.delete')}<//>`}
+          />`;
+        })}
+      <//>`;
   };
 
   const renderCatalogue = () => html`
-    <div class="action-bar">
-      <select class="select-field pf-select-narrow" value=${catFilter} onChange=${e => { setCatFilter(e.target.value); loadCatalogueData(e.target.value); }}>
-        <option value="">${t('profile.services.allCategories')}</option>
-        ${SERVICE_CATEGORIES.map(c => html`<option value=${c}>${c}</option>`)}
-      </select>
-    </div>
-    ${!catalogue ? html`<${LoadingLine} text=${t('profile.services.loading')} />`
-      : catalogue.length === 0 ? html`<div class="poster-quiet">${t('profile.services.catalogueEmpty')}</div>`
-      : html`<div class="listing listing--name-desc-doors">${catalogue.map(s => {
-          const svcId = s.id || s.action_id;
-          return html`<${ServiceCard}
-            svc=${s}
-            expanded=${!!expandedCat[svcId]}
-            onToggle=${() => toggleCatExpand(svcId)}
-          />`;
-        })}</div>`
+    <${Space} below="large">
+      <${Select} fit ariaLabel=${t('profile.services.categoryLabel')} value=${catFilter}
+        onChange=${v => { setCatFilter(v); loadCatalogueData(v); }}
+        placeholder=${t('profile.services.allCategories')} options=${SERVICE_CATEGORIES} />
+    <//>
+    ${!catalogue ? html`<${List} loading=${t('profile.services.loading')} />`
+      : html`<${List} cols="name-desc-doors" empty=${t('profile.services.catalogueEmpty')}>
+          ${catalogue.map(s => {
+            const svcId = s.id || s.action_id;
+            return html`<${ServiceCard}
+              key=${svcId}
+              svc=${s}
+              expanded=${!!expandedCat[svcId]}
+              onToggle=${() => toggleCatExpand(svcId)}
+            />`;
+          })}
+        <//>`
     }`;
 
   return html`
-    <div class="og mb-1">
-      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAutomation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.services')}</span></div>
-      <div class="og-mast"><div class="og-mast-words">
-        <div class="og-title poster-page-title">${t('profile.services.title')}</div>
-        <div class="og-desc">${t('profile.services.desc')}</div>
-      </div></div>
-    </div>
-    <div class="sub-tabs poster-row--thing">
-      <button class="poster-tab ${svcSubTab === 'mine' ? 'is-on' : ''}" onClick=${() => setSvcSubTab('mine')}>${t('profile.services.mine')}</button>
-      <button class="poster-tab ${svcSubTab === 'catalogue' ? 'is-on' : ''}" onClick=${() => { setSvcSubTab('catalogue'); if (!catalogue) loadCatalogueData(catFilter); }}>${t('profile.services.catalogue')}</button>
-    </div>
-    ${svcSubTab === 'mine' ? renderMyServices() : renderCatalogue()}
-    <${ConfirmUI} />
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.services')]}
+      title=${t('profile.services.title')}
+      desc=${t('profile.services.desc')}
+      after=${html`<${ConfirmUI} />`}>
+      <${Tabs} bar kind="view" value=${svcSubTab}
+        onSelect=${(v) => { setSvcSubTab(v); if (v === 'catalogue' && !catalogue) loadCatalogueData(catFilter); }}
+        items=${[
+          { value: 'mine', label: t('profile.services.mine') },
+          { value: 'catalogue', label: t('profile.services.catalogue') },
+        ]} />
+      ${svcSubTab === 'mine' ? renderMyServices() : renderCatalogue()}
+    <//>
   `;
 }
 
@@ -297,25 +294,21 @@ function PublishForm({ onPublish, onCancel }) {
   const [unit, setUnit] = useState('call');
   const [webhook, setWebhook] = useState('');
   return html`
-    <div class="create-form poster-row--thing">
-      <div class="form-row"><label class="poster-label">${t('profile.services.nameLabel')}</label><input class="og-input" placeholder=${t('profile.services.namePlaceholder')} value=${name} onInput=${e => setName(e.target.value)} /></div>
-      <div class="form-row"><label class="poster-label">${t('profile.services.descLabel')}</label><textarea class="og-textarea" rows="3" placeholder=${t('profile.services.descPlaceholder')} value=${desc} onInput=${e => setDesc(e.target.value)}></textarea></div>
-      <div class="form-row"><label class="poster-label">${t('profile.services.categoryLabel')}</label>
-        <select class="select-field" value=${cat} onChange=${e => setCat(e.target.value)}>
-          ${SERVICE_CATEGORIES.map(c => html`<option value=${c}>${c}</option>`)}
-        </select>
-      </div>
-      <div class="form-row"><label class="poster-label">${t('profile.services.priceLabel')}</label><input type="number" class="og-input" value=${price} min="0" onInput=${e => setPrice(e.target.value)} /></div>
-      <div class="form-row"><label class="poster-label">${t('profile.services.unitLabel')}</label>
-        <select class="select-field" value=${unit} onChange=${e => setUnit(e.target.value)}>
-          <option value="call">${t('profile.services.unitPerCall')}</option><option value="minute">${t('profile.services.unitPerMinute')}</option>
-          <option value="token">${t('profile.services.unitPerToken')}</option><option value="task">${t('profile.services.unitPerTask')}</option>
-        </select>
-      </div>
-      <div class="form-row"><label class="poster-label">${t('profile.services.webhookLabel')}</label><input class="og-input" placeholder=${t('profile.services.webhookPlaceholder')} value=${webhook} onInput=${e => setWebhook(e.target.value)} /></div>
-      <div class="form-actions">
-        <button class="poster-slab" onClick=${() => onPublish(name, desc, cat, price, unit, webhook)}>${t('profile.services.publishSaveBtn')}</button>
-        <button class="poster-action poster-action--small" onClick=${onCancel}>${t('profile.cancel')}</button>
-      </div>
-    </div>`;
+    <${Card} tone="section">
+      <${Fields}>
+        <${TextField} label=${t('profile.services.nameLabel')} placeholder=${t('profile.services.namePlaceholder')} value=${name} onInput=${setName} />
+        <${TextArea} label=${t('profile.services.descLabel')} rows=${3} placeholder=${t('profile.services.descPlaceholder')} value=${desc} onInput=${setDesc} />
+        <${Select} label=${t('profile.services.categoryLabel')} value=${cat} onChange=${setCat} options=${SERVICE_CATEGORIES} />
+        <${TextField} type="number" label=${t('profile.services.priceLabel')} value=${price} min="0" onInput=${setPrice} />
+        <${Select} label=${t('profile.services.unitLabel')} value=${unit} onChange=${setUnit} options=${[
+          ['call', t('profile.services.unitPerCall')], ['minute', t('profile.services.unitPerMinute')],
+          ['token', t('profile.services.unitPerToken')], ['task', t('profile.services.unitPerTask')],
+        ]} />
+        <${TextField} label=${t('profile.services.webhookLabel')} placeholder=${t('profile.services.webhookPlaceholder')} value=${webhook} onInput=${setWebhook} />
+      <//>
+      <${FormActions}>
+        <${Loud} onClick=${() => onPublish(name, desc, cat, price, unit, webhook)}>${t('profile.services.publishSaveBtn')}<//>
+        <${Action} small onClick=${onCancel}>${t('profile.cancel')}<//>
+      <//>
+    <//>`;
 }

@@ -9,11 +9,10 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, titleOf } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The crumb and the rail's sibling pages are data for SettingsPage; openTab is
+ *     the Rail's (component plan C9); this file writes no markup (page group G8).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Portfolio-sivu", direction A).
  */
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 
@@ -73,15 +72,18 @@ export function agentRule(owner, nodeUrl) {
   ].join('\n');
 }
 
+/** The crumb's steps (SettingsPage draws them). */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('portfolio.tabLabel')}</span></div>`;
+  return [t('nav.profile'), t('profile.landing.menuBuildShare'), t('portfolio.tabLabel')];
 }
 
-export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+export { openTab } from '/components/Rail.js';
+/** The sibling pages in the rail, as data (SettingsPage draws them → … →). */
 export function pageLinks(navigate) {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => navigate('/v1/home')}><i>→</i>${t('nav.home')}<em>→</em></button>
-    <a class="og-rail-link" href="/v1/members" target="_blank" rel="noopener"><i>→</i>${t('members.title')}<em>→</em></a>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('companies')}><i>→</i>${t('profile.tabs.companies')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>`;
+  return [
+    { onClick: () => navigate('/v1/home'), label: t('nav.home') },
+    { href: '/v1/members', newTab: true, label: t('members.title') },
+    { tab: 'companies', label: t('profile.tabs.companies') },
+    { tab: 'apps', label: t('profile.tabs.apps') },
+  ];
 }

@@ -24,6 +24,7 @@
  *   import { ComplianceCard } from './compliance-card.js';
  *   html`<${ComplianceCard} />`
  * @version-history
+ *   v1.11.0 — 2026-09-26 — Every part is a kit component (FigureStrip flush with the warn tone above zero, BoxList and BoxLine for the use-case entries, SubHeading, Code, Note, Layout): the card writes no class. A model name in the undocumented list is inline code (main's .mono) (page group G8).
  *   v1.10.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.9.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.8.0 — 2026-09-26 — A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
@@ -48,12 +49,21 @@ import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { BoxList, BoxLine } from '/components/Box.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Space } from '/components/Layout.js';
 
 /** One limit in the reader's language, falling back to the sentence the node sent. */
 function limitText(item) {
   if (typeof item === 'string') return item;
   return tOr(`admin.compliance.limit.${item.code}`, item.text, { days: item.days });
 }
+
+/** A small heading inside the card, with main's space above it. */
+const sub = (words) => html`<${Space} above="large"><${SubHeading} level=${4}>${words}<//><//>`;
 
 export function ComplianceCard() {
   const [collapsed, setCollapsed] = useState(true);
@@ -98,49 +108,41 @@ export function ComplianceCard() {
   const undocumented = models.filter(m => !documented.includes(m));
 
   return html`
-    <div class="pf-card pf-cmp">
-      <${FoldSection} num="" title=${t('complianceMine.title')} lead=${t('complianceMine.desc')} open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
+    <${FoldSection} num="" title=${t('complianceMine.title')} lead=${t('complianceMine.desc')} open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
+      ${loading && html`<${Note} kind="loading">${t('complianceMine.loading')}<//>`}
+      ${error && html`<${Note} kind="message" error>${error}<//>`}
 
-        <div class="pf-cmp-body">
-          ${loading && html`<p class="poster-quiet loading-mark">${t('complianceMine.loading')}</p>`}
-          ${error && html`<p class="form-message form-message--error">${error}</p>`}
+      ${report && html`
+        <${FigureStrip} flush items=${[
+          { key: 'calls', n: usage.calls ?? 0, label: t('complianceMine.calls') },
+          { key: 'models', n: models.length, label: t('complianceMine.models') },
+          // Only a count above zero warns: a surface that is always red teaches people to stop looking.
+          { key: 'undocumented', n: undocumented.length, tone: undocumented.length > 0 ? 'warn' : undefined, label: t('complianceMine.undocumented') },
+          { key: 'entries', n: entries.length, label: t('complianceMine.entries') },
+        ]} />
 
-          ${report && html`
-            <div class="og-strip">
-              <div><b>${usage.calls ?? 0}</b><span>${t('complianceMine.calls')}</span></div>
-              <div><b>${models.length}</b><span>${t('complianceMine.models')}</span></div>
-              <div><b class=${undocumented.length > 0 ? 'og-strip-warn' : ''}>${undocumented.length}</b><span>${t('complianceMine.undocumented')}</span></div>
-              <div><b>${entries.length}</b><span>${t('complianceMine.entries')}</span></div>
-            </div>
+        ${undocumented.length > 0 && html`
+          <${Note} kind="lead">${t('complianceMine.undocumentedNote')}<//>
+          <${IndexList} steps>
+            ${undocumented.map(m => html`<${IndexStep} key=${m}><${Code}>${m}<//><//>`)}
+          <//>
+        `}
 
-            ${undocumented.length > 0 && html`
-              <p class="og-lead">${t('complianceMine.undocumentedNote')}</p>
-              <${IndexList} steps className="pf-cmp-models">
-                ${undocumented.map(m => html`<${IndexStep} key=${m}><span class="mono">${m}</span><//>`)}
-              <//>
-            `}
+        ${entries.length > 0 && html`
+          ${sub(t('complianceMine.entriesTitle'))}
+          <${Hint}>${t('complianceMine.entriesNote')}<//>
+          <${BoxList} apart>
+            ${entries.map(e => html`<${BoxLine} key=${e.id} name=${e.title || e.id} end=${e.risk?.label || e.risk?.class || '—'} />`)}
+          <//>
+        `}
 
-            ${entries.length > 0 && html`
-              <h4 class="pf-cmp-sub sub-heading">${t('complianceMine.entriesTitle')}</h4>
-              <${Hint}>${t('complianceMine.entriesNote')}<//>
-              <ul class="pf-cmp-entries">
-                ${entries.map(e => html`
-                  <li key=${e.id} class="poster-box">
-                    <span class="pf-cmp-entry-title">${e.title || e.id}</span>
-                    <span class="pf-cmp-entry-risk">${e.risk?.label || e.risk?.class || '—'}</span>
-                  </li>
-                `)}
-              </ul>
-            `}
+        ${entries.length === 0 && html`<${Note} kind="quiet">${t('complianceMine.entriesEmpty')}<//>`}
 
-            ${entries.length === 0 && html`<p class="poster-quiet">${t('complianceMine.entriesEmpty')}</p>`}
-
-            <h4 class="pf-cmp-sub sub-heading">${t('complianceMine.limitsTitle')}</h4>
-            <${IndexList} steps className="pf-cmp-limits">
-              ${(report.not_covered ?? []).map((l, i) => html`<${IndexStep} key=${l.code || i}>${limitText(l)}<//>`)}
-            <//>
-          `}
-        </div><//>
-    </div>
+        ${sub(t('complianceMine.limitsTitle'))}
+        <${IndexList} steps>
+          ${(report.not_covered ?? []).map((l, i) => html`<${IndexStep} key=${l.code || i}>${limitText(l)}<//>`)}
+        <//>
+      `}
+    <//>
   `;
 }
