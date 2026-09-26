@@ -31,11 +31,13 @@
  * @version-history
  *   v1.0.0 — 2026-08-16 — Extracted from the four hand-built copies, with the ownerScope they all
  *     lacked. Adds the startup backfill, because an already-stored job is not re-created by a deploy.
+ *   v1.0.1 — 2026-09-26 — The installer's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export interface ExtensionScheduleDeps {
     storage: Storage;
@@ -52,7 +54,7 @@ export interface ExtensionScheduleDeps {
  * derive, which the caller must treat as "do not stamp a wrong owner".
  */
 export function extensionJobOwnerScope(installedBy: string | undefined, nodeId: string): string {
-    const bare = (installedBy ?? '').split('@')[0];
+    const bare = localAccountName(installedBy ?? '');
     return bare ? `${bare}@${nodeId}` : '';
 }
 

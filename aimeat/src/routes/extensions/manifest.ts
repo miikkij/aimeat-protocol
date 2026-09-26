@@ -5,6 +5,9 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 — 2026-09-26 — The installer named in the config.app check comes from localAccountName
+ *                         (utils/gaii.ts), which keeps an identity of another node whole, so it never
+ *                         names the local namesake (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-13 — A manifest that does not parse answers with the parser's line and column
  *                         (yamlErrorText, also used by the package ZIP door), and a `type: secret`
  *                         config field with no `default` is no longer stored as its own descriptor,
@@ -35,6 +38,7 @@ import { parse as parseYaml } from 'yaml';
 import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from '../../services/extension-secrets.js';
 import { MONEY_CURRENCIES } from '../../commerce/money.js';
 import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from '../../services/extension-workspace-declaration.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
 export type ExtBuildResult =
@@ -440,7 +444,7 @@ export function buildExtensionRecordFromManifest(
     : rawApp;
   if (typeof declaredApp === 'string' && declaredApp.length) {
     const appOwner = (declaredApp.split('/')[0] ?? '').toLowerCase();
-    const installer = installedBy.toLowerCase().split('@')[0].split('#').pop() ?? '';
+    const installer = localAccountName(installedBy.toLowerCase());
     if (appOwner !== installer) {
       return { ok: false, status: 400, code: 'INVALID_MANIFEST',
         message: `config.app "${declaredApp}" names an app owned by "${appOwner}", and this extension `

@@ -36,6 +36,7 @@
  *   import { listItems, addItem } from '../services/open-items.js';
  *   const open = await listItems(storage, config, ownerGhii, owner);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — closeItemsForTask takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-20 — closeItemsForDecision: a decision a person has confirmed or overridden
  *     takes its own row off the list, whichever surface recorded the review.
  *   v1.0.0 — 2026-08-09 — Replaces services/intents.ts. One key (P22) instead of one record per
@@ -50,6 +51,7 @@ import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from '../routes/portfolio.js';
 import { HELLO_MCP_KEY } from './hello-mcp.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** The one key. Named for what a person calls it, because their AI reads this name aloud. */
 export const OPEN_ITEMS_KEY = 'open-items.list';
@@ -502,7 +504,7 @@ export async function closeItemsForTask(
         .filter(Boolean);
     if (ids.length === 0) return 0;
     // The task carries the agent's GAII; the list lives under the OWNER's GHII.
-    const owner = task.agentGaii.includes('#') ? task.agentGaii.split('#')[1].split('@')[0] : null;
+    const owner = task.agentGaii.includes('#') ? localAccountName(task.agentGaii) : null;
     if (!owner) return 0;
     const ownerGhii = `${owner}@${config.nodeId}`;
     let closed = 0;

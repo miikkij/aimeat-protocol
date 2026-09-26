@@ -28,6 +28,7 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The joiner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-29 — The type is free text (1 to 40 characters, trimmed) on create and update; the
  *     five names that used to be the whole list are presets the settings offer with a translation.
  *   v1.0.0 — 2026-08-11 — Initial: extracted from routes/organisms/crud.ts + mcp/organisms.ts
@@ -47,6 +48,7 @@ import { updateOrganismStructure } from './structure-snapshot.js';
 import { getOrganismReadme, setOrganismReadme } from './organism-readme.js';
 import { MEMBER_VISIBILITY_VALUES } from './organism-privacy.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import { isOrganismOwner } from './organism-ownership.js';
 
 export interface OrganismDeps {
@@ -356,7 +358,7 @@ export async function joinOrganism(
       void recordAccountEvent(storage, {
         ownerGhii: organism.createdBy, kind: 'organism_member_joined', actorGaii: joinerOwner,
         subject: id, link: `/v1/organism/${encodeURIComponent(id)}`,
-        data: { name: organism.name || id, who: joinerOwner.split('@')[0] },
+        data: { name: organism.name || id, who: localAccountName(joinerOwner) },
       }, config);
     }
     return { ok: true, outcome: 'joined', membership };

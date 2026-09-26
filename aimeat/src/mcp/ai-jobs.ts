@@ -17,6 +17,8 @@
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii);
  * @version-history
  *   v1.0.0 — 2026-08-31 — Initial.
+ *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -24,7 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import type { AiJobState } from '../services/ai-jobs/types.js';
 
@@ -35,7 +37,7 @@ export function registerAiJobTools(
     getAgentGaii: () => string,
 ): void {
     const agentGaii = getAgentGaii();
-    const owner = parseGAII(agentGaii)?.owner ?? '';
+    const owner = localAccountName(agentGaii);
     const ownerGhii = `${owner}@${config.nodeId}`;
 
     const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });

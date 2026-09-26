@@ -10,6 +10,8 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.8.2 -- 2026-09-26 -- The agent token's owner comes from localAccountName, the one cut of an
+ *     identity to an account name (secaudit 2026-09, F-1). The name it gives is the one it gave.
  *   v1.8.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.8.0 -- 2026-09-05 -- DELETE /v1/auth/sessions/others: end every other device's session and
  *     keep this one, the Access page's "sign out everywhere else". The device list no longer shows
@@ -71,7 +73,7 @@ import { success, error } from '../middleware/envelope.js';
 import { loginTarpit } from '../middleware/login-tarpit.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
-import { parseGAII, isExternalPrincipal, isForeignPrincipal } from '../utils/gaii.js';
+import { parseGAII, isExternalPrincipal, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
@@ -212,11 +214,14 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // runs where it belongs: on the owner's own doors in routes/ghii/register-login.ts, at
       // registration and again at password login.
       const roles = ['agent'];
+      // The account this agent acts for. The agent record exists here, so its GAII is one of this
+      // node's, and localAccountName names its owner as the parse did.
+      const agentOwner = localAccountName(gaii);
 
       // Deactivated owner (BR-04): the agent acts in a person's name, and that person is gone from
       // this node's point of view. After the signature check (no state disclosure to strangers),
       // before any row is written.
-      const agentOwnerRecord = await storage.getOwner(parsed.owner);
+      const agentOwnerRecord = await storage.getOwner(agentOwner);
       if (agentOwnerRecord?.disabledAt) {
         res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
         return;
@@ -229,7 +234,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
 
       const token = await issueJWT({
         sub: gaii,
-        owner: parsed.owner,
+        owner: agentOwner,
         node: config.nodeId,
         roles,
         scopes: agent.defaultScopes,
@@ -238,7 +243,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       await storage.createSession({
         sessionId,
         gaii,
-        owner: parsed.owner,
+        owner: agentOwner,
         issuedAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
       });
@@ -252,7 +257,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         ttl_seconds: config.jwtTtlSeconds,
         identity: {
           gaii,
-          owner: parsed.owner,
+          owner: agentOwner,
           node: config.nodeId,
         },
         roles,

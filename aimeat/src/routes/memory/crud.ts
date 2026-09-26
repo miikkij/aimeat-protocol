@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.1 -- 2026-09-26 -- The count's cache tag names the owner with localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.8.0 -- 2026-09-25 -- POST refuses a key only the node writes (`__redirect__`, `notif.`) before
  *     the reserved-key guard, so an app or a delegated agent hears that nobody writes it here, rather
  *     than that the owner does.
@@ -44,13 +47,12 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
-import { parseGaiiLoose } from '../../utils/gaii.js';
 import { cached, TTL } from '../../services/cache.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
-import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
 import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
@@ -308,7 +310,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
           ['domain:memory', `owner:${ownerName}:memory`],
         );
       } else {
-        const owner = parseGaiiLoose(gaii).owner;
+        const owner = localAccountName(gaii);
         count = await cached(
           `memcount:${gaii}:${filterKey}`, TTL.dashboard,
           () => storage.countMemory([gaii], { prefix, visibility }),

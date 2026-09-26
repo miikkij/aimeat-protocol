@@ -31,11 +31,12 @@
  *   v1.0.0 -- 2026-07-11 -- Extract the creator-managed workspace-role logic (was duplicated in the REST
  *     routes + the MCP tools) into one service; add an explicit metadata.source stamp (grant|request|
  *     invite) + grantedBy for the members listing (TARGET-028).
+ *   v1.0.1 -- 2026-09-26 -- A grantee's and a recipient's account names come from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export type WsRole = 'viewer' | 'contributor';
 /** Where a grant came from: a direct grant, an approved access request, or an organism invitation. */
@@ -51,7 +52,7 @@ export function wsPattern(orgId: string, ws: string): string {
 
 /** The bare owner behind any grantee form (owner name / GHII / GAII / GEAI). Bare names pass through. */
 export function granteeOwner(grantee: string): string {
-  return parseGaiiLoose(grantee).owner || grantee;
+  return localAccountName(grantee);
 }
 
 /** The consent recipient for a grantee — always the OWNER on THIS node, so all their agents inherit. */
@@ -120,7 +121,7 @@ export async function listWorkspaceMemberRoles(
   const byOwner = new Map<string, WsMemberRole>();
   for (const c of await storage.listConsents(creatorGhii, { status: 'active' })) {
     if (c.dataPattern !== pattern || !WS_ROLE_PURPOSES.includes(c.purpose)) continue;
-    const owner = c.recipient.replace(/^ghii:/, '').split('@')[0];
+    const owner = localAccountName(c.recipient.replace(/^ghii:/, ''));
     const role: WsRole = c.purpose === 'workspace-contributor' ? 'contributor' : 'viewer';
     const meta = (c.metadata ?? {}) as Partial<RoleMeta>;
     const existing = byOwner.get(owner);

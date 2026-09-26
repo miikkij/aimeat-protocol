@@ -37,12 +37,14 @@
  * @version-history
  *   v1.0.0 -- 2026-08-11 -- Initial (August 2026 audit step 8): extracted from
  *     mcp/appdev-proofs.ts, with the storage write replaced by writeMemoryRecord().
+ *   v1.0.1 -- 2026-09-26 -- The caller's account comes from localAccountOf, so a visitor from another
+ *     node resolves to no owner here, never to the local namesake (secaudit 2026-09, F-1).
  */
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
-import { parseGAII } from '../utils/gaii.js';
+import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
 import { getTemplateProposal, templateProposalKey } from './app-template-proposals.js';
 
@@ -91,10 +93,9 @@ export type AttachProofResult =
 const DUPLICATE_MESSAGE =
     'Duplicate proof (same model + test set + date) — the ledger is append-only, one entry per run';
 
+/** The caller's account on this node and its GHII; none for an ecosystem app or another node's identity. */
 function ownerOf(principal: string, config: AimeatConfig): { owner: string; ownerGhii: string } | null {
-    const parsed = parseGAII(principal);
-    const owner = parsed?.owner
-        ?? (principal.includes('@') && !principal.includes('#') ? principal.split('@')[0] : null);
+    const owner = isGEAI(principal) ? null : localAccountOf(principal);
     return owner ? { owner, ownerGhii: `${owner}@${config.nodeId}` } : null;
 }
 

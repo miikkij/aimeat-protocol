@@ -24,18 +24,18 @@
  * @usage await notifyGrantIssued(storage, config, { provider, consumer, appId, capability, existing });
  * @version-history
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2): membership decisions reach the member.
+ *   v1.0.1 — 2026-09-26 — ownerOfPrincipal takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { MeteredEntitlement } from './metered-entitlements.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** The owner behind any principal string (`alice`, `alice@node`, `bot#alice@node`). */
 export function ownerOfPrincipal(principal: string): string {
-  const s = String(principal || '');
-  const afterHash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s;
-  return afterHash.split('@')[0].toLowerCase();
+  return localAccountName(String(principal || '')).toLowerCase();
 }
 
 /**

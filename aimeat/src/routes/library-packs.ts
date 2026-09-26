@@ -18,6 +18,9 @@
  *   communityPackDetail() · libraryPackIds()
  * @usage app.use(libraryPacksRouter(config, storage)) from routes-loader.
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The proof ledger's writer is named with localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-03 — Every pack carries `used_by` from the dependency map (apps that include
  *     it, read from their source), and the index carries supersededBy and showcaseUrl. For the
  *     Libraries page (design canvas "AIMEAT Kirjastot-sivu").
@@ -39,7 +42,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { getLibraryPacks, getLibraryPackIndex, getLibraryPack, renderPackText } from '../data/library-packs.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { logger } from '../utils/logger.js';
 
@@ -126,7 +129,7 @@ async function loadCommunityProofs(storage: Storage, exts: CortexExtensionRecord
     for (const rec of items) {
       const packId = rec.key.slice(PACK_PROOFS_PREFIX.length);
       const packOwner = ownerByPack.get(packId);
-      if (!packOwner || parseGaiiLoose(rec.ownerGaii).owner !== packOwner) continue;
+      if (!packOwner || localAccountName(rec.ownerGaii) !== packOwner) continue;
       const v = rec.value as { proofs?: unknown[] } | null;
       if (Array.isArray(v?.proofs)) out.set(packId, v.proofs);
     }

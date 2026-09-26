@@ -24,6 +24,7 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   v1.6.1 — 2026-09-26 — openPixelUrl takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-24 — The inbox channel's message does not count against the account's message
  *     limit (services/message-send-limit.ts): this door has its own per-sender limit, and one send
  *     here must not cost the sender twice.
@@ -72,6 +73,7 @@ import {
 } from '../connections/send-mail.js';
 import { resolveSendingCompany } from './company-sender-access.js';
 import { isValidEmail } from '../../utils/email-validator.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { getStream } from '../signals/signal-service.js';
 import { renderCampaignEmail } from './campaign-email.js';
 import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
@@ -291,7 +293,7 @@ async function openPixelUrl(
   if (!input.signalStreamId || !input.signalSubject) return null;
   const stream = await getStream(storage, ownerGhii, input.signalStreamId);
   if (!stream || !stream.enabled) return null;
-  const owner = ownerGhii.split('@')[0];
+  const owner = localAccountName(ownerGhii);
   return `${config.baseUrl}/v1/signals/${encodeURIComponent(owner)}/${encodeURIComponent(stream.streamId)}/px.svg`
     + `?e=open&c=email&s=${encodeURIComponent(input.signalSubject.slice(0, 64))}`;
 }

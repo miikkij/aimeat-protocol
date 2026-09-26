@@ -19,6 +19,8 @@
  * @usage registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes);  // register-all.ts
  * @version-history
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
+ *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -29,7 +31,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { listRequestsFor, readRequestFor, decideInstallRequest } from '../services/package-install-requests.js';
 import { getActiveScheduler } from '../services/scheduler.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export function registerPackageInstallRequestTools(
     mcp: McpServer,
@@ -44,7 +46,7 @@ export function registerPackageInstallRequestTools(
     }, annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
         const gaii = getAgentGaii();
         // Every MCP session is an agent's. The owner it acts for comes from its identity, never input.
-        const who = { sub: gaii, owner: parseGaiiLoose(gaii).owner || gaii, roles: ['agent'], scopes: sessionScopes };
+        const who = { sub: gaii, owner: localAccountName(gaii), roles: ['agent'], scopes: sessionScopes };
         const deps = { storage, config, scheduler: getActiveScheduler() ?? undefined };
 
         if (decision !== undefined) {

@@ -13,6 +13,7 @@
  *   const push = createPushService(config, storage);
  *   await push.sendNotification(ownerName, { title: '...', body: '...' });
  * @version-history
+ *   v1.2.1 -- 2026-09-26 -- broadcastToOrganism takes each member's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.2.0 -- 2026-08-11 -- One subscription per DEVICE (audit H-8): sendNotification fans out over
  *     every device the owner registered and prunes only the endpoint that reported itself gone;
  *     unsubscribe takes an optional endpoint.
@@ -24,6 +25,7 @@ import { createRequire } from 'node:module';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PushSubscriptionRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import { getStats } from './stats.js';
 
 const require = createRequire(import.meta.url);
@@ -176,7 +178,7 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
       if (!organism) return 0;
       let sent = 0;
       for (const ghii of organism.members) {
-        const ownerName = ghii.split('@')[0];
+        const ownerName = localAccountName(ghii);
         const ok = await this.sendNotification(ownerName, payload);
         if (ok) sent++;
       }

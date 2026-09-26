@@ -15,6 +15,8 @@
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
  *   v1.0.0 — 2026-08-08 — Initial: the company setup an AI chat can drive end to end.
+ *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -24,7 +26,7 @@ import type { CompanyRecord } from '../models/company-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import {
     CompanyError, createCompany, updateCompany, setFrontPage, requireOwnCompany, companyAddress,
 } from '../services/company/company-service.js';
@@ -85,7 +87,7 @@ export function registerCompanyTools(
 ): void {
     /** Companies belong to the OWNER — resolve the agent's owner GHII, never a client-supplied id. */
     const ownerGhii = (): string => {
-        const owner = parseGaiiLoose(getAgentGaii()).owner || getAgentGaii();
+        const owner = localAccountName(getAgentGaii());
         return owner.includes('@') ? owner : `${owner}@${config.nodeId}`;
     };
 

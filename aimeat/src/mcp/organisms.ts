@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.8.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.8.1 — 2026-08-29 — aimeat_organism_create's `type` is described as free text with five presets.
  *   v1.8.0 — 2026-08-11 — create/update/join/leave call services/organism-lifecycle.ts, the same
  *     writer the REST routes use (August 2026 MCP audit step 8). The tools keep their gates and their
@@ -40,7 +42,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { exportOrganism } from '../services/organism-export.js';
@@ -74,8 +76,7 @@ export function registerOrganismsTools(
      *  keyed by the bare owner name (see aimeat_organism_create), NOT the full GHII — so visibility,
      *  list-by-member, and join/leave checks must compare against the bare name. */
     function getOwnerName(): string {
-        const parsed = parseGAII(agentGaii);
-        return parsed ? parsed.owner : agentGaii;
+        return localAccountName(agentGaii);
     }
 
     /** Check if an organism is visible to the current agent. */
@@ -335,7 +336,7 @@ export function registerOrganismsTools(
             const canSeeAgents = callerMembership?.status === 'active';
             const agentsByOwner = new Map<string, { gaii: string; name: string }[]>();
             if (canSeeAgents) {
-                const ownerNames = [...new Set(members.map(m => (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0]))];
+                const ownerNames = [...new Set(members.map(m => localAccountName(m.ghii)))];
                 const batched = await storage.getAgentsByOwners(ownerNames);
                 for (const name of ownerNames) {
                     agentsByOwner.set(name, (batched[name] ?? []).map(a => ({ gaii: a.gaii, name: a.name })));
@@ -352,7 +353,7 @@ export function registerOrganismsTools(
                         status: m.status,
                         joined_at: m.joinedAt,
                         invited_by: m.invitedBy,
-                        ...(canSeeAgents ? { agents: agentsByOwner.get((m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0]) ?? [] } : {}),
+                        ...(canSeeAgents ? { agents: agentsByOwner.get(localAccountName(m.ghii)) ?? [] } : {}),
                     })), null, 2),
                 }],
             };
@@ -549,7 +550,7 @@ export function registerOrganismsTools(
         },
     );
 
-    const ownerOf = () => { const p = parseGAII(agentGaii); return p ? p.owner : agentGaii; };
+    const ownerOf = () => localAccountName(agentGaii);
 
     // ── Tool: aimeat_organism_update ──
     // Mirrors PUT /v1/organisms/:id. Creator/admin updates meta fields and/or the free-form README

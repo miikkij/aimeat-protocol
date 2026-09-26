@@ -16,6 +16,9 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.6.2 — 2026-09-26 — The app owner in the listing and the invoke comes from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.6.1 — 2026-09-24 — …and whether the caller is the owner in person (callAuthority): an app under
  *     a grant resolves to its owner's account, and it called the owner's server as them.
  *   v1.6.0 — 2026-09-24 — Both invoke paths hand the capability service the session's scopes
@@ -42,7 +45,7 @@ import type { Storage, AppRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
+import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
@@ -123,7 +126,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
   // `tools` array, because "this app sells nothing yet" and "there is no such app" are different
   // answers and only the second is a 404. A PRIVATE manifest reads exactly like an absent one.
   router.get('/v1/apps/:owner/:filename/webmcp', async (req, res) => {
-    const ownerName = decodeURIComponent(req.params.owner as string).split('@')[0] as string;
+    const ownerName = localAccountName(decodeURIComponent(req.params.owner as string));
     const filename = decodeURIComponent(req.params.filename as string);
     const tools = await loadPublicManifest(storage, config, ownerName, filename);
     // The tool manifest is a memory-record convention keyed by filename, so a seller can declare
@@ -165,7 +168,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
   // Priced → ALWAYS 402 + x402 accepts + the ready-made checkout item (payment is the
   // invocation). Unpriced callable → authenticated direct invoke. Unpriced unbound → 422.
   router.post('/v1/apps/:owner/:filename/webmcp/tools/:tool', async (req: Request, res: Response) => {
-    const ownerName = decodeURIComponent(req.params.owner as string).split('@')[0] as string;
+    const ownerName = localAccountName(decodeURIComponent(req.params.owner as string));
     const filename = decodeURIComponent(req.params.filename as string);
     const toolName = decodeURIComponent(req.params.tool as string);
     const tools = await loadPublicManifest(storage, config, ownerName, filename);

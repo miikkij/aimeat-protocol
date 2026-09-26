@@ -34,12 +34,14 @@
  *     of titles (with severity/kind) in BOTH the email body and the in-app record; mention the routed
  *     organism in the "view it" line; persist advisoryCount/advisories/body on the report record.
  *     Degrades gracefully to the prior generic line when there are no advisories. Never throws.
+ *   v1.1.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { getActiveEmailService } from './email.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** Trim an arbitrary value to a short, human-readable excerpt for the report body. */
 function excerpt(value: unknown, max = 600): string {
@@ -142,7 +144,7 @@ export async function notifyAutomationTaskComplete(
     if (!auto || auto.email !== true) return;
 
     const ownerGhii = task.ownerGaii; // owner GHII (owner@node), set by materialiseAgentTask
-    const ownerName = ownerGhii.split('@')[0];
+    const ownerName = localAccountName(ownerGhii);
     const agentName = task.agentGaii.split('#')[0];
 
     // Pull the deliverable excerpt if the agent published one (best-effort).

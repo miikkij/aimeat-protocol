@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.6.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.6.0 -- 2026-09-08 -- aimeat_agent_propose, which aimeat_agent_basics_get's own description
  *     had been telling agents to call since 2026-09-02 without it existing. Creates nothing: the
  *     approve door stays the owner in person. The registration now takes the session's scopes,
@@ -43,7 +45,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent } from '../services/agent-proposals.js';
@@ -82,7 +84,7 @@ export function registerAgentManagementTools(
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
 
-            const outcome = await setAgentTags({ storage, config }, callerParsed.owner, target_agent_name, tags);
+            const outcome = await setAgentTags({ storage, config }, localAccountName(agentGaii), target_agent_name, tags);
             if (!outcome.ok) {
                 return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             }
@@ -113,7 +115,7 @@ export function registerAgentManagementTools(
         async ({ target_agent_name, description }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
-            const outcome = await setAgentDescription({ storage, config }, callerParsed.owner, target_agent_name, description);
+            const outcome = await setAgentDescription({ storage, config }, localAccountName(agentGaii), target_agent_name, description);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, description: outcome.agent.description ?? '' }, null, 2) }] };
         },
@@ -136,7 +138,7 @@ export function registerAgentManagementTools(
         async ({ target_agent_name, run_mode }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
-            const outcome = await setAgentRunMode({ storage, config }, callerParsed.owner, target_agent_name, run_mode);
+            const outcome = await setAgentRunMode({ storage, config }, localAccountName(agentGaii), target_agent_name, run_mode);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, run_mode: outcome.agent.runMode ?? null }, null, 2) }] };
         },
@@ -160,7 +162,7 @@ export function registerAgentManagementTools(
         async ({ target_agent_name, ...src }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
-            const outcome = await setAgentRuntimeSource({ storage, config }, callerParsed.owner, target_agent_name, src);
+            const outcome = await setAgentRuntimeSource({ storage, config }, localAccountName(agentGaii), target_agent_name, src);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, runtime_source: outcome.agent.runtimeSource ?? null }, null, 2) }] };
         },
@@ -184,7 +186,7 @@ export function registerAgentManagementTools(
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
 
-            const outcome = await setAgentMode({ storage, config }, callerParsed.owner, target_agent_name, mode);
+            const outcome = await setAgentMode({ storage, config }, localAccountName(agentGaii), target_agent_name, mode);
             if (!outcome.ok) {
                 return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             }
@@ -217,7 +219,7 @@ export function registerAgentManagementTools(
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
             // Same function the HTTP route calls, so the two surfaces cannot answer differently.
-            const view = await describeBasicAgents(config, storage, callerParsed.owner);
+            const view = await describeBasicAgents(config, storage, localAccountName(agentGaii));
             return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
         },
     );
@@ -235,7 +237,7 @@ export function registerAgentManagementTools(
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
-            const out = await requestBasicAgents(config, storage, callerParsed.owner, agentGaii, note);
+            const out = await requestBasicAgents(config, storage, localAccountName(agentGaii), agentGaii, note);
             if (!out.ok) return { content: [{ type: 'text' as const, text: out.message }], isError: true };
             const data: Record<string, unknown> = { ...out };
             delete data.ok;
@@ -270,7 +272,7 @@ export function registerAgentManagementTools(
             // service applies is "no more than the caller holds", and the caller is this session.
             const out = await proposeAgent({ config, storage }, {
                 sub: agentGaii,
-                owner: callerParsed.owner,
+                owner: localAccountName(agentGaii),
                 roles: ['agent'],
                 scopes: sessionScopes,
             }, input as Parameters<typeof proposeAgent>[2]);
@@ -283,7 +285,7 @@ export function registerAgentManagementTools(
                         created: false,
                         already_waiting: out.alreadyWaiting ?? false,
                         next_step: out.alreadyWaiting
-                            ? `${out.proposal.display_name} is already waiting for ${callerParsed.owner} to approve it in their profile under Agents.`
+                            ? `${out.proposal.display_name} is already waiting for ${localAccountName(agentGaii)} to approve it in their profile under Agents.`
                             : `Nothing has been created. ${out.proposal.display_name} is waiting for you to approve it in your profile under Agents.`,
                     }, null, 2),
                 }],
@@ -309,7 +311,7 @@ export function registerAgentManagementTools(
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
 
-            const outcome = await setAgentConsoleUrl({ storage, config }, callerParsed.owner, target_agent_name, console_url);
+            const outcome = await setAgentConsoleUrl({ storage, config }, localAccountName(agentGaii), target_agent_name, console_url);
             if (!outcome.ok) {
                 return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             }

@@ -9,6 +9,8 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.9.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   2026-08-15 — aimeat_task_get answers the principal that CREATED the task, not only the one it
  *     is for. A chat commissioning a build from a fleet concierge could not read back its own
  *     commission, so a build that produced nothing and said nothing was undiagnosable from the only
@@ -72,7 +74,7 @@ import { readinessRefusal } from '../middleware/readiness-gate.js';
 import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent-task-write.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGAII, buildGAII } from '../utils/gaii.js';
+import { parseGAII, buildGAII, localAccountName } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';
 import { completeTask, failTask } from '../services/agent-task-fanout.js';
@@ -140,11 +142,11 @@ export function registerAgentTaskTools(
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
-            const targetGaii = buildGAII(target_agent, callerParsed.owner, config.nodeId);
+            const targetGaii = buildGAII(target_agent, localAccountName(agentGaii), config.nodeId);
             const targetAgent = await storage.getAgent(targetGaii);
             if (!targetAgent) {
                 return {
-                    content: [{ type: 'text' as const, text: `Target agent '${target_agent}' not found under owner '${callerParsed.owner}'. Use aimeat_agents_list to see available agents.` }],
+                    content: [{ type: 'text' as const, text: `Target agent '${target_agent}' not found under owner '${localAccountName(agentGaii)}'. Use aimeat_agents_list to see available agents.` }],
                     isError: true,
                 };
             }
@@ -157,7 +159,7 @@ export function registerAgentTaskTools(
                 agent: targetAgent,
                 agentGaii: targetGaii,
                 agentName: target_agent,
-                creator: { gaii: agentGaii, sub: agentGaii, owner: callerParsed.owner },
+                creator: { gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii) },
                 // 'queued' is THIS tool's documented default (an agent delegating work means the
                 // target to see it now); the HTTP body defaults to 'draft', which is the owner
                 // drafting a task in the dashboard.
@@ -271,7 +273,7 @@ export function registerAgentTaskTools(
             // Attachments become presigned handles here, authorized for THIS agent on THIS read — the
             // task assignment carries the reference, the read carries the permission.
             const withFiles = await taskWithFileHandles(storage, config, task, {
-                gaii: agentGaii, sub: agentGaii, owner: parseGAII(agentGaii)?.owner,
+                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii),
             });
 
             return {

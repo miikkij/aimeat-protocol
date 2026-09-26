@@ -22,9 +22,10 @@
  *   v1.1.0 -- 2026-06-23 -- deriveWorkspaceEvents now emits a publish event for current content
  *     (`.latest`/bare) that has no `.version.N`, so direct writes (notebook docs pre-fix, agent/import
  *     writes that skip draft→publish) appear in the activity log/heatmap instead of going unnoticed.
+ *   v1.1.1 -- 2026-09-26 -- An event's actor comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { MemoryRecord } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { isMemoryBackedSpace } from './workspace-meta.js';
 
 type ObjectType = { name?: unknown; namespace?: unknown; mode?: unknown; kind?: unknown; backing?: unknown };
@@ -94,7 +95,7 @@ export function deriveWorkspaceEvents(readable: MemoryRecord[], manifest: Record
   const push = (r: MemoryRecord, ns: string, instance: string, action: 'publish' | 'draft', at: string) => {
     const p = parseGaiiLoose(r.ownerGaii);
     events.push({
-      at, actor: p.owner || '', agent: p.agent || null, namespace: ns,
+      at, actor: localAccountName(r.ownerGaii), agent: p.agent || null, namespace: ns,
       type: typeByNs.get(ns) || ns,
       mode: (modeByNs.get(ns) as 'document' | 'records') || 'records',
       instance, action,

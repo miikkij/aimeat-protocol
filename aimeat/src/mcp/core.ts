@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.28.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.28.0 — 2026-09-24 — The eight admin registrations receive the session's scopes, so each
  *     operator tool asks the operator:admin word at call time as well as the account (audit A8-1).
  *   v1.27.0 — 2026-09-16 — aimeat_memory_read shows a credential record redacted (shownMemoryValue).
@@ -119,7 +121,7 @@ import { registerCoreBoardTools } from './core-boards.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
@@ -323,7 +325,7 @@ export function registerCoreTools(
             const lim = typeof limit === 'number' && limit > 0 ? Math.min(limit, 100) : 20;
             const ctx = {
                 caller: {
-                    ownerName: parsed?.owner ?? '',
+                    ownerName: parsed ? localAccountName(agentGaii) : '',
                     sub: agentGaii,
                     gaii: agentGaii,
                     isOwnerSession: false,
@@ -357,7 +359,7 @@ export function registerCoreTools(
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
             // Linked skills (registry refs) — only exposed for same-owner agents.
             let skills: Array<{ ref: string; name: string; description: string }> = [];
-            const callerOwner = parseGAII(agentGaii)?.owner;
+            const callerOwner = localAccountName(agentGaii);
             if (callerOwner && agent.owner === callerOwner) {
                 const links = await getAgentSkillLinks(storage, config, agent.owner, agent.name);
                 skills = links.map(l => ({ ref: l.ref, name: l.name, description: l.description }));
@@ -386,7 +388,7 @@ export function registerCoreTools(
             if (!parsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
-            const agents = await storage.getAgentsByOwner(parsed.owner);
+            const agents = await storage.getAgentsByOwner(localAccountName(agentGaii));
             return structuredResult('aimeat_agents_list', undefined, {
                 agents: agents.map(a => ({
                     gaii: a.gaii,
@@ -423,7 +425,7 @@ export function registerCoreTools(
             const parsedRead = parseGAII(agentGaii);
             let record = await storage.getMemory(agentGaii, key);
             if (!record && owner_scope && parsedRead) {
-                record = await getOwnerScopeMemory(storage, config.nodeId, parsedRead.owner, key);
+                record = await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key);
             }
             if (!record) {
                 // Memory is keyed by the WRITER, so a key an APP saved lives under the owner's GHII
@@ -434,7 +436,7 @@ export function registerCoreTools(
                 // The extra query runs ONLY on the miss path, where the answer was an error anyway.
                 const parsed = parseGAII(agentGaii);
                 const elsewhere = parsed
-                    ? await getOwnerScopeMemory(storage, config.nodeId, parsed.owner, key)
+                    ? await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key)
                     : null;
                 if (elsewhere) {
                     return {
@@ -491,7 +493,7 @@ export function registerCoreTools(
             // rendering the answer as text. Those are this door's business and nobody else's.
             const parsedWrite = parseGAII(agentGaii);
             const target = resolveMcpWriteTarget({
-                agentGaii, ownerName: parsedWrite?.owner ?? null, nodeId: config.nodeId,
+                agentGaii, ownerName: parsedWrite ? localAccountName(agentGaii) : null, nodeId: config.nodeId,
                 scopes: sessionScopes, key, ownerScope: owner_scope === true,
             });
             if ('deny' in target) {
@@ -586,8 +588,8 @@ export function registerCoreTools(
                         }],
                     };
                 }
-                const ownerGhii = `${parsed.owner}@${config.nodeId}`;
-                const agents = await storage.getAgentsByOwner(parsed.owner);
+                const ownerGhii = `${localAccountName(agentGaii)}@${config.nodeId}`;
+                const agents = await storage.getAgentsByOwner(localAccountName(agentGaii));
                 entries = [...await storage.listMemory(ownerGhii, { prefix, visibility, tags })];
                 // Stop accumulating once we exceed the cap — owner-scope can otherwise aggregate
                 // every agent's memory unbounded.

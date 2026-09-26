@@ -21,6 +21,8 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   v1.7.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-24 — The notice to the other party of an exchange is the node's own message, so
  *     it does not count against the sending account's message limit (services/message-send-limit.ts).
  *   v1.6.1 — 2026-09-24 — The scopes travel as the capability service's authority object; an agent
@@ -52,7 +54,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { readEntitlementForCall } from '../services/metered-entitlements.js';
@@ -107,7 +109,7 @@ export function registerExchangeRunTools(
     scopes: string[],
 ): void {
     const agentGaii = getAgentGaii();
-    const owner = parseGaiiLoose(agentGaii).owner;
+    const owner = localAccountName(agentGaii);
     const callerGaii = agentGaii;
 
     const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
@@ -148,7 +150,7 @@ export function registerExchangeRunTools(
         },
         annotationsFor('aimeat_app_tool_invoke'),
         async ({ owner: appOwner, app, tool, input }) => {
-            const ownerName = appOwner.split('@')[0];
+            const ownerName = localAccountName(appOwner);
             const manifestRec = await storage.getMemory(`${ownerName}@${config.nodeId}`, appToolsKey(app));
             if (!manifestRec) {
                 // An app id is a FILENAME and carries its extension; the app's own subdomain does not.

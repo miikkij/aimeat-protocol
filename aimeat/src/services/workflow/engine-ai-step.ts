@@ -28,6 +28,7 @@
  *   v1.4.0 — 2026-09-25 — The step adds up what its model calls cost, as the node recorded each one,
  *     and hands the sum to onPushTerminal whether it ends green or red, for the run's cost cap
  *     (WorkflowDef.maxCostUsd). A call the provider answered is spent even when the step fails.
+ *   v1.4.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -35,6 +36,7 @@ import { completeForOwner } from '../ai-completion.js';
 import { getOwnerScopeMemory } from '../owner-memory.js';
 import { template } from './engine-util.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /**
  * Run a prompt on the owner's own model and land the answer in their namespace.
@@ -69,7 +71,7 @@ export function dispatchAiStep(
     let prompt = action.prompt ? template(action.prompt, run.vars) : '';
     if (action.prompt_key) {
       const key = template(action.prompt_key, run.vars);
-      const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, ownerGhii.split('@')[0], key);
+      const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, localAccountName(ownerGhii), key);
       const val = rec?.value as unknown;
       const fromRecord = typeof val === 'string' ? val : (val && typeof val === 'object' && typeof (val as { prompt?: unknown }).prompt === 'string'
         ? (val as { prompt: string }).prompt : '');
@@ -91,7 +93,7 @@ export function dispatchAiStep(
         // has always been prefix-aware, eval-context.ts), and the assembling step answered
         // confidently from the previous run's data. Green and wrong is the worst shape available.
         const key = (run.keyPrefix ?? '') + template(raw, run.vars);
-        const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, ownerGhii.split('@')[0], key);
+        const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, localAccountName(ownerGhii), key);
         parts.push(rec
           ? `### ${key}\n${typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value, null, 2)}`
           : `### ${key}\n(no such record — do not invent its contents)`);

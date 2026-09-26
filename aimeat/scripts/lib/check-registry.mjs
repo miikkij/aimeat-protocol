@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.9.0 (2026-09-26): check:identity-shortening, an identity is cut to an account name only in utils/gaii.ts.
  *  - 1.8.0 (2026-09-24): check:supply-chain, the CI workflows and the local model files.
  *  - 1.7.0 (2026-09-24): check:shape-tokens, a component sheet reads the theme's shape values.
  *  - 1.6.0 (2026-09-24): check:theme-tokens, theme.css holds tokens only.
@@ -51,6 +52,9 @@ export const FAST_CHECKS = [
     { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
     { script: 'check:trusted-keys', label: 'Server-trusted memory keys are guarded, and each exemption says why' },
+    // From the September 2026 audit's check of the fixes: a visitor from another node is named
+    // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.
+    { script: 'check:identity-shortening', label: 'An identity is cut to an account name only by localAccountName or localAccountOf' },
     { script: 'check:storage-parity', label: 'Owner-scoped tables are in both deletion cascades' },
     { script: 'check:ext-entrypoints', label: 'Extension sandbox entry points use the shared context builder' },
     { script: 'check:shared-impl', label: 'MCP tools call what REST calls' },

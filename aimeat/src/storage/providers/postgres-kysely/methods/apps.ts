@@ -20,6 +20,8 @@
  *   v1.3.0 — 2026-08-29 — updateAppMeta merges `marks`, replaces or withdraws `authorship` and
  *     writes `authorshipLog` (the owner's chrome switches and the named reviewer).
  *   v1.4.0 — 2026-08-29 — updateAppMeta merges `legal` per kind (mergeLegal).
+ *   v1.4.1 — 2026-09-26 — normalizeAppOwnerNames strips only this node's own `@nodeId` suffix, so a
+ *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
@@ -453,14 +455,18 @@ export const appMethods = {
   },
 
   // ── Data hygiene sweeps ──
-  async normalizeAppOwnerNames(this: PostgresKyselyStorage): Promise<number> {
-    // Find rows whose ownerName still carries the `@node` suffix and rewrite each to its bare prefix.
-    // Owner names never contain '@', so the split is unambiguous. Idempotent: a second pass finds nothing.
+  async normalizeAppOwnerNames(this: PostgresKyselyStorage, nodeId: string): Promise<number> {
+    // Find rows whose ownerName still carries THIS node's `@node` suffix and rewrite each to the name
+    // before it. A name of another node (a visitor's own home GHII) stays whole, so it never becomes
+    // the local account that shares its local part, nor joins that account's bucket in
+    // mergeForkedAppBuckets. Idempotent: a second pass finds nothing.
+    const suffix = `@${nodeId}`;
     const rows = await this.db.selectFrom('App').select(['ownerGaii', 'filename', 'versionNumber', 'ownerName']).where('ownerName', 'like', '%@%').execute();
     let count = 0;
     for (const r of rows) {
-      const bare = r.ownerName.split('@')[0];
-      if (!bare || bare === r.ownerName) continue;
+      if (!r.ownerName.endsWith(suffix)) continue;
+      const bare = r.ownerName.slice(0, r.ownerName.length - suffix.length);
+      if (!bare) continue;
       await this.db.updateTable('App').set({ ownerName: bare }).where('ownerGaii', '=', r.ownerGaii).where('filename', '=', r.filename).where('versionNumber', '=', r.versionNumber).execute();
       count++;
     }

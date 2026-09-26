@@ -15,6 +15,8 @@
  * @usage mountSitemapRoutes(router, config, storage);
  * @version-history
  *   v1.0.0 — 2026-08-16 — Extracted from bootstrap.ts (line ceiling), sitemap-index.xml included
+ *   v1.0.1 — 2026-09-26 — The app owner comes from localAccountName (utils/gaii.ts), which keeps an
+ *     identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -24,6 +26,7 @@ import { apexOnly } from './agent-docs.js';
 import { appSeoIndexable } from '../services/app-seo.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** Register `/sitemap.xml` and `/sitemap-index.xml` on the given router. */
 export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -83,7 +86,7 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
         // and the review mode. Four surfaces ask this question and all four must agree, so none of
         // them recomputes it. Its first step is the gated-app rule this line used to be.
         if (!appSeoIndexable(app, config)) continue;
-        const owner = app.ownerGaii.split('@')[0].split('#').pop() ?? '';
+        const owner = localAccountName(app.ownerGaii);
         const sub = subFor.get(`${owner}/${app.filename}`);
         if (!sub) continue;
         sitemaps.push(`https://${sub}.${config.appHost}/sitemap.xml`);

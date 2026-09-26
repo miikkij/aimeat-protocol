@@ -14,9 +14,10 @@
  * @usage import { listByWorkspace, activateEngagement, retireEngagement } from '../services/workspace-engagements.js';
  * @version-history
  *   v1.0.0 — 2026-07-03 — Initial engagement object: activate/retire lifecycle + by-workspace/by-agent reads.
+ *   v1.0.1 — 2026-09-26 — The agent's owner comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 
 /** The stored shape of one engagement (the `value` of the memory record). */
 export interface WorkspaceEngagement {
@@ -54,7 +55,7 @@ export function wsPrefix(orgId: string, ws: string): string {
 /** Resolve owner + local name from a full agent GAII (or a bare `owner/name` we already split). */
 function ownerNameOf(agentGaii: string, fallbackOwner: string): { owner: string; agentName: string } {
   const p = parseGaiiLoose(agentGaii);
-  return { owner: p.owner || fallbackOwner, agentName: p.agent || agentGaii };
+  return { owner: agentGaii.includes('@') ? localAccountName(agentGaii) : fallbackOwner, agentName: p.agent || agentGaii };
 }
 
 /** Read one engagement by its coordinates, or null. */

@@ -28,10 +28,12 @@
  *   v1.0.0 — 2026-09-06 — Extracted from services/contacts.ts so the send path can ask the same
  *     question. aimeat_dm_send answered `delivered`, with a timestamp and a readable thread, for
  *     `<name>#<owner>@<node>` where the owner existed and the agent never had.
+ *   v1.0.1 — 2026-09-26 — The account a local GHII names comes from localAccountName, the one cut of an
+ *     identity to an account name (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose, isValidGAII, isValidGEAI, isValidGHII } from '../utils/gaii.js';
+import { parseGaiiLoose, isValidGAII, isValidGEAI, isValidGHII, localAccountName } from '../utils/gaii.js';
 
 /** The four things an address can be. `mail` is a person this node has no identity for. */
 export type IdentityKind = 'geai' | 'gaii' | 'ghii' | 'mail';
@@ -81,9 +83,9 @@ export async function localIdentityExists(
   storage: Storage, config: AimeatConfig, id: string,
 ): Promise<boolean | null> {
   const kind = identityKind(id);
-  const { owner, node } = parseGaiiLoose(id);
+  const { node } = parseGaiiLoose(id);
   if (node !== config.nodeId) return null;          // not ours to judge
-  if (kind === 'ghii') return !!(await storage.getOwner(owner));
+  if (kind === 'ghii') return !!(await storage.getOwner(localAccountName(id)));
   if (kind === 'gaii') return !!(await storage.getAgent(id));
   if (kind === 'geai') return !!(await storage.getEcosystemApp(id));
   return null;

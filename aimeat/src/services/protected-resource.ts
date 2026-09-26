@@ -25,6 +25,7 @@
  *   import { buildProtectedResourceMetadata } from '../services/protected-resource.js';
  *   res.json(await buildProtectedResourceMetadata(req, config, storage));
  * @version-history
+ *   v1.1.1 — 2026-09-26 — appOfSubdomain takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-04 — The apex names the ORIGIN at the bare well-known URL, and `/v1/mcp` gets
  *     its own document at the §3.1 address the 401 challenge now points at. Same defect as v1.0.0's,
  *     left in the branch that fix started from; reported against production by isitagentready, which
@@ -35,6 +36,7 @@
 import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
+import { localAccountName } from '../utils/gaii.js';
 import { cached, TTL } from './cache.js';
 
 /** The document served at `/.well-known/oauth-protected-resource` (RFC 9728 + AIMEAT extension). */
@@ -131,7 +133,7 @@ async function appOfSubdomain(storage: Storage, subdomain: string): Promise<AppR
   if (slash <= 0 || slash === site.target.length - 1) return null;
   const owner = site.target.slice(0, slash);
   const filename = site.target.slice(slash + 1);
-  const bare = owner.includes('@') ? owner.split('@')[0] : owner;
+  const bare = localAccountName(owner);
   return storage.getAppByOwnerName(bare, filename);
 }
 

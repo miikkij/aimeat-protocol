@@ -21,12 +21,14 @@
  * @version-history
  *   v1.0.0 -- 2026-08-25 -- Extracted so cancel and update share one tolerant lookup (a listed
  *     invitation on the VIP organism could not be withdrawn: it was stored as `kkk@node`).
+ *   v1.0.1 -- 2026-09-26 -- membershipOwner takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage, OrganismMembershipRecord } from '../storage/interface.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** The bare owner behind a stored membership key: `alice`, `alice@node`, `agent#alice@node`. */
 export function membershipOwner(ghii: string): string {
-  return (ghii.includes('#') ? ghii.split('#')[1] : ghii).split('@')[0];
+  return localAccountName(ghii);
 }
 
 /**

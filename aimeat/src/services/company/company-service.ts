@@ -21,6 +21,7 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — setFrontPage takes both account names from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-08 — setFrontPage learns kind 'portfolio' and refuses it (409
  *     NO_PORTFOLIO) until a page exists, so the setting never outruns the document.
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
@@ -30,6 +31,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { CompanyRecord, NewCompanyInput, CompanyFrontPage } from '../../models/company-schemas.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../../routes/subdomains.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 export class CompanyError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {
@@ -165,7 +167,7 @@ export async function updateCompany(storage: Storage, ownerGhii: string, id: str
  */
 export async function setFrontPage(storage: Storage, ownerGhii: string, id: string, front: CompanyFrontPage): Promise<CompanyRecord> {
   const company = await requireOwnCompany(storage, ownerGhii, id);
-  const ownerBare = ownerGhii.split('@')[0];
+  const ownerBare = localAccountName(ownerGhii);
 
   if (front.kind === 'app') {
     const target = (front.target ?? '').trim();
@@ -173,7 +175,7 @@ export async function setFrontPage(storage: Storage, ownerGhii: string, id: stri
     if (slash <= 0 || slash === target.length - 1) {
       throw new CompanyError('INVALID_FRONT_PAGE', 400, 'An app front page is "owner/file.html"');
     }
-    const targetOwner = target.slice(0, slash).split('@')[0];
+    const targetOwner = localAccountName(target.slice(0, slash));
     const filename = target.slice(slash + 1);
     if (targetOwner !== ownerBare) {
       throw new CompanyError('FRONT_PAGE_NOT_YOURS', 403, 'The front page must be an app you published');

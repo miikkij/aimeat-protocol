@@ -12,6 +12,7 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   v2.1.2 — 2026-09-26 — readProgramMap takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v2.1.1 — 2026-09-24 — readProgramMap strips the stamp's `gap` for everyone but the owner, as it
  *     already did `findings` (A6-10). The REST read and aimeat_datamap_get both come through here.
  *   v2.1.0 — 2026-09-14 — putProgramMap: validate, write, restamp, with no opinion about who may do
@@ -24,6 +25,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { MemoryWriteCaller } from '../memory-write.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor } from './data-map-check.js';
 import { DATA_MAP_SPEC, type DataMap, type DataMapStamp } from './data-map-types.js';
@@ -71,7 +73,7 @@ export async function readProgramMap(
   if (!ref) {
     return { refusal: { status: 400, code: 'INVALID_INPUT', message: 'Name the app as "owner/filename.html".' } };
   }
-  const bare = ref.owner.includes('@') ? ref.owner.split('@')[0] : ref.owner;
+  const bare = localAccountName(ref.owner);
   const record = await storage.getAppByOwnerName(bare, ref.filename);
   if (!record) {
     return { refusal: { status: 404, code: 'NOT_FOUND', message: `No app "${appRef}" on this node.` } };

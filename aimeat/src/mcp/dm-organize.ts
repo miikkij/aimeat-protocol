@@ -12,6 +12,8 @@
  * @usage import { registerDmOrganizeTools } from './dm-organize.js';
  * @version-history
  *   v1.0.0 -- 2026-09-13 -- Initial, with the Messages list's sections, rules and archive.
+ *   v1.0.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,7 +22,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { ownerMailbox } from '../services/direct-message-delete.js';
 import { CONVERSATION_ID, InboxOrganizePatchSchema, InboxRuleInputSchema } from '../models/inbox-organize-schemas.js';
 import { archiveConversations, organizeView, readInboxOrganizeStrict, updateInboxOrganize } from '../services/inbox-organize/record.js';
@@ -36,7 +38,7 @@ export function registerDmOrganizeTools(
     getAgentGaii: () => string,
 ): void {
     /** The mailbox is the session agent's OWN owner's, derived here and never taken from arguments. */
-    const mailbox = () => ownerMailbox({ owner: parseGaiiLoose(getAgentGaii()).owner }, config.nodeId);
+    const mailbox = () => ownerMailbox({ owner: localAccountName(getAgentGaii()) }, config.nodeId);
 
     mcp.tool(
         'aimeat_dm_archive_as_owner',

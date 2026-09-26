@@ -22,11 +22,13 @@
  * @usage const out = await sendTurn(storage, config, req.auth!, req.body);
  * @version-history
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
+ *   v1.0.1 — 2026-09-26 — resolveRecipient names the recipient's account with localAccountName, so a
+ *     principal of another node that shares the owner's name is cross-owner (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentV2MessageRecord, AgentV2PushConfigRecord } from '../storage/interface.js';
-import { resolveIdentity, parseGaiiLoose, isGEAI } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName, isGEAI } from '../utils/gaii.js';
 import { validateMessageInput, validatePushConfigInput, publicPushConfig } from '../models/agent-v2-message.js';
 import { sendAgentV2Message } from './agent-v2-messaging.js';
 
@@ -64,11 +66,13 @@ function isOwnerSession(auth: Principal): boolean {
 export async function resolveRecipient(
   storage: Storage, nodeId: string, owner: string, principal: string,
 ): Promise<OpResult<string>> {
-  const parsed = parseGaiiLoose(principal);
-  if (!parsed.owner) {
+  // The account comes from localAccountName, which keeps an identity of another node whole, so a
+  // principal elsewhere that shares the owner's name is answered as cross-owner.
+  const account = principal.includes('@') ? localAccountName(principal) : '';
+  if (!account) {
     return { ok: false, status: 400, code: 'INVALID_RECIPIENT', message: `${principal} is not an identity this node can address.` };
   }
-  if (parsed.owner !== owner) {
+  if (account !== owner) {
     return {
       ok: false, status: 403, code: 'ACCESS_DENIED',
       message: 'This road carries turns between principals of one account. To reach another person use a direct message.',

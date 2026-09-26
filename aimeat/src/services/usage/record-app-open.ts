@@ -20,12 +20,13 @@
  * @usage
  *   recordAppOpen({ appOwnerGaii: app.ownerGaii, filename: app.filename, viewer: req.auth?.sub });
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The app author's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-18 — `anonymous`: the node's synthetic anonymous principal is nobody, and an
  *     open it carries is an anonymous open. It had been counted as a signed-in one.
  *   v1.0.0 — 2026-08-14 — Initial: app opens become a measured, time-dimensioned surface.
  */
 import { recordUsageCall } from './usage-buffer.js';
-import { ownerGhiiOf } from '../../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import type { UsageActorKind } from '../../storage/interface.js';
 
 /** `undefined`, `''` and the literal 'anon' all mean nobody signed in. */
@@ -63,8 +64,8 @@ export function recordAppOpen(args: {
     surface: 'app',
     // The app id everywhere else in the node: `owner/filename`. Same string in the coordinate and
     // in appId, so a report can group by either without knowing which surface produced the row.
-    coordinate: `${ownerGhiiOf(args.appOwnerGaii).split('@')[0]}/${args.filename}`,
-    appId: `${ownerGhiiOf(args.appOwnerGaii).split('@')[0]}/${args.filename}`,
+    coordinate: `${localAccountName(args.appOwnerGaii)}/${args.filename}`,
+    appId: `${localAccountName(args.appOwnerGaii)}/${args.filename}`,
     counterpartyGhii: ownerGhiiOf(args.appOwnerGaii),
     outcome: 'ok',
   });

@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.25.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.25.0 -- 2026-09-25 -- A member's change to a workspace: aimeat_workspace_space_add,
  *     aimeat_workspace_sections_set and aimeat_workspace_suggestions (./workspace-member-changes.ts).
  *     _update takes `member_changes`, the workspace's rule for them. _object_delete takes the deleted
@@ -150,7 +152,7 @@ import { registerWorkspaceCreateTool } from './workspace-create.js';
 import { registerWorkspaceRowTools } from './workspace-rows.js';
 import { registerWorkspaceDocumentTools } from './workspace-documents.js';
 import { archivedRefusal } from '../services/workspace-write-guards.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
@@ -189,7 +191,7 @@ export function registerWorkspaceTools(
     const H = createOrganismHelpers(config, storage);
     const agentGaii = getAgentGaii();
     const parsed = parseGAII(agentGaii);
-    const ownerName = parsed ? parsed.owner : agentGaii;
+    const ownerName = localAccountName(agentGaii);
     const ownerGhii = `${ownerName}@${config.nodeId}`;
     // The identity that AUTHORS content: an agent's own GAII when an agent is calling (so the activity
     // feed + participants attribute the work to the AGENT, not its owner — the MCP-serve path used to
@@ -257,7 +259,7 @@ export function registerWorkspaceTools(
         { key, value, owner, prev, aiProvenanceId, principal: agentGaii }).then(() => undefined);
 
     // ── workspace-access helpers (shared with the GET/POST workspace-access routes) ──
-    const bareOwner = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
+    const bareOwner = (gaii: string) => localAccountName(gaii);
     /** Find a workspace's registry entry across every member's registry. */
     const findWsEntry = async (orgId: string, ws: string): Promise<{ createdBy: string; ownerGaii: string; name?: string } | null> => {
         const regKey = `organism.${orgId}.meta.workspaces`;

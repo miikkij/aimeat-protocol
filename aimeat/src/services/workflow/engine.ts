@@ -70,6 +70,7 @@
  *   v1.11.0 — 2026-09-25 — A run the trigger starts answers to whoever saved the workflow: gone, or
  *     short of a word its steps need, and it does not start; startRun answers `refused` with the
  *     refusal's record (trigger-authority.ts). A real start closes a refusal still open for it.
+ *   v1.11.1 — 2026-09-26 — sweepRun takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -79,6 +80,7 @@ import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { buildEvalCtx } from './eval-context.js';
 import { evalSignal, recordProgress } from './engine-observe.js';
 import { getWorkflow, validateWorkflow, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
@@ -448,7 +450,7 @@ export class WorkflowEngine {
       if (r.status !== 'running' && r.status !== 'waiting-step') return;
       const now = Date.now();
       const nowIso = new Date().toISOString();
-      const ownerName = ownerGhii.split('@')[0];
+      const ownerName = localAccountName(ownerGhii);
       const resolved = this.resolvedMap(r);
       const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, r);
       let changed = false;

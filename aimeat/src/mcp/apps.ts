@@ -11,9 +11,11 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.17.3 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.17.2 — 2026-09-26 — aimeat_app_get shows another owner's app through publicAppManifest
- *     (services/app-public-manifest.ts), so `dataMap.gap` and the reviewer log come off as well as the
- *     two notes this door stripped by hand (secaudit 2026-09, A6-10).
+ *     (services/app-public-manifest.ts), the one function every door that shows a manifest to
+ *     somebody other than its owner calls (secaudit 2026-09, A6-10).
  *   v1.17.1 — 2026-09-18 — `url` on aimeat_app_list and aimeat_app_get is filled on a node without
  *     an app origin as well (routes/apps/helpers.ts v1.3.0). Comments here said it was absent.
  *   v1.17.0 — 2026-09-13 — aimeat_app_publish and aimeat_app_draft_publish return
@@ -91,7 +93,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { generateDraftToken } from '../services/draft-token.js';
@@ -645,7 +647,7 @@ export function registerAppsTools(
             // Some notes on the manifest are the OWNER's own (the publish checks' findings, the
             // build-spec state, the reviewer log), and this tool reads any owner's app. They come off
             // in one place for every door that shows a manifest to somebody else.
-            const isOwn = parseGAII(getAgentGaii())?.owner === app.ownerName;
+            const isOwn = localAccountName(getAgentGaii()) === app.ownerName;
             const manifest = isOwn ? app.manifest : publicAppManifest(app.manifest);
 
             return {

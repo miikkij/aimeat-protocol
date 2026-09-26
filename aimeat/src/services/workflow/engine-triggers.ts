@@ -16,10 +16,12 @@
  *   v1.0.0 — 2026-09-09 — Moved out of engine.ts as it stood after the `parallel` change: the
  *     loops no longer pre-check overlap themselves, because they cannot see the definition and a
  *     `parallel` workflow may overlap; startRun holds the guard with the definition in hand.
+ *   v1.0.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { globToRegExp } from './signal-eval.js';
 
 /** A registered `trigger.kind:'event'` entry, as lifecycle.ts indexes it. */
@@ -90,7 +92,7 @@ export async function fireEcosystemEvent(
     ecoMatchPasses(t.match, data));
   if (hits.length === 0) return;
   for (const t of hits) {
-    deps.startRun(ownerGhii, ownerGhii.split('@')[0], t.workflowId, { mode: 'full-live' })
+    deps.startRun(ownerGhii, localAccountName(ownerGhii), t.workflowId, { mode: 'full-live' })
       .catch(err => logger.error('ecosystem-event-triggered workflow run failed', { workflowId: t.workflowId, error: String(err) }));
   }
 }
@@ -116,7 +118,7 @@ async function fireEventTriggers(
   const hits = triggers.filter(t => t.on === on && t.ownerGhii === ownerGhii && matches(t));
   if (hits.length === 0) return;
   for (const t of hits) {
-    deps.startRun(ownerGhii, ownerGhii.split('@')[0], t.workflowId, { mode: 'full-live' })
+    deps.startRun(ownerGhii, localAccountName(ownerGhii), t.workflowId, { mode: 'full-live' })
       .catch(err => logger.error('event-triggered workflow run failed', { workflowId: t.workflowId, error: String(err) }));
   }
 }

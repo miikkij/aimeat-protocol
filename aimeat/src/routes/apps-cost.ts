@@ -19,6 +19,8 @@
  *   app.use(appsCostRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-07-20 — Initial per-app cost/contract surface (EXCHANGE G3): entitlements + budgets + rake.
+ *   v1.0.1 — 2026-09-26 — ownerOf is localAccountName (utils/gaii.ts), which keeps an identity of
+ *     another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -26,14 +28,14 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import { listEntitlementsByApp, type MeteredEntitlement } from '../services/metered-entitlements.js';
 
 /** Owner (bare name) behind any principal form in a `consumerGaii` (owner GHII / GAII / bare). */
 function ownerOf(gaii: string): string {
-  return gaii.split('@')[0].split('#').pop() ?? gaii;
+  return localAccountName(gaii);
 }
 
 /** Shape one entitlement for the surface: contract terms + live consumption + the platform rake. */

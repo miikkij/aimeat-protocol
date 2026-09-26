@@ -12,6 +12,8 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.6.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-06 — Review items 2.3 and 2.4. The signed GET is bounded in time and spent on
  *     first use, and it refuses on a deactivated account. Three omissions stop disabling their own
  *     checks: no registered redirect_uris means no redirect_uri may be used (it used to mean any
@@ -41,7 +43,7 @@ import { credentialRevoked, isOwnerPrincipal } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
 import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
 import { verify } from '../auth/keypair.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
 import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
@@ -213,7 +215,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             // BR-04, and for the reason the twin door states: the agent acts in a person's name and
             // that person is gone from this node's point of view. After the signature check, so a
             // stranger learns nothing about which accounts exist, and before a credential is minted.
-            const agentOwner = await storage.getOwner(parsed.owner);
+            const agentOwner = await storage.getOwner(localAccountName(gaii));
             if (agentOwner?.disabledAt) {
                 res.status(403).json({ error: 'access_denied', error_description: 'The account this agent acts for has been deactivated' });
                 return;
@@ -226,7 +228,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 clientId,
                 clientName: client?.clientName ?? viaUrl!.clientName,
                 gaii,
-                owner: parsed.owner,
+                owner: localAccountName(gaii),
                 roles: ['agent'],
                 redirectUri: redirectUri ?? allowedRedirects[0] ?? '',
                 codeChallenge,
@@ -376,7 +378,6 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         }
 
         // Issue authorization code
-        const parsed = parseGAII(gaii);
         const code = randomBytes(32).toString('hex');
         const resolvedClientName = clientNameBody || client?.clientName || viaUrl?.clientName || client_id;
         authCodes.set(code, {
@@ -384,7 +385,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             clientId: client_id,
             clientName: resolvedClientName,
             gaii,
-            owner: parsed?.owner || agent.owner,
+            owner: localAccountName(gaii) || agent.owner,
             roles: ['agent'],
             redirectUri: finalRedirect ?? '',
             codeChallenge: code_challenge,
@@ -396,7 +397,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         await storage.createOAuthApproval({
             clientId: client_id,
             gaii,
-            owner: parsed?.owner || agent.owner,
+            owner: localAccountName(gaii) || agent.owner,
             scope: 'aimeat:full',
             approvedAt: new Date().toISOString(),
         });

@@ -21,6 +21,8 @@
  * @usage import { registerAppVisitorsTools } from './app-visitors.js';
  * @version-history
  *   v1.0.0 — 2026-09-18 — Initial: aimeat_app_visitors, aimeat_app_visitors_measure.
+ *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -28,7 +30,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { SIGNAL_GEO_LEVELS } from '../models/signal-schemas.js';
 import {
@@ -51,7 +53,7 @@ export function registerAppVisitorsTools(
   getAgentGaii: () => string,
 ): void {
   /** The caller's own account, as the bare owner name an app id starts with. */
-  const ownerName = (): string => ownerGhiiOf(getAgentGaii()).split('@')[0];
+  const ownerName = (): string => localAccountName(getAgentGaii());
 
   mcp.tool(
     'aimeat_app_visitors',

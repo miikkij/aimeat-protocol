@@ -20,6 +20,9 @@
  *   POST /v1/apps/:owner/:filename/ui/restore  · bring one version back (re-validated)
  * @usage app.use(appUiRouter(config, storage)) from mountRoutes.
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The app owner's name comes from localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-20 — GET …/ui takes ?catalogue=full|index|none and ?detail=<names>. The
  *     whole 89 kB catalogue rode along on every read: past one tool result for an AI, and
  *     downloaded on every open of every mosaic app to read a few hundred bytes of layout.
@@ -30,7 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { buildUiCatalogue } from '../services/app-ui/catalogue.js';
 import { buildUiCatalogueView, catalogueMode } from '../services/app-ui/catalogue-index.js';
@@ -53,7 +56,7 @@ export function appUiRouter(config: AimeatConfig, storage: Storage): Router {
   /** The app row, or a worded 404 the caller can act on. */
   async function appOf(req: Request, res: Response): Promise<{ ownerGaii: string; filename: string } | null> {
     const ownerParam = req.params.owner as string;
-    const ownerName = ownerParam.includes('@') ? ownerParam.split('@')[0]! : ownerParam;
+    const ownerName = localAccountName(ownerParam);
     const filename = req.params.filename as string;
     const app = await storage.getAppByOwnerName(ownerName, filename);
     if (!app) {
@@ -69,7 +72,7 @@ export function appUiRouter(config: AimeatConfig, storage: Storage): Router {
     const caller = resolveIdentity(req.auth!, config.nodeId);
     if (ownerGhiiOf(caller) === appOwnerGaii) return true;
     res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-      `This app's layout belongs to ${appOwnerGaii.split('@')[0]}. Only that owner (and the agents acting for them) may change it.`));
+      `This app's layout belongs to ${localAccountName(appOwnerGaii)}. Only that owner (and the agents acting for them) may change it.`));
     return false;
   }
 

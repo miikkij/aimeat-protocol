@@ -24,6 +24,7 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.2.2 — 2026-09-26 — ownerNameOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.2.1 — 2026-09-24 — The scope travels as the capability service's authority object; a purchase
  *     is never the owner in person.
  *   v1.2.0 — 2026-09-24 — The invoke hands the capability service mcp:use, because the settled
@@ -35,7 +36,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { buildGEAI, appSlug } from '../utils/gaii.js';
+import { buildGEAI, appSlug, localAccountName } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, applyLockedInput } from '../models/app-tool-schemas.js';
 import { authoriseMeteredCall } from './metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -46,7 +47,7 @@ import { logger } from '../utils/logger.js';
  * capabilities carry `ext.installedBy`, which is a bare name; ones registered through the HTTP door
  * carry a full GHII; either can be an agent or an ecosystem form. All four collapse to the human.
  */
-const ownerNameOf = (principal: string): string => principal.split('@')[0].split('#').pop() ?? principal;
+const ownerNameOf = (principal: string): string => localAccountName(principal);
 
 /** What an extension's purchase produced — or why it could not be made. */
 export interface ExtensionPurchaseResult {

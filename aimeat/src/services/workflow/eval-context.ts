@@ -17,12 +17,16 @@
  *     alone — agent-produced keys live in agent keyspaces, so cross-agent signals falsely counted 0.
  *   v1.2.0 — 2026-09-24 — A signal reads a record as the memory doors show it (shownMemoryValue), so
  *     a credential record reads as { configured: true } and neither the run nor the llm judge holds it.
+ *   v1.3.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-26 — The llm judge answers to the run's cost cap: what a call cost is kept on
  *     the run (`signalCostUsd`), and past maxCostUsd the judge is not asked and the leaf passes
  *     (secaudit 2026-09, A6-11).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { completeForOwner } from '../ai-completion.js';
 import { validateValueAgainstSchema } from '../schema-validator.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
@@ -65,7 +69,7 @@ function makeLlmJudge(storage: Storage, config: AimeatConfig, ownerGhii: string,
  */
 export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: string, run: WorkflowRun): SignalEvalCtx {
   const prefix = run.keyPrefix ?? '';
-  const ownerName = ownerGhii.split('@')[0];
+  const ownerName = localAccountName(ownerGhii);
   const llmEnabled = !!run.defSnapshot.llm?.approved;
   return {
     // OWNER-SCOPE reads: pipeline agents write their deliverables into their OWN (GAII) keyspaces, so

@@ -30,9 +30,11 @@
  *   const pinned = await getInterfaceVersion(storage, providerGhii, appId, tool, ent.surface.ifaceVersion);
  * @version-history
  *   v1.0.0 — 2026-07-21 — Initial pinned-interface versioning (append-only snapshots + latest pointer + freeze).
+ *   v1.0.1 — 2026-09-26 — The provider's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { createHash } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** One frozen, content-addressed version of a sellable app-tool interface — the integration contract. */
 export interface AppToolInterface {
@@ -55,7 +57,7 @@ export interface InterfaceDef {
   binding: string | null;
 }
 
-const ownerNameOf = (providerGhii: string): string => providerGhii.split('@')[0].split('#').pop() ?? providerGhii;
+const ownerNameOf = (providerGhii: string): string => localAccountName(providerGhii);
 
 /** Stable, prefix-scannable key base for all versions of one (provider, app, tool). Hashed because appId
  *  carries dots (`.html`) and tool names carry `.`/`-`, which would make a dotted key ambiguous to scan. */

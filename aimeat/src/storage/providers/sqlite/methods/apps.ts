@@ -16,6 +16,8 @@
  *   v1.5.0 — 2026-08-29 — updateAppMeta merges `legal` per kind (mergeLegal).
  *   v1.6.0 — 2026-09-09 — deleteAppGrant and getConfigValue deleted: no caller.
  *   v1.7.0 — 2026-09-26 — app_grants.ownerAddedScopes: the words the owner added by hand, a JSON list.
+ *   v1.8.1 — 2026-09-26 — normalizeAppOwnerNames strips only this node's own `@nodeId` suffix, so a
+ *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
  *   v1.8.0 — 2026-09-26 — revokeTokenIfAbsent: INSERT OR IGNORE, true when this call filed the hash
  *     (the one-time assertion spend, secaudit 2026-09 N5).
  */
@@ -472,13 +474,14 @@ export const appsMethods = {
     };
   },
 
-  async normalizeAppOwnerNames(this: SqliteStorage): Promise<number> {
-    // Strip the `@node` suffix from any ownerName stored as a full GHII. Owner
-    // names never contain '@', so `instr` finds only the GHII separator.
+  async normalizeAppOwnerNames(this: SqliteStorage, nodeId: string): Promise<number> {
+    // Strip THIS node's `@node` suffix from any ownerName stored as a full GHII of this node. A name of
+    // another node (a visitor's own home GHII) stays whole, so it never becomes the local account that
+    // shares its local part, nor joins that account's bucket in mergeForkedAppBuckets.
     const result = this.db.prepare(
-      `UPDATE apps SET ownerName = substr(ownerName, 1, instr(ownerName, '@') - 1)
-       WHERE ownerName LIKE '%@%'`
-    ).run();
+      `UPDATE apps SET ownerName = substr(ownerName, 1, length(ownerName) - length(@suffix))
+       WHERE length(ownerName) > length(@suffix) AND substr(ownerName, -length(@suffix)) = @suffix`
+    ).run({ suffix: `@${nodeId}` });
     return result.changes;
   },
 

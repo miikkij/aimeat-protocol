@@ -14,9 +14,12 @@
  *     a skip with the reason, not a write naming the other run as if this job had started it.
  *   v1.3.0 — 2026-09-25 — A workflow job whose start was refused (the saver no longer holds what the
  *     steps need) records a skip with the refusal's reason.
+ *   v1.4.1 — 2026-09-26 — The workflow and eco-capability jobs take the owner's account name from
+ *     localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never
+ *     names the local namesake (secaudit 2026-09, F-1).
  *   v1.4.0 — 2026-09-26 — An `ai` job whose input or output key names a record the node keeps for
  *     itself fails before anything is read, sent or written (services/ai-job-keys.ts). The create
- *     and edit doors refuse it; this covers schedules stored before they did (secaudit 2026-09: A6-1,
+ *     and edit doors refuse it, and this covers schedules stored earlier (secaudit 2026-09: A6-1,
  *     573704db10ed).
  */
 import type { AimeatConfig } from '../config.js';
@@ -26,7 +29,7 @@ import type { JobRunResult } from './scheduler.js';
 import { completeForOwner } from './ai-completion.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { parseGaiiLoose, buildGEAI, isSameOwner } from '../utils/gaii.js';
+import { buildGEAI, isSameOwner, localAccountName } from '../utils/gaii.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
 
 /**
@@ -125,7 +128,7 @@ export async function runWorkflowJob(job: ScheduledJobRecord): Promise<JobRunRes
   if (!owner || !workflowId) throw new Error(`workflow job "${job.id}" missing ownerScope/workflowId`);
   const engine = getActiveWorkflowEngine();
   if (!engine) return { reads: [], writes: [], skipped: true, skipReason: 'workflow engine not started' };
-  const result = await engine.startRun(owner, owner.split('@')[0], workflowId, { mode: 'full-live' });
+  const result = await engine.startRun(owner, localAccountName(owner), workflowId, { mode: 'full-live' });
   if ('error' in result) throw new Error(`workflow run failed to start: ${result.error.join('; ')}`);
   // Refused, not failed: whoever saved the workflow no longer holds what its steps need, the refusal
   // is on the workflow's run list, and the owner was told. Nothing to retry until they act.
@@ -153,7 +156,7 @@ export async function runEcoCapabilityJob(config: AimeatConfig, job: ScheduledJo
     throw new Error(`eco-capability job "${job.id}" missing app/capability_id in input`);
   }
 
-  const ownerName = parseGaiiLoose(owner).owner;
+  const ownerName = localAccountName(owner);
   const geai = buildGEAI(app, ownerName, config.nodeId);
   const caller = `${ownerName}@${config.nodeId}`;
 

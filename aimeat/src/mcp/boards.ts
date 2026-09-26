@@ -35,13 +35,15 @@
  *     setting the rules of another owner's board, the public-board ceiling) is asked of the agent
  *     through services/operator-principal.ts, so it takes operator:admin. It was read off the owner
  *     record, so every agent of an operator holding social:write carried it.
+ *   v1.7.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -419,8 +421,8 @@ export function registerBoardsTools(
             // two doors answer it differently on purpose — PATCH /v1/boards/:id/members demands an
             // owner session and rejects every agent session, while here an agent holding
             // `social:members` acts for its owner, which is what makes an agent a first-class user.
-            const agentOwner = parseGaiiLoose(agentGaii).owner;
-            const boardOwner = parseGaiiLoose(board.ownerGaii).owner;
+            const agentOwner = localAccountName(agentGaii);
+            const boardOwner = localAccountName(board.ownerGaii);
             if (agentOwner !== boardOwner) {
                 return { content: [{ type: 'text' as const, text: 'Only the board owner can manage members' }], isError: true };
             }

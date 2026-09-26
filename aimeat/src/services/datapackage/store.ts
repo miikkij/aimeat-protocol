@@ -28,6 +28,7 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   v1.0.2 -- 2026-09-26 -- The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.1 -- 2026-09-05 -- Notifies MCP through mcp/resource-events.ts, the leaf, rather than
  *            mcp/index.ts, which assembles the registry that imports this store back (a cycle the
  *            dependency cruiser refused once ai-jobs' on_done reached here through the extension road).
@@ -40,6 +41,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/resource
 import { provenanceForWrite, type DeclaredProvenance } from '../ai-provenance.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
 import {
     type Descriptor, type DescriptorResource, type LatestPointer, type PublishInput, type TableSchema,
     bare, bytesHash, contentHashOf, descriptorKey, latestKey, packageId, packageKeyRoot,
@@ -82,7 +84,7 @@ export async function publishPackage(
     deps: StoreDeps, ownerGhii: string, input: PublishInput, producedBy: ProducedBy,
 ): Promise<PublishResult> {
     const { storage, config } = deps;
-    const ownerName = ownerGhii.split('@')[0];
+    const ownerName = localAccountName(ownerGhii);
 
     const nameError = validateName(input.name);
     if (nameError) return { ok: false, code: 'INVALID_INPUT', message: nameError, issues: [] };
@@ -389,7 +391,7 @@ async function writeLatest(
     deps: StoreDeps, ownerGhii: string, name: string, contentHash: string, descriptorUrl: string, at: string,
 ): Promise<void> {
     const pointer: LatestPointer = {
-        packageId: packageId(ownerGhii.split('@')[0], name),
+        packageId: packageId(localAccountName(ownerGhii), name),
         name, contentHash, descriptorUrl, updatedAt: at,
     };
     await writeStorageFile({ storage: deps.storage, config: deps.config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
@@ -416,7 +418,7 @@ export async function recordFailure(
         pointer = JSON.parse(existing.data.toString('utf8')) as LatestPointer;
     } else {
         pointer = {
-            packageId: packageId(ownerGhii.split('@')[0], name),
+            packageId: packageId(localAccountName(ownerGhii), name),
             name, contentHash: '', descriptorUrl: '', updatedAt: new Date().toISOString(),
         };
     }

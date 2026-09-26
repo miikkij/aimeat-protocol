@@ -32,9 +32,11 @@
  *                         node refused before it started. See services/extension-schedules.ts, which
  *                         also backfills the jobs stored before the stamp existed. The refusal names
  *                         the repair rather than only the missing field.
+ *   v1.3.2 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
+import { localAccountName } from '../utils/gaii.js';
 import { runExtensionActionAsSystem } from './extension-system-run.js';
 import type { EmailService } from './email.js';
 
@@ -59,7 +61,7 @@ export async function runExtensionJob(
   // fence compares bare names, storage is addressed by GHII. Falling back to the extension record's
   // own installer would make the fence compare a value against itself, so it is not done.
   const ownerScope = job.ownerScope ?? '';
-  const ownerName = ownerScope.split('@')[0];
+  const ownerName = localAccountName(ownerScope);
   if (!ownerName) {
     throw new Error(`Extension job "${job.id}" has no owner scope — reinstall or reactivate extension "${job.extensionName}" to re-register it`);
   }

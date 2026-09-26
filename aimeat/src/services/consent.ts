@@ -20,11 +20,14 @@
  *     buffer (batched off the request path) instead of a synchronous per-read DB write.
  *   v1.3.0 -- 2026-07-16 -- organism-grant resolution reads the accessor's memberships ONCE
  *     (listMembershipsByGhii) instead of getMembership per org grant (Phase 3).
+ *   v1.3.1 -- 2026-09-26 -- The same-owner, group-owner and organism-member tests name accounts with
+ *     localAccountName / localAccountOf, so an accessor from another node is never the local
+ *     account that shares its name (secaudit 2026-09, A3-1).
  */
 import { v4 as uuidv4 } from 'uuid';
 import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
 import { globMatchSimple, consentMatchPattern } from '../storage/pattern-utils.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName, localAccountOf } from '../utils/gaii.js';
 import { bufferConsentAudit } from './consent-audit-buffer.js';
 import { logger } from '../utils/logger.js';
 
@@ -110,11 +113,12 @@ export async function checkConsentForRead(
     return { allowed: true, reason: 'owner_access' };
   }
 
-  // Owner-visibility: check if same owner (different agent of same owner)
+  // Owner-visibility: check if same owner (different agent of same owner). The account names come
+  // from localAccountName, which keeps an identity of another node whole: a principal of another
+  // node that shares the owner's name is a different person, and is never the same owner.
   if (visibility === 'owner') {
-    // Check if both GAIIs belong to the same owner
-    const ownerPart = ownerGaii.includes('#') ? ownerGaii.split('#')[1]?.split('@')[0] : ownerGaii.split('@')[0];
-    const accessorPart = accessorGaii.includes('#') ? accessorGaii.split('#')[1]?.split('@')[0] : accessorGaii.split('@')[0];
+    const ownerPart = localAccountName(ownerGaii);
+    const accessorPart = localAccountName(accessorGaii);
     if (ownerPart && accessorPart && ownerPart === accessorPart) {
       return { allowed: true, reason: 'same_owner' };
     }
@@ -131,10 +135,10 @@ export async function checkConsentForRead(
       return { allowed: true, reason: 'group_owner' };
     }
 
-    // Check accessor ownership match (bare owner name vs GHII)
+    // Check accessor ownership match: an agent of the group's owner, on this node
     const accessorParsed = parseGaiiLoose(accessorGaii);
-    const groupOwnerParsed = parseGaiiLoose(group.ownerGaii);
-    if (accessorParsed && groupOwnerParsed && accessorParsed.owner === groupOwnerParsed.owner) {
+    const accessorAccount = localAccountName(accessorGaii);
+    if (accessorAccount && accessorAccount === localAccountName(group.ownerGaii)) {
       return { allowed: true, reason: 'group_owner' };
     }
 
@@ -169,7 +173,8 @@ export async function checkConsentForRead(
     (!c.expires || new Date(c.expires) > new Date()),
   );
   if (orgGrants.length > 0) {
-    const accessorOwner = parseGaiiLoose(accessorGaii).owner;
+    // Memberships are keyed by this node's account names, so an identity of another node has none.
+    const accessorOwner = localAccountOf(accessorGaii);
     if (accessorOwner) {
       // The accessor's active organism memberships in ONE query (was getMembership per org grant), then
       // honour the first grant whose organism the accessor actively belongs to — same result, same order.

@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.8.1 -- 2026-09-26 -- Whether the caller owns the agent is asked with localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.8.0 -- 2026-09-25 -- PUT /workspace takes `member_changes`, the workspace's rule for a plain
  *     member's change ('direct' | 'suggest'), which updateWorkspaceMeta writes as `…meta.rules`.
  *   v1.7.0 -- 2026-09-24 -- The activity feeds read the workspace manifest, and the share write the
@@ -31,7 +34,7 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
-import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose, isSameOwner, localAccountName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
@@ -72,7 +75,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
     if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
     const agentGaii = toAgentGaii(agent, req.auth!.owner as string);
-    if ((parseGaiiLoose(agentGaii).owner || '') !== req.auth!.owner) {
+    if (localAccountName(agentGaii) !== req.auth!.owner) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only adopt a contract for an agent you own')); return;
     }
     const eng = await activateEngagement(storage, config.nodeId, { orgId: id, ws, agentGaii, contract: typeof contract === 'string' ? contract : undefined, by: req.auth!.owner as string });
@@ -95,7 +98,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const callerRole = await memberRole(req, organism, id);
     if (!callerRole) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
     const agentGaii = toAgentGaii(agent, req.auth!.owner as string);
-    const ownsAgent = (parseGaiiLoose(agentGaii).owner || '') === req.auth!.owner;
+    const ownsAgent = localAccountName(agentGaii) === req.auth!.owner;
     if (!ownsAgent) {
       // Not my agent → I must be able to manage this workspace's access to retire someone else's.
       const entry = await findWsEntry(id, ws);

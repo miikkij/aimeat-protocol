@@ -17,9 +17,11 @@
  *   const graph = await collectOrganismGraph(storage, config, { orgId, viewerGaii });
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: organism + workspace graph for the interactive mindmap (Osa C).
+ *   v1.0.1 — 2026-09-26 — bareOwner takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
+import { localAccountName } from '../utils/gaii.js';
 import { collectWorkspaceSummary, listWorkspaces, type WorkspaceSummary } from './structure-overview.js';
 
 export interface SpaceNode {
@@ -51,7 +53,7 @@ export interface OrganismGraph {
 
 /** Bare owner name from a GHII/GAII (alice@node / agent#alice@node → alice). */
 function bareOwner(gaii: string): string {
-  return (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
+  return localAccountName(gaii);
 }
 
 /** Map a workspace summary (the overview collector) to a graph workspace node. Per-space lastActivity

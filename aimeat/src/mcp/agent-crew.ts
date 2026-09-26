@@ -16,12 +16,14 @@
  * @usage registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
  *   v1.0.0 -- 2026-08-28 -- Initial: the five tools over services/crew-ops.ts.
+ *   v1.0.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import {
     crewState, crewValidate, crewTryStart, crewTryWait, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
     resolveCrewAgent, type CrewCaller, type CrewRefusal,
@@ -58,10 +60,9 @@ export function registerAgentCrewTools(
     const deps = { storage, config };
     const callerOf = (pipeline: string): CrewCaller => {
         const principal = getAgentGaii();
-        const loose = parseGaiiLoose(principal);
         return {
             principal,
-            owner: loose.owner,
+            owner: localAccountName(principal),
             scopes: sessionScopes,
             // An MCP session is an agent of the owner; a session minted on an owner JWT carries no '#'.
             roles: principal.includes('#') ? ['agent'] : ['owner'],

@@ -19,6 +19,9 @@
  *   peer door before the visitors sign in.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-visitor-names
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The code behind the doors: an owner-visibility read, the learned pitfalls, an
+ *     organism write, an app found by its owner segment, a priced extension and its toll. The visitor
+ *     named like the owner gets what the control gets (secaudit 2026-09, F-1 as a class).
  *   v1.1.0 — 2026-09-26 — A visitor saves and starts no workflow here, whatever its scopes (secaudit
  *     2026-09, A6-4).
  *   v1.0.0 — 2026-09-26 — Initial: a group's MCP server is attached and reached by its own members,
@@ -74,7 +77,7 @@ const homeNodeId = `aimeat-fake-home-vn-${stamp}`;
  *  need so that each case is refused for the name and not for a missing scope. */
 const VISITOR_SCOPES = [
     'memory:read', 'memory:write', 'catalogue:read', 'social:read', 'work:request', 'boards:read', 'social:write', 'boards:write',
-    'mcp:read', 'mcp:manage', 'workflow:read', 'workflow:write',
+    'mcp:read', 'mcp:manage', 'workflow:read', 'workflow:write', 'app:write',
 ];
 
 let homeKeys = { publicKey: '', privateKey: '' };
@@ -158,7 +161,7 @@ async function run() {
         const c = claims(visitorToken);
         assert(c.federated === true && c.owner === `${namesake}@${homeNodeId}` && JSON.stringify(c.roles) === '["federated"]',
             `the session this suite is about: ${JSON.stringify({ federated: c.federated, owner: c.owner, roles: c.roles })}`);
-        for (const scope of ['memory:write', 'mcp:manage', 'workflow:write']) {
+        for (const scope of ['memory:write', 'mcp:manage', 'workflow:write', 'app:write']) {
             assert((c.scopes ?? []).includes(scope), `the visitor needs ${scope} for the cases below: ${JSON.stringify(c.scopes)}`);
         }
 
@@ -220,6 +223,103 @@ async function run() {
         // Positive control: the owner in person passes the door, and meets the body check behind it.
         const own = await json(`/v1/workflows/${id}`, as(alice.token, { method: 'PUT', body: JSON.stringify({}) }));
         assert(own.status === 400, `positive control: the owner's empty save is refused for its body, not at the door: ${own.status} ${JSON.stringify(own.body?.error).slice(0, 200)}`);
+    });
+
+    // ── An identity cut to an account name (secaudit 2026-09, F-1 as a class) ──
+    // Each case below reaches code that took a whole identity and cut it at the '@'. The session names
+    // the visitor correctly; these ask whether anything behind the door turns that name back into
+    // the local namesake's.
+
+    await test('An owner-visibility record: the owner\'s agent reads it, a visitor named like her does not', async () => {
+        const key = `vn.ownervis.${stamp}`;
+        const w = await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key, value: { note: `alice-ownervis-${stamp}` }, visibility: 'owner' }) }));
+        assert(w.status === 201, `setup: the namesake's owner-visibility record: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        const path = `/v1/memory/${encodeURIComponent(alice.ghii)}/${key}`;
+        for (const [who, token] of [['the visitor named like the owner', visitorToken], ['the control visitor', strangerToken]] as const) {
+            const r = await json(path, as(token));
+            assert(r.status === 403 && !JSON.stringify(r.body ?? '').includes(`alice-ownervis-${stamp}`),
+                `${who} read the owner's owner-visibility record: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error).slice(0, 200)}`);
+        }
+        // Positive control: an agent of the same owner is who owner visibility is for.
+        const made = await json('/v1/agents', as(alice.token, { method: 'POST', body: JSON.stringify({ name: `vnagent${stamp}`.slice(0, 40), owner: namesake, capabilities: ['memory'] }) }));
+        assert(made.status === 201, `setup: the namesake's agent: ${made.status} ${JSON.stringify(made.body?.error)}`);
+        const gaii = made.body.data.agent.gaii as string;
+        const ts = new Date().toISOString();
+        const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(made.body.data.private_key, gaii + ts) }) });
+        assert(tok.status === 200, `setup: the agent's token: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+        const byAgent = await json(path, as(tok.body.data.token as string));
+        assert(byAgent.status === 200 && JSON.stringify(byAgent.body.data ?? '').includes(`alice-ownervis-${stamp}`),
+            `positive control: the owner's own agent reads it: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
+    });
+
+    await test('The owner\'s private learned pitfalls are hers: a visitor named like her lists its own, not hers', async () => {
+        const title = `vn pitfall ${stamp}`;
+        const w = await json('/v1/appdev/pitfalls/learned', as(alice.token, { method: 'POST', body: JSON.stringify({
+            model: 'e2e-model', category: 'visitors', title, symptom: 'A symptom only she knows.', resolution: 'A resolution only she knows.',
+        }) }));
+        assert(w.status === 201, `setup: the namesake's private learned pitfall: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        for (const [who, token] of [['the visitor named like the owner', visitorToken], ['the control visitor', strangerToken]] as const) {
+            const r = await json('/v1/appdev/pitfalls/learned', as(token));
+            assert(r.status === 200, `${who}'s own list answers: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            assert(!JSON.stringify(r.body.data ?? '').includes(title), `${who} was shown the owner's private pitfall: ${JSON.stringify(r.body.data).slice(0, 300)}`);
+        }
+        const hers = await json('/v1/appdev/pitfalls/learned', as(alice.token));
+        assert(hers.status === 200 && JSON.stringify(hers.body.data ?? '').includes(title), `positive control: the owner lists her own: ${hers.status}`);
+    });
+
+    await test('A visitor named like the organism\'s owner cannot write into it; she can', async () => {
+        const key = `organism.${organismId}.shared.vn-${stamp}`;
+        for (const [who, token] of [['the visitor named like the owner', visitorToken], ['the control visitor', strangerToken]] as const) {
+            const r = await json('/v1/memory', as(token, { method: 'POST', body: JSON.stringify({ key, value: { by: who }, visibility: 'private' }) }));
+            assert(r.status === 403, `${who} wrote into the owner's organism: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data).slice(0, 200)}`);
+        }
+        const own = await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key, value: { by: 'the owner' }, visibility: 'private' }) }));
+        assert(own.status === 201, `positive control: the owner writes into her organism: ${own.status} ${JSON.stringify(own.body?.error)}`);
+    });
+
+    await test('An app segment named like a visitor finds no app of the local namesake', async () => {
+        const filename = `vn-${stamp}.html`;
+        const app = await json('/v1/apps', as(alice.token, { method: 'POST', body: JSON.stringify({
+            filename, name: 'The namesake\'s app', description: 'For the app doors', category: 'utility',
+            content: Buffer.from('<!DOCTYPE html><html><body>the local alice</body></html>').toString('base64'),
+        }) }));
+        assert(app.status === 201, `setup: the namesake's app: ${app.status} ${JSON.stringify(app.body?.error)}`);
+        for (const [name, token] of [[namesake, visitorToken], [strangerName, strangerToken]] as const) {
+            const r = await json(`/v1/apps/${encodeURIComponent(`${name}@${homeNodeId}`)}/${filename}/screenshot`, as(token, { method: 'POST', body: JSON.stringify({}) }));
+            assert(r.status === 404, `the segment ${name}@<home> reached the namesake's app: ${r.status} ${JSON.stringify(r.body?.error).slice(0, 200)}`);
+        }
+        const own = await json(`/v1/apps/${namesake}/${filename}/screenshot`, as(alice.token, { method: 'POST', body: JSON.stringify({}) }));
+        assert(own.status === 400, `positive control: the owner reaches her own app and meets the body check: ${own.status} ${JSON.stringify(own.body?.error).slice(0, 200)}`);
+    });
+
+    await test('The owner\'s priced extension is free to her, and charged to a visitor named like her', async () => {
+        const ext = `vnpaid${stamp}`.slice(0, 40);
+        const manifest = JSON.stringify({
+            metadata: { name: ext, version: '1.0.0', description: 'visitor names e2e', author: 'e2e' },
+            actions: [
+                { id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', commercial: { payMorsels: 5 } },
+                { id: 'tollcall', method: 'POST', path: '/tollcall', script: 'echo', tollMorsels: 2 },
+            ],
+            config: { public_access: { default: true } },
+            limits: { timeout_ms: 5000, max_api_calls: 1 },
+        });
+        const scripts = { echo: 'export default async function(ctx, input){ return { echo: input }; }' };
+        const inst = await json('/v1/extensions', as(alice.token, { method: 'POST', body: JSON.stringify({ manifest, scripts }) }));
+        assert(inst.status === 201, `setup: install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+        const act = await json(`/v1/extensions/${ext}/activate`, as(alice.token, { method: 'POST' }));
+        assert(act.status === 200, `setup: activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
+
+        const said = (r: { body: any }) => String(JSON.stringify(r.body?.error ?? r.body?.data ?? r.body)).slice(0, 200);
+        for (const action of ['paidcall', 'tollcall']) {
+            const call = (token: string) => json(`/v1/ext/${ext}/${action}`, as(token, { method: 'POST', body: JSON.stringify({ hi: 1 }) }));
+            const control = await call(strangerToken);
+            assert(control.status === 402, `the control visitor pays for ${action}: ${control.status} ${said(control)}`);
+            const namesakeVisitor = await call(visitorToken);
+            assert(namesakeVisitor.status === control.status,
+                `${action} answered the visitor named like the owner ${namesakeVisitor.status} ${said(namesakeVisitor)}, and the control ${control.status}`);
+            const own = await call(alice.token);
+            assert(own.status === 200, `positive control: the owner calls her own ${action} free: ${own.status} ${said(own)}`);
+        }
     });
 }
 

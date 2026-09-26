@@ -13,6 +13,8 @@
  *   const tools = await listPricedAppTools(storage, config, 100);
  *   const all = await listPublicAppTools(storage, config, { pricedOnly: false });
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The owner name comes from localAccountName (utils/gaii.ts), which keeps an
+ *     identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-31 — listPublicAppTools(): the same scan with the price gate made optional, so
  *     the discovery directory can list a FREE published tool too. A free tool is still a thing a
  *     person or an agent can call, and it was invisible everywhere. The commerce surfaces keep
@@ -24,6 +26,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { AppToolsDocSchema, appIdFromToolsKey } from '../models/app-tool-schemas.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** One sellable app-tool as every discovery surface sees it. */
 export interface PricedAppTool {
@@ -83,7 +86,7 @@ export async function listPublicAppTools(
     if (!appId || rec.visibility !== 'public') continue;
     const parsed = AppToolsDocSchema.safeParse(rec.value);
     if (!parsed.success) continue;
-    const ownerName = rec.ownerGaii.split('@')[0] as string;
+    const ownerName = localAccountName(rec.ownerGaii);
     const appRef = `${ownerName}/${appId}`;
     const appPath = `${encodeURIComponent(ownerName)}/${encodeURIComponent(appId)}`;
     for (const tool of parsed.data.tools) {

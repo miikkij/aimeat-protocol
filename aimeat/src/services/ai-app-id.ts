@@ -26,13 +26,17 @@
  *   const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
  * @version-history
  *   v1.0.0 — 2026-09-19 — Initial.
+ *   v1.0.1 — 2026-09-26 — The owner prefix of an app name, and the owner it is compared with, both come
+ *     from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never
+ *     names the local namesake (secaudit 2026-09, F-1).
  */
 
-/** The bare account name of an owner GHII (`alice@node` → `alice`), or the input unchanged. */
+import { localAccountName } from '../utils/gaii.js';
+
+/** The account name of an owner GHII of this node (`alice@node` → `alice`); another node's stays whole. */
 function ownerNameOf(ownerGhii?: string): string | undefined {
   if (!ownerGhii) return undefined;
-  const at = ownerGhii.indexOf('@');
-  return at > 0 ? ownerGhii.slice(0, at) : ownerGhii;
+  return localAccountName(ownerGhii);
 }
 
 /**
@@ -44,7 +48,7 @@ export function canonicalAiAppId(raw: unknown, ownerGhii?: string): string | und
   if (!id) return undefined;
   const slash = id.indexOf('/');
   if (slash > 0) {
-    const prefix = id.slice(0, slash).split('@')[0];
+    const prefix = localAccountName(id.slice(0, slash));
     if (prefix && prefix === ownerNameOf(ownerGhii)) id = id.slice(slash + 1);
   }
   id = id.replace(/\.html?$/i, '');

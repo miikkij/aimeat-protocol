@@ -9,6 +9,8 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  *
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The overage check reads the balance of the account localAccountOf names, so
+ *     a visitor from another node never reads the local namesake's balance (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-08-09 — enforceExtensionMemoryLimits() raises the 80%/95% quota alarm, and its
  *     key-limit error names FOLDING rather than deletion as the remedy (memory-key-shape audit).
  *   v1.1.0 — 2026-06-20 — Security (H-5): add enforceExtensionMemoryLimits() so
@@ -18,8 +20,16 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountOf } from '../utils/gaii.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
+
+/**
+ * The account whose balance pays an overage: the one on this node behind the principal, or none. An
+ * identity of another node pays nothing here and reads no local balance, even one that shares its name.
+ */
+function payingAccountOf(gaii: string): string | null {
+    return gaii.includes('@') ? localAccountOf(gaii) : null;
+}
 
 // ── Size calculators ──
 
@@ -119,7 +129,7 @@ export async function checkMemoryQuota(
         return { allowed: true, currentBytes, quotaBytes, overageBytes, overageMorsels: 0 };
     }
 
-    const { owner } = parseGaiiLoose(gaii);
+    const owner = payingAccountOf(gaii);
     const ghiiRecord = owner ? await storage.getGHIIByOwner(owner) : null;
     const balance = ghiiRecord?.morselBalance ?? 0;
     if (!ghiiRecord || balance < overageMorsels) {
@@ -154,7 +164,7 @@ export async function checkStorageQuota(
     const overageGb = Math.ceil(overageBytes / (1024 * 1024 * 1024)) || 1; // minimum 1 GB billing unit
     const overageMorsels = overageGb * config.storageOverageMorselsPerGbMonth;
 
-    const { owner } = parseGaiiLoose(gaii);
+    const owner = payingAccountOf(gaii);
     const ghiiRecord = owner ? await storage.getGHIIByOwner(owner) : null;
     const balance = ghiiRecord?.morselBalance ?? 0;
     if (!ghiiRecord || balance < overageMorsels) {

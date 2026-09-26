@@ -12,6 +12,8 @@
  *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL
  *   - resolveAppUrls() — READ-ONLY: one listSubdomainSites() for a batch of apps
  * @version-history
+ *   v1.3.1 — 2026-09-26 — bare() is localAccountName (utils/gaii.ts), which keeps an identity of
+ *     another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-18 — resolveAppUrls answers on a node WITHOUT an app origin too: the node's
  *     own address in inline mode, which is how such a node opens an app anyway. It returned
  *     nothing, so aimeat_app_list said `url: null`, and the cold-agent baseline measured the
@@ -31,6 +33,7 @@ import type { AppDevAct, DelegatedDev } from '../../services/app-dev-grant.js';
 import { error } from '../../middleware/envelope.js';
 import { ensureAppSubdomain } from '../subdomains.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /**
  * The canonical-owner resolver closure built in appsRouter and passed to each route
@@ -85,9 +88,9 @@ function appOriginScheme(config: AimeatConfig): { scheme: string; portSuffix: st
     return { scheme: 'https', portSuffix: '' };
 }
 
-/** The bare owner name, with any `@node-id` suffix stripped. */
+/** The account name, with a `@node-id` of this node removed; another node's identity stays whole. */
 function bare(owner: string): string {
-    return owner.includes('@') ? owner.split('@')[0] : owner;
+    return localAccountName(owner);
 }
 
 /**

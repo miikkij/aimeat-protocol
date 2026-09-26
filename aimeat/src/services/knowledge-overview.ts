@@ -34,6 +34,7 @@
  * @usage
  *   import { buildKnowledgeOverview } from '../services/knowledge-overview.js';
  * @version-history
+ *   v1.1.1 — 2026-09-26 — authorKeyOf takes the author's name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so a visitor is never counted as the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-12 — A page or a limit that is not a number falls back instead of becoming
  *     NaN. `?page=abc` had been answering with an empty array and paging numbers that serialise as
  *     null, which is the same silence this read was written to end.
@@ -42,6 +43,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, KnowledgeManifest, OperatorReviewRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** The maturity words this node actually defines. Anything else is reported, never silently kept. */
 export const DECLARED_MATURITY = ['draft', 'review', 'published'] as const;
@@ -57,7 +59,7 @@ export interface KnowledgeFilters {
   flagged?: boolean;
   /** Exact author string, as stored. Prefer `authorKey`, which collapses the spellings. */
   author?: string;
-  /** An author collapsed across its spellings — the bare name before any `@node`. */
+  /** An author collapsed across its spellings: the name before THIS node's `@node` (authorKeyOf). */
   authorKey?: string;
   contentType?: string;
   /** Free text over name, author and tags. */
@@ -76,11 +78,12 @@ interface Row {
 }
 
 /**
- * The name before the node, lowercased. `alice@node-id` and `alice` are one person, and this node
- * writes both forms itself, so a surface that treats them as two is wrong about its own data.
+ * The name before THIS node's id, lowercased. `alice@node-id` and `alice` are one person, and this
+ * node writes both forms itself, so a surface that treats them as two is wrong about its own data.
+ * An author of another node stays whole, so a visitor is never counted as the local namesake.
  */
 export function authorKeyOf(author: string | undefined): string {
-  return String(author ?? '').trim().toLowerCase().split('@')[0] || '(unnamed)';
+  return localAccountName(String(author ?? '').trim().toLowerCase()) || '(unnamed)';
 }
 
 /** Count into a map, then hand back the biggest first. */

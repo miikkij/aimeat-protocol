@@ -21,11 +21,14 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The job owner's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-26 — A job reads no record the node keeps for itself and writes its answer over
  *     none (services/ai-job-keys.ts, the rule the scheduled AI job asks too): prompt_key, input_keys
  *     and result_key are asked at the start and again when a restart brings a queued job back. A
- *     reserved result_key now answers 403 RESERVED_KEY, as the memory doors do, where it answered
- *     400 INVALID_BODY (secaudit 2026-09: 573704db10ed).
+ *     reserved result_key answers 403 RESERVED_KEY, as the memory doors do
+ *     (secaudit 2026-09: 573704db10ed).
  *   v1.1.0 — 2026-09-20 — An agent's job is paid by its owner, in the agent's name (aiPayerOf), as
  *     POST /v1/ai/complete pays. The job and its result stay in the caller's namespace.
  *   v1.0.0 — 2026-08-31 — Initial.
@@ -38,7 +41,7 @@ import { SlotPool, SlotAbortedError } from '../slot-pool.js';
 import { completeForOwner, AiCompletionError } from '../ai-completion.js';
 import { aiPayerOf } from '../agent-ai-keys.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
-import { parseGAII } from '../../utils/gaii.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
 import { fireOnDone } from './on-done.js';
@@ -416,7 +419,7 @@ export class AiJobService implements AiJobStarter {
      * business, so "no such extension" and "that one is somebody else's" must read the same.
      */
     private async assertCallbackAllowed(ownerGhii: string, extensionName: string, actionId: string): Promise<void> {
-        const ownerName = parseGAII(ownerGhii)?.owner ?? ownerGhii.split('@')[0];
+        const ownerName = localAccountName(ownerGhii);
         const refuse = (): never => {
             throw new AiJobError('AI_JOB_CALLBACK_FORBIDDEN', 403,
                 `on_done names an extension action this account cannot call: ${extensionName}/${actionId}.`);

@@ -30,13 +30,15 @@
  *   v1.3.0 — 2026-09-13 — aimeat_storage_upload's inline answer carries versioned_url, the /v1/pub
  *     address plus ?v=<this write>, as POST /v1/storage does. A re-upload to the same key was served
  *     from browsers' five-minute copies (appdev pitfall pub-file-cache-stale-assets).
+ *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
@@ -162,7 +164,7 @@ export function registerCoreStorageTools(
         async ({ key, owner, inline }) => {
             const ref = owner ? `${owner}/${key}` : key;
             const resolved = await resolveFileRef(storage, config, ref, {
-                gaii: agentGaii, sub: agentGaii, owner: parseGaiiLoose(agentGaii).owner,
+                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii),
             });
             if (resolved.access !== 'granted' || !resolved.file) {
                 // Name the alternative instead of a bare "not found": asking for the OWNER's file by

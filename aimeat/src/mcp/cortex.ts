@@ -10,6 +10,8 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.8.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.8.0 -- 2026-09-24 -- SECURITY (audit A8-1): the namespace claim on install and redeploy is
  *     asked of the agent through services/operator-principal.ts, so it takes operator:admin. It was
  *     read off the owner record, so every agent of an operator holding cortex:write carried it.
@@ -43,7 +45,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import {
@@ -75,7 +77,7 @@ export function registerCortexTools(
      * with '' the four tools disagreed, install writing `installedBy: 'alice'` while activate
      * compared 'alice' against '' and refused the owner their own cortex.
      */
-    const callerOwner = parseGAII(getAgentGaii())?.owner ?? getAgentGaii();
+    const callerOwner = localAccountName(getAgentGaii());
 
     /**
      * The caller as services/cortex-lifecycle.ts sees it.
@@ -117,7 +119,7 @@ export function registerCortexTools(
             const extensions = visibleCortexes(agentCaller(), await storage.listCortexExtensions({}), config.nodeId);
             // Who loads each cortex, from the dependency map (the rows GET /v1/cortex carries too).
             const deps = await dependencyIndex(storage);
-            const viewerOwner = parseGAII(getAgentGaii())?.owner;
+            const viewerOwner = localAccountName(getAgentGaii());
             const { visible } = await visibleAppRefs(storage, viewerOwner ? `${viewerOwner}@${config.nodeId}` : undefined);
             return {
                 content: [{

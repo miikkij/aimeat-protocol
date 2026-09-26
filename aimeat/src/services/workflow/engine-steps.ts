@@ -6,6 +6,7 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-25 — OnPushTerminal carries what the step's own model calls cost, for the run's
  *     cost cap. A run the node stopped at that cap is finished, so its owner's finish notification
  *     says so.
@@ -37,7 +38,7 @@ import type { Storage, AgentTaskRecord, AgentTaskScope } from '../../storage/int
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
-import { buildGAII } from '../../utils/gaii.js';
+import { buildGAII, localAccountName } from '../../utils/gaii.js';
 import { notify } from '../notify.js';
 import { readNotificationSettings, appendMailLog } from '../notification-settings.js';
 import { logger } from '../../utils/logger.js';
@@ -102,7 +103,7 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
     dispatchEcosystemStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
     return [];
   }
-  const ownerName = ownerGhii.split('@')[0];
+  const ownerName = localAccountName(ownerGhii);
   const agents = Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : []);
   const now = new Date().toISOString();
   const ids: string[] = [];
@@ -239,7 +240,7 @@ export function dispatchExtensionStep(
 ): void {
   const { workflowId, runId } = run;
   const stepId = step.id;
-  const ownerName = ownerGhii.split('@')[0];
+  const ownerName = localAccountName(ownerGhii);
   const runOnce = (input: Record<string, unknown>, label: string) => runExtensionActionAsSystem(
     { storage: deps.storage, config: deps.config, emailService: deps.emailService },
     {
@@ -593,7 +594,7 @@ export async function askHumanInput(
   try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: '/v1/profile?tab=workflows', i18n: { key: 'workflow_input_needed', vars: { name, step: step.id, question: question.prompt, options: optionsSummary } } }); }
   catch (err) { logger.warn('askHumanInput: in-app notify best-effort', { error: String(err) }); }
   if (deps.pushService?.enabled) {
-    deps.pushService.sendNotification(ownerGhii.split('@')[0], { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
+    deps.pushService.sendNotification(localAccountName(ownerGhii), { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
       .catch(err => { logger.warn('askHumanInput: push best-effort', { error: String(err) }); });
   }
   return { question, askedAt: now };
@@ -605,7 +606,7 @@ export async function askHumanInput(
  * inspector is enrichment, so a missing/offline inspector never hides the failure.
  */
 export async function onStepFail(deps: StepDeps, ownerGhii: string, run: WorkflowRun, stepId: string, reason: WorkflowRunStep['state']): Promise<void> {
-  const ownerName = ownerGhii.split('@')[0];
+  const ownerName = localAccountName(ownerGhii);
   logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${stepId}" ${reason}`);
   // 1. Guaranteed owner alert (deterministic, node-owned).
   if (deps.pushService?.enabled) {
@@ -630,7 +631,7 @@ export async function onStepFail(deps: StepDeps, ownerGhii: string, run: Workflo
  */
 export async function maybeAlertAgentOffline(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep): Promise<void> {
   if (!isAgentStep(step)) return;
-  const ownerName = ownerGhii.split('@')[0];
+  const ownerName = localAccountName(ownerGhii);
   if (await anyAgentReachable(deps.storage, deps.config, ownerName, step)) return;
   const agents = (Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : [])).join(', ');
   const name = loc(run.defSnapshot.title) || run.workflowId;
@@ -739,7 +740,7 @@ export async function clearRunOutputs(deps: StepDeps, ownerGhii: string, run: Wo
     for (const k of outs) produced.add(k);
   }
   if (produced.size === 0) return;
-  const ownerName = ownerGhii.split('@')[0];
+  const ownerName = localAccountName(ownerGhii);
   const prefix = run.keyPrefix ?? '';
   let cleared = 0;
   for (const tmpl of produced) {

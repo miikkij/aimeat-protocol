@@ -15,10 +15,11 @@
  * @usage const scope = await resolveAppOwnerScope(storage, config, principal);
  * @version-history
  *   v1.0.0 — 2026-09-20 — Extracted from app-lifecycle.ts, unchanged.
+ *   v1.0.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { ownAppScope } from './app-dev-grant.js';
 
 /** The owner an app write lands under: the display/URL name, and the bucket key. */
@@ -47,5 +48,5 @@ export async function resolveAppOwnerScope(
   // The parse stays here, because it is this door's own rule about what a principal may look like and
   // the REST door's rule is a different one. Where the app LANDS is the part both doors share, and it
   // now lives in services/app-dev-grant.ts so that opening it to a second owner is one change.
-  return ownAppScope(storage, config, parsed.owner);
+  return ownAppScope(storage, config, localAccountName(principal));
 }

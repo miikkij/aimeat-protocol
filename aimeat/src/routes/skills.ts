@@ -19,6 +19,9 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.2.1 -- 2026-09-26 -- The app owner in the app-bound skills read comes from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.2.0 -- 2026-09-03 -- PATCH /v1/skills/:name changes visibility without a republish (own user
  *     skill; node scope for operators); GET /v1/skills?include=links adds each library skill's
  *     `linkedBy` (the caller's agents holding the ref). Design canvas "AIMEAT Taidot-sivu".
@@ -31,7 +34,7 @@ import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -415,7 +418,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/apps/:owner/:filename/skills', requireAuth(), async (req, res) => {
     try {
       const ownerParam = req.params.owner as string;
-      const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+      const owner = localAccountName(ownerParam);
       const filename = req.params.filename as string;
       const binding = `app:${owner}/${filename}`;
       const skills = await listSkillsByBinding(storage, config, binding, accessorOf(req));

@@ -35,6 +35,8 @@
  *     redirects only when the sender has already written to the upstream support address in that
  *     thread; any other pair thread continued by id alone falls through to the ordinary path
  *     instead of being rerouted to the vendor's support.
+ *   v1.2.1 — 2026-09-26 — The support-ticket match asks isSameOwner, which compares the owner and the
+ *     node since 2026-09-24, instead of taking both apart here (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -42,7 +44,7 @@ import type { ConversationRecord, DirectMessageAttachment } from '../storage/int
 import type { DeliveryCtx } from './message-delivery.js';
 import { listOperatorGhiis } from './operators.js';
 import { createGroupConversation, setParticipants, fanOutToParticipants } from './conversation-group.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { isSameOwner } from '../utils/gaii.js';
 import { deliveryTargetFor } from '../utils/messaging.js';
 
 /** The local part. Reserved in utils/gaii.ts so nobody registers an owner by this name. */
@@ -282,17 +284,15 @@ export async function receiveRemoteSupportMessage(
     return { ok: false, status: 503, code: 'NO_OPERATORS', message: 'This node has no operator to receive support messages' };
   }
 
-  const sender = parseGaiiLoose(input.senderGhii);
   const existing = await ctx.storage.getConversation(input.conversationId);
 
-  // Does the stored thread genuinely belong to this correspondent? Compare owner AND node: isSameOwner
-  // compares the owner name alone, so any peer with an owner called `alice` would be writing into
+  // Does the stored thread genuinely belong to this correspondent? Owner AND node, which is what
+  // isSameOwner compares: any peer with an owner called `alice` would otherwise be writing into
   // alice-from-somewhere-else's ticket.
   const matches = !!existing
     && existing.alias === SUPPORT_ADDRESS
     && existing.remote?.nodeId === input.sourceNode
-    && parseGaiiLoose(existing.remote.ghii).owner === sender.owner
-    && parseGaiiLoose(existing.remote.ghii).node === sender.node;
+    && isSameOwner(existing.remote.ghii, input.senderGhii);
 
   let convo: ConversationRecord;
   if (existing && matches) {

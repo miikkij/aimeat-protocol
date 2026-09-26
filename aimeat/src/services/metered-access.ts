@@ -25,6 +25,7 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-07-30 — A settled outcome now also carries `accrue()`, the other half of `refund()`:
  *     the door calls it after a successful invoke so the provider's beneficiaries are booked. Kept on
  *     the outcome rather than given its own entry point, because a second door is how the six money
@@ -35,7 +36,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import {
   readEntitlementForCall, budgetAllows, computeCharge,
   type MeteredEntitlement,
@@ -307,7 +308,7 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
   // 1. Own capability → free. Before the lookup: a provider holding a contract against themselves
   //    (which happens, because nothing stopped them buying it) must still not be charged for it.
   const providerOwner = product.providerOwner ?? providerOwnerOfCoordinate(product.ext);
-  const callerOwner = ownerGhiiOf(caller).split('@')[0];
+  const callerOwner = localAccountName(caller);
   if (providerOwner && callerOwner === providerOwner) return { kind: 'free_owner' };
 
   // 2. Whatever authorises this call — a grant wins over a contract while it is active.

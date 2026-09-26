@@ -17,6 +17,9 @@
  *     write moved to services/chat-instance-write.ts, shared with the two MCP doors that were
  *     building the same row. POST now returns the existing session when one is already registered
  *     under that id, where the duplicate insert used to surface as a 500.
+ *   v1.1.1 — 2026-09-26 — The ownership check names the instance's owner with localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -25,6 +28,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -94,7 +98,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
 
     // Ownership (SECURITY): a chat instance's economy (morsel balance, trust score) is private to its
     // owner. Only the same owner or an operator may read it — 404 (not 403) so existence isn't confirmed.
-    if (record.ghii.split('@')[0] !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+    if (localAccountName(record.ghii) !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }
@@ -131,7 +135,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
     }
 
     // Ownership (SECURITY): only the same owner or an operator may update this instance.
-    if (record.ghii.split('@')[0] !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+    if (localAccountName(record.ghii) !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }
@@ -153,7 +157,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
 
     // Ownership (SECURITY): fetch first and verify the caller owns it — only the same owner or an
     // operator may delete this instance (previously deleted by id with no ownership check).
-    if (!record || (record.ghii.split('@')[0] !== req.auth!.owner && !req.auth!.roles.includes('operator'))) {
+    if (!record || (localAccountName(record.ghii) !== req.auth!.owner && !req.auth!.roles.includes('operator'))) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }

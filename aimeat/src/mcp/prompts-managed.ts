@@ -14,6 +14,8 @@
  *   import { registerManagedPrompts } from './prompts-managed.js';
  *   await registerManagedPrompts(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-05 — The `cortex_extensions` variable lists only the cortexes this caller may
  *     see (services/cortex-lifecycle.ts visibleCortexes). It named every active cortex on the node,
  *     another owner's private one included — a fifth door for the same leak the four cortex reads
@@ -25,7 +27,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SystemPromptRecord } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { visibleCortexes } from '../services/cortex-lifecycle.js';
@@ -113,7 +115,7 @@ export async function registerManagedPrompts(
                 // `alice@node`, which parseGAII rejects on purpose. Both carry the owner name
                 // before the "@", so the prompt is addressed to the right person either way.
                 const parsed = parseGAII(gaii);
-                const ownerName = parsed?.owner ?? gaii.split('@')[0];
+                const ownerName = localAccountName(gaii);
 
                 const known: Record<string, string | undefined> = {
                     node_url: config.baseUrl,

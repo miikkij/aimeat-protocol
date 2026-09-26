@@ -197,6 +197,7 @@
     "check:identity-resolution": "tsx scripts/check-identity-resolution.ts --strict",
     "check:identity-resolution:report": "tsx scripts/check-identity-resolution.ts",
     "check:identity-resolution:seed": "tsx scripts/check-identity-resolution.ts --seed",
+    "check:identity-shortening": "tsx scripts/check-identity-shortening.ts",
     "check:federation-signatures": "tsx scripts/check-federation-signatures.ts --strict",
     "check:owner-principal": "tsx scripts/check-owner-principal.ts --strict",
     "check:owner-principal:report": "tsx scripts/check-owner-principal.ts",

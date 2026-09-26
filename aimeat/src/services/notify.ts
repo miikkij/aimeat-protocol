@@ -50,12 +50,14 @@
  *     GET /v1/notifications serves only such buttons from whatever is stored.
  *   v1.8.0 -- 2026-09-26 -- A `navigate` button may carry `i18n` too, such as the workflow refusal's
  *     "Approve again".
+ *   v1.8.1 -- 2026-09-26 -- The push recipient's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { logger } from '../utils/logger.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
+import { localAccountName } from '../utils/gaii.js';
 import { readNotificationSettings, prefsFor, quietState, senderKey, type NotifSource } from './notification-settings.js';
 
 export const NOTIF_PREFIX = 'notif.';
@@ -264,7 +266,7 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
           s.timer = null;
           const n = s.folded; s.folded = 0; s.at = Date.now();
           if (n <= 0 || !pushService?.enabled) return;
-          void pushService.sendNotification(recipientGhii.split('@')[0], {
+          void pushService.sendNotification(localAccountName(recipientGhii), {
             title: n === 1 ? s.sample.title : `${n} more from ${source.name}`,
             body: n === 1 ? '' : s.sample.title,
             url: n === 1 ? notifLinkToUrl(s.sample.link) : '/v1/profile?tab=notifications',
@@ -283,7 +285,7 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
     // screen can't take free text) — the SW turns a button click into a focus + postMessage so the
     // open SPA runs it with the owner's session; data.actions carries the full descriptors.
     result.pushed = true;
-    void pushService!.sendNotification(recipientGhii.split('@')[0], {
+    void pushService!.sendNotification(localAccountName(recipientGhii), {
       title: input.title,
       body: input.body ?? '',
       url: notifLinkToUrl(input.link),

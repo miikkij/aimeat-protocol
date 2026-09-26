@@ -12,6 +12,7 @@
  * @structure sweepHeldPushes · sweepNotificationDigests · listOwnerNotifications (shared read)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The held-push sweep takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-13 — The digest writes only its bookmark, on the record as it is when writing
  *     (updateNotificationSettings). It wrote back the whole record it read before sending the email,
  *     which undid a save the owner made while the email went out (docs/pitfalls.md §84).
@@ -28,6 +29,7 @@ import { getActiveEmailService } from './email.js';
 import { notificationDigestEmail } from './email-templates-digest.js';
 import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export interface StoredNotif { id: string; type: string; title: string; body: string; link: string; read: boolean; held?: boolean; createdAt: string }
 
@@ -60,7 +62,7 @@ export async function sweepHeldPushes(storage: Storage, _config: AimeatConfig, p
       const held = (await listOwnerNotifications(storage, ghii)).filter(n => n.value.held);
       if (!held.length) continue;
       const first = held[0].value;
-      const ok = await push.sendNotification(ghii.split('@')[0], {
+      const ok = await push.sendNotification(localAccountName(ghii), {
         title: held.length === 1 ? first.title : `${held.length} notifications while you were quiet`,
         body: held.length === 1 ? first.body : held.slice(0, 5).map(n => n.value.title).join('\n'),
         url: held.length === 1 ? notifLinkToUrl(first.link) : '/v1/profile?tab=notifications',

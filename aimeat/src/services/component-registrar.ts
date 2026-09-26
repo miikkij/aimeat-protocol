@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.7.1 — 2026-09-26 — Deleting an app component takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-24 — A memory component that names a key the node trusts (utils/reserved-keys.ts)
  *     is refused before its first entry is written, on a dry run too. The keys land in the installer's
  *     namespace, and a package is somebody else's content.
@@ -52,6 +53,7 @@ import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from '../routes/ex
 import YAML from 'yaml';
 import type { Storage, PackageComponentType, CortexComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import { parseBundledCrews } from './app-bundled-crews.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { publishApp } from './app-publish.js';
@@ -684,7 +686,7 @@ export async function deleteComponent(
         // rows alone left two of them behind: a subdomain still pointing at a target that no longer
         // exists, and dependency edges naming an app nobody can open. Both are visible in the
         // rollback path, which is where a half-installed package ends up.
-        const ownerName = ownerGaii.split('@')[0] ?? ownerGaii;
+        const ownerName = localAccountName(ownerGaii);
         await forgetDependencies(storage, 'app', appRef(ownerName, registeredAs));
 
         const target = `${ownerName}/${registeredAs}`;

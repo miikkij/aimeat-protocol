@@ -10,6 +10,9 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.12.1 — 2026-09-26 — Every owner segment is read with localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.12.0 — 2026-09-26 — The isolated frame (audit A7-1). On a node several people share with no
  *     app origin, a browser opening an app gets the page that holds it in an opaque-origin frame, and
  *     the app's bytes (the draft preview's too) go out only under the CSP `sandbox` directive
@@ -69,7 +72,7 @@ import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { imageUploadType } from '../../utils/raster-image.js';
-import { ownerCoordinate } from '../../utils/gaii.js';
+import { ownerCoordinate, localAccountName } from '../../utils/gaii.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { appBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
@@ -169,7 +172,7 @@ export function registerReadRoutes(
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
         // Tolerate the legacy full-GHII owner segment (owner@node) in old links.
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         // Apps live in the owner's canonical bucket (ownerGaii = owner@nodeId),
         // not under any agent GAII. Resolve the row by owner name, then list that
@@ -207,7 +210,7 @@ export function registerReadRoutes(
     router.get('/v1/apps/:owner/:filename/forks', async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         const app = await storage.getAppByOwnerName(owner, filename);
         if (!app) {
@@ -234,7 +237,7 @@ export function registerReadRoutes(
     router.get('/v1/apps/:owner/:filename/lineage', async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         const lineage = await collectAppLineage(storage, owner, filename);
         if (!lineage) {
@@ -249,7 +252,7 @@ export function registerReadRoutes(
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
         // Tolerate the legacy full-GHII owner segment (owner@node) in old links.
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         // SECURITY: Defense-in-depth path traversal protection
         const decodedFn = decodeURIComponent(filename);
@@ -305,7 +308,7 @@ export function registerReadRoutes(
     router.post('/v1/apps/:owner/:filename/screenshot/capture', requireAuth(), requireScope('app:write'), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         const app = await storage.getAppByOwnerName(owner, filename);
         if (!app) {
@@ -337,7 +340,7 @@ export function registerReadRoutes(
     router.post('/v1/apps/:owner/:filename/screenshot', requireAuth(), requireScope('app:write'), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         const decodedFn = decodeURIComponent(filename);
         if (decodedFn.includes('..') || decodedFn.includes('/') || decodedFn.includes('\\')
@@ -411,7 +414,7 @@ export function registerReadRoutes(
     router.delete('/v1/apps/:owner/:filename/screenshot', requireAuth(), requireScope('app:write'), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         const decodedFn = decodeURIComponent(filename);
         if (decodedFn.includes('..') || decodedFn.includes('/') || decodedFn.includes('\\')
@@ -527,8 +530,9 @@ export function registerReadRoutes(
         // Backward-compat: older links carry the full GHII (`owner@node`) as the
         // owner segment. ownerName is now normalized to the bare name, so retry
         // with the bare prefix when the literal lookup misses.
-        if (!app && owner.includes('@')) {
-            app = await storage.getAppByOwnerName(owner.split('@')[0], filename, version);
+        const bare = localAccountName(owner);
+        if (!app && bare !== owner) {
+            app = await storage.getAppByOwnerName(bare, filename, version);
         }
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
