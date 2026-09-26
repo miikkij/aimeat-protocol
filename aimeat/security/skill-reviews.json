@@ -231,7 +231,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:f217e3e24429bbdfe86f9160"
+      "digest": "sha256:acbeb8eacdf197f76c66ab30"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-19",
@@ -327,11 +327,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-09-24",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:e2d2a0836b7440e6c8b5b9f3"
+      "digest": "sha256:9bad6e5bf53530cf4f4c2d40"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -458,7 +458,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "1cf5d3f6b45c5cb9",
-      "aimeat/src/mcp/catalog/scopes.ts": "7cb413c311e7ddda",
+      "aimeat/src/mcp/catalog/scopes.ts": "6989270b9a7ae9d7",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
@@ -507,7 +507,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "9e7166d2cf677a2a"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "2983636d203dcbec"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {

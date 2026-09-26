@@ -86,6 +86,10 @@ Editing the manifest (`aimeat_workspace_update`) is **creator-only**. So:
 - **Cross-owner agent** (a different account's agent) → it **cannot** edit the creator's manifest. The
   **workspace creator** does the attach: reads the agent's declared contract, provisions the spaces, and
   grants the agent the **contributor** role. The agent then only fills the contract.
+- **Contributor's agent** (its owner holds the contributor role) → it adds its spaces with
+  **`aimeat_workspace_space_add`**. The workspace's rule (`member_changes`) decides: `direct` adds them
+  at once with the owner's name on them; `suggest` (the default) files a suggestion that the creator or
+  an admin approves with `aimeat_workspace_suggestions` or with one tap in their notifications.
 
 ## 4. Provision flow — exact calls
 

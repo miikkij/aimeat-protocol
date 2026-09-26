@@ -17,6 +17,11 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.25.0 -- 2026-09-25 -- A member's change to a workspace: aimeat_workspace_space_add,
+ *     aimeat_workspace_sections_set and aimeat_workspace_suggestions (./workspace-member-changes.ts).
+ *     _update takes `member_changes`, the workspace's rule for them. _object_delete takes the deleted
+ *     id out of the section index through services/workspace-member-changes.ts, which keeps the
+ *     index's owner; it wrote the index under the caller and deleted the creator's copy.
  *   v1.24.0 -- 2026-09-24 -- readManifest is services/workspace-meta.ts readWorkspaceManifest: the copy
  *     of the manifest that counts, not the first copy the store returned.
  *   v1.23.0 -- 2026-09-13 -- _write, _publish and _revert_to_draft answer the shared UNDECLARED_SPACE
@@ -151,20 +156,20 @@ import { descriptionFor } from './catalog/shape.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { canReadWorkspace } from '../services/workspace-access.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries, readWorkspaceManifest } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { MAX_BATCH_ITEMS } from '../services/workspace-write-items.js';
-import { findWorkspaceRecord, writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace-write.js';
+import { writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace-write.js';
 import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp } from '../services/workspace-tool-ops.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace-roles.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
+import { registerWorkspaceMemberChangeTools } from './workspace-member-changes.js';
+import { unfileDeletedDocument } from '../services/workspace-member-changes.js';
 import { registerWorkspaceTransferTool } from './workspace-transfer.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { logger } from '../utils/logger.js';
 
-type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number };
-type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
 export function registerWorkspaceTools(
@@ -238,8 +243,6 @@ export function registerWorkspaceTools(
         return org?.agentGaiis?.includes(agentGaii) ? 'member' : null;
     }
 
-    /** The freshest record at an EXACT key, whichever identity owns it — services/workspace-write.ts. */
-    const findByKey = (key: string): Promise<MemoryRecord | null> => findWorkspaceRecord(storage, key);
     /** Write one workspace record: ONE owner per key, forked copies collapsed, and the fan-out every
      *  other write surface runs. The whole of it is services/workspace-write.ts; `owner` defaults to
      *  the member GHII and is named explicitly only for META that must stay under a given identity. */
@@ -256,22 +259,17 @@ export function registerWorkspaceTools(
     // ── workspace-access helpers (shared with the GET/POST workspace-access routes) ──
     const bareOwner = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
     /** Find a workspace's registry entry across every member's registry. */
-    const findWsEntry = async (orgId: string, ws: string): Promise<{ createdBy: string; ownerGaii: string } | null> => {
+    const findWsEntry = async (orgId: string, ws: string): Promise<{ createdBy: string; ownerGaii: string; name?: string } | null> => {
         const regKey = `organism.${orgId}.meta.workspaces`;
         const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
         for (const rec of items) {
             if (rec.key !== regKey) continue;
-            const list = (rec.value as { workspaces?: Array<{ id: string; createdBy?: string }> } | null)?.workspaces ?? [];
+            const list = (rec.value as { workspaces?: Array<{ id: string; createdBy?: string; name?: string }> } | null)?.workspaces ?? [];
             const entry = list.find(w => w.id === ws);
-            if (entry) return { createdBy: entry.createdBy ?? bareOwner(rec.ownerGaii), ownerGaii: rec.ownerGaii };
+            if (entry) return { createdBy: entry.createdBy ?? bareOwner(rec.ownerGaii), ownerGaii: rec.ownerGaii, ...(entry.name ? { name: entry.name } : {}) };
         }
         return null;
     };
-    /** Read a workspace's manifest from the member who created it, so a member who didn't create the
-     *  workspace can still resolve its spaces to write/delete records: the copy that counts, the one
-     *  every other reader takes (services/workspace-meta.ts). */
-    const readManifest = async (orgId: string, ws: string): Promise<Manifest | null> =>
-        (await readWorkspaceManifest(storage, orgId, ws, config.nodeId)) as Manifest | null;
     /** Active membership role of the agent's owner in an org, or null. */
     const roleOf = async (orgId: string): Promise<string | null> => {
         const m = await storage.getMembership(orgId, ownerName);
@@ -439,9 +437,10 @@ export function registerWorkspaceTools(
             manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved. To only ADD spaces, prefer `add_spaces`.'),
             schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current ones first: aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
             apps: z.any().optional().describe('FULL replacement list of apps pinned to this workspace ([] clears). ARRAY of { owner, filename, label? } referencing published apps (/v1/apps). Pinning is launch-context/presentation only — workspace data access stays gated per call. Creator/admin only.'),
+            member_changes: z.enum(['direct', 'suggest']).optional().describe("How this workspace takes a change from a member who is neither its creator nor an organism admin (adding a space, changing sections): 'direct' = it lands at once with their name on it; 'suggest' = it waits until the creator or an admin approves it (the default). Creator/admin only."),
         },
         annotationsFor('aimeat_workspace_update'),
-        async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps }): Promise<TextResult> => {
+        async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps, member_changes }): Promise<TextResult> => {
             const role = await roleOf(organism_id);
             if (!role) return fail('You are not a member of this organism.');
             // Archived is read-only, and structure is exactly what it protects. The web door has
@@ -460,6 +459,7 @@ export function registerWorkspaceTools(
                     manifest: parseObj(manifest) as Record<string, unknown> | undefined,
                     schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
                     apps: Array.isArray(appsParsed) ? appsParsed as Array<Record<string, unknown>> : undefined,
+                    memberChanges: member_changes,
                 });
                 emitChange('organisms');
                 void updateOrganismStructure(storage, config, organism_id, { event: 'workspace updated', actor: writerGaii }).catch(err => { logger.warn('async: timeline best-effort', { error: String(err) }); });
@@ -495,24 +495,12 @@ export function registerWorkspaceTools(
             // batched REST delete applies too.
             const deleted = await deleteWorkspaceInstance(storage, { base, callerGhii: ownerGhii });
             if (deleted === 0) return fail(`Nothing to delete at ${base} (no record/draft/latest/version).`);
-            // Best-effort: unfile the id from the document section tree (find the type by namespace).
-            const man = await readManifest(organism_id, ws);
-            const ot = (man?.objectTypes ?? []).find(o => o.namespace === namespace);
-            if (ot) {
-                const secKey = `${root}.meta.sections.${ot.name}`;
-                // Resolved across owners, as the write path resolves the same key. Reading it under
-                // the caller's own GHII found nothing whenever the section tree belonged to the
-                // workspace creator, so the tree kept the id and the delete was only half applied.
-                const secRec = await findByKey(secKey);
-                const sections = (secRec?.value as { sections?: { documents?: string[] }[] } | undefined)?.sections;
-                if (sections) {
-                    let changed = false;
-                    for (const s of sections) {
-                        if ((s.documents ?? []).includes(id)) { s.documents = (s.documents ?? []).filter(d => d !== id); changed = true; }
-                    }
-                    if (changed) await writeRecord(secKey, { sections }, secRec, ownerGhii);  // section tree = creator meta
-                }
-            }
+            // Take the id out of the document space's section index: services/workspace-member-changes.ts,
+            // which writes the index that counts and keeps its owner. This wrote the index under the
+            // caller and deleted the creator's, so a member's delete took the tree away from the creator.
+            // Only when no copy of the document is left under anyone.
+            await unfileDeletedDocument({ storage, config }, { principal: agentGaii, owner: ownerName, roles: ['agent'] },
+                { orgId: organism_id, ws, namespace, docId: id });
             emitChange('organisms');
             // The structure history records creates and publishes; without this it silently skipped an
             // agent's deletes, so a shrinking workspace had no recorded cause.
@@ -531,6 +519,11 @@ export function registerWorkspaceTools(
 
     registerWorkspaceMemberTools(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason,
         wsManager, setWsRole, revokeWsRole, findWsEntry, roleOf, writeRecord, ensureConsent, bareOwner });
+
+    // ── aimeat_workspace_space_add / _sections_set / _suggestions ── a member's change to a
+    // workspace, and a manager's decision on a member's suggestion. ./workspace-member-changes.ts,
+    // calling the services the REST routes call.
+    registerWorkspaceMemberChangeTools(mcp, { storage, config, agentGaii, ownerName });
 
     // ── aimeat_workspace_transfer ── (workspace export/import as a base64 ZIP)
     // Extracted to workspace-transfer.ts; registered here to preserve tool order.

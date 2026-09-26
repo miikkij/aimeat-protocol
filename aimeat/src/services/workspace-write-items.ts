@@ -20,6 +20,8 @@
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
  *   const refusal = await undeclaredSpaceForKey(storage, key);   // before anything is written
  * @version-history
+ *   v1.5.0 — 2026-09-25 — The UNDECLARED_SPACE refusal names the member's door too: a contributor
+ *     adds the space with aimeat_workspace_space_add, under the workspace's rule.
  *   v1.4.0 — 2026-09-24 — readPublishSpace takes the space's own settings (`ot`) from the copy of the
  *     manifest that counts (services/workspace-meta.ts) when the caller passes `nodeId`, instead of the
  *     first live copy the scan returned. The UNDECLARED_SPACE decision still reads every copy.
@@ -283,7 +285,7 @@ export function undeclaredSpaceRefusal(
     }
 
     const declareRoute = `PUT /v1/organisms/${ctx.organismId}/workspace?ws=${ctx.ws} with { add_object_types: [{ name, namespace, mode }], schemas }, or aimeat_workspace_update { organism_id, ws, add_spaces, schemas }`;
-    const declareWho = 'Only the workspace creator or an organism admin may: a plain member is answered 403 NOT_CREATOR, and any other answer is a failure to show someone who can act.';
+    const declareWho = 'Only the workspace creator or an organism admin may: a plain member is answered 403 NOT_CREATOR, and any other answer is a failure to show someone who can act. A member holding the contributor role adds the space with aimeat_workspace_space_add or POST /v1/organisms/{id}/workspace/spaces instead, where the workspace\'s rule decides whether it lands at once or waits for an approval.';
 
     const other = types.find(o => matches(o) && !isMemoryBackedSpace(o));
     if (other && audience === 'member') {

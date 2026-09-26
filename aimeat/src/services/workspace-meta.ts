@@ -11,7 +11,9 @@
  *   the `aimeat_workspace_update` MCP tool and PUT /v1/organisms/:id/workspace.
  * @structure updateWorkspaceMeta(storage, config, opts); WorkspaceMetaError; the reader every surface
  *   shares for a workspace's meta records: workspaceMetaReader / readWorkspaceMetaRecord /
- *   readWorkspaceManifest over workspaceRegistrations + pickWorkspaceMetaCopy
+ *   readWorkspaceManifest over workspaceRegistrations + pickWorkspaceMetaCopy; unionObjectTypes (the
+ *   additive space union) and writeWorkspaceMetaRecord (the one meta write); the workspace's rule for
+ *   its members' changes: MemberChangeRule / normalizeMemberChangeRule / readMemberChangeRule
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: in-place name + readme update.
  *   v1.1.0 — 2026-06-09 — Manifest + schemas: one update path for structure (spaces/gate/settings).
@@ -60,16 +62,46 @@
  *     reads a workspace, what it shares and how a space publishes take the copy that counts too.
  *     workspaceRegistrations() reads the registry once for a whole organism, archived copies
  *     included; updateWorkspaceMeta writes the readme and apps copies the readers take.
+ *   v1.12.0 — 2026-09-25 — The workspace's rule for its plain members' changes, `member_changes`
+ *     ('direct' | 'suggest', default 'suggest'), as its own meta record (`…meta.rules`) that a manifest
+ *     replace cannot clobber; updateWorkspaceMeta sets it, creator or admin only, and
+ *     readMemberChangeRule reads the copy that counts. unionObjectTypes() and writeWorkspaceMetaRecord()
+ *     are the additive space union and the meta write, moved out unchanged so the member change doors
+ *     (services/workspace-member-changes.ts) add a space the way this path does. NOT_CREATOR names
+ *     those doors.
  */
 import type { Storage, MemoryRecord, ArchiveFilter } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { validateMemoryWrite } from './schema-validator.js';
 
 export class WorkspaceMetaError extends Error {
-  constructor(public code: 'WS_NOT_FOUND' | 'NOT_CREATOR' | 'NOTHING_TO_UPDATE' | 'INVALID_MANIFEST' | 'INVALID_APPS', message: string) {
+  constructor(public code: 'WS_NOT_FOUND' | 'NOT_CREATOR' | 'NOTHING_TO_UPDATE' | 'INVALID_MANIFEST' | 'INVALID_APPS' | 'INVALID_RULE', message: string) {
     super(message);
     this.name = 'WorkspaceMetaError';
   }
+}
+
+/**
+ * How a workspace takes a change from a plain member (neither its creator nor an organism admin):
+ * adding a space, or changing the sections of a document space. 'direct' writes it at once into the
+ * workspace's own records with the member's name on it; 'suggest' files it as a suggestion that the
+ * creator or an admin approves or declines. The default is 'suggest': nothing a member does changes
+ * someone else's structure until its owner has chosen that it may.
+ */
+export type MemberChangeRule = 'direct' | 'suggest';
+export const DEFAULT_MEMBER_CHANGE_RULE: MemberChangeRule = 'suggest';
+
+/** The rule a value names, or null when it names none. */
+export function normalizeMemberChangeRule(v: unknown): MemberChangeRule | null {
+  return v === 'direct' || v === 'suggest' ? v : null;
+}
+
+/** The rule in force on one workspace: the copy of `…meta.rules` that counts, else the default. */
+export async function readMemberChangeRule(
+  storage: Storage, orgId: string, wsId: string, nodeId: string,
+): Promise<MemberChangeRule> {
+  const rec = await readWorkspaceMetaRecord(storage, orgId, wsId, 'meta.rules', nodeId);
+  return normalizeMemberChangeRule((rec?.value as { member_changes?: unknown } | null)?.member_changes) ?? DEFAULT_MEMBER_CHANGE_RULE;
 }
 
 /** Backings the workspace tooling actually implements. 'memory' spaces hold records/documents as
@@ -395,6 +427,61 @@ export function readWorkspaceMetaRecord(
   return workspaceMetaReader(storage, orgId, nodeId).read(wsId, rel, opts);
 }
 
+/**
+ * Write one workspace meta record over `prev`, the copy the readers take, keeping its owner, its
+ * visibility and its tags. The one meta write: updateWorkspaceMeta and the member change doors both
+ * land here, so a change goes into the workspace's own record and never beside it.
+ */
+export async function writeWorkspaceMetaRecord(
+  storage: Storage, key: string, ownerGaii: string, value: unknown, prev: MemoryRecord | null,
+): Promise<void> {
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key, ownerGaii, value,
+    visibility: prev?.visibility ?? 'private', tags: prev?.tags ?? [], ttlHours: prev?.ttlHours ?? null,
+    version: (prev?.version ?? 0) + 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
+  });
+}
+
+/**
+ * The additive union: `addObjectTypes` joined to a manifest's objectTypes, skipping any whose name OR
+ * namespace already exists (idempotent), never touching an existing space, and filling the defaults
+ * of the backing each one is added with. `stamp` is merged into every space this adds, which is where
+ * the member change doors record who added it and when. Throws WorkspaceMetaError on an entry
+ * without a name and a namespace, or one normalizeObjectTypes refuses.
+ */
+export function unionObjectTypes(
+  current: Record<string, unknown>,
+  addObjectTypes: Array<Record<string, unknown>>,
+  stamp?: Record<string, unknown>,
+): { objectTypes: Array<Record<string, unknown>>; added: string[]; skipped: string[] } {
+  const added: string[] = [];
+  const skipped: string[] = [];
+  const existing = ((current.objectTypes as Array<Record<string, unknown>> | undefined) ?? []).slice();
+  const haveName = new Set(existing.map(o => o.name));
+  const haveNs = new Set(existing.map(o => o.namespace));
+  for (const raw of addObjectTypes) {
+    if (!raw || typeof raw !== 'object' || !raw.name || !raw.namespace) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Each add_spaces entry needs a name and a namespace.');
+    if (haveName.has(raw.name) || haveNs.has(raw.namespace)) { skipped.push(String(raw.name)); continue; }
+    // The defaults belong to the KIND of space being added, and they were the memory ones for
+    // everybody until 2026-09-14. A row space arrived carrying `versioned: true`, which its own
+    // rule refuses, so add_spaces rejected every row space whose caller had not thought to pass
+    // `versioned: false` — a refusal naming a field the caller never set. And `mode` is how a
+    // MEMORY space stores what it holds (a schema-locked record or a markdown page); a row space
+    // has neither, so stamping `mode: 'records'` on it tells every reader whose test is the mode
+    // that this is a records space.
+    const isRows = (raw.backing ?? 'memory') === 'rows';
+    const defaults: Record<string, unknown> = isRows
+      ? { backing: 'rows', writeRole: 'member', cardinality: 'many', versioned: false }
+      : { mode: raw.kind === 'document' ? 'document' : 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true };
+    const ot: Record<string, unknown> = normalizeObjectTypes([{
+      ...defaults, ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1`,
+    }])[0];
+    existing.push(stamp ? { ...ot, ...stamp } : ot); haveName.add(raw.name); haveNs.add(raw.namespace); added.push(String(raw.name));
+  }
+  return { objectTypes: existing, added, skipped };
+}
+
 export interface UpdateWorkspaceOpts {
   orgId: string;
   ws: string;
@@ -416,13 +503,15 @@ export interface UpdateWorkspaceOpts {
    *  published app by { owner, filename } (+ optional label). Binding is presentation/launch-context
    *  only — access to workspace DATA stays enforced per call by the workspace gates. */
   apps?: Array<Record<string, unknown>>;
+  /** The workspace's rule for its plain members' changes ('direct' | 'suggest'), stored as `…meta.rules`. */
+  memberChanges?: unknown;
 }
 
 export async function updateWorkspaceMeta(
   storage: Storage,
   config: AimeatConfig,
   opts: UpdateWorkspaceOpts,
-): Promise<{ updated: string[]; creator: string; name?: string; added?: string[]; skipped?: string[] }> {
+): Promise<{ updated: string[]; creator: string; name?: string; added?: string[]; skipped?: string[]; member_changes?: MemberChangeRule }> {
   const { orgId, ws, callerOwner, isAdmin } = opts;
   const name = typeof opts.name === 'string' ? opts.name.trim() : undefined;
   const readme = typeof opts.readme === 'string' ? opts.readme : undefined;
@@ -430,7 +519,9 @@ export async function updateWorkspaceMeta(
   const addObjectTypes = (Array.isArray(opts.addObjectTypes) && opts.addObjectTypes.length) ? opts.addObjectTypes : undefined;
   const schemas = (opts.schemas && typeof opts.schemas === 'object') ? opts.schemas : undefined;
   const apps = Array.isArray(opts.apps) ? opts.apps : undefined;
-  if (!name && readme === undefined && !manifest && !addObjectTypes && !schemas && apps === undefined) throw new WorkspaceMetaError('NOTHING_TO_UPDATE', 'Provide a new name, readme, manifest, add_spaces, schemas and/or apps.');
+  const memberChanges = opts.memberChanges === undefined ? undefined : normalizeMemberChangeRule(opts.memberChanges);
+  if (opts.memberChanges !== undefined && !memberChanges) throw new WorkspaceMetaError('INVALID_RULE', "member_changes is 'direct' (members change the workspace at once) or 'suggest' (members suggest, and the creator or an admin approves).");
+  if (!name && readme === undefined && !manifest && !addObjectTypes && !schemas && apps === undefined && !memberChanges) throw new WorkspaceMetaError('NOTHING_TO_UPDATE', 'Provide a new name, readme, manifest, add_spaces, schemas, apps and/or member_changes.');
 
   const root = `organism.${orgId}.w.${ws}`;
   // The workspace's registry entry lives in its creator's registry record — find it across members.
@@ -439,7 +530,9 @@ export async function updateWorkspaceMeta(
   if (!registration) throw new WorkspaceMetaError('WS_NOT_FOUND', 'Workspace not found');
   const regRec: MemoryRecord = registration.record;
   const entry = registration.entry;
-  if (entry.createdBy !== callerOwner && !isAdmin) throw new WorkspaceMetaError('NOT_CREATOR', 'Only the workspace creator (or an org admin) can update it.');
+  if (entry.createdBy !== callerOwner && !isAdmin) {
+    throw new WorkspaceMetaError('NOT_CREATOR', 'Only the workspace creator (or an org admin) can update it. A member adds a space with aimeat_workspace_space_add and changes the sections of a document space with aimeat_workspace_sections_set; the workspace\'s own rule decides whether that lands at once or waits for an admin to approve it.');
+  }
 
   const meta = (await storage.listAllMemory({ prefix: `${root}.meta.`, limit: 200 })).items;
   // The copies the readers read (workspaceMetaReader), so an edit lands where every reader looks.
@@ -455,13 +548,8 @@ export async function updateWorkspaceMeta(
   const updated: string[] = [];
   const added: string[] = [];
   const skipped: string[] = [];
-  const write = async (key: string, ownerGaii: string, value: unknown, prev: MemoryRecord | null) => {
-    await storage.setMemory({
-      key, ownerGaii, value,
-      visibility: prev?.visibility ?? 'private', tags: prev?.tags ?? [], ttlHours: prev?.ttlHours ?? null,
-      version: (prev?.version ?? 0) + 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
-    });
-  };
+  const write = (key: string, ownerGaii: string, value: unknown, prev: MemoryRecord | null) =>
+    writeWorkspaceMetaRecord(storage, key, ownerGaii, value, prev);
   const syncRegistryName = async (newName: string) => {
     const list = (((regRec!.value as { workspaces?: Array<Record<string, unknown>> }).workspaces) ?? []).map(w => (w.id === ws ? { ...w, name: newName } : w));
     await write(regKey, regRec!.ownerGaii, { workspaces: list }, regRec);
@@ -496,30 +584,10 @@ export async function updateWorkspaceMeta(
     // caller can pass just { name, namespace, mode (+ a schema) }.
     const current = (manRec?.value && typeof manRec.value === 'object' && !Array.isArray(manRec.value)) ? { ...(manRec.value as Record<string, unknown>) } : null;
     if (!current || !Array.isArray(current.objectTypes)) throw new WorkspaceMetaError('WS_NOT_FOUND', 'Workspace has no manifest to extend.');
-    const existing = (current.objectTypes as Array<Record<string, unknown>>).slice();
-    const haveName = new Set(existing.map(o => o.name));
-    const haveNs = new Set(existing.map(o => o.namespace));
-    for (const raw of addObjectTypes) {
-      if (!raw || typeof raw !== 'object' || !raw.name || !raw.namespace) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Each add_spaces entry needs a name and a namespace.');
-      if (haveName.has(raw.name) || haveNs.has(raw.namespace)) { skipped.push(String(raw.name)); continue; }
-      // The defaults belong to the KIND of space being added, and they were the memory ones for
-      // everybody until 2026-09-14. A row space arrived carrying `versioned: true`, which its own
-      // rule refuses, so add_spaces rejected every row space whose caller had not thought to pass
-      // `versioned: false` — a refusal naming a field the caller never set. And `mode` is how a
-      // MEMORY space stores what it holds (a schema-locked record or a markdown page); a row space
-      // has neither, so stamping `mode: 'records'` on it tells every reader whose test is the mode
-      // that this is a records space.
-      const isRows = (raw.backing ?? 'memory') === 'rows';
-      const defaults: Record<string, unknown> = isRows
-        ? { backing: 'rows', writeRole: 'member', cardinality: 'many', versioned: false }
-        : { mode: raw.kind === 'document' ? 'document' : 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true };
-      const ot: Record<string, unknown> = normalizeObjectTypes([{
-        ...defaults, ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1`,
-      }])[0];
-      existing.push(ot); haveName.add(raw.name); haveNs.add(raw.namespace); added.push(String(raw.name));
-    }
+    const union = unionObjectTypes(current, addObjectTypes);
+    added.push(...union.added); skipped.push(...union.skipped);
     if (added.length) {
-      const manifestValue: Record<string, unknown> = { ...current, objectTypes: existing, id: orgId, status: (current.status as string) || 'active' };
+      const manifestValue: Record<string, unknown> = { ...current, objectTypes: union.objectTypes, id: orgId, status: (current.status as string) || 'active' };
       if (name) manifestValue.name = name;
       const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);
       if (!valid.valid) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Manifest rejected by schema: ' + JSON.stringify(valid.errors));
@@ -554,5 +622,14 @@ export async function updateWorkspaceMeta(
     updated.push('apps');
   }
 
-  return { updated, creator: entry.createdBy ?? '', name, ...(addObjectTypes ? { added, skipped } : {}) };
+  // 5. The rule for the members' changes. Its own record, like the readme and the apps, so a manifest
+  // replace never resets it; written into the copy the readers take, with who set it and when.
+  if (memberChanges) {
+    const rulesRec = await pickMeta('meta.rules');
+    const prevRules = (rulesRec?.value && typeof rulesRec.value === 'object' && !Array.isArray(rulesRec.value)) ? rulesRec.value as Record<string, unknown> : {};
+    await write(`${root}.meta.rules`, rulesRec?.ownerGaii ?? creatorGhii, { ...prevRules, member_changes: memberChanges, updatedBy: callerOwner, updatedAt: now }, rulesRec);
+    updated.push('rules');
+  }
+
+  return { updated, creator: entry.createdBy ?? '', name, ...(addObjectTypes ? { added, skipped } : {}), ...(memberChanges ? { member_changes: memberChanges } : {}) };
 }

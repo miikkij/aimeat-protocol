@@ -22,6 +22,8 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-25 — aimeat_workspace_space_add, aimeat_workspace_sections_set and
+ *     aimeat_workspace_suggestions beside the document tools on appdev, agent and service.
  *   2026-09-25 — aimeat_admin_federation_relay_claim_set beside aimeat_admin_federation.
  *   2026-09-25 — aimeat_package_install_requests on `appdev` and `agent`, beside the install it answers.
  *   2026-09-24 — aimeat_theme_policy_set beside the other theme tools.
@@ -159,6 +161,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments',
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
+        'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink', 'aimeat_skill_update',
         'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
         'aimeat_app_fork', 'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
@@ -233,6 +236,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments',
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
+        'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         'aimeat_discover',
         'aimeat_catalogue_agents', 'aimeat_catalogue_directory', 'aimeat_catalogue_boards',
         'aimeat_board_read',
@@ -279,6 +283,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments',
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
+        'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_crew_menu', 'aimeat_crew_llm_set',

@@ -16,9 +16,13 @@
  *   import { expireOverdueApprovals, startGateExpiryJob } from '../services/gate-expiry.js';
  * @version-history
  *   v1.0.0 -- 2026-06-07 -- Phase 4: durable pause — abort-on-deadline.
+ *   v1.1.0 -- 2026-09-25 -- The sweep tells the member whose suggested workspace change expired
+ *     (services/workspace-suggestion-notices.ts): a suggestion is an approval that somebody is
+ *     waiting on, and an expiry nobody hears of reads as an admin who never answered.
  */
 import type { Storage, PendingApprovalRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { isMemberChangeAction, noticeRequester } from './workspace-suggestion-notices.js';
 
 export function isOverdue(a: PendingApprovalRecord, nowIso: string): boolean {
   return a.status === 'pending' && !!a.deadline && a.deadline < nowIso;
@@ -37,7 +41,10 @@ export async function expireApproval(storage: Storage, approvalId: string, nowIs
 /** Sweep every overdue pending approval to rejected. Returns how many were expired. */
 export async function expireOverdueApprovals(storage: Storage, nowIso: string): Promise<number> {
   const overdue = await storage.listOverduePendingApprovals(nowIso);
-  for (const a of overdue) await expireApproval(storage, a.id, nowIso);
+  for (const a of overdue) {
+    await expireApproval(storage, a.id, nowIso);
+    if (isMemberChangeAction(a.action)) await noticeRequester(storage, a, 'expired');
+  }
   return overdue.length;
 }
 

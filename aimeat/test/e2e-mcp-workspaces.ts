@@ -23,6 +23,9 @@
  *     namespace and _update accepts that same map back (the round-trip that was impossible while the
  *     only reader was a REST call), and the batch-open branch does not repeat them. 13b fails on the
  *     tree before the fix.
+ *   v1.7.0 — 2026-09-25 — Test 34b: aimeat_workspace_access decide over MCP writes the decision on
+ *     the request record and tells the requester, as the REST decision route does. Fails on the tree
+ *     before the fix: the request read 'pending' after an MCP denial and B heard nothing.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -772,6 +775,30 @@ await test('34. workspace_access decide honors an explicit role, defaults to con
     assert(bRow?.role === 'viewer' && bRow?.source === 'request', `decide grant source=request: ${JSON.stringify(bRow)}`);
     const ap2 = await A.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'decide', requester: B.ownerName, decision: 'approve' }, 1344);
     assert(JSON.parse(ap2.result.content[0].text).role === 'contributor', 'decide default (no role) stays contributor');
+});
+
+await test('34b. workspace_access decide over MCP writes the decision on the request and tells the requester, as the REST door does', async () => {
+    // The MCP decide granted or revoked and stopped: no status on the request record, so a denial read
+    // as pending in the reviewer's panel, and no notification, so B never heard either answer.
+    const bOwner = () => ({ Authorization: `Bearer ${B.ownerToken}` });
+    const requestRow = async () => ((await json(`/v1/organisms/${bootOrgId}/workspace-access?ws=${bootWs.id}`, { headers: aOwner() })).body.data.requests || [])
+        .find((r: any) => r.requester === B.ownerName);
+    const heard = async (type: string) => ((await json('/v1/notifications?limit=200', { headers: bOwner() })).body.data.notifications || []).some((n: any) => n.type === type);
+
+    await A.client.call('aimeat_workspace_member_revoke', { organism_id: bootOrgId, ws: bootWs.id, grantee: B.ownerName }, 1345);
+    const rq = await B.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'request', message: 'once more' }, 1346);
+    assert(rq.result.isError !== true, `request: ${rq.result.content?.[0]?.text}`);
+    const deny = await A.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'decide', requester: B.ownerName, decision: 'deny' }, 1347);
+    assert(JSON.parse(deny.result.content[0].text).status === 'denied', `deny: ${deny.result.content?.[0]?.text}`);
+    assert((await requestRow())?.status === 'denied', `the denial is written on the request: ${JSON.stringify(await requestRow())}`);
+    assert(await heard('workspace_access_denied'), 'B heard the denial');
+    assert((await bWrite('b-after-mcp-deny')).status === 403, 'the denial took the role away');
+
+    await B.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'request', message: 'and again' }, 1348);
+    const ap = await A.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'decide', requester: B.ownerName, decision: 'approve' }, 1349);
+    assert(JSON.parse(ap.result.content[0].text).status === 'approved', `approve: ${ap.result.content?.[0]?.text}`);
+    assert((await requestRow())?.status === 'approved', `the approval is written on the request: ${JSON.stringify(await requestRow())}`);
+    assert(await heard('workspace_access_approved'), 'B heard the approval');
 });
 
 // ── Batch writes: one tool CALL for a whole migration ──

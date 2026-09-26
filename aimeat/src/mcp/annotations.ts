@@ -23,6 +23,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-25 — aimeat_workspace_space_add and aimeat_workspace_sections_set (writes, idempotent,
+ *     nothing destroyed) and aimeat_workspace_suggestions (a decision writes).
  *   2026-09-25 — aimeat_admin_federation_relay_claim_set (idempotent, nothing destroyed).
  *   2026-09-25 — aimeat_package_install_requests (a write that installs on approval; idempotent).
  *   2026-09-24 — aimeat_theme_policy_set (idempotent, nothing destroyed).
@@ -256,6 +258,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_mcp_grant_revoke: { title: 'Remove a Narrowing', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_mcp_detach: { title: 'Remove an MCP Server', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_workspace_space_add: { title: 'Add Workspace Space', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_workspace_sections_set: { title: 'Set Workspace Sections', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_workspace_suggestions: { title: 'Workspace Suggestions', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_organism_overview: { title: 'Organism Structure Overview', readOnlyHint: true },
     aimeat_workspace_overview: { title: 'Workspace Structure Overview', readOnlyHint: true },
 

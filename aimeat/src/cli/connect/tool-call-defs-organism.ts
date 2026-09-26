@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 -- 2026-09-25 -- aimeat_workspace_space_add, _sections_set and _suggestions reach the node's
+ *     member change doors; _update forwards `member_changes`; _write files a document under a section,
+ *     and _object_delete takes a deleted one out, through the section door (workspace-section-filing.ts),
+ *     where both wrote the index with POST /v1/memory and read no answer.
  *   v1.5.0 -- 2026-09-06 -- organism get/join/leave/members read `organism_id`, the name the catalog
  *     publishes and the rest of this file already used. They read `id`, so the dispatch refused the
  *     published name and all four were unreachable. join carries `message`, members carries
@@ -22,6 +26,7 @@ import { randomUUID } from 'node:crypto';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalArray, optionalBoolean, requiredArray, coerceObject, stampValue, genWsId, wsRoot } from './tool-call-helpers.js';
 import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem, type WriteObjectType } from '../../services/workspace-write-items.js';
+import { fileThroughDoor, unfileThroughDoor, sectionsFromRead } from './workspace-section-filing.js';
 
 export const organismTools: ConnectCliToolDefinition[] = [
     {
@@ -373,17 +378,15 @@ export const organismTools: ConnectCliToolDefinition[] = [
                 planned.push({ key, v: stampValue(coerceObject(item.value), item.instanceId), item });
             }
             const written: JsonObject[] = [];
+            const sectionsCache = sectionsFromRead(wsResp.data);
             for (const { key, v, item } of planned) {
                 const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
                 if (!wr.ok) return wr;
-                if (item.isDoc && item.section) {
-                    const secKey = `${wsRoot(orgId, ws)}.meta.sections.${item.space}`;
-                    const secResp = await client.get(`/v1/memory${query({ prefix: secKey })}`);
-                    const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
-                    const targetSec = sections.find(s => s.id === item.section || s.name === item.section);
-                    if (targetSec) { targetSec.documents = [...(targetSec.documents ?? []).filter(d => d !== item.instanceId), item.instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
-                }
-                written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
+                // Filed through the node's section door, under the workspace's rule; the answer says how.
+                const filing = item.isDoc && item.section
+                    ? await fileThroughDoor(client, { orgId, ws, space: item.space, doc: item.instanceId, section: item.section }, sectionsCache)
+                    : undefined;
+                written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null, ...(filing ? { section_filing: filing as unknown as JsonObject } : {}) });
             }
             return { ok: true, data: batch ? { count: written.length, items: written } : written[0] };
         },
@@ -409,7 +412,8 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const add = coerceObject(input.add_spaces); if (Array.isArray(add)) body.add_spaces = add;
             if (input.manifest !== undefined) body.manifest = coerceObject(input.manifest);
             if (input.schemas !== undefined) body.schemas = coerceObject(input.schemas);
-            if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, add_spaces, manifest and/or schemas.');
+            const memberChanges = optionalString(input, 'member_changes'); if (memberChanges !== undefined) body.member_changes = memberChanges;
+            if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, add_spaces, manifest, schemas and/or member_changes.');
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`, body);
         },
     },
@@ -469,20 +473,11 @@ export const organismTools: ConnectCliToolDefinition[] = [
                 }
             }
             if (deleted === 0) return { ok: false, error: { code: 'NOT_FOUND', message: `Nothing to delete at ${base} (no record/draft/latest/version).` } };
-            // Best-effort: unfile the id from the document section tree (find the type by namespace).
+            // Take the id out of the document space's section index through the node's section door.
             const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace${query({ ws })}`);
             const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.namespace === namespace);
-            if (ot) {
-                const secKey = `${wsRoot(orgId, ws)}.meta.sections.${ot.name}`;
-                const secResp = await client.get(`/v1/memory${query({ prefix: secKey })}`);
-                const sections = (secResp.data as { items?: { key: string; value?: { sections?: { documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections;
-                if (sections) {
-                    let changed = false;
-                    for (const s of sections) { if ((s.documents ?? []).includes(id)) { s.documents = (s.documents ?? []).filter(d => d !== id); changed = true; } }
-                    if (changed) await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' });
-                }
-            }
-            return { ok: true, data: { deleted: base, keys: deleted } };
+            const unfiled = ot ? await unfileThroughDoor(client, { orgId, ws, space: ot.name, doc: id }, sectionsFromRead(wsResp.data)) : null;
+            return { ok: true, data: { deleted: base, keys: deleted, ...(unfiled ? { section_unfiling: unfiled as unknown as JsonObject } : {}) } };
         },
     },
     {
@@ -556,6 +551,40 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const orgId = requiredString(input, 'organism_id');
             const ws = requiredString(input, 'ws');
             return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access${query({ ws })}`);
+        },
+    },
+    // ── A member's change to a workspace, and the decision on a member's suggestion: the node's REST
+    //    doors, which apply the workspace's rule and decide who may decide. ──
+    {
+        name: 'aimeat_workspace_space_add',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { spaces: coerceObject(input.spaces) as JsonObject };
+            if (input.schemas !== undefined) body.schemas = coerceObject(input.schemas) as JsonObject;
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/spaces${query({ ws: requiredString(input, 'ws') })}`, body);
+        },
+    },
+    {
+        name: 'aimeat_workspace_sections_set',
+        handler: ({ client }, input) => client.put(
+            `/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/sections/${encodeURIComponent(requiredString(input, 'space'))}${query({ ws: requiredString(input, 'ws') })}`,
+            { sections: coerceObject(input.sections) as JsonObject },
+        ),
+    },
+    {
+        name: 'aimeat_workspace_suggestions',
+        handler: ({ client }, input) => {
+            const base = `/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/suggestions`;
+            const action = requiredString(input, 'action');
+            if (action === 'list') return client.get(`${base}${query({ ws: optionalString(input, 'ws'), status: optionalString(input, 'status') })}`);
+            if (action === 'decide') {
+                const sid = optionalString(input, 'suggestion_id');
+                if (!sid) throw new Error("action='decide' needs a suggestion_id: list them with action='list'.");
+                const body: JsonObject = {};
+                const decision = optionalString(input, 'decision'); if (decision !== undefined) body.decision = decision;
+                const note = optionalString(input, 'note'); if (note !== undefined) body.note = note;
+                return client.post(`${base}/${encodeURIComponent(sid)}`, body);
+            }
+            throw new Error("action must be 'list' or 'decide'.");
         },
     },
     // NOTE: the organism email-invitation tools (aimeat_organism_invite_email / _invitations_email /

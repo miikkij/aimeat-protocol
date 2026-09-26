@@ -11,6 +11,10 @@
  *   Access and grant live together because they are the two halves of ONE membership decision —
  *   someone asks, someone decides — and both were already reaching for the same role helpers.
  * @version-history
+ *   v1.2.0 — 2026-09-25 — aimeat_workspace_access decide runs the REST decision route's own function
+ *     (services/workspace-access-decision.ts): it writes the decision on the request record and tells
+ *     the requester, where it granted or revoked and stopped. `list` reads the written status, so a
+ *     request an agent denied reads as denied on both doors.
  *   v1.1.0 — 2026-08-01 — aimeat_workspace_access moved here from workspaces.ts (pure extraction,
  *     registration order preserved: it registers before the grant tools, exactly as before).
  *   v1.0.0 — 2026-07-13 — Extracted from mcp/workspaces.ts (max-file-lines)
@@ -22,6 +26,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { granteeOwner, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
+import { decideAccessRequest, requestStatus } from '../services/workspace-access-decision.js';
 import type { Storage } from '../storage/interface.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -37,7 +42,7 @@ export interface WorkspaceMemberToolsCtx {
     setWsRole: (creatorGhii: string, orgId: string, ws: string, grantee: string, role: WsRole, source: 'grant' | 'request', grantedBy: string) => Promise<unknown>;
     revokeWsRole: (creatorGhii: string, orgId: string, ws: string, grantee: string) => Promise<number>;
     /** Find a workspace's registry entry across every member's registry. */
-    findWsEntry: (orgId: string, ws: string) => Promise<{ createdBy: string; ownerGaii: string } | null>;
+    findWsEntry: (orgId: string, ws: string) => Promise<{ createdBy: string; ownerGaii: string; name?: string } | null>;
     /** The caller's role in the organism ('creator' | 'admin' | …), or null. */
     roleOf: (orgId: string) => Promise<string | null>;
     writeRecord: (key: string, value: unknown, prev: null, owner?: string) => Promise<void>;
@@ -88,9 +93,10 @@ export function registerWorkspaceMemberTools(
                 const roles = await listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: organism_id, ws });
                 const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
                 const requests = items.map(r => {
-                    const v = r.value as { requester?: string; message?: string; createdAt?: string };
+                    const v = r.value as { requester?: string; message?: string; createdAt?: string; status?: string };
                     const req = v.requester ?? bareOwner(r.ownerGaii);
-                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: roles.has(req) ? 'approved' : 'pending', role: roles.get(req)?.role ?? null };
+                    // The written status, as the REST list reads it: a denial is 'denied', not 'pending'.
+                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: requestStatus(v, req, roles), role: roles.get(req)?.role ?? null };
                 });
                 const members = [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null }));
                 return ok({ ws, requests, members });
@@ -98,18 +104,16 @@ export function registerWorkspaceMemberTools(
             if (action === 'decide') {
                 if (!requester) return fail("action='decide' needs a requester.");
                 if (!(await isManager())) return fail('Only the workspace creator or an org admin can decide access.');
-                // Grants are owned by the workspace CREATOR (so reads resolve via the content owner).
-                const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
-                if (decision === 'deny') {
-                    await revokeWsRole(creatorGhii, organism_id, ws, requester);
-                    emitChange('organisms');
-                    return ok({ status: 'denied', ws, requester });
-                }
-                // Explicit `role` wins; else preserve the historical default (contributor unless decision='viewer').
-                const granted: WsRole = role ?? (decision === 'viewer' ? 'viewer' : 'contributor');
-                await setWsRole(creatorGhii, organism_id, ws, requester, granted, 'request', ownerName);
-                emitChange('organisms');
-                return ok({ status: 'approved', ws, requester, role: granted });
+                // Grant or revoke, write the decision on the request record and tell the requester: the
+                // function the REST decision route calls. This path used to grant or revoke and stop,
+                // so a denial read as pending in the reviewer's panel and the requester heard nothing.
+                // Explicit `role` wins; else the historical default (contributor unless decision='viewer').
+                const decided = await decideAccessRequest({ storage, config }, {
+                    orgId: organism_id, ws, wsName: entry.name ?? ws, creator: entry.createdBy, requester,
+                    decision: decision === 'deny' ? 'deny' : 'approve',
+                    role: role ?? (decision === 'viewer' ? 'viewer' : 'contributor'), decidedBy: ownerName,
+                });
+                return ok({ ...decided, ws, requester });
             }
             return fail("action must be 'request', 'list' or 'decide'.");
         });

@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.58.0 -- 2026-09-25 -- Add e2e-workspace-member-changes.ts to ALL_SUITES: a plain member adds a
+ *            space and changes sections under the workspace's rule, and the decision on a member's
+ *            suggestion (REST and MCP). Not in the guard tier.
  *   v1.57.0 -- 2026-09-25 -- Add e2e-operator-admin-migration.ts to ALL_SUITES: the once-per-node
  *            migration that gives the operator's full-access agents operator:admin, across three
  *            boots of its own node on 40447. Not in the guard tier.
@@ -705,6 +708,7 @@ const ALL_SUITES = [
     'test/e2e-workspace-backing-gate.ts',
     'test/e2e-workspace-rows.ts',
     'test/e2e-workspace-doc-edit.ts',
+    'test/e2e-workspace-member-changes.ts',
     'test/e2e-workspace-public-sharing.ts',
     'test/e2e-workspace-public-records.ts',
     'test/e2e-workspace-member-records.ts',

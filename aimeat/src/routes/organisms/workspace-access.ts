@@ -6,6 +6,9 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-09-25 — The access decision (grant or revoke, the record, the notification) and
+ *     requestStatus move to services/workspace-access-decision.ts unchanged, so the MCP decide path
+ *     records and tells the requester as this route does.
  *   v1.10.0 — 2026-09-24 — The discovery list's enrichment reads each workspace's manifest and apps
  *     records through services/workspace-meta.ts, the copy that counts, not the first the scan held.
  *   v1.9.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 15): the four email-invitation doors
@@ -62,6 +65,7 @@ import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { workspaceMetaReader } from '../../services/workspace-meta.js';
+import { decideAccessRequest, requestStatus } from '../../services/workspace-access-decision.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
@@ -250,43 +254,8 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     res.status(201).json(success(config.nodeId, { status: 'requested', ws, workspace_creator: createdBy }));
   });
 
-  /**
-   * What a request record says about itself, with the pre-2026-08-15 fallback.
-   *
-   * The status used to be COMPUTED — `roles.has(requester) ? 'approved' : 'pending'` — and that
-   * expression has two values while the flow has four. A denied request produces no grant, so it read
-   * back as `pending` and returned to the reviewer's panel every time, for good: a request denied on
-   * 2026-07-11 was still sitting there a month later, and denying it again changed nothing. Same for a
-   * request whose author was removed from the organism. The decision is written down now; a record
-   * without one is old, and falls back to the grant it either has or does not.
-   */
-  function requestStatus(v: { status?: string }, requester: string, roles: Map<string, { role: string }>): string {
-    if (v.status === 'approved' || v.status === 'denied' || v.status === 'withdrawn') return v.status;
-    return roles.has(requester) ? 'approved' : 'pending';
-  }
-
-  /**
-   * Write the outcome onto the request record. The record is OWNED by the requester (their namespace,
-   * their key), and the person deciding is somebody else, so this is a server-side write that keeps
-   * the owner: the status is the node's answer about organism plumbing, not a claim the requester made
-   * about themselves. Returns false when there is no request to decide, which a direct grant produces.
-   */
-  async function recordRequestDecision(
-    id: string, ws: string, requester: string,
-    status: 'approved' | 'denied' | 'withdrawn', decidedBy: string,
-  ): Promise<boolean> {
-    const key = `organism.${id}.w.${ws}.access.request.${requester}`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    const rec = items.find(r => r.key === key);
-    if (!rec) return false;
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      ...rec,
-      value: { ...(rec.value as Record<string, unknown>), status, decidedBy, decidedAt: now },
-      updatedAt: now,
-    });
-    return true;
-  }
+  // requestStatus (what a request record says about itself) and the decision itself live in
+  // services/workspace-access-decision.ts, which the MCP aimeat_workspace_access decide path calls too.
 
   /* ── GET /v1/organisms/:id/workspace-access?ws= — the workspace creator (or org admin) lists the
    * pending/decided access requests for a workspace they own. ── */
@@ -372,36 +341,13 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     if (createdBy !== ownerName && role !== 'creator' && role !== 'admin') {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can decide access')); return;
     }
-    // Grants are owned by the WORKSPACE CREATOR (not the deciding admin), so reads resolve via the
-    // creator who owns the content. Approve assigns a role (default contributor; the body may ask for
-    // 'viewer'); deny revokes every workspace-role grant for the requester.
-    const wsCreatorGhii = `${createdBy}@${config.nodeId}`;
-    if (decision === 'approve') {
-      const role = (req.body?.role === 'viewer' ? 'viewer' : 'contributor') as 'viewer' | 'contributor';
-      await setWorkspaceRole(wsCreatorGhii, id, ws, requester, role, 'request', req.auth!.owner as string);
-      await recordRequestDecision(id, ws, requester, 'approved', ownerName);
-      await notify(storage, `${requester}@${config.nodeId}`, {
-        type: 'workspace_access_approved',
-        title: `Your access to "${entry.name ?? ws}" was approved (${role})`,
-        link: '/v1/profile#organisms',
-        i18n: { key: 'workspace_access_approved', vars: { ws: entry.name ?? ws, role } },
-      });
-      emitChange('notifications');
-      res.json(success(config.nodeId, { status: 'approved', ws, requester, role }));
-    } else {
-      await revokeWorkspaceRole(wsCreatorGhii, id, ws, requester);
-      // Without this the denial had nowhere to live: no grant is exactly what "never asked" looks
-      // like, so the request came straight back to this panel as pending.
-      await recordRequestDecision(id, ws, requester, 'denied', ownerName);
-      await notify(storage, `${requester}@${config.nodeId}`, {
-        type: 'workspace_access_denied',
-        title: `Your access request to "${entry.name ?? ws}" was declined`,
-        link: '/v1/profile#organisms',
-        i18n: { key: 'workspace_access_denied', vars: { ws: entry.name ?? ws } },
-      });
-      emitChange('notifications');
-      res.json(success(config.nodeId, { status: 'denied', ws, requester }));
-    }
+    // Grant or revoke, write the decision on the request record, tell the requester: the same
+    // function the MCP aimeat_workspace_access decide path calls (services/workspace-access-decision.ts).
+    const decided = await decideAccessRequest({ storage, config }, {
+      orgId: id, ws, wsName: entry.name ?? ws, creator: createdBy, requester, decision,
+      role: req.body?.role === 'viewer' ? 'viewer' : 'contributor', decidedBy: ownerName,
+    });
+    res.json(success(config.nodeId, { ...decided, ws, requester }));
   });
 
   /* ── POST /v1/organisms/:id/workspace-access/grant — creator/admin DIRECTLY adds a member with a role
