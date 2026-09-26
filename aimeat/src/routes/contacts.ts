@@ -15,6 +15,9 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.5.0 — 2026-09-25 — The per-account lookup limit moves into the service, which a save by email
+ *     also counts against (services/email-lookup-limit.ts); the resolve door's own limiter and the
+ *     per-caller limiter on saves by email are gone, and a RATE_LIMITED refusal carries Retry-After.
  *   v1.4.0 — 2026-09-25 — POST /v1/contacts/resolve admits an agent holding messages:read beside the
  *     owner in person, and counts 20 lookups in 10 minutes per account, the owner and their agents
  *     together, keyed by the owner GHII instead of per caller.
@@ -38,15 +41,13 @@
  *   v1.0.0 — 2026-07-16 — Initial: merged list, proactive save, gate-safe delete, email resolve.
  */
 import { Router } from 'express';
-import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ContactConsentRecord } from '../storage/interface.js';
 import type { OutboundContactLink } from '../models/outbound-schemas.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-import { rateBuckets } from '../services/rate-buckets.js';
-import { resolveIdentity, ownerCoordinate } from '../utils/gaii.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import {
   ContactsError, listContactsMerged, addContact, updatePersonContact, removeContact, resolveContactEmail,
   sendToContact, parseContactInclude, type AddContactInput,
@@ -57,12 +58,6 @@ import { createContactInvitation, ContactInvitationError } from '../services/con
 import { invitePublic } from '../services/invitations.js';
 import { mintContactHandle, resolveContactHandle } from '../services/contact-handles.js';
 import { resolveAppOriginTarget } from '../services/app-origin-target.js';
-
-/** How many email lookups one account may make: the owner and their agents together. */
-export const EMAIL_LOOKUP_LIMIT = { windowMs: 10 * 60 * 1000, max: 20 } as const;
-
-/** The count behind it, one per process, shared by every mount of the router. */
-const takeLookup = rateBuckets(EMAIL_LOOKUP_LIMIT.windowMs);
 
 /** Links as the caller sent them. Shape only — what is ACCEPTABLE (http(s), caps, count) is the
  *  service's decision, made once in normalizeLinks rather than again per surface. */
@@ -97,23 +92,14 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
-  /* One allowance of email lookups per ACCOUNT, keyed by the owner GHII: the owner and every agent
-   * acting for them draw on it together, so connecting a second agent does not double what one
-   * person can look up. Not per network address, because the MCP tool asks over loopback and every
-   * account would share one bucket; not per principal, which would give each agent its own. */
-  const limitLookupsPerAccount: RequestHandler = (req, res, next) => {
-    const counted = takeLookup(ownerCoordinate(req.auth!, config.nodeId), EMAIL_LOOKUP_LIMIT.max);
-    res.setHeader('X-RateLimit-Limit', counted.limit);
-    res.setHeader('X-RateLimit-Remaining', counted.remaining);
-    res.setHeader('X-RateLimit-Reset', Math.ceil(counted.resetAt / 1000));
-    if (counted.ok) { next(); return; }
-    res.setHeader('Retry-After', counted.retryAfterSec);
-    res.status(429).json(error(config.nodeId, 'RATE_LIMITED',
-      `This account has looked up ${EMAIL_LOOKUP_LIMIT.max} addresses in the last 10 minutes, the most one account may. `
-      + `Try again in ${counted.retryAfterSec} seconds. The owner and their agents share this limit.`, 429));
-  };
   const sendErr = (res: Parameters<Parameters<Router['get']>[1]>[1], e: unknown): boolean => {
-    if (e instanceof ContactsError) { res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details)); return true; }
+    if (e instanceof ContactsError) {
+      // The account's email lookups are used up (services/email-lookup-limit.ts): say when to come back.
+      const retry = (e.details as { retry_after_sec?: number } | undefined)?.retry_after_sec;
+      if (e.code === 'RATE_LIMITED' && retry) res.setHeader('Retry-After', retry);
+      res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
+      return true;
+    }
     return false;
   };
 
@@ -165,21 +151,14 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  /* Saving a person by email resolves the address to an account here and says so on the record,
-   * which is the same answer the email lookup gives; it stands behind the same limit. A save by id
-   * is not an address question and passes straight through. */
-  const personSaveLimit = rateLimit({ max: 20, windowMs: 10 * 60 * 1000 });
-  const limitPersonSaves: RequestHandler = (req, res, next) => {
-    const email = (req.body as Record<string, unknown> | undefined)?.email;
-    if (typeof email === 'string' && email.trim()) return personSaveLimit(req, res, next);
-    next();
-  };
-
   /* ── POST /v1/contacts — save a contact, in either shape:
    *   { contact_id }              a bare local owner name, GHII, GAII or GEAI
    *   { name, email, … }          a person, who may have no identity on this node
-   * A blocked contact stays blocked (409) — lift the block via Messages first. ── */
-  router.post('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('owner'), limitPersonSaves, async (req, res) => {
+   * A blocked contact stays blocked (409) — lift the block via Messages first. Saving a person by
+   * email says on the record whether the address has an account here, the lookup's answer, so the
+   * service counts it against the account's lookups (services/email-lookup-limit.ts); a save by id
+   * is not an address question and is not counted. ── */
+  router.post('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const input = parseAddInput((req.body ?? {}) as Record<string, unknown>);
     if (!input) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -314,11 +293,12 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * then waves the owner in person through and holds an agent to the word. A visitor from another
    * node stays out (requireLocalSession).
    *
-   * HOW OFTEN. 20 in 10 minutes per ACCOUNT, after the gates, so a refused caller spends nothing
-   * (limitLookupsPerAccount above). ── */
-  router.post('/v1/contacts/resolve', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:read'), limitLookupsPerAccount, async (req, res) => {
+   * HOW OFTEN. 20 in 10 minutes per ACCOUNT, the owner and their agents together, a save by email
+   * included. The service counts it (services/email-lookup-limit.ts), after these gates, so a refused
+   * caller spends nothing. ── */
+  router.post('/v1/contacts/resolve', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:read'), async (req, res) => {
     try {
-      const result = await resolveContactEmail(storage, ((req.body ?? {}).email ?? '').toString());
+      const result = await resolveContactEmail(storage, resolve(req), ((req.body ?? {}).email ?? '').toString());
       res.json(success(config.nodeId, result));
     } catch (e) { if (!sendErr(res, e)) throw e; }
   });

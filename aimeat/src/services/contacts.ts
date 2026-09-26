@@ -19,12 +19,16 @@
  *   drift from, and it never overwrites one. When such a person later PROVES that address here,
  *   promoteContactsForVerifiedEmail links the two and the projection collapses them into one row.
  *
- *   Email lookup is EXACT-match only via the same privacy-preserving hash the invite flow uses.
+ *   Email lookup is EXACT-match only via the same privacy-preserving hash the invite flow uses, and
+ *   each account has 20 in 10 minutes, a save by email included (services/email-lookup-limit.ts).
  * @structure ContactsError; normalizeContactId; resolveDisplayNames;
  *   listContactsMerged; addContact (identity | person); updatePersonContact; removeContact;
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.4.0 — 2026-09-25 — resolveContactEmail takes the asker, and it and a save by email both count
+ *     against the account's 20 lookups in 10 minutes before the address is read (ContactsError 429
+ *     RATE_LIMITED, `details.retry_after_sec`). The limit sat on the resolve door alone.
  *   v2.3.0 — 2026-09-13 — sendToContact passes a failed send on as SEND_FAILED (502, or 503 when the
  *     node has no transport) with the send-log row in `details`, the answer POST /v1/outbound/send
  *     gives since the same day. The app is told the row, never the address.
@@ -62,6 +66,7 @@ import { isValidEmail } from '../utils/email-validator.js';
 import type { ConversationSummary } from '../storage/repositories/direct-message.repository.js';
 import { sharedOrganisms, SHARED_LOOKUP_CAP, type SharedOrganism } from './contacts-together.js';
 import { pendingContactInvitation } from './contact-invitations.js';
+import { takeEmailLookup } from './email-lookup-limit.js';
 
 /**
  * How many contact RECORDS the projection folds in. The consent sources are naturally bounded by
@@ -442,6 +447,9 @@ async function addPersonContact(
   // ensureContact will repeat; that is the price of the check happening in the right order.
   const clean = (input.email || '').trim().toLowerCase();
   if (isValidEmail(clean)) {
+    // The saved record says whether this address has an account here, which is the lookup's answer,
+    // so a save by email counts against the same allowance, before the address is read.
+    countAddressLookup(ownerGhii);
     const identity = await storage.getGHIIByEmailHash(inviteEmailHash(clean));
     const resolved = identity?.emailVerifiedAt ? identity.ghii : null;
     if (resolved === ownerGhii) {
@@ -589,11 +597,23 @@ export type ResolveEmailResult =
   | { found: true; ghii: string; owner: string; display_name: string | null }
   | { found: false; can_invite: boolean };
 
+/**
+ * Count one address lookup against the asker's account, or refuse with 429 RATE_LIMITED before
+ * anything is read (services/email-lookup-limit.ts). Every door that tells whether an address has an
+ * account here reaches it through this file, so the limit holds whoever asks and however.
+ */
+function countAddressLookup(asker: string): void {
+  const turn = takeEmailLookup(asker);
+  if (!turn.ok) throw new ContactsError(429, turn.code, turn.message, { retry_after_sec: turn.retryAfterSec });
+}
+
 /** EXACT-match email → local owner (privacy-preserving hash equality; no enumeration). Not found
- *  → can_invite signals whether an email invitation could be sent. Throws ContactsError on a bad email. */
-export async function resolveContactEmail(storage: Storage, email: string): Promise<ResolveEmailResult> {
+ *  → can_invite signals whether an email invitation could be sent. Throws ContactsError on a bad email,
+ *  and on the asker's account having used its lookups (`asker` is any principal of that account). */
+export async function resolveContactEmail(storage: Storage, asker: string, email: string): Promise<ResolveEmailResult> {
   const clean = (email || '').trim().toLowerCase();
   if (!clean || !isValidEmail(clean)) throw new ContactsError(400, 'INVALID_INPUT', 'A valid "email" is required');
+  countAddressLookup(asker);
   const rec = await storage.getGHIIByEmailHash(inviteEmailHash(clean));
   if (rec) return { found: true, ghii: rec.ghii, owner: rec.ghii.split('@')[0], display_name: rec.displayName ?? null };
   return { found: false, can_invite: !!getActiveEmailService()?.enabled };

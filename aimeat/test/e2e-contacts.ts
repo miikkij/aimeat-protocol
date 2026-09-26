@@ -5,6 +5,8 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.5.0 — 2026-09-25 — Test 31: saving a person by email draws on the same per-account allowance
+ *     as the lookup, on REST and over MCP, and another account is not slowed.
  *   v1.4.0 — 2026-09-25 — Tests 28–30: an agent holding messages:read looks an address up on the REST
  *     door and the tool and gets the owner's answer; an agent without the word is refused on both;
  *     one account has 20 lookups in 10 minutes, the owner and its agents together, and another
@@ -607,6 +609,27 @@ await test('30. One account has 20 lookups in 10 minutes, the owner and its agen
 
     const other = await lookup(B.token, `b-${Date.now()}@example.com`);
     assert(other.status === 200, `another account was slowed by this one: ${other.status} ${JSON.stringify(other.body.error)}`);
+});
+
+await test('31. Saving a person by email tells the same thing, so it draws on the same allowance: after 20 lookups it is refused on REST and over MCP, and another account is not', async () => {
+    const E = await setupOwner('e');
+    const saver = await agentOf(E, 'savebot', ['messages:read', 'messages:send']);
+    for (let i = 0; i < 20; i++) {
+        const r = await lookup(i % 2 ? saver.token : E.token, `e-${i}-${Date.now()}@example.com`);
+        assert(r.status === 200, `lookup ${i + 1}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    const restEmail = `saved-${Date.now()}@example.com`;
+    const rest = await json('/v1/contacts', { method: 'POST', headers: auth(E.token), body: JSON.stringify({ name: 'One Too Many', email: restEmail }) });
+    assert(rest.status === 429 && rest.body.error?.code === 'RATE_LIMITED', `REST save: ${rest.status} ${JSON.stringify(rest.body.error ?? rest.body.data)}`);
+    const mcpEmail = `mcp-saved-${Date.now()}@example.com`;
+    const over = await mcpCallAs(saver.gaii, saver.key, 'aimeat_contact_add', { name: 'Still Too Many', email: mcpEmail });
+    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).startsWith('RATE_LIMITED'),
+        `MCP save: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+    const book = await contactsOf(E.token);
+    assert(!book.some(c => c.email === restEmail || c.email === mcpEmail), `a refused save was written: ${JSON.stringify(book.map(c => c.email))}`);
+
+    const other = await json('/v1/contacts', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'Not Slowed', email: `b-saved-${Date.now()}@example.com` }) });
+    assert(other.status === 201, `another account's save: ${other.status} ${JSON.stringify(other.body.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
