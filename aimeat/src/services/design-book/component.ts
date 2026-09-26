@@ -30,6 +30,13 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The stylesheet is benched as the CSS parser reads it (component-scan.ts
+ *     readStylesheet, css-tree): @import, @font-face and @namespace, url(), image-set(), src(),
+ *     image() and expression() are found among its tokens with every name's escapes resolved, and
+ *     what a string holds is text. Declarations, !important, position, animation, literal colours and
+ *     selectors are read from its parser's nodes, a declaration inside an at-rule's condition apart.
+ *     A stylesheet nesting deeper than MAX_NESTING, a parse error, and a part the parser keeps as raw
+ *     text are refused, and the parser reads no more than the ceiling (e82c9f26d729).
  *   v1.4.0 — 2026-09-26 — The markup is benched as the HTML parser reads it (component-scan.ts
  *     readMarkup, parse5): the elements a browser builds, with every attribute value decoded, so a
  *     plain value may hold a character reference and an address spelled with one is refused as an
@@ -68,8 +75,7 @@
  */
 import { DesignBookError } from './errors.js';
 import {
-  complexSelectorOf, cssAsRead, declarationsOf, readMarkup, selectorListOf, selectorsOf, withoutVarFallbacks,
-  type Compound, type MarkupProblem,
+  MAX_NESTING, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem,
 } from './component-scan.js';
 
 export const COMPONENT_LIMITS = { html: 12_000, css: 12_000, use: 600, why: 400, whyMin: 20 } as const;
@@ -181,49 +187,59 @@ function checkMarkup(html: string, prefix: string): void {
   }
 }
 
-function checkStyles(raw: string, prefix: string): void {
-  // EVERY CHECK READS WHAT A BROWSER READS (component-scan.ts cssAsRead): the escapes resolved,
-  // since `u\rl(` is url( to a browser, and the comments blanked only where a browser has one, by
-  // index, so nothing below can be hidden inside one or split by one, and a "/*" inside a string
-  // hides nothing. The raw text is never read again.
-  const css = cssAsRead(raw);
-  if (/@import|@font-face|@namespace/i.test(css)) refuse('A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).');
-  // Whitespace is taken out once, so "url (" and "position : fixed" are found by plain inclusion.
-  const dense = css.replace(/\s/g, '').toLowerCase();
+/** At-rules that load something from an address. */
+const LOADING_AT_RULES = new Set(['import', 'font-face', 'namespace']);
+/** Functions that take an address: url() as a token or a function, and the ones that take it as a plain string. */
+const loads = (fn: string) => fn === 'url' || fn === 'src' || fn === 'image' || fn.endsWith('image-set');
+/** Properties that bind a behaviour, in the browsers that had them. */
+const BINDINGS = new Set(['behavior', '-ms-behavior', '-moz-binding']);
+
+function checkStyles(css: string, prefix: string): void {
+  // The parser's cost grows with how deep the stylesheet nests, so it reads no more than the ceiling.
+  if (css.length > COMPONENT_LIMITS.css) refuse(`A component carries its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
+  // READ BY THE CSS PARSER (component-scan.ts readStylesheet): the at-rules, functions and addresses
+  // from its tokens, every name with its escapes resolved, since `u\72 l(` is url( to a browser; the
+  // declarations and selectors from its parser. A string is one token: what it holds is text.
+  const sheet = readStylesheet(css);
+  if (sheet.atRules.some(name => LOADING_AT_RULES.has(name))) refuse('A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).');
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
-  if (dense.includes('url(') || dense.includes('image-set(')) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
-  if (dense.includes('expression(') || dense.includes('behavior:') || dense.includes('-moz-binding')) refuse('A component\'s stylesheet carries no expression(), behavior or binding.');
-  if (dense.includes('!important')) refuse('A component\'s stylesheet carries no !important: it lands inside somebody else\'s page and must lose to it where they disagree.');
+  if (sheet.functions.some(loads)) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
+  if (sheet.depth > MAX_NESTING) {
+    refuse(`A component's stylesheet nests brackets and blocks ${sheet.depth} deep. The bench reads a stylesheet ${MAX_NESTING} deep at most, and no component needs more.`);
+  }
+  if (sheet.functions.includes('expression') || sheet.declarations.some(d => BINDINGS.has(d.property))) refuse('A component\'s stylesheet carries no expression(), behavior or binding.');
+  if (sheet.declarations.some(d => d.important)) refuse('A component\'s stylesheet carries no !important: it lands inside somebody else\'s page and must lose to it where they disagree.');
   // POSITION IS A WORD, read one declaration at a time: `position: var(--p)` with `--p: fixed`
   // is fixed to a browser, and no reading of this text short of the cascade could tell.
-  for (const d of declarationsOf(css)) {
-    const colon = d.indexOf(':');
-    if (d.slice(0, colon).trim().toLowerCase() !== 'position') continue;
-    const value = d.slice(colon + 1).trim().toLowerCase();
-    if (!POSITIONS.has(value)) {
-      refuse(`A component stays where the app puts it: no position: fixed or sticky. Position is static, relative or absolute, written as the word itself and never through a variable ("${value.slice(0, 40)}").`);
+  for (const d of sheet.declarations) {
+    if (d.property === 'position' && !(d.keyword && POSITIONS.has(d.keyword))) {
+      refuse(`A component stays where the app puts it: no position: fixed or sticky. Position is static, relative or absolute, written as the word itself and never through a variable ("${d.text.toLowerCase().slice(0, 40)}").`);
     }
   }
-  // One declaration at a time: a pattern spanning "animation … infinite" over the whole sheet restarts at every "animation".
-  if (declarationsOf(css).some(d => { const l = d.toLowerCase(); return l.trimStart().startsWith('animation') && /\binfinite\b/.test(l); })) {
+  if (sheet.declarations.some(d => d.property.startsWith('animation') && d.keywords.includes('infinite'))) {
     refuse('A component does not move at idle: no infinite animation. An entrance that ends is fine, and the ambient is the one layer allowed to keep moving.');
   }
   // A literal colour cannot follow the page it lands in. Inside var(--ak-x, #fallback) it is a fallback, which is fine.
-  const bare = withoutVarFallbacks(css);
-  const literal = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch)\s*\(/.exec(bare);
+  const [literal] = sheet.declarations.flatMap(d => d.literals);
   if (literal) {
-    refuse(`A component's colours are the page's tokens, never a literal ("${literal[0]}"): it has to wear whatever page it lands in, a Swiss poster or a night board. `
+    refuse(`A component's colours are the page's tokens, never a literal ("${literal}"): it has to wear whatever page it lands in, a Swiss poster or a night board. `
       + 'Use var(--ak-bg), --ak-surface, --ak-surface-2, --ak-ink, --ak-ink-dim, --ak-line, --ak-accent, --ak-accent-ink, --ak-ok, --ak-warn, --ak-err, and color-mix() of those. '
       + 'A genre hands the kit its own values through its bridge, so these are already the genre\'s.');
   }
-  if (!/var\(\s*--ak-/.test(css)) refuse('A component\'s stylesheet reads the page\'s tokens (var(--ak-…)) at least once: one that reads none cannot follow a look, a theme or a genre.');
+  if (!sheet.readsPageTokens) refuse('A component\'s stylesheet reads the page\'s tokens (var(--ak-…)) at least once: one that reads none cannot follow a look, a theme or a genre.');
   // EVERY RULE STAYS INSIDE THE COMPONENT, read to the END of its selector: a rule styles what its
   // last compound names, and the first class says only where it starts. `.wkgrid ~ p` starts at the
   // component and styles every paragraph after it on the page. Every entry of every selector list,
-  // in every rule, @media and @supports included (selectorsOf sees through them).
-  for (const selector of selectorsOf(css).flatMap(selectorListOf)) {
+  // in every rule, nested rules and @media, @supports and @layer included.
+  for (const { text, selector } of sheet.selectors) {
     const escape = selectorEscape(selector, prefix);
-    if (escape) refuse(SELECTOR_REFUSAL[escape](selector.slice(0, 60), prefix));
+    if (escape) refuse(SELECTOR_REFUSAL[escape](text.slice(0, 60), prefix));
+  }
+  // WHAT THE PARSER CANNOT READ IS REFUSED. A browser drops what it cannot read and reads on from a
+  // place of its own choosing, so the bench vouches only for a stylesheet it reads whole.
+  if (sheet.unreadable !== null) {
+    refuse(`A component's stylesheet reads as CSS from its first character to its last, and "${sheet.unreadable}" does not. A browser drops such a part and reads on from a place of its own choosing, so the bench vouches only for a stylesheet it reads whole. `
+      + 'Write each rule as its selector and its declarations in braces, and nest a rule inside another only behind "&".');
   }
 }
 
@@ -234,10 +250,7 @@ const PAGE_TYPES = new Set(['html', 'body']);
 const PAGE_PSEUDOS = new Set(['root', 'scope', 'host', 'host-context', 'slotted']);
 /** Pseudo-classes whose argument is a list the element ITSELF matches, or does not. */
 const ELEMENT_CONDITIONS = new Set(['is', 'where', 'not', 'matches', '-webkit-any', '-moz-any']);
-const NTH = new Set(['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type', 'nth-col', 'nth-last-col']);
-const AN_PLUS_B = /^\s*(?:odd|even|[-+]?\d*n(?:\s*[-+]\s*\d+)?|[-+]?\d+)\s*$/i;
-/** The argument of any other functional pseudo (`:lang(fi)`, `:dir(rtl)`, `::part(x)`): no selector in it. */
-const PLAIN_ARG = /^[\w\s,*"'.-]*$/;
+const NTH = new Set(['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type']);
 /** How deep a check follows pseudo-classes inside pseudo-classes before it stops vouching. */
 const MAX_DEPTH = 4;
 
@@ -251,11 +264,10 @@ const SELECTOR_REFUSAL: Record<SelectorEscape, (sel: string, prefix: string) => 
   unreadable: sel => `"${sel}" does not read as a selector the bench can follow the way a browser does. Write the component's own classes joined by spaces or ">", and "+" or "~" between two of its own classes.`,
 };
 
-/** The alternatives of a condition list, each a single compound, or null when one is not. */
-function conditionCompounds(arg: string): Compound[] | 'reach' | 'unreadable' {
+/** The alternatives of a condition list, each a single compound, or why they are not. */
+function conditionCompounds(list: Array<ComplexSelector | null>): Compound[] | 'reach' | 'unreadable' {
   const out: Compound[] = [];
-  for (const alt of selectorListOf(arg)) {
-    const x = complexSelectorOf(alt);
+  for (const x of list) {
     if (!x) return 'unreadable';
     if (x.lead || x.compounds.length !== 1) return 'reach';
     out.push(x.compounds[0]);
@@ -272,42 +284,45 @@ function isOwnCompound(c: Compound, prefix: string, depth = 0): boolean {
   if (c.classes.some(cls => ownClass(cls, prefix))) return true;
   if (depth >= MAX_DEPTH) return false;
   return c.pseudos.some(p => {
-    if (p.element || p.arg === null || (p.name !== 'is' && p.name !== 'where')) return false;
-    const alts = conditionCompounds(p.arg);
+    if (p.element || p.arg?.kind !== 'list' || (p.name !== 'is' && p.name !== 'where')) return false;
+    const alts = conditionCompounds(p.arg.list);
     return Array.isArray(alts) && alts.length > 0 && alts.every(a => isOwnCompound(a, prefix, depth + 1));
   });
 }
 
-/** Why a compound reaches the page, its functional pseudo-classes followed down, or null. */
+/**
+ * Why a compound reaches the page, its functional pseudo-classes followed down, or null. A pseudo's
+ * argument is what the CSS parser made of it (component-scan.ts Pseudo), so a pseudo it does not
+ * know, whose argument it keeps as raw text, cannot be followed and is refused.
+ */
 function compoundEscape(c: Compound, prefix: string, first: boolean, depth = 0): SelectorEscape | null {
   if (c.types.some(t => PAGE_TYPES.has(t)) || (first && c.types.includes('*'))) return 'page';
   for (const p of c.pseudos) {
     if (PAGE_PSEUDOS.has(p.name)) return 'page';
-    if (p.arg === null) continue;
-    if (depth >= MAX_DEPTH) return 'unreadable';
+    const arg = p.arg;
+    if (arg === null) continue;
+    if (depth >= MAX_DEPTH || arg.kind === 'unreadable') return 'unreadable';
+    if (arg.kind === 'plain') continue;
     let inner: Compound[] = [];
-    if (!p.element && ELEMENT_CONDITIONS.has(p.name)) {
-      const alts = conditionCompounds(p.arg);
+    if (!p.element && ELEMENT_CONDITIONS.has(p.name) && arg.kind === 'list') {
+      const alts = conditionCompounds(arg.list);
       if (!Array.isArray(alts)) return alts;
       inner = alts;
-    } else if (!p.element && p.name === 'has') {
+    } else if (!p.element && p.name === 'has' && arg.kind === 'list') {
       // A relative selector that looks DOWN: into the element (` `) or at its children (`>`).
-      for (const alt of selectorListOf(p.arg)) {
-        const x = complexSelectorOf(alt);
+      for (const x of arg.list) {
         if (!x) return 'unreadable';
         if ((x.lead && x.lead !== '>') || x.combinators.some(k => k !== ' ' && k !== '>')) return 'reach';
         inner.push(...x.compounds);
       }
-    } else if (!p.element && NTH.has(p.name)) {
-      const of = p.arg.toLowerCase().indexOf(' of ');
-      const step = of < 0 ? p.arg : p.arg.slice(0, of);
-      if (step.length > 40 || !AN_PLUS_B.test(step)) return 'unreadable';
-      if (of >= 0) {
-        const alts = conditionCompounds(p.arg.slice(of + 4));
+    } else if (!p.element && NTH.has(p.name) && arg.kind === 'nth') {
+      if (arg.of) {
+        const alts = conditionCompounds(arg.of);
         if (!Array.isArray(alts)) return alts;
         inner = alts;
       }
-    } else if (!PLAIN_ARG.test(p.arg)) {
+    } else {
+      // A selector list or a step where this pseudo takes neither: nothing the check can follow.
       return 'unreadable';
     }
     for (const x of inner) {
@@ -325,15 +340,13 @@ function compoundEscape(c: Compound, prefix: string, first: boolean, depth = 0):
  * once, because siblings share their parent, and otherwise only onto another of the component's own
  * elements, because the one it started at may be the component's root with the page all around it.
  */
-function selectorEscape(selector: string, prefix: string): SelectorEscape | null {
-  const x = complexSelectorOf(selector);
+function selectorEscape(x: ComplexSelector | null, prefix: string): SelectorEscape | null {
   if (!x) return 'unreadable';
   if (x.lead || !isOwnCompound(x.compounds[0], prefix)) return 'anchor';
   let below = false;
   for (const [i, c] of x.compounds.entries()) {
     if (i > 0) {
       const k = x.combinators[i - 1];
-      if (k === '||') return 'beside';
       if (k === ' ' || k === '>') below = true;
       else if (!below && !isOwnCompound(c, prefix)) return 'beside';
     }

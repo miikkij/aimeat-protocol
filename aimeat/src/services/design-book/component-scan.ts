@@ -2,29 +2,37 @@
  * @file src/services/design-book/component-scan.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Reading a proposed component's markup and stylesheet the way a browser reads them.
+ * @description Reading a proposed component's markup and stylesheet the way a browser reads them,
+ *   with the parsers a browser's reading is specified by. Nothing here is a hand-written imitation.
  *
  *   THE MARKUP IS READ BY THE HTML PARSER ITSELF: parse5, the parsing algorithm of the WHATWG HTML
  *   standard, which is what a browser runs (`readMarkup`). The checks get the elements it builds,
  *   each attribute value DECODED as a browser decodes it, and the first thing that keeps the bench
  *   from vouching for the markup: a parse error, a comment, or a "<" that starts no tag the parser
- *   built. WHAT THE PARSER CANNOT READ CLEANLY IS REFUSED, because an allowlist is only as good as
- *   the agreement on what the markup holds, and the parser's reading is the one a browser follows.
- *   Its cost grows with how deep the markup nests, so the bench hands it no more than its ceiling
- *   (COMPONENT_LIMITS in component.ts).
+ *   built.
  *
- *   THE STYLESHEET IS READ ONE CHARACTER AT A TIME. The first version of the bench read the text
- *   with regular expressions whose parts could each give way to the next, and on text built to never
- *   close what it opens each of those scanned the rest of the input from every start, which is
- *   quadratic (CodeQL js/polynomial-redos, alerts 1646 to 1648). Every stylesheet reader here walks
- *   the text once with an index, as utils/html-blocks.ts does for the publish checks. The stylesheet
- *   is read as a browser's tokenizer reads it (`cssAsRead`), escapes resolved, and each selector is
- *   read to its end (`complexSelectorOf`), since its end is what a rule styles. UNCLOSED MEANS
- *   REFUSED, where a pattern used to mean "not matched".
- * @structure readMarkup · cssAsRead · declarationsOf · selectorsOf · selectorListOf · complexSelectorOf ·
- *   withoutVarFallbacks
- * @usage const { elements, problem } = readMarkup(html);
+ *   THE STYLESHEET IS READ BY A CSS PARSER: css-tree, which tokenizes and parses by CSS Syntax
+ *   Level 3 (`readStylesheet`). It reads twice. Its TOKENIZER sees every at-rule, function and
+ *   address wherever it stands, a string being one token whatever it holds, and every name is read
+ *   with its escapes resolved (`u\72 l(` is `url(`), since a browser resolves them before it matches
+ *   a name. Its PARSER gives the declarations and the selectors, each selector read to its end
+ *   (`ComplexSelector`), since its end is what a rule styles.
+ *
+ *   WHAT THE PARSERS CANNOT READ CLEANLY IS REFUSED: a parse error, or a part css-tree keeps as raw
+ *   text. An allowlist is only as good as the agreement on what the text holds, and the parser's
+ *   reading is the one a browser follows. Both parsers cost more the deeper the text nests, so the
+ *   bench hands them no more than its ceiling (COMPONENT_LIMITS in component.ts), and css-tree is not
+ *   run at all on a stylesheet nesting deeper than MAX_NESTING.
+ * @structure readMarkup · readStylesheet · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
+ *   DeclarationRead · ComplexSelector · Compound · Pseudo
+ * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.0.0 — 2026-09-26 — The stylesheet is read by css-tree (readStylesheet, in place of cssAsRead,
+ *     declarationsOf, selectorsOf, selectorListOf, complexSelectorOf and withoutVarFallbacks): its
+ *     tokenizer for the at-rules, functions and addresses, with every name's escapes resolved, and
+ *     its parser for the declarations and the selectors. A string is one token, whatever it holds. A
+ *     parse error or a part kept as raw text is reported, and a stylesheet nesting deeper than 32 is
+ *     not parsed (e82c9f26d729).
  *   v1.4.0 — 2026-09-26 — The markup is read by the WHATWG HTML parser, parse5 (readMarkup, in place
  *     of tagsOf and attributesOf), in the context the preview gives it, the inside of a <div>. The
  *     checks read the elements it builds and every attribute value decoded as a browser decodes it,
@@ -52,6 +60,10 @@
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { defaultTreeAdapter, html as HTML, parseFragment, type DefaultTreeAdapterTypes, type ParserError } from 'parse5';
+import {
+  ident, parse as parseCss, tokenize, tokenTypes, walk,
+  type CssNode, type Declaration, type PseudoClassSelector, type PseudoElementSelector, type Rule, type Selector, type SelectorList,
+} from 'css-tree';
 
 type ChildNode = DefaultTreeAdapterTypes.ChildNode;
 type Template = DefaultTreeAdapterTypes.Template;
@@ -174,272 +186,242 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
   return { elements, problem: null };
 }
 
-const HEX = /[0-9a-fA-F]/;
-const CSS_NEWLINE = new Set(['\n', '\r', '\f']);
-/** An ASCII character a name is made of: a letter, a digit, "-" or "_". Past ASCII, every character is. */
-const ASCII_NAME_CHAR = /^[A-Za-z0-9_-]$/;
 /**
- * What an escape stands for, as the readers after cssAsRead may see it. A name character is itself,
- * because those are what spell `url(`, `@import` and `fixed`. Anything else becomes "_": to a
- * browser an escaped character is always part of a name or of a string, never a ";", a brace, a
- * quote or a comma, and a reader that met the character itself would take it for one.
+ * A pseudo-class or pseudo-element as the checks read it: its name with its escapes resolved and
+ * lower-cased, and what its parentheses hold, or null when it has none:
+ *   - `list`: a selector list (:is, :where, :not, :has, ::slotted, …), each entry a complex selector,
+ *     or null where one does not read as a selector;
+ *   - `nth`: :nth-child() and its kin, with the list after "of" when there is one;
+ *   - `plain`: words, strings and commas, which name no element (:lang(fi), :dir(rtl));
+ *   - `unreadable`: anything the parser kept as raw text, a pseudo it does not know included.
  */
-const escaped = (ch: string): string => (ASCII_NAME_CHAR.test(ch) || ch.charCodeAt(0) > 0x7f ? ch : '_');
-
-/**
- * Where the string opened by the quote at `at` ends: the index after its closing quote, or the
- * newline a browser ends it at, or the end of the text. Every reader below steps over a string with
- * it, since a brace or a semicolon inside one is text. Meant for cssAsRead's output, where every
- * quote is a real one: an escaped quote comes out as "_".
- */
-function stringEnd(s: string, at: number): number {
-  const quote = s[at];
-  for (let i = at + 1; i < s.length; i++) {
-    if (s[i] === quote) return i + 1;
-    if (CSS_NEWLINE.has(s[i])) return i;
-  }
-  return s.length;
-}
-
-/**
- * The stylesheet as a browser's tokenizer reads it, so that a check reads what the browser reads:
- *   - every escape is resolved: `u\rl(` is `url(`, `\75 rl(` is `url(` (up to six hex digits and
- *     one whitespace after them), `f\ixed` is `fixed`. An escape that stands for anything but a name
- *     character comes out as "_" (see `escaped`), so `.a\;b` reads as the one class a browser reads;
- *   - a comment is blanked only where a browser has one: never inside a string (`content: "/*"`
- *     opens a string) and never behind a backslash (`\/*` is an escaped "/" and a "*"). An
- *     unclosed comment takes the rest, as a parser does;
- *   - a string ends at its quote or at a newline, as a browser ends it.
- * One pass with an index, like every reader here. What an escape turns into is never read again
- * as structure: an escaped quote does not open a string and an escaped "/*" does not open a comment.
- */
-export function cssAsRead(css: string): string {
-  let out = '';
-  let quote = '';
-  let i = 0;
-  while (i < css.length) {
-    const ch = css[i];
-    if (ch === '\\') {
-      const next = css[i + 1];
-      if (next === undefined) { out += '�'; i++; continue; }
-      if (CSS_NEWLINE.has(next)) {
-        // In a string a backslash before a newline joins the lines; outside one it escapes nothing.
-        if (quote) i += next === '\r' && css[i + 2] === '\n' ? 3 : 2;
-        else { out += ch; i++; }
-        continue;
-      }
-      if (HEX.test(next)) {
-        let j = i + 1;
-        while (j < css.length && j < i + 7 && HEX.test(css[j])) j++;
-        const cp = parseInt(css.slice(i + 1, j), 16);
-        out += cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '�' : escaped(String.fromCodePoint(cp));
-        if (css[j] === '\r' && css[j + 1] === '\n') j += 2;
-        else if (css[j] === ' ' || css[j] === '\t' || CSS_NEWLINE.has(css[j])) j++;
-        i = j;
-        continue;
-      }
-      out += escaped(next);
-      i += 2;
-      continue;
-    }
-    if (quote) {
-      if (ch === quote || CSS_NEWLINE.has(ch)) quote = '';
-      out += ch;
-      i++;
-      continue;
-    }
-    if (ch === '"' || ch === '\'') { quote = ch; out += ch; i++; continue; }
-    if (ch === '/' && css[i + 1] === '*') {
-      out += ' ';
-      const close = css.indexOf('*/', i + 2);
-      if (close === -1) return out;
-      i = close + 2;
-      continue;
-    }
-    out += ch;
-    i++;
-  }
-  return out;
-}
-
-/** Every `property: value` of the stylesheet, as written, whatever rule it sits in. Strings stepped over. */
-export function declarationsOf(css: string): string[] {
-  const out: string[] = [];
-  let from = 0;
-  for (let i = 0; i <= css.length; i++) {
-    const ch = css[i];
-    if (ch === '"' || ch === '\'') { i = stringEnd(css, i) - 1; continue; }
-    if (i === css.length || ch === ';' || ch === '{' || ch === '}') {
-      const piece = css.slice(from, i).trim();
-      if (piece.includes(':')) out.push(piece);
-      from = i + 1;
-    }
-  }
-  return out;
-}
-
-/**
- * The selector of every style rule, with at-rules seen through (`@media`, `@supports`, `@container`,
- * `@layer` wrap rules that still count) and `@keyframes` skipped whole (its `from`, `to` and
- * percentages are steps, not selectors). A brace or a semicolon inside a string is text: it opens
- * or closes nothing, so it cannot hold the reader inside a block the browser has left.
- */
-export function selectorsOf(css: string): string[] {
-  const out: string[] = [];
-  const stack: Array<'rule' | 'at' | 'keyframes'> = [];
-  let from = 0;
-  for (let i = 0; i < css.length; i++) {
-    const ch = css[i];
-    if (ch === '"' || ch === '\'') { i = stringEnd(css, i) - 1; continue; }
-    if (ch === '{') {
-      const prelude = css.slice(from, i).trim();
-      if (prelude.startsWith('@')) stack.push(/^@(?:-[a-z]+-)?keyframes\b/i.test(prelude) ? 'keyframes' : 'at');
-      else {
-        if (!stack.includes('keyframes')) out.push(prelude);
-        stack.push('rule');
-      }
-      from = i + 1;
-    } else if (ch === '}') {
-      stack.pop();
-      from = i + 1;
-    } else if (ch === ';') {
-      from = i + 1;
-    }
-  }
-  return out;
+export interface Pseudo {
+  name: string;
+  element: boolean;
+  arg: null
+    | { kind: 'list'; list: Array<ComplexSelector | null> }
+    | { kind: 'nth'; of: Array<ComplexSelector | null> | null }
+    | { kind: 'plain' }
+    | { kind: 'unreadable' };
 }
 
 /**
  * One compound selector as the check reads it: what is written on the element itself. A class
  * inside a pseudo-class's parentheses is a condition, not the element's own class, so it stays with
- * its pseudo-class and is never counted in `classes`.
+ * its pseudo-class and is never counted in `classes`. An id or an attribute selector is a condition
+ * on the element and is not kept.
  */
 export interface Compound {
+  /** Class names with their escapes resolved: `.a\;b` is the one class `a;b`. */
   classes: string[];
   /** Type names, lower-cased, `*` included. */
   types: string[];
-  /** Pseudo-classes and pseudo-elements, lower-cased, each with its argument when it takes one. */
-  pseudos: Array<{ name: string; element: boolean; arg: string | null }>;
+  pseudos: Pseudo[];
   /** `&`, the parent rule's selector under CSS nesting. */
   nesting: boolean;
 }
 
 /**
- * A complex selector: compounds joined by combinators, `' '` (descendant), `'>'`, `'+'`, `'~'` or
- * `'||'`. `lead` is a combinator written before the first compound, which is what a relative
- * selector looks like (inside `:has()`, or a nested rule).
+ * A complex selector: compounds joined by combinators, `' '` (descendant), `'>'`, `'+'` or `'~'`.
+ * `lead` is a combinator written before the first compound, which is what a relative selector looks
+ * like (inside `:has()`, or a nested rule).
  */
 export interface ComplexSelector { lead: string | null; compounds: Compound[]; combinators: string[] }
 
-const IDENT_CHAR = /[\w\u0080-￿-]/;
-
-/** Where the bracket opened at `at` closes, strings stepped over, or -1 when it never does. */
-function closingOf(s: string, at: number, open: string, close: string): number {
-  let depth = 0;
-  for (let i = at; i < s.length; i++) {
-    const ch = s[i];
-    if (ch === '"' || ch === '\'') i = stringEnd(s, i) - 1;
-    else if (ch === open) depth++;
-    else if (ch === close && --depth === 0) return i;
-  }
-  return -1;
+/** One declaration as the checks read it, outside the conditions of an at-rule's prelude. */
+export interface DeclarationRead {
+  /** The property with its escapes resolved, lower-cased. */
+  property: string;
+  important: boolean;
+  /** The value when it is one keyword, escapes resolved and lower-cased, and null otherwise. */
+  keyword: string | null;
+  /** Every keyword in the value, escapes resolved and lower-cased. A string is not a keyword. */
+  keywords: string[];
+  /** Every literal colour in the value outside var(): "#111111", "rgb(". */
+  literals: string[];
+  /** The value as written, for a message. */
+  text: string;
 }
 
-/** The entries of a selector list: split at the commas outside parentheses, brackets and strings. */
-export function selectorListOf(text: string): string[] {
-  const out: string[] = [];
-  let depth = 0;
-  let from = 0;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '"' || ch === '\'') i = stringEnd(text, i) - 1;
-    else if (ch === '(' || ch === '[') depth++;
-    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
-    else if (ch === ',' && depth === 0) { out.push(text.slice(from, i)); from = i + 1; }
-  }
-  out.push(text.slice(from));
-  return out.map(s => s.trim()).filter(Boolean);
+/** A stylesheet as the CSS parser reads it (readStylesheet). */
+export interface StylesheetReading {
+  /** Every at-rule's name the tokenizer saw, escapes resolved, lower-cased. */
+  atRules: string[];
+  /** Every function's name the tokenizer saw, escapes resolved, lower-cased, and "url" for an address token. */
+  functions: string[];
+  /** Whether a var() reads one of the page's tokens, `--ak-…`. */
+  readsPageTokens: boolean;
+  /** How deep brackets and blocks nest. */
+  depth: number;
+  declarations: DeclarationRead[];
+  /** Every selector of every style rule outside @keyframes, as written, and read, or null where it does not read. */
+  selectors: Array<{ text: string; selector: ComplexSelector | null }>;
+  /** The first part the parser could not read (a parse error, or text it kept raw), or null. */
+  unreadable: string | null;
 }
+
+/** How deep brackets and blocks may nest before css-tree is not run at all. No component needs more. */
+export const MAX_NESTING = 32;
+
+const KEYFRAMES = /^(?:-[a-z]+-)?keyframes$/;
+const COMBINATORS = new Set([' ', '>', '+', '~']);
+const COLOUR_FUNCTIONS = new Set(['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch']);
+const HEX_COLOUR = /^[0-9a-f]{3,8}$/i;
+const T = tokenTypes;
+
+/** A name as the text spells it, escapes resolved and lower-cased: `U\72 L` is `url`, as a browser matches it. */
+const nameOf = (raw: string): string => ident.decode(raw).toLowerCase();
+
+/** The text a node stands on, trimmed. */
+const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(node.loc.start.offset, node.loc.end.offset).trim() : '');
 
 /**
- * One complex selector read to its end, as a browser reads it, or null when it does not read as one
- * (a namespace bar, two compounds with nothing between them, a bracket that never closes). Null is a
- * refusal to the caller: what this reader cannot follow, the bench cannot vouch for. Meant for the
- * stylesheet as cssAsRead gives it, escapes resolved.
+ * The stylesheet as a browser reads it, in two passes of css-tree.
+ *
+ * THE TOKENS. A browser's tokenizer makes a token the same way wherever it stands, so the at-rules,
+ * the functions and the addresses are taken from the tokens, and none hides in a part the parser
+ * later keeps raw. A string is one token, so nothing it holds is an at-rule, a function or a
+ * structure. A name is read with its escapes resolved: css-tree matches `url(` as written, and a
+ * browser matches it after resolving `u\72 l(`, so every function name is resolved here and the
+ * checks read that. The same pass measures how deep the brackets and blocks nest, pairing each
+ * closer with its own opener as CSS does (a "]" inside "(" closes nothing).
+ *
+ * THE STRUCTURE, from css-tree's parser, only when the nesting is within MAX_NESTING: every
+ * declaration outside an at-rule's conditions, and every selector of every style rule outside
+ * @keyframes (whose from, to and percentages are steps, not selectors). A parse error, and any part
+ * the parser keeps as raw text, is reported as unreadable.
  */
-export function complexSelectorOf(text: string): ComplexSelector | null {
-  const s = text.trim();
-  let i = 0;
-  const identAt = (): string => { const from = i; while (i < s.length && IDENT_CHAR.test(s[i])) i++; return s.slice(from, i); };
-  const spaceAt = (): boolean => { const from = i; while (i < s.length && /\s/.test(s[i])) i++; return i > from; };
-  const combinatorAt = (): string | null => (s.startsWith('||', i) ? '||' : s[i] === '>' || s[i] === '+' || s[i] === '~' ? s[i] : null);
-  const compoundAt = (): Compound | null => {
-    const c: Compound = { classes: [], types: [], pseudos: [], nesting: false };
-    const start = i;
-    if (s[i] === '*') { c.types.push('*'); i++; } else if (IDENT_CHAR.test(s[i] ?? '')) c.types.push(identAt().toLowerCase());
-    for (;;) {
-      const ch = s[i];
-      if (ch === '.' || ch === '#') {
-        i++;
-        const name = identAt();
-        if (!name) return null;
-        if (ch === '.') c.classes.push(name);
-      } else if (ch === '&') {
-        i++;
-        c.nesting = true;
-      } else if (ch === '[') {
-        const close = closingOf(s, i, '[', ']');
-        if (close < 0) return null;
-        i = close + 1;
-      } else if (ch === ':') {
-        const element = s[i + 1] === ':';
-        i += element ? 2 : 1;
-        const name = identAt().toLowerCase();
-        if (!name) return null;
-        let arg: string | null = null;
-        if (s[i] === '(') {
-          const close = closingOf(s, i, '(', ')');
-          if (close < 0) return null;
-          arg = s.slice(i + 1, close);
-          i = close + 1;
-        }
-        c.pseudos.push({ name, element, arg });
-      } else break;
-    }
-    return i > start ? c : null;
-  };
-
-  const out: ComplexSelector = { lead: null, compounds: [], combinators: [] };
-  const lead = combinatorAt();
-  if (lead) { out.lead = lead; i += lead.length; spaceAt(); }
-  for (;;) {
-    const compound = compoundAt();
-    if (!compound) return null;
-    out.compounds.push(compound);
-    const spaced = spaceAt();
-    if (i >= s.length) return out;
-    const combinator = combinatorAt();
-    if (combinator) { out.combinators.push(combinator); i += combinator.length; spaceAt(); continue; }
-    if (!spaced) return null;
-    out.combinators.push(' ');
+export function readStylesheet(css: string): StylesheetReading {
+  const reading: StylesheetReading = { atRules: [], functions: [], readsPageTokens: false, depth: 0, declarations: [], selectors: [], unreadable: null };
+  const tokens: Array<{ type: number; start: number; end: number }> = [];
+  tokenize(css, (type, start, end) => { tokens.push({ type, start, end }); });
+  const closers: number[] = [];
+  const open = (closer: number) => { closers.push(closer); reading.depth = Math.max(reading.depth, closers.length); };
+  for (let t = 0; t < tokens.length; t++) {
+    const { type, start, end } = tokens[t];
+    if (type === T.AtKeyword) reading.atRules.push(nameOf(css.slice(start + 1, end)));
+    else if (type === T.Url || type === T.BadUrl) reading.functions.push('url');
+    else if (type === T.Function) {
+      const name = nameOf(css.slice(start, end - 1));
+      reading.functions.push(name);
+      if (name === 'var') {
+        let next = t + 1;
+        while (next < tokens.length && (tokens[next].type === T.WhiteSpace || tokens[next].type === T.Comment)) next++;
+        // A custom property's name keeps its case: `--AK-ink` is not one of the page's tokens.
+        const arg = tokens[next];
+        if (arg?.type === T.Ident && ident.decode(css.slice(arg.start, arg.end)).startsWith('--ak-')) reading.readsPageTokens = true;
+      }
+      open(T.RightParenthesis);
+    } else if (type === T.LeftParenthesis) open(T.RightParenthesis);
+    else if (type === T.LeftSquareBracket) open(T.RightSquareBracket);
+    else if (type === T.LeftCurlyBracket) open(T.RightCurlyBracket);
+    else if (closers.length && type === closers[closers.length - 1]) closers.pop();
   }
+  if (reading.depth > MAX_NESTING) return reading;
+
+  try {
+    const ast = parseCss(css, {
+      positions: true,
+      parseCustomProperty: true,
+      onParseError: (error, fallback) => { reading.unreadable ??= (fallback.type === 'Raw' ? fallback.value : css.slice(error.offset)).trim().slice(0, 60); },
+    });
+    let keyframes = 0;
+    walk(ast, {
+      enter(node) {
+        if (node.type === 'Raw') reading.unreadable ??= node.value.trim().slice(0, 60);
+        else if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes++;
+        else if (node.type === 'Rule' && keyframes === 0) reading.selectors.push(...selectorsOfRule(node, css));
+        else if (node.type === 'Declaration' && !this.atrulePrelude) reading.declarations.push(declarationOf(node, css));
+      },
+      leave(node) {
+        if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes--;
+      },
+    });
+  } catch (err) {
+    // css-tree reads a failing part as raw text and goes on; an error that escapes it is a text it
+    // could not read at all, and that is what the bench says.
+    reading.unreadable ??= `the stylesheet (${String((err as Error)?.message ?? err).slice(0, 60)})`;
+  }
+  return reading;
 }
 
-/** The stylesheet with every `var(--x, fallback)` reduced to `var()`, parentheses matched by counting. */
-export function withoutVarFallbacks(css: string): string {
-  let out = '';
-  let at = 0;
-  for (;;) {
-    const open = css.indexOf('var(', at);
-    if (open === -1) return out + css.slice(at);
-    out += css.slice(at, open) + 'var()';
-    let depth = 1;
-    let i = open + 4;
-    while (i < css.length && depth > 0) {
-      if (css[i] === '(') depth++;
-      else if (css[i] === ')') depth--;
-      i++;
+/** One declaration, its value's keywords and literal colours read from the parser's nodes. */
+function declarationOf(node: Declaration, css: string): DeclarationRead {
+  const read: DeclarationRead = { property: nameOf(node.property), important: Boolean(node.important), keyword: null, keywords: [], literals: [], text: textOf(css, node.value) };
+  if (node.value.type === 'Raw') return read;
+  const parts = node.value.children.toArray().filter(n => n.type !== 'WhiteSpace');
+  if (parts.length === 1 && parts[0].type === 'Identifier') read.keyword = nameOf(parts[0].name);
+  // A colour inside var(--x, …) is a fallback, which the page's token overrides: not a literal.
+  let insideVar = 0;
+  walk(node.value, {
+    enter(n) {
+      if (n.type === 'Identifier') read.keywords.push(nameOf(n.name));
+      else if (n.type === 'Function') {
+        const name = nameOf(n.name);
+        if (name === 'var') insideVar++;
+        else if (!insideVar && COLOUR_FUNCTIONS.has(name)) read.literals.push(`${name}(`);
+      } else if (n.type === 'Hash' && !insideVar && HEX_COLOUR.test(ident.decode(n.value))) read.literals.push(`#${ident.decode(n.value)}`);
+    },
+    leave(n) {
+      if (n.type === 'Function' && nameOf(n.name) === 'var') insideVar--;
+    },
+  });
+  return read;
+}
+
+/** Every selector of one style rule, as written and as read. A prelude the parser kept raw is one unreadable entry. */
+function selectorsOfRule(rule: Rule, css: string): StylesheetReading['selectors'] {
+  if (rule.prelude.type === 'Raw') return [{ text: rule.prelude.value.trim(), selector: null }];
+  return rule.prelude.children.toArray().map(s => ({ text: s.type === 'Raw' ? s.value.trim() : textOf(css, s), selector: s.type === 'Selector' ? complexOf(s) : null }));
+}
+
+const listOf = (list: SelectorList): Array<ComplexSelector | null> => list.children.toArray().map(s => (s.type === 'Selector' ? complexOf(s) : null));
+
+/**
+ * One selector as compounds and combinators, or null when it does not read as one: two combinators
+ * with nothing between them, a combinator at its end, a type or a namespace written anywhere but at
+ * a compound's start, a combinator CSS no longer has (`/deep/`), or anything but a simple selector
+ * in a compound (a percentage outside @keyframes). Null is a refusal to the caller.
+ */
+function complexOf(selector: Selector): ComplexSelector | null {
+  const out: ComplexSelector = { lead: null, compounds: [], combinators: [] };
+  let compound: Compound | null = null;
+  let pending: string | null = null;
+  for (const node of selector.children.toArray()) {
+    if (node.type === 'Combinator') {
+      if (!COMBINATORS.has(node.name)) return null;
+      if (compound) { out.compounds.push(compound); compound = null; pending = node.name; continue; }
+      if (out.compounds.length === 0 && out.lead === null && pending === null) { out.lead = node.name; continue; }
+      return null;
     }
-    at = i;
+    if (!compound) {
+      compound = { classes: [], types: [], pseudos: [], nesting: false };
+      if (pending !== null) { out.combinators.push(pending); pending = null; }
+    }
+    if (node.type === 'TypeSelector') {
+      const name = nameOf(node.name);
+      if (name.includes('|') || compound.types.length || compound.classes.length || compound.pseudos.length || compound.nesting) return null;
+      compound.types.push(name);
+    } else if (node.type === 'ClassSelector') compound.classes.push(ident.decode(node.name));
+    else if (node.type === 'NestingSelector') compound.nesting = true;
+    else if (node.type === 'PseudoClassSelector' || node.type === 'PseudoElementSelector') compound.pseudos.push(pseudoOf(node));
+    else if (node.type !== 'IdSelector' && node.type !== 'AttributeSelector') return null;
   }
+  if (!compound) return null;
+  out.compounds.push(compound);
+  return out;
+}
+
+/** A pseudo-class or pseudo-element with what its parentheses hold, as css-tree read it. */
+function pseudoOf(node: PseudoClassSelector | PseudoElementSelector): Pseudo {
+  const pseudo: Pseudo = { name: nameOf(node.name), element: node.type === 'PseudoElementSelector', arg: null };
+  if (node.children === null) return pseudo;
+  const kids = node.children.toArray();
+  const [only] = kids;
+  if (kids.length === 1 && only.type === 'SelectorList') pseudo.arg = { kind: 'list', list: listOf(only) };
+  else if (kids.length === 1 && only.type === 'Selector') pseudo.arg = { kind: 'list', list: [complexOf(only)] };
+  else if (kids.length === 1 && only.type === 'Nth') pseudo.arg = { kind: 'nth', of: only.selector ? listOf(only.selector) : null };
+  else if (kids.length > 0 && kids.every(k => k.type === 'Identifier' || k.type === 'String' || k.type === 'Operator')) pseudo.arg = { kind: 'plain' };
+  else pseudo.arg = { kind: 'unreadable' };
+  return pseudo;
 }

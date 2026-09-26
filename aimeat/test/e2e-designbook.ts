@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.5.5 — 2026-09-26 — The stylesheet is read by the CSS parser (e82c9f26d729): a string naming url(
+ *     passes, since a string is one token whatever it holds.
  *   v1.5.4 — 2026-09-26 — The markup is read by the HTML parser (1a0a15eb7b20): an address spelled with
  *     a character reference is refused as an address, and a value holding a named reference passes.
  *   v1.5.3 — 2026-09-26 — A component whose stylesheet hides a page rule behind an escaped ";" or a "{"
@@ -495,6 +497,9 @@ const GOOD_BODY = {
         // A plain value may hold a character reference: the bench reads it decoded, as a browser does.
         const named = await propose(`comp-named-${stamp}`, body({ html: '<div class="wkgrid" role="grid" aria-label="Mon &ndash; Sun"><button class="wkgrid-cell" type="button" aria-pressed="false" data-day="mon"></button></div>' }));
         assert(named.status === 201, `a value holding a named reference passes: ${named.status} ${JSON.stringify(named.body?.error)}`);
+        // A string is one token to the CSS parser, whatever it holds: what it says loads nothing.
+        const quoted = await propose(`comp-quoted-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid-cell::after { content: "see url(x)"; }' }));
+        assert(quoted.status === 201, `a string naming url( passes: ${quoted.status} ${JSON.stringify(quoted.body?.error)}`);
 
         // The owner says so; the same proposal, made again, is on the shelf with no operator in between.
         const keep = await json('/v1/designbook/keep', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f }) });
