@@ -5,6 +5,8 @@
   deliberately cannot. Covers the read direction, the send direction, bring-your-own application,
   the Google alias path, and Microsoft's three differences.
 @version-history
+  2026-09-26 — An unverified alias is refused naming only the alias asked for; the one-time notice
+    names the owner's agents too, and an agent refused the read door is told the way.
   v1.0.0 — 2026-08-26 — Initial. The subsystem had shipped without a document, so the only way to
     learn it was to read providers.ts.
 -->
@@ -159,6 +161,11 @@ addresses are listed**, because an unverified one is refused at send time for a 
 does not carry. An alias added at Google after the mailbox was connected can take a day to appear;
 read the list live rather than caching it, so the delay is Google's and not ours.
 
+A send with a `from_alias` the mailbox has not verified is refused with `400 ALIAS_NOT_VERIFIED`.
+The refusal names only the alias that was asked for. The list itself is a read of the mailbox:
+`aimeat_mail_aliases`, or the call above, which takes `connections:read-through`, a word a caller
+that may only send does not hold.
+
 Microsoft has no equivalent that a delegated permission can read, so the same call returns nothing
 there rather than guessing. Sending as an alias on Microsoft is an Exchange SendAs right rather than
 a Graph permission, and it is not promised here until it has been proven against a real tenant.
@@ -229,6 +236,13 @@ reads mail needs the owner to grant the new word, and there are two ways:
 - **The app asks.** An app refused the read door is told the word and the way: it adds
   `connections:read-through` to its `<meta name="aimeat-scopes">`, and the owner approves it in the
   consent window.
+
+An agent reads only the connections that are its own, and one that holds `connections:use` by name
+(not `*` or `connections:*`) reads its mailbox no more until its owner gives it the word. The same
+run tells each owner whose agents hold `connections:use` by name beside a mailbox of their own, in a
+notification of its own that names those agents, with a button per agent (three at most) that
+opens the agent's page, where the owner gives the word. An agent refused the read door is told the
+word, and that its owner gives it on the agent's page.
 
 A word the owner added by hand is recorded on the grant (`owner_added_scopes` in
 `GET /v1/app-grants`). A refresh and a silent sign-in bring a grant down to what the app declares,
