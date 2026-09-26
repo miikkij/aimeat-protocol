@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.17.2 — 2026-09-26 — aimeat_app_get shows another owner's app through publicAppManifest
+ *     (services/app-public-manifest.ts), so `dataMap.gap` and the reviewer log come off as well as the
+ *     two notes this door stripped by hand (secaudit 2026-09, A6-10).
  *   v1.17.1 — 2026-09-18 — `url` on aimeat_app_list and aimeat_app_get is filled on a node without
  *     an app origin as well (routes/apps/helpers.ts v1.3.0). Comments here said it was absent.
  *   v1.17.0 — 2026-09-13 — aimeat_app_publish and aimeat_app_draft_publish return
@@ -104,7 +107,7 @@ import {
 } from '../services/app-lifecycle.js';
 import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app-dev-grant.js';
 import { roadmapGate } from '../services/app-roadmap.js';
-import { publicPosture } from '../services/app-ai-posture.js';
+import { publicAppManifest } from '../services/app-public-manifest.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
@@ -639,15 +642,11 @@ export function registerAppsTools(
             const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
             const urlByApp = await resolveAppUrls(config, storage, [{ owner: app.ownerName, filename: app.filename }]);
 
-            // Two notes on the manifest are the OWNER's own — the disclosure gap and the build-spec
-            // state of their last publish — and this tool reads any owner's app. The catalogue
-            // listing has stripped them from the start; this door had not.
+            // Some notes on the manifest are the OWNER's own (the publish checks' findings, the
+            // build-spec state, the reviewer log), and this tool reads any owner's app. They come off
+            // in one place for every door that shows a manifest to somebody else.
             const isOwn = parseGAII(getAgentGaii())?.owner === app.ownerName;
-            const manifest = isOwn ? app.manifest : {
-                ...app.manifest,
-                ...(app.manifest.aiPosture ? { aiPosture: publicPosture(app.manifest.aiPosture) } : {}),
-                ...(app.manifest.specCheck ? { specCheck: undefined } : {}),
-            };
+            const manifest = isOwn ? app.manifest : publicAppManifest(app.manifest);
 
             return {
                 content: [{

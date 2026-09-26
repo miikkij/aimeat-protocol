@@ -18,6 +18,9 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The receipt keeps the manifest as anybody but the seller sees it
+ *     (services/app-public-manifest.ts): the seller's own notes are not copied to the buyer
+ *     (secaudit 2026-09, A6-10).
  *   v1.3.0 — 2026-09-04 — The purchase door asks appSpendRefusal before it debits. It was the fifth
  *     place that charges and the only one that asked nothing, so an app grant approved for
  *     memory:read alone could buy from the store with the human's morsels — debitBalance resolves
@@ -47,6 +50,7 @@ import { sign } from '../auth/keypair.js';
 import { settleMarketplaceFee } from '../services/marketplace-fee.js';
 import { appSpendRefusal } from '../services/metered-access.js';
 import { percentFee } from '../commerce/money.js';
+import { publicAppManifest } from '../services/app-public-manifest.js';
 
 export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -178,9 +182,11 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         // (replaces the old app_store_fee tx that recorded a vanishing fee on the seller).
         await settleMarketplaceFee(storage, config, { fee: transactionFee, payerGhii: buyerGaii, trackingCode: txId, source: 'app-store' });
 
-        // Snapshot app content
+        // Snapshot app content. The buyer reads the receipt, so the manifest in it is the one anybody
+        // but the seller sees: the seller's own notes (the publish checks' findings, the build-spec
+        // state, the reviewer log) are not part of what was sold.
         const appContent = app.data.toString('base64');
-        const appManifest: AppManifest = { ...app.manifest };
+        const appManifest: AppManifest = publicAppManifest(app.manifest);
 
         // Get optional screenshot
         let appScreenshot: string | undefined;

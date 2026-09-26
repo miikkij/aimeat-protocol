@@ -11,6 +11,8 @@
  *   that guessing cannot come back without turning this suite red.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-map
  * @version-history
+ *   v2.2.0 — 2026-09-26 — A6-10 on the MCP door: aimeat_app_get gives another owner's agent the
+ *     manifest without `dataMap.gap`. Failed on the code before the fix: the gap was there.
  *   v2.1.0 — 2026-09-24 — A6-10: another owner and a caller with no token read the stamp without
  *     its `gap`; the owner still reads it.
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2.
@@ -103,6 +105,60 @@ const CONTRADICTED_MAP = {
     ...GOOD_MAP,
     held: [{ ...GOOD_MAP.held[0], where: 'owner-memory-private', owner: 'person', readers: 'owner-only' }],
 };
+
+/** An agent of this owner, and its token. aimeat_app_get asks no scope word, so memory:read does. */
+async function agentOf(o: Owner): Promise<string> {
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: auth(o.token),
+        body: JSON.stringify({ name: `dmapag${Date.now() % 100000}${Math.floor(Math.random() * 900 + 100)}`, owner: o.name, scopes: ['memory:read'] }),
+    });
+    assert(reg.status === 201, `agent registration ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(reg.body.data.private_key, gaii + ts) }),
+    });
+    assert(tok.status === 200, `agent token ${tok.status}`);
+    return tok.body.data.token as string;
+}
+
+function parseSSE(text: string): any[] {
+    const out: any[] = [];
+    const NL = String.fromCharCode(10);
+    for (const evt of text.split(NL + NL)) {
+        let data = '';
+        for (const line of evt.trim().split(NL)) if (line.startsWith('data: ')) data += line.slice(6);
+        if (data) { try { out.push(JSON.parse(data)); } catch { /* not a JSON frame */ } }
+    }
+    return out;
+}
+
+/** One MCP tool call on a fresh session. */
+async function mcpCall(token: string, name: string, args: Record<string, unknown>): Promise<{ raw: string; parsed: any; isError: boolean }> {
+    let sessionId = '';
+    let id = 1;
+    const rpc = async (method: string, params: Record<string, unknown>): Promise<any> => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`,
+                ...(sessionId ? { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id: id++, method, params }),
+        });
+        const sid = res.headers.get('mcp-session-id');
+        if (sid) sessionId = sid;
+        const ct = res.headers.get('content-type') ?? '';
+        if (ct.includes('text/event-stream')) return parseSSE(await res.text())[0] ?? {};
+        return await res.json();
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Data map E2E', version: '1.0.0' } });
+    const out = await rpc('tools/call', { name, arguments: args });
+    const raw = out?.result?.content?.[0]?.text ?? '';
+    let parsed: any = null;
+    try { parsed = JSON.parse(raw); } catch { /* a refusal is prose */ }
+    return { raw, parsed, isError: !!out?.result?.isError };
+}
 
 async function publish(o: Owner, filename: string): Promise<void> {
     const r = await json('/v1/apps', {
@@ -225,6 +281,22 @@ async function publish(o: Owner, filename: string): Promise<void> {
                 `${who} must not read the finding: ${JSON.stringify(r.body.data.stamp.gap)}`);
             assert(r.body.data.stamp.missing === true, `${who} still reads the rest of the stamp`);
         }
+    });
+
+    // A6-10, the MCP door. aimeat_app_get reads any owner's app, and it handed the stamp over whole
+    // inside the manifest: the finding the data map door strips went out beside it.
+    await test('aimeat_app_get gives another owner\'s agent the manifest without the owner\'s findings', async () => {
+        const mine = await mcpCall(await agentOf(o), 'aimeat_app_get', { owner: o.name, filename: 'probe-none.html' });
+        assert(!mine.isError && mine.parsed, `the owner's agent reads the app: ${mine.raw}`);
+        assert(mine.parsed.manifest?.dataMap?.gap?.code === 'DATAMAP_MISSING',
+            `the owner's agent still reads the finding: ${JSON.stringify(mine.parsed.manifest?.dataMap)}`);
+        const theirs = await mcpCall(await agentOf(other), 'aimeat_app_get', { owner: o.name, filename: 'probe-none.html' });
+        assert(!theirs.isError && theirs.parsed, `another owner's agent reads the app: ${theirs.raw}`);
+        const stamp = theirs.parsed.manifest?.dataMap;
+        assert(stamp?.missing === true, `the rest of the stamp is public: ${JSON.stringify(stamp)}`);
+        assert(stamp.gap === undefined, `another owner's agent must not read the finding: ${JSON.stringify(stamp.gap)}`);
+        assert(theirs.parsed.manifest?.specCheck === undefined && theirs.parsed.manifest?.aiPosture?.gap === undefined,
+            `nor the other notes that are the owner's own: ${JSON.stringify({ specCheck: theirs.parsed.manifest?.specCheck, gap: theirs.parsed.manifest?.aiPosture?.gap })}`);
     });
 
     await test('another owner cannot write this map', async () => {
