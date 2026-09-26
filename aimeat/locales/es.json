@@ -262,7 +262,7 @@
           "sharedOrigin": "Las aplicaciones funcionan en la dirección de este servidor",
           "sharedOriginWhy": "Aquí solo una persona tiene cuenta, así que cada aplicación es suya y funciona con su sesión. Cuando otra persona obtiene una cuenta, cada aplicación pasa sola a un marco aislado.",
           "isolatedFrame": "Las aplicaciones funcionan en un marco aislado",
-          "isolatedFrameWhy": "Este servidor tiene {people} cuentas y las aplicaciones no tienen dirección propia. El marco no puede leer la sesión ni los datos guardados de nadie aquí, y una aplicación llega a este servidor solo con los permisos que se le dieron. En el marco, una aplicación no puede usar una base de datos del navegador ni enviar notificaciones, y no se puede instalar.",
+          "isolatedFrameWhy": "Este servidor tiene {people} cuentas y las aplicaciones no tienen dirección propia. El marco no puede leer la sesión ni los datos guardados de nadie aquí, y una aplicación llega a este servidor solo con los permisos que se le dieron. En el marco, una aplicación no puede usar una base de datos del navegador ni un service worker, ni enviar notificaciones, y no se puede instalar.",
           "isolatedFrameFix": "Para darle a cada aplicación su propia dirección: apunta *.{host} a este servidor con un certificado TLS que lo cubra, define AIMEAT_APP_HOST={host} y AIMEAT_APP_ORIGIN_ENABLED=true, y reinicia el servidor."
         },
         "doors": {
