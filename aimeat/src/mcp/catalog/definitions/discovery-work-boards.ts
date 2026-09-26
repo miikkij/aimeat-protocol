@@ -19,6 +19,7 @@
  *     beside the CORS pair. Hooks had no MCP door at all.
  *   v1.4.0 — 2026-09-08 — aimeat_admin_cors_overview (the CORS page in one read) and
  *     aimeat_admin_cors_set, beside the Security pair.
+ *   v1.3.1 — 2026-09-25 — aimeat_admin_security_overview names the apps line (audit A7-1).
  *   v1.3.0 — 2026-09-05 — aimeat_admin_security_overview (the Security page in one read) and
  *     aimeat_admin_incident_resolve, beside the other operator tools.
  *   v1.2.0 — 2026-08-30 — Board tool descriptions say what a board is for (RFC v4.0 §27 reinstated):
@@ -345,7 +346,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_admin_security_overview',
         // A6: the overview reports a bounded sample and an explicit unknown comparison state.
-        description: 'Operator-only. The Security page in one read: a bounded sample of at most 1000 readable log lines filtered to the last 24 hours (count_kind=sample, window_total=null; unknown zone when comparison history is insufficient) (refusals, distinct sources, walled addresses, each with a zone decided from this instance\'s own readable history), the refusal log grouped by door, source, credential kind and credential fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count, who holds the operator role and which accounts are deactivated or use two-step sign-in, and the door settings (rate limits, tarpit, lockout, TOTP, CORS origins, federation sign-in, body limits, the log file). The same data as GET /v1/admin/security/overview. Returns an operator-role error for non-operators.',
+        description: 'Operator-only. The Security page in one read: a bounded sample of at most 1000 readable log lines filtered to the last 24 hours (count_kind=sample, window_total=null; unknown zone when comparison history is insufficient) (refusals, distinct sources, walled addresses, each with a zone decided from this instance\'s own readable history), the refusal log grouped by door, source, credential kind and credential fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count, who holds the operator role and which accounts are deactivated or use two-step sign-in, how apps are kept apart from the sign-in of whoever opens them (apps: on their own addresses, in an isolated frame, or on this node\'s address while one person has an account; on a node several people share with no app addresses, a warning in words and the settings that give every app its own address), and the door settings (rate limits, tarpit, lockout, TOTP, CORS origins, federation sign-in, body limits, the log file). The same data as GET /v1/admin/security/overview. Returns an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {},

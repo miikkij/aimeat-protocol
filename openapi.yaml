@@ -53533,7 +53533,9 @@ paths:
         history), the refusal log grouped by door, source, credential kind and credential
         fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count,
         who holds the operator role and which accounts are deactivated or use two-step sign-in,
-        and the door settings. The same data the `aimeat_admin_security_overview` tool returns.
+        how apps are kept apart (`apps`, with a warning and the settings to change on a node several
+        people share with no app origin), and the door settings. The same data the
+        `aimeat_admin_security_overview` tool returns.
         Requires the `operator` role.
       security:
         - BearerAuth: []
@@ -53584,6 +53586,18 @@ paths:
                           accounts:
                             type: object
                             description: Owners in all, the operator names, the deactivated accounts, how many use two-step sign-in, registration mode and organisation sign-in
+                          apps:
+                            type: object
+                            description: How apps are kept apart from the sign-in of whoever opens them. On a node several people share with no app origin, zone is watch and warning, what_to_set and settings say what gives every app its own address.
+                            properties:
+                              isolation: { type: string, enum: [app-origin, isolated-frame, shared-origin] }
+                              people: { type: integer, description: People with an account here who can publish an app }
+                              app_origin: { type: object, properties: { enabled: { type: boolean }, host: { type: string, nullable: true } } }
+                              zone: { type: string, enum: [healthy, watch] }
+                              summary: { type: string }
+                              warning: { type: string, nullable: true }
+                              what_to_set: { type: string, nullable: true }
+                              settings: { type: object, nullable: true, additionalProperties: { type: string }, description: "AIMEAT_APP_HOST and AIMEAT_APP_ORIGIN_ENABLED with the values this node would take" }
                           settings:
                             type: object
                             description: The door settings as configured (rate limits, tarpit, lockout, TOTP, passkeys, CORS origins, federation sign-in, body limits, the log file)

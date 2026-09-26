@@ -7,6 +7,8 @@
  *   and credential kind and listed newest first, the incident open with the status word "open" —
  *   and that resolving and deleting go through the same service the MCP tool calls.
  * @version-history
+ *   v1.1.0 -- 2026-09-25 -- The apps line (audit A7-1): the overview says how apps are kept apart, and
+ *     on a node several people share with no app origin it warns and names what to set.
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 -- 2026-09-05 -- Initial: the overview's gate and shape, the incident lifecycle.
  */
@@ -96,6 +98,22 @@ await test('The operator reads the page in one call, with every part present', a
     assert(typeof d.settings.login_rate_limit.max === 'number', 'settings carry the sign-in rate limit');
     assert(typeof d.settings.tarpit.enabled === 'boolean', 'settings carry the tarpit');
     assert(typeof d.settings.auth_log.path === 'string', 'settings name the log file');
+});
+
+await test('The overview says how apps are kept apart, with the warning and what to set on a shared node without app addresses', async () => {
+    // The runner's node has several owners and no app origin, which is the case audit A7-1 is about:
+    // apps run in the isolated frame, and the operator is told what gives every app an address.
+    const d = await overview(opToken);
+    assert(!!d.apps, `the overview carries the apps line, got ${JSON.stringify(Object.keys(d))}`);
+    assert(d.apps.isolation === 'isolated-frame', `isolation, got ${d.apps.isolation}`);
+    assert(d.apps.people >= 2, `people who can publish, got ${d.apps.people}`);
+    assert(d.apps.zone === 'watch', `zone, got ${d.apps.zone}`);
+    assert(d.apps.app_origin.enabled === false, 'no app origin here');
+    assert(typeof d.apps.summary === 'string' && d.apps.summary.includes('isolated frame'), `summary, got ${d.apps.summary}`);
+    assert(typeof d.apps.warning === 'string' && d.apps.warning.length > 0, 'a warning in words');
+    assert(/AIMEAT_APP_HOST=\S+/.test(d.apps.what_to_set) && d.apps.what_to_set.includes('AIMEAT_APP_ORIGIN_ENABLED=true'),
+        `what to set names both settings, got ${d.apps.what_to_set}`);
+    assert(d.apps.settings?.AIMEAT_APP_ORIGIN_ENABLED === 'true' && !!d.apps.settings?.AIMEAT_APP_HOST, `settings, got ${JSON.stringify(d.apps.settings)}`);
 });
 
 await test('The two knocks above are in the last 24 hours, grouped by door and by credential, newest first', async () => {

@@ -470,7 +470,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | **Admin dashboard** | Node, identity, data, infrastructure, services, integrations and federation, in one control plane. | operator sign-in, `/v1/admin/*` |
 | **Runtime configuration** | Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart; the configuration reference lists the available settings. | `/v1/admin/config`, `aimeat_admin_config` |
 | **People and roles** | Disable or enable an account, grant or revoke roles, reset two-step sign-in, recover an account. | `aimeat_admin_owner_*`, `/v1/admin/roles/*` |
-| **Security overview** | Door activity, the refusal log, and quarantined incidents to resolve. | `/v1/admin/security/*`, `aimeat_admin_security_overview` |
+| **Security overview** | Door activity, the refusal log, and quarantined incidents to resolve. It also says how apps are kept apart from the sign-in of whoever opens them, and on a node several people share with no app addresses it warns and names the two settings that give every app its own address. | `/v1/admin/security/*`, `aimeat_admin_security_overview` |
 | **CORS** | Allowed origins per node, person, agent and memory key. | `aimeat_admin_cors_*` |
 | **Memory across accounts** | Search, delete and restore records across owners. Each search, read, delete and restore of someone's entry is on that person's feed and in the operator's usage record. | `/v1/admin/memory*` |
 | **Organism break-glass** | Take over or add an owner to an organism whose owners are gone. | `aimeat_admin_organism_*` |
