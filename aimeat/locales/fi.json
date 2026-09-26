@@ -7491,6 +7491,8 @@
   "appspage.descPlaceholder": "Yksi tai kaksi lausetta siitä, mitä sovellus tekee. Tekoälysi voi kirjoittaa sen.",
   "appspage.codeLabel": "Pääsykoodi, jos sovellus ei ole julkinen",
   "appspage.codePlaceholder": "tyhjä = julkinen",
+  "appspage.codeShow": "Näytä pääsykoodi",
+  "appspage.codeHide": "Piilota pääsykoodi",
   "appspage.publishFile": "Julkaise tiedosto",
   "appspage.uploadHint": "Saat sovellukselle heti oman osoitteen, ja kuvaus näkyy käynnistimessä ja julkisella esittelysivullasi (portfolio). Kun tiedosto on julkaistu, näet samalla, onko sovellus tehty voimassa olevan rakennusohjeen mukaan.",
   "appspage.uploaded": "Sovellus julkaistu",

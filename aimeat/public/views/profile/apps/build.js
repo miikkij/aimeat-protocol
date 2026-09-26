@@ -10,6 +10,8 @@
  * @structure secAgents · secBuild · UploadForm · buildAgentAuthoringPrompt · skillPrompt
  * @usage import { secAgents, secBuild } from './build.js';
  * @version-history
+ *   2026-09-26 — The upload form's access code is typed hidden, with an eye inside the field that
+ *     shows it.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-09-02 — Initial. The crew-definition editor and its prompt moved here from
  *     apps-tab.js v1.8.0, where they sat on every card.
@@ -101,19 +103,31 @@ function UploadForm({ onUpload, busy }) {
   const shotRef = useRef(null);
   const [desc, setDesc] = useState('');
   const [code, setCode] = useState('');
+  // The access code is typed hidden; the eye inside the field shows it (Jouni, 2026-09-26).
+  const [showCode, setShowCode] = useState(false);
   const [roadmap, setRoadmap] = useState('');
   return html`
     <div class="ap-form">
       <label class="ap-field"><span class="og-label">${a('fileLabel')}</span><input type="file" class="og-input ap-file" ref=${fileRef} accept=".html,.htm" /></label>
       <label class="ap-field"><span class="og-label">${a('shotLabel')}</span><input type="file" class="og-input ap-file" ref=${shotRef} accept="image/*" /></label>
       <label class="ap-field ap-field--wide"><span class="og-label">${a('descLabel')}</span><textarea class="og-input" rows="2" maxLength="2000" placeholder=${a('descPlaceholder')} value=${desc} onInput=${(e) => setDesc(e.target.value)}></textarea></label>
-      <label class="ap-field"><span class="og-label">${a('codeLabel')}</span><input class="og-input" placeholder=${a('codePlaceholder')} value=${code} onInput=${(e) => setCode(e.target.value)} /></label>
+      <label class="ap-field"><span class="og-label">${a('codeLabel')}</span>
+        <span class="ap-secret">
+          <input class="og-input" type=${showCode ? 'text' : 'password'} autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder=${a('codePlaceholder')} value=${code} onInput=${(e) => setCode(e.target.value)} />
+          <button type="button" class="ap-secret-eye" aria-pressed=${showCode ? 'true' : 'false'} aria-label=${showCode ? a('codeHide') : a('codeShow')} title=${showCode ? a('codeHide') : a('codeShow')} onClick=${() => setShowCode((s) => !s)}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7S4.5 16.5 2 12z" /><circle cx="12" cy="12" r="3" />
+              ${showCode ? html`<path d="M4 4l16 16" />` : null}
+            </svg>
+          </button>
+        </span>
+      </label>
       <label class="ap-field ap-field--wide"><span class="og-label">${a('roadPublishLabel')}</span><textarea class="og-input" rows="2" maxLength="600" value=${roadmap} onInput=${e => setRoadmap(e.target.value)} /></label>
       <p class="ap-hint ap-field--wide">${a('roadPublishHint')}</p>
       <div class="ap-field ap-field--send">
         <button type="button" class="og-door" disabled=${busy} onClick=${async () => {
           const ok = await onUpload({ file: fileRef.current?.files?.[0], description: desc, screenshot: shotRef.current?.files?.[0], accessCode: code, roadmap });
-          if (ok) { setDesc(''); setCode(''); setRoadmap(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
+          if (ok) { setDesc(''); setCode(''); setShowCode(false); setRoadmap(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
         }}>${a('publishFile')}</button>
       </div>
     </div>`;
