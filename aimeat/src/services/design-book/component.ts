@@ -30,6 +30,11 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.3.1 — 2026-09-26 — An attribute value is benched as a browser uses it (1a0a15eb7b20): a value
+ *     holding a character reference other than &amp; is refused, since a browser decodes it before
+ *     use (`u&#114;l(` is url(), and so is one holding a backslash, since a browser reads an SVG
+ *     attribute such as fill as a style value, where `u\72 l(` is url() too. The address check read
+ *     the value as written, and a preview fetched the address.
  *   v1.3.0 — 2026-09-24 — Every selector is read to its end (selectorEscape), since a rule styles
  *     what its last compound names: it starts at one of the component's own elements, goes down
  *     freely, goes sideways only onto another of its own elements until it has gone down once, and
@@ -129,12 +134,19 @@ function checkMarkup(html: string, prefix: string): void {
           + 'Every attribute is a name, "=", and a value in double quotes.');
       }
       if (odd) {
-        refuse(`On <${name}>, the attribute "${key.slice(0, 40)}" carries a quote or an angle bracket where a browser and this bench could read the tag differently. `
-          + 'Write every value in double quotes, with no quote, "<" or ">" inside it.');
+        refuse(`On <${name}>, the attribute "${key.slice(0, 40)}" carries a quote or an angle bracket, or a character reference, where a browser and this bench could read it differently. `
+          + 'Write every value in double quotes, with no quote, "<", ">" or "&" inside it: "&amp;" is the one character reference allowed.');
       }
       if (!(ATTRIBUTES.has(key) || key.startsWith('data-') || key.startsWith('aria-'))) {
         refuse(`A component's markup may not carry the attribute "${key}" on <${name}>. Allowed: class, id, role, data-*, aria-*, the form and table attributes, and the SVG drawing attributes. `
           + 'An event handler is the app\'s to wire, in its own script.');
+      }
+      // A browser reads an SVG drawing attribute (fill, stroke, …) as a style value, where an escape
+      // stands for another character: `u\72 l(` is url( to it, and the address check below would
+      // read past it. No value a component needs holds a backslash.
+      if (value.includes('\\')) {
+        refuse(`The attribute "${key}" on <${name}> carries a backslash. A browser reads an SVG attribute such as fill as a style value, where a backslash stands for another character, so the bench could not read the value the browser uses. `
+          + 'Write the characters themselves.');
       }
       // A browser drops whitespace and control characters inside a scheme, so they go first.
       // eslint-disable-next-line no-control-regex -- control characters are exactly what is being removed
