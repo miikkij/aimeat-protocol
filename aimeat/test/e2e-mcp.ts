@@ -5,6 +5,9 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.2.0 -- 2026-09-26 -- Test 13: a re-spelled copy of the revoked access token (the signature's
+ *     unread last bits changed) works before the revocation and is refused after it, on MCP and on
+ *     REST (secaudit 2026-09, N4).
  *   v1.1.0 -- 2026-07-14 -- Tests 1 + 1b: agent_auth block on the RFC 8414 metadata and the
  *     /auth.md agent-registration document (agent readiness); header added (campsite rule)
  *   v1.0.0 -- pre-2026-07 -- T-2: MCP tool + OAuth E2E tests
@@ -30,6 +33,16 @@ async function test(name: string, fn: () => Promise<void>) {
 
 function assert(cond: boolean, msg: string) {
     if (!cond) throw new Error(msg);
+}
+
+/**
+ * The same token spelled another way. An Ed25519 signature is 64 bytes in 86 base64url characters,
+ * so the last character's low four bits are read by nobody: change only those and the copy verifies.
+ */
+function respelled(token: string): string {
+    const B64U = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const last = B64U.indexOf(token[token.length - 1]);
+    return token.slice(0, -1) + B64U[(last & 0x30) | ((last + 1) & 0x0f)];
 }
 
 async function json(path: string, opts: RequestInit = {}) {
@@ -460,6 +473,12 @@ await test('13. Token revocation', async () => {
     };
     const before = await openSession(tokenToRevoke);
     assert(before === 200, `the fresh token must work before revocation, got ${before}`);
+    // Another spelling of the same token: the signature's last character carries four bits nobody
+    // reads, so this copy verifies. It works now, which is what makes the check after the revocation
+    // mean something (secaudit 2026-09, N4).
+    const copy = respelled(tokenToRevoke);
+    const copyBefore = await openSession(copy);
+    assert(copyBefore === 200, `the re-spelled copy must work before revocation, got ${copyBefore}`);
 
     const { status, body } = await json('/v1/mcp/token/revoke', {
         method: 'POST',
@@ -472,6 +491,11 @@ await test('13. Token revocation', async () => {
     // and gets the same body — so the echo proves nothing. The credential itself has to stop working.
     const after = await openSession(tokenToRevoke);
     assert(after === 401, `a revoked access token must be refused, got ${after}`);
+    // …in every spelling: the copy is the same token.
+    const copyAfter = await openSession(copy);
+    assert(copyAfter === 401, `a re-spelled copy of a revoked access token must be refused, got ${copyAfter}`);
+    const copyRest = await json('/v1/memory?limit=1', { headers: { Authorization: `Bearer ${copy}` } });
+    assert(copyRest.status === 401, `the re-spelled copy must be refused on REST too, got ${copyRest.status}`);
 
     // The refresh token is a SEPARATE credential and is revoked separately (the same endpoint takes
     // both). Revoking it must stop the exchange, or a leaked pair can mint its way back forever.

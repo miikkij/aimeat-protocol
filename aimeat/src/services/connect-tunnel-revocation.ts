@@ -24,6 +24,8 @@
  *   import { revokeByGaii } from './connect-tunnel-revocation.js';
  *   revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii);
  * @version-history
+ *   2026-09-26 — revokeByToken compares token ids (auth/jwt.ts tokenIdOf), not strings, so the
+ *     socket of any spelling of a revoked token is told and cut (secaudit 2026-09, N4).
  *   2026-09-03 — These detach ONE identity instead of closing a socket. Closing was right while a
  *     socket carried exactly one identity and catastrophic the moment it carried twelve: one dead
  *     credential would have dropped eleven good ones. The socket closes only when the manager's
@@ -33,6 +35,7 @@
  */
 import type { WebSocket } from 'ws';
 import type { ConnectFrame } from './connect-tunnel-wire.js';
+import { tokenIdOf } from '../auth/jwt.js';
 import { logger } from '../utils/logger.js';
 
 /** Just enough of a connection for these three to do their work. */
@@ -71,11 +74,14 @@ function cut(send: Send, detach: Detach, conn: Closable, message: string, where:
  * P2: a bearer was revoked — if its socket is live, tell the principal to stop + re-auth, then
  * close. The forward bearer IS this token, so leaving the socket open would just 401 every forward
  * call (silent breakage); pushing `auth_revoked` lets the client surface re-auth guidance at once
- * and removes the client's periodic auth-liveness probe. Matched by the pinned rawToken.
+ * and removes the client's periodic auth-liveness probe. Matched by the pinned rawToken's id
+ * (tokenIdOf), never its string: a socket opened with another spelling of the revoked token holds
+ * the same token, so it is told and cut with it.
  */
 export function revokeByToken(connections: Map<string, Closable>, send: Send, detach: Detach, rawToken: string): void {
+  const revokedId = tokenIdOf(rawToken);
   for (const conn of connections.values()) {
-    if (conn.rawToken !== rawToken) continue;
+    if (tokenIdOf(conn.rawToken) !== revokedId) continue;
     cut(send, detach, conn, 'Token revoked', 'onTokenRevoked');
     break;  // one live session per identity — at most one match
   }
