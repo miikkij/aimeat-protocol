@@ -13,6 +13,8 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   v1.3.1 — 2026-09-25 — The note on aimeat_contact_resolve_email says what the route decides now: an
+ *     agent holding messages:read is answered, 20 lookups in 10 minutes per account. No code changed.
  *   v1.3.0 — 2026-09-24 — SECURITY (audit A5-2): aimeat_contact_resolve_email asks POST
  *     /v1/contacts/resolve with the session's own bearer, over loopback, instead of calling the
  *     service behind messages:read alone. The route's owner gate and its 20-per-10-minutes limiter
@@ -158,11 +160,12 @@ export function registerContactTools(
     // ── aimeat_contact_resolve_email — exact-match email → local owner ──
     //
     // THE ROUTE, NOT THE SERVICE. Whether an address has an account here is an oracle, so POST
-    // /v1/contacts/resolve is the account holder's door and throttled: requireRole('owner') and 20
-    // lookups per 10 minutes. This tool called resolveContactEmail() itself behind messages:read, so
-    // any agent holding that word asked as often as it liked (security audit A5-2). It now asks the
-    // route with the session's own bearer over loopback, the way aimeat_invoke does, so the gate and
-    // the limiter are the route's single copy and the agent reads the answer REST would give it.
+    // /v1/contacts/resolve decides who asks and how often: the owner in person or an agent holding
+    // messages:read, and 20 lookups in 10 minutes per account, the owner and their agents together.
+    // This tool called resolveContactEmail() itself behind messages:read, so any agent holding that
+    // word asked as often as it liked (security audit A5-2). It asks the route with the session's own
+    // bearer over loopback, the way aimeat_invoke does, so the gate and the limiter are the route's
+    // single copy and the agent reads the answer REST would give it.
     mcp.tool(
         'aimeat_contact_resolve_email',
         descriptionFor('aimeat_contact_resolve_email'),

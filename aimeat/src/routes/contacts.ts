@@ -15,6 +15,9 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.4.0 — 2026-09-25 — POST /v1/contacts/resolve admits an agent holding messages:read beside the
+ *     owner in person, and counts 20 lookups in 10 minutes per account, the owner and their agents
+ *     together, keyed by the owner GHII instead of per caller.
  *   v1.3.1 — 2026-09-13 — A refusal carries its `details` (the handle send's failed attempt names its
  *     send-log row).
  *   v1.3.0 — 2026-09-13 — Every door here takes requireLocalSession(). A session signed in from
@@ -42,7 +45,8 @@ import type { OutboundContactLink } from '../models/outbound-schemas.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { rateBuckets } from '../services/rate-buckets.js';
+import { resolveIdentity, ownerCoordinate } from '../utils/gaii.js';
 import {
   ContactsError, listContactsMerged, addContact, updatePersonContact, removeContact, resolveContactEmail,
   sendToContact, parseContactInclude, type AddContactInput,
@@ -53,6 +57,12 @@ import { createContactInvitation, ContactInvitationError } from '../services/con
 import { invitePublic } from '../services/invitations.js';
 import { mintContactHandle, resolveContactHandle } from '../services/contact-handles.js';
 import { resolveAppOriginTarget } from '../services/app-origin-target.js';
+
+/** How many email lookups one account may make: the owner and their agents together. */
+export const EMAIL_LOOKUP_LIMIT = { windowMs: 10 * 60 * 1000, max: 20 } as const;
+
+/** The count behind it, one per process, shared by every mount of the router. */
+const takeLookup = rateBuckets(EMAIL_LOOKUP_LIMIT.windowMs);
 
 /** Links as the caller sent them. Shape only — what is ACCEPTABLE (http(s), caps, count) is the
  *  service's decision, made once in normalizeLinks rather than again per surface. */
@@ -86,6 +96,22 @@ function parseAddInput(body: Record<string, unknown>): AddContactInput | null {
 export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
+
+  /* One allowance of email lookups per ACCOUNT, keyed by the owner GHII: the owner and every agent
+   * acting for them draw on it together, so connecting a second agent does not double what one
+   * person can look up. Not per network address, because the MCP tool asks over loopback and every
+   * account would share one bucket; not per principal, which would give each agent its own. */
+  const limitLookupsPerAccount: RequestHandler = (req, res, next) => {
+    const counted = takeLookup(ownerCoordinate(req.auth!, config.nodeId), EMAIL_LOOKUP_LIMIT.max);
+    res.setHeader('X-RateLimit-Limit', counted.limit);
+    res.setHeader('X-RateLimit-Remaining', counted.remaining);
+    res.setHeader('X-RateLimit-Reset', Math.ceil(counted.resetAt / 1000));
+    if (counted.ok) { next(); return; }
+    res.setHeader('Retry-After', counted.retryAfterSec);
+    res.status(429).json(error(config.nodeId, 'RATE_LIMITED',
+      `This account has looked up ${EMAIL_LOOKUP_LIMIT.max} addresses in the last 10 minutes, the most one account may. `
+      + `Try again in ${counted.retryAfterSec} seconds. The owner and their agents share this limit.`, 429));
+  };
   const sendErr = (res: Parameters<Parameters<Router['get']>[1]>[1], e: unknown): boolean => {
     if (e instanceof ContactsError) { res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details)); return true; }
     return false;
@@ -278,9 +304,19 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
     } catch (e) { if (!sendErr(res, e)) throw e; }
   });
 
-  /* ── POST /v1/contacts/resolve — EXACT-match email → local owner. Authenticated + rate-limited
-   * hash equality (no enumeration; the invite flow already discloses the same fact). ── */
-  router.post('/v1/contacts/resolve', requireAuth(), requireLocalSession(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+  /* ── POST /v1/contacts/resolve — EXACT-match email → local owner. Hash equality, no enumeration;
+   * the answer (an account or not, can be invited) is what the invite flow already tells.
+   *
+   * WHO. The owner in person, or their agent holding messages:read, the word the MCP tool has always
+   * declared: the tool asks this door over loopback, so the two cannot disagree (the developer's
+   * ruling of 2026-09-25). requireRole('agent') admits the owner and their agents and keeps an app
+   * grant and an ecosystem app out, which requireScope alone would admit on the word; requireScope
+   * then waves the owner in person through and holds an agent to the word. A visitor from another
+   * node stays out (requireLocalSession).
+   *
+   * HOW OFTEN. 20 in 10 minutes per ACCOUNT, after the gates, so a refused caller spends nothing
+   * (limitLookupsPerAccount above). ── */
+  router.post('/v1/contacts/resolve', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:read'), limitLookupsPerAccount, async (req, res) => {
     try {
       const result = await resolveContactEmail(storage, ((req.body ?? {}).email ?? '').toString());
       res.json(success(config.nodeId, result));
