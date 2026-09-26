@@ -12,6 +12,8 @@
  *   poster.css; a page never styles it from outside.
  * @usage Linked from public/spa.html in the component block, after turn.css.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — On your own message the writer's name, the time and the read marks take the
+ *     turn's words' colour (inherit): ink on the sun in AIMEAT, light in Pebble's dark mode.
  *   v1.1.1 — 2026-09-26 — The flash ring and the quote's left edge read var(--shape-frame-heavy) (3px
  *     in AIMEAT), not a literal (check:shape-tokens; fix pass).
  *   v1.1.0 — 2026-09-26 —.message-thread--capped (Thread `capped`): a thread inside a page scrolls
@@ -26,7 +28,7 @@
 /* Who wrote it, above the words: the row label's small capitals (Jouni's decision "Row label"),
    coral beside the spine, ink on the sun. */
 .message-who { margin-bottom: 2px; }
-.poster-turn--user .message-who { color: var(--on-sun); }
+.poster-turn--user .message-who { color: inherit; }
 .message-words { word-break: break-word; }
 .message-words .md-body > :first-child { margin-top: 0; }
 .message-words .md-body > :last-child { margin-bottom: 0; }
@@ -47,12 +49,12 @@
 }
 .message-meta .poster-chip, .message-meta .poster-status { white-space: nowrap; }
 .poster-turn--user .message-meta,
-.poster-turn--user .message-meta .poster-time { color: var(--on-sun); }
+.poster-turn--user .message-meta .poster-time { color: inherit; }
 .message-receipt { font-size: 11px; }
 .message-receipt--read { color: var(--accent); }
 .message-receipt--error { color: var(--danger); }
 /* On your own words the marks are ink, as main draws them on the sun. */
-.poster-turn--user .message-receipt { color: var(--on-sun); }
+.poster-turn--user .message-receipt { color: inherit; }
 /* The line under the message: Copy, Listen and ⋯ (its place under the spine is the turn's own). */
 .message-actions { gap: 4px; }
 
