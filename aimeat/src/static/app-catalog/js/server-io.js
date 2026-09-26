@@ -7,6 +7,8 @@
  *   main-local fns (+ closeModal from apps-io) injected via initServerIo(deps). Carved from main.js.
  * @usage import { initServerIo, loadPublishedApps, showPublishModal } from './server-io.js'; initServerIo({...})
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The publish dialog opens with the access code hidden; dates follow the
+ *     page language (dateLocale).
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 11).
  *   v2.0.0 — 2026-07-20 — Server-only cutover: drop "Import from AIMEAT" (offline server→local import);
  *     the create flow publishes then parks so a new app lands unlisted.
@@ -36,7 +38,8 @@ import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.
 import { getAllApps, saveApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
-import { t, getLang } from './i18n.js';
+import { t, getLang, dateLocale } from './i18n.js';
+import { initSecretFields } from './secret-field.js';
 import { closeModal } from './apps-io.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
@@ -117,6 +120,9 @@ function showPublishModal(appId, opts) {
   document.getElementById('publish-filename').value = safeName;
   document.getElementById('publish-description').value = app.description || '';
   document.getElementById('publish-access-code').value = '';
+  // Every opening starts with the code hidden, whatever the last one left.
+  document.getElementById('publish-access-code').type = 'password';
+  initSecretFields();
   // Surface the sign-in requirement up front: publishing needs a signed-in owner.
   var pubStatus = document.getElementById('publish-status');
   var pubSubmit = document.getElementById('publish-submit-btn');
@@ -642,7 +648,7 @@ function renderBackupSelection() {
   var html =
     '<div style="font-size:.8rem;color:var(--text-muted)">' + t('backup.from') + ': <span style="font-family:monospace">' +
       escapeHtml((d.source.owner || '?') + '@' + (d.source.nodeId || '?')) + '</span>' +
-      (d.exported_at ? ' · ' + new Date(d.exported_at).toLocaleString() : '') +
+      (d.exported_at ? ' · ' + new Date(d.exported_at).toLocaleString(dateLocale()) : '') +
     '</div>' +
     '<div class="backup-toolbar-row">' +
       '<div>' +
@@ -665,7 +671,7 @@ function renderBackupSelection() {
           'onchange="window._launcher.backupUpdateSummary()"/> v' + ver.version +
           (ver.semver ? ' (' + escapeHtml(ver.semver) + ')' : '') +
           ' · ' + (ver.size < 1024 ? ver.size + ' B' : (ver.size / 1024).toFixed(1) + ' KB') +
-          (ver.created_at ? ' · ' + new Date(ver.created_at).toLocaleDateString() : '') +
+          (ver.created_at ? ' · ' + new Date(ver.created_at).toLocaleDateString(dateLocale()) : '') +
         '</label>';
     }
     html +=

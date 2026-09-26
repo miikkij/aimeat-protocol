@@ -417,7 +417,10 @@
       </div>
       <div class="form-group">
         <label for="publish-access-code" data-i18n="publish.accessCode">Access Code (optional)</label>
-        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off"/>
+        <div class="secret-field">
+          <input type="password" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true"/>
+          <button type="button" class="secret-eye" data-secret-toggle="publish-access-code" aria-controls="publish-access-code" aria-pressed="false" aria-label="Show the access code" title="Show the access code"></button>
+        </div>
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</div>
       </div>
       <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>

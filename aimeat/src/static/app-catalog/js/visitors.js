@@ -20,12 +20,13 @@
  *   visitorsToggle · visitorsSetGeo · visitorsCountry · visitorsZoom
  * @usage import { visitorsSectionInner, visitorsOnOpen } from './visitors.js'
  * @version-history
+ *   v1.0.1 — 2026-09-26 — Dates follow the page language (dateLocale).
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { escapeHtml } from './util.js';
 import { dtlBtn, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
-import { t } from './i18n.js';
+import { t, dateLocale } from './i18n.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { barsFromSeries, clampWindow, WINDOW_DEFAULT, WINDOW_MIN, WINDOW_MAX } from './visitors-model.js';
 import { loadAtlas, mapHtml, mapFocus, mapZoom, mapReset } from './visitors-map.js';
@@ -155,8 +156,8 @@ function chartHtml(title, series, parts) {
   var rects = '';
   bars.forEach(function (bar, i) {
     var x = i * (bw + PAD);
-    var when = new Date(bar.from + 'T00:00:00').toLocaleDateString()
-      + (bar.to !== bar.from ? ' – ' + new Date(bar.to + 'T00:00:00').toLocaleDateString() : '');
+    var when = new Date(bar.from + 'T00:00:00').toLocaleDateString(dateLocale())
+      + (bar.to !== bar.from ? ' – ' + new Date(bar.to + 'T00:00:00').toLocaleDateString(dateLocale()) : '');
     var label = when + ' · ' + parts.map(function (p) { return t(p.label) + ' ' + bar[p.key]; }).join(' · ');
     var marks = '';
     var y = BASE;
@@ -176,8 +177,8 @@ function chartHtml(title, series, parts) {
     + '<span class="version-chart-max">' + escapeHtml(fill(folded.grain === 'week' ? 'visitors.maxPerWeek' : 'visitors.maxPerDay', folded.max)) + '</span></div>'
     + '<svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + ' ' + H + '" role="img" aria-label="' + escapeHtml(title) + '">'
     + '<line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects + '</svg>'
-    + '<div class="version-chart-axis"><span>' + escapeHtml(new Date(vData.from + 'T00:00:00').toLocaleDateString()) + '</span><span>'
-    + escapeHtml(new Date(vData.to + 'T00:00:00').toLocaleDateString()) + '</span></div>'
+    + '<div class="version-chart-axis"><span>' + escapeHtml(new Date(vData.from + 'T00:00:00').toLocaleDateString(dateLocale())) + '</span><span>'
+    + escapeHtml(new Date(vData.to + 'T00:00:00').toLocaleDateString(dateLocale())) + '</span></div>'
     + '<div class="vis-keys">' + key + '</div></div>';
 }
 

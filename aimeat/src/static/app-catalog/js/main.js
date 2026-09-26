@@ -25,6 +25,7 @@
  *     and keeps a half-written form; the page's own keys stand aside while a dialog is open.
  *   v2.9.0 — 2026-09-18 — Visitors: expose visitorsSetDays / visitorsApplyDays / visitorsToggle /
  *     visitorsSetGeo / visitorsCountry / visitorsZoom.
+ *   v2.10.0 — 2026-09-26 — initSecretFields(): the access code fields hide their value behind an eye.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -50,6 +51,7 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
 import { checkLegacyLocalApps } from './migrate.js';
 import { toggleFavorite } from './favorites.js';
 import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
+import { initSecretFields } from './secret-field.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -63,6 +65,7 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
     setLang(lang);
     try { var config = loadConfig(); config.language = getLang(); saveConfig(config); } catch (e) {}
     applyI18n();
+    initSecretFields();  // the eye buttons' names follow the language
     // Re-render dynamic sections so JS-built strings pick up the new language.
     try { renderApps(); } catch (e) {}
     try { renderTags(); } catch (e) {}
@@ -327,6 +330,8 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
       ? _urlLang
       : ((loadConfig().language === 'fi') ? 'fi' : 'en'));
     applyI18n();
+    // The access code fields hide their value until the eye beside them is pressed.
+    initSecretFields();
     // Every dialog in the template gets its X and its closing rules before anything can open one.
     // A dialog whose closing does more than hide it names what it does here; the rest just close.
     initDialogs();

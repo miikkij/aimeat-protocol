@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-26 — The access code editor hides the code behind an eye (secret-field.js); dates and
+ *     times follow the page language (dateLocale), not the browser's.
  *   2026-09-18 — The Visitors section (visitors.js) for the owner's own published app, after the
  *     versions: who opened it, when and from where.
  *   2026-09-13 — Lineage, copy protection and versions open and close through dialogs.js (the
@@ -72,7 +74,8 @@ import { saveApp, deleteApp } from './db.js';
 import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { dataMapSectionHtml, loadDataMapInto } from './data-map.js';
 import { loadConfig } from './config.js';
-import { t, getLang } from './i18n.js';
+import { t, getLang, dateLocale } from './i18n.js';
+import { secretToggleHtml } from './secret-field.js';
 import { getPromotion, setPromotion, loadPromoted } from './promote.js';
 import { monetizeSectionInner, monetizeOnOpen, odpsSectionInner } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
@@ -183,7 +186,11 @@ function serverMgmtInner(app) {
   var acEditor = detailEditingAccessCode
     ? '<div class="dtl-ac-editor" style="margin-top:10px">' +
         '<label class="dtl-stat-label" for="detail-ac-input">' + t('detail.accessCodeLabel') + '</label>' +
-        '<input id="detail-ac-input" class="modal-input" maxlength="64" placeholder="' + escapeHtml(t('detail.accessCodePh')) + '" style="margin:4px 0 6px" />' +
+        // Hidden until the eye beside it is pressed (secret-field.js).
+        '<div class="secret-field">' +
+          '<input id="detail-ac-input" type="password" class="modal-input" maxlength="64" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="' + escapeHtml(t('detail.accessCodePh')) + '" />' +
+          secretToggleHtml('detail-ac-input') +
+        '</div>' +
         '<div class="dtl-sync none" style="margin:0 0 8px">' + t('detail.accessCodeRemoveHint') + '</div>' +
         '<div class="dtl-btn-row">' +
           dtlBtn(t('detail.saveDetails'), 'window._launcher.detailAccessCodeSave()', {variant:'primary'}) +
@@ -399,7 +406,7 @@ function renderDetailView() {
     wcExplain = t('wc.explainPending');
   } else if (wcState === 'saved') {
     wcValue = detailWorkSavedAt
-      ? t('wc.savedAt').replace('{t}', new Date(detailWorkSavedAt).toLocaleTimeString())
+      ? t('wc.savedAt').replace('{t}', new Date(detailWorkSavedAt).toLocaleTimeString(dateLocale()))
       : t('wc.savedEarlier');
     wcExplain = app.published
       ? t('wc.explainSaved').replace('{v}', String((app.publishedVersionNumber || 0) + 1))
@@ -460,7 +467,7 @@ function renderDetailView() {
   // the detail view is open); Save PATCHes the server when the app is published.
   var tags = (app.tags && app.tags.length) ? app.tags.join(', ') : '—';
   var cortex = (app.usesCortex && app.usesCortex.length) ? app.usesCortex.join(', ') : '—';
-  var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : '—';
+  var created = app.addedAt ? new Date(app.addedAt).toLocaleString(dateLocale()) : '—';
   // Favourites are a Phase-2 (server-backed) feature; the old local-only star was dropped with the
   // server-only cutover so it isn't shown here anymore.
   var favBtn = '';
@@ -797,7 +804,7 @@ function renderDetailView() {
   };
   var bandItems = '';
   if (svrFacts) {
-    var updated = svrFacts.createdAt ? new Date(svrFacts.createdAt).toLocaleDateString() : '';
+    var updated = svrFacts.createdAt ? new Date(svrFacts.createdAt).toLocaleDateString(dateLocale()) : '';
     bandItems += bandItem(String(svrFacts.downloads || 0), t('detail.opens'));
     if (app.publishedVersionNumber) bandItems += bandItem(String(app.publishedVersionNumber), t('detail.versions'));
     if (svrFacts.size) bandItems += bandItem(fmtSize(svrFacts.size), t('detail.size'));
@@ -841,7 +848,7 @@ function detailCheckpointRows(app) {
   var out = '';
   for (var i = 0; i < list.length; i++) {
     var c = list[i];
-    var when = c.at ? new Date(c.at).toLocaleString() : '';
+    var when = c.at ? new Date(c.at).toLocaleString(dateLocale()) : '';
     var kb = c.size ? (Math.round(c.size / 102.4) / 10) + ' KB' : '';
     var note = c.note ? t('wc.before').replace('{note}', c.note) : t('wc.beforeUnnamed');
     out +=
@@ -1559,8 +1566,8 @@ function versionSpanText(versions) {
   var newest = versions[0].created_at;
   var oldest = versions[versions.length - 1].created_at;
   if (!newest || !oldest) return '';
-  var first = new Date(oldest).toLocaleDateString();
-  var last = new Date(newest).toLocaleDateString();
+  var first = new Date(oldest).toLocaleDateString(dateLocale());
+  var last = new Date(newest).toLocaleDateString(dateLocale());
   var when = first === last ? first : first + ' – ' + last;
   var span = durationLabel(gapMs(newest, oldest), durationUnits());
   return ' · ' + when + (span ? ' · ' + t('versions.span') + ' ' + span : '');
@@ -1633,7 +1640,7 @@ function versionChartHtml(sittings) {
   for (var i = 0; i < bars.length; i++) {
     var h = bars[i].n ? Math.max(4, Math.round((bars[i].n / max) * (H - 14))) : 0;
     var x = i * (bw + PAD);
-    var when = new Date(bars[i].day).toLocaleDateString();
+    var when = new Date(bars[i].day).toLocaleDateString(dateLocale());
     var label = when + (bucket > 1 ? ' +' + (bucket - 1) : '') + ' · ' + t('versions.perDay').replace('{n}', String(bars[i].n));
     rects += '<g class="version-bar"><title>' + escapeHtml(label) + '</title>' +
       '<rect class="version-bar-hit" x="' + x + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent"></rect>' +
@@ -1648,8 +1655,8 @@ function versionChartHtml(sittings) {
       '</svg>' +
       // A short chart (a few days) cannot hold a date at each end, so it says the span in one line.
       (svgW < 240
-        ? '<div class="version-chart-axis"><span>' + escapeHtml(new Date(first).toLocaleDateString() + (first === last ? '' : ' – ' + new Date(last).toLocaleDateString())) + '</span></div>'
-        : '<div class="version-chart-axis" style="max-width:' + svgW + 'px"><span>' + escapeHtml(new Date(first).toLocaleDateString()) + '</span><span>' + escapeHtml(new Date(last).toLocaleDateString()) + '</span></div>') +
+        ? '<div class="version-chart-axis"><span>' + escapeHtml(new Date(first).toLocaleDateString(dateLocale()) + (first === last ? '' : ' – ' + new Date(last).toLocaleDateString(dateLocale()))) + '</span></div>'
+        : '<div class="version-chart-axis" style="max-width:' + svgW + 'px"><span>' + escapeHtml(new Date(first).toLocaleDateString(dateLocale())) + '</span><span>' + escapeHtml(new Date(last).toLocaleDateString(dateLocale())) + '</span></div>') +
     '</div>';
 }
 
@@ -1670,7 +1677,7 @@ function versionSpanHtml(versions) {
   for (var w = 0; w < sittings.length; w++) worked += sittings[w].end - sittings[w].start;
   var parts = [versions.length + ' ' + t('versions.stored')];
   if (asc.length) {
-    var firstDay = new Date(asc[0]).toLocaleDateString(), lastDay = new Date(asc[asc.length - 1]).toLocaleDateString();
+    var firstDay = new Date(asc[0]).toLocaleDateString(dateLocale()), lastDay = new Date(asc[asc.length - 1]).toLocaleDateString(dateLocale());
     parts.push(firstDay === lastDay ? firstDay : firstDay + ' – ' + lastDay);
   }
   if (sittings.length) {
@@ -1720,7 +1727,7 @@ function detailLoadVersions(owner, filename) {
         var v = versions[i];
         var isLatest = (i === 0);
         var kb = v.size ? (Math.round(v.size / 102.4) / 10) + ' KB' : '';
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : '';
+        var when = v.created_at ? new Date(v.created_at).toLocaleString(dateLocale()) : '';
         // The list is newest-first, so the row after this one is the publish before it.
         var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
@@ -2325,7 +2332,7 @@ function renderLineageTree(d) {
     if (seen[id]) return ''; seen[id] = true;
     var n = byId[id]; if (!n) return '';
     var isSelf = (id === d.self);
-    var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + '</span>' : '';
+    var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString(dateLocale())) + '</span>' : '';
     var statusTxt = t('lineage.status.' + n.status) || n.status;
     var line = '<div class="lineage-node' + (isSelf ? ' self' : '') + '" style="margin-left:' + (depth * 16) + 'px">'
       + (depth > 0 ? '↳ ' : '') + escapeHtml(n.owner + '/' + n.filename) + (isSelf ? ' ●' : '')
@@ -2422,7 +2429,7 @@ function showVersionsModal(owner, filename) {
         var v = versions[i];
         var isLatest = (i === 0);
         var kb = v.size ? (Math.round(v.size / 102.4) / 10) + ' KB' : '';
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : '';
+        var when = v.created_at ? new Date(v.created_at).toLocaleString(dateLocale()) : '';
         var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
         html +=

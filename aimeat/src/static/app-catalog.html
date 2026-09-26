@@ -2289,6 +2289,8 @@
   @structure tokens · site bar · masthead, band, tools · rail · the index (rows and panels) ·
     foot · detail view · phone
   @version-history
+    v1.12.0 — 2026-09-26 — .secret-field and .secret-eye: the access code hidden behind an eye.
+      The Marks legal text reads --text-muted (2.43:1 on --text-dim was under the 4.5:1 minimum).
     v1.11.0 — 2026-09-24 — The footer's own button words are gone: a dialog's footer wears the
       library's action link and loud action, built in from poster.css (Jouni's decision "Dialog
       actions").
@@ -2740,6 +2742,18 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .dtl-sync.none { display: block; background: transparent; padding: 4px 0 0; font-size: .8rem; color: var(--text-dim); font-family: var(--font-body); font-weight: var(--font-poster-text-weight); line-height: 1.5; }
 .dtl-ac-editor { margin-top: 18px; }
 .dtl-ac-editor .modal-input, .od-form .modal-input { margin: 0; width: 100%; }
+/* A value hidden until the eye beside it is pressed (js/secret-field.js): the eye sits inside the
+   field's right end, so the field keeps its width and the text stops short of the button. */
+.secret-field { position: relative; display: flex; align-items: center; }
+.dtl-ac-editor .secret-field { margin: 4px 0 6px; }
+.secret-field .modal-input { flex: 1 1 auto; width: 100%; padding-right: 44px; }
+.secret-eye {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.secret-eye:hover, .secret-eye[aria-pressed="true"] { color: var(--text); }
+.secret-eye:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── Where this app puts what: a paragraph, then facts as rows, then the keys as a table ─── */
 .dtl-dm-body > p.dtl-dm-what { font-family: var(--font-body); font-size: 1.05rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); margin: 0 0 14px; max-width: 66ch; }
@@ -2800,7 +2814,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .mk-author-form { display: flex; flex-direction: column; gap: 10px; max-width: 520px; margin: 14px 0 8px; }
 .mk-author-form .modal-input { margin: 0; width: 100%; }
 .mk-aside { border: 3px dashed var(--accent); background: var(--card-bg); padding: 14px 18px; margin: 22px 0 14px; font-size: .95rem; line-height: 1.6; }
-.mk-legal { font-size: .92rem; line-height: 1.6; color: var(--text-dim); margin: 0 0 8px; }
+/* --text-muted, not --text-dim: the legal text is read, and --text-dim measured 2.43:1 on the light
+   page (2026-09-26); --text-muted is over 4.5:1 in both themes. */
+.mk-legal { font-size: .92rem; line-height: 1.6; color: var(--text-muted); margin: 0 0 8px; }
 .mk-legal-link { color: var(--text); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--text); }
 .mk-legal-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .mk-sees { display: grid; grid-template-columns: 220px 1fr; gap: 6px 24px; margin: 0 0 8px; font-size: .92rem; line-height: 1.5; }
@@ -3784,7 +3800,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       </div>
       <div class="form-group">
         <label for="publish-access-code" data-i18n="publish.accessCode">Access Code (optional)</label>
-        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off"/>
+        <div class="secret-field">
+          <input type="password" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true"/>
+          <button type="button" class="secret-eye" data-secret-toggle="publish-access-code" aria-controls="publish-access-code" aria-pressed="false" aria-label="Show the access code" title="Show the access code"></button>
+        </div>
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</div>
       </div>
       <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
@@ -4893,6 +4912,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "detail.editAccess": "Access code",
       "detail.accessCodeHint": "Set or remove an optional code required to open this app.",
       "detail.accessCodeLabel": "Access code",
+      "secret.show": "Show the access code",
+      "secret.hide": "Hide the access code",
       "detail.accessCodePh": "Leave empty for public / removes protection",
       "detail.accessCodeRemoveHint": "Enter a 4–64 character code to protect this app, or leave it empty and Save to make it public again.",
       "detail.accessCodeLen": "Access code must be 4–64 characters.",
@@ -5050,7 +5071,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     },
     fi: {
       // ── data map: copied from locales/fi.json, which is the source of truth
-      "dataMap.title": "Mihin tämä appi panee mitä",
+      "dataMap.title": "Mihin tämä sovellus panee mitä",
       "dataMap.usedForLabel": "Mihin käyttöön:",
       "dataMap.formLabel": "Muoto:",
       "dataMap.arrangementLabel": "Miten data on järjestetty",
@@ -5065,8 +5086,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "dataMap.state.unfinished": "Kesken",
       "dataMap.state.stated": "Kirjoitettu",
       "dataMap.state.contradicted": "Ei täsmää",
-      "dataMap.panel.missing": "Tälle appille ei ole kirjoitettu datakarttaa. Seuraavan rakentajan on luettava lähdekoodi selvittääkseen minne sen data menee, ja juuri niin data päätyy sinne mihin ylsi helpoiten.",
-      "dataMap.panel.noWhat": "Kukaan ei ole kertonut mikä tämä appi on.",
+      "dataMap.panel.missing": "Tälle sovellukselle ei ole kirjoitettu datakarttaa. Seuraavan rakentajan on luettava lähdekoodi selvittääkseen minne sen data menee, ja juuri niin data päätyy sinne mihin ylsi helpoiten.",
+      "dataMap.panel.noWhat": "Kukaan ei ole kertonut mikä tämä sovellus on.",
       "dataMap.panel.noUsedFor": "Kukaan ei ole kertonut mihin sitä käytetään.",
       "dataMap.panel.noArrangement": "Kukaan ei ole kuvannut miten data on järjestetty.",
       "dataMap.row.noWhy": "Kukaan ei ole kertonut miksi tämä on täällä eikä jossain muualla.",
@@ -5079,7 +5100,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "dataMap.elsewhere.already-left": "Jo lähtenyt talosta",
       "dataMap.elsewhere.account-in-a-foreign-system": "Tunnus järjestelmään jota emme pyöritä",
       "dataMap.contradiction.sharedButPrivate": "Tämä sanoo että sitä käyttää useampi, ja jokainen rivi laskeutuu yhden ihmisen omaan muistiin jossa vain hän näkee sen. Juuri tämän virheen takia kartta on olemassa.",
-      "dataMap.contradiction.personalButShared": "Tämä sanoo olevansa yhden hengen appi, ja se kirjoittaa sinne minne useampi näkee.",
+      "dataMap.contradiction.personalButShared": "Tämä sanoo olevansa yhden hengen sovellus, ja se kirjoittaa sinne minne useampi näkee.",
       "dataMap.contradiction.staticButStores": "Tämä sanoo olevansa staattinen sivu, ja se luettelee mitä tallentaa.",
       "dataMap.form.one-person": "Yhden ihmisen työkalu",
       "dataMap.form.private": "Yksityinen ja arkaluontoinen",
@@ -5101,7 +5122,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "dataMap.where.extension-namespace": "laajennuksen omaan tilaan",
       "dataMap.where.cortex": "cortex-pakettiin",
       "dataMap.where.file-storage": "tiedostovarastoon",
-      "dataMap.where.app-published-record": "appin omaan julkaistuun tietueeseen",
+      "dataMap.where.app-published-record": "sovelluksen omaan julkaistuun tietueeseen",
       "dataMap.where.another-node": "toiselle AIMEAT-palvelimelle",
       "dataMap.where.external-service": "ulkopuoliseen palveluun",
       "dataMap.kind.settings": "asetuksia",
@@ -5122,12 +5143,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "dataMap.kind.link-between-things": "mihin tämä on kiinni",
       "dataMap.kind.permissions": "kuka saa tehdä mitä",
       "dataMap.kind.secret": "salaisuus tai avain",
-      "dataMap.use.app-cannot-run-without": "appi ei toimi ilman sitä",
+      "dataMap.use.app-cannot-run-without": "sovellus ei toimi ilman sitä",
       "dataMap.use.user-returns-to-read": "käyttäjä palaa ja lukee sen",
       "dataMap.use.shown-as-a-list": "näytetään listana",
       "dataMap.use.search-and-filter": "haku ja suodatus",
       "dataMap.use.calculation-and-reporting": "laskenta ja raportointi",
-      "dataMap.use.app-resumes-where-it-left": "appi jatkaa mihin jäi",
+      "dataMap.use.app-resumes-where-it-left": "sovellus jatkaa mihin jäi",
       "dataMap.use.to-share-with-others": "jaettavaksi muille",
       "dataMap.use.to-send-out": "lähetettäväksi ulos",
       "dataMap.use.evidence-of-what-happened": "todiste siitä mitä tapahtui",
@@ -5137,7 +5158,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "dataMap.owner.person": "ihminen",
       "dataMap.owner.organism": "ryhmä",
       "dataMap.owner.extension": "laajennus",
-      "dataMap.owner.ecosystem-app": "liitetty appi",
+      "dataMap.owner.ecosystem-app": "liitetty sovellus",
       "dataMap.owner.someone-else": "joku muu",
       "dataMap.owner.external-controller": "ulkopuolinen organisaatio",
       "dataMap.owner.nobody": "ei kukaan, se on väliaikaista",
@@ -5146,10 +5167,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "dataMap.readers.named-people": "nimetyt ihmiset",
       "dataMap.readers.organism-members": "kaikki ryhmässä",
       "dataMap.readers.anyone": "kuka tahansa",
-      "dataMap.readers.the-app-itself": "vain appi itse",
+      "dataMap.readers.the-app-itself": "vain sovellus itse",
       "dataMap.readers.a-recipient-elsewhere": "se joka sen vastaanottaa",
       "dataMap.writer.person-in-the-ui": "ihminen ruudulla",
-      "dataMap.writer.the-app-for-the-person": "appi ihmisen puolesta",
+      "dataMap.writer.the-app-for-the-person": "sovellus ihmisen puolesta",
       "dataMap.writer.an-agent": "agentti",
       "dataMap.writer.a-schedule-unattended": "ajastus, ilman ketään paikalla",
       "dataMap.writer.an-extension-server-side": "laajennus palvelimella",
@@ -5172,17 +5193,17 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "dataMap.loss.recoverable-from-source": "voidaan hakea uudelleen",
       "dataMap.loss.recomputable": "voidaan laskea uudelleen",
       "dataMap.loss.user-can-rewrite": "käyttäjä voi kirjoittaa uudelleen",
-      "dataMap.loss.may-vanish": "saa hävitä, appi selviää",
+      "dataMap.loss.may-vanish": "saa hävitä, sovellus selviää",
       "header.title": "Omat sovellukset",
       "cta.backHome": "Takaisin etusivulle",
       "cta.publishOwn": "Julkaise oma sovelluksesi",
       "mode.global": "Jaetut",
-      "mode.global.title": "Selain-paikalliset appit jaettu kaikille tämän selaimen tileille",
+      "mode.global.title": "Selain-paikalliset sovellukset jaettu kaikille tämän selaimen tileille",
       "mode.personal": "Omat",
-      "mode.personal.title": "Selain-paikalliset appit yksityisiä tilillesi",
-      "mode.personal.needsLogin": "Kirjaudu sisään käyttääksesi tilisi paikallisia appeja",
-      "mode.caption": "Paikalliset appit",
-      "mode.caption.title": "Nämä valitsevat mitkä selain-paikalliset appit näet — ei server-näkyvyyttä",
+      "mode.personal.title": "Selain-paikalliset sovellukset yksityisiä tilillesi",
+      "mode.personal.needsLogin": "Kirjaudu sisään käyttääksesi tilisi paikallisia sovelluksia",
+      "mode.caption": "Paikalliset sovellukset",
+      "mode.caption.title": "Nämä valitsevat mitkä selain-paikalliset sovellukset näet — ei server-näkyvyyttä",
       "search.ph": "Etsi sovelluksia...",
       "datamap.title": "Minne tämä panee mitä",
       "datamap.loading": "Luetaan…",
@@ -5220,12 +5241,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "help.title": "Miten tämä katalogi toimii",
       "help.modesTitle": "Sovelluksen luominen",
       "help.modes": "Lisää sovellus antaa liittää HTML:ää tai ladata HTML/ZIP-tiedoston (tai luoda sen tekoälyllä). Se julkaistaan suoraan tilillesi EI LISTALLA — palvelimelle mutta ei vielä julkiseksi — joten voit tarkistaa sen ennen listaamista. Mitään ei tallenneta vain selaimeesi.",
-      "help.whereTitle": "Missä appisi asuvat",
+      "help.whereTitle": "Missä sovelluksesi asuvat",
       "help.where": "Jokainen sovellus sijaitsee palvelimella tililläsi — katalogi on vain palvelinpohjainen, joten mitään ei säilytetä tässä selaimessa. Sovelluksesi seuraavat sinua mihin tahansa selaimeen tai laitteeseen automaattisesti.",
       "help.sectionsTitle": "Kaksi näkymää",
-      "help.sections": "Kaksi välilehteä. Kirjasto = sinun appisi, jokainen yhtenä korttina jonka merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa katalogista, sinä ja kuka tahansa linkillä voitte yhä käyttää). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos odottamassa. Yhteisö = muiden julkaisemat appit.",
+      "help.sections": "Kaksi välilehteä. Kirjasto = sinun sovelluksesi, jokainen yhtenä korttina jonka merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa katalogista, sinä ja kuka tahansa linkillä voitte yhä käyttää). Violetti Staging-merkki kertoo että sovelluksella on myös julkaisematon luonnos odottamassa. Yhteisö = muiden julkaisemat sovellukset.",
       "help.backupTitle": '"Varmuuskopio" tarkoittaa kahta eri asiaa',
-      "help.backup": "💾-valikko (yläpalkki) vie/tuo PALVELIN-appisi + laajennukset .zip-tiedostona — täysi palvelinpuolen varmuuskopio, jonka voit palauttaa valikoiden.",
+      "help.backup": "💾-valikko (yläpalkki) vie/tuo PALVELIN-sovelluksesi + laajennukset .zip-tiedostona — täysi palvelinpuolen varmuuskopio, jonka voit palauttaa valikoiden.",
       "help.standaloneTitle": "Mille nodelle tämä puhuu",
       "help.standalone": "Tämän katalogin tarjoilee sen node, ja se puhuu aina sille nodelle (same-origin) — Asetusten Palvelin-URL on kiinnitetty siihen. Käyttääksesi omaa: avaa /app-catalog.html omalla nodellasi. localhost, aimeat-desktop ja federoidut nodet tarjoilevat kukin OMAN kataloginsa.",
       "action.theme": "Vaihda vaalea / tumma",
@@ -5233,11 +5254,11 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "common.close": "Sulje",
       "confirm.deleteApp": 'Poistetaanko "{name}"?',
       "confirm.clearAll1": "Haluatko varmasti tyhjentää kaikki tiedot? Tätä ei voi perua.",
-      "confirm.clearAll2": "Tämä poistaa KAIKKI appit ja nollaa asetukset. Jatketaanko?",
-      "confirm.removePublished": "Poistetaanko tämä julkaistu appi palvelimelta?",
+      "confirm.clearAll2": "Tämä poistaa KAIKKI sovellukset ja nollaa asetukset. Jatketaanko?",
+      "confirm.removePublished": "Poistetaanko tämä julkaistu sovellus palvelimelta?",
       "confirm.deleteFromServer": 'Poistetaanko "{file}" palvelimelta?',
       "confirm.clearScreenshot": "Tyhjennetäänkö nykyinen kuvakaappaus? Node ottaa uuden seuraavalla ajastetulla ajolla.",
-      "confirm.restoreVersion": 'Palautetaanko versio {version} appista "{file}"?\n\nSe julkaistaan uudelleen uusimpana versiona. Vanhat versiot säilytetään.',
+      "confirm.restoreVersion": 'Palautetaanko versio {version} sovelluksesta "{file}"?\n\nSe julkaistaan uudelleen uusimpana versiona. Vanhat versiot säilytetään.',
       "confirm.unsavedClose": "Sinulla on tallentamattomia muutoksia. Suljetaanko silti?",
       "common.cancel": "Peruuta",
       "common.confirm": "OK",
@@ -5369,7 +5390,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "sec.parkedBlurb": "Vain sinä näet ja voit käyttää näitä — ne pysyvät käytettävissä mutta eivät näy julkisessa katalogissa. Paina Julkaise siirtääksesi takaisin julkaistuihin.",
       "sec.recent": "Viimeksi avatut",
       "sec.local": "Sinun sovelluksesi",
-      "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa julkisesta katalogista). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos.",
+      "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa julkisesta katalogista). Violetti Staging-merkki kertoo että sovelluksella on myös julkaisematon luonnos.",
       "sec.localHint": "Lisää sovellus julkaisee sen tilillesi listaamattomana. Listaa se, kun se on valmis muille; luonnos odottaa julkaistun version rinnalla, kunnes julkaiset sen.",
       "fav.title": "Suosikit",
       "fav.add": "Lisää suosikkeihin",
@@ -5491,7 +5512,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "card.openReleased": "Avaa julkaistu",
       "card.openReleasedHint": "Avaa julkaistu (live) versio",
       "card.openStaging": "Avaa staging",
-      "card.openStagingHint": "Avaa julkaisematon staging-luonnos testattavaksi — live-appi pysyy ennallaan",
+      "card.openStagingHint": "Avaa julkaisematon staging-luonnos testattavaksi — live-sovellus pysyy ennallaan",
       "card.stagingBadge": "Staging",
       "card.stagingHint": "Tällä sovelluksella on julkaisematon staging-luonnos odottamassa live-version rinnalla",
       "common.menu": "Valikko",
@@ -5620,7 +5641,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "card.operatorHidden": "MODEROITU OPERAATTORIN TOIMESTA: PIILOTETTU",
       "common.loading": "Ladataan…",
       "consents.title": "Sovellukselle antamasi luvat",
-      "consents.none": "Et ole antanut tälle apille pääsyä.",
+      "consents.none": "Et ole antanut tälle sovellukselle pääsyä.",
       "consents.granted": "Annoit tälle sovellukselle luvan:",
       "consents.revoke": "Peru pääsy",
       "consents.hint": "Peruminen katkaisee sovelluksen pääsyn. Se pyytää nämä uudelleen kun seuraavan kerran tarvitsee niitä — yksittäisiä oikeuksia ei muokata täältä.",
@@ -5671,14 +5692,14 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "monetize.currency2": "Valuutta",
       "monetize.money2Hint": "Valinnainen: myy sama kutsu toisessa valuutassa. Ostaja valitsee valuutan sopimusta avatessaan.",
       "odps.title": "EXCHANGE ja ODPS",
-      "odps.hint": "Myykö tämä appi jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.1 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.",
+      "odps.hint": "Myykö tämä sovellus jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.1 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.",
       "odps.statusOn": "Markkinalla: {live} / {total} työkalua",
       "odps.statusOff": "Ei markkinalla ({total} työkalua määritelty)",
       "odps.statusBlocked": "{n} työkalua on merkitty EXCHANGEen mutta ei vielä listaudu — syy näkyy työkalun kohdalla.",
-      "odps.noTools": "Tällä apilla ei ole vielä myytäviä työkaluja. Lisää työkalu Monetize-osiossa, niin voit myydä kyvykkyyden markkinalla.",
-      "odps.editDefaults": "Appin ODPS-oletukset",
+      "odps.noTools": "Tällä sovelluksella ei ole vielä myytäviä työkaluja. Lisää työkalu Monetize-osiossa, niin voit myydä kyvykkyyden markkinalla.",
+      "odps.editDefaults": "Sovelluksen ODPS-oletukset",
       "odps.close": "Sulje",
-      "odps.defaultsHint": "Täytetään kerran appille ja periytyy jokaiselle sen myymälle työkalulle. Työkalu voi ylikirjoittaa minkä tahansa niistä.",
+      "odps.defaultsHint": "Täytetään kerran sovellukselle ja periytyy jokaiselle sen myymälle työkalulle. Työkalu voi ylikirjoittaa minkä tahansa niistä.",
       "odps.legalName": "Juridinen yhtiö (datan haltija)",
       "odps.businessId": "Y-tunnus",
       "odps.holderEmail": "Yhteyssähköposti",
@@ -5715,8 +5736,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "odps.quality": "Laatulupaukset (yksi riviä kohti: ulottuvuus arvo yksikkö — kuvaus)",
       "odps.qualityPlaceholder": "accuracy 99 percentage — Nimet täsmäävät rekisteriin",
       "odps.toolAttestation": "Tämän kyvykkyyden provenienssi",
-      "odps.toolAttestationHint": "Vain se mikä poikkeaa appin oletuksista. Tyhjänä appitason vakuutus pätee.",
-      "odps.inherited": "peritään apilta",
+      "odps.toolAttestationHint": "Vain se mikä poikkeaa sovelluksen oletuksista. Tyhjänä sovellustason vakuutus pätee.",
+      "odps.inherited": "peritään sovellukselta",
       "odps.transformations": "Mitä raaka-aineelle tehtiin",
       "odps.transformationsPlaceholder": "Nimet normalisoitu, kuntakoodit liitetty, lakanneet yritykset poistettu.",
       "odps.suggest": "Luonnostele tekoälyllä",
@@ -5739,8 +5760,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "odps.useMeasured": "Käytä mitattua + 30 %",
       "odps.noMeasurement": "Toimitusaikaa ei ole vielä mitattu. Palvele ensin kutsuja, sitoudu vasta sitten lukuun jonka pystyt pitämään.",
       "odps.inheritedIs": "peritään:",
-      "odps.inheritedNone": "appitason vakuutusta ei ole vielä asetettu",
-      "odps.openAppDefaults": "Muokkaa appitason oletuksia",
+      "odps.inheritedNone": "sovellustason vakuutusta ei ole vielä asetettu",
+      "odps.openAppDefaults": "Muokkaa sovellustason oletuksia",
       "odps.blockedSchema": "Ei listaudu: työkalu tarvitsee ei-tyhjän syöte- JA tulosskeeman.",
       "odps.blockedBinding": "Ei listaudu: työkalu tarvitsee kyvykkyyssidonnan (action_id).",
       "odps.blockedPrice": "Ei listaudu: työkalu tarvitsee hinnan.",
@@ -5758,15 +5779,15 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       // ── Haku: löytyykö tämä sovellus hakukoneesta (seo.js) ──
       // ── lakisivut: appin omat ehdot, tietosuojaseloste, yhteystiedot ja loput
       "legal.title": "Lakisivut",
-      "legal.intro": "Appi vastaa siitä mitä se tekee, ei node jolla se pyörii: kauppa myynnistään, henkilötietoja käsittelevä appi niistä tiedoista. Nämä sivut ovat appin omia; ne tarjoillaan osoitteissa /terms, /privacy ja niin edelleen appin osoitteen alla, linkitetään sen headista ja nimetään agenteille sen llms.txt:ssä.",
+      "legal.intro": "Sovellus vastaa siitä mitä se tekee, ei node jolla se pyörii: kauppa myynnistään, henkilötietoja käsittelevä sovellus niistä tiedoista. Nämä sivut ovat sovelluksen omia; ne tarjoillaan osoitteissa /terms, /privacy ja niin edelleen sovelluksen osoitteen alla, linkitetään sen headista ja nimetään agenteille sen llms.txt:ssä.",
       "legal.loading": "Tarkistetaan…",
-      "legal.loadFailed": "Tämän appin lakisivuja ei saatu luettua.",
+      "legal.loadFailed": "Tämän sovelluksen lakisivuja ei saatu luettua.",
       "legal.saveFailed": "Tallennus ei onnistunut.",
       "legal.saved": "Tallennettu.",
       "legal.empty": "Kirjoita sivu ensin, tai liitä osoite jossa se jo on.",
       "legal.removeConfirm": "Poistetaanko sivu? Sen osoite lakkaa vastaamasta. Poisto jää auditointilokiin.",
-      "legal.readinessMissing": "Sivuista, jotka tällä apilla pitäisi olla, puuttuu vielä {n}.",
-      "legal.readinessOk": "Jokainen sivu, joka tällä apilla pitäisi olla, on paikallaan.",
+      "legal.readinessMissing": "Sivuista, jotka tällä sovelluksella pitäisi olla, puuttuu vielä {n}.",
+      "legal.readinessOk": "Jokainen sivu, joka tällä sovelluksella pitäisi olla, on paikallaan.",
       "legal.chip": "{n} lakisivua vielä kirjoittamatta",
       "legal.missing": "Puuttuu",
       "legal.none": "Ei kirjoitettu",
@@ -5783,9 +5804,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "legal.format.html": "HTML",
       "legal.format.url": "Linkki",
       "legal.hint.markdown": "Otsikot, kappaleet, listat, linkit. Node renderöi sen tavalliselle sivulle, joka kertoo kenen sivu on; jokainen merkki escapetaan, joten mikään ei voi suorittua.",
-      "legal.hint.html": "Kokonainen HTML-dokumentti, tarjoillaan täsmälleen kirjoitettuna appin omalla originilla, appin omilla säännöillä.",
+      "legal.hint.html": "Kokonainen HTML-dokumentti, tarjoillaan täsmälleen kirjoitettuna sovelluksen omalla originilla, sovelluksen omilla säännöillä.",
       "legal.hint.url": "https-osoite. Sivu ohjaa sinne. Sovelluskaupat hyväksyvät linkin.",
-      "legal.aiHint": "Tekoälysi voi luonnostella tämän: pyydä sitä kirjoittamaan sivu tälle apille sen perusteella mitä appi tekee, ja lue se ennen julkaisua. Se joka vastaa apista, vastaa sivusta.",
+      "legal.aiHint": "Tekoälysi voi luonnostella tämän: pyydä sitä kirjoittamaan sivu tälle sovellukselle sen perusteella mitä sovellus tekee, ja lue se ennen julkaisua. Se joka vastaa sovelluksesta, vastaa sivusta.",
       "legal.kind.terms": "Käyttöehdot",
       "legal.kind.privacy": "Tietosuojaseloste",
       "legal.kind.imprint": "Yhteystiedot ja vastuutaho",
@@ -5793,19 +5814,19 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "legal.kind.accessibility": "Saavutettavuusseloste",
       "legal.kind.cookies": "Evästeet ja selaimen tallennus",
       "legal.kind.support": "Tuki",
-      "legal.placeholder.terms": "# Käyttöehdot\n\nKuka tarjoaa tämän appin, mitä sillä saa tehdä, mitä maksetaan ja miten, mitä tapahtuu riitatilanteessa…",
-      "legal.placeholder.privacy": "# Tietosuojaseloste\n\nKuka on rekisterinpitäjä ja miten hänet tavoittaa, mitä henkilötietoja appi käsittelee ja miksi, millä perusteella, kuinka kauan, kuka muu niitä näkee, mitkä oikeudet ihmisellä on ja minne valittaa…",
+      "legal.placeholder.terms": "# Käyttöehdot\n\nKuka tarjoaa tämän sovelluksen, mitä sillä saa tehdä, mitä maksetaan ja miten, mitä tapahtuu riitatilanteessa…",
+      "legal.placeholder.privacy": "# Tietosuojaseloste\n\nKuka on rekisterinpitäjä ja miten hänet tavoittaa, mitä henkilötietoja sovellus käsittelee ja miksi, millä perusteella, kuinka kauan, kuka muu niitä näkee, mitkä oikeudet ihmisellä on ja minne valittaa…",
       "legal.placeholder.imprint": "# Yhteystiedot ja vastuutaho\n\nNimi, osoite, sähköposti, puhelin, kaupparekisteri- ja ALV-tunnus jos sellainen on…",
       "legal.placeholder.refunds": "# Palautukset ja peruuttaminen\n\n14 päivän peruuttamisoikeus, miten sitä käytetään, miten ja milloin palautus maksetaan…",
-      "legal.placeholder.accessibility": "# Saavutettavuusseloste\n\nMiten tämä appi täyttää saavutettavuusvaatimukset, mikä ei vielä täytä, ja miten esteestä ilmoitetaan…",
-      "legal.placeholder.cookies": "# Evästeet ja selaimen tallennus\n\nMitä appi säilyttää selaimessa, miksi ja kuinka kauan…",
-      "legal.placeholder.support": "# Tuki\n\nMiten tavoittaa sen, joka vastaa tästä apista, ja milloin vastausta voi odottaa…",
+      "legal.placeholder.accessibility": "# Saavutettavuusseloste\n\nMiten tämä sovellus täyttää saavutettavuusvaatimukset, mikä ei vielä täytä, ja miten esteestä ilmoitetaan…",
+      "legal.placeholder.cookies": "# Evästeet ja selaimen tallennus\n\nMitä sovellus säilyttää selaimessa, miksi ja kuinka kauan…",
+      "legal.placeholder.support": "# Tuki\n\nMiten tavoittaa sen, joka vastaa tästä sovelluksesta, ja milloin vastausta voi odottaa…",
       // ── auditointiloki
       "audit.title": "Auditointiloki",
-      "audit.intro": "Jokainen muutos siihen, miten tätä appia tarjotaan, uusin ensin: kuka teki (sinä, tai mikä agentti nimissäsi) ja milloin. Vain sinä voit lukea tämän.",
+      "audit.intro": "Jokainen muutos siihen, miten tätä sovellusta tarjotaan, uusin ensin: kuka teki (sinä, tai mikä agentti nimissäsi) ja milloin. Vain sinä voit lukea tämän.",
       "audit.loading": "Luetaan…",
       "audit.loadFailed": "Auditointilokia ei saatu luettua.",
-      "audit.empty": "Tähän appiin ei ole vielä tehty muutoksia.",
+      "audit.empty": "Tähän sovellukseen ei ole vielä tehty muutoksia.",
       "audit.more": "Näytä {n} lisää",
       "audit.action.legal.set": "Lakisivu julkaistu",
       "audit.action.legal.cleared": "Lakisivu poistettu",
@@ -5824,33 +5845,33 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "audit.action.description": "Kuvaus muutettu",
       // ── merkinnät ja tekijyys
       "marks.title": "Merkinnät ja tekijyys",
-      "marks.intro": "Mitä tämä node lisää appiin tarjoillessaan sen, ja kuka vastaa siitä.",
+      "marks.intro": "Mitä tämä node lisää sovellukseen tarjoillessaan sen, ja kuka vastaa siitä.",
       "marks.loading": "Tarkistetaan…",
-      "marks.loadFailed": "Tämän appin merkintöjä ei saatu luettua.",
+      "marks.loadFailed": "Tämän sovelluksen merkintöjä ei saatu luettua.",
       "marks.saveFailed": "Tallennus ei onnistunut.",
       "marks.saved": "Tallennettu.",
-      "marks.badge": "Julkaise oma appisi -merkki",
-      "marks.badgeOn": "Näkyy appin kulmassa: tie takaisin tähän nodeen sille, joka avaa appin.",
+      "marks.badge": "Julkaise oma sovelluksesi -merkki",
+      "marks.badgeOn": "Näkyy sovelluksen kulmassa: tie takaisin tähän nodeen sille, joka avaa sovelluksen.",
       "marks.badgeOff": "Ei näy.",
-      "marks.install": "Asenna tämä appi -tarjous",
-      "marks.installOn": "Kävijöille tarjotaan appin asentamista selaimeen.",
+      "marks.install": "Asenna tämä sovellus -tarjous",
+      "marks.installOn": "Kävijöille tarjotaan sovelluksen asentamista selaimeen.",
       "marks.installOff": "Ei tarjota.",
       "marks.turnOn": "Ota käyttöön",
       "marks.turnOff": "Ota pois",
-      "marks.authorTitle": "Kuka vastaa tästä apista",
+      "marks.authorTitle": "Kuka vastaa tästä sovelluksesta",
       "marks.authorNone": "Kukaan ei ole ilmoittautunut. Tekoälymerkintä seuraa alkuperätietuetta.",
-      "marks.authorIs": "Katselmoinut {name}, ilmoitettu {when}. Nimi tarjoillaan appin lähdekoodissa ja näkyvä tekoälymerkintä on pois.",
+      "marks.authorIs": "Katselmoinut {name}, ilmoitettu {when}. Nimi tarjoillaan sovelluksen lähdekoodissa ja näkyvä tekoälymerkintä on pois.",
       "marks.authorIsStrict": "Katselmoinut {name}, ilmoitettu {when}. Nimi näkyy sovelluksen lähdekoodissa. Julkisessa sovelluksessa näkyvä merkintä pysyy, koska tämä palvelin merkitsee myös sen, mitä laki ei vaadi. Merkinnässä lukee, että {name} on katselmoinut sovelluksen.",
       "marks.authorLabel": "Katselmoijan nimi",
       "marks.authorPh": "Etunimi Sukunimi",
       "marks.authorEmpty": "Kirjoita ensin katselmoijan nimi.",
       "marks.declare": "Ilmoita",
       "marks.withdraw": "Peru",
-      "marks.audited": "Tämä jää kirjaan. Jokainen ilmoitus ja peruutus säilyy nimen, tilin ja ajan kanssa, ja nimetty henkilö vastaa siitä, mitä appi julkaisee. Vain sinä itse kirjautuneena voit tehdä sen; nimissäsi toimiva agentti ei voi.",
-      "marks.legal": 'Ilmoitus poistaa näkyvän "tekoälyn tuottama" -merkinnän: kun ihminen on katselmoinut sisällön ja vastaa siitä, laki ei vaadi merkintää (EU:n tekoälyasetus, 50 artiklan 4 kohta). Se ei poista ilmoitusta, jonka appi näyttää keskustellessaan ihmisen kanssa tekoälynä (50 artiklan 1 kohta); se pysyy, katselmoi appin kuka tahansa. Koneluettava alkuperätieto pysyy myös, joten lähdekoodin lukija näkee edelleen, että synteesiä on voinut tapahtua.',
+      "marks.audited": "Tämä jää kirjaan. Jokainen ilmoitus ja peruutus säilyy nimen, tilin ja ajan kanssa, ja nimetty henkilö vastaa siitä, mitä sovellus julkaisee. Vain sinä itse kirjautuneena voit tehdä sen; nimissäsi toimiva agentti ei voi.",
+      "marks.legal": 'Ilmoitus poistaa näkyvän "tekoälyn tuottama" -merkinnän: kun ihminen on katselmoinut sisällön ja vastaa siitä, laki ei vaadi merkintää (EU:n tekoälyasetus, 50 artiklan 4 kohta). Se ei poista ilmoitusta, jonka sovellus näyttää keskustellessaan ihmisen kanssa tekoälynä (50 artiklan 1 kohta); se pysyy, katselmoi sovelluksen kuka tahansa. Koneluettava alkuperätieto pysyy myös, joten lähdekoodin lukija näkee edelleen, että synteesiä on voinut tapahtua.',
       "marks.legalStrict": 'Kun ihminen on katselmoinut sisällön ja vastaa siitä, laki ei vaadi näkyvää "tekoälyn tuottama" -merkintää (EU:n tekoälyasetus, 50 artiklan 4 kohta). Tämä palvelin merkitsee myös sen, mitä laki ei vaadi. Siksi julkisessa sovelluksessa merkintä pysyy, ja siinä lukee, kuka sovelluksen katselmoi. Asetusta voi muuttaa vain palvelimen ylläpitäjä. Katselmoidussa sovelluksessa, joka on pääsykoodin takana, ei ole merkintää. Ilmoitus, jonka sovellus näyttää keskustellessaan ihmisen kanssa tekoälynä (50 artiklan 1 kohta), pysyy aina. Myös koneluettava alkuperätieto pysyy, joten lähdekoodin lukija näkee edelleen, että synteesiä on voinut tapahtua.',
       "marks.legalLink": "Lue 50 artikla",
-      "marks.seesTitle": "Mitä tämä node näkee appin tekoälykäytöstä",
+      "marks.seesTitle": "Mitä tämä node näkee sovelluksen tekoälykäytöstä",
       "marks.seesGenerates": "Tuottaa",
       "marks.seesNothing": "ei ilmoitettua",
       "marks.seesUsesAi": "Kutsuu tekoälymalleja (ai:use)",
@@ -5899,9 +5920,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "monetize.saved": "Työkalumanifesti tallennettu.",
       "monetize.saveFailed": "Työkalumanifestin tallennus epäonnistui",
       "monetize.needLogin": "Kirjaudu sisään muokataksesi työkalumanifestia.",
-      "cost.title": "Kulut & sopimukset — mitä tämä appi hankkii",
-      "cost.hint": "Tämän appin EXCHANGE-sopimukset: pysyvät mitatut käyttöoikeudet joita se kutsuu, live-kulutus kutakin budjettia vasten ja alustan siivu. Kutsukohtainen hinta tulee tarjoajalta; sinä asetat vain budjettikaton.",
-      "cost.empty": "Ei vielä EXCHANGE-sopimuksia — tämä appi ei hanki mitään hinnoiteltua.",
+      "cost.title": "Kulut & sopimukset — mitä tämä sovellus hankkii",
+      "cost.hint": "Tämän sovelluksen EXCHANGE-sopimukset: pysyvät mitatut käyttöoikeudet joita se kutsuu, live-kulutus kutakin budjettia vasten ja alustan siivu. Kutsukohtainen hinta tulee tarjoajalta; sinä asetat vain budjettikaton.",
+      "cost.empty": "Ei vielä EXCHANGE-sopimuksia — tämä sovellus ei hanki mitään hinnoiteltua.",
       "cost.summary": "{n} sopimus(ta) · {spent} morselia käytetty · {calls} kutsu(a)",
       "cost.capabilityCol": "Kyvykkyys",
       "cost.providerCol": "Tarjoaja",
@@ -5911,7 +5932,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "cost.stateCol": "Tila",
       "cost.uncapped": "ei kattoa",
       "cost.remaining": "{n} jäljellä",
-      "cost.needLogin": "Kirjaudu sisään nähdäksesi tämän appin kulut & sopimukset.",
+      "cost.needLogin": "Kirjaudu sisään nähdäksesi tämän sovelluksen kulut & sopimukset.",
       "cost.loadFailed": "Kulujen & sopimusten lataus epäonnistui",
       // Kävijät: kuka avasi sovelluksen, milloin ja mistä (visitors.js, visitors-map.js)
       "visitors.title": "Kävijät",
@@ -5990,6 +6011,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "detail.editAccess": "Pääsykoodi",
       "detail.accessCodeHint": "Aseta tai poista valinnainen koodi, joka vaaditaan sovelluksen avaamiseen.",
       "detail.accessCodeLabel": "Pääsykoodi",
+      "secret.show": "Näytä pääsykoodi",
+      "secret.hide": "Piilota pääsykoodi",
       "detail.accessCodePh": "Jätä tyhjäksi julkiseksi / poistaa suojauksen",
       "detail.accessCodeRemoveHint": "Anna 4–64 merkin koodi suojataksesi sovelluksen, tai jätä tyhjäksi ja tallenna tehdäksesi siitä taas julkisen.",
       "detail.accessCodeLen": "Pääsykoodin on oltava 4–64 merkkiä.",
@@ -6011,11 +6034,11 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "detail.discard": "Hylkää",
       "detail.draftReady": "AI-ehdotus valmis — mitään ei ole vielä tallennettu.",
       "detail.draftUploading": "Valmistellaan testiversiota…",
-      "detail.draftOpened": "Luonnos avattu uuteen välilehteen — toimii kuten julkaistu appi. Live-appi pysyy ennallaan.",
-      "detail.draftNeedsPublished": "Julkaise appi ensin, niin voit testata muutoksia ennen kuin ne menevät liveksi.",
+      "detail.draftOpened": "Luonnos avattu uuteen välilehteen — toimii kuten julkaistu sovellus. Live-sovellus pysyy ennallaan.",
+      "detail.draftNeedsPublished": "Julkaise sovellus ensin, niin voit testata muutoksia ennen kuin ne menevät liveksi.",
       "detail.draftNeedsSignin": "Kirjaudu sisään testataksesi luonnosta.",
       "detail.draftPublishConfirm": "Julkaistaanko testattu luonnos uutena live-versiona?",
-      "detail.draftPublished": "Julkaistu versiona v{v}. Se on nyt live-appi.",
+      "detail.draftPublished": "Julkaistu versiona v{v}. Se on nyt live-sovellus.",
       "detail.kept": "Luonnos säilytetty paikallisena kopiona.",
       // ── Työkopio → julkaistu (TARGET-048). Yksi sanasto koko muokkaussilmukalle: sana
       //    "luonnos" on tarkoituksella poissa — se tarkoitti täällä kolmea eri asiaa. ──
@@ -6034,23 +6057,23 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "wc.explainPending": "Tekoäly kirjoitti muutoksen, mutta mitään ei ole vielä tallennettu. Tallenna se työkopioon — pääset aina takaisin nykyiseen tilaan.",
       "wc.explainSaved": "Sinulla on tallennettu työkopio, jota kukaan muu ei näe. Julkaise se versiona v{v}, kun se on valmis.",
       "wc.explainSavedUnpublished": "Sinulla on tallennettu työkopio. Julkaise se, kun se on valmis.",
-      "wc.explainClean": "Työkopiosi on sama kuin julkaistu appi. Muokkaa alla — jokainen tallennus säilyttää edellisen tilan, joten mikään ei katoa.",
-      "wc.explainUnpublished": "Tätä appia ei ole vielä julkaistu. Julkaise se, niin sillä on versio jonka muut voivat avata.",
+      "wc.explainClean": "Työkopiosi on sama kuin julkaistu sovellus. Muokkaa alla — jokainen tallennus säilyttää edellisen tilan, joten mikään ei katoa.",
+      "wc.explainUnpublished": "Tätä sovellusta ei ole vielä julkaistu. Julkaise se, niin sillä on versio jonka muut voivat avata.",
       "wc.save": "Tallenna työkopioon",
       "wc.saving": "Tallennetaan…",
       "wc.saved": "Tallennettu työkopioon — säilyy sivun päivityksen yli ja pysyy yksityisenä kunnes julkaiset.",
       "wc.savedShort": "Tallennettu!",
       "wc.saveFailed": "Tallennus ei onnistunut",
-      "wc.keptLocalOnly": "Säilytetty vain tässä välilehdessä — julkaise appi ensin, niin saat pysyvän työkopion.",
+      "wc.keptLocalOnly": "Säilytetty vain tässä välilehdessä — julkaise sovellus ensin, niin saat pysyvän työkopion.",
       "wc.try": "Kokeile turvallisesti",
       "wc.tryLocal": "Pikaesikatselu",
       "wc.publishAs": "Julkaise versiona v{v}",
       "wc.publishNew": "Julkaise uutena versiona",
       "wc.discardProposal": "Hylkää ehdotus",
       "wc.discardWork": "Hylkää työkopio",
-      "wc.confirmDiscardWork": "Heitetäänkö tallennettu työkopio pois ja palataan julkaistuun appiin?",
-      "wc.discardedWork": "Työkopio hylätty — olet takaisin julkaistussa apissa.",
-      "wc.verbsHint": "Tallenna säilyttää muutoksen vain sinulle. Kokeile avaa sen oikeassa osoitteessa muuttamatta live-appia. Julkaise on se minkä muut näkevät.",
+      "wc.confirmDiscardWork": "Heitetäänkö tallennettu työkopio pois ja palataan julkaistuun sovellukseen?",
+      "wc.discardedWork": "Työkopio hylätty — olet takaisin julkaistussa sovelluksessa.",
+      "wc.verbsHint": "Tallenna säilyttää muutoksen vain sinulle. Kokeile avaa sen oikeassa osoitteessa muuttamatta live-sovellusta. Julkaise on se minkä muut näkevät.",
       "wc.history": "Työkopion historia",
       "wc.historyHint": "Jokainen tallennus jättää tänne tarkistuspisteen, joten voit aina palata taaksepäin. Nämä ovat vain sinun — julkaistut versiot alempana ovat ne jotka muut näkevät.",
       "wc.none": "Ei vielä tarkistuspisteitä — ensimmäinen tallennus luo sellaisen.",
@@ -6062,7 +6085,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "wc.previewTitle": "tarkistuspisteen esikatselu",
       "wc.confirmRestore": "Palautetaanko tämä tarkistuspiste työkopioon? Nykyisestä työkopiosta tehdään ensin tarkistuspiste, joten voit kumota tämän.",
       "wc.confirmDelete": "Poistetaanko tämä tarkistuspiste pysyvästi?",
-      "wc.restored": "Palautettu työkopioon. Julkaistu appi on ennallaan.",
+      "wc.restored": "Palautettu työkopioon. Julkaistu sovellus on ennallaan.",
       "wc.gone": "Tätä tarkistuspistettä ei ole enää tallessa.",
       "wc.loginNeeded": "Kirjaudu sisään tallentaaksesi työkopion.",
       "wc.noteManual": "käsin muokattu lähdekoodi",
@@ -6082,12 +6105,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "detail.publishAs": "Julkaise versiona",
       "detail.urlCantEdit": "Tämä on URL-linkitetty sovellus — paikallista lähdekoodia ei voi muokata tekoälyllä.",
       "jsonImport.title": "Tuo JSON-varmuuskopio",
-      "jsonImport.desc": "Valitse mitkä appit tuodaan. Katalogissa jo olevat on merkitty duplikaateiksi ja jätetty valitsematta — mitään ei tuoda ilman valintaasi.",
+      "jsonImport.desc": "Valitse mitkä sovellukset tuodaan. Katalogissa jo olevat on merkitty duplikaateiksi ja jätetty valitsematta — mitään ei tuoda ilman valintaasi.",
       "jsonImport.statusDup": "duplikaatti",
       "jsonImport.config": "Tuo myös asetukset (teema, kieli, palvelimen osoite)",
       "jsonImport.done": "Tuotu",
-      "dedup.btn": "Poista duplikaattiappit",
-      "dedup.none": "Duplikaattiappeja ei löytynyt.",
+      "dedup.btn": "Poista duplikaattisovellukset",
+      "dedup.none": "Duplikaattisovelluksia ei löytynyt.",
       "dedup.confirm": "Poistetaanko duplikaattikopiot (suosikit ja vanhimmat kopiot säilytetään)? Poistettavia kopioita:",
       "dedup.done": "Duplikaatit poistettu",
       "srvImport.import": "Tuo valitut",
@@ -6101,10 +6124,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "backup.selectAll": "Valitse kaikki",
       "backup.selectNone": "Tyhjennä valinta",
       "backup.restoring": "Palautetaan",
-      "backup.sumApps": "appia",
+      "backup.sumApps": "sovellusta",
       "backup.sumVersions": "versiota",
       "backup.sumExts": "laajennusta",
-      "backup.colApp": "Appi",
+      "backup.colApp": "Sovellus",
       "backup.colVersions": "Versiot",
       "backup.colStatus": "Tila",
       "backup.statusNew": "uusi",
@@ -6123,10 +6146,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "backup.resErrors": "Virheet",
       "backup.loginRequired": "Kirjaudu ensin sisään käyttääksesi varmuuskopioita.",
       "backup.nothingSelected": "Mitään ei ole valittu.",
-      "backup.empty": "Varmuuskopiossa ei ole appeja eikä laajennuksia.",
+      "backup.empty": "Varmuuskopiossa ei ole sovelluksia eikä laajennuksia.",
       "subModal.title": "Liitä alidomain",
       "subModal.label": "Alidomain",
-      "subModal.hint": "Pienet kirjaimet, numerot ja viivat (2-63 merkkiä). Appi tarjoillaan alidomainin juuresta.",
+      "subModal.hint": "Pienet kirjaimet, numerot ja viivat (2-63 merkkiä). Sovellus tarjoillaan alidomainin juuresta.",
       "subModal.unassign": "Poista liitos",
       "subModal.assigned": "Alidomain liitetty",
       "subModal.unassigned": "Liitos poistettu",
@@ -6149,6 +6172,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   var currentLang = "en";
   function getLang() {
     return currentLang;
+  }
+  function dateLocale() {
+    return currentLang === "fi" ? "fi-FI" : void 0;
   }
   function setLang(lang) {
     currentLang = lang === "fi" ? "fi" : "en";
@@ -6922,6 +6948,41 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     } catch (err) {
       body.innerHTML = '<p class="dtl-desc">' + escapeHtml(t("dataMap.panel.missing")) + "</p>";
     }
+  }
+
+  // src/static/app-catalog/js/secret-field.js
+  var SVG_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">';
+  var ALMOND = '<path d="M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7S4.5 16.5 2 12z"/><circle cx="12" cy="12" r="3"/>';
+  var EYE = SVG_OPEN + ALMOND + "</svg>";
+  var EYE_OFF = SVG_OPEN + ALMOND + '<path d="M4 4l16 16"/></svg>';
+  function secretToggleHtml(inputId) {
+    var label2 = escapeHtml(t("secret.show"));
+    return '<button type="button" class="secret-eye" data-secret-toggle="' + escapeHtml(inputId) + '" aria-controls="' + escapeHtml(inputId) + '" aria-pressed="false" aria-label="' + label2 + '" title="' + label2 + '">' + EYE + "</button>";
+  }
+  function setShown(btn, input2, shown) {
+    input2.type = shown ? "text" : "password";
+    var label2 = t(shown ? "secret.hide" : "secret.show");
+    btn.setAttribute("aria-pressed", shown ? "true" : "false");
+    btn.setAttribute("aria-label", label2);
+    btn.setAttribute("title", label2);
+    btn.innerHTML = shown ? EYE_OFF : EYE;
+  }
+  var wired = false;
+  function initSecretFields() {
+    var btns = document.querySelectorAll("[data-secret-toggle]");
+    for (var i = 0; i < btns.length; i++) {
+      var input2 = document.getElementById(btns[i].getAttribute("data-secret-toggle"));
+      if (input2) setShown(btns[i], input2, input2.type === "text");
+    }
+    if (wired) return;
+    wired = true;
+    document.addEventListener("click", function(e) {
+      var btn = e.target && e.target.closest ? e.target.closest("[data-secret-toggle]") : null;
+      if (!btn) return;
+      var field = document.getElementById(btn.getAttribute("data-secret-toggle"));
+      if (!field) return;
+      setShown(btn, field, field.type === "password");
+    });
   }
 
   // src/static/app-catalog/js/cortex.js
@@ -9117,7 +9178,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var rects = "";
     bars.forEach(function(bar, i) {
       var x = i * (bw + PAD);
-      var when = (/* @__PURE__ */ new Date(bar.from + "T00:00:00")).toLocaleDateString() + (bar.to !== bar.from ? " – " + (/* @__PURE__ */ new Date(bar.to + "T00:00:00")).toLocaleDateString() : "");
+      var when = (/* @__PURE__ */ new Date(bar.from + "T00:00:00")).toLocaleDateString(dateLocale()) + (bar.to !== bar.from ? " – " + (/* @__PURE__ */ new Date(bar.to + "T00:00:00")).toLocaleDateString(dateLocale()) : "");
       var label2 = when + " · " + parts.map(function(p) {
         return t(p.label) + " " + bar[p.key];
       }).join(" · ");
@@ -9135,7 +9196,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var key = parts.map(function(p) {
       return '<span class="vis-key"><i class="vis-key-mark ' + p.cls + '"></i>' + escapeHtml(t(p.label)) + "</span>";
     }).join("");
-    return '<div class="version-chart vis-chart"><div class="version-chart-head"><span class="version-chart-title">' + escapeHtml(title) + '</span><span class="version-chart-max">' + escapeHtml(fill2(folded.grain === "week" ? "visitors.maxPerWeek" : "visitors.maxPerDay", folded.max)) + '</span></div><svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + " " + H + '" role="img" aria-label="' + escapeHtml(title) + '"><line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects + '</svg><div class="version-chart-axis"><span>' + escapeHtml((/* @__PURE__ */ new Date(vData.from + "T00:00:00")).toLocaleDateString()) + "</span><span>" + escapeHtml((/* @__PURE__ */ new Date(vData.to + "T00:00:00")).toLocaleDateString()) + '</span></div><div class="vis-keys">' + key + "</div></div>";
+    return '<div class="version-chart vis-chart"><div class="version-chart-head"><span class="version-chart-title">' + escapeHtml(title) + '</span><span class="version-chart-max">' + escapeHtml(fill2(folded.grain === "week" ? "visitors.maxPerWeek" : "visitors.maxPerDay", folded.max)) + '</span></div><svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + " " + H + '" role="img" aria-label="' + escapeHtml(title) + '"><line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects + '</svg><div class="version-chart-axis"><span>' + escapeHtml((/* @__PURE__ */ new Date(vData.from + "T00:00:00")).toLocaleDateString(dateLocale())) + "</span><span>" + escapeHtml((/* @__PURE__ */ new Date(vData.to + "T00:00:00")).toLocaleDateString(dateLocale())) + '</span></div><div class="vis-keys">' + key + "</div></div>";
   }
   function windowHtml() {
     var presets = PRESETS.map(function(d) {
@@ -9378,7 +9439,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   function fmtDate(iso) {
     if (!iso) return "";
     var d = new Date(iso);
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(dateLocale());
   }
   function rowHtml2(m) {
     var stateText = m.state === "unlisted" ? t("status.parked") : m.state === "local" ? t("status.local") : t("status.published");
@@ -10391,7 +10452,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var p = svrState.protection || {};
     var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
     var acLabel = (svrState.accessCode ? "🔒 " : "") + t("detail.editAccess");
-    var acEditor = detailEditingAccessCode ? '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="detail-ac-input">' + t("detail.accessCodeLabel") + '</label><input id="detail-ac-input" class="modal-input" maxlength="64" placeholder="' + escapeHtml(t("detail.accessCodePh")) + '" style="margin:4px 0 6px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("detail.accessCodeRemoveHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAccessCodeSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAccessCodeCancel()") + '</div><div class="dtl-ai-status" id="detail-ac-status"></div></div>' : "";
+    var acEditor = detailEditingAccessCode ? '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="detail-ac-input">' + t("detail.accessCodeLabel") + '</label><div class="secret-field"><input id="detail-ac-input" type="password" class="modal-input" maxlength="64" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="' + escapeHtml(t("detail.accessCodePh")) + '" />' + secretToggleHtml("detail-ac-input") + '</div><div class="dtl-sync none" style="margin:0 0 8px">' + t("detail.accessCodeRemoveHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAccessCodeSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAccessCodeCancel()") + '</div><div class="dtl-ai-status" id="detail-ac-status"></div></div>' : "";
     return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(acLabel, "window._launcher.detailAccessCodeEdit()", { title: t("detail.accessCodeHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
     dtlBtn(t("card.consents"), "window._launcher.openConsents('" + ownerArg2 + "', '" + fnArg + "', '" + jsArg(app.name || app.publishedFilename) + "')", { title: t("card.consentsHint") }) + // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
     // everyone else, so only show this to operators.
@@ -10553,7 +10614,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       wcValue = t("wc.pending");
       wcExplain = t("wc.explainPending");
     } else if (wcState === "saved") {
-      wcValue = detailWorkSavedAt ? t("wc.savedAt").replace("{t}", new Date(detailWorkSavedAt).toLocaleTimeString()) : t("wc.savedEarlier");
+      wcValue = detailWorkSavedAt ? t("wc.savedAt").replace("{t}", new Date(detailWorkSavedAt).toLocaleTimeString(dateLocale())) : t("wc.savedEarlier");
       wcExplain = app.published ? t("wc.explainSaved").replace("{v}", String((app.publishedVersionNumber || 0) + 1)) : t("wc.explainSavedUnpublished");
     } else {
       wcValue = app.published ? t("wc.sameAsPublished") : t("wc.nothingYet");
@@ -10569,7 +10630,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     (wcState === "saved" && app.published && !isUrlApp ? '<div class="dtl-btn-row">' + dtlBtn(t("wc.try"), "window._launcher.detailWorkTry()") + dtlBtn(t("wc.publishAs").replace("{v}", String((app.publishedVersionNumber || 0) + 1)), "window._launcher.detailWorkPublish()", { variant: "success" }) + dtlBtn(t("wc.discardWork"), "window._launcher.detailWorkDiscard()") + "</div>" : "") + (app.blob && !isUrlApp ? '<p class="wc-size">' + escapeHtml(t("detail.size") + ": " + fmtSize(localBytes)) + "</p>" : "") + "</div>";
     var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
     var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
-    var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
+    var created = app.addedAt ? new Date(app.addedAt).toLocaleString(dateLocale()) : "—";
     var favBtn = "";
     var aboutHeader = "<h3><span>" + t("detail.about") + '</span><span class="dtl-h3-doors">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
     var descs = app.descriptions || {};
@@ -10672,7 +10733,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     };
     var bandItems = "";
     if (svrFacts) {
-      var updated = svrFacts.createdAt ? new Date(svrFacts.createdAt).toLocaleDateString() : "";
+      var updated = svrFacts.createdAt ? new Date(svrFacts.createdAt).toLocaleDateString(dateLocale()) : "";
       bandItems += bandItem(String(svrFacts.downloads || 0), t("detail.opens"));
       if (app.publishedVersionNumber) bandItems += bandItem(String(app.publishedVersionNumber), t("detail.versions"));
       if (svrFacts.size) bandItems += bandItem(fmtSize(svrFacts.size), t("detail.size"));
@@ -10700,7 +10761,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var out = "";
     for (var i = 0; i < list.length; i++) {
       var c = list[i];
-      var when = c.at ? new Date(c.at).toLocaleString() : "";
+      var when = c.at ? new Date(c.at).toLocaleString(dateLocale()) : "";
       var kb = c.size ? Math.round(c.size / 102.4) / 10 + " KB" : "";
       var note = c.note ? t("wc.before").replace("{note}", c.note) : t("wc.beforeUnnamed");
       out += '<div class="dtl-version-row"><div class="version-meta"><span class="wc-ckpt-when">' + escapeHtml(when) + '</span><span class="wc-ckpt-note">' + escapeHtml(note) + (kb ? " · " + kb : "") + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("wc.preview"), "window._launcher.detailCheckpointPreview('" + jsArg(c.id) + "')") + dtlBtn(t("wc.restore"), "window._launcher.detailCheckpointRestore('" + jsArg(c.id) + "')", { variant: "primary", disabled: detailCheckpointBusy }) + dtlBtn(t("wc.delete"), "window._launcher.detailCheckpointDelete('" + jsArg(c.id) + "')", { disabled: detailCheckpointBusy }) + "</div></div>";
@@ -11405,8 +11466,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var newest = versions[0].created_at;
     var oldest = versions[versions.length - 1].created_at;
     if (!newest || !oldest) return "";
-    var first = new Date(oldest).toLocaleDateString();
-    var last = new Date(newest).toLocaleDateString();
+    var first = new Date(oldest).toLocaleDateString(dateLocale());
+    var last = new Date(newest).toLocaleDateString(dateLocale());
     var when = first === last ? first : first + " – " + last;
     var span = durationLabel(gapMs(newest, oldest), durationUnits());
     return " · " + when + (span ? " · " + t("versions.span") + " " + span : "");
@@ -11466,12 +11527,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     for (var i = 0; i < bars.length; i++) {
       var h = bars[i].n ? Math.max(4, Math.round(bars[i].n / max * (H - 14))) : 0;
       var x = i * (bw + PAD);
-      var when = new Date(bars[i].day).toLocaleDateString();
+      var when = new Date(bars[i].day).toLocaleDateString(dateLocale());
       var label2 = when + (bucket > 1 ? " +" + (bucket - 1) : "") + " · " + t("versions.perDay").replace("{n}", String(bars[i].n));
       rects += '<g class="version-bar"><title>' + escapeHtml(label2) + '</title><rect class="version-bar-hit" x="' + x + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent"></rect>' + (h ? '<rect class="version-bar-mark" x="' + x + '" y="' + (BASE - h) + '" width="' + bw + '" height="' + h + '" rx="' + Math.min(2, bw / 2) + '"></rect>' : "") + "</g>";
     }
     return '<div class="version-chart"><div class="version-chart-head"><span class="version-chart-title">' + escapeHtml(t("versions.chartTitle")) + '</span><span class="version-chart-max">' + escapeHtml(t("versions.chartMax").replace("{n}", String(max))) + '</span></div><svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + " " + H + '" role="img" aria-label="' + escapeHtml(t("versions.chartTitle")) + '"><line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects + "</svg>" + // A short chart (a few days) cannot hold a date at each end, so it says the span in one line.
-    (svgW < 240 ? '<div class="version-chart-axis"><span>' + escapeHtml(new Date(first).toLocaleDateString() + (first === last ? "" : " – " + new Date(last).toLocaleDateString())) + "</span></div>" : '<div class="version-chart-axis" style="max-width:' + svgW + 'px"><span>' + escapeHtml(new Date(first).toLocaleDateString()) + "</span><span>" + escapeHtml(new Date(last).toLocaleDateString()) + "</span></div>") + "</div>";
+    (svgW < 240 ? '<div class="version-chart-axis"><span>' + escapeHtml(new Date(first).toLocaleDateString(dateLocale()) + (first === last ? "" : " – " + new Date(last).toLocaleDateString(dateLocale()))) + "</span></div>" : '<div class="version-chart-axis" style="max-width:' + svgW + 'px"><span>' + escapeHtml(new Date(first).toLocaleDateString(dateLocale())) + "</span><span>" + escapeHtml(new Date(last).toLocaleDateString(dateLocale())) + "</span></div>") + "</div>";
   }
   function versionSpanHtml(versions) {
     if (!versions.length) return "";
@@ -11490,7 +11551,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     for (var w = 0; w < sittings.length; w++) worked += sittings[w].end - sittings[w].start;
     var parts = [versions.length + " " + t("versions.stored")];
     if (asc.length) {
-      var firstDay = new Date(asc[0]).toLocaleDateString(), lastDay = new Date(asc[asc.length - 1]).toLocaleDateString();
+      var firstDay = new Date(asc[0]).toLocaleDateString(dateLocale()), lastDay = new Date(asc[asc.length - 1]).toLocaleDateString(dateLocale());
       parts.push(firstDay === lastDay ? firstDay : firstDay + " – " + lastDay);
     }
     if (sittings.length) {
@@ -11536,7 +11597,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         var v = versions[i];
         var isLatest = i === 0;
         var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var when = v.created_at ? new Date(v.created_at).toLocaleString(dateLocale()) : "";
         var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
         html += '<div class="dtl-version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span> <span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : "") + (when ? " · " + when : "") + since + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("card.view"), "window._launcher.viewPublished('" + escapeHtml(viewU) + "', '" + jsArg(filename) + "')") + (isLatest ? "" : dtlBtn(t("card.restore"), "window._launcher.restoreVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")")) + dtlBtn(t("card.fork"), "window._launcher.forkVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")") + "</div></div>";
@@ -12130,7 +12191,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       var n = byId2[id];
       if (!n) return "";
       var isSelf = id === d.self;
-      var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + "</span>" : "";
+      var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString(dateLocale())) + "</span>" : "";
       var statusTxt = t("lineage.status." + n.status) || n.status;
       var line = '<div class="lineage-node' + (isSelf ? " self" : "") + '" style="margin-left:' + depth * 16 + 'px">' + (depth > 0 ? "↳ " : "") + escapeHtml(n.owner + "/" + n.filename) + (isSelf ? " ●" : "") + '<span class="lineage-status ' + escapeHtml(n.status) + '">' + escapeHtml(statusTxt) + "</span>" + when + "</div>";
       var kids = children[id] || [];
@@ -12226,7 +12287,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         var v = versions[i];
         var isLatest = i === 0;
         var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
-        var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var when = v.created_at ? new Date(v.created_at).toLocaleString(dateLocale()) : "";
         var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
         html += '<div class="version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span><span class="version-sub">' + escapeHtml(v.version || "") + (kb ? " · " + kb : "") + (when ? " · " + when : "") + since + `</span></div><div class="version-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewU) + "', '" + jsArg(filename) + `')">` + t("card.view") + "</button>" + (isLatest ? "" : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Re-publish this version as the new latest">' + t("card.restore") + "</button>") + '<button onclick="window._launcher.forkVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Copy this version into a new app">' + t("card.fork") + "</button></div></div>";
@@ -12818,6 +12879,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     document.getElementById("publish-filename").value = safeName;
     document.getElementById("publish-description").value = app.description || "";
     document.getElementById("publish-access-code").value = "";
+    document.getElementById("publish-access-code").type = "password";
+    initSecretFields();
     var pubStatus = document.getElementById("publish-status");
     var pubSubmit = document.getElementById("publish-submit-btn");
     if (!getCortexOwnerToken()) {
@@ -13282,13 +13345,13 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       return;
     }
     var conflictOptions = '<option value="skip">' + t("backup.conflictSkip") + '</option><option value="append">' + t("backup.conflictAppend") + '</option><option value="copy">' + t("backup.conflictCopy") + "</option>";
-    var html = '<div style="font-size:.8rem;color:var(--text-muted)">' + t("backup.from") + ': <span style="font-family:monospace">' + escapeHtml((d.source.owner || "?") + "@" + (d.source.nodeId || "?")) + "</span>" + (d.exported_at ? " · " + new Date(d.exported_at).toLocaleString() : "") + '</div><div class="backup-toolbar-row"><div><button class="backup-link-btn" onclick="window._launcher.backupSelectAll(true)">' + t("backup.selectAll") + '</button> / <button class="backup-link-btn" onclick="window._launcher.backupSelectAll(false)">' + t("backup.selectNone") + '</button></div><div class="backup-summary-line" id="backup-summary"></div></div><table class="backup-table"><thead><tr><th></th><th>' + t("backup.colApp") + "</th><th>" + t("backup.colVersions") + "</th><th>" + t("backup.colStatus") + "</th></tr></thead><tbody>";
+    var html = '<div style="font-size:.8rem;color:var(--text-muted)">' + t("backup.from") + ': <span style="font-family:monospace">' + escapeHtml((d.source.owner || "?") + "@" + (d.source.nodeId || "?")) + "</span>" + (d.exported_at ? " · " + new Date(d.exported_at).toLocaleString(dateLocale()) : "") + '</div><div class="backup-toolbar-row"><div><button class="backup-link-btn" onclick="window._launcher.backupSelectAll(true)">' + t("backup.selectAll") + '</button> / <button class="backup-link-btn" onclick="window._launcher.backupSelectAll(false)">' + t("backup.selectNone") + '</button></div><div class="backup-summary-line" id="backup-summary"></div></div><table class="backup-table"><thead><tr><th></th><th>' + t("backup.colApp") + "</th><th>" + t("backup.colVersions") + "</th><th>" + t("backup.colStatus") + "</th></tr></thead><tbody>";
     for (var i = 0; i < d.apps.length; i++) {
       var app = d.apps[i];
       var versionList = "";
       for (var v = 0; v < app.versions.length; v++) {
         var ver = app.versions[v];
-        versionList += '<label><input type="checkbox" class="backup-ver" data-app="' + i + '" data-v="' + ver.version + '" checked onchange="window._launcher.backupUpdateSummary()"/> v' + ver.version + (ver.semver ? " (" + escapeHtml(ver.semver) + ")" : "") + " · " + (ver.size < 1024 ? ver.size + " B" : (ver.size / 1024).toFixed(1) + " KB") + (ver.created_at ? " · " + new Date(ver.created_at).toLocaleDateString() : "") + "</label>";
+        versionList += '<label><input type="checkbox" class="backup-ver" data-app="' + i + '" data-v="' + ver.version + '" checked onchange="window._launcher.backupUpdateSummary()"/> v' + ver.version + (ver.semver ? " (" + escapeHtml(ver.semver) + ")" : "") + " · " + (ver.size < 1024 ? ver.size + " B" : (ver.size / 1024).toFixed(1) + " KB") + (ver.created_at ? " · " + new Date(ver.created_at).toLocaleDateString(dateLocale()) : "") + "</label>";
       }
       html += '<tr><td><input type="checkbox" id="backup-app-' + i + '" checked onchange="window._launcher.backupUpdateSummary()"/></td><td>' + escapeHtml(app.name || app.filename) + '<div class="mono-cell">' + escapeHtml(app.filename) + "</div></td><td>" + app.versions.length + ` <button class="backup-versions-toggle" onclick="var el=document.getElementById('backup-app-` + i + `-versions');el.style.display=el.style.display==='none'?'':'none'">` + t("backup.colVersions").toLowerCase() + ' ▾</button><div class="backup-version-list" id="backup-app-' + i + '-versions" style="display:none">' + versionList + "</div></td><td>" + (app.exists ? '<span class="backup-status-badge backup-status-exists">' + t("backup.statusExists") + '</span><br/><select class="backup-conflict-select" id="backup-app-' + i + '-conflict">' + conflictOptions + "</select>" : '<span class="backup-status-badge backup-status-new">' + t("backup.statusNew") + "</span>") + "</td></tr>";
     }
@@ -13880,7 +13943,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       setN("cat-band-apps", String(entries.length));
       setN("cat-band-listed", String(listed));
       setN("cat-band-drafts", String(drafts));
-      setN("cat-band-opens", opensTotal.toLocaleString());
+      setN("cat-band-opens", opensTotal.toLocaleString(dateLocale()));
       band.hidden = !(listingLoaded && entries.length > 0);
     }
     var mast = document.getElementById("cat-mastline");
@@ -14539,6 +14602,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     } catch (e) {
     }
     applyI18n();
+    initSecretFields();
     try {
       renderApps4();
     } catch (e) {
@@ -14830,6 +14894,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var _urlLang = _params.get("lang");
     setLang(_urlLang === "fi" || _urlLang === "en" ? _urlLang : loadConfig().language === "fi" ? "fi" : "en");
     applyI18n();
+    initSecretFields();
     initDialogs();
     onDlgClose("confirm-overlay", function() {
       closeConfirm(false);
