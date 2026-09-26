@@ -305,12 +305,15 @@ attached action, in order, the node POSTs JSON to that URL:
 ```json
 {
   "hook": "pre_owner_registration",
-  "action_ref": "spam-check",
+  "action_ref": "spam-check#checker#you@aimeat-finland-001-genesis",
   "context": { "name": "alice", "display_name": "Alice" },
   "node_id": "aimeat-finland-001-genesis",
   "timestamp": "2026-09-03T18:00:00.000Z"
 }
 ```
+
+`action_ref` is the reference as the hook keeps it, normally the action's id with the identity that
+published it.
 
 Two ways to refuse: answer with a non-2xx status, or answer `200` with `{"allowed": false, "reason":
 "..."}`. Anything else lets the flow continue. Outbound calls are SSRF-guarded (a webhook pointing at
@@ -331,7 +334,9 @@ curl https://your-node/v1/admin/hooks -H "Authorization: Bearer $OPERATOR_TOKEN"
 ```
 
 An action reference is either the action's id, or `id#providerGaii` when two providers publish the
-same id.
+same id. When one provider publishes the id you bind, the node stores it as that `id#providerGaii`,
+so an action with the same id that somebody else publishes later does not change what the hook
+calls.
 
 ### A worked example: refuse throwaway domains
 

@@ -1,3 +1,6 @@
+// 2026-09-26 (security audit A8-3): a bare id one provider publishes is bound as id#provider, so
+// tests 4, 4b and 6 read the binding and the webhook's action_ref in that form. They asserted the id
+// as typed, which is the form a later publication of the same id by another owner could take over.
 // 2026-08-16 (August 2026 test-quality audit, e2e-hooks:206): a hook runs on every work request on
 // the node, and every call to the three admin hook doors in this file was the operator. Test 4b adds
 // the second owner the suite already has — registered after the operator, so roles are exactly
@@ -216,7 +219,10 @@ await test('4. Configure pre_work_request hook', async () => {
         body: JSON.stringify({ actions: [hookActionId] }),
     });
     assert(status === 200, `hook config: ${status} ${JSON.stringify(body)}`);
-    assert(body.data.actions.includes(hookActionId), 'action in hook list');
+    // A bare id one provider publishes is stored with its provider (security audit A8-3), so another
+    // owner publishing the same id later cannot change what this binding names.
+    assert(JSON.stringify(body.data.actions) === JSON.stringify([`${hookActionId}#${providerGaii}`]),
+        `the binding names the action with its provider, got ${JSON.stringify(body.data.actions)}`);
 });
 
 // A hook runs on every work request on the node, so who may set one is an operator decision. Every
@@ -245,7 +251,7 @@ await test('4b. A non-operator owner is refused every hook door, and the list do
     const asOperator = await json('/v1/admin/hooks', { headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(asOperator.status === 200, `operator read: ${asOperator.status}`);
     const configured = asOperator.body.data.extension_hooks?.pre_work_request ?? asOperator.body.data.hooks?.pre_work_request;
-    assert(JSON.stringify(configured) === JSON.stringify([hookActionId]),
+    assert(JSON.stringify(configured) === JSON.stringify([`${hookActionId}#${providerGaii}`]),
         `the refused calls must leave the hook list alone, got ${JSON.stringify(configured)}`);
 });
 
@@ -274,7 +280,8 @@ await test('6. Hook server received context', async () => {
     assert(hookPayloads.length >= 1, `expected webhook payload, got ${hookPayloads.length}`);
     const payload = hookPayloads[0];
     assert(payload.hook === 'pre_work_request', `hook: ${payload.hook}`);
-    assert(payload.action_ref === hookActionId, `action_ref: ${payload.action_ref}`);
+    // The reference as the binding stores it: the id with its provider (security audit A8-3).
+    assert(payload.action_ref === `${hookActionId}#${providerGaii}`, `action_ref: ${payload.action_ref}`);
     assert(payload.context.requester_gaii === agentGaii, `requester_gaii: ${payload.context.requester_gaii}`);
     assert(payload.context.action_id === hookActionId, `action_id: ${payload.context.action_id}`);
     assert(payload.context.provider_gaii === providerGaii, `provider_gaii: ${payload.context.provider_gaii}`);

@@ -24982,6 +24982,10 @@ paths:
         written, and the message names the `id#provider` of each. It names no one action, and a
         gate bound to such an id refuses rather than calling either.
 
+        A bare id that one provider publishes is stored as that action's `id#provider`, and the
+        answer's `actions` shows it so. Another owner who publishes the same id later cannot change
+        what the binding names.
+
         An empty list clears the moment, the same as DELETE.
       tags: [Admin]
       security:
