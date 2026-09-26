@@ -279,6 +279,7 @@
     "busboy": "^1.6.0",
     "compression": "^1.8.2",
     "croner": "^10.0.1",
+    "css-tree": "3.2.1",
     "express": "^5.2.1",
     "ini": "^7.0.0",
     "javascript-obfuscator": "^5.7.0",

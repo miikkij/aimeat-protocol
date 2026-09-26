@@ -5,6 +5,11 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The stylesheet is read by the CSS parser (e82c9f26d729): a string passes
+ *     whatever it holds (url(, @import, !important, a colour, an escaped url(), and only a real var()
+ *     reads the page's tokens; an escape spells the name it stands in, in any case (R\47 B( is rgb();
+ *     the column combinator is refused as a selector the bench cannot read; readStylesheet is timed at
+ *     the ceiling, and at MAX_NESTING.
  *   v1.5.0 — 2026-09-26 — The markup is read by the HTML parser (1a0a15eb7b20): a character reference
  *     of any spelling is decoded, so a plain value holding one passes and an address spelled with one
  *     is refused as an address; a reference without its ";" is refused as markup that does not read
@@ -29,9 +34,7 @@
 import { describe, it, expect } from 'vitest';
 import { validateComponentBody, componentPreviewHtml, componentSnippet, type ComponentBody } from '../../src/services/design-book/component.js';
 import { validatePartInput, PART_KINDS } from '../../src/services/design-book/validate.js';
-import {
-  complexSelectorOf, cssAsRead, declarationsOf, readMarkup, selectorListOf, selectorsOf, withoutVarFallbacks,
-} from '../../src/services/design-book/component-scan.js';
+import { MAX_NESTING, readMarkup, readStylesheet } from '../../src/services/design-book/component-scan.js';
 
 const WEEK_GRID = {
   prefix: 'wkgrid',
@@ -186,34 +189,50 @@ describe('the component bench', () => {
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { --wkgrid-p: fixed; position: var(--wkgrid-p); color: var(--ak-ink); }' })).toThrow(/position/);
     // image-set() takes its address as a string, with no url( in sight.
     expect(bad({ css: WEEK_GRID.css + rule('background-image: image-set("https://evil.example/x.png" 1x)') })).toThrow(/no url\(\)/);
-    // An escaped "/*" opens no comment, and since e82c9f26d729 it does not come out as "/*" either:
-    // an escape that stands for anything but a name character is written "_", so no reader after
-    // this one can take it for structure.
-    expect(cssAsRead('a\\62 c /* x */ "/*" \\2f\\2a d')).toBe('abc   "/*" __d');
+    // The tokenizer resolves an escape inside the name it stands in, and a comment or a string
+    // holds no function: what is left is what a browser reads.
+    expect(readStylesheet('a { b: \\75 rl(x) /* image-set( */ "src(" v\\61r(--ak-ink); }')).toMatchObject({ functions: ['url', 'var'], readsPageTokens: true });
     // An escape a real component uses, a tick drawn by the stylesheet, still passes.
     expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-cell[aria-pressed="true"]::after { content: "\\2713"; position: absolute; color: var(--ak-accent-ink); }' })).not.toThrow();
   });
 
-  // e82c9f26d729, the second read: cssAsRead resolved an escape to its character, and the readers
-  // after it took that character, and every character inside a string, as structure. A browser reads
-  // `\;` as part of a class name and a "{" inside a string as text, so each of these styled the page
-  // around the component while the bench read it as staying inside.
+  // e82c9f26d729: a browser reads `\;` as part of a class name and a "{" inside a string as text, so
+  // each of these styles the page around the component. The bench reads them the same way.
   it('never reads what an escape stands for, or what a string holds, as structure', () => {
-    // A browser reads the class `wkgrid;` and styles every p on the page; the bench read `.wkgrid`.
+    // A browser reads the class `wkgrid;` and styles every p on the page.
     expect(bad({ css: WEEK_GRID.css + '\np, .wkgrid\\;.wkgrid { display: none; }' })).toThrow(/starts at one of its own classes/);
-    // The "{" in the string kept the bench inside @keyframes, so body was never looked at.
+    // A "{" in a string opens no block, so the rule after @keyframes is read, and it names the page.
     expect(bad({ css: WEEK_GRID.css + '\n@keyframes wkgrid-a { from { content: "{"; } }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "}"; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
     // An escaped quote, written plain or in hex, does not end the string to a browser.
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "\\22"; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "\\""; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
-    // What an escape stands for is text in the reader's output unless it is a letter, a digit, "-" or
-    // "_": those are what spell url( or fixed, and nothing else can be structure.
-    expect(cssAsRead('.a\\;b "x\\"y" \\7b')).toBe('.a_b "x_y" _');
-    expect(selectorsOf('@keyframes k { from { content: "{"; } }\nbody { color: red; }')).toEqual(['body']);
-    expect(declarationsOf('.a { content: ";position: fixed"; color: red }')).toEqual(['content: ";position: fixed"', 'color: red']);
+    // An escaped character is part of the name it stands in: `.a\;b` is the one class `a;b`.
+    expect(readStylesheet('.a\\;b { c: d }').selectors[0].selector?.compounds[0].classes).toEqual(['a;b']);
+    expect(readStylesheet('@keyframes k { from { content: "{"; } }\nbody { color: red; }').selectors.map(s => s.text)).toEqual(['body']);
+    expect(readStylesheet('.a { content: ";position: fixed"; color: red }').declarations.map(d => d.property)).toEqual(['content', 'color']);
     // A string may hold a brace, a semicolon or a quote of the other kind, and a real component passes.
     expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-cell[data-mark="{;}"]::after { content: "a;b{c}\'"; color: var(--ak-ink); }' })).not.toThrow();
+  });
+
+  // e82c9f26d729, read by the CSS parser: a string is one token, whatever it holds, and an escape is
+  // resolved inside the name it belongs to. What a string holds loads nothing and sets nothing.
+  it('reads a string as text, whatever it holds, and an escaped name as the name it spells', () => {
+    const rule = (decl: string) => ({ css: `${WEEK_GRID.css}\n.wkgrid-x::before { ${decl}; color: var(--ak-ink); }` });
+    for (const decl of [
+      'content: "see url(x)"', 'content: "@import"', 'content: "!important"', 'content: "#fff rgb(0, 0, 0)"',
+      'content: "\\75 rl(x)"', 'content: \'image-set("x" 1x)\'',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, ...rule(decl) }), decl).not.toThrow();
+    }
+    // A string that names the page's tokens does not read them.
+    expect(bad({ css: '.wkgrid::before { content: "var(--ak-ink)"; color: red; }' })).toThrow(/reads the page's tokens/);
+    // An escape spells the name it stands in, in any case: R\47 B( is rgb( to a browser.
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { color: R\\47 B(0 0 0); }' })).toThrow(/never a literal/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { background: u\\72 l("https://evil.example/x.png"); }' })).toThrow(/no url\(\)/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { background: \\55 RL(https://evil.example/x.png); }' })).toThrow(/no url\(\)/);
+    // What follows a string is still read: the rule after it names the page and is refused.
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "a;b}{"; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
   });
 
   // Served from the node's own origin, so a body stored before the bench learned a trick is not
@@ -231,12 +250,11 @@ describe('the component bench', () => {
     expect(componentSnippet(validateComponentBody(WEEK_GRID)).html).toContain('class="wkgrid"');
   });
 
-  it('reads text that opens and never closes in time that grows with its length and nothing else', () => {
-    // MEASURED 2026-09-20 on the patterns this replaced, 40 000 openings each: the tag pattern took
-    // 1.3 s, the comment strip 0.6 s, the at-rule strip 3.2 s and "animation … infinite" 6.3 s, and
-    // ten times less input took a hundred times less time. The bench's 12 000-character ceiling is
-    // what kept that to a tenth of a second in practice; the readers no longer depend on it.
-    const n = 40_000;
+  it('reads text that opens and never closes in bounded time, at the most the bench accepts', () => {
+    // MEASURED 2026-09-20 on the patterns the first readers used, 40 000 openings each: the tag
+    // pattern took 1.3 s, the comment strip 0.6 s, the at-rule strip 3.2 s and "animation … infinite"
+    // 6.3 s. The parsers read the text once, and each costs more the deeper the text nests, so each
+    // is handed no more than the bench's 12 000-character ceiling and timed here at it.
     const timed = (name: string, run: () => unknown) => {
       const started = performance.now();
       run();
@@ -250,16 +268,18 @@ describe('the component bench', () => {
       ['tags', '<a '], ['attributes', 'a= ', '<div '], ['nesting', '<div>'], ['list items', '<li>', '<ul>'], ['misnesting', '<b>x</i>'],
       ['stray end tags', '</p>'], ['formatting', '<a><p>'], ['tables', '<table>'], ['references', '&#', '<div title="'],
     ]) timed(`markup, ${shape}`, () => readMarkup(ceiling(unit, head)));
-    timed('comments', () => cssAsRead('/* '.repeat(n)));
-    timed('strings', () => cssAsRead('"a\\'.repeat(n)));
-    timed('escapes', () => cssAsRead('\\75 '.repeat(n)));
-    timed('selector lists', () => selectorListOf('(,'.repeat(n)));
-    timed('selectors, open', () => complexSelectorOf('.a:is('.repeat(n)));
-    timed('selectors, nested', () => complexSelectorOf(':is('.repeat(n) + '.a' + ')'.repeat(n)));
-    timed('declarations', () => declarationsOf('animation '.repeat(n)));
-    timed('strings the readers step over', () => { selectorsOf('"{\''.repeat(n)); declarationsOf('";\''.repeat(n)); selectorListOf('",\''.repeat(n)); });
-    timed('selectors', () => selectorsOf('@media '.repeat(n)));
-    timed('var fallbacks', () => withoutVarFallbacks('var(--a,('.repeat(n)));
+    // The CSS parser's cost grows with how deep brackets and blocks nest, and it runs out of stack.
+    // Measured 2026-09-26 at 12 000 characters: 570 ms for "@supports ((((…", and a RangeError for
+    // "@media{@media{…". So it is not run on a stylesheet nesting deeper than MAX_NESTING.
+    for (const [shape, unit, head] of [
+      ['comments', '/* '], ['strings', '"a\\'], ['escapes', '\\75 '], ['declarations', 'animation ', '.a{'], ['strings in rules', '"{\'', '.a{'],
+      ['flat at-rules', '@media '], ['selector lists', '.a, '], ['conditions', '(', '@supports '], ['blocks', '@media{'], ['nested rules', '& {', '.a{'],
+      ['pseudo-classes', ':is(', '.a'], ['var fallbacks', 'var(--a,(', '.a{b:'], ['closed declarations', 'a:b; ', '.a{'],
+    ]) timed(`stylesheet, ${shape}`, () => readStylesheet(ceiling(unit, head)));
+    // Nesting at the most the bench reads is parsed, and parsed quickly.
+    timed('stylesheet, nested as deep as the bench reads', () => {
+      expect(readStylesheet('@supports ' + '('.repeat(MAX_NESTING) + 'a' + ')'.repeat(MAX_NESTING) + ' {}').depth).toBe(MAX_NESTING);
+    });
     // And through the bench itself, at the most it accepts.
     timed('the bench, markup', () => { try { validateComponentBody({ ...WEEK_GRID, html: '<div class="wkgrid">' + '<a '.repeat(3900) }); } catch { /* refused is the right answer */ } });
     timed('the bench, markup nesting', () => { try { validateComponentBody({ ...WEEK_GRID, html: ceiling('<div class="wkgrid">') }); } catch { /* refused is the right answer */ } });
@@ -295,7 +315,8 @@ describe('the component bench', () => {
     expect(bad(rule('.wkgrid:not(body)'))).toThrow(/names the page itself/);
     expect(bad(rule('.wkgrid:root'))).toThrow(/names the page itself/);
     expect(bad(rule('*.wkgrid'))).toThrow(/names the page itself/);
-    expect(bad(rule('.wkgrid || td'))).toThrow(/beside it/);
+    // The column combinator is not one the CSS parser reads, so the bench cannot follow it.
+    expect(bad(rule('.wkgrid || td'))).toThrow(/does not read as a selector/);
     expect(bad(rule('.wkgrid-x { & ~ p'))).toThrow(/starts at one of its own classes/);
     // …and what a component legitimately writes still passes: inside it, and between its own parts.
     for (const ok of [
