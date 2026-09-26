@@ -17,6 +17,9 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.6.2 — 2026-09-26 — localAccountName cuts at the LAST '@', so a visitor a route composed with
+ *     this node's id (`alice@their-node@this-node`) stays `alice@their-node` instead of becoming the
+ *     local namesake (secaudit 2026-09, F-1 as a class).
  *   v1.6.1 — 2026-09-24 — RESERVED_NAMES gains `security-system` and `scheduler`, the two owners
  *     the node writes under itself that were still open to registration.
  *   v1.6.0 — 2026-09-24 — `isForeignPrincipal`, `homeIdentityOf` and `FEDERATED_ROLE`: the ONE
@@ -262,16 +265,19 @@ export function setThisNodeId(nodeId: string | null): void {
  * and the doors that asked "is the caller this app's owner" or "which roster row is the caller's" on
  * the shortened name answered for her: the app member roster and its plan, the roadmap, the legal
  * page, every door behind the apps router's canonicalOwner (secaudit 2026-09, root cause F-1). Whole,
- * it names nobody here. The six copies of `x.includes('@') ? x.split('@')[0] : x` that shortened the
- * CALLER are this function now; the ones that shorten a stored record's owner or an app id are not
- * the caller and stay as they are.
+ * it names nobody here.
+ *
+ * The cut is at the LAST '@'. Many routes compose the caller as `${req.auth.owner}@${config.nodeId}`,
+ * and a visitor's owner is its home GHII, so the composed name is `alice@their-node@this-node`: it
+ * ends in this node, and cut at the first '@' it named the namesake again. Cut at the last, it is
+ * `alice@their-node`, the visitor, and every identity of this node is cut exactly as before.
  */
 export function localAccountName(identity: string): string {
   const s = String(identity ?? '');
   const at = s.lastIndexOf('@');
   if (thisNodeId && at >= 0 && s.slice(at + 1) !== thisNodeId) return s;
   const afterHash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s;
-  return afterHash.split('@')[0];
+  return afterHash.includes('@') ? afterHash.slice(0, afterHash.lastIndexOf('@')) : afterHash;
 }
 
 export function resolveIdentity(
