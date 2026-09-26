@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-09-25 — isolated-frame-on-shared-nodes: what an app meets on a node several people share
+ *     with no app origin, where it runs in an opaque-origin frame (audit A7-1).
  *   2026-09-19 — track-drift: a new app that ended up on Classic, and what the publish says about
  *     it.
  *   v1.7.1 — 2026-09-13 — handle-both-auth-paths names onSession, the one handler for a restore and a
@@ -337,6 +339,18 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     updatedAt: '2026-09-13',
     ...CHECKED,
+  }),
+  E({
+    id: 'isolated-frame-on-shared-nodes',
+    title: 'On a node several people share with no app addresses, the app runs in an isolated frame',
+    symptom: 'The app opens at its usual /v1/apps/<owner>/<file>?mode=inline address, but inside a frame whose origin is opaque. Code that took the node\'s own sign-in directly (the stored aimeat_session, POST /v1/auth/refresh, a fetch with credentials: "include") gets nothing, IndexedDB and a service worker are refused, and push notifications, installing the app and Web Locks are not there. aimeat.io and every node that gives apps an address of their own are not affected.',
+    fix: 'Sign in only through aimeat-auth: AIMEAT.auth.login() on start, AIMEAT.auth.signIn() from a click, and session.fetch() or the SDK libraries for every call. They take the app\'s own grant from the page around the frame and need no change. localStorage, sessionStorage and document.cookie work (the node keeps localStorage for each app); keep what must last in memory or files through the node (AIMEAT.data, AIMEAT.storage), never in IndexedDB. AIMEAT.auth.isAppOrigin() is true in the frame.',
+    appliesTo: ['auth', 'app'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-09-25',
+    verifiedAt: '2026-09-25',
+    verifiedVersion: '3.19.0',
   }),
   E({
     id: 'apps-localhost-cross-site',

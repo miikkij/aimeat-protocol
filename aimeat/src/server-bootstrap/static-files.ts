@@ -11,6 +11,11 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.13.0 -- 2026-09-25 -- The isolated frame (audit A7-1): /app-frame.js, the script of the page
+ *     that holds an app on a node several people share, is served with no-cache, so a node update
+ *     reaches the next open instead of the next day; and every /lib/ file answers any origin, because
+ *     an app in that frame has an opaque origin and its module imports, wasm and JSON fetches from
+ *     /lib/ are cross-origin requests (fonts already answered any origin).
  *   v1.12.0 -- 2026-09-08 -- The three inline path-candidate lists move to asset-dirs.ts, and the
  *     static/ one gains the location the PACKAGE carries it at. public/ and locales/ keep their
  *     directory name in the build, so one candidate answered for both the dev tree and the
@@ -64,13 +69,14 @@
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import { serveSpa } from '../routes/portal.js';
 import { buildAuthMd } from '../services/auth-md.js';
 import { resolveAssetDir } from './asset-dirs.js';
 import { appOriginServiceWorker } from '../utils/app-sw-source.js';
+import { appFrameHostScript } from '../utils/app-frame-assets.js';
 
 /**
  * This module's own directory, which is what asset-dirs.ts measures the asset trees against:
@@ -366,7 +372,11 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
         // app on <name>.apps.<domain> loads /lib/aimeat-theme.css (or /lib/fonts.css) from the apex,
         // and without this header the browser refuses every woff2 — apps silently fell back to
         // system faces since the fonts pack shipped. Public static assets; wildcard is correct.
-        if (/\.(woff2?|ttf|otf)$/.test(filePath)) {
+        //
+        // Every /lib/ file too: an app in the isolated frame (audit A7-1) has an opaque origin, so a
+        // module import, a wasm fetch or a JSON read of /lib/ is a cross-origin request from it, and
+        // without this header the browser refuses the answer. The same public files, no credential.
+        if (/\.(woff2?|ttf|otf)$/.test(filePath) || /^lib[/\\]/.test(relative(publicDir, filePath))) {
           res.setHeader('Access-Control-Allow-Origin', '*');
         }
       },
@@ -445,6 +455,16 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
         res.type('html').send(html);
       });
     }
+
+    // The isolated frame's page script (audit A7-1). Revalidated on every open rather than cached for
+    // the day the rest of this tree is: the page and the script it loads must be the same version as
+    // the node answering them, or a node update breaks sign-in in apps for a day.
+    app.get('/app-frame.js', (_req, res, next) => {
+      const source = appFrameHostScript();
+      if (!source) { next(); return; }
+      res.setHeader('Cache-Control', 'no-cache');
+      res.type('application/javascript').send(source);
+    });
 
     app.use(express.static(pwaStaticDir, { maxAge: '1d', dotfiles: 'deny' }));
   }

@@ -7355,13 +7355,21 @@ paths:
         Auto-approves only the owner's **own** app (or one the owner already granted); anyone else →
         `consent_required`. Returns the same scoped, revocable grant token as the code flow — never
         the session. Response `data.error` ∈ {login_required, consent_required, bad_origin,
-        unknown_app, invalid_scope, app_origin_disabled}.
+        unknown_app, invalid_scope, app_origin_disabled, frame_off}.
         `invalid_scope` is answered before the session is read (one word outside GET
         /v1/app-grants/scopes refuses the whole list, whoever is signed in) and carries `app`
         (owner/filename), `app_name` and `unknown` (the ungrantable words, space-separated).
+
+        **Isolated frame.** On a node several people share with no app origin, an app runs in an
+        opaque-origin frame on the node's own address (see `GET /v1/apps/{owner}/{filename}`), and
+        the node's page holding that frame asks with `app=owner/filename` instead of `origin`: the
+        app has no address of its own to be bound by. The same caller check applies, so only a page
+        of the node itself is answered, and the answer is the same scoped grant. On any other node
+        `app` is answered `frame_off`.
       tags: [Auth]
       parameters:
-        - { in: query, name: origin, required: true, schema: { type: string }, description: The embedding app's origin (a <sub>.apps.<host> origin) }
+        - { in: query, name: origin, required: false, schema: { type: string }, description: "The embedding app's origin (a <sub>.apps.<host> origin). Required unless `app` is given." }
+        - { in: query, name: app, required: false, schema: { type: string }, description: "owner/filename, from the node's isolated-frame page on a node that runs apps in that frame" }
         - { in: query, name: scope, required: false, schema: { type: string }, description: Space-separated grantable scopes }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
@@ -26526,11 +26534,23 @@ paths:
         (plus `x-original-tokens` on the converted fallback). Browsers (`Accept: text/html`) keep
         the exact HTML behavior. The same negotiation applies at mapped subdomain app roots
         (`https://<sub>.<apex>/` and `https://<sub>.apps.<apex>/`).
+
+        **Isolated frame (a node several people share, with no app origin):** such a node never runs
+        an app in its own origin, where the session of the person who opens it lives. A browser that
+        opens `mode=inline` (`Sec-Fetch-Dest` document, iframe or frame) gets a small page of the
+        node that holds the app in an iframe whose origin is opaque, and none of the app's bytes; the
+        page gets the app its own scoped grant (`GET /v1/auth/app-grant-silent?app=`) and keeps the
+        app's localStorage for it. The bytes themselves are served for `mode=frame`, and for a
+        `mode=inline` request that is not a browser opening a page, always with the CSP `sandbox`
+        directive (no `allow-same-origin`) and a short support script in front of the app's own
+        markup. `mode=frame` is sandboxed on every node, and redirected like `inline` where an app
+        origin exists. A node one person uses serves `mode=inline` exactly as before. A draft
+        preview (`preview=`) follows the same rules.
       tags: [Apps]
       parameters:
         - { in: path, name: owner, required: true, schema: { type: string } }
         - { in: path, name: filename, required: true, schema: { type: string } }
-        - { in: query, name: mode, required: false, schema: { type: string, enum: [inline] } }
+        - { in: query, name: mode, required: false, schema: { type: string, enum: [inline, frame] }, description: "inline: runnable. frame: runnable in an opaque-origin sandbox (the isolated frame's own request)." }
         - { in: query, name: format, required: false, schema: { type: string, enum: [md] }, description: "md forces the Agent Face markdown variant regardless of the Accept header" }
         - { in: query, name: version, required: false, schema: { type: integer } }
         - in: query

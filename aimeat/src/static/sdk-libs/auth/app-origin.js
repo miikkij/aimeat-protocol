@@ -15,6 +15,11 @@
  *   reportUngrantableScopes
  * @usage import { isAppOrigin, silentAppToken } from './app-origin.js';
  * @version-history
+ *   v1.2.0 — 2026-09-25 — The isolated frame (audit A7-1). An app the node serves into its isolated
+ *     frame counts as isolated too (isAppOrigin is true there), and silentAppToken, apexLogout and
+ *     requestConsentPopup ask the page around the frame (./app-frame.js) instead of a bridge iframe or
+ *     a popup of their own, which an opaque origin cannot use. Every caller in session.js and pill.js
+ *     is unchanged, so an app written for the app origin works in the frame as it is.
  *   v1.1.0 — 2026-09-13 — reportUngrantableScopes moved here from session.js, unchanged, when the
  *     onLogin decision took that file past the 800-line ceiling. It reads the bridge's answer and
  *     writes to the console, and nothing else, so it sits with the bridge it reports on.
@@ -24,12 +29,17 @@ import { APEX_URL, appDeclaredScopes } from './config.js';
 import { parseJwt } from './crypto.js';
 import { emit } from './events.js';
 import { b64url, pkce } from './pkce.js';
+import { inIsolatedFrame, askFrameHost } from './app-frame.js';
 
 // ── App-origin seamless SSO (H-2) ──
 // When this SDK runs on an APP ORIGIN (a *.apps.<domain> host, different from the node/apex), the
 // host-only session cookie can't be read directly. The same-site silent bridge (a hidden iframe to
 // the apex, where the cookie IS first-party) mints a SCOPED, revocable grant token and posts it back.
+// An app in the node's ISOLATED FRAME (a node several people share with no app origin) is just as far
+// from the session: its URL is the node's own, its origin is opaque, and the page around the frame
+// gets the grant for it (./app-frame.js). It takes every app-origin road below.
 export function isAppOrigin() {
+  if (inIsolatedFrame()) return true;
   try { return location.origin !== new URL(APEX_URL).origin; } catch { return false; }
 }
 
@@ -41,6 +51,8 @@ export function appScopeDrift(session) {
 }
 
 export function silentAppToken() {
+  // The page around the isolated frame answers with the same shape the bridge does.
+  if (inIsolatedFrame()) return askFrameHost('login', { scope: appDeclaredScopes() }, 8000);
   return new Promise(function (resolve) {
     var apexOrigin;
     try { apexOrigin = new URL(APEX_URL).origin; } catch { resolve(null); return; }
@@ -87,6 +99,7 @@ export function reportUngrantableScopes(r) {
 
 // End the shared apex session from an APP ORIGIN (frames the same-site apex bridge in ?mode=logout).
 export function apexLogout() {
+  if (inIsolatedFrame()) return askFrameHost('logout', {}, 8000).then(function (r) { return !!(r && r.ok); });
   return new Promise(function (resolve) {
     var apexOrigin;
     try { apexOrigin = new URL(APEX_URL).origin; } catch { resolve(false); return; }
@@ -117,6 +130,12 @@ export function apexLogout() {
 
 // ── App-grant consent popup (H-2, PKCE code flow; b64url/pkce live in ./pkce.js) ──
 export async function requestConsentPopup(app, scopeStr, manage) {
+  // In the isolated frame the page around it opens the consent window and exchanges the code: a
+  // window this frame opened could not hand the code back to an opaque origin. The page may take as
+  // long as the person reads; it answers null when they close the window or say no.
+  if (inIsolatedFrame()) {
+    return askFrameHost('consent', { scope: scopeStr || appDeclaredScopes(), manage: !!manage }, 15 * 60 * 1000);
+  }
   var apexOrigin;
   try { apexOrigin = new URL(APEX_URL).origin; } catch { return null; }
   var p = await pkce();

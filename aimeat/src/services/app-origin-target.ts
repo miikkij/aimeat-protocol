@@ -13,9 +13,13 @@
  *
  *   The single-label rule is load-bearing in both families: `a.b.apps.example` must NOT resolve, or
  *   a nested subdomain could stand in for the app one level up.
- * @structure PORTFOLIO_TARGET_PREFIX · isPortfolioTarget · resolveAppOriginTarget
+ * @structure PORTFOLIO_TARGET_PREFIX · isPortfolioTarget · resolveAppOriginTarget ·
+ *   resolveFrameAppTarget
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   v1.2.0 — 2026-09-25 — resolveFrameAppTarget: the app the isolated frame's page asks for, by its
+ *     `owner/filename`, on a node several people share with no app origin (audit A7-1). There an app
+ *     has no address of its own to be bound by, and the page asking is the node's own.
  *   v1.1.0 — 2026-08-23 — The company origin resolves. `deriveCoHost` makes `co.<apex>` a SIBLING of
  *     `apps.<apex>` rather than a child, so `host.endsWith('.' + appHost)` never matched it: an app
  *     served as a company's front page was anonymous and had no way to sign anyone in. It resolves
@@ -29,6 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { resolvePublishedPortfolio } from '../routes/portfolio.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../routes/subdomains.js';
+import { appIsolationMode } from './app-isolation.js';
 
 /**
  * A grant target for a portfolio origin reads `portfolio:<username>`. An app target reads
@@ -43,7 +48,7 @@ export function isPortfolioTarget(target: string): boolean {
 
 export type AppOriginTarget =
   | { ok: true; family: 'app' | 'portfolio'; target: string; name: string; owner: string }
-  | { ok: false; error: 'app_origin_disabled' | 'bad_origin' | 'unknown_app' };
+  | { ok: false; error: 'app_origin_disabled' | 'bad_origin' | 'unknown_app' | 'frame_off' };
 
 /**
  * Resolve a caller-supplied origin to the app (or portfolio) it serves.
@@ -125,4 +130,33 @@ export async function resolveAppOriginTarget(
   }
 
   return { ok: false, error: 'bad_origin' };
+}
+
+/**
+ * Resolve the app the isolated frame's page asks for, `owner/filename`, to its grant target.
+ *
+ * Only on a node that runs apps in the isolated frame (services/app-isolation.ts). There an app has
+ * no address of its own for a token to be bound by: it runs at the node's own address, in a frame
+ * whose origin is opaque, and the page holding the frame asks for it by name. That page is the node's
+ * own (routes/app-grants.ts lets only a same-origin caller in), and it names the app whose address it
+ * was served at. Everywhere else a grant is bound by the app's address and this answers 'frame_off'.
+ *
+ * The target is the same `owner/filename` the app origin resolves to, so one app carries one grant
+ * however it is reached, and a node that gains an app origin later keeps the grants it made.
+ * An app its operator hid resolves to nothing, as its address answers nothing.
+ */
+export async function resolveFrameAppTarget(
+  config: AimeatConfig, storage: Storage, app: string,
+): Promise<AppOriginTarget> {
+  if ((await appIsolationMode(config, storage)) !== 'isolated-frame') return { ok: false, error: 'frame_off' };
+  const slash = app.indexOf('/');
+  if (slash <= 0 || slash === app.length - 1 || app.indexOf('/', slash + 1) >= 0) return { ok: false, error: 'unknown_app' };
+  const record = await storage.getAppByOwnerName(app.slice(0, slash), app.slice(slash + 1));
+  if (!record || record.operatorHidden) return { ok: false, error: 'unknown_app' };
+  return {
+    ok: true, family: 'app',
+    target: `${record.ownerName}/${record.filename}`,
+    name: record.filename,
+    owner: record.ownerName,
+  };
 }

@@ -10,6 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.5.1 — 2026-09-25 — The bundle version moves: an app in the node's isolated frame signs in
+ *     through the page around the frame (app-frame.js, app-origin.js v1.2.0).
  *   v1.5.0 — 2026-09-24 — AIMEAT.auth.getPalettes() answers the styles of the theme the page wears on
  *     AIMEAT's own pages (palette.js paletteRegistry, Themes & Styles), and PALETTES everywhere else.
  *   v1.4.0 — 2026-09-06 — The page says whether it keeps its own light, and the register no longer
@@ -73,4 +75,4 @@ auth.getPalettes = function () { return paletteRegistry().map(function (p) { ret
 if (typeof document !== 'undefined') { aimeatRestorePalette(); aimeatRestoreMode(); }
 
 const ns = attach('auth', auth);
-ns.version = '2026-09-24-001';
+ns.version = '2026-09-25-001';

@@ -51,6 +51,8 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.1.0 — 2026-09-25 — The isolated frame's support script (utils/app-frame-assets.ts, audit A7-1)
+ *     is a mark too: a copy of an app as the frame received it is stored without it.
  *   v1.0.0 — 2026-09-13 — Initial: the developer's decision that a served copy is stripped at
  *     publish rather than warned about (it replaces checkServedCopy in app-artifact-lint.ts).
  */
@@ -59,10 +61,12 @@ import { RESERVE_MARK } from '../utils/app-chrome-reserve.js';
 import { APP_REF_MARK, DISCOVERY_MARK } from '../utils/app-agent-discovery.js';
 import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
 import { REVIEWED_MARK } from './app-serve-marks.js';
+import { FRAME_SUPPORT_MARK } from '../utils/app-frame-assets.js';
 
 /** Which of the node's marks a removal was. One word per block the serve pass writes. */
 export type ServedMarkKind =
-  | 'chrome-reserve' | 'badge' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by';
+  | 'chrome-reserve' | 'badge' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by'
+  | 'frame-support';
 
 /** One kind of mark taken out of an upload, with everything of that kind summed. */
 export interface ServedMarkRemoval {
@@ -105,6 +109,7 @@ const WEBMCP_BRIDGE = /<script src="\/v1\/libs\/aimeat-webmcp\.js\?expose=app" d
 const APP_REF_OPEN = `<script type="application/json" ${APP_REF_MARK}>`;
 const REVIEWED_META = new RegExp(`<meta ${REVIEWED_MARK} content="([^"<>]*)">`, 'y');
 const REVIEWED_OPEN = `<meta ${REVIEWED_MARK} content="`;
+const FRAME_SUPPORT_OPEN = `<script ${FRAME_SUPPORT_MARK}>`;
 
 /** The order removals are reported in, so one upload always reads the same way. */
 const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string }> = [
@@ -115,6 +120,7 @@ const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string
   { mark: 'agent-discovery', marker: DISCOVERY_MARK, words: 'the agent-discovery block' },
   { mark: 'app-ref', marker: APP_REF_MARK, words: 'the app identity block (#aimeat-app-ref)' },
   { mark: 'reviewed-by', marker: REVIEWED_MARK, words: 'the reviewer tags' },
+  { mark: 'frame-support', marker: FRAME_SUPPORT_MARK, words: 'the isolated frame\'s support script' },
 ];
 
 /** Where markDocumentElement looks for the `<html>` tag, in the document it marks. */
@@ -287,6 +293,14 @@ function findCuts(text: string): Cut[] {
     const author = `<meta name="author" content="${m[1]}">`;
     const start = precededBy(text, at, author) ? at - author.length : at;
     cut('reviewed-by', start, at + m[0].length);
+  }
+
+  // The isolated frame's support script: one inline script with the node's attribute, in front of
+  // the app's markup. Its source holds no `</script>` (test/unit/app-frame.test.ts), so the first
+  // one after the tag is its end.
+  for (const at of anchors(FRAME_SUPPORT_OPEN)) {
+    const end = scriptEnd(at + FRAME_SUPPORT_OPEN.length);
+    if (end > 0) cut('frame-support', at, end);
   }
 
   // Sorted, and an overlap keeps the earlier cut: no rule above can produce one from a real serve,

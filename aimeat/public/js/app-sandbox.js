@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description Open a user-published app from anywhere in the SPA. Apps always open TOP-LEVEL
  *   in a new tab via the apex `?mode=inline` URL — a clean, full-screen page (no overlay/X).
- *   The server decides isolation:
- *     - app origin OFF → the app is served inline on the apex (same host as the SPA), so the
- *       user's session carries into the app (it can refresh + read its own data — "logged in");
- *     - app origin ON  → the apex 301s to `apps.<domain>`, an isolated origin with no ambient
- *       session (apps then use the explicit grant flow).
- *   So "logged into aimeat.io ⇒ apps are logged in" is the OFF (default) behaviour; ON is the
- *   opt-in hardened mode for multi-user/public nodes.
+ *   The server decides isolation (services/app-isolation.ts):
+ *     - app origin ON → the apex 301s to `apps.<domain>`, an isolated origin with no ambient
+ *       session (apps then use the explicit grant flow);
+ *     - app origin OFF, several people on the node → the apex serves a small page that holds the
+ *       app in an opaque-origin frame; the app gets its own grant through that page, never the
+ *       session (audit A7-1);
+ *     - app origin OFF, one person on the node → the app is served inline on the apex, so that
+ *       person's session carries into their own app, as it always did.
  * @structure isAppHtmlUrl() route matcher · openAppSandboxed() top-level opener.
  * @usage import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js'
  * @version-history
@@ -19,6 +20,9 @@
  *   v2.0.0 — 2026-06-20 — Always open apps TOP-LEVEL (the opaque sandbox gave apps origin `null`,
  *     breaking their storage/API and forcing a re-login). Isolation is now the server's job via
  *     the app origin; with it off, apps run on the apex and inherit the user's session.
+ *   v2.0.1 — 2026-09-25 — The header names the third way: the isolated frame on a node several
+ *     people share with no app origin, which gives the app its storage and its own sign-in through
+ *     the page around the frame. The code is unchanged; the server decides.
  */
 
 /** Matches the published-app HTML route: /v1/apps/<owner>/<file> (optionally ?mode=inline). */

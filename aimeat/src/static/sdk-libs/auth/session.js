@@ -12,6 +12,7 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.5.1 — 2026-09-25 — isAppOrigin()'s comment names the isolated frame too (app-origin.js v1.2.0).
  *   v1.5.0 — 2026-09-13 — Every 'login' says which road produced the session, as `{ restored }` in the
  *     listener's second argument: true for login()'s restore, the cookie, the unasked silent bridge
  *     and a parent-handed session; false for a password, passkey, registration, a click's bridge or
@@ -689,7 +690,7 @@ export const auth = {
     return null;
   },
 
-  /** True when running inside a published app on its isolated origin (not the apex). */
+  /** True inside a published app that is kept apart from the node: on its own origin, or in the node's isolated frame. */
   isAppOrigin() { return isAppOrigin(); },
 
   /** Open the sign-in modal (password + Google if configured). If a session arrives while it is open,

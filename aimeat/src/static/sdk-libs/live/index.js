@@ -22,6 +22,9 @@
  *     last change of a burst never reached the view; it is now a throttle with one trailing call. With
  *     keyPrefix, an event that arrived during a count probe was dropped; one more probe now runs when
  *     the current one settles. The SSE frame is unchanged: it still carries a domain name and no key.
+ *   v1.1.2 — 2026-09-25 — A page whose origin is opaque (an app in the node's isolated frame, audit
+ *     A7-1) is refused the Web Locks election outright, and the refusal was swallowed as an abort, so
+ *     the stream never opened there. A refused request now makes the page its own leader.
  */
 import { makeSession } from '../_core/session.js';
 const { getSession } = makeSession('aimeat-live.js');
@@ -59,9 +62,16 @@ function startShared() {
   bc = new BroadcastChannel('aimeat-live');
   bc.onmessage = function (ev) { if (ev.data && ev.data.type === 'domains') ingestDomains(ev.data.domains); };
   leaderAbort = new AbortController();
-  navigator.locks.request('aimeat-live-leader', { mode: 'exclusive', signal: leaderAbort.signal }, function () {
-    return new Promise(function (release) { leaderRelease = release; becomeLeader(); });
-  }).catch(function () { /* aborted while queued */ });
+  var abort = leaderAbort;
+  // Aborted while queued (disconnect) is the ordinary refusal. Any other is a page the browser gives
+  // no locks at all, an opaque origin among them: it has no other tab to share with, so it leads for
+  // itself rather than waiting for a lock that will never come.
+  var refused = function () { if (!abort.signal.aborted) becomeLeader(); };
+  try {
+    navigator.locks.request('aimeat-live-leader', { mode: 'exclusive', signal: abort.signal }, function () {
+      return new Promise(function (release) { leaderRelease = release; becomeLeader(); });
+    }).catch(refused);
+  } catch { refused(); }
 }
 
 function becomeLeader() { if (isLeader) return; isLeader = true; _open(); }

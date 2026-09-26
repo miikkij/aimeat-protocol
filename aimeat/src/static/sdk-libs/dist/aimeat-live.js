@@ -68,13 +68,20 @@
       if (ev.data && ev.data.type === "domains") ingestDomains(ev.data.domains);
     };
     leaderAbort = new AbortController();
-    navigator.locks.request("aimeat-live-leader", { mode: "exclusive", signal: leaderAbort.signal }, function() {
-      return new Promise(function(release) {
-        leaderRelease = release;
-        becomeLeader();
-      });
-    }).catch(function() {
-    });
+    var abort = leaderAbort;
+    var refused = function() {
+      if (!abort.signal.aborted) becomeLeader();
+    };
+    try {
+      navigator.locks.request("aimeat-live-leader", { mode: "exclusive", signal: abort.signal }, function() {
+        return new Promise(function(release) {
+          leaderRelease = release;
+          becomeLeader();
+        });
+      }).catch(refused);
+    } catch {
+      refused();
+    }
   }
   function becomeLeader() {
     if (isLeader) return;

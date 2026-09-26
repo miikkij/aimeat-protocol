@@ -65,6 +65,33 @@ for the origin setup). What this means for your app:
 - **`AIMEAT.ai` / `AIMEAT.ai.complete()` (this guide) is unaffected** — the
   OpenRouter relay is a separate path. Use it exactly as documented here.
 
+### On a node several people share with no app origin: the isolated frame
+
+A node without app addresses that more than one person uses (a company node on
+an internal name, for example) never runs an app on its own address, where the
+session of the person who opens it lives. The app keeps its usual link
+(`/v1/apps/<owner>/<file>?mode=inline`), and the node answers it with a small page
+that holds the app in an iframe whose origin is **opaque**. That page gets the
+app **its own** grant (the owner's own app silently, another person's app after
+the consent window) and keeps the app's `localStorage` for it. A node one person
+uses runs apps on its own address as before.
+
+What an app author has to know:
+
+- **Use `aimeat-auth` and it works unchanged.** `AIMEAT.auth.login()`,
+  `AIMEAT.auth.signIn()` (from a click), `session.fetch()` and every SDK library
+  take the grant from the page around the frame. `AIMEAT.auth.isAppOrigin()` is
+  `true` there.
+- **`localStorage`, `sessionStorage` and `document.cookie` work.** The node keeps
+  `localStorage` for each app separately; cookies last until the page closes.
+- **Not there:** the node's own cookies and stored session, `/v1/auth/refresh`,
+  `IndexedDB`, service workers, push notifications, installing the app, and Web
+  Locks. Keep what must last in memory or files through the node
+  (`AIMEAT.data`, `AIMEAT.storage`).
+- **The hand-rolled grant flow below does not fit the frame:** the frame cannot
+  navigate the whole tab to the consent page and back. Let `aimeat-auth` do it.
+- Links the app opens in a new window (`target="_blank"`) open as ordinary pages.
+
 ### Public data — just fetch it
 
 Data that needs no auth is a same-origin `fetch('/v1/...')` to the app origin

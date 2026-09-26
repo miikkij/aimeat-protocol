@@ -1550,10 +1550,10 @@
      "slug": "g-10-its-own-origin",
      "cells": [
       "<strong>Its own origin</strong>",
-      "Every app runs on its own subdomain, so a broken or hostile app cannot reach your session on the main site.",
-      "<code>*.apps.&lt;apex&gt;</code>"
+      "Every app runs on its own subdomain, so a broken or hostile app cannot reach your session on the main site. A node that several people share and that has no app subdomains runs every app in an isolated frame on its own address instead: the frame's origin is opaque, so the app reads nobody's sign-in, and it gets only its own grant through the node's page around it. Apps that use the served libraries work there unchanged, <code>localStorage</code> included; IndexedDB, service workers, push and installing need an app subdomain. A node one person uses runs apps on its own address as before.",
+      "<code>*.apps.&lt;apex&gt;</code>, <code>/v1/apps/:owner/:filename?mode=inline</code>"
      ],
-     "plain": "Its own origin Every app runs on its own subdomain, so a broken or hostile app cannot reach your session on the main site. *.apps.<apex>"
+     "plain": "Its own origin Every app runs on its own subdomain, so a broken or hostile app cannot reach your session on the main site. A node that several people share and that has no app subdomains runs every app in an isolated frame on its own address instead: the frame's origin is opaque, so the app reads nobody's sign-in, and it gets only its own grant through the node's page around it. Apps that use the served libraries work there unchanged, localStorage included; IndexedDB, service workers, push and installing need an app subdomain. A node one person uses runs apps on its own address as before. *.apps.<apex>, /v1/apps/:owner/:filename?mode=inline"
     },
     {
      "slug": "g-10-fork-and-lineage",
@@ -2922,10 +2922,10 @@
      "slug": "g-20-host-only-cookies-and-app-isolation",
      "cells": [
       "<strong>Host-only cookies and app isolation</strong>",
-      "The session cookie never reaches app subdomains.",
-      "<code>*.apps.&lt;apex&gt;</code>"
+      "The session cookie never reaches app subdomains. On a node several people share without app subdomains, an app runs in an opaque-origin frame, where neither the cookie nor the stored session can be read.",
+      "<code>*.apps.&lt;apex&gt;</code>, the isolated frame"
      ],
-     "plain": "Host-only cookies and app isolation The session cookie never reaches app subdomains. *.apps.<apex>"
+     "plain": "Host-only cookies and app isolation The session cookie never reaches app subdomains. On a node several people share without app subdomains, an app runs in an opaque-origin frame, where neither the cookie nor the stored session can be read. *.apps.<apex>, the isolated frame"
     },
     {
      "slug": "g-20-security-profile",

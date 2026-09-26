@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.1 — 2026-09-25 — GET /app-frame.js answered as a static asset (the isolated frame's page script).
  *   v1.0.0 — 2026-09-18 — Initial. Instruction review, item 13.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -68,6 +69,7 @@ const NOT_API: Record<string, string> = {
     'GET /start': REDIRECT,
     'GET /v1/admin/ui': REDIRECT,
     'GET /v1/pricing': REDIRECT,
+    'GET /app-frame.js': ASSET,
     'GET /apple-touch-icon.png': ASSET,
     'GET /favicon.ico': ASSET,
     'GET /favicon.svg': ASSET,
