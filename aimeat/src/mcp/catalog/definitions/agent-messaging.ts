@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-26 — aimeat_contact_invite says it takes messages:send, as POST /v1/contacts/invite now
+ *     does for an agent.
  *   2026-09-26 — aimeat_contact_invite says an invitation counts against the same 20 lookups per
  *     account in 10 minutes (secaudit 2026-09, A5-2).
  *   2026-09-25 — aimeat_contact_add and aimeat_contact_resolve_email say a save by email counts
@@ -439,7 +441,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_contact_invite',
-        description: "Invite a person to join this AIMEAT with no organism behind it: they get an email in the owner's name with a link that opens an account here, and if the owner wrote them down as a contact, that entry becomes them when they arrive. Refused when the address already has an account (add them with aimeat_contact_add instead), when the owner's own invitation to it is still open, or when the owner has too many open. To invite someone INTO an organism, use aimeat_organism_invite_email. Send one only when the owner asks: it is an email in their name. An invitation counts as an address lookup: one account has 20 in 10 minutes, the owner and all their agents together, and past that the answer is RATE_LIMITED with the seconds to wait.",
+        description: "Invite a person to join this AIMEAT with no organism behind it: they get an email in the owner's name with a link that opens an account here, and if the owner wrote them down as a contact, that entry becomes them when they arrive. Refused when the address already has an account (add them with aimeat_contact_add instead), when the owner's own invitation to it is still open, or when the owner has too many open. To invite someone INTO an organism, use aimeat_organism_invite_email. Send one only when the owner asks: it is an email in their name. It takes messages:send, here and on POST /v1/contacts/invite alike. An invitation counts as an address lookup: one account has 20 in 10 minutes, the owner and all their agents together, and past that the answer is RATE_LIMITED with the seconds to wait.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {
