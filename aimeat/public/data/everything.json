@@ -2746,10 +2746,10 @@
      "slug": "g-19-security-overview",
      "cells": [
       "<strong>Security overview</strong>",
-      "Door activity, the refusal log, and quarantined incidents to resolve.",
+      "Door activity, the refusal log, and quarantined incidents to resolve. It also says how apps are kept apart from the sign-in of whoever opens them, and on a node several people share with no app addresses it warns and names the two settings that give every app its own address.",
       "<code>/v1/admin/security/*</code>, <code>aimeat_admin_security_overview</code>"
      ],
-     "plain": "Security overview Door activity, the refusal log, and quarantined incidents to resolve. /v1/admin/security/*, aimeat_admin_security_overview"
+     "plain": "Security overview Door activity, the refusal log, and quarantined incidents to resolve. It also says how apps are kept apart from the sign-in of whoever opens them, and on a node several people share with no app addresses it warns and names the two settings that give every app its own address. /v1/admin/security/*, aimeat_admin_security_overview"
     },
     {
      "slug": "g-19-cors",

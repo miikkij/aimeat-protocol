@@ -27,6 +27,9 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   v1.1.0 -- 2026-09-25 -- The apps line (services/app-isolation-status.ts, audit A7-1): how this node
+ *     keeps an app away from the sign-in of the person who opens it, and on a node several people
+ *     share with no app addresses, a warning in words with the two settings that give every app one.
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 -- 2026-09-05 -- Initial: the Security page in the poster face (wish
  *     wish-admin-security-view-direction-a, design canvas "AIMEAT Admin Security").
@@ -36,6 +39,7 @@ import type { Storage } from '../storage/interface.js';
 import { readRecentAuthFailures, authLogStatus, type AuthFailureLine } from './auth-audit.js';
 import { listSecurityIncidents, type SecurityIncidentValue } from './security-incident.js';
 import { getStats } from './stats.js';
+import { appIsolationStatus, type AppIsolationStatus } from './app-isolation-status.js';
 
 /** The rolling window the headline counts cover. */
 export const REFUSAL_WINDOW_HOURS = 24;
@@ -108,6 +112,8 @@ export interface SecurityOverview {
     registration_mode: AimeatConfig['registrationMode'];
     sso_enabled: boolean;
   };
+  /** How apps are kept apart from the sign-in of whoever opens them, and what to set when it can be better. */
+  apps: AppIsolationStatus;
   settings: {
     login_rate_limit: { max: number; window_ms: number };
     registration_rate_limit: { max: number; window_ms: number };
@@ -267,6 +273,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
       registration_mode: config.registrationMode,
       sso_enabled: config.ssoEnabled,
     },
+    apps: await appIsolationStatus(config, storage),
     settings: {
       login_rate_limit: { max: config.loginRateLimitMax, window_ms: config.loginRateLimitWindowMs },
       registration_rate_limit: { max: config.registrationRateLimitMax, window_ms: config.registrationRateLimitWindowMs },
