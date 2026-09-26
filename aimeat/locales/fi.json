@@ -1162,6 +1162,15 @@
         "logOff": "Epäysloki: pois päältä",
         "logWhy": "{path}, {bytes} / {max}; vaihtuu sen ylittyessä ja säilyttää yhden vanhemman sukupolven.",
         "logOffWhy": "Käännytyksistä ei kirjoiteta mitään. Aseta tiedostopolku, niin tarina säilyy.",
+        "apps": {
+          "appOrigin": "Jokaisella sovelluksella on oma osoite",
+          "appOriginWhy": "Sovellukset toimivat osoitteen {host} alla. Siellä ei ole sovelluksen avaajan kirjautumista.",
+          "sharedOrigin": "Sovellukset toimivat tämän palvelimen omassa osoitteessa",
+          "sharedOriginWhy": "Täällä on vain yhden ihmisen tili, joten jokainen sovellus on hänen omansa ja toimii hänen kirjautumisellaan. Kun toinen ihminen saa tilin, jokainen sovellus siirtyy itsestään eristettyyn kehykseen.",
+          "isolatedFrame": "Sovellukset toimivat eristetyssä kehyksessä",
+          "isolatedFrameWhy": "Tällä palvelimella on {people} tiliä, eikä sovelluksilla ole omaa osoitetta. Kehys ei näe kenenkään kirjautumista eikä tallennettuja tietoja, ja sovellus pääsee palvelimelle vain niillä oikeuksilla, jotka sille on annettu. Kehyksessä sovellus ei voi käyttää selaimen tietokantaa eikä lähettää ilmoituksia, eikä sitä voi asentaa.",
+          "isolatedFrameFix": "Näin annat jokaiselle sovellukselle oman osoitteen: ohjaa *.{host} tälle palvelimelle TLS-varmenteella, joka kattaa sen, aseta AIMEAT_APP_HOST={host} ja AIMEAT_APP_ORIGIN_ENABLED=true ja käynnistä palvelin uudelleen."
+        },
         "doors": {
           "security": "Asetukset · Turvallisuus",
           "totp": "Asetukset · TOTP"

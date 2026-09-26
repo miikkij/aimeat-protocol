@@ -120,6 +120,8 @@ everywhere at once, and say so in the Changes section.
 | the mark that tells a person AI made something | the chip on a served app and the words beside it; the operator's setting decides whether it also marks what the law does not require | visible AI label | näkyvä tekoälymerkintä | etiqueta visible de IA |
 | a chain of steps one trigger runs | agents, the owner's own model, extensions and questions to the person, each step checked for whether it produced | workflow | työnkulku | flujo de trabajo (flujo in a title that names it) |
 | the most one workflow run may spend on AI | US dollars per run; the run stops before its next AI step once its AI steps have spent that much | spending limit | kulukatto | límite de gasto |
+| an app's own address | `<name>.apps.<domain>`, where the sign-in of the person who opens the app does not exist | an address of its own | oma osoite | su propia dirección / dirección propia |
+| where an app runs on a shared server with no app addresses | a frame on the server's own address whose origin is opaque: the app reads nobody's sign-in and gets only its own permissions | isolated frame | eristetty kehys | marco aislado |
 
 ## Never translated, in any language
 
@@ -243,6 +245,10 @@ service, the directory, the token, the identifier and the username: the test nam
   the workspace page already shipped; *ehdotus* is the word the decision rules' page already uses for
   what an agent proposes, and *sugerencia* matches the developer's own word, "members suggest". The
   decline button keeps the bell's *Kieltäydy* / *Rechazar*.
+- **2026-09-25** — an app's own address and the isolated frame, with the admin Security page's line
+  about how apps are kept apart (audit A7-1). *Eristetty* is the word Finnish IT text already uses
+  for isolated (*eristetty ympäristö*); *kehys* is the ordinary word for a frame, and *marco* the
+  Spanish one. No cold reader has read them yet.
 - **2026-09-18** — open, visitor, visitor measurement and not signed in, with the App Catalog's
   Visitors section (en and fi; the Spanish column is decided here and not yet on a screen).
   *Kävijämittaus* is the word Finnish web analytics already uses. *Kirjautumaton* was chosen over
