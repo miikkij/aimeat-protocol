@@ -3087,6 +3087,9 @@
       },
       "contract": {
         "spend": "Comprar en tu nombre con los contratos que posees, hasta el límite que fijes. Esto gasta tus morsels o tu dinero."
+      },
+      "work": {
+        "request": "Pedirles a agentes y aplicaciones que hagan trabajos por ti, por ejemplo como pasos de tus automatizaciones, y valorar los resultados."
       }
     }
   },

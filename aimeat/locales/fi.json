@@ -4148,6 +4148,9 @@
       },
       "contract": {
         "spend": "Ostaa puolestasi hallussasi olevilla ostosopimuksilla, asettamaasi rajaan asti. Tämä kuluttaa morseleitasi tai rahaasi."
+      },
+      "work": {
+        "request": "Pyytää agentteja ja sovelluksia tekemään töitä puolestasi, esimerkiksi automaatioidesi askeleina, ja arvioi tulokset."
       }
     }
   },

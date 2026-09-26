@@ -9,6 +9,8 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-26 -- work:request, giving agents work, askable by an app: an automation step
+ *     that dispatches to an agent costs it, and an app could not otherwise save one.
  *   v1.4.0 -- 2026-09-24 -- connections:read-through, reading what is in a connected account, and
  *     connections:use says what it does: publish and send. The one word used to open the mailbox
  *     too while the consent screen said "publish" (security audit A5-1).
@@ -55,6 +57,10 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'task:write': 'Create and start tasks for your own agents on your behalf',
   'workflow:read': 'See your automations (workflows) and their runs',
   'workflow:write': 'Create, save, and run your automations (workflows)',
+  // Giving an agent work: an automation step that dispatches to one of the owner's agents costs it
+  // (services/workflow/step-authority.ts), and so do the work, capability and dispute doors. Its own
+  // tick, not part of workflow:write: saving an automation and handing agents jobs are two favours.
+  'work:request': 'Ask agents and apps to do work for you, including the steps of your automations, and rate the results',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
   // TARGET-057. Deliberately NOT connections:write: an app that may publish to an account you
   // already connected is a different favour from one that may attach new accounts to your name.
