@@ -13,20 +13,20 @@
       "digest": "sha256:419637142e14deb6ba0452d4"
     },
     "node:aimeat-open-items": {
-      "reviewedOn": "2026-09-20",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:b650f2cb65a60dc8a36f8c7a"
+      "digest": "sha256:b37756797be3a65edcdfec3a"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts"
       ],
-      "digest": "sha256:f745b9c277450aba72ddc796"
+      "digest": "sha256:53c95273e024b7c245b91fbb"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-09-19",
@@ -37,11 +37,11 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-welcome-pages": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/src/mcp/portfolio.ts"
       ],
-      "digest": "sha256:8eb987753d674043842c35fb"
+      "digest": "sha256:43a4b1ad39271a34e14ac866"
     },
     "node:aimeat-activating-a-person": {
       "reviewedOn": "2026-09-19",
@@ -213,7 +213,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/mcp/catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:8a97c9f54e417db43e4431ce"
+      "digest": "sha256:d37ffbd289e7e220b120bbab"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-09-19",
@@ -249,11 +249,11 @@
       "digest": "sha256:0df0bd3216ebc2fa5c264ec8"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:2b209ec7b47f0509aee1bd3c"
+      "digest": "sha256:ed9b1ce8324f860d6cd1db66"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-09-19",
@@ -269,7 +269,7 @@
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts"
       ],
-      "digest": "sha256:b91a2fac59b7e908fd276e2f"
+      "digest": "sha256:de9052aed3ca6750d5bef6b3"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -331,7 +331,7 @@
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:9bad6e5bf53530cf4f4c2d40"
+      "digest": "sha256:4af59ef380de34e5f07900c7"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -350,13 +350,13 @@
   },
   "fileDigests": {
     "node:aimeat-open-items": {
-      "aimeat/src/services/open-items.ts": "4e5fa428e0a80d4e"
+      "aimeat/src/services/open-items.ts": "90d6c5cd3b219d62"
     },
     "node:aimeat-first-conversation": {
       "aimeat/src/services/model-recommendation.ts": "bd4bb581e6178a21"
     },
     "node:aimeat-welcome-pages": {
-      "aimeat/src/mcp/portfolio.ts": "89ad000b9f585bb2"
+      "aimeat/src/mcp/portfolio.ts": "1e74799cca813339"
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
@@ -450,7 +450,7 @@
       "aimeat/src/mcp/core-admin.ts": "17c66f53ecaa3360"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "518c63f78a623d05",
+      "aimeat/src/mcp/core.ts": "6a71b2d552098442",
       "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "27c768cb681705a5"
     },
     "node:manage-my-profile-data": {
@@ -471,15 +471,15 @@
       "aimeat/src/routes/ai.ts": "2d7af2e57b126a83"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "b0c9b667b1187bba"
+      "aimeat/src/routes/skills.ts": "44bf52891c9f8fcd"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "687cf0e7e8db349e",
-      "aimeat/src/mcp/agent-schedules.ts": "3e2a000c330237b0",
-      "aimeat/src/services/scheduler.ts": "cbda6b12ca974775"
+      "aimeat/src/mcp/agent-schedules.ts": "491ce215a8732f44",
+      "aimeat/src/services/scheduler.ts": "347f524fd059e4c8"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "d4c59f171eb2fb20",
@@ -507,7 +507,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "2983636d203dcbec"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "d8ada89647e315f2"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -516,7 +516,7 @@
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "5d6d832ec8021f6f",
-      "aimeat/src/mcp/agent-schedules.ts": "3e2a000c330237b0",
+      "aimeat/src/mcp/agent-schedules.ts": "491ce215a8732f44",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc"
     },
     "node:aimeat-decide": {
