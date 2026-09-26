@@ -42,6 +42,10 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.7.0 — 2026-09-26 — reviewedForLabel() takes the app's real visibility (`publiclyReadable`,
+ *     default true) instead of assuming public, and under a strict node policy the chip names the
+ *     reviewer and shows the AI-involvement icon instead of "AI-generated". Reported by the
+ *     originalmiskate.com node on 2026-09-25: a reviewed board deck still read "AI-generated".
  *   v1.6.0 — 2026-08-29 — aiDisclosureParts takes `reviewedBy`: with a named reviewer the visible
  *     label is decided again under editorial responsibility (reviewedForLabel); the machine marks
  *     stay as minted, and the interaction and deep-fake reasons are left untouched. The reviewer
@@ -456,12 +460,14 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
  */
 export function aiDisclosureParts(
   p: ServedProvenance,
-  visible?: { config: AimeatConfig; locale: Locale; reviewedBy?: string },
+  visible?: { config: AimeatConfig; locale: Locale; reviewedBy?: string; publiclyReadable?: boolean },
 ): { block: string; w3c: string | undefined } {
   const w3c = toW3cHtml(p.record);
   // The machine-readable marks come from the record AS MINTED. Only the chip a person sees is
   // re-decided when a reviewer has been declared — see reviewedForLabel().
-  const forLabel = visible?.reviewedBy ? reviewedForLabel(p, visible.config) : p;
+  const forLabel = visible?.reviewedBy
+    ? reviewedForLabel(p, visible.config, visible.reviewedBy, visible.publiclyReadable !== false)
+    : p;
   const block =
     (w3c ? `<meta name="ai-disclosure" content="${esc(w3c)}">` : '')
     + `<link rel="ai-provenance" href="${esc(p.recordUrl)}">`
@@ -480,17 +486,27 @@ export function aiDisclosureParts(
  * whoever reviewed the app (Art. 50(1)), and a deep fake is labelled regardless of review (the
  * exemption belongs to the text limb). Under the node's `strict` policy the light "a model was
  * involved" label still shows, with the neutral wording — buildDisclosure() chooses it from the
- * `policy` reason, which is the same wording the record would have carried had the review been
- * observed at mint time.
+ * `policy` reason, and the chip then names the reviewer ("AI-drafted, reviewed by {name}") with
+ * the EU icon for AI involvement rather than the "AI generated" lockup, because that is the
+ * statement the reviewer made. Only the chip's copy of the record changes.
+ *
+ * `publiclyReadable` is the app AS SERVED NOW: an access code or a park since publication makes it
+ * private, and the strict policy labels only what anyone can read. Until 2026-09-26 this function
+ * assumed every app was public.
  */
-function reviewedForLabel(p: ServedProvenance, config: AimeatConfig): ServedProvenance {
+function reviewedForLabel(
+  p: ServedProvenance, config: AimeatConfig, reviewer: string, publiclyReadable: boolean,
+): ServedProvenance {
   const reason = p.record.disclosure?.reason;
   if (!p.record.disclosure?.required) return p;
   if (reason === 'art50_1_interaction' || reason === 'art50_4_deepfake') return p;
   const ctx: SurfaceContext = {
-    visibility: 'public', humanAudience: true, editorialResponsibility: true, mediaKind: 'text',
+    visibility: publiclyReadable ? 'public' : 'private',
+    humanAudience: true, editorialResponsibility: true, mediaKind: 'text',
   };
-  return { ...p, record: { ...p.record, disclosure: buildDisclosure(p.record, ctx, config.aiLabelPublic) } };
+  const disclosure = buildDisclosure(p.record, ctx, config.aiLabelPublic, { reviewer });
+  const humanInvolvement = p.record.humanInvolvement === 'full-human' ? 'full-human' : 'editorial-control';
+  return { ...p, record: { ...p.record, humanInvolvement, disclosure } };
 }
 
 // ── Markdown ────────────────────────────────────────────────────────────────────────────────────

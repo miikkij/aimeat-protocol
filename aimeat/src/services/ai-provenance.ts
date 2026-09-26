@@ -42,6 +42,9 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.3.3 — 2026-09-26 — buildDisclosure(): a label the node policy adds to REVIEWED content says
+ *     so ("AI-drafted, reviewed by {name}" or "…by a person") instead of "AI-generated". Optional
+ *     `opts.reviewer` carries the declared name. Every other reason keeps its words.
  *   v1.3.2 — 2026-09-24 — `held`: mintProvenance, stampAgentWrite, stampAutonomousOutput and
  *     provenanceForWrite can build and check a record and hand it back unstored, for a write that may
  *     still lose a compare-and-swap after the item names the record's id. The store is append-only,
@@ -153,6 +156,8 @@ function localized(key: string, vars?: Record<string, string>): LocalizedText {
  */
 export function buildDisclosure(
   record: AiProvenance, ctx: SurfaceContext, policy: DisclosureLabelPolicy = 'light',
+  /** `reviewer`: the named person who declared editorial responsibility, for the chip's words. */
+  opts: { reviewer?: string } = {},
 ): AiDisclosureBlock {
   const decision = disclosureFor(record, ctx, policy);
 
@@ -163,8 +168,14 @@ export function buildDisclosure(
   } else if (decision.reason === 'policy') {
     // Labelled beyond the law. The words must not overstate: this content was either reviewed by a
     // person or declared outside the public-interest limb, so it gets the neutral "a model was
-    // involved" wording rather than the "no human editorial review" statement.
-    shortKey = record.level === 'assisted' ? 'aiLabel.assisted' : 'aiLabel.short';
+    // involved" wording rather than the "no human editorial review" statement. And the chip itself
+    // says the review when there was one: "AI-generated" beside "a person reviewed it" was the
+    // label a reviewed board deck still carried on 2026-09-25.
+    const reviewed = ctx.editorialResponsibility === true
+      || record.humanInvolvement === 'editorial-control' || record.humanInvolvement === 'full-human';
+    shortKey = record.level === 'assisted' ? 'aiLabel.assisted'
+      : reviewed && opts.reviewer ? 'aiLabel.reviewed'
+      : reviewed ? 'aiLabel.reviewedShort' : 'aiLabel.short';
     longKey = 'aiLabel.policyLong';
   } else if (record.level === 'original') {
     shortKey = 'aiLabel.original'; longKey = 'aiLabel.originalLong';
@@ -180,7 +191,7 @@ export function buildDisclosure(
     required: decision.required,
     reason: decision.reason,
     strength: decision.strength,
-    short: localized(shortKey),
+    short: localized(shortKey, opts.reviewer ? { name: opts.reviewer } : undefined),
     long: localized(longKey),
   };
 }

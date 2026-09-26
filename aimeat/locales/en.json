@@ -3819,6 +3819,7 @@
     "originalLong": "A person wrote this. No AI was involved.",
     "unstatedLong": "We do not know whether AI was involved in making this.",
     "reviewed": "AI-drafted, reviewed by {{name}}.",
+    "reviewedShort": "AI-drafted, reviewed by a person.",
     "detailsLink": "How this was made",
     "policyLong": "A model was involved in making this. It is labelled here even where the law does not require it.",
     "interactionTitle": "You are talking to an AI assistant",

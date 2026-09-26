@@ -21,6 +21,8 @@
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.1.1 — 2026-09-26 — Under the default strict policy the reviewed page keeps its chip, and the
+ *     chip names the reviewer instead of saying "AI-generated". Failed on the code before the fix.
  *   v1.1.0 — 2026-09-24 — An agent without provenance:write that declares how a legal page was
  *     made is refused before its rename, park and access code land (508c32904067). Failed on the
  *     old code first.
@@ -270,6 +272,11 @@ await test('A page an AI drafted carries its provenance record; the named review
     assert(reviewed.text.includes('<link rel="ai-provenance"'), 'machine marks kept');
     assert(reviewed.text.includes('<meta name="aimeat-reviewed-by" content="Maija Meikäläinen">'), 'the reviewer named in the page head');
     assert(reviewed.text.includes('<meta name="author" content="Maija Meikäläinen">'), 'and as the author tag');
+    // Under strict the chip stays, and since 2026-09-26 it says who reviewed the page instead of
+    // "AI-generated" (the report from originalmiskate.com, 2026-09-25).
+    assert(reviewed.text.includes('id="aimeat-ai-label"'), 'strict keeps the chip on a public page');
+    assert(reviewed.text.includes('<b>AI-drafted, reviewed by Maija Meik&#228;l&#228;inen.</b>'), 'the chip names the reviewer');
+    assert(!reviewed.text.includes('<b>AI-generated</b>'), 'and no longer says AI-generated');
     assert((await patchA({ author: null })).status === 200, 'withdrawn again');
     assert(!(await page('refunds')).text.includes('aimeat-reviewed-by'), 'tags gone with the withdrawal');
 

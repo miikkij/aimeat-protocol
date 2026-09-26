@@ -3819,6 +3819,7 @@
     "originalLong": "Tämän on kirjoittanut ihminen. Tekoäly ei ole ollut mukana.",
     "unstatedLong": "Emme tiedä, onko tekoäly ollut mukana tämän tekemisessä.",
     "reviewed": "Tekoälyn luonnostelema, tarkistanut {{name}}.",
+    "reviewedShort": "Tekoälyn luonnostelema, ihmisen tarkistama.",
     "detailsLink": "Miten tämä on tehty",
     "policyLong": "Tämän tekemisessä on ollut mukana tekoälymalli. Se merkitään täällä silloinkin, kun laki ei sitä vaadi.",
     "interactionTitle": "Keskustelet tekoälyavustajan kanssa",

@@ -8,6 +8,8 @@
  *   switches. The E2E suite (test/e2e-app-marks.ts) proves the route and the log; this file proves
  *   the bytes, because no provenance record is minted there.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The reviewer under the strict node policy: the chip names the reviewer,
+ *     a private app gets none, and a label beyond the law says "reviewed" when a person reviewed.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -16,6 +18,7 @@ import { applyAppHeadMeta } from '../../src/utils/app-head-meta.js';
 import {
   parseMarksInput, parseAuthorInput, appBadgeOn, appInstallChipOn, appReviewedBy, AUTHOR_NAME_MAX,
 } from '../../src/services/app-marks.js';
+import { buildDisclosure } from '../../src/services/ai-provenance.js';
 import { SERVE_MARK_CASES, FIXTURE_CONFIG, provFixture } from './serve-marks-fixtures.js';
 import type { AppManifest } from '../../src/storage/types/apps.js';
 
@@ -152,6 +155,64 @@ describe('the served bytes with a named reviewer', () => {
       });
       expect(b.equals(a)).toBe(true);
     }
+  });
+});
+
+// Reported by the originalmiskate.com node on 2026-09-25: a reviewed board deck on a node with the
+// default STRICT policy still read "AI-generated", and the catalogue had promised the label would
+// come off. Strict keeps the label on a public app on purpose (the developer's ruling, 2026-09-26);
+// what was wrong was its words, and that the re-decision took every app for a public one.
+describe('the reviewer under the strict node policy', () => {
+  const strict = { ...FIXTURE_CONFIG, aiLabelPublic: 'strict' } as typeof FIXTURE_CONFIG;
+  const visible = { config: strict, locale: 'en' as const };
+
+  it('a public app keeps the chip, and the chip names the reviewer instead of saying AI-generated', () => {
+    const out = applyServeMarks(DOC, {
+      provenance: provFixture('labelled'), visibleLabel: visible, reviewedBy: 'Maija Meikäläinen',
+    }).toString();
+    expect(out).toContain(LABEL);
+    expect(out).toContain('<b>AI-drafted, reviewed by Maija Meik&#228;l&#228;inen.</b>');
+    expect(out).not.toContain('<b>AI-generated</b>');
+    // The icon for AI involvement, not the "AI generated" lockup: the reviewer's statement.
+    expect(out).toContain('/eu-ai-icons/svg/ai-basic_');
+    expect(out).not.toContain('/eu-ai-icons/svg/ai-generated_');
+  });
+
+  it('an app behind an access code or parked gets no chip once a reviewer is named', () => {
+    const out = applyServeMarks(DOC, {
+      provenance: provFixture('labelled'), visibleLabel: { ...visible, publiclyReadable: false }, reviewedBy: 'Maija',
+    }).toString();
+    expect(out).not.toContain(LABEL);
+    expect(out).toContain('<link rel="ai-provenance"');
+  });
+
+  it('the machine-readable marks stay as minted', () => {
+    const out = applyServeMarks(DOC, {
+      provenance: provFixture('labelled'), visibleLabel: visible, reviewedBy: 'Maija',
+    }).toString();
+    const ld = JSON.parse(out.match(/<script type="application\/ld\+json"[^>]*>([^<]*)<\/script>/)![1]);
+    expect(ld.editor).toEqual({ '@type': 'Person', name: 'Maija' });
+    expect(out).toContain('ai-disclosure');
+  });
+});
+
+describe('the words of a label the node adds beyond the law', () => {
+  const ctx = { visibility: 'public' as const, humanAudience: true };
+  const record = (humanInvolvement: 'none' | 'editorial-control') => ({
+    ...provFixture('labelled').record, humanInvolvement, disclosure: undefined,
+  });
+
+  it('a record a person reviewed reads "reviewed by a person", not "AI-generated"', () => {
+    const d = buildDisclosure(record('editorial-control'), ctx, 'strict');
+    expect(d.reason).toBe('policy');
+    expect(d.short.en).toBe('AI-drafted, reviewed by a person.');
+    expect(d.short.fi).toBe('Tekoälyn luonnostelema, ihmisen tarkistama.');
+  });
+
+  it('unreviewed content declared outside the public interest still reads "AI-generated"', () => {
+    const d = buildDisclosure(record('none'), { ...ctx, publicInterest: 'no' }, 'strict');
+    expect(d.reason).toBe('policy');
+    expect(d.short.en).toBe('AI-generated');
   });
 });
 
