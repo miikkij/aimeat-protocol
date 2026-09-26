@@ -579,17 +579,19 @@ mod tests {
         assert!(!is_same_node("https://aimeat.io/v1/other", "https://aimeat.io"));
     }
 
+    // The expected paths are joined, not written out: Windows joins with "\" and Linux with "/", and
+    // this test runs on both (desktop-check.yml has a Linux job since 2026-09-26).
     #[test]
     fn claude_code_follows_its_config_dir_when_one_is_set() {
         let home = Some(PathBuf::from("C:\\Users\\someone"));
         let moved = Some(PathBuf::from("D:\\claude"));
         assert_eq!(
             claude_code_config_in(None, home.clone()).unwrap(),
-            PathBuf::from("C:\\Users\\someone\\.claude.json")
+            PathBuf::from("C:\\Users\\someone").join(".claude.json")
         );
         assert_eq!(
             claude_code_config_in(moved, home).unwrap(),
-            PathBuf::from("D:\\claude\\.claude.json")
+            PathBuf::from("D:\\claude").join(".claude.json")
         );
         assert!(claude_code_config_in(None, None).is_none());
     }
