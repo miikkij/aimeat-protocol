@@ -453,9 +453,8 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
     });
 
     // ── 13. A result_key the node keeps for itself ──
-    // 403 RESERVED_KEY, the answer every memory door gives for the same key (services/ai-job-keys.ts).
-    // It was 400 INVALID_BODY until 2026-09-26, and a credential record or a key only the node writes
-    // under a prefix the list did not name then was not refused at all.
+    // 403 RESERVED_KEY, the answer every memory door gives for the same key (services/ai-job-keys.ts),
+    // for a reserved key, a credential record and a key only the node writes.
     await test('13. A result_key the node keeps for itself is refused 403 RESERVED_KEY', async () => {
         for (const key of ['ai-usage.today', 'openrouter.apikey', 'notif.aijob']) {
             const r = await startJob(a, { prompt: 'x', result_key: key });

@@ -137,9 +137,8 @@ await test('NO_DRAFT for an instance with no draft', async () => {
 });
 
 // REFUSE BEFORE YOU WRITE (secaudit 2026-09, N1). Opening a document's embedded files to the
-// workspace's members is a write, and the batch publish did it for each record before asking that
-// record's own refusals: an append-only space refused the record, nothing was published, and its
-// file was already readable by every member.
+// workspace's members is a write, so the batch publish does it after the record's own refusals and
+// only for the records that pass them.
 await test('A record the batch refuses opens none of its embedded files; the record it publishes does', async () => {
     const LOG = 'shared.log';
     const manifest = { manifestVersion: '1.0', id: orgId, name: 'WS', kind: 'project', status: 'active', objectTypes: [
