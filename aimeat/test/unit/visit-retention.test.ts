@@ -23,9 +23,11 @@
  *   - describe blocks: the cutoff · the cut table · the fold, per provider
  * @usage cd aimeat && pnpm exec vitest run test/unit/visit-retention.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — An app's member list forgets a signed-in visitor thirteen months after
+ *     their last visit (A6-14). Failed on the code before the fix: both guests stayed.
  *   v1.0.0 — 2026-09-25 — Initial, with the thirteen-month rule in the privacy notice.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import type BetterSqlite3 from 'better-sqlite3';
@@ -39,6 +41,7 @@ import { readAppVisitors, type AppVisitorsReport } from '../../src/services/app-
 import {
   runVisitRetentionJob, visitNameCutoffDay, ACCOUNT_ACTIVITY_CUTS,
 } from '../../src/services/usage/visit-retention.js';
+import { noteVisit, listVisits } from '../../src/services/app-members.js';
 
 const SQLITE_PATH = `./test/.visit-retention-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
@@ -329,6 +332,42 @@ for (const providerName of PROVIDER_NAMES) describe(`folding the account out of 
       const second = await runVisitRetentionJob(p.storage, NOW);
       expect(second.hotRows + second.archiveRows + second.rollupRows, `${p.name}: nothing left to fold`).toBe(0);
       expect(await report(p.storage, s), `${p.name}: the report is stable`).toEqual(after);
+    }
+  }, 60_000);
+});
+
+// A6-14. An app that keeps a member list shows its owner, by name, the signed-in people who opened
+// it and hold no role there (services/app-members.ts noteVisit). That list is a visit record that
+// names an account too, so it keeps the same thirteen months, counted from the person's last visit.
+for (const providerName of PROVIDER_NAMES) describe(`a signed-in visitor leaves an app's member list thirteen months after their last visit, on ${providerName}`, () => {
+  const pick = (): Provider[] => provs.filter(x => x.name === providerName);
+
+  it('a guest last seen fourteen months ago is forgotten, one seen twelve months ago stays', async () => {
+    for (const p of pick()) {
+      const s = `${p.name === 'sqlite' ? 'sq' : 'pg'}${randomBytes(3).toString('hex')}`;
+      const appId = `guestowner${s}/guests-${s}.html`;
+      const oldGuest = `oldguest${s}`;
+      const newGuest = `newguest${s}`;
+      // Written the way the node writes a visit: noteVisit, on the clock of the day it happened.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date(monthsAgo(15)));
+        await noteVisit(p.storage, appId, oldGuest);
+        vi.setSystemTime(new Date(monthsAgo(14)));
+        await noteVisit(p.storage, appId, oldGuest);
+        vi.setSystemTime(new Date(monthsAgo(12)));
+        await noteVisit(p.storage, appId, newGuest);
+      } finally {
+        vi.useRealTimers();
+      }
+      const before = (await listVisits(p.storage, appId)).map(v => v.owner).sort();
+      expect(before, `${p.name}: both guests are on the list before the job`).toEqual([newGuest, oldGuest]);
+
+      const result = await runVisitRetentionJob(p.storage, NOW);
+      const after = await listVisits(p.storage, appId);
+      expect(after.map(v => v.owner), `${p.name}: only the recent guest is left`).toEqual([newGuest]);
+      expect(after[0].visits, `${p.name}: and keeps what the list says about them`).toBe(1);
+      expect(result.guestsForgotten, `${p.name}: the job says how many it forgot`).toBeGreaterThanOrEqual(1);
     }
   }, 60_000);
 });
