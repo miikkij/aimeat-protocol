@@ -10,6 +10,11 @@
 # production install of its dependencies, and `tauri build` then bundles NSIS and MSI; that belongs
 # in release-desktop.yml, on a tag. Here only the Node sidecar is staged, because tauri-build
 # validates `externalBin` while cargo compiles, and the Rust crate is compiled and tested.
+#
+# Two jobs. `check` runs on Windows, the one platform an installer ships for. `check-linux` compiles
+# and tests the same crate on Linux, because the Windows job never compiles its macOS and Linux
+# code: the `#[cfg(unix)]` parts and their tests, for example the test that a client's config file
+# keeps its mode when the app rewrites it (src-tauri/src/connectors.rs). No Linux build ships.
 name: Desktop Check
 
 on:
@@ -77,6 +82,58 @@ jobs:
       # not here yet: this crate has never been held to either, so switching them on would paint
       # the gate red over files this change did not touch. They are worth adding as their own
       # piece of work, with the sweep that makes them pass.
+      - name: Tests
+        run: cargo test
+        working-directory: aimeat-desktop/src-tauri
+
+  check-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+
+      - name: Cache cargo / Rust build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: aimeat-desktop/src-tauri
+
+      # What Tauri v2 builds against on Linux: WebKitGTK 4.1 with GTK 3 and libsoup 3, librsvg for
+      # the icons and the app indicator for the tray icon, plus libxdo for the menus and OpenSSL,
+      # which reqwest uses there.
+      - name: System packages for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config libssl-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
+            librsvg2-dev libayatana-appindicator3-dev
+
+      # The same script as on Windows: it reads the target triple from rustc, so the sidecar is
+      # staged as node-x86_64-unknown-linux-gnu, a copy of the runner's own node.
+      - name: Stage the Node sidecar
+        run: node scripts/stage-node.mjs
+        working-directory: aimeat-desktop
+
+      # The two resource folders get the same placeholders as on Windows. The third glob,
+      # WebView2Loader.*, is the Windows DLL that the Windows job copies out of a Windows-only
+      # crate; here one placeholder file matches it instead.
+      - name: Placeholders for the resource globs
+        run: |
+          mkdir -p src-tauri/resources/server src-tauri/resources/licenses
+          echo 'Compile check only.' > src-tauri/resources/server/PLACEHOLDER.txt
+          echo 'Compile check only.' > src-tauri/resources/licenses/PLACEHOLDER.txt
+          echo 'Compile check only.' > src-tauri/WebView2Loader.placeholder
+        working-directory: aimeat-desktop
+
       - name: Tests
         run: cargo test
         working-directory: aimeat-desktop/src-tauri
