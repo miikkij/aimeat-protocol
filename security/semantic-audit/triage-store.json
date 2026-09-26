@@ -2827,10 +2827,10 @@
       "line": 370,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: 13adc5248",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2853,10 +2853,10 @@
       "line": 59,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2892,10 +2892,10 @@
       "line": 456,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2905,10 +2905,10 @@
       "line": 54,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2918,10 +2918,10 @@
       "line": 83,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2931,10 +2931,10 @@
       "line": 155,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2944,10 +2944,10 @@
       "line": 150,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2957,10 +2957,10 @@
       "line": 235,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2970,10 +2970,10 @@
       "line": 275,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -2983,10 +2983,10 @@
       "line": 51,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
-      "decidedBy": "ai",
-      "date": "2026-09-13",
+      "verdict": "legit",
+      "reason": "Korjattu: cc37c0f2b",
+      "decidedBy": "human",
+      "date": "2026-09-26",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
     },
     {
@@ -3104,7 +3104,8 @@
       "id": "9c44f40fc696",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Ratkaistu: 042b6bb51"
     },
     {
       "invariant": 16,
@@ -3113,7 +3114,8 @@
       "id": "fce8838521f0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 042b6bb51"
     },
     {
       "invariant": 13,
@@ -3122,7 +3124,8 @@
       "id": "b66190f1bb65",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: cdca7f2a7"
     },
     {
       "invariant": 14,
@@ -3131,7 +3134,8 @@
       "id": "66bddd362bc9",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 1fbd0a198"
     },
     {
       "invariant": 14,
@@ -3140,7 +3144,8 @@
       "id": "e9c6e4efb23d",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 9aadae33a"
     },
     {
       "invariant": 13,
@@ -3149,7 +3154,8 @@
       "id": "80b838db4855",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: c3b569ba9"
     },
     {
       "invariant": 14,
@@ -3158,7 +3164,8 @@
       "id": "cd163bbd24a7",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: a0f30bea5"
     },
     {
       "invariant": 5,
@@ -3167,7 +3174,8 @@
       "id": "9044f82ef284",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Ratkaistu: 042b6bb51"
     },
     {
       "invariant": 14,
@@ -3176,7 +3184,8 @@
       "id": "41b93ca99e1c",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: de1a9b4f2"
     },
     {
       "invariant": 13,
@@ -3185,7 +3194,8 @@
       "id": "fe1f03fb7069",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 9725aafcb"
     },
     {
       "invariant": 13,
@@ -3194,7 +3204,8 @@
       "id": "5e1e5c1a63fe",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 09006347e"
     },
     {
       "invariant": 14,
@@ -3203,7 +3214,8 @@
       "id": "84412e7a6741",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: b10aaa905"
     },
     {
       "invariant": 14,
@@ -3212,7 +3224,8 @@
       "id": "d76c5fb32593",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 9aadae33a"
     },
     {
       "invariant": 5,
@@ -3221,7 +3234,8 @@
       "id": "09094ef387d5",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 48fa7999a"
     },
     {
       "invariant": 14,
@@ -3230,7 +3244,8 @@
       "id": "005111c01128",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: cf2159918"
     },
     {
       "invariant": 13,
@@ -3239,7 +3254,8 @@
       "id": "b4063449dd36",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 13adc5248"
     },
     {
       "invariant": 5,
@@ -3248,7 +3264,8 @@
       "id": "16b1b069ddd3",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Ratkaistu: 042b6bb51"
     },
     {
       "invariant": 14,
@@ -3257,7 +3274,8 @@
       "id": "ab9a0278b0c0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: b10aaa905"
     },
     {
       "invariant": 13,
@@ -3266,7 +3284,8 @@
       "id": "0180c9e2940d",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 6255a46f0"
     },
     {
       "invariant": 14,
@@ -3275,7 +3294,8 @@
       "id": "8f037ebde7a0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 1e2b7cfad"
     },
     {
       "invariant": 5,
@@ -3284,7 +3304,8 @@
       "id": "aa3566aabbd0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 48fa7999a"
     },
     {
       "invariant": 13,
@@ -3293,7 +3314,8 @@
       "id": "be6d7382cd1a",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu: 4a1885ca1"
     },
     {
       "invariant": 14,
@@ -3302,7 +3324,197 @@
       "id": "f41de998c424",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
+      "status": "closed",
+      "resolution": "Korjattu: a0f30bea5"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/mcp/mcp-proxy.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "be4b4f34e521",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: e044c4535"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/mcp/remote-tools.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "a49e32ddeb4e",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 4349a0b2c"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/routes/ai-decide.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "273435328c90",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: c9bb18f91"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/routes/apps/fork-manage.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "508c32904067",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 085093455"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/routes/cortex/activation.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "db8a5635a633",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: d10e2d3df"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/routes/mcp-servers.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "e88dab4d8341",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: e044c4535"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/routes/mcp-servers.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "a0ecb62eafb3",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
       "status": "open"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/routes/mcp-servers.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "ffebae45c100",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 085c2045b"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/services/app-publish.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "bbfbeca149de",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 810ae39b1"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/services/decide/providers.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "fb2dacf3f593",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: c9bb18f91"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/services/decide/runs.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "573704db10ed",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 5b697d746"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/services/design-book/component-scan.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "1a0a15eb7b20",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 107daa4c1"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/services/design-book/component.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "e82c9f26d729",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 107daa4c1"
+    },
+    {
+      "invariant": 13,
+      "file": "aimeat/src/services/mcp-client/invoke.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "f740ecf9bc39",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 7bd3c3f1d, 18cd8b3f6, 91ec9d505"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/services/mcp-client/registry.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "749d1b8440ce",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Väärä hälytys"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/services/owner-secrets.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "7d6c102099f3",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 9a6bc0eaa"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/services/workspace-tool-ops.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "2c0639ff342e",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 3e361f7e0"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/services/workspace-tool-ops.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "3b4882500941",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Sama kuin 2c0639ff342e. Korjattu: 3e361f7e0"
+    },
+    {
+      "invariant": 14,
+      "file": "aimeat/src/services/extension-ctx.ts",
+      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "id": "919ef5f56d69",
+      "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
+      "date": "2026-09-24",
+      "status": "closed",
+      "resolution": "Korjattu: 9a6bc0eaa"
     }
   ],
   "invariantReviewCoverage": {
