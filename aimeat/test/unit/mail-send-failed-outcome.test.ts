@@ -15,7 +15,9 @@
  *   Each door is exercised with a sent outcome as well, so "everything is an error now" cannot pass.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mail-send-failed-outcome.test.ts
  * @version-history
- *   v1.1.0 — 2026-09-13 — The connector doors are fed the SEND_FAILED error a current node answers,
+ *   v1.2.0 — 2026-09-26 — The tool's refusal no longer carries `channel`: whether an address has an
+ *     account here reaches only the owner in person, and a tool session is always an agent's.
+ *   v1.1.0 — 2026-09-13 —The connector doors are fed the SEND_FAILED error a current node answers,
  *     beside the 200 'failed' envelope an older node still answers, and a refusal that is not about
  *     delivery passes through untouched.
  *   v1.0.0 — 2026-09-13 — Initial.
@@ -94,9 +96,12 @@ describe('node MCP aimeat_mail_send', () => {
         expect(logged).toHaveLength(1);
         expect(logged[0].status).toBe('failed');
         expect(out.content[0].text).toContain(logged[0].id);
-        // The same fields the REST error carries in details and the connector doors lift to the top.
+        // The same fields the REST error carries in details and the connector doors lift to the top,
+        // less `channel`: it says whether the address has an account here, which only the owner in
+        // person learns, and a tool session is always an agent's.
         const parsed = JSON.parse(out.content[0].text);
-        expect(parsed).toMatchObject({ code: 'SEND_FAILED', message_id: logged[0].id, reason: 'SMTP_SEND_FAILED', status: 'failed', channel: 'email' });
+        expect(parsed).toMatchObject({ code: 'SEND_FAILED', message_id: logged[0].id, reason: 'SMTP_SEND_FAILED', status: 'failed' });
+        expect(parsed.channel).toBeUndefined();
     });
 
     it('a send with no transport at all is an error result too', async () => {
