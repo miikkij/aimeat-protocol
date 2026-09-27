@@ -12,6 +12,8 @@
  *   - createServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.2.0 — 2026-09-26 — Every request runs as this node (runAsNode, utils/gaii.ts), so an identity
+ *     is cut to an account name for the node that serves the request.
  *   v1.1.0 — 2026-09-08 — /v1/mcp is parsed at the large body limit like the file doors it fronts.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -28,6 +30,7 @@ import { requestIdMiddleware } from './middleware/request-id.js';
 import { subdomainMiddleware } from './middleware/subdomain.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
 import { logger } from './utils/logger.js';
+import { runAsNode } from './utils/gaii.js';
 import { TunnelManager } from './services/personal-tunnel.js';
 import { ConnectTunnelManager } from './services/connect-tunnel.js';
 import { RealtimeManager } from './services/realtime-manager.js';
@@ -66,6 +69,12 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   // Per-request storage profiler (opt-in: config.perfTrace + ?trace=1). Outermost so its wall-clock
   // spans the whole pipeline; a no-op middleware when disabled. See services/perf-trace.ts.
   app.use(perfTraceMiddleware(config.perfTrace));
+
+  // Every request runs as THIS node, so localAccountName and localAccountOf (utils/gaii.ts) cut this
+  // node's identities and keep every other node's whole, also in a process that serves more than one
+  // node. Before everything else the request meets, so that every middleware and route after it, and
+  // whatever they schedule, is inside it.
+  app.use((_req, _res, next) => runAsNode(config.nodeId, () => next()));
 
   // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies
   const trustProxy = process.env.AIMEAT_TRUST_PROXY;
