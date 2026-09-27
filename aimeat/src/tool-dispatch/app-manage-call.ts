@@ -11,6 +11,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import type { AimeatClient, ApiResponse } from './api-client.js';
@@ -29,7 +30,7 @@ const enc = encodeURIComponent;
 
 /**
  * Run one aimeat_app_manage call over REST. `owner` is the caller's own account, the default for
- * every action that names an app. `extra` names parameters the surface adds itself (the
+ * every action that names an app. `extra` names parameters the interface adds itself (the
  * connector's agent_name), which the field check ignores.
  */
 export async function appManageCall(client: AimeatClient, owner: string, input: Input, extra: string[] = []): Promise<ApiResponse> {

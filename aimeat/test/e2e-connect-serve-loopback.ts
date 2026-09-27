@@ -21,6 +21,7 @@
 //     and one addressed to a foreign Host are refused, and the daemon stays up.
 //
 // Version history:
+//   2026-09-27 — A tool that moved into aimeat_app_manage answers TOOL_MOVED on the connector MCP and /local/call.
 //   2026-09-24 — Phase 0 (admission) added; every call to a daemon and every MCP
 //     session carries the secret from serve.json, which is schema 3 now (A9-1).
 
@@ -712,6 +713,26 @@ await test('MCP initialize + tools/list works on the loopback /v1/mcp', async ()
   } finally {
     await client.close();
   }
+});
+
+await test('a tool that moved into aimeat_app_manage answers TOOL_MOVED with the new call, on the connector MCP and on /local/call', async () => {
+  const client = new Client({ name: 'loopback-e2e', version: '1.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
+    requestInit: { headers: daemonAuth(loopbackBase) },
+  });
+  await client.connect(transport);
+  try {
+    const names = (await client.listTools()).tools.map(t => t.name);
+    assert(names.includes('aimeat_app_manage') && !names.includes('aimeat_app_seo_set'), 'the new tool is listed and the old one is not');
+    const r = await client.callTool({ name: 'aimeat_app_seo_set', arguments: { filename: 'x.html', index: true } }) as { isError?: boolean; content?: Array<{ text?: string }> };
+    const text = r.content?.[0]?.text ?? '';
+    assert(r.isError === true && text.startsWith('TOOL_MOVED') && text.includes('aimeat_app_manage with action "seo"'), `connector MCP: ${text.slice(0, 200)}`);
+  } finally {
+    await client.close();
+  }
+  const call = await json(loopbackBase, '/local/call/aimeat_app_versions', { method: 'POST', body: JSON.stringify({ owner: 'x', filename: 'x.html' }) });
+  assert(call.status === 410 && call.body?.error?.code === 'TOOL_MOVED' && String(call.body.error.message).includes('action "versions"'),
+    `/local/call: ${call.status} ${JSON.stringify(call.body).slice(0, 200)}`);
 });
 
 await test('owner_scope survives the connector — a dropped permission flag looks exactly like a missing key', async () => {

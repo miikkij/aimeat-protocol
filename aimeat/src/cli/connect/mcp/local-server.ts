@@ -34,6 +34,8 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-27 -- The /local/call route moved to ./local-call.ts (pure extraction, the file passed 800 lines),
+ *     where a tool that moved into aimeat_app_manage answers 410 TOOL_MOVED with the replacing call.
  *   2026-09-24 — The degraded proxy holds back a credential the node refused (../refused-credentials.ts).
  *   2026-09-24 — An enrolment offer is handed the identity whose socket carried it (A9-2).
  *   2026-09-24 — One admission check in front of every route (./local-admission.ts): a loopback Host
@@ -148,7 +150,6 @@ import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
 import { pollWaitMs, refuseUnknownAgent } from './local-poll-guard.js';
 import { DaemonStats, registerLocalStats } from './local-stats.js';
 import { admitLoopbackCaller, newLoopbackSecret } from './local-admission.js';
-import { CONNECT_CLI_TOOLS } from '../tool-call.js';
 
 // Re-exported so the unit test (serve-wake-watermark.test.ts) and any importer keep resolving
 // after the class moved to ./local-channel.ts.
@@ -156,6 +157,7 @@ export { AgentChannel } from './local-channel.js';
 import { logger } from '../../../utils/logger.js';
 import { checkBuildFreshness, announceBuild, buildIdentity } from '../../../utils/build-stamp.js';
 import { installTimestampedOutput } from '../../../utils/log-timestamps.js';
+import { registerLocalCallRoute } from './local-call.js';
 
 // The `serve.json` contract -- schema version, its two row shapes, where the file lives and
 // whether the pid in an existing one is still alive -- is its own unit in ./local-discovery.ts:
@@ -635,39 +637,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     res.json({ ok: true, data: { agent: entry.agent, cancelled: channels.get(entry.gaii)!.getCancelledIds() } });
   });
 
-  // ── Tool-call surface: deterministic shell-callable tool dispatch over the
-  // tunnel. Same handler registry as `aimeat connect call`, but routed through
-  // the agent's tunnel-backed client — one loopback POST, no per-call subprocess
-  // and no fresh TLS per call. Body = the tool's JSON input (as `connect call
-  // --json`); response = the AIMEAT envelope (callers check `ok`). Agent picked
-  // by `X-Aimeat-Agent` / `?agent=` (defaults to the registry primary).
-  app.post('/local/call/:tool', async (req: Request, res: Response) => {
-    let entry: RegisteredAgent;
-    try { entry = resolveAgent(req); }
-    catch (err) {
-      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
-      return;
-    }
-    const toolName = req.params.tool as string;
-    const tool = CONNECT_CLI_TOOLS.find(t => t.name === toolName);
-    if (!tool) {
-      res.status(404).json({ ok: false, error: { code: 'UNKNOWN_TOOL', message: `Unknown shell-callable tool: ${toolName}` } });
-      return;
-    }
-    const input = (req.body && typeof req.body === 'object' && !Array.isArray(req.body))
-      ? req.body as Record<string, unknown>
-      : {};
-    try {
-      const response = await tool.handler({
-        client: entry.client, // tunnel-backed in tunnel mode, direct fetch when degraded
-        config: { node_url: entry.config.node_url, agent: entry.agent, owner: entry.owner },
-        agentPath: encodeURIComponent(entry.agent),
-      }, input);
-      res.status(response.ok ? 200 : 400).json(response);
-    } catch (err) {
-      res.status(400).json({ ok: false, error: { code: 'TOOL_CALL_ERROR', message: (err as Error).message } });
-    }
-  });
+  // `POST /local/call/:tool`: the shell-callable tool dispatch over the tunnel (./local-call.ts).
+  registerLocalCallRoute(app, resolveAgent);
 
   app.get('/local/status', (_req: Request, res: Response) => {
     res.json({

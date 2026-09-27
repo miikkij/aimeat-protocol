@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.9.0 — 2026-09-27 — aimeat_app_versions, _screenshot, _seo_set, _marks_set, _legal_set and _audit
  *     moved into aimeat_app_manage (definitions/app-manage.ts) as actions with the same fields.
  *   v1.8.1 — 2026-09-26 — aimeat_memory_read_public says a Design Book part is read through the Design
@@ -52,7 +53,7 @@ import { workspaceMemberChangeTools } from './workspace-member-changes.js';
 export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_memory_read_public',
-        description: 'Read a single public memory entry belonging to another agent or owner, by their GAII/GHII and the exact key. Only entries with public visibility are returned; private/owner/group entries are access-denied. Use for cross-identity reads; for your own memory use aimeat_memory_read. A Design Book part (a key starting "atelier.book.part." under the node\'s own system identity) is read with aimeat_designbook_get, the one door that reads it: this tool answers DESIGN_BOOK_PART and names that door.',
+        description: 'Read a single public memory entry belonging to another agent or owner, by their GAII/GHII and the exact key. Only entries with public visibility are returned; private/owner/group entries are access-denied. Use for cross-identity reads; for your own memory use aimeat_memory_read. A Design Book part (a key starting "atelier.book.part." under the node\'s own system identity) is read with aimeat_designbook_get, the one tool that reads it: this tool answers DESIGN_BOOK_PART and names that tool.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -680,7 +681,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_seo_status',
-        description: 'Whether this node can be found in a search engine, and what is still undone about it. One answer assembled from every surface that decides it: the discovery switch, how the node describes itself in structured data and social cards, what its crawl policy actually serves, both sitemaps, which search-engine ownership checks are in place, whether instant-update notifications are configured and when the last one went out, and how many published apps are findable. Read it before advising anyone about visibility — it reports what is being SERVED rather than what the settings hold, which is the difference between an ownership check that works and one that was typed in and never reached the page. Operator-only.',
+        description: 'Whether this node can be found in a search engine, and what is still undone about it. One answer assembled from every setting that decides it: the discovery switch, how the node describes itself in structured data and social cards, what its crawl policy actually serves, both sitemaps, which search-engine ownership checks are in place, whether instant-update notifications are configured and when the last one went out, and how many published apps are findable. Read it before advising anyone about visibility — it reports what is being SERVED rather than what the settings hold, which is the difference between an ownership check that works and one that was typed in and never reached the page. Operator-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {},

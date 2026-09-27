@@ -9,6 +9,7 @@
  *   inline-only — the local runtime has the files at hand, so presigned ZIP upload is not
  *   needed (that mode lives on the server MCP surface).
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.1.0 -- 2026-09-03 -- aimeat_skill_update proxies PATCH /v1/skills/:name (visibility without
  *     a republish).
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry tools (node + user scopes).
@@ -22,7 +23,7 @@ import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
 
 export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): void {
   mcp.tool('aimeat_skill_publish', descriptionFor('aimeat_skill_publish'), {
-    skill_md: z.string().optional().describe('The SKILL.md content (frontmatter + body). Required on this surface (no presigned upload mode here).'),
+    skill_md: z.string().optional().describe('The SKILL.md content (frontmatter + body). Required on the connector (no presigned upload mode here).'),
     files: z.record(z.string(), z.string()).optional().describe('Additional files as relative-path -> content (scripts/, references/, assets/).'),
     scope: z.enum(['user', 'node', 'workspace']).optional().describe('Registry scope (default user). node is operator-only; workspace requires organism_id + workspace_id.'),
     visibility: z.enum(['owner', 'members', 'public']).optional().describe('Registry visibility (node/user; workspace skills are always workspace-visible).'),
@@ -31,7 +32,7 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     agent_name: agentNameSchema,
   }, annotationsFor('aimeat_skill_publish'), async ({ skill_md, files, scope, visibility, organism_id, workspace_id, agent_name }) => {
     if (!skill_md) {
-      return { content: [{ type: 'text' as const, text: 'skill_md is required on this surface — pass the SKILL.md content inline.' }], isError: true };
+      return { content: [{ type: 'text' as const, text: 'skill_md is required on the connector — pass the SKILL.md content inline.' }], isError: true };
     }
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post('/v1/skills', { skill_md, files, scope, visibility, organism: organism_id, ws: workspace_id });

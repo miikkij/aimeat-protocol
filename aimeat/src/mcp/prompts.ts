@@ -10,6 +10,7 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.7.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   2026-09-19 — aimeat_handbook_get serves the ATELIER specification in parts
@@ -74,7 +75,7 @@ export function registerPromptsTools(
         descriptionFor('aimeat_handbook_get'),
         {
             tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.'),
-            surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another surface\'s handbook than your own. Leave it out to get the one for the surface you are connected to.'),
+            surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
         },
         annotationsFor('aimeat_handbook_get'),
         async ({ tier, surface }) => {

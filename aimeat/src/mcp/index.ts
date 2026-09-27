@@ -11,6 +11,7 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-09-27 — answerMovedTools(): a call to one of the ten tools aimeat_app_manage replaced answers TOOL_MOVED.
  *   v1.28.0 -- 2026-09-27 -- Bind every session request to its verified principal and read scopes
  *     from the current request, including discovery and concurrent tool calls (A01/A02).
  *   v1.27.0 -- 2026-09-18 -- Every tool is registered through withErrorNextStep as well: a failing
@@ -143,6 +144,7 @@ import { mcpRequestAuthority, sameMcpPrincipal, withRequestPermission } from './
 // registry this file assembles (which imports the service back: a cycle). Re-exported here so
 // every existing importer keeps working; new code imports the leaf.
 import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
+import { answerMovedTools } from './moved-tools-answer.js';
 export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -304,6 +306,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Restore the original methods and report what scope enforcement did this session.
         patchable.tool = originalTool;
         patchable.registerTool = originalRegisterTool;
+        // A tool that became an action of another answers with the call that replaces it, and stays
+        // out of tools/list (mcp/moved-tools-answer.ts).
+        answerMovedTools(mcp);
 
         // The node's managed prompts, as the primitive the PERSON picks from (a slash command in
         // Claude Code) rather than one the model has to think of calling. Registered after the

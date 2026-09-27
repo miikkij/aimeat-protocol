@@ -15,6 +15,7 @@
  *   aimeat connect schema aimeat_onboarding_status
  *   aimeat connect call aimeat_message_send --json input.json
  * @version-history
+ *   2026-09-27 -- A tool that moved into aimeat_app_manage answers TOOL_MOVED with the new call, on `call` and `schema`.
  *   v1.0.0 -- 2026-05-28 -- Add initial shell fallback for agent lifecycle tools
  *   v1.1.0 -- 2026-05-28 -- Read public tool metadata from the shared MCP catalog
  *   v1.2.0 -- 2026-05-28 -- Add app, extension, and cortex CLI fallback handlers
@@ -54,6 +55,13 @@ import { LOOPBACK_REFUSAL } from './mcp/local-admission.js';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
 export { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
+import { movedToolMessage } from '../../mcp/catalog/moved-tools.js';
+
+/** What an unknown name answers: the replacing call for a tool that moved, else that it is unknown. */
+function unknownToolMessage(name: string): string {
+    const moved = movedToolMessage(name);
+    return moved ? `TOOL_MOVED: ${moved}` : `Unknown CLI-callable tool: ${name}`;
+}
 
 function getTool(name: string): ConnectCliToolDefinition | undefined {
     return CONNECT_CLI_TOOLS.find(tool => tool.name === name);
@@ -129,7 +137,7 @@ export function runToolSchema(toolName: string | undefined): void {
     }
     const tool = getCliToolMetadata(toolName);
     if (!tool || !getTool(toolName)) {
-        console.error(`Unknown CLI-callable tool: ${toolName}`);
+        console.error(unknownToolMessage(toolName));
         process.exitCode = 1;
         return;
     }
@@ -187,7 +195,11 @@ export async function runToolCall(toolName: string | undefined, flags: Record<st
     const tool = getTool(toolName);
     const metadata = getCliToolMetadata(toolName);
     if (!tool || !metadata) {
-        console.error(`Unknown CLI-callable tool: ${toolName}`);
+        // A tool that became an action of another names the call that replaces it, as JSON on
+        // stdout like every other answer here, so a script reading the output learns it too.
+        const moved = movedToolMessage(toolName);
+        if (moved) printJson({ ok: false, error: { code: 'TOOL_MOVED', message: moved } });
+        else console.error(unknownToolMessage(toolName));
         process.exitCode = 1;
         return;
     }

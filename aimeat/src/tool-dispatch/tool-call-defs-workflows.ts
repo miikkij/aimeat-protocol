@@ -7,6 +7,7 @@
  * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { workflowTools } from './tool-call-defs-workflows.js';
  * @version-history
+ *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   v1.3.3 -- 2026-09-26 -- aimeat_workflow_save's description says an ai step's call holds its share
  *     of maxCostUsd until it answers, the share is one attempt, and a step expected to cost more than
  *     the whole cap starts alone (secaudit 2026-09, A6-11).
@@ -82,7 +83,7 @@ export const workflowTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_workflow_answer',
         description: 'Answer a paused human-input step of a workflow run (resumes the run).',
         input: {
-            workflow_id: { type: 'string', description: 'The workflow id. (`id` is accepted as the older spelling this door used.)' },
+            workflow_id: { type: 'string', description: 'The workflow id. (`id` is accepted as the older spelling this tool used.)' },
             id: { type: 'string', description: 'Older spelling of workflow_id.' },
             run_id: { type: 'string', required: true, description: 'The run id (from aimeat_workflow_pending_inputs).' },
             step_id: { type: 'string', required: true, description: 'The paused step id awaiting input.' },

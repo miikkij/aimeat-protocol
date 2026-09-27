@@ -15,6 +15,7 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.4.0 — 2026-09-20 — One sentence on the apps ground: an owner saying an app turned out well
  *     is recorded with aimeat_designbook_keep. Measured with the cold-agent task `keep-app`: in a
  *     NEW conversation 0 of 3 runs recorded it (each thanked the person and called nothing),
@@ -43,13 +44,13 @@ import type { SurfaceRole } from './catalog/surfaces.js';
  * catalog/surfaces.ts so the surface describes itself the same way in both places.
  */
 export const SURFACE_INTROS: Record<SurfaceRole, string> = {
-    appdev: 'This surface is for building and publishing: apps, extensions and cortex packs.',
-    agent: "This surface is the owner's own agent: their memory, tasks, messages, knowledge and discovery.",
-    service: 'This surface is for offering a service: work, actions, wallet, capabilities and organisms.',
-    admin: 'This surface is for governance: operator settings, flags, groups, consent and agent management.',
-    commerce: 'This surface is for selling and getting paid: credentials, priced manifests, checkout and receipts.',
-    primitives: 'This surface is a handful of tools, and everything else is data: search what this node can do with aimeat_discover (type="capability"), then run what you found with aimeat_invoke. It runs as you, so it can do what you can do and nothing more.',
-    full: 'This surface carries everything the node offers, so nothing here is narrowed to one kind of work. If your work does have a shape — building apps, running the owner\'s own agent, offering a service, governing the node, selling — the surface named after it is smaller to hold and harder to misfire from. Start with aimeat_handbook_get either way.',
+    appdev: 'This interface is for building and publishing: apps, extensions and cortex packs.',
+    agent: "This interface is the owner's own agent: their memory, tasks, messages, knowledge and discovery.",
+    service: 'This interface is for offering a service: work, actions, wallet, capabilities and organisms.',
+    admin: 'This interface is for governance: operator settings, flags, groups, consent and agent management.',
+    commerce: 'This interface is for selling and getting paid: credentials, priced manifests, checkout and receipts.',
+    primitives: 'This interface is a handful of tools, and everything else is data: search what this node can do with aimeat_discover (type="capability"), then run what you found with aimeat_invoke. It runs as you, so it can do what you can do and nothing more.',
+    full: 'This interface carries everything the node offers, so nothing here is narrowed to one kind of work. If your work does have a shape — building apps, running the owner\'s own agent, offering a service, governing the node, selling — the surface named after it is smaller to hold and harder to misfire from. Start with aimeat_handbook_get either way.',
 };
 
 /** An owner's word about an app is what the Design Book grows from (services/design-book/reasons.ts). */

@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.2.0 — 2026-09-27 — aimeat_cortex_list takes name and include_source: one cortex in full, and its source.
  *   v1.1.0 — 2026-09-13 — aimeat_extension_get takes include_source (each action's script, for the
  *     installer's own sessions holding ext:write), and aimeat_cortex_install takes update (redeploy in
@@ -44,7 +45,7 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_extension_install',
-        description: 'Install or update a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). BEFORE you build one to fetch something on a person\'s behalf on a schedule: check whether one of their agents should do it instead: load `node:aimeat-recurring-work`. An extension you write is a fourth parallel implementation if they already have an agent doing it, and it will not show up in any of their agent surfaces. Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest YAML string plus a scripts map directly. Updating an installed extension: pass update:true to upsert it in place (activation status, lifecycle fields and its ext: memory are preserved; owner-gated). Pass activate:true to activate in the same call; otherwise activate with aimeat_extension_activate.',
+        description: 'Install or update a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). BEFORE you build one to fetch something on a person\'s behalf on a schedule: check whether one of their agents should do it instead: load `node:aimeat-recurring-work`. An extension you write is a fourth parallel implementation if they already have an agent doing it, and it will not show up in any of their agent screens. Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest YAML string plus a scripts map directly. Updating an installed extension: pass update:true to upsert it in place (activation status, lifecycle fields and its ext: memory are preserved; owner-gated). Pass activate:true to activate in the same call; otherwise activate with aimeat_extension_activate.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

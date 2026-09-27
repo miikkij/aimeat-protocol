@@ -8,6 +8,7 @@
  *   every surface and with every optional part switched on, because each of those pushes text down.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-instructions-cut.test.ts
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -46,6 +47,6 @@ describe('the MCP instructions, cut where a client cuts them', () => {
         const t = instructionsFor('agent' as never);
         expect(t).toMatch(/SPEAK TO THE PERSON, NOT ABOUT THE SYSTEM/);
         expect(t).toMatch(/Three habits make the difference/);
-        expect(t).toMatch(/This surface is the owner's own agent/);
+        expect(t).toMatch(/This interface is the owner's own agent/);
     });
 });
