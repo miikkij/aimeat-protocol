@@ -30,8 +30,6 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { SiteService, SiteError } from '../services/site.js';
-import { injectCspNonce } from '../utils/csp-nonce.js';
-import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
 import { siteLayoutRouter } from './site-layout.js';
 import { themesRouter } from './themes.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
@@ -63,32 +61,6 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     // The node's themes (Themes & Styles) are the site's look: the same family, the same guard.
     router.use(themesRouter(config, storage, requireNotLb, provenance));
 
-    // GET / — Serve the portal HTML (Markdown for Agents: Accept: text/markdown gets a
-    // markdown rendering of the same portal content; browsers keep the HTML).
-    router.get('/', async (req, res) => {
-        if (!config.siteEnabled) {
-            res.status(404).send('Portal not enabled');
-            return;
-        }
-        try {
-            res.vary('Accept');
-            const langParam = req.query.lang as string | undefined;
-            const html = await site.getPortalHtml(langParam, req.headers.cookie, req.headers['accept-language']);
-            res.set('Cache-Control', `public, max-age=${config.siteCacheTtlSeconds}`);
-            if (prefersMarkdown(req)) {
-                sendMarkdown(res, htmlToMarkdown(html), html);
-                return;
-            }
-            // Stamp the per-request CSP nonce so operator-template inline <script> runs.
-            res.type('text/html').send(injectCspNonce(html, res.locals.cspNonce as string | undefined));
-        } catch (err) {
-            if (err instanceof SiteError) {
-                res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));
-                return;
-            }
-            throw err;
-        }
-    });
 
     // GET /v1/site — Portal metadata (JSON)
     router.get('/v1/site', async (_req, res) => {

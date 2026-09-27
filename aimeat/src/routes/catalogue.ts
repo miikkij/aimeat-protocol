@@ -6,7 +6,7 @@
  *   actions, agents, and boards, plus the people/organism directory and catalogue hash for federation
  *   sync. Node-global scans are cached (~30s) and invalidated by domain tags. Agents tagged `unlisted`
  *   (e.g. the per-owner Secretary) are excluded from the public agent listing.
- * @structure catalogueRouter(config, storage, directoryService?, getRealtimeStats?) — GET /v1/catalogue,
+ * @structure catalogueRouter(config, storage, directoryService?) — GET /v1/catalogue,
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
  *   v1.1.0 — 2026-06-23 — Exclude `unlisted` agents from GET /v1/catalogue/agents (Secretary Phase 0).
@@ -30,7 +30,6 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
 import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
-import type { RealtimeStats } from '../services/realtime-manager.js';
 
 /** Shape of a stored knowledge-package manifest value (memory record `value`). */
 interface KnowledgePackageManifest {
@@ -49,7 +48,7 @@ interface KnowledgePackageManifest {
   updated?: string;
 }
 
-export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService, getRealtimeStats?: () => RealtimeStats | null): Router {
+export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService): Router {
   const router = Router();
 
   // Node-global full-table scans, cached 30s. These lists are polled every 5–30s by federation
@@ -206,42 +205,6 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     }));
   });
 
-  // GET /v1/stats — public node statistics (Tier 0)
-  router.get('/v1/stats', async (_req, res) => {
-    const agents = await storage.listAgents();
-    const actions = await storage.listActions();
-    const boards = await storage.listBoards();
-    const owners = await storage.listOwners();
-
-    let activeAgents24h = 0;
-    const now = Date.now();
-    for (const a of agents) {
-      if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) {
-        activeAgents24h++;
-      }
-    }
-
-    res.json(success(config.nodeId, {
-      node_id: config.nodeId,
-      uptime_seconds: Math.floor(process.uptime()),
-      counts: {
-        owners: owners.length,
-        agents: agents.length,
-        active_agents_24h: activeAgents24h,
-        actions: actions.length,
-        boards: boards.length,
-      },
-      economy: {
-        welcome_bonus: config.welcomeBonus,
-        daily_allowance: config.dailyAllowance,
-        burn_rate: config.burnRate,
-      },
-      ...(getRealtimeStats ? (() => {
-        const rt = getRealtimeStats();
-        return rt ? { realtime: { rooms: rt.rooms, peers: rt.peers, messages_in: rt.messagesIn, messages_out: rt.messagesOut } } : {};
-      })() : {}),
-    }));
-  });
 
   // GET /v1/catalogue/directory — people directory search (the member "phone book").
   // Privacy: (1) requireAuth() — you must be a SIGNED-IN user to browse it (the anonymous internet
