@@ -12,6 +12,7 @@
  *     Response now includes found + owner_gaii.
  *   v1.0.0 — (pre-2026-06) — Initial permissions routes.
  */
+import { countConsentRecipients } from '../storage/consent-recipient.js';
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -48,15 +49,7 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
         const ownerGaii = resolve(req);
         const consents = await storage.listConsents(ownerGaii, { status: 'active' });
 
-        const byType = { wildcard: 0, gaii: 0, ghii: 0, organism: 0, domain: 0, node: 0 };
-        for (const c of consents) {
-            if (c.recipient === '*') byType.wildcard++;
-            else if (c.recipient.startsWith('ghii:')) byType.ghii++;
-            else if (c.recipient.startsWith('organism.')) byType.organism++;
-            else if (c.recipient.startsWith('domain:')) byType.domain++;
-            else if (c.recipient.startsWith('node:')) byType.node++;
-            else byType.gaii++;
-        }
+        const byType = countConsentRecipients(consents);
 
         const memoryKeys = await storage.listMemory(ownerGaii);
         const storageFiles = await storage.listStorageFiles(ownerGaii);

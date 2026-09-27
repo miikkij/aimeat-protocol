@@ -35,6 +35,7 @@
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
 
+import { enrichThreadTitles } from '../services/thread-titles.js';
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentMessageRecord } from '../storage/interface.js';
@@ -49,7 +50,6 @@ import { createAgentMessagesOverviewService } from '../services/db/agent-message
 import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { sendAgentMessage } from '../services/agent-message-send.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
-import { logger } from '../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -191,22 +191,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     const agentGaii = resolveAgentGaii(req, agentName);
     const threads = await storage.listThreads(agentGaii);
 
-    // Threads are task-based: a task-linked thread uses the task id as its
-    // threadId. Resolve the task title so the UI can label the thread with the
-    // task name instead of a generic "Thread". Cache lookups so several threads
-    // pointing at the same task only hit storage once.
-    const taskCache = new Map<string, string | null>();
-    const resolveTaskTitle = async (threadId: string): Promise<string | null> => {
-      if (taskCache.has(threadId)) return taskCache.get(threadId) ?? null;
-      const task = await storage.getAgentTask(threadId).catch(err => { logger.warn('resolveTaskTitle: continuing after a suppressed failure', { error: String(err) }); return null; });
-      const title = task?.title ?? null;
-      taskCache.set(threadId, title);
-      return title;
-    };
-    const enriched = await Promise.all(threads.map(async (thread) => {
-      const title = await resolveTaskTitle(thread.threadId);
-      return { ...thread, title, linkedTaskId: title !== null ? thread.threadId : null };
-    }));
+    const enriched = await enrichThreadTitles(storage, threads);
 
     res.json(success(config.nodeId, { threads: enriched }));
   });

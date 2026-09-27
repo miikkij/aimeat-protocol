@@ -23,6 +23,7 @@
  *     organism + workspace names, the consent quota in the summary.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Data Wallet tab's 3 reads into one composite (memory = meta-only).
  */
+import { countConsentRecipients } from '../../storage/consent-recipient.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { getPendingConsentAudit } from '../consent-audit-buffer.js';
@@ -80,15 +81,7 @@ export class DataWalletService {
 
       // Permission summary — derived from the active subset of the SAME consent list (no re-read).
       const active = consents.filter(c => c.status === 'active');
-      const byType: Record<string, number> = { wildcard: 0, gaii: 0, ghii: 0, organism: 0, domain: 0, node: 0 };
-      for (const c of active) {
-        if (c.recipient === '*') byType.wildcard++;
-        else if (c.recipient.startsWith('ghii:')) byType.ghii++;
-        else if (c.recipient.startsWith('organism.')) byType.organism++;
-        else if (c.recipient.startsWith('domain:')) byType.domain++;
-        else if (c.recipient.startsWith('node:')) byType.node++;
-        else byType.gaii++;
-      }
+      const byType = countConsentRecipients(active);
 
       const names = await this.namesFor(organismIdsIn(
         consents.flatMap(c => [c.dataPattern, c.recipient]),
