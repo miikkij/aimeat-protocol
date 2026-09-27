@@ -8,6 +8,9 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — HUMAN_TIMEOUT_MIN_DEFAULT and sweepHumanStep, the watchdog's on_timeout
+ *     policy for a waiting human-input step, moved here from engine.ts unchanged (max-file-lines).
+ *     engine.ts exports the constant as before.
  *   v1.2.0 — 2026-08-15 — The upgrade requires a PERSON, which the paragraph guarding it always
  *     said and the code never asked. An agent could call aimeat_workflow_answer on the step holding
  *     its own draft and the node stamped that content 'editorial-control' with the note "reviewed
@@ -25,7 +28,11 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { stampAutonomousOutput } from '../ai-provenance.js';
 import { template } from './engine-util.js';
-import type { WorkflowRun, WorkflowHumanQuestion } from '../../models/workflow-schemas.js';
+import { failDownstream } from './engine-readiness.js';
+import type { WorkflowRun, WorkflowStep, WorkflowHumanQuestion } from '../../models/workflow-schemas.js';
+
+/** Default wait for a human-input step's answer — humans sleep; 24h, not the agent-step 60 min. */
+export const HUMAN_TIMEOUT_MIN_DEFAULT = 1440;
 
 export interface HumanAnswerValue {
   picks: string[];
@@ -127,4 +134,34 @@ export async function applyHumanAnswer(
     }
   }
   rs.state = 'green'; rs.endedAt = now;
+}
+
+/**
+ * The watchdog's turn for a human-input step that waits for its answer: once timeout_min (default
+ * HUMAN_TIMEOUT_MIN_DEFAULT) has passed since the question was asked, the step's on_timeout policy
+ * applies (fail | skip | default). `onTimedOut` is the engine's alert for a failed step. Returns
+ * whether the step changed. The caller holds the run lock, has checked that the step waits with its
+ * question asked, and saves the run afterwards.
+ */
+export async function sweepHumanStep(
+  storage: Storage, config: AimeatConfig, ownerGhii: string, r: WorkflowRun, step: WorkflowStep,
+  now: number, nowIso: string, onTimedOut: () => Promise<void>,
+): Promise<boolean> {
+  const rs = r.steps[step.id];
+  const action = step.action?.kind === 'human-input' ? step.action : undefined;
+  const deadline = new Date(rs.human!.askedAt).getTime() + (step.timeout_min ?? HUMAN_TIMEOUT_MIN_DEFAULT) * 60_000;
+  if (now < deadline) return false;
+  const policy = action?.on_timeout ?? 'fail';
+  if (policy === 'default' && action?.default_option) {
+    await applyHumanAnswer(storage, config, ownerGhii, r, step.id, {
+      picks: [action.default_option], pick: action.default_option, by: 'timeout-default',
+    });
+  } else if (policy === 'skip') {
+    rs.state = 'skipped'; rs.endedAt = nowIso;
+  } else {
+    rs.state = 'timed-out'; rs.endedAt = nowIso;
+    failDownstream(r, step.id);
+    await onTimedOut();
+  }
+  return true;
 }
