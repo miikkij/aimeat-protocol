@@ -5,6 +5,8 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.11.0 — 2026-09-26 — A repeated attribute, a missing space between attributes and a "/" on a
+ *     <div> each get their own sentence.
  *   v1.10.0 — 2026-09-26 — Markup that leaves an element open where it ends is refused, with the
  *     outermost open element named; implied end tags and self-closing SVG pass.
  *   v1.9.0 — 2026-09-26 — A pseudo whose argument is words and numbers passes (::part(label),
@@ -149,7 +151,7 @@ describe('the component bench', () => {
     expect(bad({ html: '<div class="wkgrid"><body onload="x()"></body></div>' })).toThrow(/starts no tag a browser reads in that place/);
     expect(bad({ html: '<svg class="wkgrid-i"><![CDATA[><script>alert(1)</script>]]></svg>' })).toThrow(/starts no tag a browser reads in that place/);
     expect(bad({ html: '<div class="wkgrid">x</p></div>' })).toThrow(/starts no tag a browser reads in that place/);
-    expect(bad({ html: '<div class="wkgrid"/>' })).toThrow(/does not read cleanly/);
+    expect(bad({ html: '<div class="wkgrid"/>' })).toThrow(/ignores the "\/"/);
     // Markup a browser and the parser agree on passes: a table with its rows, a list closed by its end
     // tag, text with its references, a textarea whose text holds no "<".
     for (const html of [
@@ -429,6 +431,17 @@ describe('the component bench', () => {
     ]) {
       expect(() => validateComponentBody({ ...WEEK_GRID, html }), html).not.toThrow();
     }
+  });
+
+  it('says in words of its own what a repeated attribute, a missing space and a "/" on a <div> are', () => {
+    expect(bad({ html: '<div class="wkgrid" class="wkgrid-x"></div>' })).toThrow(/On <div>, the attribute "class" is written twice/);
+    expect(bad({ html: '<div class="wkgrid" hidden data-x="1" hidden></div>' })).toThrow(/the attribute "hidden" is written twice/);
+    expect(bad({ html: '<div class="wkgrid"role="grid"></div>' })).toThrow(/On <div>, the attribute "role" follows the value before it with no space/);
+    expect(bad({ html: '<div class="wkgrid"/>' })).toThrow(/A browser ignores the "\/" at the end of <div …\/>, so the <div> stays open.*Close every element inside the markup/);
+    expect(bad({ html: '<div class="wkgrid"><span class="wkgrid-b"/></div>' })).toThrow(/the <span> stays open/);
+    expect(readMarkup('<div hidden hidden></div>').problem).toEqual({ kind: 'duplicate', element: 'div', attribute: 'hidden' });
+    expect(readMarkup('<div class="a"id="b"></div>').problem).toEqual({ kind: 'no-space', element: 'div', attribute: 'id' });
+    expect(readMarkup('<div class="a"/>').problem).toEqual({ kind: 'slash', element: 'div' });
   });
 
   it('wears the page it lands in: a literal colour is refused with the tokens named, a fallback is fine', () => {
