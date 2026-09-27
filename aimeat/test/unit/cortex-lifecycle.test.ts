@@ -7,6 +7,8 @@
  *   an in-memory storage double: the function needs no server.
  * @usage pnpm exec vitest run test/unit/cortex-lifecycle.test.ts
  * @version-history
+ *   v1.4.0 — 2026-09-26 — A package's active cortex is taken down before its record goes
+ *     (deleteComponent): the actions its activation published are deleted, then the libs and the record.
  *   v1.3.0 — 2026-09-26 — A record stored without the identity has each action deleted under every
  *     principal of the account that installed the cortex: its bare name, its GHII, its agents and its
  *     ecosystem apps, and the deactivator's own two. The prompts and ontologies an activation wrote are
@@ -24,6 +26,7 @@ import { describe, it, expect } from 'vitest';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex, libsWithoutContent,
 } from '../../src/services/cortex-lifecycle.js';
+import { deleteComponent } from '../../src/services/component-registrar.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, CortexExtensionRecord } from '../../src/storage/interface.js';
 
@@ -205,6 +208,44 @@ describe('activateCortex and deactivateCortex: a cortex action is keyed on the r
         const off = activationStorage('active', [ACTION_ID], 'bot#alice@test-node');
         expect((await deactivateCortex({ storage: off.storage, config }, agent, 'laake')).ok).toBe(true);
         expect(off.deleted).toEqual([{ id: ACTION_ID, providerGaii: 'bot#alice@test-node' }]);
+    });
+});
+
+describe('deleteComponent: a package that goes takes its active cortex down first', () => {
+    const ACTION_ID = 'cortex-pkg-laake-lookup';
+    // The package uninstall and the rollback of a failed install both remove a cortex component here.
+    // What an activation made (its actions above all) goes before the record, as an uninstall does it.
+    function packageCortex(actionProvider: string) {
+        const deleted: { id: string; providerGaii: string }[] = [];
+        const removed: string[] = [];
+        const record = {
+            name: 'pkg-laake', installedBy: 'alice', status: 'active',
+            components: [{ type: 'lib', name: 'laake', filename: 'laake.js', exports: [], api_surface: '' }],
+            activationArtifacts: {
+                schemaKeys: [], promptKeys: [], actionIds: [ACTION_ID], actionProvider,
+                boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: ['laake.js'],
+            },
+        } as unknown as CortexExtensionRecord;
+        const storage = {
+            getCortexExtension: async () => record,
+            deleteAction: async (id: string, providerGaii: string) => { deleted.push({ id, providerGaii }); return true; },
+            deleteMemory: async () => true,
+            deleteCortexLibFile: async (_name: string, file: string) => { removed.push(`lib:${file}`); return true; },
+            deleteCortexExtension: async (name: string) => { removed.push(`record:${name}`); return true; },
+            deleteDependencyEdges: async () => 0,
+            deleteComponentVersions: async () => 0,
+            getGHIIByOwner: async () => ({ ghii: 'alice@test-node' }),
+            getAgentsByOwner: async () => [],
+            getEcosystemAppsByOwner: async () => [],
+        } as unknown as Storage;
+        return { storage, deleted, removed };
+    }
+
+    it('an uninstall deletes the actions the activation published, and then the libs and the record', async () => {
+        const { storage, deleted, removed } = packageCortex('bot#alice@test-node');
+        expect(await deleteComponent(storage, 'cortex', 'pkg-laake', 'alice@test-node')).toBe(true);
+        expect(deleted).toEqual([{ id: ACTION_ID, providerGaii: 'bot#alice@test-node' }]);
+        expect(removed).toEqual(['lib:laake.js', 'record:pkg-laake']);
     });
 });
 

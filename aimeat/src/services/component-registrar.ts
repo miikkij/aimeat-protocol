@@ -15,6 +15,10 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.8.0 — 2026-09-26 — Deleting a cortex component (a package uninstall, or the rollback of a failed
+ *     install or migration) is removeCortex, the cortex uninstall: an active cortex is taken down
+ *     first, so its actions, boards, schema locks and prompts go, and its kept versions and dependency
+ *     edges go with the record (secaudit 2026-09, R4 4c).
  *   v1.7.1 — 2026-09-26 — Deleting an app component takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-24 — A memory component that names a key the node trusts (utils/reserved-keys.ts)
  *     is refused before its first entry is written, on a dry run too. The keys land in the installer's
@@ -59,6 +63,7 @@ import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { publishApp } from './app-publish.js';
 import { putProgramMap } from './data-map/data-map-access.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
+import { removeCortex } from './cortex-lifecycle.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
 
@@ -664,22 +669,13 @@ export async function deleteComponent(
       case 'extension':
         return await storage.deleteExtension(registeredAs);
       case 'cortex': {
+        // The one uninstall of a cortex (services/cortex-lifecycle.ts removeCortex): an active one is
+        // taken down first, so the actions, boards, schema locks and prompts its activation made go
+        // before the record does. The calling endpoint has checked that the caller owns the package;
+        // the actor is that owner, under the account name and the GHII the package code paths pass here.
         const ctx = await storage.getCortexExtension(registeredAs);
-        if (ctx) {
-          for (const libFile of ctx.activationArtifacts.libFiles) {
-            await storage.deleteCortexLibFile(registeredAs, libFile);
-          }
-          for (const key of ctx.activationArtifacts.seedDataKeys) {
-            await storage.deleteMemory(ctx.installedBy, key);
-          }
-          for (const key of ctx.activationArtifacts.promptKeys) {
-            await storage.deleteMemory(ctx.installedBy, key);
-          }
-          for (const key of ctx.activationArtifacts.ontologyKeys) {
-            await storage.deleteMemory(ctx.installedBy, key);
-          }
-        }
-        return await storage.deleteCortexExtension(registeredAs);
+        if (!ctx) return await storage.deleteCortexExtension(registeredAs);
+        return await removeCortex(storage, ctx, { gaii: ctx.installedBy, identity: ownerGaii });
       }
       case 'app': {
         // Three things are created for an app now that it goes through publishApp, and deleting the

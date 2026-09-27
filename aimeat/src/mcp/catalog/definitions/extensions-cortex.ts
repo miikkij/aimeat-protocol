@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.5.0 — 2026-09-26 — aimeat_cortex_delete says what an uninstall removes.
  *   v1.4.0 — 2026-09-26 — aimeat_cortex_install says that a ZIP upload under the name of a cortex the
  *     caller installed replaces it the way update:true does, and what the redeploy of an active one
  *     takes down.
@@ -139,7 +140,7 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_delete',
-        description: 'Uninstall a cortex extension by name, deactivating it first if active and removing its stored lib files. Irreversible. To merely pause it, use aimeat_cortex_deactivate instead.',
+        description: 'Uninstall a cortex extension by name. An active one is deactivated first, so its actions, boards, schema locks, prompts and ontologies go; then its seed data, stored lib files and kept versions go with it. Irreversible. To merely pause it, use aimeat_cortex_deactivate instead.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
