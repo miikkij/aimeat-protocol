@@ -92,6 +92,8 @@
  *     resolveRunVars, runSignalsOnly's loop to engine-observe.ts evalRunSignals, and the watchdog's
  *     on_timeout policy for a waiting human-input step, with HUMAN_TIMEOUT_MIN_DEFAULT, to
  *     engine-human.ts sweepHumanStep. This module still exports HUMAN_TIMEOUT_MIN_DEFAULT.
+ *   v1.16.0 — 2026-09-26 — onTaskTerminal takes a finished task only for an agent step, and only when
+ *     the task is one the engine dispatched for the step's current attempt (secaudit 2026-09, R4 row 10).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -411,7 +413,10 @@ export class WorkflowEngine {
       if (!rec) return;
       const run = rec.value as WorkflowRun;
       const rs = run.steps[stepId];
-      if (!rs || rs.state !== 'dispatched') return; // already resolved / not awaiting
+      const stepDef = run.defSnapshot.steps.find(s => s.id === stepId);
+      // Only a task the engine dispatched for the attempt that runs now decides the step, and only an
+      // agent step. Every retry replaces taskIds, so they are the tasks of the current attempt.
+      if (!rs || rs.state !== 'dispatched' || !stepDef || !isAgentStep(stepDef) || !(rs.taskIds ?? []).includes(task.id)) return;
 
       // Wait until every task of this step is terminal (a step may fan out to several agents).
       for (const tid of rs.taskIds ?? []) {
@@ -432,7 +437,6 @@ export class WorkflowEngine {
       recordProgress(rs, output.observed);
       if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, template(r.deliverableKey, run.vars)])];
 
-      const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
       if (output.ok) {
         // Reality check wins: if the leaves are present, the step is green even when the crew task
         // reported `failed` — a slow/partial crew that ultimately filled the keys still produced.

@@ -7,10 +7,14 @@
  *   the step's output while its call runs, a timeout, a retry beside a call still open, a failing
  *   call, a cancel, a restart, a cost that arrives after the run finished, and a watchdog pass that
  *   comes between a run's first save and its first step. Then a late answer of an earlier attempt,
- *   while the step runs again after a retry, for an ai step and an extension step. The model and the
- *   extension's action are stand-ins whose calls stay open until the case answers them. The same road
- *   with a real provider is test/e2e-workflows.ts.
+ *   while the step runs again after a retry, for an ai step and an extension step, and a finished
+ *   agent task, which decides only the agent step whose current attempt it was dispatched for. The
+ *   model and the extension's action are stand-ins whose calls stay open until the case answers them.
+ *   The same road with a real provider is test/e2e-workflows.ts.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — A finished agent task decides only the agent step whose current attempt it
+ *     was dispatched for, and the step's own task still decides it, also after a restart (secaudit
+ *     2026-09, R4 row 10).
  *   v1.3.0 — 2026-09-26 — An answer of an earlier attempt: a late failure leaves the step to the
  *     attempt that runs now, for an ai step and for an extension step, and a success without the
  *     output uses up no retry (secaudit 2026-09, R3 problem 2).
@@ -24,7 +28,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkflowEngine } from '../../src/services/workflow/engine.js';
 import { reservedUsd, spentUsd, pinCostEstimates } from '../../src/services/workflow/run-cost.js';
 import type { AimeatConfig } from '../../src/config.js';
-import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
+import type { Storage, MemoryRecord, AgentTaskRecord } from '../../src/storage/interface.js';
 import type {
     WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, ResolvedStepSignals, Signal,
 } from '../../src/models/workflow-schemas.js';
@@ -51,6 +55,9 @@ const WF = 'held';
 const RUN = 'run-1';
 const RUN_KEY = `workflows.run.${WF}.${RUN}`;
 
+/** The agent tasks the node holds, by id. */
+const tasks = new Map<string, AgentTaskRecord>();
+
 /**
  * Memory the way a real backend keeps it: a value goes in and comes out as a copy, so two readers
  * never share one object. `onSet` runs after a write lands.
@@ -74,7 +81,7 @@ function memStorage(onSet?: (rec: MemoryRecord) => Promise<void>): Storage {
         listMemory: async (owner: string, o?: { prefix?: string }) => listed(r => r.ownerGaii === owner, o?.prefix),
         listMemoryForOwners: async (owners: string[], o?: { prefix?: string }) => listed(r => owners.includes(r.ownerGaii), o?.prefix),
         getAgent: async () => null,
-        getAgentTask: async () => null,
+        getAgentTask: async (id: string) => { const t = tasks.get(id); return t ? structuredClone(t) : null; },
         getAgentsByOwner: async () => [],
         getEcosystemAppsByOwner: async () => [],
     } as unknown as Storage;
@@ -96,6 +103,23 @@ const extension = (id: string, extra: Partial<WorkflowStep> = {}): WorkflowStep 
     id, description: id, required_to_function: 'none', timeout_min: 1,
     action: { kind: 'extension', extension: 'demo', action: 'run', result_to_key: `out.${id}` }, ...extra,
 } as unknown as WorkflowStep);
+
+/** A step the owner's agent `writer` does: it gets a task, writes `out.<id>` and finishes the task. */
+const agentStep = (id: string, extra: Partial<WorkflowStep> = {}): WorkflowStep => ({
+    id, description: id, required_to_function: 'none', timeout_min: 1, agent: 'writer', ...extra,
+} as unknown as WorkflowStep);
+
+/** A task that names this run and `stepId` the way a task the engine dispatches does, held by the node. */
+function taskFor(id: string, stepId: string, status: AgentTaskRecord['status'] = 'done'): AgentTaskRecord {
+    const task = {
+        id, agentGaii: `writer#alice@${NODE}`, ownerGaii: OWNER, title: stepId,
+        scope: [{ name: 'workflow-run', value: `${WF}/${RUN}`, type: 'text', description: stepId }],
+        rules: [], verification: { userExpects: '', technicalChecks: [] }, todos: [],
+        status, createdAt: 't', updatedAt: 't', lastEventAt: 't',
+    } as unknown as AgentTaskRecord;
+    tasks.set(id, task);
+    return task;
+}
 
 const defOf = (steps: WorkflowStep[], cap: number): WorkflowDef => ({
     id: WF, title: WF, description: 'd', trigger: { kind: 'manual' }, vars: [], steps,
@@ -150,7 +174,7 @@ async function answer(i: number, costUsd: number, content = 'an answer'): Promis
 const callAnswers = (engine: WorkflowEngine, stepId: string, ok: boolean, costUsd: number, attempt = 0) =>
     engine.onPushTerminal(OWNER, WF, RUN, stepId, ok, costUsd, attempt);
 
-beforeEach(() => { model.calls.length = 0; sandbox.runs.length = 0; });
+beforeEach(() => { model.calls.length = 0; sandbox.runs.length = 0; tasks.clear(); });
 
 describe('an ai step\'s call holds its share of the limit until it answers', () => {
     it('the watchdog finds the output while the call runs: the call keeps its hold, and the waiting step starts when it answers', async () => {
@@ -479,5 +503,73 @@ describe('a run\'s first step starts once', () => {
         expect(model.calls).toHaveLength(1);
         expect(reservedUsd(run)).toBeCloseTo(0.05, 10);
         expect(spentUsd(run)).toBe(0);
+    });
+});
+
+describe('a finished agent task decides only the agent step whose current attempt it was dispatched for', () => {
+    it('a task named after an ai step decides nothing: the step waits for its own model call', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left', { retry: { max: 1, backoff_min: 0 } })], 0.05), {
+            left: stepAt('dispatched', { holds: 0.02, estimate: 0.02, startedMsAgo: 10_000 }),
+        });
+        const engine = engineFor(storage);
+
+        // A task made with the ai step's scope ends while the step's model call is still open.
+        await engine.onTaskTerminal(taskFor('t-made', 'left'), 'done');
+        const run = await readRun(storage);
+        expect(run.steps.left.state).toBe('dispatched');
+        expect(run.steps.left.attempt).toBe(0);
+        expect(model.calls).toHaveLength(0);
+        expect(reservedUsd(run)).toBeCloseTo(0.02, 10);
+    });
+
+    it('a task of an earlier attempt decides nothing, also when the task of the attempt that runs now is gone', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([agentStep('left', { retry: { max: 1, backoff_min: 0 } })], 0.05), {
+            left: { ...stepAt('dispatched', { startedMsAgo: 10_000 }), attempt: 1, taskIds: ['t-now'] },
+        });
+        const engine = engineFor(storage);
+
+        // The task of attempt 0 ends late. The task of attempt 1, t-now, was deleted.
+        await engine.onTaskTerminal(taskFor('t-before', 'left'), 'done');
+        const run = await readRun(storage);
+        expect(run.steps.left.state).toBe('dispatched');
+        expect(run.steps.left.attempt).toBe(1);
+        expect(run.steps.left.taskIds).toEqual(['t-now']);
+        expect(run.status).toBe('waiting-step');
+    });
+
+    it('a task made with the step\'s scope decides nothing, and the step\'s own task still decides it', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([agentStep('left')], 0.05), {
+            left: { ...stepAt('dispatched', { startedMsAgo: 10_000 }), taskIds: ['t-own'] },
+        });
+        taskFor('t-own', 'left', 'active');
+        const engine = engineFor(storage);
+
+        await engine.onTaskTerminal(taskFor('t-made', 'left'), 'done');
+        let run = await readRun(storage);
+        expect(run.steps.left.state).toBe('dispatched');
+
+        // The agent writes the output and finishes the step's own task.
+        await put(storage, OWNER, 'out.left', 'written by the agent');
+        await engine.onTaskTerminal(taskFor('t-own', 'left', 'done'), 'done');
+        run = await readRun(storage);
+        expect(run.steps.left.state).toBe('green');
+        expect(run.status).toBe('done');
+    });
+
+    it('after a restart, the step\'s own task that ended while the node was down decides the step', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([agentStep('left')], 0.05), {
+            left: { ...stepAt('dispatched', { startedMsAgo: 10_000 }), taskIds: ['t-own'] },
+        });
+        taskFor('t-own', 'left', 'done');
+        await put(storage, OWNER, 'out.left', 'written by the agent');
+
+        await engineFor(storage).resumeInflight();
+        const run = await readRun(storage);
+        expect(run.steps.left.state).toBe('green');
+        expect(run.status).toBe('done');
     });
 });
