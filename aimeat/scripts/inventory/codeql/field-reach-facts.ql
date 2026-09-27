@@ -313,6 +313,10 @@ string surfaceOfFile(File f) {
   not f.getRelativePath().matches("src/cli/connect/mcp/%") and
   result = "cli.dispatch"
   or
+  // These definitions are shared by CLI and node invocation after the transport extraction.
+  // Their REST calls still prove the same CLI dispatch reach; do not lose them on a path move.
+  f.getRelativePath().matches("src/tool-dispatch/%") and result = "cli.dispatch"
+  or
   f.getRelativePath().matches("src/mcp/%") and result = "mcp.node"
 }
 
@@ -534,7 +538,11 @@ DataFlow::FunctionNode clientReach(DataFlow::FunctionNode u) {
     mid = clientReach(u) and
     callIn(call, mid) and
     result = calleeOf(call) and
-    result.getFile().getRelativePath().matches("src/cli/%")
+    (
+      result.getFile().getRelativePath().matches("src/cli/%")
+      or
+      result.getFile().getRelativePath().matches("src/tool-dispatch/%")
+    )
   )
 }
 
