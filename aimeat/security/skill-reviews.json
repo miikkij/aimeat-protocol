@@ -191,7 +191,7 @@
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:36b0699d57d6b4877c52b848"
+      "digest": "sha256:0ff0f075a0df183d122b6ed5"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-09-26",
@@ -232,7 +232,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:ec70ed83e6809fc6d48a22fe"
+      "digest": "sha256:99c2edd3669a4b9ea451392d"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-27",
@@ -440,8 +440,8 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "1cf5d3f6b45c5cb9",
-      "aimeat/src/routes/ghii/register-login.ts": "ab22b99f8c27a3b8",
+      "aimeat/src/routes/agents/device-auth.ts": "adf10232e2b2acac",
+      "aimeat/src/routes/ghii/register-login.ts": "5b394a0c41435277",
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
     "node:ai-transparency": {
@@ -459,7 +459,7 @@
       "aimeat/src/routes/memory/shared.ts": "4dfb11c1bdee087c"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "1cf5d3f6b45c5cb9",
+      "aimeat/src/routes/agents/device-auth.ts": "adf10232e2b2acac",
       "aimeat/src/mcp/catalog/scopes.ts": "dffd85ec4c3c727a",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
