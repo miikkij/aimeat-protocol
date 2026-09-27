@@ -13,6 +13,12 @@
  *   An AI provenance record outlives its owner for a like reason: it answers "which model made these
  *   bytes" for content that can outlive the account ("AiProvenance" in the same file).
  *
+ *   Work between two accounts is the same kind of record. Finished work is the other side's book
+ *   entry, so it stays. Open work cannot go on without the erased side: it is cancelled, and when the
+ *   erased person was the one to do it, the morsels held from the requester go back to the requester.
+ *   When the erased person asked for it, the morsels held were their own, and they go with the
+ *   account.
+ *
  *   WHY THE NAME CANNOT STAY IN IT. A deleted username is released for reuse (decision 2026-08-10),
  *   and every purchase read keys on `name@node`. A receipt that kept the name therefore belonged to
  *   whoever registered that name next: the receipts, the paid content in them and a valid licence.
@@ -27,10 +33,15 @@
  *   - ERASED_PARTY_PREFIX: what every pseudonym starts with
  *   - erasedPartyPseudonym(): one fresh pseudonym, for one erasure
  *   - partyIdentities(name, ghiis): every value a receipt may name this person by
+ *   - isPartyIdentity(identity, name, ghiis): the same identities, as a test on one value
+ *   - OPEN_WORK_STATUSES: the work statuses an erasure cancels
  * @usage
  *   import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
  *   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
  * @version-history
+ *   v1.2.0 — 2026-09-26 — Work: open requests are cancelled and the requester's held morsels go back,
+ *     finished work stays under the pseudonym (isPartyIdentity, OPEN_WORK_STATUSES; secaudit 2026-09:
+ *     A8-4, N6).
  *   v1.1.0 — 2026-09-26 — The AI provenance records an erased person owns take the same pseudonym, in
  *     both cascades (secaudit 2026-09: A8-4). No change to the rule itself.
  *   v1.0.0 — 2026-09-24 — Initial: the purchase receipts an erased buyer or seller is a party to
@@ -76,3 +87,18 @@ export function partyIdentities(name: string, ghiis: string[]): { exact: string[
     suffixPatterns: [...new Set(ghiis)].map(g => `%#${escapeLike(g)}`),
   };
 }
+
+/**
+ * The identities partyIdentities lists, as a test on one value. For code that has read a row and has
+ * to say which of its two sides is the erased person.
+ */
+export function isPartyIdentity(identity: string, name: string, ghiis: string[]): boolean {
+  return identity === name || ghiis.some(g => identity === g || identity.endsWith(`#${g}`));
+}
+
+/**
+ * The statuses in which work is still open: the provider has not delivered, and what the requester
+ * was charged is held for it. Every other status is finished work: delivered, rated, settled,
+ * cancelled, or a dispute that follows a delivery.
+ */
+export const OPEN_WORK_STATUSES: readonly string[] = ['pending', 'accepted', 'in_progress'];

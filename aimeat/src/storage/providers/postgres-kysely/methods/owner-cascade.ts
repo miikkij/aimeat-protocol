@@ -29,9 +29,14 @@
  *   - cascadeDeleteIdentityData(db, gaii) — every owner-scoped table for ONE identity (GHII or GAII)
  *   - pseudonymisePurchasePartiesDb(db, name, ghiis, pseudonym) — the kept receipts, without the name
  *   - pseudonymiseProvenanceOwnerDb(db, name, ghiis, pseudonym) — the kept AI provenance, without it
+ *   - settleErasedPartyWorkDb(db, name, ghiis, pseudonym) — open work cancelled, held morsels back,
+ *     finished work kept without the name
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.6.0 — 2026-09-26 — settleErasedPartyWorkDb runs first in deleteOwnerCascade: open work is
+ *     cancelled and the requester's held morsels go back with a ledger line, finished work and its
+ *     dispute stay for the other side under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
  *   v1.5.0 — 2026-09-26 — deleteOwnerCascade deletes the actions the owner published in person, stored
  *     under the bare account name, and pseudonymiseProvenanceOwnerDb rewrites the owner and principal
  *     of the kept AI provenance records to the erasure's pseudonym. A freed name inherits neither
@@ -51,10 +56,13 @@
  *   v1.0.0 — 2026-08-11 — Initial: Postgres reaches parity with the SQLite cascade, and the whole
  *     delete runs in one transaction (GAP-001's first half).
  */
+import { randomUUID } from 'node:crypto';
+import { sql } from 'kysely';
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
 import { pseudonymiseTallyWriterDb } from './memory-tally.js';
-import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
+import { resolveGhii } from '../ghii-resolve.js';
+import { erasedPartyPseudonym, partyIdentities, isPartyIdentity, OPEN_WORK_STATUSES } from '../../../erased-party.js';
 
 /** A Kysely handle: the root connection or an open transaction. */
 type Db = Kysely<DB>;
@@ -254,17 +262,100 @@ export async function pseudonymiseProvenanceOwnerDb(
 }
 
 /**
+ * Settle every work row an erased person is a party to, and take their name out of what stays.
+ *
+ * The rule and its reasons are written on the SQLite twin, settleErasedPartyWork in
+ * ../../sqlite/repos/work-erasure.ts, and both keep to it: open work is cancelled, and when the erased
+ * person was the one to do it, the requester's held morsels go back with an `escrow_return` line in
+ * the requester's ledger. Finished work stays under the pseudonym, with its status, its times and the
+ * delivery, and so does a dispute on it; its log keeps its hashes. A row between two identities of
+ * the erased person goes with its dispute.
+ *
+ * Postgres LIKE escapes with a backslash by default, which is how partyIdentities escapes.
+ */
+export async function settleErasedPartyWorkDb(
+  db: Db, name: string, ghiis: string[], pseudonym: string,
+): Promise<{ cancelled: number; returned: number; kept: number; deleted: number }> {
+  const { exact, suffixPatterns } = partyIdentities(name, ghiis);
+  const rows = await db.selectFrom('Work')
+    .select(['trackingCode', 'status', 'providerGaii', 'requesterGaii', 'costTotal'])
+    .where(eb => eb.or([
+      eb('providerGaii', 'in', exact), ...suffixPatterns.map(p => eb('providerGaii', 'like', p)),
+      eb('requesterGaii', 'in', exact), ...suffixPatterns.map(p => eb('requesterGaii', 'like', p)),
+    ]))
+    .execute();
+
+  const out = { cancelled: 0, returned: 0, kept: 0, deleted: 0 };
+  const now = new Date();
+  for (const w of rows) {
+    const providerGone = isPartyIdentity(w.providerGaii, name, ghiis);
+    const requesterGone = isPartyIdentity(w.requesterGaii, name, ghiis);
+    // DisputeAudit keys on Dispute.disputeId, the business key, not on the surrogate id.
+    const disputeIds = db.selectFrom('Dispute').select('disputeId').where('trackingCode', '=', w.trackingCode);
+    if (providerGone && requesterGone) {
+      await db.deleteFrom('DisputeAudit').where('disputeId', 'in', disputeIds).execute();
+      await db.deleteFrom('Dispute').where('trackingCode', '=', w.trackingCode).execute();
+      await db.deleteFrom('Work').where('trackingCode', '=', w.trackingCode).execute();
+      out.deleted++;
+      continue;
+    }
+
+    const open = OPEN_WORK_STATUSES.includes(w.status);
+    if (open && providerGone && w.costTotal > 0) {
+      const payer = await resolveGhii(db, w.requesterGaii);
+      const credited = payer
+        ? await db.updateTable('Ghii').set({ morselBalance: sql`COALESCE("morselBalance", 0) + ${w.costTotal}` })
+          .where('ghii', '=', payer).executeTakeFirst()
+        : null;
+      if (payer && Number(credited?.numUpdatedRows ?? 0) > 0) {
+        await db.insertInto('Transaction').values({
+          txId: `tx-${randomUUID()}`, gaii: payer, type: 'escrow_return', amount: w.costTotal,
+          counterpartyGaii: pseudonym, trackingCode: w.trackingCode,
+          initiatorGaii: payer !== w.requesterGaii ? w.requesterGaii : null, timestamp: now,
+        }).execute();
+        out.returned++;
+      }
+    }
+
+    await db.updateTable('Work').set({
+      status: open ? 'cancelled' : w.status,
+      providerGaii: providerGone ? pseudonym : w.providerGaii,
+      requesterGaii: requesterGone ? pseudonym : w.requesterGaii,
+      ...(requesterGone ? { callbackUrl: null } : {}),
+      ...(open ? { updatedAt: now } : {}),
+    }).where('trackingCode', '=', w.trackingCode).execute();
+    await db.updateTable('Dispute').set({ openedBy: pseudonym })
+      .where('trackingCode', '=', w.trackingCode)
+      .where(eb => eb.or([eb('openedBy', 'in', exact), ...suffixPatterns.map(p => eb('openedBy', 'like', p))]))
+      .execute();
+    await db.updateTable('DisputeAudit').set({ actor: pseudonym })
+      .where('disputeId', 'in', disputeIds)
+      .where(eb => eb.or([eb('actor', 'in', exact), ...suffixPatterns.map(p => eb('actor', 'like', p))]))
+      .execute();
+    if (open) out.cancelled++; else out.kept++;
+  }
+  return out;
+}
+
+/**
  * Delete an owner and everything owner-scoped underneath. Runs every agent GAII and every GHII
  * through {@link cascadeDeleteIdentityData}, then clears the tables keyed by the owner NAME.
  * Returns true when an Owner row was actually removed.
  */
 export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean> {
+  // The work this person is a party to, settled before the per-identity passes below delete what
+  // they find: open work is cancelled and the requester's held morsels go back, finished work stays
+  // for the other side under the erasure's pseudonym. One pseudonym for the whole erasure, so the
+  // other side's books still see one party.
+  const ghiis = await db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).execute();
+  const pseudonym = erasedPartyPseudonym();
+  await settleErasedPartyWorkDb(db, name, ghiis.map(g => g.ghii), pseudonym);
+
   // Per-identity data: agents first, then the person's own GHIIs.
   const agents = await db.selectFrom('Agent').select('gaii').where('owner', '=', name).execute();
   for (const a of agents) await cascadeDeleteIdentityData(db, a.gaii);
   await db.deleteFrom('Agent').where('owner', '=', name).execute();
 
-  const ghiis = await db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).execute();
   for (const g of ghiis) await cascadeDeleteIdentityData(db, g.ghii);
 
   // An action the owner published in person. It is stored under the bare account name (the owner
@@ -280,8 +371,7 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
 
   // The purchase receipts this person is a party to stay, because each one is also the other side's
   // book entry. The name leaves them: it is released for reuse, and every purchase read keys on it.
-  // One pseudonym for the whole erasure, so the books still see one party.
-  const pseudonym = erasedPartyPseudonym();
+  // The pseudonym is the one the work above took.
   await pseudonymisePurchasePartiesDb(db, name, ghiis.map(g => g.ghii), pseudonym);
   // The AI provenance records stay too, for the content that outlives the account. The name leaves
   // the two columns every owner read keys on, under the same pseudonym.
