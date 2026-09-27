@@ -67,8 +67,9 @@ domain logic.
    enabled (`AIMEAT_CONNECT_TUNNEL_ENABLED=true`). If it is off or the node is
    older, `serve_params` still works — it transparently degrades to direct HTTP +
    polling (no crash), you just don't get push delivery. Check the active mode via
-   `GET http://127.0.0.1:<port>/local/status` or the `transport` field in
-   `<AIMEAT_HOME>/serve.json`.
+   `GET http://127.0.0.1:<port>/local/status` with `Authorization: Bearer <secret>`
+   (the `secret` in serve.json; aimeat 3.20.0 refuses the request without it), or
+   read the `transport` field in `<AIMEAT_HOME>/serve.json`.
 
 5. **Verify** end to end:
    - Run the crew once; confirm the liaison's AIMEAT tool calls succeed.

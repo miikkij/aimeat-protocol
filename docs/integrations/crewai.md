@@ -112,6 +112,13 @@ and tasks arrive in realtime (push) rather than by polling. `serve_params`
 auto-starts the daemon via its discovery file (`<AIMEAT_HOME>/serve.json`) if one
 isn't already running, and reuses it across crews.
 
+The daemon checks a secret it writes into `serve.json` at every start. `serve_params`,
+the daemon REST helpers and `serve_client()` send it (aimeat-crewai 0.29.0+); a client
+that builds its own HTTP session adds `serve_auth_headers(ensure_serve())`. The daemon
+in aimeat 3.19.x still lets in a request that sends no secret, and names its caller once
+in the daemon's log so that you can find the program to update. From aimeat 3.20.0 it
+refuses that request with 401. A request with a wrong secret gets 401 in both releases.
+
 ```python
 from aimeat_crewai import serve_params
 params = serve_params(agent_name="marketing-crew")
