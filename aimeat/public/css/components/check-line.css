@@ -45,7 +45,7 @@
   user-select: none;
 }
 .check--pill:hover { background: var(--surface); }
-.check--pill:has(input:checked) { background: var(--sun); color: var(--on-sun); }
+.check--pill:has(input:checked) { background: var(--shape-chosen-ground); color: var(--on-sun); }
 .check--pill input { margin: 0; accent-color: var(--text); }
 
 /* `ruled` (appcat parity): one choice of a list, 12px above and under it and a thin rule under it, the

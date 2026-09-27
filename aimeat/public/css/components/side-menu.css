@@ -65,7 +65,7 @@
   border: var(--shape-frame-heavy) solid var(--shape-frame-colour); background: var(--card-bg); font-size: 1.1rem;
 }
 .side-menu-title-words {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; line-height: var(--font-poster-leading);
+  font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: 1rem; line-height: var(--font-poster-leading);
   letter-spacing: var(--font-poster-tracking); text-transform: var(--shape-case-heading); color: var(--text);
 }
 .side-menu-tally { margin-left: auto; flex: 0 0 auto; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }

@@ -332,7 +332,7 @@
 @keyframes list-index-in { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
 .listing.list--index > .listing-row > div:not(.listing-open) { padding: 0; border-bottom: 0; min-width: 0; }
 .listing.list--index > .listing-row:hover { background: var(--bg-surface); }
-.listing.list--index > .listing-row.is-open { background: var(--sun); color: var(--on-sun); }
+.listing.list--index > .listing-row.is-open { background: var(--shape-chosen-ground); color: var(--on-sun); }
 .listing.list--index > .listing-row.is-open .listing-name small, .listing.list--index > .listing-row.is-open > .listing-desc { color: var(--on-sun); }
 .listing.list--index > .listing-row.is-faded .avatar { border-style: dashed; border-color: var(--muted); }
 /* The old page faded the whole row, its ground too: an unlisted row under the pointer or opened
@@ -371,7 +371,7 @@
 .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(5) { font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--accent); text-transform: var(--shape-case-label); letter-spacing: .04em; }
 .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row.is-faded > :nth-child(5) { color: var(--text-dim); }
 .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :is(:nth-child(6), :nth-child(7)) {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.125rem; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--text);
+  font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: 1.125rem; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--text);
 }
 @media (max-width: 900px) {
   .listing.list--index > .listing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 0; }

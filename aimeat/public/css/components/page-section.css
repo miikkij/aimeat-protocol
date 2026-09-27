@@ -115,7 +115,7 @@
 .og-sec-h--folds { cursor: pointer; }
 .og-sec-fold {
   flex: none; background: none; border: 0; padding: 0; cursor: pointer; transform: rotate(180deg); transition: transform .2s;
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; color: var(--text);
+  font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: 1rem; color: var(--text);
 }
 .og-sec-fold.og-sec-fold--shut { transform: none; }
 /* PageSection list `spaced` and `foot` (appcat parity): 6px between the headline and the list (the
