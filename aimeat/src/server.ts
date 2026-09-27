@@ -9,9 +9,14 @@
  * @structure
  *   - ServerResult: bundle returned by createServer (app + tunnel/realtime/scheduler/storage managers)
  *   - ConfigSources: provenance metadata (env/file/cli keys) passed in for accurate tracking
- *   - createServer: builds and wires the Express app and its background managers
+ *   - createServer: runs buildServer as this node (runAsNode, utils/gaii.ts)
+ *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.3.0 — 2026-09-26 — Everything createServer starts runs as this node: the body is buildServer,
+ *     run inside runAsNode(config.nodeId). Its timers, cron jobs, sweeps and the jobs it does not wait
+ *     for answer for this node also in a process that serves more than one node, whichever node booted
+ *     last. One node per process in production, so no answer there changes.
  *   v1.2.0 — 2026-09-26 — Every request runs as this node (runAsNode, utils/gaii.ts), so an identity
  *     is cut to an account name for the node that serves the request.
  *   v1.1.0 — 2026-09-08 — /v1/mcp is parsed at the large body limit like the file doors it fronts.
@@ -63,7 +68,31 @@ export interface ConfigSources {
   fileName: string | null;
 }
 
+/**
+ * Build this node's server, and run everything the build starts as THIS node (runAsNode, utils/gaii.ts).
+ *
+ * A timer, a cron job, a sweep and a job the build starts and does not wait for each keep the node
+ * they were started under, so localAccountName and localAccountOf answer for this node in its
+ * watchdog, its scheduler, its retries and its sweeps. That holds also in a process that serves more
+ * than one node, as the multi-node E2E suites do, whichever node booted last and was registered last.
+ *
+ * The node is set once, here, and not where each of those is started. They are started in more than a
+ * dozen places across the bootstrap steps and the services, and one started later in a new place
+ * would answer for the wrong node without anyone noticing. Three things run outside what this
+ * reaches, and they name their node themselves: a request (see the first middleware of buildServer);
+ * an event-bus listener, which runs as whoever emitted the event (routes/sse.ts, process-buffers.ts,
+ * background-jobs.ts, services/connect-tunnel.ts); and a WebSocket upgrade and each handler of an
+ * open socket that reaches storage or an identity (index-start.ts, and the connect-tunnel,
+ * personal-tunnel and realtime-manager services).
+ *
+ * A production process serves one node, and that node is also the one registered at boot, so no
+ * answer changes there.
+ */
 export async function createServer(config: AimeatConfig, configSources?: ConfigSources): Promise<ServerResult> {
+  return runAsNode(config.nodeId, () => buildServer(config, configSources));
+}
+
+async function buildServer(config: AimeatConfig, configSources?: ConfigSources): Promise<ServerResult> {
   const app = express();
 
   // Per-request storage profiler (opt-in: config.perfTrace + ?trace=1). Outermost so its wall-clock
@@ -73,7 +102,8 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   // Every request runs as THIS node, so localAccountName and localAccountOf (utils/gaii.ts) cut this
   // node's identities and keep every other node's whole, also in a process that serves more than one
   // node. Before everything else the request meets, so that every middleware and route after it, and
-  // whatever they schedule, is inside it.
+  // whatever they schedule, is inside it. createServer's runAsNode does not reach a request: the
+  // server listens after createServer returns, so a request arrives as no node until this line.
   app.use((_req, _res, next) => runAsNode(config.nodeId, () => next()));
 
   // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies

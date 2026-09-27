@@ -21,12 +21,16 @@
  *     write half runs on shutdown only). Found while writing test/e2e-realtime-rooms.ts, the first
  *     suite in this repo to open a realtime socket at all. Until it, 23 of this class's 28 members
  *     ran in no test, which is how two of them could be dead without anybody noticing.
+ *   v1.3.0 — 2026-09-26 — The frame, close and error handlers of a peer's socket run as this node
+ *     (runAsNode, utils/gaii.ts), also in a process that serves more than one node. One node per
+ *     process in production, so nothing there changes.
  */
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { runAsNode } from '../utils/gaii.js';
 import type {
   RealtimeMessage,
   PeerConnection,
@@ -219,8 +223,9 @@ export class RealtimeManager {
       });
     }
 
-    // Register WS handlers
-    ws.on('message', (data) => {
+    // Register WS handlers. A socket event arrives as no node, so each one runs as THIS node
+    // (runAsNode). One node per process in production.
+    ws.on('message', (data) => runAsNode(this.config.nodeId, () => {
       try {
         const raw = typeof data === 'string' ? data : data.toString('utf-8');
         if (raw.length > this.config.realtimeMaxMessageSizeBytes) {
@@ -240,10 +245,10 @@ export class RealtimeManager {
       } catch {
         this.sendToWs(ws, { type: 'error', code: 'INVALID_MESSAGE', message: 'Could not parse message' });
       }
-    });
+    }));
 
-    ws.on('close', () => this.removePeer(peerId));
-    ws.on('error', () => this.removePeer(peerId));
+    ws.on('close', () => runAsNode(this.config.nodeId, () => this.removePeer(peerId)));
+    ws.on('error', () => runAsNode(this.config.nodeId, () => this.removePeer(peerId)));
 
     this.updatePeakPeers();
     logger.info('Peer joined room', { roomId, peerId, nick });

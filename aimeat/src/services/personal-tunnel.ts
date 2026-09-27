@@ -13,6 +13,9 @@
  *   - setNotificationService(): wires optional mailbox-notification delivery
  *
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The frame and close handlers of a socket run as this node (runAsNode,
+ *     utils/gaii.ts), also in a process that serves more than one node. One node per process in
+ *     production, so nothing there changes.
  *   v1.1.0 — 2026-09-08 — A replaced socket's close handler no longer unregisters the socket that
  *     replaced it. The registry entry is deleted, and the node marked offline, only by the socket
  *     the registry still points at. Found by e2e-personal-tunnel the day it first opened the tunnel.
@@ -24,6 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from './mailbox-notification.js';
 import { logger } from '../utils/logger.js';
+import { runAsNode } from '../utils/gaii.js';
 import { getStats } from './stats.js';
 import { getPromMetrics } from './prometheus.js';
 
@@ -127,7 +131,8 @@ export class TunnelManager {
     // Send initial message with mailbox summary
     this.sendMailboxSummary(nodeId, ws);
 
-    ws.on('message', (data) => {
+    // A frame arrives as no node, so it runs as THIS node (runAsNode). One node per process in production.
+    ws.on('message', (data) => runAsNode(this.config.nodeId, () => {
       try {
         const msg: TunnelMessage = JSON.parse(data.toString());
         this.handleMessage(nodeId, msg);
@@ -138,9 +143,10 @@ export class TunnelManager {
           error: err,
         });
       }
-    });
+    }));
 
-    ws.on('close', () => {
+    // A close arrives as no node, so it runs as THIS node (runAsNode). One node per process in production.
+    ws.on('close', () => runAsNode(this.config.nodeId, () => {
       // A socket that was replaced (handleConnection closed it because the same node reconnected)
       // is no longer the registry's entry for this node id: the new socket is. Deleting by id here
       // dropped that live socket from the registry, so connections_active read 0 and the status
@@ -167,7 +173,7 @@ export class TunnelManager {
         personal_node_id: nodeId,
         reason: 'clean',
       });
-    });
+    }));
 
     ws.on('error', (err) => {
       logger.error('Personal node WebSocket error', {

@@ -15,10 +15,13 @@
  *   - isForeignPrincipal / homeIdentityOf / FEDERATED_ROLE: a session signed in on another node
  *   - setThisNodeId / runAsNode / localAccountName / localAccountOf: the account an identity names on
  *     THIS node, for a lookup (another node's identity comes back whole) or a decision (it comes back
- *     null); "this node" is the node serving the request, else the node registered at boot
+ *     null); "this node" is the node the code runs as (runAsNode), else the node registered at boot
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.8.1 — 2026-09-26 — The comments name every place a node's code runs as that node: its
+ *     requests, everything createServer starts, its event-bus listeners, its WebSocket upgrades and
+ *     the handlers of its open sockets.
  *   v1.8.0 — 2026-09-26 — runAsNode: server.ts runs each request as the node that serves it, and
  *     localAccountName and localAccountOf answer for that node. In a process that serves more than one
  *     node (the multi-node E2E suites), each node's own identities are cut and every other node's stay
@@ -263,29 +266,35 @@ export function homeIdentityOf(auth: { owner: string; homeNode?: string }): stri
  *
  * It is one value for the whole process, and the last node to boot sets it. A production process
  * serves one node, so there it names that node. A process that serves more than one node (the
- * multi-node E2E suites boot two or three) needs the answer for the node a request reached, so a
- * request is answered for the node that serves it (runAsNode), and this value is for code that runs
- * outside a request.
+ * multi-node E2E suites boot two or three) needs the answer for the node whose code is running, so
+ * that code runs as its node (runAsNode): each request (server.ts), everything createServer starts
+ * (its timers, cron jobs, sweeps and the jobs it does not wait for), each event-bus listener that
+ * cuts an identity, each WebSocket upgrade (index-start.ts), and each handler of an open socket that
+ * reaches storage or an identity (connect-tunnel.ts, personal-tunnel.ts, realtime-manager.ts). This
+ * value is for code that runs as no node: the connector CLI and a unit test.
  */
 let thisNodeId: string | null = null;
 export function setThisNodeId(nodeId: string | null): void {
   thisNodeId = nodeId;
 }
 
-/** The node serving the current request, for the length of that request (runAsNode). */
+/** The node the current code runs as (runAsNode), for as long as that code and what it started run. */
 const servingNode = new AsyncLocalStorage<string>();
 
 /**
  * Run `fn` as the node `nodeId`: localAccountName and localAccountOf inside it, and inside everything
  * it awaits or schedules, answer for that node. server.ts runs every request of a node's app this
- * way. Outside a request (boot, a scheduled sweep, a WebSocket upgrade) the node registered with
- * setThisNodeId answers.
+ * way, and createServer runs the whole boot this way, so every timer, cron job and sweep it starts
+ * keeps its node. An event-bus listener runs as whoever emitted the event, so a listener that cuts an
+ * identity calls this itself with its own node. A WebSocket upgrade and an event on an open socket
+ * arrive as no node, so index-start.ts and the socket managers call this with their own node too.
+ * Code that runs as no node gets the node registered with setThisNodeId.
  */
 export function runAsNode<T>(nodeId: string, fn: () => T): T {
   return servingNode.run(nodeId, fn);
 }
 
-/** The node a cut answers for: the one serving this request, else the one registered at boot. */
+/** The node a cut answers for: the one the code runs as, else the one registered at boot. */
 function currentNodeId(): string | null {
   return servingNode.getStore() ?? thisNodeId;
 }
@@ -306,7 +315,7 @@ function currentNodeId(): string | null {
  * ends in this node, and cut at the first '@' it named the namesake again. Cut at the last, it is
  * `alice@their-node`, the visitor, and every identity of this node is cut exactly as before.
  *
- * THIS node is the node serving the current request (runAsNode), else the node registered at boot.
+ * THIS node is the node the code runs as (runAsNode), else the node registered at boot.
  */
 export function localAccountName(identity: string): string {
   const s = String(identity ?? '');

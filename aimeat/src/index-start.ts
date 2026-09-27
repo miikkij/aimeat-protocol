@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — A WebSocket upgrade runs as this node (runAsNode, utils/gaii.ts), so it
+ *     answers for this node also in a process that serves more than one node. The handler body is
+ *     onUpgrade, unchanged. One node per process in production, so nothing there changes.
  *   v1.2.0 — 2026-09-24 — The personal tunnel upgrade asks the question its anchor door asks: is this
  *     the account holder in person (isOwnerPrincipal). It verified the token and then found the node
  *     by the token's owner NAME, so any of the owner's agents, and a visitor from another node sharing
@@ -18,10 +21,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
+import type { Duplex } from 'node:stream';
 import { createServer, type ConfigSources } from './server.js';
 import { securityPostureWarnings } from './config.js';
 import type { AimeatConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
+import { runAsNode } from './utils/gaii.js';
 
 /**
  * Start an AIMEAT node. Runs the post-upgrade asset self-heal, launches the HTTP
@@ -219,7 +225,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       return true;
     }
 
-    server.on('upgrade', async (request, socket, head) => {
+    const onUpgrade = async (request: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> => {
       const url = new URL(request.url ?? '', `http://${request.headers.host}`);
 
       // ── Personal tunnel upgrade ──
@@ -450,7 +456,15 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
 
       // Unknown WebSocket path
       socket.destroy();
-    });
+    };
+
+    // An upgrade runs as THIS node (runAsNode, utils/gaii.ts). The server listens outside
+    // createServer, so an upgrade arrives as no node, and this line gives it its node, also in a
+    // process that serves more than one node. A production process serves one node, so nothing there
+    // changes. An event that arrives later on the open socket arrives as no node again, and the socket
+    // managers (connect-tunnel.ts, personal-tunnel.ts, realtime-manager.ts) run each handler that
+    // reaches storage or an identity as their node.
+    server.on('upgrade', (request, socket, head) => { void runAsNode(config.nodeId, () => onUpgrade(request, socket, head)); });
 
     if (tunnelManager) logger.info('WebSocket upgrade handler registered for /v1/personal/tunnel');
     if (realtimeManager) logger.info('WebSocket upgrade handler registered for /v1/realtime/ws');

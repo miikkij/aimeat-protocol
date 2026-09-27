@@ -21,13 +21,16 @@
  *   v1.0.1 — 2026-09-26 — The owner in the cache tag comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
+ *   v1.0.2 — 2026-09-26 — The cache-invalidation listener runs as this node (runAsNode), so the owner
+ *     tag is cut for this node when another node in the same process emits. One node per process in
+ *     production, so nothing there changes.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { onChangeEvent } from '../services/event-bus.js';
 import { invalidateTag } from '../services/cache.js';
-import { localAccountName } from '../utils/gaii.js';
+import { localAccountName, runAsNode } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
 import { configureAuthAudit } from '../services/auth-audit.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
@@ -69,13 +72,16 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // into cache tag drops. The broad `domain:<d>` tag is the safety net for write paths that don't
   // carry an owner; the owner-scoped tag is the precise drop when they do. Read paths opt in by
   // tagging their cached() entries with these same tags (see services/cache.ts).
-  onChangeEvent((evt) => {
+  // The bus calls a listener as whoever emitted the event, which in a process that serves more than
+  // one node can be another node, so this one runs as THIS node and cuts the owner for it. A
+  // production process serves one node, so nothing there changes.
+  onChangeEvent((evt) => runAsNode(config.nodeId, () => {
     invalidateTag(`domain:${evt.domain}`);
     if (evt.ownerGaii) {
       const owner = localAccountName(evt.ownerGaii);
       if (owner) invalidateTag(`owner:${owner}:${evt.domain}`);
     }
-  });
+  }));
 
   return { webhookDispatcher, stats };
 }

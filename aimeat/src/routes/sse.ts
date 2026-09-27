@@ -11,6 +11,10 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   v1.5.2 -- 2026-09-26 -- The change listener runs as this node (runAsNode, utils/gaii.ts). A
+ *     listener runs as whoever emitted the event, and in a process that serves more than one node
+ *     that can be another node; now the stream matches the owner for the node that opened it. One
+ *     node per process in production, so nothing there changes.
  *   v1.5.1 -- 2026-09-26 -- The owner segment an event is matched on comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so a visitor's stream never
  *     hears the local namesake's events (secaudit 2026-09, F-1).
@@ -41,7 +45,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { onChangeEvent, offChangeEvent } from '../services/event-bus.js';
 import type { ChangeEvent } from '../services/event-bus.js';
-import { resolveIdentity, localAccountName } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName, runAsNode } from '../utils/gaii.js';
 import { presence } from '../services/presence.js';
 import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-domain-scopes.js';
 
@@ -167,7 +171,10 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
       res.write(`data: ${JSON.stringify({ domains })}\n\n`);
       flush();
     };
-    const handler = (evt: ChangeEvent): void => {
+    // The bus calls this as whoever emitted the event, which in a process that serves more than one
+    // node can be another node. So it runs as THIS node, and matches the owner for the node that
+    // opened the stream. A production process serves one node, so nothing there changes.
+    const handler = (evt: ChangeEvent): void => runAsNode(config.nodeId, () => {
       // Owner-private events for a different owner are not this client's business.
       if (evt.ownerGaii && localAccountName(evt.ownerGaii) !== ownerKey) return;
       // Scope gate: a restricted principal (app grant, agent, eco app) is told only about the
@@ -182,7 +189,7 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
       } else {
         trailingTimer = setTimeout(() => { trailingTimer = null; flushChange(); }, COALESCE_MS - since);
       }
-    };
+    });
     onChangeEvent(handler);
 
     // Cleanup on disconnect
