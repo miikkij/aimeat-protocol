@@ -7,6 +7,8 @@
  *   the centred card of a signed-out or refused visit. Drawn by components/OperatorFrame.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — A section brought to the top lands under the bar, its headline in sight
+ *     (scroll-margin-top, which Rail's scrollToSection now reads; Jouni).
  *   v1.0.0 — 2026-09-27 — Moved out of views/admin.css (.adm, .adm-main, .adm-topbar,
  *     .adm-topbar-right, .adm-page-title, .adm-time, .adm-login, .adm-card, and the operator's sizes
  *     for .og-sec) with every value unchanged, under the component's own names.
@@ -40,6 +42,8 @@
 /* The operator's sizes for the page kit: a smaller section title than the Settings side, and a
    section's number in mono coral beside it. */
 .operator-frame-page .og-sec { --poster-section-size: 1.5rem; }
+/* A section brought to the top lands under the bar that stays there (62px), not behind it. */
+.operator-frame-page .og-sec { scroll-margin-top: 78px; }
 .operator-frame-page .og-sec-h h2 small {
   font-family: var(--font-mono);
   font-size: .78rem;
