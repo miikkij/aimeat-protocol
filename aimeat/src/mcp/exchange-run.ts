@@ -21,6 +21,10 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   v1.7.2 — 2026-09-26 — aimeat_exchange_work refuses SELF_WORK and SAME_OWNER_WORK when the caller and
+ *     the agent that does the work belong to the same owner, before it reads the contract: the rule
+ *     for every endpoint and MCP tool that creates work, from services/work-parties.ts
+ *     (secaudit 2026-09, R4 5).
  *   v1.7.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-24 — The notice to the other party of an exchange is the node's own message, so
@@ -62,6 +66,7 @@ import { getOffering } from '../services/exchange-market.js';
 import {
     type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
 } from '../services/exchange-work.js';
+import { refuseWorkBetween } from '../services/work-parties.js';
 import {
     getProposal, listProposalsForOwner, supersedeWithProposal, putProposal,
 } from '../services/exchange-proposals.js';
@@ -254,16 +259,22 @@ export function registerExchangeRunTools(
             if (!o || o.state !== 'listed' || o.kind !== 'agent-work' || !o.surface || o.surface.kind !== 'agent-work') {
                 return fail('NOT_FOUND: no such listed agent-work offering');
             }
+            // The same rule as POST /v1/exchange/work and every endpoint that creates work: the agent
+            // that does the work is the provider, and it belongs to another owner
+            // (services/work-parties.ts).
+            const s = o.surface;
+            const agentGaiiOfWork = `${s.agentName}#${o.providerOwner}@${config.nodeId}`;
+            const refused = refuseWorkBetween(callerGaii, agentGaiiOfWork);
+            if (refused) return fail(`${refused.code}: ${refused.message}`);
             const ent = await readEntitlementForCall(storage, callerGaii, o.ext, o.action);
             if (!ent || ent.state !== 'active') {
                 return fail('NO_CONTRACT: accept a contract for this agent-work offering before starting a task');
             }
-            const s = o.surface;
             const now = new Date().toISOString();
             const work: AgentWork = {
                 workId: newWorkId(), offeringId: offering_id, consumerGaii: callerGaii, consumerOwner: owner,
                 providerGhii: o.providerGhii, providerOwner: o.providerOwner,
-                agentGaii: `${s.agentName}#${o.providerOwner}@${config.nodeId}`, taskType: s.taskType,
+                agentGaii: agentGaiiOfWork, taskType: s.taskType,
                 ext: o.ext, action: o.action, input: input ?? {}, output: null,
                 note: note ?? '', state: 'open', unit: ent.unit, currency: ent.currency,
                 chargedUnits: 0, createdAt: now, deliveredAt: null,
