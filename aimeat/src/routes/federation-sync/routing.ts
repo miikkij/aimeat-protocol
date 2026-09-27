@@ -5,6 +5,11 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The routing fee is routingFee (services/morsel.ts) on both endpoints, taken
+ *     where the route begins as its first call goes out, after the address check. A balance that
+ *     cannot cover it stops the route with 402 INSUFFICIENT_MORSELS before anything is sent. It goes
+ *     back when the target or peer cannot be reached or responds with an error, and when no relay
+ *     completes a multi-hop route (secaudit 2026-09, R4 6).
  *   v1.4.1 — 2026-09-26 — POST /v1/federation/route names the person who starts a route by the
  *     resolved identity (resolveIdentity): in the relay claim to the target, in the claim to a
  *     relaying peer and on the routing fee (secaudit 2026-09, R3 9).
@@ -24,7 +29,6 @@
  */
 
 import type { Router, RequestHandler } from 'express';
-import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireOwnerPrincipal } from '../../auth/middleware.js';
@@ -38,6 +42,7 @@ import { buildHopSigningMessage } from '../../types/route-manifest.js';
 import { emitChange } from '../../services/event-bus.js';
 import { buildRelayClaim } from '../../services/relay-claim.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { routingFee } from '../../services/morsel.js';
 
 /**
  * Who may drive POST /v1/federation/route: this node's own account holder, or a peer relaying a hop.
@@ -125,7 +130,8 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
         // routing fee below is taken from the same identity.
         const requesterGaii = req.relay ? req.relay.caller : resolveIdentity(req.auth!, config.nodeId);
 
-        // Helper: charge 1 morsel routing fee (atomic debit), ONLY on the node where the route began.
+        // The 1-morsel routing fee (routingFee, services/morsel.ts), ONLY on the node where the route
+        // began.
         //
         // A morsel paces a person, and the person who asked has their balance on the node they asked
         // from, which charges them once there. A hop holds no account for a name from another node,
@@ -133,20 +139,15 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
         // instead would make a node pay for carrying other people's traffic, which is the opposite
         // of what allowRouting lets an operator choose. Ruled 2026-09-17 with the relay-claim
         // authentication.
-        async function chargeRoutingFee(): Promise<void> {
-            if (req.relay) return;
-            const debited = await storage.debitBalance(requesterGaii, 1);
-            if (debited) {
-                await storage.addTransaction({
-                    id: `txn-${randomBytes(8).toString('hex')}`,
-                    gaii: requesterGaii,
-                    type: 'federation_routing',
-                    amount: -1,
-                    trackingCode: `relay:${relayPath}`,
-                    timestamp: new Date().toISOString(),
-                });
-            }
-        }
+        //
+        // The fee is taken as the first call of the route goes out, after the checks that can refuse
+        // it, and a balance that cannot cover it stops the route before anything is sent. It goes
+        // back when no route is made: the target cannot be reached, or it answers with an error.
+        const fee = routingFee(storage, req.relay ? null : requesterGaii, {
+            type: 'federation_routing', trackingCode: `relay:${relayPath}`,
+        });
+        const refuseForFee = () => res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
+            'Insufficient morsels for the routing fee (1 morsel)'));
 
         // F.2: Build route hop for this relay node
         async function buildLocalHop(forwardedTo: string | null, prevSignature: string): Promise<RouteHop> {
@@ -187,6 +188,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     res.status(400).json(error(config.nodeId, 'INVALID_URL', targetUrlCheck.reason ?? 'URL validation failed'));
                     return;
                 }
+                if (!(await fee.take())) { refuseForFee(); return; }
                 // The receiving node decides whether it accepts a relay from US, and it needs proof
                 // rather than the header below — anyone can type that one. One claim per forwarded
                 // request, bound to this method and this path, single-use at the far end.
@@ -209,7 +211,8 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 });
 
                 const data = await response.json().catch(err => { logger.warn('buildLocalHop: continuing after a suppressed failure', { error: String(err) }); return null; });
-                await chargeRoutingFee();
+                // An error answer is no route made, so the fee goes back.
+                if (!response.ok) await fee.giveBack();
 
                 // F.2: Add hop signing for direct peer routing
                 const hop = await buildLocalHop(target_node, inboundManifest.hops.length > 0 ? inboundManifest.hops[inboundManifest.hops.length - 1].signature : '');
@@ -226,6 +229,8 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 }));
                 emitChange('federation');
             } catch (err) {
+                // The route failed, so the fee goes back.
+                await fee.giveBack();
                 res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
                     `Failed to reach peer ${target_node}: ${err instanceof Error ? err.message : 'unknown error'}`));
             }
@@ -249,6 +254,9 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     logger.warn(`Blocked outbound relay to peer ${relay.nodeId}: ${relayUrlCheck.reason}`);
                     continue;
                 }
+                // Taken once, as the first call of this route goes out; the relays tried after it
+                // share the same fee.
+                if (!(await fee.take())) { refuseForFee(); return; }
                 // ONE HOP, ONE CLAIM: this one is written for the NEXT node and covers the call we
                 // are actually making to it, which is a POST to its own /v1/federation/route. The
                 // node after that gets its own claim from that node. A receiver only ever decides
@@ -282,7 +290,6 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
 
                 if (response.ok) {
                     const data = await response.json().catch(err => { logger.warn('buildLocalHop: continuing after a suppressed failure', { error: String(err) }); return null; });
-                    await chargeRoutingFee();
 
                     // F.2: Add hop signing for multi-hop relay routing
                     const relayHop = await buildLocalHop(relay.nodeId, inboundManifest.hops.length > 0 ? inboundManifest.hops[inboundManifest.hops.length - 1].signature : '');
@@ -305,6 +312,8 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             }
         }
 
+        // No relay made the route, so the fee goes back.
+        await fee.giveBack();
         res.status(404).json(error(config.nodeId, 'FEDERATION_ERROR',
             `No route to node ${target_node} via any active peer`));
     });
@@ -389,6 +398,13 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             return;
         }
 
+        // Who asked, by the full identity: a person's GHII, an agent's GAII. The peer reads it as the
+        // requester, and a bare account name names nobody there, or that node's namesake. The routing
+        // fee is taken from the same identity: as the call goes out, and back again when the peer
+        // cannot be reached or answers with an error (routingFee, services/morsel.ts).
+        const requester = resolveIdentity(req.auth!, config.nodeId);
+        const fee = routingFee(storage, requester, { type: 'federation_routing' });
+
         try {
             // SSRF validation: block requests to private/reserved IPs
             const crossNodeUrlCheck = await validateOutboundUrl(peer.url);
@@ -396,11 +412,10 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 res.status(400).json(error(config.nodeId, 'INVALID_URL', crossNodeUrlCheck.reason ?? 'URL validation failed'));
                 return;
             }
-
-            // Who asked, by the full identity: a person's GHII, an agent's GAII. The peer reads it as
-            // the requester, and a bare account name names nobody there, or that node's namesake. The
-            // routing fee below is taken from the same identity.
-            const requester = resolveIdentity(req.auth!, config.nodeId);
+            if (!(await fee.take())) {
+                res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS', 'Insufficient morsels for the routing fee (1 morsel)'));
+                return;
+            }
 
             // P1-11: Sign outbound cross-node work request
             const workPayload = {
@@ -439,18 +454,8 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             });
 
             const data = await response.json().catch(err => { logger.warn('POST /v1/federation/cross-node/work: continuing after a suppressed failure', { error: String(err) }); return null; });
-
-            // Charge 1 morsel routing fee, atomically, to the requester named above
-            const debited = await storage.debitBalance(requester, 1);
-            if (debited) {
-                await storage.addTransaction({
-                    id: `txn-${randomBytes(8).toString('hex')}`,
-                    gaii: requester,
-                    type: 'federation_routing',
-                    amount: -1,
-                    timestamp: new Date().toISOString(),
-                });
-            }
+            // An error answer is no route made, so the fee goes back.
+            if (!response.ok) await fee.giveBack();
 
             res.status(response.status).json(success(config.nodeId, {
                 routed_to: target_node,
@@ -458,6 +463,8 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             }));
             emitChange('federation');
         } catch (err) {
+            // The call failed, so the fee goes back.
+            await fee.giveBack();
             res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
                 `Failed to submit cross-node work: ${err instanceof Error ? err.message : 'unknown error'}`));
         }

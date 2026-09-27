@@ -12,6 +12,9 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.5.0 — 2026-09-26 — Work for a provider on another node checks the node's address first, then
+ *     takes the 1-morsel routing fee as the call goes out (routingFee, services/morsel.ts). The fee
+ *     goes back when the node cannot be reached or answers with an error (secaudit 2026-09, R4 6).
  *   v1.4.3 — 2026-09-26 — createWorkItem refuses INVALID_INPUT (400) when provider_gaii is not a full
  *     identity (a GHII, a GAII or a GEAI), for every work endpoint and MCP tool (secaudit 2026-09, R4 5).
  *   v1.4.2 — 2026-09-26 — createWorkItem asks refuseWorkBetween (services/work-parties.ts) for SELF_WORK
@@ -42,7 +45,6 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
@@ -52,7 +54,7 @@ import { refuseWorkBetween } from '../services/work-parties.js';
 import { isIdentityShaped } from '../services/local-identity.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
-import { calculateWorkCost, holdEscrow } from '../services/morsel.js';
+import { calculateWorkCost, holdEscrow, routingFee } from '../services/morsel.js';
 import { logger } from '../utils/logger.js';
 import { createWorkTabService } from '../services/db/work-tab-db-service.js';
 import { executeHooks } from '../services/hooks.js';
@@ -146,34 +148,31 @@ export async function createWorkItem(
     if (targetPeer && targetPeer.allowRouting === false) {
       return { error: 'Target node does not accept routed work (visiting tier)', status: 403, code: 'POLICY_DENIED' };
     }
-    // Charge 1 morsel cross-node routing fee (§15) — atomic debit prevents double-spending
-    const debited = await storage.debitBalance(requesterGaii, 1);
-    if (!debited) {
+    // SSRF validation: block requests to private/reserved IPs. Checked before the routing fee is
+    // taken, so a refused address costs nothing.
+    const remoteUrlCheck = await validateOutboundUrl(resolved.nodeUrl);
+    if (!remoteUrlCheck.valid) {
+      logger.warn(`Blocked outbound work request to ${resolved.nodeUrl}: ${remoteUrlCheck.reason}`);
+      return { error: `Remote node URL blocked: ${remoteUrlCheck.reason}`, status: 400, code: 'INVALID_URL' };
+    }
+
+    // The 1-morsel cross-node routing fee (§15), taken as the call goes out. It goes back when no
+    // route is made: the node cannot be reached, or it answers with an error (services/morsel.ts).
+    const fee = routingFee(storage, requesterGaii, { type: 'routing_fee', trackingCode: `route:${resolved.nodeId}` });
+    if (!(await fee.take())) {
       return { error: 'Insufficient morsels for cross-node routing fee (1 morsel)', status: 402, code: 'INSUFFICIENT_MORSELS' };
     }
-    await storage.addTransaction({
-      id: `tx-${randomUUID()}`,
-      gaii: requesterGaii,
-      type: 'routing_fee',
-      amount: -1,
-      trackingCode: `route:${resolved.nodeId}`,
-      timestamp: new Date().toISOString(),
-    });
 
     // Forward work request to the remote node
+    let resp: Response;
+    let remoteResult: Record<string, unknown>;
     try {
-      // SSRF validation: block requests to private/reserved IPs
-      const remoteUrlCheck = await validateOutboundUrl(resolved.nodeUrl);
-      if (!remoteUrlCheck.valid) {
-        logger.warn(`Blocked outbound work request to ${resolved.nodeUrl}: ${remoteUrlCheck.reason}`);
-        return { error: `Remote node URL blocked: ${remoteUrlCheck.reason}`, status: 400, code: 'INVALID_URL' };
-      }
       // safeFetch, not fetch, even though the URL was just validated: the check above reads the
       // FIRST hop only, and a host that passes it can answer 302 to loopback or to a metadata
       // address. safeFetch re-runs the same validation on every hop and throws `Fetch blocked: …`,
       // which the catch below turns into the same REMOTE_UNREACHABLE the network errors give. The
       // pre-check stays because it is what produces the specific 400 a caller can act on.
-      const resp = await safeFetch(`${resolved.nodeUrl}/v1/work/request`, {
+      resp = await safeFetch(`${resolved.nodeUrl}/v1/work/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,12 +181,14 @@ export async function createWorkItem(
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(30_000),
       });
-      const remoteResult = await resp.json() as Record<string, unknown>;
-      return { forwarded: true, remoteStatus: resp.status, remoteResult };
+      remoteResult = await resp.json() as Record<string, unknown>;
     } catch (err) {
+      await fee.giveBack();
       logger.warn('Failed to forward work request to remote node', { nodeUrl: resolved.nodeUrl, error: String(err) });
       return { error: `Remote node ${resolved.nodeId} unreachable`, status: 502, code: 'REMOTE_UNREACHABLE' };
     }
+    if (!resp.ok) await fee.giveBack();
+    return { forwarded: true, remoteStatus: resp.status, remoteResult };
   }
 
   const ttl = ttl_hours ?? 24;
