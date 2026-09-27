@@ -40640,6 +40640,11 @@ paths:
     delete:
       operationId: deleteCortexModel
       summary: Delete cortex model
+      description: >
+        Uninstalls the cortex. An active one is taken down first, as POST
+        /v1/cortex/{name}/deactivate takes it down: its actions, boards, schema locks, prompts and
+        ontologies go. Then its seed data, its lib files, its kept versions, its dependency edges
+        and the record go. Only the installing owner, or an operator, may uninstall it.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -40692,8 +40697,9 @@ paths:
         operator, deactivates. A record that names no such identity has each action deleted under
         every principal of the account that installed the cortex (its bare name, its GHII, its
         agents and its ecosystem apps) and under the caller's own. The prompts and ontologies are
-        deleted under the same principals, whoever activated the cortex. Uninstall and the redeploy
-        of an active cortex (PUT /v1/cortex/{name}, or a ZIP upload under its name) do the same.
+        deleted under the same principals, whoever activated the cortex. Uninstall, the removal of
+        a package that carried the cortex, and the redeploy of an active cortex (PUT
+        /v1/cortex/{name}, or a ZIP upload under its name) do the same.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -43056,7 +43062,14 @@ paths:
     delete:
       operationId: removeInstance
       summary: Remove instance
-      description: Remove a package instance. Sets status to removed.
+      description: >
+        Remove a package instance. With `removeComponents: true` (in the body, or
+        `?removeComponents=true`) its installed components go too, in reverse dependency order,
+        and the answer counts them in `componentsRemoved`. A cortex component is uninstalled as
+        DELETE /v1/cortex/{name} uninstalls one: an active cortex is taken down first, so the
+        actions, boards, schema locks and prompts its activation made go before the record. The
+        rollback of an install that fails part way removes the components it registered the same
+        way.
       tags: [Instances]
       security:
         - BearerAuth: []

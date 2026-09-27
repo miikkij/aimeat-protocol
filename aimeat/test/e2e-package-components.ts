@@ -20,12 +20,15 @@
  *   node itself trusts is refused at install and at migration, before anything is written. Part H:
  *   a memory component writes into the owner's memory, which costs an agent or an app the words the
  *   memory door asks; without them the install waits for the owner, and a translation part needs
- *   none of them.
+ *   none of them. Part I: a package's cortex that is live when the package goes is taken down
+ *   first, so the actions its activation published leave with it.
  * @structure Setup · Part A msm register + read back · Part B memory register + read back ·
  *   Part C the parse ladder · Part D status hashing · Part E uninstall · Part F refusals ·
- *   Part G reserved keys · Part H the owner-write words
+ *   Part G reserved keys · Part H the owner-write words · Part I a cortex component
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-components
  * @version-history
+ *   v1.4.0 -- 2026-09-26 -- Part I: removing a package whose cortex is live takes the cortex down
+ *     first; no action its activation published stays in the catalogue, and the record goes.
  *   v1.3.0 -- 2026-09-25 -- Part H: without the words, the install, the migration and the update
  *     answer 202 with a request for the owner instead of 403 (H2, H5, H6), an app grant may not
  *     decide one (H6), and a translation part installs on packages:write alone (H7). All four failed
@@ -837,8 +840,81 @@ await test('H7. A translation part costs packages:write alone: it writes only th
     await removeInstancesOf(B.token, translationPkg.groupId);
 });
 
+// ── Part I: a cortex component ───────────────────────────────────────────────
+// A package installs its cortex live. When the package goes (an uninstall with removeComponents, or
+// the rollback of an install that failed later), an active cortex is taken down first, as an
+// uninstall of the cortex itself does: the actions its activation published leave the catalogue
+// before the record goes, and nothing stays published under a cortex that no longer exists.
+console.log('\nPart I — a cortex component');
+
+let cortexPkg!: Awaited<ReturnType<typeof createPackage>>;
+
+/** A cortex manifest with one lib and one action, `proofread`. */
+function cortexManifest(name: string, namespace: string, version: string): string {
+    return `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+  description: A cortex a package carries
+spec:
+  version: "${version}"
+  components:
+    - type: lib
+      name: cx
+      filename: cx.js
+      exports: [hello]
+      api_surface: hello()
+    - type: action
+      name: proofread
+      description: Proofreads a text
+      input_schema:
+        type: object
+`;
+}
+
+/** Every provider that publishes an action with this id; a cortex action is tagged with its cortex's name. */
+async function publishedUnder(cortex: string, actionId: string): Promise<string[]> {
+    const found = await json(`/v1/actions?q=${encodeURIComponent(cortex)}&per_page=200`);
+    assert(found.status === 200, `the catalogue: ${found.status}`);
+    return ((found.body.data?.actions ?? []) as any[]).filter(a => a.id === actionId).map(a => a.provider_gaii);
+}
+
+await test('I1. Removing a package takes its active cortex down first: no action its activation published stays', async () => {
+    cortexPkg = await createPackage(A.token, `cortex-kit-${Date.now()}`, [
+        {
+            id: 'cx', type: 'cortex', label: 'A cortex', dependencies: [],
+            content: JSON.stringify({ manifest: cortexManifest('cx', A.name, '1.0.0'), libs: { 'cx.js': "export function hello() { return 'pkg'; }" } }),
+        },
+    ]);
+    const inst = await install(A.token, cortexPkg.encoded, 'cortex kit');
+    const name = inst.at('cx');
+    const enc = encodeURIComponent(name);
+    const detail = await json(`/v1/cortex/${enc}`, { headers: authH(A.token) });
+    assert(detail.status === 200 && detail.body.data?.status === 'active', `the package's cortex is installed live: ${detail.status} ${JSON.stringify(detail.body.data?.status)}`);
+
+    // A redeploy of the live cortex in place runs its activation again, which publishes the action.
+    const put = await json(`/v1/cortex/${enc}`, {
+        method: 'PUT', headers: authH(A.token),
+        body: JSON.stringify({ manifest: cortexManifest(name, A.name, '1.0.1'), libs: { 'cx.js': "export function hello() { return 'pkg v2'; }" } }),
+    });
+    assert(put.status === 200 && put.body.data?.reinitialized === true, `redeploy: ${put.status} ${JSON.stringify(put.body.error ?? put.body.data)}`);
+    const actionId = `cortex-${name}-proofread`;
+    const published = await publishedUnder(name, actionId);
+    assert(JSON.stringify(published) === JSON.stringify([`${A.name}@${NODE_ID}`]), `the activation publishes under the person's GHII: ${JSON.stringify(published)}`);
+
+    const del = await json(`/v1/instances/${inst.id}`, {
+        method: 'DELETE', headers: authH(A.token), body: JSON.stringify({ removeComponents: true }),
+    });
+    assert(del.status === 200 && del.body.data?.componentsRemoved === 1, `uninstall: ${del.status} ${JSON.stringify(del.body.error ?? del.body.data)}`);
+    const left = await publishedUnder(name, actionId);
+    const record = await json(`/v1/cortex/${enc}`, { headers: authH(A.token) });
+    assert(left.length === 0, `an action of the removed cortex is still published under ${JSON.stringify(left)}`);
+    assert(record.status === 404, `the cortex record is gone: ${record.status}`);
+});
+
 await test('Cleanup: delete the packages and both owners', async () => {
-    for (const p of [mainPkg, ladderPkg, publicPkg, reservedPkg, migPkg, ownedPkg, plainPkg, translationPkg].filter(Boolean)) {
+    for (const p of [mainPkg, ladderPkg, publicPkg, reservedPkg, migPkg, ownedPkg, plainPkg, translationPkg, cortexPkg].filter(Boolean)) {
         const r = await json(`/v1/packages/${p.encoded}`, { method: 'DELETE', headers: authH(A.token) });
         assert(r.status === 200, `package delete ${p.groupId} → ${r.status}`);
     }

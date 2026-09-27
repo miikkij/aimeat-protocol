@@ -38,11 +38,17 @@
  *   - installCortex() — validate, parse, gate the namespace and the prior owner, create, write libs
  *   - activateCortex() — materialise the components, record the artifacts
  *   - deactivateCortex() — tear them down, preserving seed-data and lib files
- *   - deleteCortex() — deactivate, drop seed-data, drop lib files, drop the record
+ *   - deleteCortex() — the ownership question, then removeCortex()
+ *   - removeCortex() — deactivate, drop seed-data, drop lib files, drop the record, its edges and
+ *     versions; shared with the package registrar
  * @usage
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   v1.6.0 — 2026-09-26 — removeCortex: the uninstall after its ownership question, shared by
+ *     deleteCortex and the package registrar, so a package that goes takes an active cortex down
+ *     before its record goes. It removes every lib file the record names, the manifest's and the
+ *     artifacts' (secaudit 2026-09, R4 4c).
  *   v1.5.0 — 2026-09-26 — CortexCaller carries `identity`, the caller's resolved identity (a person's
  *     GHII, an agent's GAII). Activation publishes a cortex's actions under it, and deactivation and
  *     uninstall delete them under it and under `gaii`. Install publishes nothing and does not take it
@@ -72,7 +78,7 @@ import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '
 import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
 import { cortexInstallRefusal } from './install-quotas.js';
 import { emitChange } from './event-bus.js';
-import { activateExtension, deactivateExtension } from '../routes/cortex/activation.js';
+import { activateExtension, deactivateExtension, type CortexActor } from '../routes/cortex/activation.js';
 import { refreshCortexDependencies, forgetDependencies } from './dependency-map.js';
 import { snapshotCortexVersion, forgetVersions } from './component-versions.js';
 import { logger } from '../utils/logger.js';
@@ -422,9 +428,8 @@ export async function deactivateCortex(
 }
 
 /**
- * Uninstall a cortex: tear down an active one, delete the seed-data memory it wrote, delete its lib
- * files, delete the record. Seed-data is removed under `installedBy`, the identity it was created
- * with when the installing owner activated it.
+ * Uninstall a cortex: the ownership question, then removeCortex. Seed-data is removed under
+ * `installedBy`, the identity it was created with when the installing owner activated it.
  */
 export async function deleteCortex(
     deps: CortexDeps,
@@ -439,8 +444,29 @@ export async function deleteCortex(
         return refuse(403, 'FORBIDDEN', 'Not your extension');
     }
 
+    await removeCortex(storage, ext, caller);
+    return { ok: true, value: { name } };
+}
+
+/**
+ * Take one cortex off the node, the one way it is done: an active cortex is taken down first
+ * (deactivateExtension, so the actions, boards, schema locks, prompts and ontologies its activation
+ * made go), then the seed-data memory it wrote, every lib file the record names (the manifest's lib
+ * components and the files its artifacts list), the record, its dependency edges and its kept
+ * versions. Returns whether a record was deleted.
+ *
+ * It asks no ownership question: each caller has answered it. deleteCortex answers it for the HTTP
+ * and MCP uninstall; the package registrar (services/component-registrar.ts deleteComponent) removes
+ * a cortex it installed, when the package goes or an install that failed later is rolled back.
+ */
+export async function removeCortex(
+    storage: Storage,
+    ext: CortexExtensionRecord,
+    actor: CortexActor,
+): Promise<boolean> {
+    const { name } = ext;
     if (ext.status === 'active') {
-        await deactivateExtension(ext, storage, caller);
+        await deactivateExtension(ext, storage, actor);
     }
 
     // Uninstall removes seed-data; deactivation deliberately does not.
@@ -448,18 +474,20 @@ export async function deleteCortex(
         await storage.deleteMemory(ext.installedBy, key);
     }
 
+    const libFiles = new Set(ext.activationArtifacts.libFiles);
     for (const comp of ext.components) {
-        if (comp.type === 'lib') {
-            await storage.deleteCortexLibFile(name, comp.filename);
-        }
+        if (comp.type === 'lib') libFiles.add(comp.filename);
+    }
+    for (const file of libFiles) {
+        await storage.deleteCortexLibFile(name, file);
     }
 
-    await storage.deleteCortexExtension(name);
+    const removed = await storage.deleteCortexExtension(name);
     await forgetDependencies(storage, 'cortex', name)
-        .catch(err => logger.warn('deleteCortex: dependency map not cleared', { name, error: String(err) }));
+        .catch(err => logger.warn('removeCortex: dependency map not cleared', { name, error: String(err) }));
     await forgetVersions(storage, 'cortex', name)
-        .catch(err => logger.warn('deleteCortex: kept versions not dropped', { name, error: String(err) }));
+        .catch(err => logger.warn('removeCortex: kept versions not dropped', { name, error: String(err) }));
 
     emitChange('cortex');
-    return { ok: true, value: { name } };
+    return removed;
 }
