@@ -21,6 +21,10 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.7.0 -- 2026-09-26 -- deleteOwner settles the erased person's work on every provider: open
+ *     requests are cancelled and the requesters' held morsels come back with a ledger line, finished
+ *     work stays for the other party under the erasure's pseudonym, and work between two of their
+ *     own identities goes (secaudit 2026-09: A8-4, N6).
  *   v1.6.0 -- 2026-09-26 -- One assertion sent by eight requests at once is spent by exactly one, on
  *     every provider: the spend is one insert that does nothing when the key is there (secaudit
  *     2026-09, N5).
@@ -44,7 +48,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
-import type { Storage } from '../../src/storage/interface.js';
+import type { Storage, WorkRecord } from '../../src/storage/interface.js';
 import { spendAssertionIdentity } from '../../src/services/assertion-spend.js';
 
 const SQLITE_PATH = `./test/.conformance-${process.pid}.db`;
@@ -219,6 +223,78 @@ async function seedErasable(s: Storage) {
     return { owner, ghii, gaii, stranger, ids, statement };
 }
 
+/** One work row: ten morsels and a fee of one unless `extra` says otherwise. */
+function workRow(trackingCode: string, providerGaii: string, requesterGaii: string, status: string, extra: Partial<WorkRecord> = {}): WorkRecord {
+    const now = new Date().toISOString();
+    return {
+        trackingCode, status, actionId: 'conf-work', providerGaii, requesterGaii, input: { text: 'conformance' },
+        cost: { basePrice: 10, networkFee: 1, total: 11, inEscrow: 11 },
+        ttlExpiresAt: new Date(Date.now() + 86_400_000).toISOString(), createdAt: now, updatedAt: now, ...extra,
+    };
+}
+
+/**
+ * Two people, each with an agent and 100 morsels, and work between them in every state the erasure
+ * has to tell apart. The person to erase appears under all three names a row can carry: the GHII, the
+ * agent's GAII and the bare account name an owner session stored before 2026-09-26.
+ */
+async function seedWorkErasure(s: Storage) {
+    const node = 'aimeat-conformance-001';
+    const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const erased = `confwe${tag}`, other = `confwo${tag}`;
+    const now = new Date().toISOString();
+    const people: Record<string, { ghii: string; gaii: string }> = {};
+    for (const name of [erased, other]) {
+        const ghii = `${name}@${node}`, gaii = `bot#${name}@${node}`;
+        await s.createOwner({ name, displayName: name, publicKey: 'pk', roles: ['owner'], createdAt: now });
+        await s.createGHII({
+            username: name, nodeId: node, ghii, displayName: name, verificationLevel: 0,
+            ownerName: name, totpEnabled: false, morselBalance: 100, loginCount: 0, createdAt: now, updatedAt: now,
+        });
+        await s.createAgent({
+            name: 'bot', owner: name, gaii, publicKey: 'pk', trustScore: 50, morselBalance: 0,
+            capabilities: [], createdAt: now, lastSeen: now,
+        });
+        people[name] = { ghii, gaii };
+    }
+    const E = people[erased], O = people[other];
+    const tc = (k: string) => `tc-conf-${k}-${tag}`;
+
+    // Open work the erased person was to do. The other side's morsels are held, as holdEscrow holds them.
+    const heldFor = [
+        workRow(tc('open-ghii'), E.ghii, O.gaii, 'pending'),
+        workRow(tc('open-agent'), E.gaii, O.ghii, 'accepted', { cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }),
+        workRow(tc('open-bare'), erased, O.gaii, 'in_progress', { cost: { basePrice: 2, networkFee: 1, total: 3, inEscrow: 3 } }),
+    ];
+    for (const w of heldFor) {
+        await s.createWork(w);
+        await s.debitBalance(w.requesterGaii, w.cost.total);
+    }
+    // Open work the erased person asked for: their own morsels were held for it.
+    const asked = workRow(tc('open-asked'), O.gaii, E.gaii, 'pending', { cost: { basePrice: 6, networkFee: 1, total: 7, inEscrow: 7 } });
+    await s.createWork(asked);
+    await s.debitBalance(E.gaii, 7);
+
+    // Finished work, one on each side.
+    await s.createWork(workRow(tc('done-provided'), E.ghii, O.gaii, 'accepted'));
+    await s.updateWork(tc('done-provided'), { status: 'delivered', output: { answer: 42 }, updatedAt: now });
+    await s.createWork(workRow(tc('done-asked'), O.ghii, E.ghii, 'accepted', { callbackUrl: `https://${erased}.example.test/cb` }));
+    await s.updateWork(tc('done-asked'), { status: 'rated', output: { answer: 7 }, rating: { score: 5 }, updatedAt: now });
+
+    // A delivery the erased person disputed, with one entry in the log from each side.
+    await s.createWork(workRow(tc('disputed'), O.gaii, E.gaii, 'delivered'));
+    await s.updateWork(tc('disputed'), { status: 'contested', updatedAt: now });
+    const disputeId = `dispute-conf-${tag}`;
+    await s.createDispute({ id: disputeId, trackingCode: tc('disputed'), status: 'contested', openedBy: E.gaii, reason: 'wrong answer', createdAt: now, updatedAt: now });
+    await s.addDisputeAuditEntry(disputeId, { sequence: 1, event: 'dispute_opened', actor: E.gaii, timestamp: now, data: { reason: 'wrong answer' }, hash: 'a'.repeat(64), previousHash: '0'.repeat(64) });
+    await s.addDisputeAuditEntry(disputeId, { sequence: 2, event: 'counter_dispute', actor: O.gaii, timestamp: now, data: { reason: 'it was right' }, hash: 'b'.repeat(64), previousHash: 'a'.repeat(64) });
+
+    // Work between two identities of the erased person: there is nobody else to keep it for.
+    await s.createWork(workRow(tc('own'), E.ghii, E.gaii, 'delivered'));
+
+    return { erased, other, E, O, tc, disputeId, heldFor, asked };
+}
+
 /** Everything the cascade must leave empty, read back through the Storage interface. */
 async function leftovers(s: Storage, owner: string, ghii: string, _gaii: string) {
     return {
@@ -302,6 +378,70 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect.soft(kept[0]?.ownerGhii, `${name}: one pseudonym for the whole erasure`).toBe(kept[1]?.ownerGhii);
             expect.soft((await storage.listAiProvenance({ ownerGhii: p.ghii })).total, `${name}: the freed name still lists the records`).toBe(0);
             expect.soft((await storage.getAiProvenance(p.ids.stranger))?.ownerGhii, `${name}: somebody else's record changed`).toBe(p.stranger);
+        }
+    }, 60_000);
+
+    // Open work of an erased account is cancelled and the requesters get their held morsels back;
+    // finished work stays for the other party with the name taken out, the rule the purchase receipts
+    // follow (secaudit 2026-09: A8-4, N6). Soft assertions, so each provider reports its own result.
+    it('deleteOwner cancels the open work, gives the held morsels back and keeps the finished work without the name', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const p = await seedWorkErasure(storage);
+            await storage.deleteOwner(p.erased);
+
+            for (const w of p.heldFor) {
+                const row = await storage.getWork(w.trackingCode);
+                expect.soft(row?.status, `${name}: open work the erased person was to do is cancelled (${w.trackingCode})`).toBe('cancelled');
+                expect.soft(row?.providerGaii, `${name}: the cancelled work still names the erased provider (${w.trackingCode})`).toMatch(erasedRe);
+                expect.soft(row?.requesterGaii, `${name}: the cancelled work lost its requester (${w.trackingCode})`).toBe(w.requesterGaii);
+            }
+            expect.soft((await storage.getGHII(p.O.ghii))?.morselBalance, `${name}: the requester's held morsels did not come back`).toBe(100);
+            const returns = (await storage.getTransactions(p.O.ghii, 500)).filter(t => t.type === 'escrow_return');
+            expect.soft(returns.map(t => `${t.trackingCode}:${t.amount}`).sort(), `${name}: one escrow_return line per cancelled request`)
+                .toEqual(p.heldFor.map(w => `${w.trackingCode}:${w.cost.total}`).sort());
+            for (const t of returns) {
+                expect.soft(t.counterpartyGaii, `${name}: a return line names the erased person`).toMatch(erasedRe);
+            }
+
+            const asked = await storage.getWork(p.asked.trackingCode);
+            expect.soft(asked?.status, `${name}: an open request the erased person made is not cancelled`).toBe('cancelled');
+            expect.soft(asked?.requesterGaii, `${name}: that request still names them`).toMatch(erasedRe);
+            expect.soft(asked?.providerGaii, `${name}: that request lost its provider`).toBe(p.O.gaii);
+
+            const provided = await storage.getWork(p.tc('done-provided'));
+            expect.soft(provided?.status, `${name}: finished work they delivered changed status`).toBe('delivered');
+            expect.soft(provided?.providerGaii, `${name}: finished work they delivered still names them`).toMatch(erasedRe);
+            expect.soft(provided?.output, `${name}: the delivery itself is kept`).toEqual({ answer: 42 });
+            const doneAsked = await storage.getWork(p.tc('done-asked'));
+            expect.soft(doneAsked?.status, `${name}: finished work they asked for changed status`).toBe('rated');
+            expect.soft(doneAsked?.requesterGaii, `${name}: finished work they asked for still names them`).toMatch(erasedRe);
+            expect.soft(doneAsked?.callbackUrl, `${name}: their callback address is still on the row`).toBeUndefined();
+
+            const disputed = await storage.getWork(p.tc('disputed'));
+            expect.soft(disputed?.status, `${name}: disputed work changed status`).toBe('contested');
+            expect.soft(disputed?.requesterGaii, `${name}: disputed work still names them`).toMatch(erasedRe);
+            const dispute = await storage.getDisputeByTrackingCode(p.tc('disputed'));
+            expect.soft(dispute?.openedBy, `${name}: the dispute still names who opened it`).toMatch(erasedRe);
+            const log = await storage.getDisputeAuditLog(p.disputeId);
+            expect.soft(log.map(e => e.actor), `${name}: the dispute log still names them, or lost the other side`)
+                .toEqual([expect.stringMatching(erasedRe), p.O.gaii]);
+            expect.soft(log.map(e => e.hash), `${name}: the dispute log's hashes changed`).toEqual(['a'.repeat(64), 'b'.repeat(64)]);
+
+            expect.soft(await storage.getWork(p.tc('own')), `${name}: work between two of their own identities survived`).toBeNull();
+
+            const pseudonyms = new Set([
+                ...(await Promise.all(p.heldFor.map(async w => (await storage.getWork(w.trackingCode))?.providerGaii))),
+                asked?.requesterGaii, provided?.providerGaii, doneAsked?.requesterGaii, disputed?.requesterGaii, dispute?.openedBy,
+            ]);
+            expect.soft(pseudonyms.size, `${name}: one pseudonym for the whole erasure`).toBe(1);
+
+            // Nothing is left under any name of theirs for whoever holds the name next.
+            for (const id of [p.erased, p.E.ghii, p.E.gaii]) {
+                expect.soft(await storage.listWorkByProvider(id), `${name}: work to do is left under ${id}`).toEqual([]);
+                expect.soft(await storage.listWorkByRequester(id), `${name}: work asked for is left under ${id}`).toEqual([]);
+            }
+            await storage.deleteOwner(p.other);
         }
     }, 60_000);
 
