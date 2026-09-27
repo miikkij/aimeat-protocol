@@ -13,6 +13,8 @@
  *   operator frame's bar, 62px).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — One scroller for the index (the rail inside no longer scrolls on its own),
+ *     with a thin bar in a lane of its own beside the counts (Jouni: the bar lay over the numbers).
  *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
  */
 
@@ -26,6 +28,10 @@
 /* The index beside the settings stays in sight under the pinned row. */
 .settings-index-body { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 36px; align-items: start; }
 .settings-index-side { position: sticky; top: calc(var(--settings-index-top, 62px) + 60px); max-height: calc(100dvh - 190px); overflow-y: auto; }
+/* The index scrolls here and only here: a thin bar in the rule's grey, with its own lane beside the
+   counts so it never lies over them. */
+.settings-index-side { scrollbar-width: thin; scrollbar-color: var(--border) transparent; scrollbar-gutter: stable; padding-right: 6px; }
+.settings-index-side > .og-rail { position: static; max-height: none; overflow: visible; }
 .settings-index-main { min-width: 0; }
 
 /* One setting: its name, key and what it does; where its value comes from; the editor; the end. */

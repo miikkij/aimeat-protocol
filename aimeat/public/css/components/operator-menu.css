@@ -11,6 +11,8 @@
  *   the paper Settings menu is how the operator's side is known at once.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — A thin scroll bar in the menu's grey, in a lane of its own beside the
+ *     counts (Jouni: the bar lay over the numbers).
  *   v1.0.0 — 2026-09-27 — Moved out of views/admin.css (.adm-sidebar, .adm-nav-group, .adm-nav-item,
  *     .cnt, .node-id) with every value unchanged, under the component's own names; the heading is new.
  */
@@ -32,6 +34,11 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  /* A long menu scrolls: a thin bar in the menu's own grey on the ink, in a lane of its own, so it
+     never lies over the counts. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--operator-menu-ink, var(--operator-menu-ink-default)) 28%, transparent) transparent;
+  scrollbar-gutter: stable;
 }
 .operator-menu-title {
   padding: 4px 18px 0;
