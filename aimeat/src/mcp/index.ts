@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.28.0 -- 2026-09-27 -- Bind every session request to its verified principal and read scopes
+ *     from the current request, including discovery and concurrent tool calls (A01/A02).
  *   v1.27.0 -- 2026-09-18 -- Every tool is registered through withErrorNextStep as well: a failing
  *            tool now says what to do next (try once more, then support@operators), which REST
  *            errors always did and no MCP error did. See mcp/error-next-step.ts.
@@ -130,6 +132,11 @@ import { registerOAuthRoutes } from './oauth.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
 import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
 import { MCP_VIA_HEADER, parseVia, viaRefusal, runWithVia } from '../services/mcp-client/hops.js';
+import { verifyJWT, type VerifiedToken } from '../auth/jwt.js';
+import { credentialRevoked } from '../auth/middleware.js';
+import { withCurrentScopes } from '../auth/effective-scopes.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { mcpRequestAuthority, sameMcpPrincipal, withRequestPermission } from './request-authority.js';
 
 // ── Resource change event bus ──
 // Lives in resource-events.ts, a leaf, so a service can notify an agent without importing the
@@ -145,12 +152,37 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     const transports = new Map<string, StreamableHTTPServerTransport>();
     // Map MCP session IDs to ChatInstance IDs for heartbeat tracking
     const sessionChatInstances = new Map<string, string>();
-    // Per-session BEARER TOKEN, kept live. A session outlives its access token: the OAuth token
-    // has jwtTtlSeconds (1 h default) and the client silently rotates it via refresh_token, sending
-    // the new one on every subsequent request. The few tools that re-present the caller's token to
-    // the node's own HTTP surface (capability invocation) must use the CURRENT one, not the one
-    // captured at initialize — otherwise they start answering AUTH_REQUIRED an hour into a session.
-    const sessionTokens = new Map<string, { current: string | undefined }>();
+    const sessionPrincipals = new Map<string, VerifiedToken>();
+    const authority = mcpRequestAuthority();
+
+    async function authenticate(req: Request, res: Response): Promise<VerifiedToken | null> {
+        const header = req.headers.authorization;
+        const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+        if (!token) return null;
+        const verified = await verifyJWT(token);
+        if (!verified || await credentialRevoked(token, verified)) {
+            res.status(401).json({ jsonrpc: '2.0', error: { code: -32001,
+                message: 'Token is invalid or has been revoked. Obtain a new access token via /v1/mcp/token.' },
+                id: req.body?.id ?? null });
+            return null;
+        }
+        return withCurrentScopes(storage, verified);
+    }
+
+    function sessionAllowed(req: Request, res: Response, id: string, auth: VerifiedToken | null): auth is VerifiedToken {
+        if (!auth) {
+            if (!res.headersSent) res.status(401).json({ jsonrpc: '2.0', error: {
+                code: -32001, message: 'Authentication required for this MCP session.' }, id: req.body?.id ?? null });
+            return false;
+        }
+        const initial = sessionPrincipals.get(id);
+        if (!initial || !sameMcpPrincipal(initial, auth)) {
+            res.status(403).json({ jsonrpc: '2.0', error: {
+                code: -32003, message: 'This MCP session belongs to a different principal.' }, id: req.body?.id ?? null });
+            return false;
+        }
+        return true;
+    }
     // IDLE EXPIRY (memory trace 2026-08-19). Every session carries a full McpServer — hundreds of
     // registered tools, each with its Zod schema graph — and until now a session died ONLY when the
     // client sent DELETE. Most clients never do: a closed desktop app, a dropped connection or a
@@ -178,7 +210,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                     logger.warn('MCP idle sweep: transport close failed; maps are cleaned regardless', { error: String(err) }));
                 transports.delete(id);
                 sessionChatInstances.delete(id);
-                sessionTokens.delete(id);
+                sessionPrincipals.delete(id);
                 sessionLastSeen.delete(id);
                 sessionAgents.delete(id);
             }
@@ -250,8 +282,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // measurement, so what is measured is what the tool itself returned.
         const measuredTool = wrapToolHandler(withErrorNextStep(originalTool), () => agentGaii);
         const measuredRegisterTool = wrapToolHandler(withErrorNextStep(originalRegisterTool), () => agentGaii);
-        patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? measuredTool(...args) : undefined;
-        patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? measuredRegisterTool(...args) : undefined;
+        // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
+        // list/call time, so a removed permission affects discovery without rebuilding a session.
+        // Newly granted tools outside that initial surface still require re-initialization.
+        const liveGate = (name: string) => !enforce || scopeAllowsTool(scopes, name);
+        const liveTool = withRequestPermission(measuredTool, liveGate);
+        const liveRegisterTool = withRequestPermission(measuredRegisterTool, liveGate);
+        patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? liveTool(...args) : undefined;
+        patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? liveRegisterTool(...args) : undefined;
 
         // Every tool group, from the one list the schema audit registers against too
         // (mcp/register-all.ts). It used to stand here and the audit kept its own copy; the copies
@@ -279,9 +317,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // skipped, it is answered earlier — nothing is registered unless this session holds
         // mcp:use and the owner's grant allows the tool, and each call goes back through the
         // same chokepoint the gateway uses.
+        patchable.registerTool = withRequestPermission(originalRegisterTool, () => scopeIsCovered(scopes, 'mcp:use'));
         const remoteCount = await registerRemoteTools(mcp, {
             storage, config, scopes, agentGaii: () => agentGaii,
         });
+        patchable.registerTool = originalRegisterTool;
         if (remoteCount > 0) {
             logger.info(`[mcp-remote] ${remoteCount} flattened tool(s) offered to ${agentGaii}`);
         }
@@ -353,24 +393,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // opened with, and that branch even refreshes the session's stored bearer from the request.
         // E2E test-quality audit, e2e-mcp:448: the suite asserted the endpoint's `revoked: true`
         // echo, which RFC 7009 answers unconditionally for any string.
-        if (token) {
-            const { verifyJWT } = await import('../auth/jwt.js');
-            const { credentialRevoked } = await import('../auth/middleware.js');
-            const verified = await verifyJWT(token);
-            if (!verified || await credentialRevoked(token, verified)) {
-                res.status(401).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Token is invalid or has been revoked. Obtain a new access token via /v1/mcp/token.' },
-                    id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
-                });
-                return;
-            }
-        }
+        const verified = await authenticate(req, res);
+        if (res.headersSent) return;
 
         // Determine session ID from header
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
         if (sessionId && transports.has(sessionId)) {
+            if (!sessionAllowed(req, res, sessionId, verified)) return;
             // Existing session — update lastSeen for session tracking
             sessionLastSeen.set(sessionId, Date.now());
             const ciId = sessionChatInstances.get(sessionId);
@@ -382,12 +412,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             // The agent's own MCP-use mark, throttled inside: the MCP page reads "viimeksi" from it.
             const who = sessionAgents.get(sessionId);
             if (who) void markAgentMcpUse(storage, who.gaii, who.platform);
-            // Refresh the session's bearer token from THIS request before dispatching: the client
-            // rotates its access token mid-session, and capability invocation re-presents it.
-            const box = sessionTokens.get(sessionId);
-            if (box && token) box.current = token;
             const transport = transports.get(sessionId)!;
-            await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
+            await authority.run(token!, verified, () =>
+                transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body));
             return;
         }
 
@@ -409,29 +436,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
 
         // New session: authenticate the agent via OAuth token
         // MCP ALWAYS requires GHII authentication — no anonymous access allowed
-        let agentGaii: string | undefined;
-        let sessionOwner: string | undefined;
-        let mcpClientName: string | undefined;
-
-        if (token) {
-            try {
-                const { verifyJWT } = await import('../auth/jwt.js');
-                const payload = await verifyJWT(token);
-                if (payload) {
-                    agentGaii = payload.sub as string;
-                    sessionOwner = payload.owner as string;
-                    mcpClientName = payload.mcp_client;
-                }
-            } catch {
-                // Token was provided but is invalid/expired — return 401
-                res.status(401).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Token expired or invalid. Please refresh your access token via /v1/mcp/token.' },
-                    id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
-                });
-                return;
-            }
-        }
+        const agentGaii = verified?.sub;
+        let sessionOwner = verified?.owner;
+        const mcpClientName = verified?.mcp_client;
 
         if (!agentGaii) {
             // ONE QUESTION A STRANGER MAY ASK WITHOUT AN ACCOUNT: what can you do?
@@ -477,7 +484,6 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Validate agent exists and has a real owner
         let chatInstanceId: string | undefined;
         let sessionAgentInfo: { gaii: string; platform: string } | undefined;
-        let sessionScopes: string[]; // assigned from agent.defaultScopes in the validation block below
 
         {
             const agent = await storage.getAgent(authenticatedGaii);
@@ -510,7 +516,6 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 return;
             }
             sessionOwner = agent.owner;
-            sessionScopes = agent.defaultScopes ?? [];
 
             // Upsert ChatInstanceRecord for session tracking
             // Prefer mcp_client from JWT (set during OAuth consent) over User-Agent sniffing
@@ -570,14 +575,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 
-        const tokenBox: { current: string | undefined } = { current: token };
-        const mcpServer = await createMcpServer(authenticatedGaii, sessionScopes, serverRole, () => tokenBox.current, sessionOwner);
+        const mcpServer = await authority.run(token!, verified!, () =>
+            createMcpServer(authenticatedGaii, authority.scopes, serverRole, authority.token, sessionOwner));
 
         transport.onclose = () => {
             if (transport.sessionId) {
                 transports.delete(transport.sessionId);
                 sessionChatInstances.delete(transport.sessionId);
-                sessionTokens.delete(transport.sessionId);
+                sessionPrincipals.delete(transport.sessionId);
                 sessionLastSeen.delete(transport.sessionId);
                 sessionAgents.delete(transport.sessionId);
             }
@@ -585,13 +590,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
 
         await mcpServer.connect(transport);
 
-        await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
+        await authority.run(token!, verified!, () =>
+            transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body));
 
         // Store transport for session reuse (sessionId is generated during handleRequest)
         if (transport.sessionId) {
             transports.set(transport.sessionId, transport);
             sessionLastSeen.set(transport.sessionId, Date.now());
-            sessionTokens.set(transport.sessionId, tokenBox);
+            sessionPrincipals.set(transport.sessionId, verified!);
             if (chatInstanceId) {
                 sessionChatInstances.set(transport.sessionId, chatInstanceId);
             }
@@ -602,11 +608,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     // GET handler (SSE server→client notifications) — role-agnostic; the session is already bound
     // to its (role-scoped) server from the POST that created it.
     const handleMcpGet = async (req: Request, res: Response) => {
+        const auth = await authenticate(req, res);
+        if (res.headersSent) return;
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         if (!sessionId || !transports.has(sessionId)) {
             res.status(400).json({ error: 'Missing or invalid mcp-session-id header' });
             return;
         }
+        if (!sessionAllowed(req, res, sessionId, auth)) return;
         sessionLastSeen.set(sessionId, Date.now());
         const transport = transports.get(sessionId)!;
         await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse);
@@ -614,11 +623,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
 
     // DELETE handler — close session (role-agnostic)
     const handleMcpDelete = async (req: Request, res: Response) => {
+        const auth = await authenticate(req, res);
+        if (res.headersSent) return;
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         if (!sessionId || !transports.has(sessionId)) {
             res.status(404).json({ error: 'Session not found' });
             return;
         }
+        if (!sessionAllowed(req, res, sessionId, auth)) return;
         const transport = transports.get(sessionId)!;
         await transport.close();
         transports.delete(sessionId);

@@ -699,6 +699,7 @@ const ALL_SUITES = [
     'test/e2e-core-jobs.ts',
     'test/e2e-registration-mode.ts',
     'test/e2e-mcp-session-expiry.ts',
+    'test/e2e-mcp-session-authority.ts',
     'test/e2e-usage-telemetry.ts',
     'test/e2e-organism-delete-cascade.ts',
     'test/e2e-organism-bulk-delete.ts',
