@@ -44,7 +44,7 @@
  *     so a verdict can be checked against its reason. New op setSubject. Backward-compatible:
  *     check{permission}/check{command} keep their shape and gain two fields. See TARGET-055.
  *   v1.2.1 — 2026-07-30 — action schemas were declared as `input_schema:`/`output_schema:`, but the
- *     extension manifest parser reads `input:`/`output:` (routes/extensions/manifest.ts), so BOTH
+ *     extension manifest parser reads `input:`/`output:` (services/extension-manifest.ts), so BOTH
  *     schemas were dropped silently: every extension installed from this package advertised check
  *     and admin with no schema at all, which is why an agent could not discover the gate. Renamed to
  *     the keys the parser and build-extension-prompt.ts actually document. Same bug was in

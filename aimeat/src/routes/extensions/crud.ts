@@ -45,7 +45,7 @@ import {
   listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
   snapshotExtensionVersion,
 } from '../../services/component-versions.js';
-import { buildExtensionRecordFromManifest } from './manifest.js';
+import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
 import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';

@@ -22,7 +22,7 @@
  * @version-history
  *   v1.0.0 — 2026-06-26 — initial: extension (post/remove) + multi-seller storefront app.
  *   v1.0.1 — 2026-07-30 — action schemas were declared as `input_schema:`/`output_schema:`, but the
- *     extension manifest parser reads `input:`/`output:` (routes/extensions/manifest.ts), so both
+ *     extension manifest parser reads `input:`/`output:` (services/extension-manifest.ts), so both
  *     schemas were dropped silently and every install advertised an action with no schema. Renamed
  *     to the keys the parser and the authoring prompt actually document. Same bug in
  *     aimeat-iam-package.ts; found while fixing nuotta-iam (TARGET-055).

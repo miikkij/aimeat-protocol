@@ -59,7 +59,7 @@
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields } from '../services/extension-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';

@@ -25,7 +25,7 @@
  *                         the owner fence is now re-checked at RUN time (it was create-time only, and
  *                         a delete-and-reinstall by another owner outlives a create-time gate), and
  *                         the sandbox limits go through sandboxLimits() like every other road — the
- *                         ceiling was already applied at install (routes/extensions/manifest.ts), so
+ *                         ceiling was already applied at install (services/extension-manifest.ts), so
  *                         this only adds the small floors that keep a sandbox large enough to start.
  *   v1.3.1 — 2026-08-16 — The owner scope reading it needs is now WRITTEN: no install door stamped it
  *                         on a manifest-declared job, so from v1.3.0 every scheduled extension on the

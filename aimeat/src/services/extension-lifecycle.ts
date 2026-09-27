@@ -7,7 +7,7 @@
  *
  *   Two doors do all four. Over HTTP that is POST/PUT /v1/extensions plus the activate, deactivate
  *   and DELETE routes in routes/extensions/crud.ts; over MCP it is the aimeat_extension_* tools in
- *   mcp/extensions.ts. Manifest validation was already shared (routes/extensions/manifest.ts) and the
+ *   mcp/extensions.ts. Manifest validation was already shared (services/extension-manifest.ts) and the
  *   in-place code swap was already shared (extension-upsert.ts). Everything around those two stayed
  *   copied, and the copies had stopped being the same code:
  *

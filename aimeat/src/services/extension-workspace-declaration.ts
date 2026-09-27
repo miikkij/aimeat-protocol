@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The manifest's `workspace: { read, write }` declaration as it is stored on an
  *   extension record, and the one reader of it. A LEAF module on purpose: the manifest builder
- *   (routes/extensions/manifest.ts) and the CRUD routes need only this, and importing the full
+ *   (services/extension-manifest.ts) and the CRUD routes need only this, and importing the full
  *   sandbox binding (extension-workspace.ts → workspace-tool-ops.ts → memory-write → scheduler →
  *   mcp/index → mcp/extensions → manifest.ts) closed an import cycle dependency-cruiser refused.
  * @structure WorkspaceDeclaration · WORKSPACE_DECLARATION_KEY · workspaceDeclarationOf()
@@ -19,7 +19,7 @@ import type { ExtensionRecord } from '../storage/interface.js';
 export interface WorkspaceDeclaration { read: boolean; write: boolean }
 
 /** The config key the manifest builder writes the declaration to. `__`-prefixed, so a manifest's
- *  own `config:` block cannot set it (routes/extensions/manifest.ts strips those). */
+ *  own `config:` block cannot set it (services/extension-manifest.ts strips those). */
 export const WORKSPACE_DECLARATION_KEY = '__workspace';
 
 /** The declaration on an installed extension, or null when the manifest declared none. */
