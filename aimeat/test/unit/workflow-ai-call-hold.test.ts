@@ -5,10 +5,12 @@
  * @description What a run holds of its spending limit (maxCostUsd) while an ai step's model call is
  *   open, and what it has spent, through the engine over an in-memory storage: the watchdog finding
  *   the step's output while its call runs, a timeout, a retry beside a call still open, a failing
- *   call, a cancel, a restart, and a cost that arrives after the run finished. The model is a
- *   stand-in whose calls stay open until the case answers them. The same road with a real provider is
- *   test/e2e-workflows.ts.
+ *   call, a cancel, a restart, a cost that arrives after the run finished, and a watchdog pass that
+ *   comes between a run's first save and its first step. The model is a stand-in whose calls stay open
+ *   until the case answers them. The same road with a real provider is test/e2e-workflows.ts.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A watchdog pass between a run's first save and its first tick starts
+ *     nothing twice (secaudit 2026-09, A6-11).
  *   v1.1.0 — 2026-09-26 — A step keeps the most one attempt cost, and the next run expects one attempt
  *     (secaudit 2026-09, A6-11).
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, A6-11).
@@ -334,5 +336,29 @@ describe('an ai step\'s call holds its share of the limit until it answers', () 
         const next: Record<string, WorkflowRunStep> = { left: stepAt('pending') };
         pinCostEstimates(run.defSnapshot, next, [run]);
         expect(next.left.estimateUsd).toBeCloseTo(0.025, 10);
+    });
+});
+
+describe('a run\'s first step starts once', () => {
+    it('a watchdog pass that finds the run between its first save and its first tick does not start its steps a second time', async () => {
+        let sweeping: Promise<void> | undefined;
+        const storage = memStorage(async rec => {
+            if (sweeping || rec.key !== 'workflows.active') return;
+            // The watchdog's minute comes round the moment the run is listed as in flight. It gets
+            // as far as it can in 50 ms, and the start goes on after that.
+            sweeping = engine.sweep();
+            await Promise.race([sweeping, new Promise(resolve => { setTimeout(resolve, 50); })]);
+        });
+        const engine = engineFor(storage);
+        await put(storage, OWNER, `workflows.def.${WF}`, defOf([ai('left')], 0.05));
+
+        const started = await engine.startRun(OWNER, 'alice', WF, { mode: 'full-live', caller: { roles: ['owner'], scopes: [] } });
+        await sweeping;
+        expect('runId' in started && !started.skipped).toBe(true);
+        const run = await readRun(storage, `workflows.run.${WF}.${(started as { runId: string }).runId}`);
+        expect(run.steps.left.state).toBe('dispatched');
+        expect(model.calls).toHaveLength(1);
+        expect(reservedUsd(run)).toBeCloseTo(0.05, 10);
+        expect(spentUsd(run)).toBe(0);
     });
 });
