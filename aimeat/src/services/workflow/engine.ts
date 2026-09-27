@@ -84,6 +84,10 @@
  *     ended with the process (secaudit 2026-09, A6-11).
  *   v1.14.0 — 2026-09-26 — startRun takes the run's lock before its first save, so nothing advances
  *     the run before its first tick (secaudit 2026-09, A6-11).
+ *   v1.15.0 — 2026-09-26 — onPushTerminal tells an answer of an earlier attempt from the answer of the
+ *     attempt that runs now. After a retry, an earlier attempt's answer settles its own cost and hold
+ *     and ticks the run, turns the step green only when it succeeded and the output is there, and
+ *     never uses up a retry or turns the step red (secaudit 2026-09, R3 problem 2).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -692,8 +696,10 @@ export class WorkflowEngine {
    * reuses the same lock + success_signal evaluation + partial-fail + tick. `ok` is whether the
    * push-ack / capability-response succeeded; a step is green iff ok AND its success_signal (if any)
    * passes. `costUsd` is what the step's own model calls cost (an ai step), kept on the step for the
-   * run's cost cap, and `call` is the attempt that model call was started for: what it held of the
-   * cap goes now, with its answer.
+   * run's cost cap, and `call` is the attempt the answer was dispatched for: what an ai step's model
+   * call held of the cap goes now, with its answer. An answer of an EARLIER attempt, while the step
+   * runs again after a retry, turns the step green when it succeeded and its output is there, and
+   * otherwise leaves the step to the current attempt: it never uses up a retry or turns it red.
    */
   async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number): Promise<void> {
     await this.withLock(runId, async () => {
@@ -706,8 +712,10 @@ export class WorkflowEngine {
       // retry, the watchdog finding its output first): the owner paid for it, and the cap and the next
       // run's estimate count it. Only now does the hold it carried go (run-cost.ts aiCallAnswered).
       const answered = aiCallAnswered(rs, call, costUsd);
-      if (rs.state !== 'dispatched') {
-        // Not awaiting this answer any more. A live run may now have room for an ai step that waited.
+      // The step was given a retry after this answer's attempt started, and the current attempt runs.
+      const earlier = call !== undefined && call !== rs.attempt;
+      if (rs.state !== 'dispatched' || (earlier && !ok)) {
+        // Not awaiting this answer. A live run may now have room for an ai step that waited.
         const live = run.status === 'running' || run.status === 'waiting-step';
         if (answered && live) await this.tick(ownerGhii, run);
         else if (answered) await this.persist(ownerGhii, run);
@@ -726,6 +734,8 @@ export class WorkflowEngine {
       const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
       if (ok && output.ok) {
         rs.state = 'green'; rs.endedAt = now;
+      } else if (earlier) {
+        // An earlier attempt succeeded, and its output is not there: the current attempt decides.
       } else if (stepDef.retry && rs.attempt < stepDef.retry.max) {
         rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
         rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();

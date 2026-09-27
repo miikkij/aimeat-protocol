@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.4 — 2026-09-26 — dispatchStep hands the answer of every step kind to the engine with the
+ *     attempt it was dispatched for, so the engine tells a late answer of an earlier attempt from the
+ *     answer of the attempt that runs now (secaudit 2026-09, R3 problem 2).
  *   v1.5.3 — 2026-09-26 — OnPushTerminal carries the attempt an ai step's model call was started for,
  *     so the engine drops that call's hold on the cost cap when it answers (secaudit 2026-09, A6-11).
  *   v1.5.2 — 2026-09-26 — A run stopped because its next ai step's estimate did not fit under the
@@ -73,8 +76,9 @@ export interface StepDeps {
 }
 
 /** Callback into the engine's non-task terminal path for ecosystem action steps. `costUsd` is what the
- *  step's own model calls cost (an ai step), for the run's cost cap, and `call` is the attempt that
- *  model call was started for, whose hold on the cap goes with its answer. */
+ *  step's own model calls cost (an ai step), for the run's cost cap, and `call` is the attempt the
+ *  answer was dispatched for: an ai step's model call holds its share of the cap until it answers,
+ *  and an answer of an earlier attempt does not decide the attempt that runs now (engine.ts). */
 export type OnPushTerminal = (ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number) => void | Promise<void>;
 
 const TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled', 'stopped']);
@@ -84,29 +88,33 @@ const FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red'
 export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, resolved: ResolvedStep | undefined, onPushTerminal: OnPushTerminal): Promise<string[]> {
   // human-input steps are parked by tick() BEFORE dispatch (askHumanInput) — they never reach here.
   if (step.action?.kind === 'human-input') return [];
+  // Every answer names the attempt it was dispatched for, so the engine tells a late answer of an
+  // earlier attempt from the answer of the attempt that runs now, after the watchdog gave a retry.
+  const attempt = run.steps[step.id]?.attempt ?? 0;
+  const onAnswer: OnPushTerminal = (o, w, rid, s, ok, cost, call) => onPushTerminal(o, w, rid, s, ok, cost, call ?? attempt);
   // An extension step runs HERE, on this node, in the QuickJS sandbox — no agent to reach, no
   // tunnel to cross, no model. Completion arrives through the same onPushTerminal path as an
   // ecosystem step, so its success_signal decides green or red the same way.
   if (step.action?.kind === 'extension') {
-    dispatchExtensionStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
+    dispatchExtensionStep(deps, ownerGhii, run, step, step.action, onAnswer);
     return [];
   }
   // An ai step runs the owner's own model here, on this node. No agent, no fleet, no browser — and
   // no round trip through another repository to change what it says.
   if (step.action?.kind === 'ai') {
-    dispatchAiStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
+    dispatchAiStep(deps, ownerGhii, run, step, step.action, onAnswer);
     return [];
   }
   // A datapackage step publishes what an earlier step produced. Also here rather than over a wire:
   // it reads an owner-namespace key and calls the same publish the REST route calls.
   if (step.action?.kind === 'datapackage') {
-    dispatchDataPackageStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
+    dispatchDataPackageStep(deps, ownerGhii, run, step, step.action, onAnswer);
     return [];
   }
   // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
   // async onPushTerminal path, never an agent task. They record no task ids.
   if (step.action && step.action.kind !== 'agent') {
-    dispatchEcosystemStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
+    dispatchEcosystemStep(deps, ownerGhii, run, step, step.action, onAnswer);
     return [];
   }
   const ownerName = localAccountName(ownerGhii);
