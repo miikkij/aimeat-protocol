@@ -44,6 +44,7 @@ import { logger } from '../../utils/logger.js';
 import { batchKeyRefusal, storageReferenceRefusal } from './batch-guards.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
 import { isKeyArchived } from '../../services/archive.js';
+import { discoverMemory } from '../../services/memory-discover.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -485,24 +486,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const callerGaii = resolve(req);
 
-    const result = await storage.listAllMemory({
-      prefix: prefix || undefined,
-      ownerPrefix: owner || undefined,
-      visibility: 'public',
-      limit,
-      offset,
+    const items = await discoverMemory(storage, callerGaii, {
+      prefix: prefix || undefined, owner: owner || undefined, q, limit, offset,
     });
-
-    // Filter out the caller's own entries and apply text search if provided
-    let items = result.items.filter(m => m.ownerGaii !== callerGaii);
-    if (q) {
-      const lq = q.toLowerCase();
-      items = items.filter(m =>
-        m.key.toLowerCase().includes(lq) ||
-        (m.ownerGaii && m.ownerGaii.toLowerCase().includes(lq)) ||
-        (m.tags && m.tags.some(t => t.toLowerCase().includes(lq)))
-      );
-    }
 
     stats?.increment('memory_discover');
 
