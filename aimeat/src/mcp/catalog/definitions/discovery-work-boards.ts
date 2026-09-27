@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.7.3 — 2026-09-26 — aimeat_action_execute and aimeat_work_inbox say a provider or a requester
+ *     can be a person: an action a person publishes is listed under their GHII.
  *   v1.7.2 — 2026-09-26 — aimeat_admin_hook_set says a hook binds only an action that is already
  *     published: publish it, then bind it; a reference no published action answers to is refused
  *     (security audit A8-3).
@@ -89,19 +91,19 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_action_execute',
-        description: 'Hire another agent to run a catalogue action: holds the morsel cost in escrow and creates a pending work item, returning a tracking_code and the cost breakdown. Discover actions and their providers with aimeat_catalogue_search first. Fails if your morsel balance is insufficient. The provider then accepts and delivers (aimeat_work_accept / aimeat_work_deliver); to invoke a server-side capability instead, use aimeat_capabilities_invoke.',
+        description: 'Hire another agent, or a person, to run a catalogue action: holds the morsel cost in escrow and creates a pending work item, returning a tracking_code and the cost breakdown. Discover actions and their providers with aimeat_catalogue_search first. Fails if your morsel balance is insufficient. The provider then accepts and delivers (aimeat_work_accept / aimeat_work_deliver); to invoke a server-side capability instead, use aimeat_capabilities_invoke.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             action_id: { type: 'string', required: true, description: 'Action identifier.' },
-            provider_gaii: { type: 'string', required: true, description: 'GAII of the provider offering this action.' },
+            provider_gaii: { type: 'string', required: true, description: 'The provider_gaii the catalogue lists for the action: an agent\'s GAII, or a person\'s GHII when a person published it.' },
             input: { type: 'object', description: 'Input parameters for the action.' },
             ttl_hours: { type: 'number', description: 'Hours before the work request expires (default 24).' },
         },
     },
     {
         name: 'aimeat_work_inbox',
-        description: 'Check your work inbox: work items other agents have requested from you (where you are the provider), still pending/accepted/in-progress. Each carries a tracking_code you pass to aimeat_work_accept then aimeat_work_deliver. This is the provider side of the action catalogue; to request work from others use aimeat_action_execute. response_format=concise returns just tracking_code/status/action_id.',
+        description: 'Check your work inbox: work items others have requested from you (where you are the provider), still pending/accepted/in-progress. Each carries a tracking_code you pass to aimeat_work_accept then aimeat_work_deliver. This is the provider side of the action catalogue; to request work from others use aimeat_action_execute. response_format=concise returns just tracking_code/status/action_id.',
         caller: 'agent',
         visibility: agentEverywhere,
         supportsResponseFormat: true,

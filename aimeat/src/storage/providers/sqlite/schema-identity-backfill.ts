@@ -1,0 +1,74 @@
+/**
+ * @file src/storage/providers/sqlite/schema-identity-backfill.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The SQLite half of Postgres migration 0085: actions a person published, the work on
+ *   them and the requests a person made move from the bare account name to the person's GHII.
+ *   schema.ts calls it on every open, like its other in-place migrations; once the rows are moved it
+ *   finds nothing and changes nothing.
+ *
+ *   WHY. An action a person publishes is stored under their full identity, like an agent's under its
+ *   GAII, and every work door compares the full identity (routes/actions.ts, routes/work.ts). Rows
+ *   written before carry the bare name, and no door would find them under it.
+ *
+ *   WHICH ACCOUNT. A row moves only to an account that existed when the row was written. A deleted
+ *   username is released for reuse, so a row older than the account holding its name now belonged to
+ *   a person whose account is gone. That person's actions go, and their work is settled the way
+ *   deleting their account settles it (repos/work-erasure.ts): open work is cancelled and the
+ *   requester's held morsels go back, finished work stays for the other side under a pseudonym.
+ *   A copy of another node's action (id `<node>:<id>`, tag `federated:<node>`) names a person of that
+ *   node and is left as it is.
+ * @structure moveActionsAndWorkToFullIdentity(db)
+ * @usage moveActionsAndWorkToFullIdentity(db);   // from initializeSchema in schema.ts
+ * @version-history
+ *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09: N6, F-1). Mirrors Postgres 0085.
+ */
+import type Database from 'better-sqlite3';
+import { erasedPartyPseudonym } from '../../erased-party.js';
+import { settleErasedPartyWork } from './repos/work-erasure.js';
+import { resolveGhiiIn } from './repos/ghii-resolve.js';
+
+/** A bare account name: no node, no agent. */
+const bare = (column: string): string => `instr(${column}, '@') = 0 AND instr(${column}, '#') = 0`;
+
+/**
+ * The GHII of the account named in `column`, when that account existed at `createdAt`; NULL when no
+ * account holds the name, or the one that does came later.
+ */
+const heldGhii = (column: string, createdAt: string): string =>
+  `(SELECT g.ghii FROM owners o JOIN ghiis g ON g.ownerName = o.name
+     WHERE o.name = ${column} AND o.createdAt <= ${createdAt} ORDER BY g.createdAt LIMIT 1)`;
+
+/** An action of this node rather than a copy of another node's. */
+const LOCAL_ACTION = `instr(actions.id, ':') = 0 AND actions.tags NOT LIKE '%"federated:%'`;
+
+/** Move bare-name actions and work to the GHII, and settle what a deleted account left. */
+export function moveActionsAndWorkToFullIdentity(db: Database.Database): void {
+  const run = db.transaction(() => {
+    const actionGhii = heldGhii('actions.providerGaii', 'actions.createdAt');
+    db.exec(`
+      UPDATE actions SET providerGaii = ${actionGhii}
+      WHERE ${bare('providerGaii')} AND ${LOCAL_ACTION} AND ${actionGhii} IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM actions x WHERE x.id = actions.id AND x.providerGaii = ${actionGhii});
+      DELETE FROM actions
+      WHERE ${bare('providerGaii')} AND ${LOCAL_ACTION}
+        AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.name = actions.providerGaii AND o.createdAt <= actions.createdAt);
+    `);
+    for (const column of ['providerGaii', 'requesterGaii']) {
+      const workGhii = heldGhii(`work.${column}`, 'work.createdAt');
+      db.exec(`UPDATE work SET ${column} = ${workGhii} WHERE ${bare(column)} AND ${workGhii} IS NOT NULL`);
+    }
+
+    // What is left under a bare name belonged to a deleted account: every row when nobody holds the
+    // name now, the rows older than the account when somebody does.
+    const left = db.prepare(
+      `SELECT providerGaii AS name FROM work WHERE ${bare('providerGaii')}
+       UNION SELECT requesterGaii FROM work WHERE ${bare('requesterGaii')}`,
+    ).all() as { name: string }[];
+    for (const { name } of left) {
+      const holder = db.prepare('SELECT createdAt FROM owners WHERE name = ?').get(name) as { createdAt: string } | undefined;
+      settleErasedPartyWork(db, name, [], erasedPartyPseudonym(), id => resolveGhiiIn(db, id), { createdBefore: holder?.createdAt });
+    }
+  });
+  run();
+}

@@ -6,9 +6,11 @@
  *   calls it inside its own transaction, before the per-identity cascade, with the pseudonym the
  *   purchase receipts get. A free function over the connection for the reason
  *   repos/app-purchase-erasure.ts gives: no import cycle through the provider class.
- * @structure settleErasedPartyWork(db, name, ghiis, pseudonym, resolvePayer)
+ * @structure settleErasedPartyWork(db, name, ghiis, pseudonym, resolvePayer, opts)
  * @usage settleErasedPartyWork(this.db, name, ghiis, pseudonym, id => this.resolveGhii(id));
  * @version-history
+ *   v1.1.0 — 2026-09-26 — `createdBefore`, for the boot migration's rows of a deleted account whose
+ *     name somebody holds again.
  *   v1.0.0 — 2026-09-26 — Initial: open work is cancelled and the requester's held morsels go back,
  *     finished work stays under the pseudonym (secaudit 2026-09: A8-4, N6). The Postgres twin is
  *     settleErasedPartyWorkDb in its owner-cascade.ts.
@@ -43,10 +45,13 @@ interface WorkRow { trackingCode: string; status: string; providerGaii: string; 
  *
  * The rows are found by the forms partyIdentities lists: the GHII, the bare account name an owner
  * session stored before 2026-09-26, and `…#name@node` for an agent or an app acting for them.
+ * `createdBefore` limits the pass to rows written before a time: the boot migration's rows of a
+ * deleted account whose name somebody else holds now (schema-identity-backfill.ts).
  */
 export function settleErasedPartyWork(
   db: Database.Database, name: string, ghiis: string[], pseudonym: string,
   resolvePayer: (identity: string) => string | null,
+  opts: { createdBefore?: string } = {},
 ): WorkErasureResult {
   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
   const params = [...exact, ...suffixPatterns];
@@ -54,10 +59,11 @@ export function settleErasedPartyWork(
     `${column} IN (${exact.map(() => '?').join(', ')})`,
     ...suffixPatterns.map(() => `${column} LIKE ? ESCAPE '\\'`),
   ].join(' OR ');
+  const before = opts.createdBefore ? ' AND createdAt < ?' : '';
   const rows = db.prepare(
     `SELECT trackingCode, status, providerGaii, requesterGaii, cost FROM work
-     WHERE (${matches('providerGaii')}) OR (${matches('requesterGaii')})`,
-  ).all(...params, ...params) as WorkRow[];
+     WHERE ((${matches('providerGaii')}) OR (${matches('requesterGaii')}))${before}`,
+  ).all(...params, ...params, ...(opts.createdBefore ? [opts.createdBefore] : [])) as WorkRow[];
 
   const out: WorkErasureResult = { cancelled: 0, returned: 0, kept: 0, deleted: 0 };
   const now = new Date().toISOString();

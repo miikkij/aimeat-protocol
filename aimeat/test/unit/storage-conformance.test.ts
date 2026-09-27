@@ -21,6 +21,10 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.8.0 -- 2026-09-26 -- The deploy migration moves an action published under the bare account name,
+ *     and the work on it, to the owner's GHII on every provider; an action whose name has no account,
+ *     or only a newer one, goes; another node's copy stays; open work for a person whose account is
+ *     gone is cancelled and its held morsels go back (Postgres 0085, SQLite schema-identity-backfill).
  *   v1.7.0 -- 2026-09-26 -- deleteOwner settles the erased person's work on every provider: open
  *     requests are cancelled and the requesters' held morsels come back with a ledger line, finished
  *     work stays for the other party under the erasure's pseudonym, and work between two of their
@@ -47,8 +51,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
+import type pg from 'pg';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, WorkRecord } from '../../src/storage/interface.js';
+import { runMigrations } from '../../src/storage/providers/postgres-kysely/migrate.js';
 import { spendAssertionIdentity } from '../../src/services/assertion-spend.js';
 
 const SQLITE_PATH = `./test/.conformance-${process.pid}.db`;
@@ -295,6 +301,25 @@ async function seedWorkErasure(s: Storage) {
     return { erased, other, E, O, tc, disputeId, heldFor, asked };
 }
 
+/** The Postgres migration that moves actions and work to the full identity. */
+const IDENTITY_MIGRATION = '0085_actions_work_full_identity.sql';
+
+/**
+ * Run the deploy migration again over what is in the database now, the way a deploy runs it.
+ * SQLite migrates in place every time a database is opened (sqlite/schema.ts), so a second open IS
+ * the deploy. Postgres applies each file once: forget this one, and the runner applies it again.
+ */
+async function rerunIdentityMigration(provider: string, storage: Storage): Promise<void> {
+    if (provider === 'sqlite') {
+        const again = await createStorage({ provider: 'sqlite', sqlitePath: SQLITE_PATH });
+        await (again as unknown as { close?: () => void | Promise<void> }).close?.();
+        return;
+    }
+    const pool = (storage as unknown as { pool: pg.Pool }).pool;
+    await pool.query('DELETE FROM "_kysely_migrations" WHERE name = $1', [IDENTITY_MIGRATION]);
+    await runMigrations(pool);
+}
+
 /** Everything the cascade must leave empty, read back through the Storage interface. */
 async function leftovers(s: Storage, owner: string, ghii: string, _gaii: string) {
     return {
@@ -442,6 +467,137 @@ describe('storage providers agree on what they do, not just on their signatures'
                 expect.soft(await storage.listWorkByRequester(id), `${name}: work asked for is left under ${id}`).toEqual([]);
             }
             await storage.deleteOwner(p.other);
+        }
+    }, 60_000);
+
+    // An action a person publishes is stored under their GHII, and so is the work on it, on every
+    // door. The rows written before that carry the bare account name, and the deploy migration moves
+    // them. It moves a row only to an account that already existed when the row was written: a name is
+    // released for reuse, so a row older than the account holding the name now belonged to a person
+    // whose account was deleted. That person's actions go, and their open work is settled the way a
+    // deletion settles it.
+    it('the deploy migration moves an action published under the bare name, and the work on it, to the owner\'s GHII', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const hour = 3_600_000;
+            const now = new Date().toISOString();
+            const earlier = new Date(Date.now() - hour).toISOString();
+            const longAgo = new Date(Date.now() - 48 * hour).toISOString();
+            const owner = `confmig${tag}`, requester = `confmigr${tag}`, reused = `confmigx${tag}`, gone = `confmigg${tag}`;
+            const ghii = `${owner}@${node}`, reqGaii = `bot#${requester}@${node}`;
+            for (const n of [owner, requester, reused]) {
+                await storage.createOwner({ name: n, displayName: n, publicKey: 'pk', roles: ['owner'], createdAt: earlier });
+                await storage.createGHII({
+                    username: n, nodeId: node, ghii: `${n}@${node}`, displayName: n, verificationLevel: 0,
+                    ownerName: n, totpEnabled: false, morselBalance: 100, loginCount: 0, createdAt: earlier, updatedAt: earlier,
+                });
+            }
+            await storage.createAgent({
+                name: 'bot', owner: requester, gaii: reqGaii, publicKey: 'pk', trustScore: 50, morselBalance: 0,
+                capabilities: [], createdAt: earlier, lastSeen: earlier,
+            });
+            const publish = (id: string, providerGaii: string, createdAt: string, tags: string[] = []) => storage.createAction({
+                id, providerGaii, displayName: id, description: 'conformance', inputSchema: {}, outputSchema: {},
+                pricing: { baseMorsels: 10 }, tags, createdAt, updatedAt: createdAt,
+            });
+            const mine = `conf-mig-${tag}`, federated = `peer-node:conf-mig-${tag}`, orphan = `conf-gone-${tag}`, previous = `conf-prev-${tag}`;
+            await publish(mine, owner, now);                                   // the owner's own: moves
+            await publish(federated, owner, now, ['federated:peer-node']);     // another node's copy: stays
+            await publish(orphan, gone, now);                                  // a name with no account: goes
+            await publish(previous, reused, longAgo);                          // the name's previous holder: goes
+            // Work on the owner's action, and a request the owner made, both under the bare name.
+            await storage.createWork(workRow(`tc-mig-p-${tag}`, owner, reqGaii, 'pending', { actionId: mine }));
+            await storage.debitBalance(reqGaii, 11);
+            await storage.createWork(workRow(`tc-mig-r-${tag}`, reqGaii, owner, 'accepted'));
+            await storage.updateWork(`tc-mig-r-${tag}`, { status: 'delivered', output: { answer: 1 }, updatedAt: now });
+            // Open work for a person whose account is gone, with the requester's morsels held.
+            await storage.createWork(workRow(`tc-mig-g-${tag}`, gone, reqGaii, 'pending', { actionId: orphan }));
+            await storage.debitBalance(reqGaii, 11);
+
+            // The rest of what a deleted account can leave, one row per branch of the settlement, so
+            // every statement of the migration runs here and not first on a production database.
+            const gone2 = `confmigh${tag}`, reqGhii = `${requester}@${node}`;
+            const tc = (k: string) => `tc-mig-${k}-${tag}`;
+            // Asked by a person in person: the morsels go back to the GHII itself.
+            await storage.createWork(workRow(tc('g2'), gone, reqGhii, 'accepted', { cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }));
+            await storage.debitBalance(reqGhii, 5);
+            // Asked by the deleted person: cancelled, and what was held was theirs.
+            await storage.createWork(workRow(tc('g3'), reqGaii, gone, 'pending'));
+            // Between two deleted accounts: cancelled, with nobody to give anything back to.
+            await storage.createWork(workRow(tc('g4'), gone, gone2, 'pending'));
+            // Finished, asked by the deleted person, and disputed: kept, and the dispute without the name.
+            await storage.createWork(workRow(tc('g5'), reqGaii, gone, 'delivered', { callbackUrl: 'https://gone.example.test/cb' }));
+            await storage.updateWork(tc('g5'), { status: 'disputed', updatedAt: now });
+            await storage.createDispute({ id: `dispute-mig5-${tag}`, trackingCode: tc('g5'), status: 'open', openedBy: gone, reason: 'wrong', createdAt: now, updatedAt: now });
+            await storage.addDisputeAuditEntry(`dispute-mig5-${tag}`, { sequence: 1, event: 'dispute_opened', actor: gone, timestamp: now, data: { reason: 'wrong' }, hash: 'c'.repeat(64), previousHash: '0'.repeat(64) });
+            await storage.addDisputeAuditEntry(`dispute-mig5-${tag}`, { sequence: 2, event: 'counter_dispute', actor: reqGaii, timestamp: now, data: { reason: 'right' }, hash: 'd'.repeat(64), previousHash: 'c'.repeat(64) });
+            // With the deleted person on both sides, and disputed: goes with its dispute.
+            await storage.createWork(workRow(tc('g6'), gone, gone, 'delivered'));
+            await storage.createDispute({ id: `dispute-mig6-${tag}`, trackingCode: tc('g6'), status: 'open', openedBy: gone, reason: 'x', createdAt: now, updatedAt: now });
+            await storage.addDisputeAuditEntry(`dispute-mig6-${tag}`, { sequence: 1, event: 'dispute_opened', actor: gone, timestamp: now, data: {}, hash: 'e'.repeat(64), previousHash: '0'.repeat(64) });
+            // A name somebody holds again: the previous holder's open work is settled, the holder's own moves.
+            await storage.createWork(workRow(tc('x1'), reused, reqGaii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
+            await storage.debitBalance(reqGaii, 11);
+            await storage.createWork(workRow(tc('x2'), reused, reqGaii, 'pending'));
+            await storage.debitBalance(reqGaii, 11);
+
+            await rerunIdentityMigration(name, storage);
+
+            expect.soft((await storage.getAction(mine, ghii))?.id, `${name}: the owner's action did not move to the GHII`).toBe(mine);
+            expect.soft((await storage.listActionsByProvider(owner)).map(a => a.id), `${name}: under the bare name, only another node's copy stays`)
+                .toEqual([federated]);
+            expect.soft(await storage.listActionsByProvider(gone), `${name}: an action whose name has no account survived`).toEqual([]);
+            expect.soft(await storage.listActionsByProvider(reused), `${name}: the previous holder's action survived under the name`).toEqual([]);
+            expect.soft(await storage.listActionsByProvider(`${reused}@${node}`), `${name}: the previous holder's action moved to the new holder`).toEqual([]);
+
+            const provided = await storage.getWork(`tc-mig-p-${tag}`);
+            expect.soft(provided?.providerGaii, `${name}: the work on the owner's action did not move`).toBe(ghii);
+            expect.soft(provided?.status, `${name}: the work on the owner's action changed status`).toBe('pending');
+            expect.soft((await storage.getWork(`tc-mig-r-${tag}`))?.requesterGaii, `${name}: the owner's request did not move`).toBe(ghii);
+            expect.soft(await storage.listWorkByProvider(owner), `${name}: work is left under the bare name`).toEqual([]);
+            expect.soft(await storage.listWorkByRequester(owner), `${name}: a request is left under the bare name`).toEqual([]);
+
+            const leftover = await storage.getWork(`tc-mig-g-${tag}`);
+            expect.soft(leftover?.status, `${name}: open work for a deleted account is not cancelled`).toBe('cancelled');
+            expect.soft(leftover?.providerGaii, `${name}: that work still names the deleted account`).toMatch(erasedRe);
+
+            const g2 = await storage.getWork(tc('g2')), g3 = await storage.getWork(tc('g3'));
+            const g4 = await storage.getWork(tc('g4')), g5 = await storage.getWork(tc('g5'));
+            expect.soft([g2?.status, g3?.status, g4?.status], `${name}: open work of a deleted account is not all cancelled`).toEqual(['cancelled', 'cancelled', 'cancelled']);
+            expect.soft(g2?.requesterGaii, `${name}: a request made in person lost its requester`).toBe(reqGhii);
+            expect.soft(g3?.requesterGaii, `${name}: a request the deleted person made still names them`).toMatch(erasedRe);
+            expect.soft(g3?.providerGaii, `${name}: that request lost its provider`).toBe(reqGaii);
+            expect.soft([g4?.providerGaii, g4?.requesterGaii], `${name}: work between two deleted accounts still names one`).toEqual([expect.stringMatching(erasedRe), expect.stringMatching(erasedRe)]);
+            expect.soft(g4?.providerGaii === g4?.requesterGaii, `${name}: two deleted accounts got one pseudonym`).toBe(false);
+            expect.soft(new Set([leftover?.providerGaii, g2?.providerGaii, g3?.requesterGaii, g4?.providerGaii, g5?.requesterGaii]).size,
+                `${name}: one deleted account got more than one pseudonym`).toBe(1);
+            expect.soft(g5?.status, `${name}: finished, disputed work changed status`).toBe('disputed');
+            expect.soft(g5?.requesterGaii, `${name}: finished work still names the deleted account`).toMatch(erasedRe);
+            expect.soft(g5?.callbackUrl, `${name}: the deleted account's callback address is still on the row`).toBeUndefined();
+            expect.soft((await storage.getDisputeByTrackingCode(tc('g5')))?.openedBy, `${name}: the dispute still names who opened it`).toMatch(erasedRe);
+            const log = await storage.getDisputeAuditLog(`dispute-mig5-${tag}`);
+            expect.soft(log.map(e => e.actor), `${name}: the dispute log still names the deleted account, or lost the other side`)
+                .toEqual([expect.stringMatching(erasedRe), reqGaii]);
+            expect.soft(log.map(e => e.hash), `${name}: the dispute log's hashes changed`).toEqual(['c'.repeat(64), 'd'.repeat(64)]);
+            expect.soft(await storage.getWork(tc('g6')), `${name}: work with the deleted account on both sides survived`).toBeNull();
+            expect.soft(await storage.getDisputeByTrackingCode(tc('g6')), `${name}: its dispute survived`).toBeNull();
+            expect.soft(await storage.getDisputeAuditLog(`dispute-mig6-${tag}`), `${name}: its dispute log survived`).toEqual([]);
+
+            const x1 = await storage.getWork(tc('x1')), x2 = await storage.getWork(tc('x2'));
+            expect.soft([x1?.status, x1?.providerGaii], `${name}: the previous holder's open work was not settled`).toEqual(['cancelled', expect.stringMatching(erasedRe)]);
+            expect.soft([x2?.status, x2?.providerGaii], `${name}: the current holder's own work did not move`).toEqual(['pending', `${reused}@${node}`]);
+
+            // 100, less 11 + 11 + 5 + 11 + 11 held, plus the 11 + 5 + 11 held for work of deleted accounts.
+            expect.soft((await storage.getGHII(reqGhii))?.morselBalance, `${name}: the morsels held for deleted accounts' work did not come back`).toBe(78);
+            const returns = (await storage.getTransactions(reqGhii, 500)).filter(t => t.type === 'escrow_return');
+            expect.soft(returns.map(t => `${t.trackingCode}:${t.amount}`).sort(), `${name}: one escrow_return line per settled request`)
+                .toEqual([`${tc('g')}:11`, `${tc('g2')}:5`, `${tc('x1')}:11`].sort());
+            for (const t of returns) expect.soft(t.counterpartyGaii, `${name}: a return line names a deleted account`).toMatch(erasedRe);
+
+            for (const n of [owner, requester, reused]) await storage.deleteOwner(n);
+            await storage.deleteAction(federated, owner);
         }
     }, 60_000);
 
