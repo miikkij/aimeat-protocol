@@ -19308,6 +19308,8 @@ paths:
         Browse public memory entries shared by other users on this node.
         Returns entries with visibility 'public' from all users except the caller.
         Supports text search across keys, owners, and tags.
+        Filters are applied before offset and limit. Items contain metadata only.
+        The returned total is the number of items on this page, not all matching entries.
       tags: [Memory]
       security:
         - BearerAuth: []

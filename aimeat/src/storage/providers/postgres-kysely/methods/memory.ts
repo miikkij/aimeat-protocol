@@ -363,7 +363,7 @@ export const memoryMethods = {
 
   async listMemoryMeta(this: PostgresKyselyStorage, ownerGaii: string, opts?: ListOpts): Promise<MemoryMetaRow[]> {
     const rows = await applyList(this.db.selectFrom('Memory').select(META_COLS).where('ownerGaii', '=', ownerGaii), opts).execute();
-    return rows.map(rowToMeta);
+    return rows.filter(isLive).map(rowToMeta);
   },
 
   async listMemoryForOwners(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: ListOpts): Promise<MemoryRecord[]> {
@@ -375,7 +375,7 @@ export const memoryMethods = {
   async listMemoryMetaForOwners(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: ListOpts): Promise<MemoryMetaRow[]> {
     if (ownerGaiis.length === 0) return [];
     const rows = await applyList(this.db.selectFrom('Memory').select(META_COLS).where('ownerGaii', 'in', ownerGaiis), opts).execute();
-    return rows.map(rowToMeta);
+    return rows.filter(isLive).map(rowToMeta);
   },
 
   async countMemory(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: CountOpts): Promise<number> {
