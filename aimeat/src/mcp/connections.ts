@@ -23,7 +23,9 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
- *   v1.3.0 — 2026-09-25 — aimeat_mail_send leaves out the `channel`, on a send and on a refusal: it
+ *   v1.4.0 — 2026-09-28 — aimeat_mail_read takes store (with filename, mime_type, key): the attachment
+ *     becomes a private file up to the node's per-file limit, through services/connections/attachment-store.ts.
+ *   v1.3.0 — 2026-09-25 —aimeat_mail_send leaves out the `channel`, on a send and on a refusal: it
  *     says whether the address has an account here, which only the owner in person reads.
  *   v1.2.0 — 2026-09-13 — aimeat_mail_send reads the failed send from the SEND_FAILED error
  *     sendOutbound now throws (the REST route answers the same error with 502 or 503), and returns
@@ -45,6 +47,8 @@ import { buildOutboundProviders, listProviderMeta } from '../services/connection
 import { requireEncryptionKey } from '../services/connections/credential.js';
 import { startAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { readResource } from '../services/connections/read.js';
+import { storeMailAttachment, type StoreAttachmentInput } from '../services/connections/attachment-store.js';
+import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
 import { listSendAsAliases } from '../services/connections/send-mail.js';
 import { listOwnConnections, requireOwnConnection } from '../services/connections/access.js';
 import { sendOutbound, OutboundError } from '../services/outbound/outbound-service.js';
@@ -159,6 +163,23 @@ export function registerConnectionTools(
         return ok({ provider: out.provider, resource: out.resource, data: out.data });
     };
 
+    /** The `store: true` branch of aimeat_mail_read: the same service POST /read/attachment calls. */
+    const storeVia = async (connectionId: string, input: StoreAttachmentInput): Promise<TextResult> => {
+        const off = capabilityOff();
+        if (off) return fail(off);
+        if (!scopeIsCovered(scopes, 'storage:write')) {
+            return fail('SCOPE_DENIED: storing an attachment writes a file, which needs the storage:write permission. Read it without store, or ask the owner for that permission.');
+        }
+        const c = ctx();
+        if ('error' in c) return fail(c.error);
+        const conn = await requireOwnConnection(storage, principal(), connectionId);
+        if (!conn) return fail('NOT_FOUND: no such connection of yours.');
+        const out = await storeMailAttachment(c, { storage, config, emitResourceUpdated, emitResourceListChanged },
+            principal(), conn.id, input);
+        if (!out.ok) return fail(`${out.code}: ${out.message}`);
+        return ok({ provider: out.provider, resource: 'attachment', stored: { key: out.key, filename: out.filename, mime_type: out.mime_type, size: out.size } });
+    };
+
     mcp.tool('aimeat_mail_search', descriptionFor('aimeat_mail_search'),
         {
             connection_id: z.string().describe('Which connected mailbox, from aimeat_connection_list.'),
@@ -181,15 +202,20 @@ export function registerConnectionTools(
             connection_id: z.string().describe('Which connected mailbox.'),
             message_id: z.string().describe('The message, from aimeat_mail_search.'),
             attachment_id: z.string().optional().describe('Fetch one attachment instead of the message.'),
+            store: z.boolean().optional().describe('With attachment_id: store the attachment as your private file (up to the node\'s per-file limit) and answer its storage key, instead of its bytes. Needs storage:write.'),
+            filename: z.string().optional().describe('With store: the file name, from the message parts (Gmail does not send it with the attachment).'),
+            mime_type: z.string().optional().describe('With store: the file type, from the message parts.'),
+            key: z.string().optional().describe('With store: the storage key. Default mail/<provider>/<message id>/<file name>.'),
         },
         annotationsFor('aimeat_mail_read'),
-        async ({ connection_id, message_id, attachment_id }): Promise<TextResult> => (
-            attachment_id
+        async ({ connection_id, message_id, attachment_id, store, filename, mime_type, key }): Promise<TextResult> => {
+            if (attachment_id && store === true) return storeVia(connection_id, { message_id, attachment_id, filename, mime_type, key });
+            return attachment_id
                 // Fetched only when asked for: an attachment is a real download against the
                 // person's own allowance, and most of the time the answer is in the text.
                 ? readVia(connection_id, 'attachment', { message_id, attachment_id })
-                : readVia(connection_id, 'message', { id: message_id })
-        ));
+                : readVia(connection_id, 'message', { id: message_id });
+        });
 
     mcp.tool('aimeat_mail_aliases', descriptionFor('aimeat_mail_aliases'),
         { connection_id: z.string().describe('A connected Gmail mailbox.') },

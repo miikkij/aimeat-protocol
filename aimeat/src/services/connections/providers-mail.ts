@@ -21,6 +21,8 @@
  *   · clampLimit
  * @usage import { googleMail, microsoftMail } from './providers-mail.js';
  * @version-history
+ *   v1.1.0 — 2026-09-28 — An Outlook message comes with its attachments' ids, names, types and sizes
+ *     ($expand, no bytes), so an attachment can be fetched or stored at all.
  *   v1.0.0 — 2026-08-26 — Extracted from providers.ts.
  */
 import type { OutboundProvider, OAuthEndpoints } from './providers.js';
@@ -270,7 +272,12 @@ export function microsoftMail(
           if (!/^[A-Za-z0-9_\-=]{1,512}$/.test(id)) {
             throw new Error('Name which message to open. The id comes from the message list.');
           }
-          return `${GRAPH}/messages/${id}`;
+          // The attachments' names, types and sizes come with the message, never their bytes: Graph
+          // lists no attachments on a message unless asked, and without the ids nothing could fetch
+          // one. The bytes are the separate `attachment` read.
+          const u = new URL(`${GRAPH}/messages/${id}`);
+          u.searchParams.set('$expand', 'attachments($select=id,name,contentType,size,isInline)');
+          return u.toString();
         },
       },
       attachment: {

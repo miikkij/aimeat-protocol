@@ -34,6 +34,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   v1.2.0 — 2026-09-28 — aimeat-mail-to-data said the node reads an attached PDF on its own, and no
+ *     code path did; it now says to store the attachment with aimeat_mail_read store: true.
  *   v1.1.0 — 2026-09-19 — Four corrections, the first two of which handed the reader something
  *     that failed the moment it was used. aimeat-welcome-pages gave out /p/{owner} as the person's
  *     address, which no route has ever answered (mcp/portfolio.ts dropped it from the tool's own
@@ -620,8 +622,10 @@ Two things specific to mail:
 
 - **Keep the message id in a column.** Same reason a photograph keeps its address: a total nobody can
   trace back to the message it came from is a claim, and the person will want to check one.
-- **A PDF invoice attached to a mail is a file this node reads on its own.** Text comes out of it
-  without a model guessing. Do not transcribe a PDF by eye when it can be read.
+- **Store a PDF attachment instead of carrying its bytes.** \`aimeat_mail_read\` with \`attachment_id\`
+  and \`store: true\` (plus \`filename\` and \`mime_type\` from the message parts) writes it to your
+  private storage up to the node's per-file limit and answers its key. One answer without \`store\` is
+  capped at about 3 MB of attachment. Do not transcribe a PDF by eye.
 
 ## What not to do with somebody's mailbox
 

@@ -10,7 +10,9 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
- *   v1.2.0 — 2026-09-13 — refuseUnsentSend() reads the SEND_FAILED error a current node answers
+ *   v1.3.0 — 2026-09-28 — aimeat_mail_read forwards store, filename, mime_type and key: the attachment
+ *     is stored as a private file and the answer names it.
+ *   v1.2.0 — 2026-09-13 —refuseUnsentSend() reads the SEND_FAILED error a current node answers
  *     (502 or 503, the send-log row in error.details) as well as an older node's 200 'failed', and
  *     returns both as the same error with message_id and reason at the top. The route's contract
  *     changed that day by the developer's decision; the connector still meets older nodes.
@@ -20,7 +22,7 @@
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, optionalString, optionalNumber } from './tool-call-helpers.js';
+import { requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
 import type { ApiResponse } from './api-client.js';
 
 /** The read direction names a RESOURCE; the node builds every URL from the parameters. */
@@ -114,9 +116,17 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             const connectionId = requiredString(input, 'connection_id');
             const messageId = requiredString(input, 'message_id');
             const attachmentId = optionalString(input, 'attachment_id');
-            return attachmentId
-                ? client.post(readPath(connectionId, 'attachment'), { message_id: messageId, attachment_id: attachmentId })
-                : client.post(readPath(connectionId, 'message'), { id: messageId });
+            if (!attachmentId) return client.post(readPath(connectionId, 'message'), { id: messageId });
+            const filename = optionalString(input, 'filename');
+            const mimeType = optionalString(input, 'mime_type');
+            const key = optionalString(input, 'key');
+            return client.post(readPath(connectionId, 'attachment'), {
+                message_id: messageId, attachment_id: attachmentId,
+                ...(optionalBoolean(input, 'store') === true ? { store: true } : {}),
+                ...(filename ? { filename } : {}),
+                ...(mimeType ? { mime_type: mimeType } : {}),
+                ...(key ? { key } : {}),
+            });
         },
     },
     {

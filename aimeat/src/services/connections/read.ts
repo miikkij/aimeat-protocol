@@ -32,6 +32,8 @@
  *   v1.1.1 -- 2026-09-26 -- The cap is OUTBOUND_READ_MAX_BYTES from utils/read-capped.ts, the one
  *     an extension's ctx.fetch and a decision provider's answer read with too. Still 4 MB, same
  *     answers here (secaudit 2026-09, N3).
+ *   v1.2.0 -- 2026-09-28 -- readResource takes opts.maxBytes, so storing a mail attachment can read
+ *     up to the node's per-file limit; every other caller keeps the 4 MB cap.
  */
 import type { ConnectContext } from './oauth.js';
 import { ensureFreshCredential } from './refresh.js';
@@ -60,7 +62,11 @@ export type ReadResult =
 export async function readResource(
     ctx: ConnectContext, connectionId: string, resourceName: string,
     params: Record<string, unknown> = {},
+    opts: { maxBytes?: number } = {},
 ): Promise<ReadResult> {
+    // The ceiling is OUTBOUND_READ_MAX_BYTES unless the caller names a larger one for a reason of its
+    // own: storing a mail attachment (attachment-store.ts) streams up to the node's per-file limit.
+    const maxBytes = opts.maxBytes && opts.maxBytes > 0 ? opts.maxBytes : OUTBOUND_READ_MAX_BYTES;
     const fresh = await ensureFreshCredential(ctx, connectionId);
     if (!fresh.ok) {
         return { ok: false, code: fresh.code, message: reconnectAdvice(fresh.code, fresh.reason) };
@@ -127,11 +133,11 @@ export async function readResource(
             };
         }
 
-        const body = await readCapped(resp);
+        const body = await readCapped(resp, maxBytes);
         if (body === null) {
             return {
                 ok: false, code: 'TOO_LARGE',
-                message: `That is more than ${Math.round(OUTBOUND_READ_MAX_BYTES / 1024 / 1024)} MB of answer. Ask for a smaller window: fewer items, or a date range.`,
+                message: `That is more than ${Math.round(maxBytes / 1024 / 1024)} MB of answer. Ask for a smaller window: fewer items, or a date range.`,
             };
         }
         return { ok: true, resource: resourceName, provider: provider.id, data: body };
@@ -153,9 +159,9 @@ export async function readResource(
  * utils/read-capped.ts, which the package pull shares; a response with no body at all answers null
  * here, as it always has.
  */
-async function readCapped(resp: Response): Promise<unknown | null> {
+async function readCapped(resp: Response, maxBytes: number): Promise<unknown | null> {
     if (!resp.body) return null;
-    const body = await readBodyCapped(resp, OUTBOUND_READ_MAX_BYTES);
+    const body = await readBodyCapped(resp, maxBytes);
     if (body === null) return null;
 
     const text = body.toString('utf8');

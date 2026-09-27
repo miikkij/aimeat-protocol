@@ -1851,6 +1851,15 @@
      "plain": "Ontology library Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms. /v1/libs/aimeat-onto.js, /v1/ns"
     },
     {
+     "slug": "g-11-sending-to-an-outside-address-from-an-app",
+     "cells": [
+      "<strong>Sending to an outside address from an app</strong>",
+      "An app posts a JSON payload to an address you allow, or reads one, through your node rather than from the browser. You keep the list of allowed hosts; a key is named in a header and filled from your own vault on the way out, so the app never sees it. Up to 256 kB per send and 60 sends a minute. Preview.",
+      "<code>/v1/libs/aimeat-webhook.js</code>"
+     ],
+     "plain": "Sending to an outside address from an app An app posts a JSON payload to an address you allow, or reads one, through your node rather than from the browser. You keep the list of allowed hosts; a key is named in a header and filled from your own vault on the way out, so the app never sees it. Up to 256 kB per send and 60 sends a minute. Preview. /v1/libs/aimeat-webhook.js"
+    },
+    {
      "slug": "g-11-prompt-card-for-apps",
      "cells": [
       "<strong>Prompt card for apps</strong>",
@@ -2030,10 +2039,10 @@
      "slug": "g-12-connected-mailboxes",
      "cells": [
       "<strong>Connected mailboxes</strong>",
-      "Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. An app or agent needs its own permission to read the mail, separate from the one that publishes and sends. An app asks for it on its consent screen; for an app that already publishes through your accounts you can allow it yourself with one tap, and take it away again. You are told once which of your agents need it, and allow it for each with one tap as well. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/connecting-an-outside-account.md\" target=\"_blank\" rel=\"noopener\">connecting-an-outside-account.md</a>.",
+      "Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. An app or agent needs its own permission to read the mail, separate from the one that publishes and sends. An app asks for it on its consent screen; for an app that already publishes through your accounts you can allow it yourself with one tap, and take it away again. You are told once which of your agents need it, and allow it for each with one tap as well. An attachment can go straight to your own storage as a private file, up to the node's file size limit, instead of travelling through the answer. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/connecting-an-outside-account.md\" target=\"_blank\" rel=\"noopener\">connecting-an-outside-account.md</a>.",
       "<code>/v1/connections</code>, <code>/v1/app-grants/{grantId}/read-through</code>, <code>/v1/agents/{name}/read-through</code>, <code>aimeat_mail_*</code>, <code>aimeat_connection_*</code>"
      ],
-     "plain": "Connected mailboxes Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. An app or agent needs its own permission to read the mail, separate from the one that publishes and sends. An app asks for it on its consent screen; for an app that already publishes through your accounts you can allow it yourself with one tap, and take it away again. You are told once which of your agents need it, and allow it for each with one tap as well. See connecting-an-outside-account.md. /v1/connections, /v1/app-grants/{grantId}/read-through, /v1/agents/{name}/read-through, aimeat_mail_*, aimeat_connection_*"
+     "plain": "Connected mailboxes Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. An app or agent needs its own permission to read the mail, separate from the one that publishes and sends. An app asks for it on its consent screen; for an app that already publishes through your accounts you can allow it yourself with one tap, and take it away again. You are told once which of your agents need it, and allow it for each with one tap as well. An attachment can go straight to your own storage as a private file, up to the node's file size limit, instead of travelling through the answer. See connecting-an-outside-account.md. /v1/connections, /v1/app-grants/{grantId}/read-through, /v1/agents/{name}/read-through, aimeat_mail_*, aimeat_connection_*"
     },
     {
      "slug": "g-12-connected-social-accounts",
@@ -3371,6 +3380,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 334
+  "rows": 335
  }
 }

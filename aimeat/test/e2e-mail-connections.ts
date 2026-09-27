@@ -20,7 +20,10 @@
  *   dead connection gives
  * @usage cd aimeat && node --import tsx test/e2e-mail-connections.ts
  * @version-history
- *   v1.2.0 — 2026-09-26 — An unverified alias is refused naming none of the mailbox's addresses:
+ *   v1.3.0 — 2026-09-28 — store: true on the attachment read: a Gmail and a Graph attachment become
+ *     private files named in the answer and readable back byte for byte; a store without an attachment
+ *     id and a store by an app without storage:write are refused before the provider is called.
+ *   v1.2.0 — 2026-09-26 —An unverified alias is refused naming none of the mailbox's addresses:
  *     the refusal names aimeat_mail_aliases and connections:read-through, where the list is read,
  *     in the service (Phase 7) and at the send door, which sends nothing (Phase 8) (security audit
  *     A5-1).
@@ -338,6 +341,28 @@ try {
     const badAtt = await readVia(jwt, gmailRead, 'attachment', { message_id: 'm1', attachment_id: '' });
     assert(badAtt.status === 400 && /which attachment/.test(badAtt.data.error.message), `${badAtt.status}`);
   });
+  await test('with store: true a Gmail attachment becomes a private file, and the answer names it', async () => {
+    const bytes = Buffer.from('the invoice bytes of m1', 'utf8');
+    const r = await readVia(jwt, gmailRead, 'attachment', {
+      message_id: 'm1', attachment_id: 'att-1', store: true, filename: 'invoice.pdf', mime_type: 'application/pdf',
+    });
+    assert(r.status === 201, `store: ${r.status} ${JSON.stringify(r.data?.error)}`);
+    const stored = r.data.data.stored;
+    assert(stored.key === 'mail/google-mail/m1/invoice.pdf', `key ${stored.key}`);
+    assert(stored.size === bytes.length && stored.mime_type === 'application/pdf', `stored ${JSON.stringify(stored)}`);
+    assert(r.data.data.data === undefined, 'a stored attachment still answered its bytes');
+    const meta = await api(`/v1/storage/${stored.key}?mode=handle`, { method: 'GET', bearer: jwt });
+    assert(meta.status === 200 && meta.data?.data?.size === bytes.length && meta.data.data.visibility === 'private',
+      `storage ${meta.status} ${JSON.stringify(meta.data)}`);
+    const file = await fetch(`${BASE}/v1/storage/${stored.key}`, { headers: { Authorization: `Bearer ${jwt}` } });
+    assert(Buffer.from(await file.arrayBuffer()).equals(bytes), 'the stored bytes are not the attachment');
+  });
+  await test('store: true without an attachment id is refused, and nothing reaches the provider', async () => {
+    const before = up.calls.length;
+    const r = await readVia(jwt, gmailRead, 'attachment', { message_id: 'm1', store: true });
+    assert(r.status === 400 && r.data.error.code === 'BAD_PARAMETERS', `${r.status} ${r.data?.error?.code}`);
+    assert(up.calls.length === before, 'a refused store still reached the provider');
+  });
   await test('the profile and the verified sender addresses are readable on the read scope alone', async () => {
     const profile = await readVia(jwt, gmailRead, 'profile');
     assert(profile.data.data.data.emailAddress === up.mailbox, 'profile did not name the mailbox');
@@ -396,10 +421,21 @@ try {
   await test('a Graph message and attachment are readable, and their ids are checked', async () => {
     const msg = await readVia(jwt, msRead, 'message', { id: 'AAMkAGI2=' });
     assert(msg.status === 200 && msg.data.data.data.subject.startsWith('Invoice'), `${msg.status}`);
+    // Graph lists no attachments unless asked, and without their ids none could be fetched.
+    const opened = new URL(lastUpstream((c) => c.path === '/v1.0/me/messages/AAMkAGI2=').url);
+    assert((opened.searchParams.get('$expand') ?? '').startsWith('attachments('), `$expand ${opened.searchParams.get('$expand')}`);
     const att = await readVia(jwt, msRead, 'attachment', { message_id: 'AAMkAGI2=', attachment_id: 'AAA=' });
     assert(att.status === 200 && typeof att.data.data.data.contentBytes === 'string', `${att.status}`);
     const bad = await readVia(jwt, msRead, 'message', { id: 'not/an/id' });
     assert(bad.status === 400 && bad.data.error.code === 'BAD_PARAMETERS', `${bad.status}`);
+  });
+  await test('a stored Graph attachment takes its name and type from Graph', async () => {
+    const r = await readVia(jwt, msRead, 'attachment', { message_id: 'AAMkAGI2=', attachment_id: 'AAA=', store: true });
+    assert(r.status === 201, `store: ${r.status} ${JSON.stringify(r.data?.error)}`);
+    const stored = r.data.data.stored;
+    assert(stored.filename === 'invoice.pdf' && stored.mime_type === 'application/pdf', `stored ${JSON.stringify(stored)}`);
+    assert(stored.key === 'mail/microsoft-mail/AAMkAGI2_/invoice.pdf', `key ${stored.key}`);
+    assert(stored.size === Buffer.from('the graph attachment of AAMkAGI2=', 'utf8').length, `size ${stored.size}`);
   });
   await test('the Graph profile is /me itself', async () => {
     const r = await readVia(jwt, msRead, 'profile');
@@ -701,6 +737,18 @@ try {
     assert(r.status === 200, `${r.status} ${r.data?.error?.message}`);
     const publish = await api('/v1/connections/publish', { bearer: appToken, body: { connection_id: xConn, caption: 'no' } });
     assert(publish.status === 403, `the read word published as well: ${publish.status}`);
+  });
+  await test('an app that may read a mailbox may not store an attachment without storage:write', async () => {
+    const reader = await grantAppToken(jwt, owner, ['connections:read-through']);
+    const before = up.calls.length;
+    const refused = await readVia(reader, gmailRead, 'attachment', { message_id: 'm2', attachment_id: 'att-2', store: true, filename: 'a.pdf' });
+    assert(refused.status === 403 && refused.data?.error?.code === 'SCOPE_DENIED',
+      `stored without storage:write: ${refused.status} ${refused.data?.error?.code}`);
+    assert(up.calls.length === before, 'a refused store still reached the provider');
+    const writer = await grantAppToken(jwt, owner, ['connections:read-through', 'storage:write']);
+    const stored = await readVia(writer, gmailRead, 'attachment', { message_id: 'm2', attachment_id: 'att-2', store: true, filename: 'a.pdf' });
+    assert(stored.status === 201 && stored.data.data.stored.key === 'mail/google-mail/m2/a.pdf',
+      `${stored.status} ${JSON.stringify(stored.data?.error ?? stored.data?.data)}`);
   });
   await test('an app holding neither word cannot read a mailbox', async () => {
     const appToken = await grantAppToken(jwt, owner, ['memory:read']);

@@ -65,12 +65,12 @@
       "digest": "sha256:2e3539a88893f2f4af07a56c"
     },
     "node:aimeat-mail-to-data": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/src/mcp/catalog/definitions/connections.ts",
         "aimeat/src/services/connections/providers.ts"
       ],
-      "digest": "sha256:e90eef7358cf0ac171c358e5"
+      "digest": "sha256:15c0e396fbd5e30a4674cf02"
     },
     "node:aimeat-app-workstation": {
       "reviewedOn": "2026-09-19",
@@ -319,7 +319,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:2a8165ed43f7c7de066ed9b1"
+      "digest": "sha256:6a3174992dc2f969160229d9"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -367,7 +367,7 @@
       "aimeat/src/services/ai-completion.ts": "81e90001f1305d31"
     },
     "node:aimeat-mail-to-data": {
-      "aimeat/src/mcp/catalog/definitions/connections.ts": "84591ad8fce0795b",
+      "aimeat/src/mcp/catalog/definitions/connections.ts": "774105847fbe84e3",
       "aimeat/src/services/connections/providers.ts": "6ad885b6987db150"
     },
     "node:aimeat-app-workstation": {
@@ -503,7 +503,7 @@
       "scripts/gen_image.py": "e2435908849b31d3"
     },
     "project:aimeat-library-authoring": {
-      "aimeat/scripts/build-sdk-libs.ts": "043098bf1614d12a",
+      "aimeat/scripts/build-sdk-libs.ts": "f93fad5d9aa0231a",
       ".githooks/pre-commit": "e8840eb33aa805c0",
       "aimeat/src/services/build-extension-prompt.ts": "8af960e29230b620"
     },

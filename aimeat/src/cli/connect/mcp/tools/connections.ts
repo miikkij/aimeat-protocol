@@ -7,7 +7,9 @@
  *   seven tools locally. Thin proxies over the shared REST routes, so both surfaces behave
  *   identically and neither can drift into being the permissive one.
  * @version-history
- *   v1.2.0 -- 2026-09-13 -- aimeat_mail_send also reads the SEND_FAILED error (502 or 503) a current
+ *   v1.3.0 -- 2026-09-28 -- aimeat_mail_read takes store, filename, mime_type and key: the attachment
+ *     is stored as a private file and the answer names it.
+ *   v1.2.0 -- 2026-09-13 --aimeat_mail_send also reads the SEND_FAILED error (502 or 503) a current
  *     node answers for a send that did not go out, through refuseUnsentSend(), and names the send-log
  *     id and the reason whichever node answered.
  *   v1.1.0 -- 2026-09-13 -- aimeat_mail_send returns an error result when the node says the send did
@@ -70,9 +72,19 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
     connection_id: z.string().describe('Which connected mailbox.'),
     message_id: z.string().describe('The message, from aimeat_mail_search.'),
     attachment_id: z.string().optional().describe('Fetch this attachment instead of the message body.'),
-  }, annotationsFor('aimeat_mail_read'), async ({ connection_id, message_id, attachment_id }) => out(
+    store: z.boolean().optional().describe("With attachment_id: store the attachment as your private file (up to the node's per-file limit) and answer its storage key, instead of its bytes. Needs storage:write."),
+    filename: z.string().optional().describe('With store: the file name, from the message parts (Gmail does not send it with the attachment).'),
+    mime_type: z.string().optional().describe('With store: the file type, from the message parts.'),
+    key: z.string().optional().describe('With store: the storage key. Default mail/<provider>/<message id>/<file name>.'),
+  }, annotationsFor('aimeat_mail_read'), async ({ connection_id, message_id, attachment_id, store, filename, mime_type, key }) => out(
     attachment_id
-      ? await read(connection_id, 'attachment', { message_id, attachment_id })
+      ? await read(connection_id, 'attachment', {
+        message_id, attachment_id,
+        ...(store === true ? { store: true } : {}),
+        ...(filename ? { filename } : {}),
+        ...(mime_type ? { mime_type } : {}),
+        ...(key ? { key } : {}),
+      })
       : await read(connection_id, 'message', { id: message_id }),
   ));
 

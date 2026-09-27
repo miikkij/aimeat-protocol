@@ -28,7 +28,9 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
- *   v1.5.0 — 2026-09-26 — An agent refused the read door is told the word it lacks and that its owner
+ *   v1.6.0 — 2026-09-28 — POST /read/attachment with `store: true` stores the attachment as a private
+ *     file of the owner (up to the node's per-file limit) and answers its key; routes/connections-attachment.ts.
+ *   v1.5.0 — 2026-09-26 —An agent refused the read door is told the word it lacks and that its owner
  *     gives it on the agent's page (explainReadThrough, which the app's sentence moved into). Still
  *     SCOPE_DENIED (secaudit 2026-09, A5-1).
  *   v1.4.0 — 2026-09-26 — An app refused the read door is told the word it lacks and how an app gets
@@ -66,6 +68,7 @@ import { listOwnConnections, requireOwnConnection, toPublicConnection, toPublicC
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { readResource } from '../services/connections/read.js';
+import { answerStoredAttachment } from './connections-attachment.js';
 import { attachCredential } from '../services/connections/attach.js';
 import { quotaStatus, openPublish } from '../services/connections/publish-gate.js';
 import { publishToProvider } from '../services/connections/publish.js';
@@ -762,6 +765,9 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
 
     const ctx: ConnectContext = { config, storage, providers, key };
     const params = (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) ? req.body : {};
+    if (req.params.resource === 'attachment' && params.store === true) {
+      return answerStoredAttachment(req, res, config, storage, ctx, connection.id, principal, params);
+    }
     const out = await readResource(ctx, connection.id, req.params.resource as string, params as Record<string, unknown>);
 
     if (!out.ok) {
