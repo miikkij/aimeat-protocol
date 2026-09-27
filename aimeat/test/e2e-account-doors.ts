@@ -22,9 +22,12 @@
  *   Phase 9  POST /v1/agents refusals, platform detection, GET /v1/agents/verify
  *   Phase 10 POST /v1/agents/connect (connectivity key)
  *   Phase 11 401 and 403 on every door
- *   Phase 12 erasure: a name registered again inherits no action published in person, and no work
+ *   Phase 12 erasure: a name registered again inherits no action published in person, no work and
+ *            no line in the other side's ledger
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.6.0 — 2026-09-26 — 59: when an account is deleted, the other side's escrow_hold and earned
+ *     lines name the erasure's pseudonym, the one its work names, and no line names the freed name.
  *   v1.5.0 — 2026-09-26 — 58: when an owner deletes one agent, its open work is cancelled and the
  *     requester gets the held morsels back with a ledger line; its finished work stays in the
  *     requester's list under the agent's own identity.
@@ -1167,6 +1170,66 @@ await test('58. When an owner deletes an agent, its open work is cancelled, the 
     assert(line?.amount === 11 && line?.counterparty_gaii === worker.gaii, `the escrow_return line: ${JSON.stringify(line ?? lines)}`);
     assert(openRow?.status === 'cancelled' && openRow?.provider_gaii === worker.gaii, `the open request in the requester's list: ${JSON.stringify(openRow ?? sent)}`);
     assert(doneRow?.status === 'delivered' && doneRow?.provider_gaii === worker.gaii, `the finished work in the requester's list: ${JSON.stringify(doneRow ?? sent)}`);
+});
+
+// The other side's ledger outlives a deleted account, as its work does, and names the deleted person
+// the way the work does: by the erasure's pseudonym, never by the name, which is released for reuse.
+await test('59. When an account is deleted, the other side\'s ledger lines name the erasure\'s pseudonym, and the freed name is in none of them', async () => {
+    const first = await setupOwner('ledgone');
+    const other = await setupOwner('ledkeep');
+    const stamp = Date.now().toString(36);
+    const firstAction = `ledger-gone-${stamp}`, otherAction = `ledger-keep-${stamp}`;
+    const publish = async (o: Owner, id: string) => {
+        const pub = await json('/v1/actions', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ id, display_name: id, description: 'Work between two people.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+        });
+        assert(pub.status === 201, `publish ${id} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+        return pub.body.data.provider_gaii as string;
+    };
+    const firstProvider = await publish(first, firstAction);
+    const otherProvider = await publish(other, otherAction);
+    const request = async (o: Owner, actionId: string, provider: string) => {
+        const r = await json('/v1/work/request', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ action_id: actionId, provider_gaii: provider, input: { text: 'hello' } }),
+        });
+        assert(r.status === 201, `request ${actionId} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        return r.body.data.tracking_code as string;
+    };
+    const finish = async (o: Owner, tc: string) => {
+        for (const [step, body] of [['accept', undefined], ['deliver', { output: { text: 'done' } }]] as const) {
+            const r = await json(`/v1/work/${tc}/${step}`, { method: 'POST', headers: auth(o.token), ...(body ? { body: JSON.stringify(body) } : {}) });
+            assert(r.status === 200, `${step} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        }
+    };
+    // The other side asks the first person for work and pays for it: an escrow_hold line names them.
+    const asked = await request(other, firstAction, firstProvider);
+    await finish(first, asked);
+    // The first person asks the other side, who delivers and is paid: an earned line names them.
+    const served = await request(first, otherAction, otherProvider);
+    await finish(other, served);
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    const again = await registerAgain(first.name);
+
+    const lines = (await json('/v1/wallet/transactions?per_page=200', { headers: auth(other.token) })).body.data?.transactions ?? [];
+    const hold = lines.find((t: any) => t.type === 'escrow_hold' && t.tracking_code === asked);
+    const earned = lines.find((t: any) => t.type === 'earned' && t.tracking_code === served);
+    const askedRow = (await json(`/v1/work/${asked}`, { headers: auth(other.token) })).body.data;
+    const freed = [first.name, `${first.name}@${NODE_ID}`];
+    const named = lines.filter((t: any) => freed.includes(t.counterparty_gaii) || freed.includes(t.initiator_gaii));
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+    await json(`/v1/owners/${other.name}`, { method: 'DELETE', headers: auth(other.token) });
+
+    const erased = /^erased:[0-9a-f]{24}$/;
+    assert(!!hold && !!earned, `the other side's ledger lost its lines for the two pieces of work: ${JSON.stringify(lines)}`);
+    assert(erased.test(hold.counterparty_gaii ?? ''), `the escrow_hold line names ${hold.counterparty_gaii}, not the erasure's pseudonym`);
+    assert(erased.test(earned.counterparty_gaii ?? ''), `the earned line names ${earned.counterparty_gaii}, not the erasure's pseudonym`);
+    assert(hold.counterparty_gaii === askedRow?.provider_gaii && earned.counterparty_gaii === hold.counterparty_gaii,
+        `one pseudonym for the erasure, on the work and in the ledger: ${hold.counterparty_gaii}, ${earned.counterparty_gaii}, ${askedRow?.provider_gaii}`);
+    assert(named.length === 0, `the freed name is still in the other side's ledger: ${JSON.stringify(named)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

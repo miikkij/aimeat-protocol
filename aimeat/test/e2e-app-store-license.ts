@@ -19,6 +19,8 @@
  *   sale, while the books keep the amount, the date and the app.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-store-license
  * @version-history
+ *   v1.3.0 — 2026-09-26 — Erasure: the other side's ledger line for the sale names the erased buyer
+ *     or seller by the receipt's pseudonym.
  *   v1.2.0 — 2026-09-26 — The receipt's manifest carries none of the seller's own findings (A6-10).
  *     Failed on the code before the fix: `dataMap.gap` was in it.
  *   v1.1.0 — 2026-09-24 — Erasure: a name registered again after its buyer or its seller deleted the
@@ -302,6 +304,12 @@ await test('A name registered again after the BUYER deleted their account inheri
     assert(detail.body.data.buyer_owner === row.buyer_owner, `the receipt names the same pseudonym: ${JSON.stringify(detail.body.data.buyer_owner)}`);
     // The node's signature covered the erased identity, so keeping it would confirm a guessed name.
     assert(detail.body.data.signature === '', 'the signature over the erased identity was kept');
+    // The seller's ledger line for the sale stays, and names the buyer by the receipt's pseudonym.
+    const ledger = await json('/v1/wallet/transactions?type=app_sale&per_page=200', auth(sellerTok));
+    const sale = (ledger.body.data?.transactions ?? []).find((t: any) => t.tracking_code === txId);
+    assert(!!sale && sale.amount > 0, `the seller's ledger line for the sale must outlive the buyer's account: ${JSON.stringify(sale)}`);
+    assert(sale.counterparty_gaii === row.buyer_owner,
+        `the seller's ledger line names ${sale.counterparty_gaii}, not the receipt's pseudonym ${row.buyer_owner}`);
 
     await json(`/v1/owners/${name}`, { ...auth(again.token), method: 'DELETE' });
 });
@@ -337,6 +345,12 @@ await test('A name registered again after the SELLER deleted their account inher
         'the customer keeps the content they paid for');
     assert(mine.body.data.seller_owner !== shop && ERASED.test(String(mine.body.data.seller_owner)),
         `the receipt still names the erased seller: ${JSON.stringify(mine.body.data.seller_owner)}`);
+    // So does the customer's ledger line for the purchase, by the same pseudonym.
+    const ledger = await json('/v1/wallet/transactions?type=app_purchase&per_page=200', auth(c.token));
+    const paid = (ledger.body.data?.transactions ?? []).find((t: any) => t.tracking_code === txId);
+    assert(!!paid && paid.amount < 0, `the customer's ledger line for the purchase must outlive the seller's account: ${JSON.stringify(paid)}`);
+    assert(paid.counterparty_gaii === mine.body.data.seller_owner,
+        `the customer's ledger line names ${paid.counterparty_gaii}, not the receipt's pseudonym ${mine.body.data.seller_owner}`);
 
     // And the old licence does not open whatever the new account publishes under the same name.
     const pub2 = await json('/v1/apps', { ...auth(s2.token), method: 'POST', body: JSON.stringify({ filename: APP, content: b64('<h1>somebody new</h1>'), name: 'Somebody New', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 10, license_type: 'lifetime' }) });

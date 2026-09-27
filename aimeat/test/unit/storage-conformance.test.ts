@@ -21,6 +21,9 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- deleteOwner keeps the other side's ledger lines on every provider, with
+ *     the erased person named by the erasure's one pseudonym as counterparty and as the one who acted;
+ *     a line naming somebody else or a node stays, and so do the amounts, the types and the dates.
  *   v1.11.0 -- 2026-09-26 -- The deploy migration gives what was held for a deleted account's open work
  *     back only to a requester whose account existed when the row was written, in each form a
  *     requester is stored in; the requester of the migration case is older than its oldest request
@@ -491,6 +494,56 @@ describe('storage providers agree on what they do, not just on their signatures'
                 expect.soft(await storage.listWorkByProvider(id), `${name}: work to do is left under ${id}`).toEqual([]);
                 expect.soft(await storage.listWorkByRequester(id), `${name}: work asked for is left under ${id}`).toEqual([]);
             }
+            await storage.deleteOwner(p.other);
+        }
+    }, 60_000);
+
+    // The other side's ledger lines outlive an erased account, as the work and the receipts do, and
+    // name it the way they do: by the erasure's one pseudonym, in whichever column named the person,
+    // never by a name that is released for reuse. The amounts, the types and the dates stay for the
+    // books, and a line that names somebody else stays as it was.
+    it('deleteOwner keeps the other side\'s ledger lines and takes the name out of them', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const p = await seedWorkErasure(storage);
+            const now = new Date().toISOString();
+            const stranger = `confstranger${Date.now()}${Math.floor(Math.random() * 1000)}@aimeat-conformance-001`;
+            const line = (k: string, type: string, amount: number, counterpartyGaii: string, initiatorGaii?: string) => storage.addTransaction({
+                id: `tx-conf-${k}-${randomUUID()}`, gaii: p.O.ghii, type, amount, counterpartyGaii,
+                trackingCode: p.tc(`ledger-${k}`), timestamp: now, ...(initiatorGaii ? { initiatorGaii } : {}),
+            });
+            await line('hold-ghii', 'escrow_hold', -11, p.E.ghii, p.O.gaii);   // asked for work the erased person was to do
+            await line('hold-bare', 'escrow_hold', -3, p.erased, p.O.gaii);    // the same, stored under the bare name
+            await line('earned', 'earned', 10, p.E.gaii);                      // did work the erased person's agent asked for
+            await line('purchase', 'app_purchase', -50, p.E.ghii);             // bought the erased person's app
+            await line('ext', 'extension_earn', 4, p.E.gaii, p.E.gaii);        // the erased person's agent paid to use an extension
+            await line('sale', 'app_sale', 9, stranger);                       // somebody else: stays
+            await line('relay', 'relay_fee', -1, 'peer-node-001');             // a node: stays
+            // The erased person's own line of the purchase goes with the account.
+            await storage.addTransaction({
+                id: `tx-conf-own-${randomUUID()}`, gaii: p.E.ghii, type: 'app_sale', amount: 50, counterpartyGaii: p.O.ghii,
+                trackingCode: p.tc('ledger-purchase'), timestamp: now,
+            });
+
+            await storage.deleteOwner(p.erased);
+
+            const pseudonym = (await storage.getWork(p.tc('done-provided')))?.providerGaii;
+            expect.soft(pseudonym, `${name}: the erasure wrote a pseudonym on the work`).toMatch(erasedRe);
+            const lines = (await storage.getTransactions(p.O.ghii, 500)).filter(t => t.trackingCode?.includes('-ledger-'));
+            const of = (k: string) => lines.find(t => t.trackingCode === p.tc(`ledger-${k}`));
+            for (const k of ['hold-ghii', 'hold-bare', 'earned', 'purchase', 'ext']) {
+                expect.soft(of(k)?.counterpartyGaii, `${name}: the other side's ${k} line does not name the erasure's pseudonym`).toBe(pseudonym);
+            }
+            expect.soft(of('ext')?.initiatorGaii, `${name}: the line does not name the erasure's pseudonym as the one who acted`).toBe(pseudonym);
+            expect.soft([of('hold-ghii')?.initiatorGaii, of('hold-bare')?.initiatorGaii], `${name}: who acted for the other side changed`)
+                .toEqual([p.O.gaii, p.O.gaii]);
+            expect.soft(of('sale')?.counterpartyGaii, `${name}: a line naming somebody else changed`).toBe(stranger);
+            expect.soft(of('relay')?.counterpartyGaii, `${name}: a line naming a node changed`).toBe('peer-node-001');
+            expect.soft(lines.map(t => `${t.type}:${t.amount}`).sort(), `${name}: the books changed with the erasure`).toEqual(
+                ['escrow_hold:-11', 'escrow_hold:-3', 'earned:10', 'app_purchase:-50', 'extension_earn:4', 'app_sale:9', 'relay_fee:-1'].sort());
+            expect.soft(lines.every(t => Date.parse(t.timestamp) === Date.parse(now)), `${name}: the dates changed with the erasure`).toBe(true);
+            expect.soft(await storage.getTransactions(p.E.ghii, 500), `${name}: the erased person's own lines survived`).toEqual([]);
+
             await storage.deleteOwner(p.other);
         }
     }, 60_000);
