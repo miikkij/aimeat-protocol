@@ -23,6 +23,8 @@
  *   SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.3.1 -- 2026-09-27 -- recordSecurityIncident quarantines only a Buffer: a blob of any other type
+ *     is recorded without a copy (CodeQL js/type-confusion-through-parameter-tampering).
  *   v1.3.0 -- 2026-09-26 -- An incident names the runs of the records it was made from (`sources`), so
  *     the start step's record joins it once.
  *   v1.2.0 -- 2026-09-26 -- An incident can carry names to decide, the hook bindings that name nothing
@@ -127,11 +129,15 @@ export async function recordSecurityIncident(
   const now = new Date().toISOString();
   const owner = securityOwner(config.nodeId);
 
+  // The callers take the blob from a request body, which a client can send as a string or an array.
+  // Only a Buffer is evidence to keep; anything else is recorded without a quarantined copy.
+  const blob = Buffer.isBuffer(input.blob) && !Array.isArray(input.blob) ? input.blob : undefined;
+
   let quarantineKey: string | null = null;
-  if (input.blob && input.blob.length > 0 && input.blob.length <= QUARANTINE_MAX_BYTES) {
+  if (blob && blob.length > 0 && blob.length <= QUARANTINE_MAX_BYTES) {
     const key = `${SECURITY_QUARANTINE_PREFIX}${id}`;
     try {
-      await storage.createStorageFile({ key, ownerGaii: owner, visibility: 'private', mimeType: 'application/zip', size: input.blob.length, data: input.blob, createdAt: now });
+      await storage.createStorageFile({ key, ownerGaii: owner, visibility: 'private', mimeType: 'application/zip', size: blob.length, data: blob, createdAt: now });
       quarantineKey = key;
     } catch (err) { logger.warn('recordSecurityIncident: quarantine is best-effort', { error: String(err) }); }
   }
@@ -145,7 +151,7 @@ export async function recordSecurityIncident(
         id, type: input.type, code: input.code,
         actor: input.actorGhii, actor_name: input.actorName ?? '',
         detail: input.detail, source: input.source ?? '',
-        quarantine_key: quarantineKey, size_bytes: input.blob?.length ?? 0,
+        quarantine_key: quarantineKey, size_bytes: blob?.length ?? 0,
         status: 'open', createdAt: now,
         ...(input.names ? { names: input.names } : {}),
         ...(input.bindingsLeft ? { bindings_left: input.bindingsLeft } : {}),

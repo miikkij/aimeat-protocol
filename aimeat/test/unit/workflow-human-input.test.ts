@@ -8,12 +8,14 @@
  *   (the 60s sweep interval is not black-box-able in E2E); the happy/decline paths are also covered
  *   end-to-end in test/e2e-workflows-human.ts.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — A step id of `__proto__` is refused by onHumanAnswer and applyHumanAnswer,
+ *     and nothing lands on Object.prototype (CodeQL js/prototype-polluting-assignment).
  *   v1.0.0 — 2026-07-16 — Initial human-input engine + validation coverage.
  */
 import { describe, it, expect } from 'vitest';
 import { WorkflowEngine } from '../../src/services/workflow/engine.js';
 import { validateWorkflow } from '../../src/services/workflow/store.js';
-import { validateHumanAnswer } from '../../src/services/workflow/engine-human.js';
+import { validateHumanAnswer, applyHumanAnswer } from '../../src/services/workflow/engine-human.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import type {
@@ -213,6 +215,20 @@ describe('onHumanAnswer', () => {
     expect(again).toMatchObject({ ok: false, code: 'NOT_WAITING' });
     const missing = await engine.onHumanAnswer(OWNER, WF, 'no-such-run', 'gate', { picks: ['approve'], by: OWNER });
     expect(missing).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+  });
+
+  it('a step id of __proto__ is refused and writes nothing to Object.prototype', async () => {
+    const storage = memStorage();
+    seed(storage, { steps: [humanStep()], runSteps: { gate: waitingStep(1000) }, status: 'waiting-step' });
+    const res = await engineFor(storage).onHumanAnswer(OWNER, WF, 'run-1', '__proto__', { picks: ['approve'], by: OWNER });
+    expect(res).toMatchObject({ ok: false, code: 'NOT_WAITING' });
+
+    const run = await readRun(storage);
+    const answer = { picks: ['approve'], pick: 'approve', by: OWNER };
+    await expect(applyHumanAnswer(storage, { nodeId: NODE } as AimeatConfig, OWNER, run, '__proto__', answer))
+      .rejects.toThrow(/not a step/);
+    expect(({} as Record<string, unknown>).state).toBeUndefined();
+    expect(({} as Record<string, unknown>).human).toBeUndefined();
   });
 });
 
