@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "declaration": false, "declarationMap": false },
+  "include": [
+    "src/**/*.ts",
+    "test/e2e-mcp-session-authority.ts",
+    "test/e2e-memory-batch-provenance.ts",
+    "test/unit/mcp-request-authority.test.ts",
+    "test/unit/memory-batch-write.test.ts",
+    "test/unit/memory-read-contract.test.ts",
+    "test/unit/memory-write-atomic.test.ts",
+    "test/unit/memory-write-authority.test.ts",
+    "test/unit/route-responsibility.test.ts",
+    "test/unit/workflow-lock-lifecycle.test.ts",
+    "test/unit/extension-vm-fetch-contract.test.ts"
+  ],
+  "exclude": ["node_modules", "dist", "src/generated/prisma-postgres"]
+}

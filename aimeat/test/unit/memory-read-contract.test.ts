@@ -31,9 +31,9 @@ describe.each(names)('%s memory reads', name => {
     const storage = providers.get(name)!;
     const prefix = `read-${randomUUID()}.`;
     const caller = `${prefix}caller@node`, other = `${prefix}other@node`;
-    await storage.bulkSetMemory(Array.from({ length: 1000 }, (_, i) =>
+    await storage.bulkSetMemory!(Array.from({ length: 1000 }, (_, i) =>
       row(i < 500 ? caller : other, `${prefix}a${String(i).padStart(4, '0')}`)));
-    await storage.bulkSetMemory([
+    await storage.bulkSetMemory!([
       row(other, prefix + 'y-secret', { visibility: 'private', tags: ['ÄÄNI'] }),
       row(other, prefix + 'z1', { tags: ['ÄÄNI'] }), row(other, prefix + 'z2', { tags: ['ÄÄNI'] }),
     ]);
@@ -56,7 +56,7 @@ describe.each(names)('%s memory reads', name => {
   it('metadata has the same live keys, order and filters as full reads', async () => {
     const storage = providers.get(name)!;
     const owner = `meta-${randomUUID()}@node`;
-    await storage.bulkSetMemory([
+    await storage.bulkSetMemory!([
       row(owner, 'b', { tags: ['match'] }), row(owner, 'a', { tags: ['match'] }),
       row(owner, 'expired', { tags: ['match'], ttlHours: 1, createdAt: '2020-01-01T00:00:00.000Z' }),
       row(owner, 'private', { visibility: 'private', tags: ['match'] }),
