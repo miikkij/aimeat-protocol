@@ -28,9 +28,12 @@
  *   an element still open where the markup ends takes that content in, so a rule of the component
  *   styles it. The markup is read once more with an element after it, the way a page follows it.
  * @structure readMarkup · readStylesheet · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
- *   DeclarationRead · ComplexSelector · Compound · Pseudo
+ *   NameKind · NameDefinition · DeclarationRead · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.5.0 — 2026-09-26 — readStylesheet reads the name each @keyframes, @property and @counter-style
+ *     defines (`definitions`), from the tokens of its prelude: one identifier or string, escapes
+ *     resolved and lower-cased, or null when the prelude holds anything else.
  *   v2.4.0 — 2026-09-26 — A repeated attribute (`duplicate`, named from the text before the error,
  *     since parse5 drops it), a missing space between two attributes (`no-space`) and a "/" ending the
  *     start tag of an element that is not empty (`slash`) are each reported as itself.
@@ -79,7 +82,7 @@
  */
 import { defaultTreeAdapter, html as HTML, parseFragment, type DefaultTreeAdapterTypes, type ParserError } from 'parse5';
 import {
-  ident, parse as parseCss, tokenize, tokenTypes, walk,
+  ident, parse as parseCss, string as cssString, tokenize, tokenTypes, walk,
   type CssNode, type Declaration, type PseudoClassSelector, type PseudoElementSelector, type Rule, type Selector, type SelectorList,
 } from 'css-tree';
 
@@ -304,10 +307,26 @@ export interface DeclarationRead {
   text: string;
 }
 
+/** The at-rules that define a name the whole page shares: an animation, a custom property, a counter style. */
+export type NameKind = 'keyframes' | 'property' | 'counter-style';
+
+/** One at-rule that defines a name the whole page shares, as readStylesheet read its prelude. */
+export interface NameDefinition {
+  kind: NameKind;
+  /** The at-rule's name as the tokenizer saw it, escapes resolved, lower-cased: "keyframes", "-webkit-keyframes". */
+  atRule: string;
+  /** The one name its prelude holds, an identifier or a string, escapes resolved and lower-cased; null when it holds anything else. */
+  name: string | null;
+  /** The at-rule and its prelude as written, for a message. */
+  text: string;
+}
+
 /** A stylesheet as the CSS parser reads it (readStylesheet). */
 export interface StylesheetReading {
   /** Every at-rule's name the tokenizer saw, escapes resolved, lower-cased. */
   atRules: string[];
+  /** Every at-rule that defines a name the whole page shares, wherever it stands, with the name it defines. */
+  definitions: NameDefinition[];
   /** Every function's name the tokenizer saw, escapes resolved, lower-cased, and "url" for an address token. */
   functions: string[];
   /** Whether a var() reads one of the page's tokens, `--ak-…`. */
@@ -337,6 +356,33 @@ const T = tokenTypes;
 /** A name as the text spells it, escapes resolved and lower-cased: `U\72 L` is `url`, as a browser matches it. */
 const nameOf = (raw: string): string => ident.decode(raw).toLowerCase();
 
+/** What kind of page-wide name an at-rule defines, or null when it defines none. */
+function nameKindOf(atRule: string): NameKind | null {
+  if (KEYFRAMES.test(atRule)) return 'keyframes';
+  return atRule === 'property' || atRule === 'counter-style' ? atRule : null;
+}
+
+/**
+ * The name the at-rule whose at-keyword is token `at` defines, read from the tokens of its prelude
+ * up to its block, its ";" or the end of the block it stands in. The prelude is one name, an
+ * identifier or a string, or the name is null.
+ */
+function definitionAt(tokens: ReadonlyArray<{ type: number; start: number; end: number }>, at: number, css: string, atRule: string, kind: NameKind): NameDefinition {
+  const parts: Array<{ type: number; start: number; end: number }> = [];
+  let t = at + 1;
+  for (; t < tokens.length; t++) {
+    const { type } = tokens[t];
+    if (type === T.LeftCurlyBracket || type === T.Semicolon || type === T.RightCurlyBracket) break;
+    if (type !== T.WhiteSpace && type !== T.Comment) parts.push(tokens[t]);
+  }
+  const text = css.slice(tokens[at].start, t < tokens.length ? tokens[t].start : css.length).replace(/\s+/g, ' ').trim().slice(0, 60);
+  const [only] = parts;
+  let name: string | null = null;
+  if (parts.length === 1 && only.type === T.Ident) name = nameOf(css.slice(only.start, only.end));
+  else if (parts.length === 1 && only.type === T.String) name = cssString.decode(css.slice(only.start, only.end)).toLowerCase();
+  return { kind, atRule, name, text };
+}
+
 /** The text a node stands on, trimmed. */
 const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(node.loc.start.offset, node.loc.end.offset).trim() : '');
 
@@ -349,7 +395,8 @@ const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(nod
  * structure. A name is read with its escapes resolved: css-tree matches `url(` as written, and a
  * browser matches it after resolving `u\72 l(`, so every function name is resolved here and the
  * checks read that. The same pass measures how deep the brackets and blocks nest, pairing each
- * closer with its own opener as CSS does (a "]" inside "(" closes nothing).
+ * closer with its own opener as CSS does (a "]" inside "(" closes nothing), and reads the name that
+ * @keyframes, @property and @counter-style define, from the tokens of their prelude (definitionAt).
  *
  * THE STRUCTURE, from css-tree's parser, only when the nesting is within MAX_NESTING: every
  * declaration outside an at-rule's conditions, and every selector of every style rule outside
@@ -357,15 +404,19 @@ const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(nod
  * the parser keeps as raw text, is reported as unreadable.
  */
 export function readStylesheet(css: string): StylesheetReading {
-  const reading: StylesheetReading = { atRules: [], functions: [], readsPageTokens: false, depth: 0, declarations: [], selectors: [], unreadable: null };
+  const reading: StylesheetReading = { atRules: [], definitions: [], functions: [], readsPageTokens: false, depth: 0, declarations: [], selectors: [], unreadable: null };
   const tokens: Array<{ type: number; start: number; end: number }> = [];
   tokenize(css, (type, start, end) => { tokens.push({ type, start, end }); });
   const closers: number[] = [];
   const open = (closer: number) => { closers.push(closer); reading.depth = Math.max(reading.depth, closers.length); };
   for (let t = 0; t < tokens.length; t++) {
     const { type, start, end } = tokens[t];
-    if (type === T.AtKeyword) reading.atRules.push(nameOf(css.slice(start + 1, end)));
-    else if (type === T.Url || type === T.BadUrl) reading.functions.push('url');
+    if (type === T.AtKeyword) {
+      const atRule = nameOf(css.slice(start + 1, end));
+      reading.atRules.push(atRule);
+      const kind = nameKindOf(atRule);
+      if (kind) reading.definitions.push(definitionAt(tokens, t, css, atRule, kind));
+    } else if (type === T.Url || type === T.BadUrl) reading.functions.push('url');
     else if (type === T.Function) {
       const name = nameOf(css.slice(start, end - 1));
       reading.functions.push(name);

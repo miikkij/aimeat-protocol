@@ -27158,7 +27158,11 @@ paths:
         `&`, which stands for the elements of the rule it is nested in; at the top of the
         stylesheet `&` is the page and is refused. A stylesheet carries no `@scope`: inside it `&`
         stands for the elements its prelude chooses, and the component's own classes already keep
-        every rule inside it. A component whose builder judged it `general`
+        every rule inside it. It carries no `@layer`, `@page` or `@view-transition`, each of which
+        acts on the whole page, and a name it defines with `@keyframes`, `@property` or
+        `@counter-style` starts with its prefix (`@keyframes wkgrid-spin`, `@property --wkgrid-x`),
+        because the whole page shares that name; an animation or counter style the page defines is
+        still used by its name. A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide

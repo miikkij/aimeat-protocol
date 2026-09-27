@@ -5,13 +5,15 @@
  * @description Types for the part of css-tree the Design Book's component bench calls
  *   (services/design-book/component-scan.ts). css-tree ships no types of its own, so this states the
  *   calls and the nodes as the bench uses them: parse(), whose `children` are css-tree Lists the bench
- *   reads through toArray(); walk() with enter and leave; tokenize(); the token type numbers; and
- *   ident.decode(). A node type the bench does not read is named in OtherNode, so a switch on `type`
- *   still narrows. The shapes follow css-tree 3.2.1's node definitions (lib/syntax/node/*.js). Its
- *   `list: false` option is not stated: in 3.2.1 the parser does not read a rule with it and keeps
- *   the text raw.
- * @usage import { parse, walk, tokenize, tokenTypes, ident } from 'css-tree';
+ *   reads through toArray(); walk() with enter and leave; tokenize(); the token type numbers;
+ *   ident.decode() and string.decode(). A node type the bench does not read is named in OtherNode,
+ *   so a switch on `type` still narrows. The shapes follow css-tree 3.2.1's node definitions
+ *   (lib/syntax/node/*.js). Its `list: false` option is not stated: in 3.2.1 the parser does not
+ *   read a rule with it and keeps the text raw.
+ * @usage import { parse, walk, tokenize, tokenTypes, ident, string } from 'css-tree';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — string.decode(), and the token types of a string and a ";", which the bench
+ *     reads in the prelude of an at-rule that defines a name.
  *   v1.1.0 — 2026-09-26 — The token types of a number, a dimension, a percentage and a comma, which
  *     the bench reads in a pseudo's argument of words and numbers.
  *   v1.0.0 — 2026-09-26 — Initial, for the component bench's stylesheet reader.
@@ -83,8 +85,10 @@ declare module 'css-tree' {
     readonly WhiteSpace: number; readonly Comment: number; readonly LeftParenthesis: number; readonly RightParenthesis: number;
     readonly LeftSquareBracket: number; readonly RightSquareBracket: number; readonly LeftCurlyBracket: number;
     readonly RightCurlyBracket: number; readonly Number: number; readonly Dimension: number; readonly Percentage: number;
-    readonly Comma: number;
+    readonly Comma: number; readonly String: number; readonly Semicolon: number;
   };
   /** A name with its escapes resolved: `u\72 l` is `url`. */
   export const ident: { decode(text: string): string };
+  /** A string token's value, its quotes taken off and its escapes resolved. */
+  export const string: { decode(text: string): string };
 }

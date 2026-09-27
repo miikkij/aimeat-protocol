@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.2 — 2026-09-26 — At propose, @layer, @page and @view-transition are refused by name, and a
+ *     @keyframes, @property or @counter-style passes under a name that starts with the prefix and is
+ *     refused under another, with the prefixed form.
  *   v1.8.1 — 2026-09-26 — At propose, a stylesheet carrying @scope is refused, and the refusal shows the
  *     rule written on the component's own classes.
  *   v1.8.0 — 2026-09-26 — A Design Book part through the generic memory doors: the public read (plain,
@@ -642,6 +645,35 @@ const GOOD_BODY = {
         const scoped = await proposeComponent(`comp-bad-${Date.now() % 100000}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); @scope (body) { & p { color: var(--ak-accent); } } }' }));
         assert(refusedWith(scoped, /carries no @scope, and a component does not need it.*"& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/),
             `@scope is refused, with the form that passes: ${said(scoped)}`);
+    });
+
+    await test('@layer, @page and @view-transition are refused at propose, each by name: each acts on the whole page', async () => {
+        const stamp = Date.now() % 100000;
+        const wrong: string[] = [];
+        for (const [name, rule] of [['layer', '@layer wkgrid-base { .wkgrid-cell { min-height: 40px; } }'], ['page', '@page { margin: 0; }'], ['view-transition', '@view-transition { navigation: auto; }']]) {
+            const r = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `.wkgrid { color: var(--ak-ink); }\n${rule}` }));
+            if (!refusedWith(r, new RegExp(`carries no @${name}: `))) wrong.push(`@${name}: ${said(r)}`);
+        }
+        assert(wrong.length === 0, `each is refused by name: ${wrong.join('; ')}`);
+    });
+
+    await test('@keyframes, @property and @counter-style pass under a name that starts with the prefix, and are refused under another with the prefixed form', async () => {
+        const stamp = Date.now() % 100000;
+        const own = await proposeComponent(`comp-names-${stamp}`, componentBody({
+            css: '.wkgrid { color: var(--ak-ink); animation: wkgrid-in 1s; }\n@keyframes wkgrid-in { from { opacity: 0; } }\n'
+                + '@property --wkgrid-x { syntax: "<length>"; inherits: false; initial-value: 0px; }\n@counter-style wkgrid-count { system: cyclic; symbols: "*"; }',
+        }));
+        assert(own.status === 201, `names of its own pass: ${said(own)}`);
+        const wrong: string[] = [];
+        for (const [rule, form] of [
+            ['@keyframes fade { from { opacity: 0; } }', '"@keyframes wkgrid-fade"'],
+            ['@property --ak-ink { syntax: "*"; inherits: false; }', '"@property --wkgrid-ak-ink"'],
+            ['@counter-style decimal { system: numeric; symbols: "0" "1"; }', '"@counter-style wkgrid-decimal"'],
+        ]) {
+            const r = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `.wkgrid { color: var(--ak-ink); }\n${rule}` }));
+            if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(form))) wrong.push(`${rule.split(' {')[0]}: ${said(r)}`);
+        }
+        assert(wrong.length === 0, `each is refused with the prefixed form: ${wrong.join('; ')}`);
     });
 
     await test('markup that leaves an element open where it ends is refused, with the element named', async () => {
