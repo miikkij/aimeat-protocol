@@ -31,12 +31,16 @@
  *   v1.4.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-26 — The step tells onPushTerminal which attempt its model call was made for, so
  *     what that call holds of the run's cost cap goes when it answers (secaudit 2026-09, A6-11).
+ *   v1.6.0 — 2026-09-26 — The step reports its outcome to the engine through reportOutcome
+ *     (engine-answer.ts): only a failure of the step's own work fails the attempt, and an error inside
+ *     the engine while it takes the answer in is logged as the engine's (secaudit 2026-09, R4).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
 import { completeForOwner } from '../ai-completion.js';
 import { getOwnerScopeMemory } from '../owner-memory.js';
 import { template } from './engine-util.js';
+import { reportOutcome } from './engine-answer.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 
@@ -150,10 +154,11 @@ export function dispatchAiStep(
     }
   };
 
-  fire()
-    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, spentUsd, attempt))
-    .catch(err => {
+  reportOutcome(fire(),
+    () => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, spentUsd, attempt),
+    err => {
       logger.warn(`workflow ${workflowId} run ${runId}: ai step "${stepId}" failed`, { error: String(err) });
       return onPushTerminal(ownerGhii, workflowId, runId, stepId, false, spentUsd, attempt);
-    });
+    },
+    `workflow ${workflowId} run ${runId}: ai step "${stepId}"`);
 }

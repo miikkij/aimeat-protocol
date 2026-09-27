@@ -7,11 +7,14 @@
  *   the step's output while its call runs, a timeout, a retry beside a call still open, a failing
  *   call, a cancel, a restart, a cost that arrives after the run finished, and a watchdog pass that
  *   comes between a run's first save and its first step. Then a late answer of an earlier attempt,
- *   while the step runs again after a retry, for an ai step and an extension step, and a finished
- *   agent task, which decides only the agent step whose current attempt it was dispatched for. The
- *   model and the extension's action are stand-ins whose calls stay open until the case answers them.
- *   The same road with a real provider is test/e2e-workflows.ts.
+ *   while the step runs again after a retry, for an ai step and an extension step; a finished agent
+ *   task, which decides only the agent step whose current attempt it was dispatched for; and an error
+ *   inside the engine while it takes an answer in, which is not a failure of the attempt. The model
+ *   and the extension's action are stand-ins whose calls stay open until the case answers them. The
+ *   same road with a real provider is test/e2e-workflows.ts.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — An error inside the engine while it takes a model call's answer in leaves
+ *     the attempt as it was, and the watchdog decides the step by its output (secaudit 2026-09, R4).
  *   v1.4.0 — 2026-09-26 — A finished agent task decides only the agent step whose current attempt it
  *     was dispatched for, and the step's own task still decides it, also after a restart (secaudit
  *     2026-09, R4 row 10).
@@ -27,6 +30,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkflowEngine } from '../../src/services/workflow/engine.js';
 import { reservedUsd, spentUsd, pinCostEstimates } from '../../src/services/workflow/run-cost.js';
+import { logger } from '../../src/utils/logger.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, MemoryRecord, AgentTaskRecord } from '../../src/storage/interface.js';
 import type {
@@ -57,6 +61,8 @@ const RUN_KEY = `workflows.run.${WF}.${RUN}`;
 
 /** The agent tasks the node holds, by id. */
 const tasks = new Map<string, AgentTaskRecord>();
+/** The next this many writes of the run record fail: an error inside the engine, not in the step. */
+const faults = { runWritesToFail: 0 };
 
 /**
  * Memory the way a real backend keeps it: a value goes in and comes out as a copy, so two readers
@@ -73,6 +79,10 @@ function memStorage(onSet?: (rec: MemoryRecord) => Promise<void>): Storage {
             return rec ? structuredClone(rec) : null;
         },
         setMemory: async (rec: MemoryRecord) => {
+            if (faults.runWritesToFail > 0 && rec.key === RUN_KEY) {
+                faults.runWritesToFail -= 1;
+                throw new Error('the store did not answer');
+            }
             map.set(k(rec.ownerGaii, rec.key), structuredClone(rec));
             if (onSet) await onSet(rec);
             return rec;
@@ -174,7 +184,7 @@ async function answer(i: number, costUsd: number, content = 'an answer'): Promis
 const callAnswers = (engine: WorkflowEngine, stepId: string, ok: boolean, costUsd: number, attempt = 0) =>
     engine.onPushTerminal(OWNER, WF, RUN, stepId, ok, costUsd, attempt);
 
-beforeEach(() => { model.calls.length = 0; sandbox.runs.length = 0; tasks.clear(); });
+beforeEach(() => { model.calls.length = 0; sandbox.runs.length = 0; tasks.clear(); faults.runWritesToFail = 0; });
 
 describe('an ai step\'s call holds its share of the limit until it answers', () => {
     it('the watchdog finds the output while the call runs: the call keeps its hold, and the waiting step starts when it answers', async () => {
@@ -571,5 +581,33 @@ describe('a finished agent task decides only the agent step whose current attemp
         const run = await readRun(storage);
         expect(run.steps.left.state).toBe('green');
         expect(run.status).toBe('done');
+    });
+});
+
+describe('an error inside the engine while it takes an answer in is the engine\'s, not a failure of the attempt', () => {
+    it('the engine\'s own save fails once as it takes a model call\'s answer in: the attempt stays, and the watchdog decides the step by its output', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left')], 0.05), { left: stepAt('pending', { estimate: 0.02 }) });
+        const engine = engineFor(storage);
+        await engine.sweep();
+        expect(model.calls).toHaveLength(1);
+
+        const errors = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+        try {
+            faults.runWritesToFail = 1;
+            await answer(0, 0.01, 'the answer');
+            let run = await readRun(storage);
+            expect(run.steps.left.state).toBe('dispatched');
+            expect(run.steps.left.attempt).toBe(0);
+            expect(errors).toHaveBeenCalledWith(expect.stringContaining('the engine failed'), expect.anything());
+
+            // The next watchdog pass finds the step's output and turns the step green.
+            await engine.sweep();
+            run = await readRun(storage);
+            expect(run.steps.left.state).toBe('green');
+            expect(run.status).toBe('done');
+        } finally {
+            errors.mockRestore();
+        }
     });
 });
