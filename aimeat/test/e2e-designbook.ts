@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.4 — 2026-09-26 — At propose, a stylesheet that leaves a block, a comment, a string or a rule
+ *     open where it ends is refused, with what is open.
  *   v1.8.3 — 2026-09-26 — At propose, the at-rules are a list: @container, @starting-style and the four
  *     more at-rules that define a name pass under the prefix, those four are refused under another name
  *     with the prefixed form, and @document is refused with the list.
@@ -712,6 +714,22 @@ const GOOD_BODY = {
         assert(refusedWith(twice, /the attribute "class" is written twice/), `a repeated attribute says so: ${said(twice)}`);
         const slash = await proposeComponent(`comp-bad-${stamp}`, componentBody({ html: '<div class="wkgrid"/>' }));
         assert(refusedWith(slash, /ignores the "\/" at the end of <div …\/>, so the <div> stays open/), `a "/" on a <div> says what a browser does with it: ${said(slash)}`);
+    });
+
+    await test('a stylesheet that leaves a block, a comment, a string or a rule open where it ends is refused, with what is open', async () => {
+        const stamp = Date.now() % 100000;
+        const wrong: string[] = [];
+        for (const [tail, expected] of [
+            ['\n.wkgrid-cell { color: var(--ak-ink);', 'The block of ".wkgrid-cell" is still open where the stylesheet ends, so it would take in whatever a page writes after the component.'],
+            ['\n@media print {', 'The block of "@media print" is still open where the stylesheet ends'],
+            ['\n/* rest of page', 'The comment "/* rest of page" is still open where the stylesheet ends'],
+            ['\n.wkgrid-cell::after { content: "abc', 'The string "abc is still open where the stylesheet ends'],
+            ['\n@media print', 'The rule "@media print" is still open where the stylesheet ends: it has no block yet'],
+        ]) {
+            const r = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: componentBody().css + tail }));
+            if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${JSON.stringify(tail)}: ${said(r)}`);
+        }
+        assert(wrong.length === 0, `each is refused with what is open: ${wrong.join('; ')}`);
     });
 
     // A component the second owner proposed, stored when it passed an older bench: `.wkgrid ~ p`

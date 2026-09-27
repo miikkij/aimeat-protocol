@@ -12,6 +12,8 @@
  *   read a rule with it and keeps the text raw.
  * @usage import { parse, walk, tokenize, tokenTypes, ident, string } from 'css-tree';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The token types of "<!--" and "-->" (CDO, CDC), which start no rule at the top
+ *     of a stylesheet, for the reading of what is still open where a stylesheet ends.
  *   v1.2.0 — 2026-09-26 — string.decode(), and the token types of a string and a ";", which the bench
  *     reads in the prelude of an at-rule that defines a name.
  *   v1.1.0 — 2026-09-26 — The token types of a number, a dimension, a percentage and a comma, which
@@ -85,7 +87,7 @@ declare module 'css-tree' {
     readonly WhiteSpace: number; readonly Comment: number; readonly LeftParenthesis: number; readonly RightParenthesis: number;
     readonly LeftSquareBracket: number; readonly RightSquareBracket: number; readonly LeftCurlyBracket: number;
     readonly RightCurlyBracket: number; readonly Number: number; readonly Dimension: number; readonly Percentage: number;
-    readonly Comma: number; readonly String: number; readonly Semicolon: number;
+    readonly Comma: number; readonly String: number; readonly Semicolon: number; readonly CDO: number; readonly CDC: number;
   };
   /** A name with its escapes resolved: `u\72 l` is `url`. */
   export const ident: { decode(text: string): string };

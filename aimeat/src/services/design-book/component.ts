@@ -16,8 +16,8 @@
  *   is a security decision before it is a design one: a part's preview is served from the node's
  *   own origin, so a part that carried script would be anybody's code running as this node. For
  *   the same reason the markup is read against an ALLOWLIST of elements and attributes, and the
- *   stylesheet may not load anything, reach outside its own prefix, carry an at-rule off its list, or
- *   fix itself over the page.
+ *   stylesheet may not load anything, reach outside its own prefix, carry an at-rule off its list,
+ *   fix itself over the page, or leave anything open where it ends.
  *
  *   IT WEARS WHATEVER PAGE IT LANDS IN. Every colour is a `var(--ak-…)` token, never a literal,
  *   so inside a genre it takes the genre's ground, ink and accent through the genre's bridge, and
@@ -36,6 +36,9 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.14.0 — 2026-09-26 — A stylesheet ends at its top level: one that leaves a block, a bracket, a
+ *     comment, a string or a rule open where it ends is refused in a sentence that names what is open,
+ *     because an app pastes it before the page's own rules and what is open takes them in.
  *   v1.13.0 — 2026-09-26 — The at-rules a component's stylesheet may carry are a list: @media, @supports,
  *     @container and @starting-style, and @keyframes, @property, @counter-style, @font-palette-values,
  *     @position-try, @function and @font-feature-values under a name that starts with its prefix, with
@@ -114,6 +117,7 @@ import { createHash } from 'node:crypto';
 import { DesignBookError } from './errors.js';
 import {
   MAX_NESTING, nameKindOf, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem, type NameDefinition, type NameKind,
+  type StylesheetOpen,
 } from './component-scan.js';
 import { escapeHtml } from '../site-tags.js';
 
@@ -320,6 +324,30 @@ function definitionRefusal(d: NameDefinition, prefix: string): string {
       ?? `The stylesheet defines the ${def.noun} "${name}" with @${d.atRule}, a name the whole page shares, so the page's own ${def.noun} of that name would change.`;
   return `${found} A component defines names of its own only: start the name with its prefix, "@${d.atRule} ${own}${def.after ?? ''}", and use it as "${def.use(own)}". ${def.still}`;
 }
+
+/**
+ * What the bench says when something is still open where the stylesheet ends (component-scan.ts
+ * readStylesheet): an app pastes the stylesheet before the page's own rules, which the open part takes in.
+ */
+function openRefusal(open: StylesheetOpen): string {
+  const takes = 'so it would take in whatever a page writes after the component.';
+  const joins = 'so the first rule a page writes after the component would join it.';
+  switch (open.kind) {
+    case 'comment': return `The comment "${open.text}" is still open where the stylesheet ends, ${takes} Close every comment inside the stylesheet: "/* … */".`;
+    case 'string': return `The string ${open.text} is still open where the stylesheet ends, ${takes} Close every string inside the stylesheet with the quote it starts with.`;
+    case 'bracket':
+      return `The "${open.bracket}" of "${open.text}" is still open where the stylesheet ends, ${takes} Close every bracket inside the stylesheet: "${open.bracket === '[' ? '[ … ]' : '( … )'}".`;
+    case 'block':
+      return `${open.text ? `The block of "${open.text}"` : 'A block'} is still open where the stylesheet ends, ${takes} Close every block inside the stylesheet: "${open.text ? `${open.text} ` : ''}{ … }".`;
+    case 'rule': {
+      // A ";" or a "}" with no rule before it starts a rule to a browser: it is taken out, not given a block.
+      const stray = open.text[0] === ';' || open.text[0] === '}' ? open.text[0] : '';
+      if (stray) return `The "${stray}" at the top of the stylesheet has no rule before it, so a browser reads it as the start of a rule that is still open where the stylesheet ends, ${joins} Take out the "${stray}".`;
+      return `The rule "${open.text}" is still open where the stylesheet ends: it has no block yet, ${joins} Give every rule its block inside the stylesheet: "${open.text} { … }".`;
+    }
+  }
+}
+
 /** Functions that take an address: url() as a token or a function, and the ones that take it as a plain string. */
 const loads = (fn: string) => fn === 'url' || fn === 'src' || fn === 'image' || fn.endsWith('image-set');
 /** Properties that bind a behaviour, in the browsers that had them. */
@@ -338,6 +366,9 @@ function checkStyles(css: string, prefix: string): void {
   // from its tokens, every name with its escapes resolved, since `u\72 l(` is url( to a browser; the
   // declarations and selectors from its parser. A string is one token: what it holds is text.
   const sheet = readStylesheet(css);
+  // THE STYLESHEET ENDS AT ITS TOP LEVEL. An app pastes it into a page before the page's own rules,
+  // and a block, a bracket, a comment, a string or a rule still open where it ends takes them in.
+  if (sheet.open) refuse(openRefusal(sheet.open));
   // A COMPONENT'S STYLESHEET REACHES ONLY THE COMPONENT. It carries the at-rules on the list and no
   // other, known or unknown, and every name it defines for the whole page (an animation, a custom
   // property, a font palette, …) is its own. What it uses by name may be the page's own.

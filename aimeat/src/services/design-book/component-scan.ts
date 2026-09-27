@@ -27,10 +27,18 @@
  *   THE MARKUP CLOSES EVERY ELEMENT IT OPENS. A page writes its own content after the component, and
  *   an element still open where the markup ends takes that content in, so a rule of the component
  *   styles it. The markup is read once more with an element after it, the way a page follows it.
+ *
+ *   THE STYLESHEET ENDS AT ITS TOP LEVEL. An app pastes it into a page before the page's own rules,
+ *   and a block, a bracket, a comment, a string or a rule still open where it ends takes those rules
+ *   in. The tokens say what is open (`open`).
  * @structure readMarkup · readStylesheet · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
- *   NameKind · NameDefinition · nameKindOf · DeclarationRead · ComplexSelector · Compound · Pseudo
+ *   StylesheetOpen · NameKind · NameDefinition · nameKindOf · DeclarationRead · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.7.0 — 2026-09-26 — readStylesheet says what is still open where the stylesheet ends (`open`):
+ *     the comment or the string the text ends in, else the innermost open bracket or block, else a
+ *     rule at the top that has no block, a ";" or a "}" with no rule before it included, since a
+ *     browser reads either as the start of a rule.
  *   v2.6.0 — 2026-09-26 — readStylesheet notes for every at-rule the at-rule whose block it stands in
  *     (`atRules[].within`), and reads the name @font-palette-values, @position-try, @function (its
  *     function token) and @font-feature-values (the family) define beside the other three
@@ -328,6 +336,20 @@ export interface NameDefinition {
   text: string;
 }
 
+/**
+ * What is still open where a stylesheet ends. An app pastes the stylesheet into its page before the
+ * page's own rules, and what is open takes them in: an open comment or string holds them as text, an
+ * open bracket or block holds them as part of itself, and a rule at the top with no block yet takes
+ * the next rule's selector into its own.
+ *   - `comment`, `string`: the text ends inside one, and `text` is how it starts;
+ *   - `bracket`: the innermost open "(" or "[", with `text` from the start of its rule or declaration;
+ *   - `block`: the innermost open "{", with `text` the prelude of its rule;
+ *   - `rule`: at the top, a rule that has begun and has no block, with `text` what it holds.
+ */
+export type StylesheetOpen =
+  | { kind: 'comment' | 'string' | 'block' | 'rule'; text: string }
+  | { kind: 'bracket'; bracket: '(' | '['; text: string };
+
 /** A stylesheet as the CSS parser reads it (readStylesheet). */
 export interface StylesheetReading {
   /**
@@ -343,6 +365,8 @@ export interface StylesheetReading {
   readsPageTokens: boolean;
   /** How deep brackets and blocks nest. */
   depth: number;
+  /** What is still open where the stylesheet ends, or null when it ends at its top level with every rule whole. */
+  open: StylesheetOpen | null;
   declarations: DeclarationRead[];
   /**
    * Every selector of every style rule outside @keyframes, as written, and read, or null where it
@@ -365,6 +389,37 @@ const T = tokenTypes;
 
 /** A name as the text spells it, escapes resolved and lower-cased: `U\72 L` is `url`, as a browser matches it. */
 const nameOf = (raw: string): string => ident.decode(raw).toLowerCase();
+
+/** One token as css-tree's tokenizer gives it: its type and where it stands in the text. */
+type Token = { type: number; start: number; end: number };
+
+/** Tokens that start no rule at the top of a stylesheet: a browser drops them there. */
+const BETWEEN_RULES = new Set<number>([T.WhiteSpace, T.Comment, T.CDO, T.CDC]);
+
+/** A piece of the stylesheet quoted in a message: whitespace folded, cut short. */
+const quoted = (text: string): string => text.slice(0, 200).replace(/\s+/g, ' ').trim().slice(0, 60);
+
+/** Whether a string token ends with the quote it starts with, and that quote is not escaped. */
+function closedString(text: string): boolean {
+  if (text.length < 2 || text[text.length - 1] !== text[0]) return false;
+  let backslashes = 0;
+  for (let i = text.length - 2; i > 0 && text[i] === '\\'; i--) backslashes++;
+  return backslashes % 2 === 0;
+}
+
+/**
+ * What is still open where the stylesheet ends (StylesheetOpen): a comment or a string the last token
+ * leaves open, else the innermost open bracket or block, else a rule at the top with no block.
+ */
+function openAtEnd(css: string, last: Token | undefined, opened: ReadonlyArray<{ closer: number; at: number; from: number }>, pending: number): StylesheetOpen | null {
+  const lastText = last ? css.slice(last.start, last.end) : '';
+  if (last?.type === T.Comment && (lastText.length < 4 || !lastText.endsWith('*/'))) return { kind: 'comment', text: quoted(lastText) };
+  if (last?.type === T.String && !closedString(lastText)) return { kind: 'string', text: quoted(lastText) };
+  const inner = opened[opened.length - 1];
+  if (inner?.closer === T.RightCurlyBracket) return { kind: 'block', text: quoted(css.slice(inner.from, inner.at)) };
+  if (inner) return { kind: 'bracket', bracket: inner.closer === T.RightSquareBracket ? '[' : '(', text: quoted(css.slice(inner.from)) };
+  return pending < 0 ? null : { kind: 'rule', text: quoted(css.slice(pending)) };
+}
 
 const NAME_KINDS = new Set<string>(['property', 'counter-style', 'font-palette-values', 'position-try', 'function', 'font-feature-values']);
 
@@ -420,25 +475,36 @@ const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(nod
  * the parser keeps as raw text, is reported as unreadable.
  */
 export function readStylesheet(css: string): StylesheetReading {
-  const reading: StylesheetReading = { atRules: [], definitions: [], functions: [], readsPageTokens: false, depth: 0, declarations: [], selectors: [], unreadable: null };
-  const tokens: Array<{ type: number; start: number; end: number }> = [];
+  const reading: StylesheetReading = { atRules: [], definitions: [], functions: [], readsPageTokens: false, depth: 0, open: null, declarations: [], selectors: [], unreadable: null };
+  const tokens: Token[] = [];
   tokenize(css, (type, start, end) => { tokens.push({ type, start, end }); });
-  const closers: number[] = [];
-  const open = (closer: number) => { closers.push(closer); reading.depth = Math.max(reading.depth, closers.length); };
+  // Every bracket and block still open, the innermost last: the token that closes it, where its
+  // opener stands, and where the rule or declaration it belongs to starts.
+  const opened: Array<{ closer: number; at: number; from: number }> = [];
+  // Where the rule or declaration being read starts: after the last "{", "}" or ";".
+  let from = 0;
+  const open = (closer: number, at: number) => { opened.push({ closer, at, from }); reading.depth = Math.max(reading.depth, opened.length); };
+  // Where a rule at the top of the stylesheet starts, until its block opens or its ";" ends it as an
+  // at-rule; -1 between rules. A ";" or a "}" with no rule before it starts a rule to a browser.
+  let pending = -1;
   // The at-rule each open block belongs to, the innermost last (null for a style rule's block), and
   // the at-rule whose prelude is being read, whose block the next "{" opens.
   const owners: Array<string | null> = [];
   let prelude: string | null = null;
   for (let t = 0; t < tokens.length; t++) {
     const { type, start, end } = tokens[t];
+    if (!opened.length && pending < 0 && !BETWEEN_RULES.has(type)) pending = start;
     if (type === T.AtKeyword) {
       const atRule = nameOf(css.slice(start + 1, end));
       reading.atRules.push({ name: atRule, within: owners.length ? owners[owners.length - 1] : null });
       prelude = atRule;
       const kind = nameKindOf(atRule);
       if (kind) reading.definitions.push(definitionAt(tokens, t, css, atRule, kind));
-    } else if (type === T.Semicolon) prelude = null;
-    else if (type === T.Url || type === T.BadUrl) reading.functions.push('url');
+    } else if (type === T.Semicolon) {
+      if (!opened.length && prelude !== null) pending = -1;
+      prelude = null;
+      from = end;
+    } else if (type === T.Url || type === T.BadUrl) reading.functions.push('url');
     else if (type === T.Function) {
       const name = nameOf(css.slice(start, end - 1));
       reading.functions.push(name);
@@ -449,18 +515,22 @@ export function readStylesheet(css: string): StylesheetReading {
         const arg = tokens[next];
         if (arg?.type === T.Ident && ident.decode(css.slice(arg.start, arg.end)).startsWith('--ak-')) reading.readsPageTokens = true;
       }
-      open(T.RightParenthesis);
-    } else if (type === T.LeftParenthesis) open(T.RightParenthesis);
-    else if (type === T.LeftSquareBracket) open(T.RightSquareBracket);
+      open(T.RightParenthesis, start);
+    } else if (type === T.LeftParenthesis) open(T.RightParenthesis, start);
+    else if (type === T.LeftSquareBracket) open(T.RightSquareBracket, start);
     else if (type === T.LeftCurlyBracket) {
-      open(T.RightCurlyBracket);
+      open(T.RightCurlyBracket, start);
       owners.push(prelude);
       prelude = null;
-    } else if (closers.length && type === closers[closers.length - 1]) {
-      closers.pop();
-      if (type === T.RightCurlyBracket) { owners.pop(); prelude = null; }
+      pending = -1;
+      from = end;
+    } else if (opened.length && type === opened[opened.length - 1].closer) {
+      opened.pop();
+      if (type === T.RightCurlyBracket) { owners.pop(); prelude = null; from = end; }
     }
   }
+  // THE STYLESHEET ENDS AT ITS TOP LEVEL, or what is open takes in the page's rules after it.
+  reading.open = openAtEnd(css, tokens[tokens.length - 1], opened, pending);
   if (reading.depth > MAX_NESTING) return reading;
 
   try {

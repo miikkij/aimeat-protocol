@@ -5,6 +5,11 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.16.0 — 2026-09-26 — A stylesheet that ends inside a block, a bracket, a comment, a string or a
+ *     rule with no block is refused, by what is open, and one whose comments and strings close passes;
+ *     the reader is timed on blocks and brackets left open.
+ *     Four older inputs were stylesheets that end inside an unclosed block or a rule; they close it now,
+ *     so each still reaches the check it asserts.
  *   v1.15.0 — 2026-09-26 — The at-rules are a list: @font-palette-values, @position-try, @function and
  *     @font-feature-values pass under a name that starts with the prefix and are refused under another,
  *     an at-rule off the list (@document, @charset, one nobody has named yet, a feature block outside
@@ -208,7 +213,7 @@ describe('the component bench', () => {
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { color: var(--ak-ink) !\\important; }' })).toThrow(/no !important/);
     expect(bad({ css: WEEK_GRID.css + rule('color: r\\gb(0, 0, 0)') })).toThrow(/never a literal/);
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "/*"; }\n.wkgrid-b { background: url(https://evil.example/x.png); }\n.wkgrid-c::before { content: "*/"; }' })).toThrow(/no url\(\)/);
-    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a\\/* { }\n.wkgrid-b { background: url(https://evil.example/x.png); }\n.wkgrid-c { color: var(--ak-ink); } */' })).toThrow(/no url\(\)/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a\\/* { }\n.wkgrid-b { background: url(https://evil.example/x.png); }\n.wkgrid-c { color: var(--ak-ink); } */ { }' })).toThrow(/no url\(\)/);
     // A value handed in through a custom property is not the word the bench reads, so position is a word.
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { --wkgrid-p: fixed; position: var(--wkgrid-p); color: var(--ak-ink); }' })).toThrow(/position/);
     // image-set() takes its address as a string, with no url( in sight.
@@ -273,6 +278,45 @@ describe('the component bench', () => {
     expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-x::before { content: "<\\/p>"; color: var(--ak-ink); }' })).not.toThrow();
   });
 
+  // An app pastes the stylesheet into its page before the page's own rules. What is still open
+  // where the stylesheet ends takes those rules in: they nest under a rule of the component, apply
+  // only in print, or vanish inside a comment or a string.
+  it('ends at the top of the stylesheet: a block, a comment, a string, a bracket or a rule still open where it ends is refused, by what is open', () => {
+    for (const [tail, message] of [
+      ['\n.wkgrid-cell { color: var(--ak-ink);',
+        /The block of "\.wkgrid-cell" is still open where the stylesheet ends, so it would take in whatever a page writes after the component\. Close every block inside the stylesheet: "\.wkgrid-cell \{ … \}"\./],
+      ['\n@media print {', /The block of "@media print" is still open where the stylesheet ends/],
+      ['\n@media print { .wkgrid-x { color: var(--ak-ink); }', /The block of "@media print" is still open where the stylesheet ends/],
+      ['\n.wkgrid-row { color: var(--ak-ink); & .wkgrid-x { color: var(--ak-ink);', /The block of "& \.wkgrid-x" is still open where the stylesheet ends/],
+      ['\n/* rest of page', /The comment "\/\* rest of page" is still open where the stylesheet ends.*Close every comment inside the stylesheet: "\/\* … \*\/"\./],
+      ['\n/*/', /The comment "\/\*\/" is still open where the stylesheet ends/],
+      ['\n.wkgrid-x::after { content: "abc', /The string "abc is still open where the stylesheet ends.*Close every string inside the stylesheet with the quote it starts with\./],
+      ['\n.wkgrid-x::after { content: \'a\\\'', /The string 'a\\' is still open where the stylesheet ends/],
+      ['\n@media (min-width: 1px', /The "\(" of "@media \(min-width: 1px" is still open where the stylesheet ends.*Close every bracket inside the stylesheet: "\( … \)"\./],
+      ['\n.wkgrid-x { background: color-mix(in oklab, var(--ak-ink)', /The "\(" of "background: color-mix\(in oklab, var\(--ak-ink\)" is still open/],
+      ['\n.wkgrid-x[data-a', /The "\[" of "\.wkgrid-x\[data-a" is still open where the stylesheet ends.*"\[ … \]"/],
+      ['\n@media print', /The rule "@media print" is still open where the stylesheet ends: it has no block yet, so the first rule a page writes after the component would join it\. Give every rule its block inside the stylesheet: "@media print \{ … \}"\./],
+      ['\n.wkgrid-x', /The rule "\.wkgrid-x" is still open where the stylesheet ends/],
+      ['\n.wkgrid-x { color: var(--ak-ink); } }', /The "\}" at the top of the stylesheet has no rule before it, so a browser reads it as the start of a rule that is still open where the stylesheet ends.*Take out the "\}"\./],
+      ['\n.wkgrid-x { color: var(--ak-ink); };', /The ";" at the top of the stylesheet has no rule before it/],
+    ]) {
+      expect(bad({ css: WEEK_GRID.css + tail }), JSON.stringify(tail)).toThrow(message as RegExp);
+    }
+    // The reader says what is open: the comment or string the text ends in, else the innermost bracket or block, else a rule at the top with no block.
+    expect(readStylesheet('.a { b: c').open).toEqual({ kind: 'block', text: '.a' });
+    expect(readStylesheet('.a { b: c; } /* x').open).toEqual({ kind: 'comment', text: '/* x' });
+    expect(readStylesheet('.a { b: "c').open).toEqual({ kind: 'string', text: '"c' });
+    expect(readStylesheet('@media (a').open).toEqual({ kind: 'bracket', bracket: '(', text: '@media (a' });
+    expect(readStylesheet('.a { } @media print').open).toEqual({ kind: 'rule', text: '@media print' });
+    for (const css of ['.a { }', '.a { } /* end */', '.a { } /**/', '.a { b: "c\\\\" }', '@media print { .a { b: c } }', '.a { }\n<!--', '']) {
+      expect(readStylesheet(css).open, css).toBeNull();
+    }
+    // What closes inside the stylesheet passes, a comment or a string holding a brace or "*/" included.
+    for (const tail of ['\n/* the end */', '\n.wkgrid-x::after { content: "} /* *\\/ {"; color: var(--ak-ink); }', '\n@media print { .wkgrid-x { color: var(--ak-ink); } }']) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + tail }), tail).not.toThrow();
+    }
+  });
+
   // Served from the node's own origin, so a body stored before the bench learned a trick is not
   // trusted for having passed once: the page shows only what passes the bench now.
   it('benches the stored body again before the preview shows any of it', () => {
@@ -314,6 +358,7 @@ describe('the component bench', () => {
       ['flat at-rules', '@media '], ['selector lists', '.a, '], ['conditions', '(', '@supports '], ['blocks', '@media{'], ['nested rules', '& {', '.a{'],
       ['pseudo-classes', ':is(', '.a'], ['var fallbacks', 'var(--a,(', '.a{b:'], ['closed declarations', 'a:b; ', '.a{'],
       ['at-rules that define a name', '@keyframes '], ['custom functions', '@function --a('],
+      ['blocks left open', '.a{b:c;'], ['brackets left open', '[(', '.a{b:'],
     ]) timed(`stylesheet, ${shape}`, () => readStylesheet(ceiling(unit, head)));
     // Nesting at the most the bench reads is parsed, and parsed quickly.
     timed('stylesheet, nested as deep as the bench reads', () => {
@@ -343,12 +388,13 @@ describe('the component bench', () => {
   // class says only where it starts. `.wkgrid ~ p` starts at the component and styles every
   // paragraph after it on the page.
   it('reads every selector to its end, and each one stays inside the component', () => {
-    const rule = (selector: string) => ({ css: `${WEEK_GRID.css}\n${selector} { color: var(--ak-ink); }` });
+    // `close` ends the blocks the selector opens, so the stylesheet ends at its top level.
+    const rule = (selector: string, close = '') => ({ css: `${WEEK_GRID.css}\n${selector} { color: var(--ak-ink); }${close}` });
     expect(bad(rule('.wkgrid ~ p'))).toThrow(/beside it/);
     expect(bad(rule('.wkgrid + *'))).toThrow(/beside it/);
     expect(bad(rule('.wkgrid, body'))).toThrow(/starts at one of its own classes/);
-    expect(bad(rule('@media (min-width: 1px) { .wkgrid-row ~ div'))).toThrow(/beside it/);
-    expect(bad(rule('@supports (display: grid) { .wkgrid-a, .wkgrid-b + section'))).toThrow(/beside it/);
+    expect(bad(rule('@media (min-width: 1px) { .wkgrid-row ~ div', ' }'))).toThrow(/beside it/);
+    expect(bad(rule('@supports (display: grid) { .wkgrid-a, .wkgrid-b + section', ' }'))).toThrow(/beside it/);
     expect(bad(rule('.wkgrid:has(~ p)'))).toThrow(/looks only down/);
     expect(bad(rule('.wkgrid-x:is(.page-theme .wkgrid-x)'))).toThrow(/looks only down/);
     expect(bad(rule('.wkgrid:not(body)'))).toThrow(/names the page itself/);
@@ -357,7 +403,7 @@ describe('the component bench', () => {
     // The column combinator is not one the CSS parser reads, so the bench cannot follow it.
     expect(bad(rule('.wkgrid || td'))).toThrow(/does not read as a selector/);
     // Nested, "&" is .wkgrid-x, so this is `.wkgrid-x ~ p`: it reaches beside the component.
-    expect(bad(rule('.wkgrid-x { & ~ p'))).toThrow(/beside it/);
+    expect(bad(rule('.wkgrid-x { & ~ p', ' }'))).toThrow(/beside it/);
     // …and what a component legitimately writes still passes: inside it, and between its own parts.
     for (const ok of [
       '.wkgrid > *', '.wkgrid li', '.wkgrid-row + .wkgrid-row', '.wkgrid-cell ~ .wkgrid-cell-today',
