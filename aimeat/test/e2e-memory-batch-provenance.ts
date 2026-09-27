@@ -24,7 +24,6 @@ async function json(path: string, token?: string, body?: unknown, method = body 
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000),
   });
   // Runtime assertions below validate the HTTP contract at this untyped JSON boundary.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { status: response.status, body: await response.json() as Record<string, any> };
 }
 async function login(identity: string, privateKey: string, isAgent = false): Promise<string> {

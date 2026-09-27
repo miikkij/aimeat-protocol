@@ -27,6 +27,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { identityRelations, validateRelationReviews, type RelationReview } from './lib/storage-owner-relations.js';
 
 const ROOT = process.cwd();
 const PG_SCHEMA = join(ROOT, 'src', 'storage', 'providers', 'postgres-kysely', 'migrations');
@@ -121,6 +122,17 @@ function sqliteCandidates(pgTable: string): string[] {
 function main(): void {
     const strict = process.argv.includes('--strict');
     const seed = process.argv.includes('--seed');
+
+    // Classification is separate from the legacy delete-name ratchet. A history or authorship
+    // relation need not cascade, and a recorded pending decision is never a claim of safe erasure.
+    const relations = identityRelations(readFileSync(join(ROOT, 'src/storage/providers/postgres-kysely/db-types.ts'), 'utf8'));
+    const reviews = JSON.parse(readFileSync(join(ROOT, 'security/storage-owner-relations.json'), 'utf8')).relations as Record<string, RelationReview>;
+    const reviewErrors = validateRelationReviews(relations, reviews, path => existsSync(join(ROOT, path)));
+    const pending = Object.entries(reviews).filter(([, review]) => review.decision === 'required').map(([key]) => key);
+    console.log(`  Additional identity relations: ${relations.length}; policy decisions still required: ${pending.length}`);
+    if (pending.length) console.log(`  Pending: ${pending.join(', ')}`);
+    for (const message of reviewErrors) console.error(`  ${message}`);
+    if (strict && reviewErrors.length) process.exit(1);
 
     const schema = readAll(PG_SCHEMA);
     const pgCascade = readAll(PG_METHODS);
