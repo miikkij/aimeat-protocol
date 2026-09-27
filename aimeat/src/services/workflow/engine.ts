@@ -88,6 +88,10 @@
  *     attempt that runs now. After a retry, an earlier attempt's answer settles its own cost and hold
  *     and ticks the run, turns the step green only when it succeeded and the output is there, and
  *     never uses up a retry or turns the step red (secaudit 2026-09, R3 problem 2).
+ *   v1.15.1 — 2026-09-26 — Moved out unchanged (max-file-lines): resolveVars' body to engine-util.ts
+ *     resolveRunVars, runSignalsOnly's loop to engine-observe.ts evalRunSignals, and the watchdog's
+ *     on_timeout policy for a waiting human-input step, with HUMAN_TIMEOUT_MIN_DEFAULT, to
+ *     engine-human.ts sweepHumanStep. This module still exports HUMAN_TIMEOUT_MIN_DEFAULT.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -99,17 +103,17 @@ import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { buildEvalCtx } from './eval-context.js';
-import { evalSignal, recordProgress } from './engine-observe.js';
+import { evalSignal, recordProgress, evalRunSignals } from './engine-observe.js';
 import { getWorkflow, validateWorkflow, listRuns, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
 import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
 import { fireMemoryWrite, fireOfferOrdered, fireEcosystemEvent, type TriggerDeps } from './engine-triggers.js';
-import { template, runDateIn } from './engine-util.js';
+import { template, resolveRunVars } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import {
   dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
 } from './engine-steps.js';
-import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
+import { validateHumanAnswer, applyHumanAnswer, sweepHumanStep } from './engine-human.js';
 import {
   spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls,
 } from './run-cost.js';
@@ -126,8 +130,8 @@ let _active: WorkflowEngine | null = null;
 export function setActiveWorkflowEngine(e: WorkflowEngine): void { _active = e; }
 export function getActiveWorkflowEngine(): WorkflowEngine | null { return _active; }
 
-/** Default wait for a human-input step's answer — humans sleep; 24h, not the agent-step 60 min. */
-export const HUMAN_TIMEOUT_MIN_DEFAULT = 1440;
+/** Default wait for a human-input step's answer: lives in engine-human.ts, exported here for the routes. */
+export { HUMAN_TIMEOUT_MIN_DEFAULT } from './engine-human.js';
 
 // The readiness rules live in engine-readiness.ts. Imported for use here AND re-exported, because
 // they are this module's published surface: routes import the timeout, tests the decision helpers.
@@ -301,23 +305,7 @@ export class WorkflowEngine {
 
   /** signals-only: evaluate every step's input + output against existing memory; no dispatch. */
   private async runSignalsOnly(ownerGhii: string, run: WorkflowRun): Promise<void> {
-    const resolved = this.resolvedMap(run);
-    const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
-    for (const step of run.defSnapshot.steps) {
-      const r = resolved.get(step.id);
-      const rs = run.steps[step.id];
-      const reads = new Set<string>();
-      // input
-      const input = await evalSignal(r?.required_to_function, ctx, reads);
-      if (!input.ok) { rs.state = 'input-red'; rs.inputObserved = input.observed; rs.reads = [...reads]; continue; }
-      // output
-      const output = await evalSignal(r?.success_signal, ctx, reads);
-      rs.outputObserved = output.observed;
-      rs.reads = [...reads];
-      rs.state = output.ok ? 'green' : 'output-red';
-    }
-    run.status = runOutcome(run.steps);
-    run.endedAt = new Date().toISOString();
+    await evalRunSignals(this.storage, this.config, ownerGhii, run, this.resolvedMap(run));
     await this.persist(ownerGhii, run);
     emitChange('workflows');
   }
@@ -492,22 +480,8 @@ export class WorkflowEngine {
         // waiting-human: no progress tracking, no offline logic — just the on_timeout policy once
         // timeout_min (default 24h for human steps) has elapsed since the question was asked.
         if (rs.state === 'waiting-human' && rs.human) {
-          const action = step.action?.kind === 'human-input' ? step.action : undefined;
-          const deadline = new Date(rs.human.askedAt).getTime() + (step.timeout_min ?? HUMAN_TIMEOUT_MIN_DEFAULT) * 60_000;
-          if (now < deadline) continue;
-          const policy = action?.on_timeout ?? 'fail';
-          if (policy === 'default' && action?.default_option) {
-            await applyHumanAnswer(this.storage, this.config, ownerGhii, r, step.id, {
-              picks: [action.default_option], pick: action.default_option, by: 'timeout-default',
-            });
-          } else if (policy === 'skip') {
-            rs.state = 'skipped'; rs.endedAt = nowIso;
-          } else {
-            rs.state = 'timed-out'; rs.endedAt = nowIso;
-            failDownstream(r, step.id);
-            await this.onStepFail(ownerGhii, r, step.id, 'timed-out');
-          }
-          changed = true;
+          const timedOut = () => this.onStepFail(ownerGhii, r, step.id, 'timed-out');
+          if (await sweepHumanStep(this.storage, this.config, ownerGhii, r, step, now, nowIso, timedOut)) changed = true;
           continue;
         }
 
@@ -670,23 +644,7 @@ export class WorkflowEngine {
 
   /** Public since 2026-08-30: preflight.ts resolves the same vars a run would, without starting one. */
   resolveVars(def: WorkflowDef, overrides: Record<string, string> | undefined, runId: string): Record<string, string> {
-    // The run date belongs to the zone the SCHEDULE is in, not the server's — see runDateIn(), which
-    // carries the why. Only a schedule trigger has a zone; manual/event runs stay on UTC as before.
-    const today = runDateIn(def.trigger.kind === 'schedule' ? def.trigger.timezone : undefined);
-    const out: Record<string, string> = {};
-    for (const v of def.vars) {
-      const override = overrides?.[v.name];
-      const def0 = v.default === '<run-date>' ? today : v.default;
-      out[v.name] = override ?? def0 ?? '';
-    }
-    // Built-in run-scoping vars (available to key templates WITHOUT declaration; a declared var of the
-    // same name wins). `{run}` = this run's id (unique per invocation); `{date}` = the run date. Templating
-    // deliverable keys with one of these gives each run its OWN keyspace — so a re-run never sees a prior
-    // run's output (no stale false-green, no wasted crew re-run over already-present keys) and history is
-    // preserved. See docs — this is the recommended alternative to the destructive `fresh` clear.
-    if (!('run' in out)) out.run = runId;
-    if (!('date' in out)) out.date = today;
-    return out;
+    return resolveRunVars(def, overrides, runId);
   }
 
   // evalSignal and recordProgress live in engine-observe.ts, skipSubtree and failDownstream in
