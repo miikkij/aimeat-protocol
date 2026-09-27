@@ -329,29 +329,13 @@ export const ownerMethods = {
   },
 
   async setMemoryIfVersion(this: SqliteStorage, record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
-    const valueStr = JSON.stringify(record.value);
-    // Read the row this replaces so an unnamed group can be inherited (resolveGroupId rule 3). Safe
-    // against a racing writer without reading inside the UPDATE: a concurrent change bumps the
-    // version, and the WHERE below then matches nothing and this write is refused.
-    const existing = await this.getMemory(record.ownerGaii, record.key);
-    const groupId = resolveGroupId(record, existing);
-    record.groupId = groupId ?? undefined;
-    const result = this.db.prepare(
-      `UPDATE memory SET value = ?, visibility = ?, groupId = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
-       updatedAt = ?, flagCount = ?, allowedOrigins = ?, byteSize = ?, aiProvenanceId = ?
-       WHERE ownerGaii = ? AND key = ? AND version = ?`
-    ).run(
-      valueStr, record.visibility, groupId, record.workspaceRef ?? null,
-      JSON.stringify(record.tags), record.ttlHours,
-      record.version, record.updatedAt,
-      record.flagCount ?? 0,
-      record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
-      Buffer.byteLength(valueStr, 'utf8'),
-      record.aiProvenanceId ?? null,
-      record.ownerGaii, record.key, expectedVersion,
-    );
-    if (result.changes === 0) return null; // version conflict
-    return record;
+    // Serialize the check with the write and reuse setMemory's history and field semantics.
+    // The transaction guard also keeps an unrelated writer out while this call awaits.
+    return this.transaction(async () => {
+      const existing = await this.getMemory(record.ownerGaii, record.key);
+      if (!existing || existing.version !== expectedVersion) return null;
+      return this.setMemory(record);
+    });
   },
 
   isMemoryExpired(this: SqliteStorage, record: MemoryRecord): boolean {

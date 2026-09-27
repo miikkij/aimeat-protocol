@@ -181,7 +181,7 @@ export const memoryMethods = {
       const trx = this.db;
       const existing = await trx.selectFrom('Memory').selectAll()
         .where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).forUpdate().executeTakeFirst();
-      if (!existing || existing.version !== expectedVersion) return null;
+      if (!existing || !isVisible(existing) || existing.version !== expectedVersion) return null;
       const trackable = record.trackable ?? existing.trackable ?? false;
       if (existing.trackable) {
         await trx.insertInto('MemoryVersion').values({
@@ -197,7 +197,7 @@ export const memoryMethods = {
         value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [], ttlHours: record.ttlHours,
         version: newVersion, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null, trackable,
-        groupId: cswGroupId,
+        groupId: cswGroupId, workspaceRef: record.workspaceRef ?? null,
         byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
         aiProvenanceId: record.aiProvenanceId ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
