@@ -83,6 +83,26 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.11.2 — 2026-09-27 — Name `onFollow`: with `href`, the link's own click (a page that opens the
+ *     thing in place keeps the address for a new tab: the fleet's agent names); Row `hover` now also
+ *     turns a linked name coral (list.css). Additive, admin page group G9.
+ *   v1.11.1 — 2026-09-27 — SearchLine `find`: the magnifier before the field (main's admin Cortex and
+ *     Knowledge searches). Additive, admin page group G7.
+ *   v1.11.0 — 2026-09-27 — Row `quietDoors`: the row's doors show only while the pointer is on the
+ *     row, the keyboard is in it, or it is open or selected; they stay in the tab order, and on a
+ *     phone they show only on the opened or selected row (main's admin Owners list, .adm-own-acts:
+ *     the doors belong to one row at a time). List `stackWide`: a list of many columns stacks
+ *     already under 1180px, not 860px, its `labels` said from there (main's admin GHII list,
+ *     measured at 64 rows). Additive, page group G4 (admin).
+ *   v1.10.0 — 2026-09-27 — A head entry's `onSort` + `sorted`: the column's name is the button that
+ *     sorts the list, coral while sorted (main's admin Applications heads); a Doors menu keeps its
+ *     `{ divider: true }` lines (the Applications row menu); Row `rail="notice"`: the heavy coral line
+ *     at the row's start, a thing past its limit (main's admin Work row past its deadline).
+ *     Additive, page group G5 (admin).
+ *   v1.9.0 — 2026-09-27 — List `labels`: when the rows stack on a phone, each cell after the first
+ *     says its column's name (the head's words) before its value, as the operator pages' tables did
+ *     (main's data-l / data-label on the admin Packages and MSM rows); Name `marks`: tags in a
+ *     wrapping line under the name's words (main's .adm-pk-parts). Additive, page group G8 (admin).
  *   v1.8.1 — 2026-09-27 — The Name's way in draws .list-name-link (list.css, the values of
  *     .og-tbl-name) instead of the space table's .og-tbl-name (Jouni: components draw only their own
  *     class names, a move).
@@ -144,7 +164,10 @@ const LINES = new Set([2, 3, 4]);
 function useCell(title, ownId) {
   const row = useContext(RowContext);
   const id = ownId || (row.anchor ? row.anchor.take() : undefined);
-  return { title, id, draggable: row.draggable ? 'true' : undefined };
+  // `labels` (added by page group G8): the column's name goes with the cell, said before its value
+  // when the row stacks on a phone.
+  const label = row.labels ? row.labels.take() : undefined;
+  return { title, id, draggable: row.draggable ? 'true' : undefined, 'data-label': label || undefined };
 }
 
 function anchorOf(id) {
@@ -152,48 +175,75 @@ function anchorOf(id) {
   return { take: () => { const v = left; left = undefined; return v; } };
 }
 
+/* The column names of a List with `labels`, handed to its cells in the order they draw (G8). */
+const ListContext = createContext(null);
+
+function labelsOf(names) {
+  let i = 0;
+  return { take: () => names[i++] };
+}
+
+function headWord(entry) {
+  const isEntry = entry && typeof entry === 'object' && !('type' in entry) && ('label' in entry);
+  const label = isEntry ? entry.label : entry;
+  return typeof label === 'string' || typeof label === 'number' ? String(label) : '';
+}
+
 /* ── The list ─────────────────────────────────────────────────────────────────────────────────── */
 
 function headCell(entry, i) {
   const isEntry = entry && typeof entry === 'object' && !('type' in entry) && ('label' in entry);
   const label = isEntry ? entry.label : entry;
-  return html`<div key=${i} class=${cx('poster-label', isEntry && entry.num && 'listing-n')} title=${isEntry ? entry.title : undefined}>${label ?? ''}</div>`;
+  // onSort + sorted (added by page group G5, admin): the column's name is the button that sorts the
+  // list by it, coral while the list is sorted so (main's admin Applications table heads).
+  const words = isEntry && typeof entry.onSort === 'function'
+    ? html`<button type="button" class=${cx('list-sort', entry.sorted && 'is-sorted')} aria-pressed=${entry.sorted ? 'true' : 'false'} onClick=${entry.onSort}>${label ?? ''}</button>`
+    : label ?? '';
+  return html`<div key=${i} class=${cx('poster-label', isEntry && entry.num && 'listing-n')} title=${isEntry ? entry.title : undefined}>${words}</div>`;
 }
 
-export function List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, id, rows, render, children }) {
+export function List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, labels, stackWide, id, rows, render, children }) {
   if (loading) return html`<div class="list-empty"><${Note} kind="loading">${typeof loading === 'string' ? loading : null}<//></div>`;
   const items = rows ? rows.map((r, i) => (render ? render(r, i) : r)) : children;
   const none = rows ? rows.length === 0 : (Array.isArray(children) ? children.flat(Infinity).filter(Boolean).length === 0 : !children);
   if (none && empty !== undefined && empty !== null) return html`<div class="list-empty">${typeof empty === 'string' ? html`<${Note} kind="quiet">${empty}<//>` : empty}</div>`;
   const cls = cx('listing', cols && `listing--${cols}`, keepCols && 'listing--cols', dense && 'list--dense',
     under && 'list--under', small && 'list--small', scroll && 'list--scroll', scroll === 'medium' && 'list--scroll-medium',
-    apart && 'list--apart');
+    apart && 'list--apart', labels && head && 'list--labels', stackWide && !keepCols && 'list--stack-wide');
+  // stackWide (added by page group G4, admin): a list of many columns stacks under 1180px (list.css).
   // scroll="medium" (added by the fix pass): capped at 300px rather than 17rem (main's
   // .pf-agd-event-log-scroll, an agent's usage lists).
-  return html`<div class=${cls} id=${id}>
+  // labels (added by page group G8): when the rows stack on a phone, each cell after the first says
+  // its column's name (the head's words) before its value, as the operator pages' tables did. Every
+  // List provides the names (or none), so a list inside a row's panel never takes its outer list's.
+  return html`<${ListContext.Provider} value=${labels && head ? head.map(headWord) : null}><div class=${cls} id=${id}>
     ${head ? html`<div class="listing-row listing-row--head">${head.map(headCell)}</div>` : null}
     ${items}
-  </div>`;
+  </div><//>`;
 }
 
 /* ── One row ──────────────────────────────────────────────────────────────────────────────────── */
 
 export function Row({ open, onToggle, selected, faded, fine, rail, colour, picked, onPick, pickLabel, draggable, dragOver,
-  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, grip, dragging, pickOff, hover, below, panel, panelDoors, id, children }) {
+  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, grip, dragging, pickOff, hover, quietDoors, below, panel, panelDoors, id, children }) {
   const toggles = typeof onToggle === 'function';
+  // quietDoors (added by page group G4, admin): the doors show on the row under the pointer, the row
+  // the keyboard is in, and the opened or selected row only (list.css .list-row--quiet-doors).
   const pick = typeof onPick === 'function';
   const hue = COLOURS.has(colour) ? colour : null;
   // hover (added by the fix pass): the name turns coral while the pointer is on the row, as main's
   // .pf .mem-item:hover drew the Access rows (connections, MCP servers) that open nothing.
   const cls = cx('listing-row', open && 'is-open', toggles && 'list-row--toggle', hover && !toggles && 'list-row--hover', selected && 'is-selected',
-    faded && 'is-faded', fine && 'is-fine', rail === 'warn' && 'list-row--warn', hue && `list-row--colour list-colour--${hue}`,
+    faded && 'is-faded', fine && 'is-fine', rail === 'warn' && 'list-row--warn', rail === 'notice' && 'list-row--notice', hue && `list-row--colour list-colour--${hue}`,
     pick && !toggles && 'list-row--pick', draggable && 'list-row--drag', dragOver && 'is-drag-over',
-    draggable && grip && 'list-row--grip', dragging && 'is-dragging', pick && pickOff && 'list-row--pick-off');
+    draggable && grip && 'list-row--grip', dragging && 'is-dragging', pick && pickOff && 'list-row--pick-off',
+    quietDoors && 'list-row--quiet-doors');
   // A row that opens AND is picked (G3, memory's key list): its pick box and what stands below it
   // are their own controls, so a press on them does not open the row.
   const onClick = toggles ? (e) => { if (e.target.closest?.('.listing-open, .list-below, .list-pick')) return; onToggle(e); } : undefined;
   const anchor = id ? anchorOf(id) : null;
-  const ctx = { toggles, open: !!open, draggable: !!draggable, anchor, grip: draggable ? grip : null };
+  const names = useContext(ListContext);
+  const ctx = { toggles, open: !!open, draggable: !!draggable, anchor, grip: draggable ? grip : null, labels: names ? labelsOf(names) : null };
   const drag = draggable ? { onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd } : {};
   const Tag = pick && !toggles ? 'label' : 'div';
   return html`<${RowContext.Provider} value=${ctx}>
@@ -214,15 +264,25 @@ function tagsOf(tag) {
     .map((x, i) => (typeof x === 'string' || typeof x === 'number' ? html`<${Mark} key=${i}>${x}<//>` : x));
 }
 
+/** `marks` of a Name (added by page group G8): tags in a wrapping line under its words (the parts a
+ *  package carries, on the operator's Packages page). */
+function nameMarks(marks) {
+  const tags = tagsOf(marks);
+  return tags && tags.length ? html`<span class="list-marks">${tags}</span>` : null;
+}
+
 export function Name({ onOpen, href, newTab, openLabel, meta, warn, clip, desc, note, noteTone, tag, after, dot, dotTitle,
-  asKey, code, unread, attention, end, before, blurred, title, id, nameRef, children }) {
+  asKey, code, unread, attention, end, before, blurred, marks, title, id, nameRef, onFollow, children }) {
   const row = useContext(RowContext);
   const cell = useCell(title, id);
+  // onFollow (added by admin page group G9): with `href`, the link's own click before the browser
+  // follows it; the page may open the thing in place and call preventDefault, while the address
+  // stays for a new tab (the fleet's agent names inside Settings & Controls).
   const text = code ? html`<code class="code-inline">${children}</code>` : children;
   const words = blurred ? html`<span class="list-blur">${text}</span>` : text;
   const nameCls = cx('list-name-link', asKey && 'key-name');
   let name;
-  if (href) name = html`<a class=${nameCls} href=${href} target=${newTab ? '_blank' : undefined} rel=${newTab ? 'noopener' : undefined} aria-label=${openLabel}>${words}</a>`;
+  if (href) name = html`<a class=${nameCls} href=${href} target=${newTab ? '_blank' : undefined} rel=${newTab ? 'noopener' : undefined} aria-label=${openLabel} onClick=${onFollow}>${words}</a>`;
   else if (onOpen) name = html`<button type="button" class=${nameCls} aria-label=${openLabel} onClick=${onOpen}>${words}</button>`;
   else if (row.toggles) name = html`<button type="button" class=${nameCls} aria-expanded=${row.open ? 'true' : 'false'}>${words}</button>`;
   else name = asKey ? html`<span class="key-name">${words}</span>` : words;
@@ -232,6 +292,7 @@ export function Name({ onOpen, href, newTab, openLabel, meta, warn, clip, desc, 
     ${meta !== undefined && meta !== null && meta !== '' ? html`<small class=${warn ? 'is-warn' : undefined}>${meta}</small>` : null}
     ${descs.map((d, i) => html`<p class="list-desc" key=${'d' + i}>${d}</p>`)}
     ${note ? html`<span class=${cx('list-note', noteTone === 'fine' && 'list-note--fine')}>${note}</span>` : null}
+    ${nameMarks(marks)}
   </div>`;
 }
 
@@ -281,10 +342,12 @@ export function Cell({ meta, sign, dim, faint, clip, line, code, sub, subQuiet, 
 
 /** The ⋯ menu of a row: the library's CardMenu in the line of the doors. */
 function RowMenu({ items, label }) {
-  const actions = (items || []).filter((it) => it && !it.divider).map((it) => ({
+  // A { divider: true } item stays a divider (added by page group G5, admin: the Applications row
+  // menu's line between its groups); no caller passed one before, so nothing existing changes.
+  const actions = (items || []).filter(Boolean).map((it) => (it.divider ? { divider: true } : {
     label: it.icon ? `${it.icon} ${it.label}` : it.label, run: it.onClick || it.run, danger: it.danger,
   }));
-  if (!actions.length) return null;
+  if (!actions.some((a) => !a.divider)) return null;
   return html`<${CardMenu} inline="end" actions=${actions} label=${label} />`;
 }
 
@@ -393,10 +456,13 @@ export function Filter({ on, count, onClick, attention, end, disabled, title, ch
  * The search line over a list: the field, and `note` (what the search looks in, or how many it
  * shows) or other doors after it. `onEnter` runs on Enter; `onClear` adds the ✕ while there is text.
  */
-export function SearchLine({ value, onInput, onEnter, onClear, placeholder, label, note, text, autofocus, clearLabel, beside, children }) {
+export function SearchLine({ value, onInput, onEnter, onClear, placeholder, label, note, text, autofocus, clearLabel, beside, find, children }) {
   // beside (added by the fix pass): one of several lines side by side in a Row, each growing up to
   // 500px, under each other on a phone (main's memory list: search and filter in one .action-bar).
+  // find (added by admin page group G7): the magnifier before the field, as the operator pages'
+  // searches drew it (main's admin Cortex and Knowledge searches).
   return html`<div class=${cx('search-line', beside && 'search-line--beside')}>
+    ${find ? html`<svg class="search-line-glass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.3-4.3" /></svg>` : null}
     <input class="og-input" type=${text ? 'text' : 'search'} value=${value} placeholder=${placeholder} aria-label=${label || placeholder}
       autofocus=${autofocus} onInput=${onInput} onKeyDown=${onEnter ? (e) => { if (e.key === 'Enter') onEnter(e); } : undefined} />
     ${onClear && value ? html`<button type="button" class="poster-icon poster-icon--small" title=${clearLabel} aria-label=${clearLabel} onClick=${onClear}>✕</button>` : null}

@@ -13,9 +13,11 @@
  *   THE TWO DOORS ARE DRAWN ON ONE ROW AT A TIME. The page used to paint two buttons on every row,
  *   a hundred and twenty-two of them, the destructive one no louder than the other. They belong to
  *   the row under the pointer, the row with keyboard focus, or the row somebody opened by pressing
- *   its name, which is the same gesture on a phone.
+ *   its name, which is the same gesture on a phone (the List's Row quietDoors).
  *
  *   A DOOR IS ABSENT WHERE THE NODE WOULD REFUSE IT: see owners-tab.model.js.
+ *
+ *   Every part is a library component; the page passes data and writes no class.
  *
  * @structure
  *   - OwnersTab({ data, session, reload, switchPage }) — the three sections
@@ -23,6 +25,9 @@
  *   - askGrant / askRevoke / askDisable / askEnable — the question each act asks first
  *
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only (the admin pages on the shared set): Section,
+ *     Verdict, FigureStrip, the List with its quiet doors, the filter Tabs, TextField, More,
+ *     SettingBox; the question's rows are Facts in a Box. The page sheet admin-owners.css goes.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
@@ -37,22 +42,35 @@
  *     model); cell content preserved verbatim.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Row, Badge, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { Section } from '/components/Section.js';
+import { Verdict } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure } from '/components/Figure.js';
+import { List, Row as Item, Name, Num, When, Cell, Doors, More } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Box, SettingBox } from '/components/Box.js';
+import { CardGrid } from '/components/Card.js';
+import { Facts } from '/components/Facts.js';
+import { TextField } from '/components/TextField.js';
+import { Tabs } from '/components/Tabs.js';
+import { Row as Line, Stack } from '/components/Layout.js';
 import { grantRole, revokeRole, disableOwner, enableOwner } from '/js/services/admin.js';
 import { decorate, summarise, counts, search, FILTERS, PAGE } from './owners-tab.model.js';
 
 const R = (key, params) => t('dashboard.roster.' + key, params);
 
-/** The question this page asks wears the poster face; admin-owners.css dresses this class. */
-const DLG = 'adm-own-dlg';
+/** The anchor of section 03, which section 01's door scrolls to. */
+const ACTS_ID = 'adm-own-acts';
 
 /** The five chips, keyed by the filter ids FILTERS orders and counts() counts. */
 const FILTER_LABEL = { all: 'fAll', operators: 'fOperators', agents: 'fAgents', quiet: 'fQuiet', off: 'fOff' };
@@ -69,34 +87,30 @@ function agentWords(count) {
 /** One row: the numeral, the name with its chips, the agent count, the day, the doors. */
 function OwnerRow({ row, index, open, onOpen, onGrant, onRevoke, onDisable, onEnable }) {
   const doors = [];
-  if (row.canGrant) doors.push(html`<button type="button" class="adm-own-act" onClick=${() => onGrant(row)}>${R('grantLabel')}</button>`);
-  if (row.canRevoke) doors.push(html`<button type="button" class="adm-own-act" onClick=${() => onRevoke(row)}>${R('askRevokeBtn')}</button>`);
-  if (row.canDisable) doors.push(html`<button type="button" class="adm-own-act adm-own-act--hot" onClick=${() => onDisable(row)}>${R('offLabel')}</button>`);
-  if (row.canEnable) doors.push(html`<button type="button" class="adm-own-act" onClick=${() => onEnable(row)}>${R('askOnBtn')}</button>`);
+  if (row.canGrant) doors.push(html`<${Action} small key="grant" onClick=${() => onGrant(row)}>${R('grantLabel')}<//>`);
+  if (row.canRevoke) doors.push(html`<${Action} small key="revoke" onClick=${() => onRevoke(row)}>${R('askRevokeBtn')}<//>`);
+  if (row.canDisable) doors.push(html`<${Action} small key="off" tone="danger" onClick=${() => onDisable(row)}>${R('offLabel')}<//>`);
+  if (row.canEnable) doors.push(html`<${Action} small key="on" onClick=${() => onEnable(row)}>${R('askOnBtn')}<//>`);
+
+  const marks = html`
+    ${row.you && html`<${Mark} tone="sun">${R('you').toLowerCase()}<//>`}
+    ${row.operator && html`<${Mark} tone="coral">${R('operator').toLowerCase()}<//>`}
+    ${row.disabledAt && html`<${Mark} tone="coral" title=${dt(row.disabledAt)}>${R('offChip', { date: day(row.disabledAt) })}<//>`}
+    ${row.managedBy && html`<${Mark} title=${t('dashboard.ownerManagedHint')}>${row.managedBy}<//>`}`;
 
   return html`
-    <div class="adm-own-tr ${open ? 'is-open' : ''} ${row.disabledAt ? 'is-off' : ''}">
-      <div class="adm-own-n poster-stat-number poster-stat-number--small">${String(index).padStart(2, '0')}</div>
-      <div class="adm-own-nm">
-        <button type="button" class="adm-own-name" onClick=${onOpen}>${row.name}</button>
-        ${row.display && html`<span class="adm-own-sub">${row.display}</span>`}
-        <span class="adm-own-marks">
-          ${row.you && html`<span class="adm-own-chip adm-own-chip--you">${R('you').toLowerCase()}</span>`}
-          ${row.operator && html`<span class="adm-own-chip adm-own-chip--op">${R('operator').toLowerCase()}</span>`}
-          ${row.disabledAt && html`<span class="adm-own-chip adm-own-chip--op" title=${dt(row.disabledAt)}>${R('offChip', { date: day(row.disabledAt) })}</span>`}
-          ${row.managedBy && html`<span class="adm-own-chip" title=${t('dashboard.ownerManagedHint')}>${row.managedBy}</span>`}
-        </span>
-      </div>
-      <div class="adm-own-ag ${row.agents ? '' : 'is-zero'}">${row.agents}</div>
-      <div class="adm-own-day" title=${dt(row.createdAt)}>${day(row.createdAt)}</div>
+    <${Item} quietDoors hover selected=${open} faded=${!!row.disabledAt}>
+      <${Num}><${Figure} small n=${String(index).padStart(2, '0')} /><//>
+      <${Name} onOpen=${onOpen} meta=${row.display} end=${marks}>${row.name}<//>
+      <${Num} dim=${!row.agents}>${row.agents}<//>
+      <${When} title=${dt(row.createdAt)}>${day(row.createdAt)}<//>
       ${doors.length
-    ? html`<div class="adm-own-acts">${doors}</div>`
-    : html`<div class="adm-own-held">${row.you ? R('yours') : ''}</div>`}
-    </div>`;
+    ? html`<${Doors}>${doors}<//>`
+    : html`<${Cell} meta>${row.you ? R('yours') : ''}<//>`}
+    <//>`;
 }
 
 export default function OwnersTab({ data, session, reload, switchPage }) {
-  useViewCSS('/css/views/admin-owners.css');
   const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const [filter, setFilter] = useState('all');
@@ -127,159 +141,124 @@ export default function OwnersTab({ data, session, reload, switchPage }) {
   }
 
   function askGrant(row) {
-    const body = html`<span class="adm-own-ask">
-      <span>${R('askGrantBody', { name: row.name })}</span>
-      <span class="adm-own-ask-note">${figures.operators === 1
+    const body = html`<${Stack}>
+      ${R('askGrantBody', { name: row.name })}
+      <${Note} kind="hint">${figures.operators === 1
     ? R('askGrantCountOne')
-    : R('askGrantCount', { count: figures.operators, next: figures.operators + 1 })}</span>
-    </span>`;
+    : R('askGrantCount', { count: figures.operators, next: figures.operators + 1 })}<//>
+    <//>`;
     confirm(body, () => act(() => grantRole(row.name, 'operator')),
-      { title: R('askGrantTitle'), confirmLabel: R('grantLabel'), className: DLG });
+      { title: R('askGrantTitle'), confirmLabel: R('grantLabel') });
   }
 
   function askRevoke(row) {
-    const body = html`<span class="adm-own-ask"><span>${R('askRevokeBody', { name: row.name })}</span></span>`;
-    confirm(body, () => act(() => revokeRole(row.name, 'operator')),
-      { title: R('askRevokeTitle'), confirmLabel: R('askRevokeBtn'), className: DLG });
+    confirm(R('askRevokeBody', { name: row.name }), () => act(() => revokeRole(row.name, 'operator')),
+      { title: R('askRevokeTitle'), confirmLabel: R('askRevokeBtn') });
   }
 
   function askDisable(row) {
     const lead = row.agents === 0
       ? R('askOffBodyNone')
       : row.agents === 1 ? R('askOffBodyOne') : R('askOffBody', { agents: agentWords(row.agents) });
-    const body = html`<span class="adm-own-ask">
-      <span class="adm-own-ask-who">${row.name}</span>
-      <span>${lead}</span>
-      <span class="adm-own-ask-rows">
-        <span class="adm-own-ask-row">${R('askOffRowAgents')}<em>${R('askOffRowAgentsVal', { count: row.agents })}</em></span>
-        <span class="adm-own-ask-row">${R('askOffRowTokens')}<em>${R('askOffRowTokensVal')}</em></span>
-        <span class="adm-own-ask-row">${R('askOffRowKeeps')}<em>${R('askOffRowKeepsVal')}</em></span>
-      </span>
-      <span class="adm-own-ask-note">${R('askOffNote')}</span>
-    </span>`;
+    const body = html`<${Stack}>
+      <${Mark} tone="coral">${row.name}<//>
+      ${lead}
+      <${Box}><${Facts} flush rows=${[
+    { k: R('askOffRowAgents'), v: R('askOffRowAgentsVal', { count: row.agents }) },
+    { k: R('askOffRowTokens'), v: R('askOffRowTokensVal') },
+    { k: R('askOffRowKeeps'), v: R('askOffRowKeepsVal') },
+  ]} /><//>
+      <${Note} kind="hint">${R('askOffNote')}<//>
+    <//>`;
     confirm(body, () => act(() => disableOwner(row.name)),
-      { title: R('askOffTitle'), confirmLabel: R('offLabel'), danger: true, className: DLG });
+      { title: R('askOffTitle'), confirmLabel: R('offLabel'), danger: true });
   }
 
   function askEnable(row) {
-    const body = html`<span class="adm-own-ask"><span>${R('askOnBody', { name: row.name })}</span></span>`;
-    confirm(body, () => act(() => enableOwner(row.name)),
-      { title: R('askOnTitle'), confirmLabel: R('askOnBtn'), className: DLG });
+    confirm(R('askOnBody', { name: row.name }), () => act(() => enableOwner(row.name)),
+      { title: R('askOnTitle'), confirmLabel: R('askOnBtn') });
   }
 
-  const chip = (id, label) => html`
-    <button type="button" class="adm-own-fchip ${filter === id ? 'on' : ''}"
-      onClick=${() => { setFilter(id); setAll(false); }}>${label}</button>`;
-
-  return html`
-    <div class="og adm-own">
-      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${R('who')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => {
-    document.querySelector('.adm-own-acts-sec')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }}>${R('whoDoor')}</button>
-          </div>
-        </div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status">${figures.operators === 1 ? R('operatorWord') : R('operatorsWord', { count: figures.operators })}</div>
-            <p class="adm-alert-line">${R('lead')}</p>
-            <div class="adm-ov-up">${figures.total - figures.operators > 0
-    ? R('leadRest', { total: num(figures.total), rest: num(figures.total - figures.operators) })
-    : R('leadAlone', { total: num(figures.total) })}</div>
-          </div>
-          <div>
-            ${figures.operatorRows.map((r, i) => html`
-              <${Row}
-                title=${r.name}
-                why=${r.you
+  const operatorWhy = (r) => (r.you
     ? R('youWhy')
     : r.agents === 1
       ? R('rowWhyOne', { date: day(r.createdAt) })
       : r.agents === 0
         ? R('rowWhyNone', { date: day(r.createdAt) })
-        : R('rowWhy', { date: day(r.createdAt), agents: agentWords(r.agents) })}
-                chip=${html`<${Badge} type=${r.you ? 'warning' : 'healthy'} label=${r.you ? R('you') : R('operator')} />`}
-                value=${r.you ? day(r.createdAt) : agentWords(r.agents)}
-                last=${i === figures.operatorRows.length - 1} />`)}
-          </div>
-        </div>
-      </section>
+        : R('rowWhy', { date: day(r.createdAt), agents: agentWords(r.agents) }));
 
-      <div class="og-strip">
-        <div><b>${num(figures.total)}</b><span>${R('stripOwners')}</span><small>${R('stripOwnersSub', { count: num(figures.joinedWeek) })}</small></div>
-        <div><b>${num(figures.withAgents)}</b><span>${R('stripWith')}</span><small>${R('stripWithSub', { count: num(figures.quiet) })}</small></div>
-        <button type="button" onClick=${() => switchPage('agents')}>
-          <b>${num(agentTotal)}</b><span>${R('stripAgents')}</span><small>${R('stripAgentsSub', { count: num(activeAgents) })}</small></button>
-        <div><b class=${figures.off ? 'og-coral-num' : ''}>${num(figures.off)}</b><span>${R('stripOff')}</span><small>${R('stripOffSub')}</small></div>
-      </div>
+  return html`
+    <${Fragment}>
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${R('every')}<small>02</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setNewestFirst(v => !v)}>
-              ${newestFirst ? R('orderOldest') : R('orderNewest')}</button>
-          </div>
-        </div>
+      <${Section} first num="01" title=${R('who')}
+        doors=${html`<${Action} small soft onClick=${() => {
+    document.getElementById(ACTS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }}>${R('whoDoor')}<//>`}>
+        <${Verdict}
+          word=${figures.operators === 1 ? R('operatorWord') : R('operatorsWord', { count: figures.operators })}
+          line=${R('lead')}
+          stamp=${figures.total - figures.operators > 0
+    ? R('leadRest', { total: num(figures.total), rest: num(figures.total - figures.operators) })
+    : R('leadAlone', { total: num(figures.total) })}>
+          ${figures.operatorRows.map((r, i) => html`
+            <${Row} key=${r.name}
+              title=${r.name}
+              why=${operatorWhy(r)}
+              chip=${html`<${Badge} type=${r.you ? 'warning' : 'healthy'} label=${r.you ? R('you') : R('operator')} />`}
+              value=${r.you ? day(r.createdAt) : agentWords(r.agents)}
+              last=${i === figures.operatorRows.length - 1} />`)}
+        <//>
+      <//>
 
-        <div class="adm-own-find">
-          <div class="adm-own-fld">
-            <div class="adm-own-lbl">${R('find')}</div>
-            <input type="search" class="adm-own-input" value=${query} placeholder=${R('findPlaceholder')}
-              onInput=${e => { setQuery(e.target.value); setAll(false); }} />
-          </div>
-          <div class="adm-own-chips">
-            ${FILTERS.map(id => chip(id, R(FILTER_LABEL[id], { count: num(chips[id]) })))}
-          </div>
-        </div>
+      <${FigureStrip} wrap items=${[
+    { key: 'owners', n: num(figures.total), label: R('stripOwners'), sub: R('stripOwnersSub', { count: num(figures.joinedWeek) }) },
+    { key: 'with', n: num(figures.withAgents), label: R('stripWith'), sub: R('stripWithSub', { count: num(figures.quiet) }) },
+    { key: 'agents', n: num(agentTotal), label: R('stripAgents'), sub: R('stripAgentsSub', { count: num(activeAgents) }), onClick: () => switchPage('agents') },
+    { key: 'off', n: num(figures.off), tone: figures.off ? 'notice' : undefined, label: R('stripOff'), sub: R('stripOffSub') },
+  ]} />
 
-        <div class="adm-own-tr adm-own-tr--head">
-          <div class="adm-own-n poster-stat-number poster-stat-number--small">#</div>
-          <div>${R('colName')}</div>
-          <div class="adm-own-ag">${R('colAgents')}</div>
-          <div>${R('colCreated')}</div>
-          <div></div>
-        </div>
+      <${Section} num="02" title=${R('every')}
+        doors=${html`<${Action} small soft onClick=${() => setNewestFirst(v => !v)}>
+          ${newestFirst ? R('orderOldest') : R('orderNewest')}<//>`}>
+        <${Line} wrap align="end" gap="large" below="medium">
+          <${TextField} search label=${R('find')} value=${query} placeholder=${R('findPlaceholder')}
+            onInput=${(v) => { setQuery(v); setAll(false); }} />
+          <${Tabs} tone="filter" value=${filter} label=${R('find')}
+            onSelect=${(id) => { setFilter(id); setAll(false); }}
+            items=${FILTERS.map(id => ({ value: id, label: R(FILTER_LABEL[id], { count: num(chips[id]) }) }))} />
+        <//>
 
-        ${shown.length === 0
-    ? html`<${Empty} text=${R('none')} />`
-    : shown.map((row, i) => html`
-          <${OwnerRow}
-            row=${row}
-            index=${newestFirst ? found.length - i : i + 1}
-            open=${open === row.name}
-            onOpen=${() => setOpen(open === row.name ? null : row.name)}
-            onGrant=${askGrant} onRevoke=${askRevoke} onDisable=${askDisable} onEnable=${askEnable} />`)}
+        <${List} cols="n-name-n-when-doors" keepCols empty=${R('none')}
+          head=${[{ label: '#', num: true }, R('colName'), { label: R('colAgents'), num: true }, R('colCreated'), '']}>
+          ${shown.map((row, i) => html`
+            <${OwnerRow} key=${row.name}
+              row=${row}
+              index=${newestFirst ? found.length - i : i + 1}
+              open=${open === row.name}
+              onOpen=${() => setOpen(open === row.name ? null : row.name)}
+              onGrant=${askGrant} onRevoke=${askRevoke} onDisable=${askDisable} onEnable=${askEnable} />`)}
+        <//>
 
         ${found.length > PAGE && html`
-          <div class="adm-own-more">
-            <span>${R('shown', { shown: num(shown.length), total: num(found.length) })}</span>
-            ${!all && html`<button type="button" class="og-door" onClick=${() => setAll(true)}>${R('showRest')}</button>`}
-          </div>`}
-      </section>
+          <${More} note=${R('shown', { shown: num(shown.length), total: num(found.length) })}
+            label=${R('showRest')} onMore=${!all ? () => setAll(true) : null} />`}
+      <//>
 
-      <section class="og-sec adm-own-acts-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${R('acts')}<small>03</small></h2></div>
-        <div class="adm-own-two">
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${R('grantLabel')}</span>
+      <${Section} id=${ACTS_ID} num="03" title=${R('acts')}>
+        <${CardGrid} cols="sections">
+          <${SettingBox} label=${R('grantLabel')}>
             <p>${R('grantBody')}</p>
-            <p class="adm-own-rule">${R('grantRule')}</p>
-          </div>
-          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
-            <span class="og-box-label">${R('offLabel')}</span>
+            <p><b>${R('grantRule')}</b></p>
+          <//>
+          <${SettingBox} label=${R('offLabel')} irreversible>
             <p>${R('offBody')}</p>
-            <p class="adm-own-rule">${R('offRule')}</p>
-          </div>
-        </div>
-      </section>
+            <p><b>${R('offRule')}</b></p>
+          <//>
+        <//>
+      <//>
 
       <${ConfirmUI} />
-    </div>
+    <//>
   `;
 }

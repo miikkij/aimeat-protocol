@@ -6,6 +6,9 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.12.0 — 2026-09-27 — The frame and the side menu are components (OperatorFrame, OperatorMenu):
+ *     the menu keeps its look and gains the heading "Operator menu" (Jouni, 2026-09-27); the page
+ *     writes no class.
  *   v1.11.0 — 2026-09-24 — Themes & Styles in the Design group (UI consolidation phase 4).
  *   v1.10.0 — 2026-09-23 — A Design group with aimeat-design-lab (the library view).
  *   v1.8.0 -- 2026-09-13 -- Compose the existing page title with poster-page-title.
@@ -30,9 +33,10 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { time as fmtTime } from '/js/format.js';
-import { escHtml } from '/js/utils.js';
-import { useViewCSS } from '/components/useViewCSS.js';
+import { OperatorFrame } from '/components/OperatorFrame.js';
+import { OperatorMenu } from '/components/OperatorMenu.js';
+import { ErrorNote } from '/components/ErrorNote.js';
+import { Note } from '/components/Note.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
@@ -170,8 +174,6 @@ NAV_GROUPS.forEach(g => g.items.forEach(i => {
 }));
 
 export default function Admin({ navigate, locale }) {
-  useViewCSS('/css/views/admin.css');
-
   const [session, setSession] = useState(null);
   const [activePage, setActivePage] = useState('overview');
   const [data, setData] = useState(null);
@@ -398,27 +400,19 @@ export default function Admin({ navigate, locale }) {
 
   // ── Not logged in ──
   if (!session) {
-    return html`<div class="adm">
-      <div class="adm-login">
-        <div class="adm-card" style="text-align:center">
-          <h2>${t('dashboard.loginTitle')}</h2>
-          <p>${t('dashboard.loginDesc')}</p>
-          <p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loginNeedOperator') || 'You need to sign in with an operator account from the header.'}</p>
-        </div>
-      </div>
-    </div>`;
+    return html`<${OperatorFrame} shut=${{
+      title: t('dashboard.loginTitle'),
+      text: t('dashboard.loginDesc'),
+      note: t('dashboard.loginNeedOperator') || 'You need to sign in with an operator account from the header.',
+    }} />`;
   }
 
   // ── Access denied (server returned 403) ──
   if (accessDenied) {
-    return html`<div class="adm">
-      <div class="adm-login">
-        <div class="adm-card" style="text-align:center">
-          <h2>${t('dashboard.accessDenied') || 'Access Denied'}</h2>
-          <p>${t('dashboard.operatorRequired') || 'You need the operator role to access the admin dashboard.'}</p>
-        </div>
-      </div>
-    </div>`;
+    return html`<${OperatorFrame} shut=${{
+      title: t('dashboard.accessDenied') || 'Access Denied',
+      text: t('dashboard.operatorRequired') || 'You need the operator role to access the admin dashboard.',
+    }} />`;
   }
 
   // Find active component
@@ -429,48 +423,28 @@ export default function Admin({ navigate, locale }) {
 
   const tabProps = { data, reload: loadAll, session, navigate, locale, switchPage };
 
+  // The operator menu: every group with its items, and a count beside the items that carry one.
+  const menuGroups = NAV_GROUPS.map(group => ({
+    key: group.key,
+    title: t(group.key),
+    items: group.items.map(item => ({
+      id: item.id,
+      label: t(item.key),
+      count: item.count != null && counts[item.count] != null ? counts[item.count] : null,
+    })),
+  }));
+
   return html`
-    <div class="adm">
-      <!-- Sidebar -->
-      <nav class="adm-sidebar">
-        <div class="node-id">${data?.dash?.node_id || ''}</div>
-
-        ${NAV_GROUPS.map(group => html`
-          <div class="adm-nav-group">${t(group.key)}</div>
-          ${group.items.map(item => html`
-            <button
-              class="adm-nav-item ${activePage === item.id ? 'active' : ''}"
-              onClick=${() => switchPage(item.id)}
-            >
-              <span class="label">${t(item.key)}</span>
-              ${item.count != null && counts[item.count] != null
-                ? html`<span class="cnt">${counts[item.count]}</span>`
-                : null}
-            </button>
-          `)}
-        `)}
-      </nav>
-
-      <!-- Main content -->
-      <div class="adm-main">
-        <div class="adm-topbar">
-          <div class="adm-page-title poster-page-title">
-            ${t(pageInfo.key)}
-          </div>
-          <div class="adm-topbar-right">
-            <button class="adm-refresh" onClick=${loadAll} disabled=${loading}>
-              ${loading ? t('dashboard.loading') : t('dashboard.refresh')}
-            </button>
-            ${lastUpdate && html`<span class="adm-time">${fmtTime(lastUpdate)}</span>`}
-          </div>
-        </div>
-
-        ${error && html`<div class="error-box"><strong>${t('dashboard.failedToLoad')}</strong><br/>${escHtml(error)}</div>`}
-
-        ${!data && !error && html`<div class="empty"><div class="spinner"></div> ${t('dashboard.loading')}</div>`}
-
-        ${data && html`<${ActiveComponent} ...${tabProps} />`}
-      </div>
-    </div>
+    <${OperatorFrame}
+      menu=${html`<${OperatorMenu} title=${t('dashboard.operatorMenu')} nodeId=${data?.dash?.node_id || ''}
+        groups=${menuGroups} active=${activePage} onPick=${switchPage} />`}
+      title=${t(pageInfo.key)}
+      onRefresh=${loadAll} refreshing=${loading}
+      refreshLabel=${t('dashboard.refresh')} busyLabel=${t('dashboard.loading')}
+      time=${lastUpdate}>
+      ${error && html`<${ErrorNote} text=${t('dashboard.failedToLoad')} hint=${error} />`}
+      ${!data && !error && html`<${Note} kind="loading">${t('dashboard.loading')}<//>`}
+      ${data && html`<${ActiveComponent} ...${tabProps} />`}
+    <//>
   `;
 }

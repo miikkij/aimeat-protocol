@@ -2,7 +2,9 @@
  * @file msm-tab.write.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The screen for writing a new machine service manifest.
+ * @description The screen for writing a new machine service manifest, and the ready-made ones as a
+ *   list (TemplateList), which the page's own section 04 shows too.
+ *   Drawn only from library components: the page passes data and writes no class.
  *
  *   THE TEN READY-MADE ONES COME FIRST. They ship with the software, every one of them complete
  *   (auth, actions, what each takes and gives back, a health block), and not one has ever been used
@@ -13,86 +15,95 @@
  *   AND THE SCREEN SAYS WHAT SAVING DOES. The shape is checked and the service is not: nothing
  *   calls the address, nothing looks for the key, nothing runs the health block. A manifest for a
  *   service switched off last year saves exactly as cleanly as one for a service that works.
- * @structure MsmWrite (default export)
+ * @structure MsmWrite (default export) · TemplateList
  * @usage <${MsmWrite} templates=${...} yaml=${...} onSave=${...} ... />
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only: the head PageHead, the sections Section, the
+ *     ready-made ones two Lists in Columns (TemplateList, shared with the page's section 04), the
+ *     YAML a code TextArea, the federate choice a Check, the three steps a List with the step
+ *     figure (Figure), the doors Loud and Action.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 — 2026-09-13 — Compose shared B1 headings; keep existing layout in the view sheet.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { num, ErrorBox } from './shared.js';
+import { Section } from '/components/Section.js';
+import { PageHead } from '/components/PageHead.js';
+import { Note } from '/components/Note.js';
+import { List, Row, Name, Cell, Doors } from '/components/List.js';
+import { Figure } from '/components/Figure.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { TextArea } from '/components/TextField.js';
+import { Check } from '/components/Check.js';
+import { Columns, Space } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const M = (key, params) => t('admin.msm.' + key, params);
 
+/** The ready-made manifests in two columns, each with its way to start from it. */
+export function TemplateList({ list, busy, onPick }) {
+    const half = Math.ceil(list.length / 2);
+    const column = (part) => html`
+      <${List} cols="name-doors">
+        ${part.map((ft) => html`
+          <${Row} key=${ft.type}>
+            <${Name} desc=${ft.description}>${ft.name}<//>
+            <${Doors}><${Action} small soft disabled=${busy} onClick=${() => onPick(ft.type)}>${M('write.start')}<//><//>
+          <//>`)}
+      <//>`;
+    return html`<${Columns}>${column(list.slice(0, half))}${column(list.slice(half))}<//>`;
+}
+
 export default function MsmWrite({ templates, picked, yaml, federate, busy, err, onPick, onYaml, onFederate, onSave, onCancel }) {
     const list = Array.isArray(templates) ? templates : [];
-    const half = Math.ceil(list.length / 2);
-    const columns = [list.slice(0, half), list.slice(half)];
 
-    const tpl = (ft, last) => html`
-      <div class=${'adm-msm-tpl' + (last ? ' adm-msm-tpl--last' : '')} key=${ft.type}>
-        <span><b>${ft.name}</b><span class="adm-why">${ft.description}</span></span>
-        <span><button type="button" class="og-door og-door--quiet" disabled=${busy}
-          onClick=${() => onPick(ft.type)}>${M('write.start')}</button></span>
-      </div>`;
-
-    const step = (i, key, last) => html`
-      <div class=${'adm-msm-step' + (last ? ' adm-msm-step--last' : '')}>
-        <span class="adm-msm-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${String(i).padStart(2, '0')}</span>
-        <span><b>${M('write.' + key)}</b><span class="adm-why">${M('write.' + key + 'Why')}</span></span>
-      </div>`;
+    const step = (i, key) => html`
+      <${Row} key=${key}>
+        <${Cell}><${Figure} small step n=${String(i).padStart(2, '0')} /><//>
+        <${Name} desc=${M('write.' + key + 'Why')}>${M('write.' + key)}<//>
+        <${Doors} />
+      <//>`;
 
     return html`
-    <div class="adm-msm">
-      <button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${M('detail.back')}</button>
+    <${Fragment}>
+      <${Actions}><${Action} small soft onClick=${onCancel}>${M('detail.back')}<//><//>
 
-      <div class="adm-msm-head">
-        <h2>${M('write.title')}</h2>
-      </div>
-      <p class="adm-msm-intro adm-msm-write-intro">${M('write.lead')}</p>
+      <${PageHead} title=${M('write.title')} desc=${M('write.lead')} />
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('write.startFrom')}<small>01</small></h2>
-          <div class="og-doors"><span class="adm-msm-note">${M('write.templateCount', { n: num(list.length) })}</span></div></div>
+      <${Section} num="01" title=${M('write.startFrom')}
+        doors=${html`<${Note} kind="meta" inline>${M('write.templateCount', { n: num(list.length) })}<//>`}>
         ${list.length === 0
-          ? html`<p class="adm-msm-note">${M('write.noTemplates')}</p>`
+          ? html`<${Note} kind="quiet">${M('write.noTemplates')}<//>`
           : html`
-            <p class="adm-msm-lead">${M('write.startFromWhy')}</p>
-            <div class="adm-msm-tpls">
-              ${columns.map(col => html`<div>${col.map((ft, i) => tpl(ft, i === col.length - 1))}</div>`)}
-            </div>`}
-      </section>
+            <${Note} kind="lead">${M('write.startFromWhy')}<//>
+            <${TemplateList} list=${list} busy=${busy} onPick=${onPick} />`}
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('write.theManifest')}<small>02</small></h2>
-          ${picked && html`<div class="og-doors"><span class="adm-msm-note">${M('write.from', { name: picked })}</span></div>`}</div>
-        <label class="adm-msm-field adm-msm-yaml-field">
-          <span>${M('write.yamlLabel')}</span>
-          <textarea class="adm-msm-yaml" rows="20" placeholder=${M('write.yamlPlaceholder')}
-            value=${yaml} onInput=${ev => onYaml(ev.target.value)}></textarea>
-        </label>
-        <label class="adm-msm-pick">
-          <input type="checkbox" checked=${federate} onChange=${ev => onFederate(ev.target.checked)} />
-          <span>${M('write.federate')}</span>
-        </label>
-        ${err && html`<div class="adm-msm-write-error"><${ErrorBox} message=${err} /></div>`}
-      </section>
+      <${Section} num="02" title=${M('write.theManifest')}
+        doors=${picked ? html`<${Note} kind="meta" inline>${M('write.from', { name: picked })}<//>` : null}>
+        <${TextArea} code rows=${20} label=${M('write.yamlLabel')} placeholder=${M('write.yamlPlaceholder')}
+          value=${yaml} onInput=${onYaml} />
+        <${Check} checked=${federate} onChange=${onFederate}>${M('write.federate')}<//>
+        ${err && html`<${Space} above="medium"><${ErrorBox} message=${err} /><//>`}
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('write.whenYouSave')}<small>03</small></h2></div>
-        ${step(1, 'shapeChecked')}
-        ${step(2, 'serviceNot')}
-        ${step(3, 'goesPublic', true)}
-        <div class="adm-msm-dialog-acts adm-msm-save-actions">
-          <button type="button" class="og-slab" disabled=${busy || !yaml.trim()} onClick=${onSave}>
-            ${busy ? M('write.saving') : M('write.save')}
-          </button>
-          <button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${t('common.cancel')}</button>
-        </div>
-      </section>
-    </div>`;
+      <${Section} num="03" title=${M('write.whenYouSave')}>
+        <${List} cols="n-name-doors" keepCols>
+          ${step(1, 'shapeChecked')}
+          ${step(2, 'serviceNot')}
+          ${step(3, 'goesPublic')}
+        <//>
+        <${Space} above="large">
+          <${Actions}>
+            <${Loud} control disabled=${busy || !yaml.trim()} onClick=${onSave}>
+              ${busy ? M('write.saving') : M('write.save')}
+            <//>
+            <${Action} small soft onClick=${onCancel}>${t('common.cancel')}<//>
+          <//>
+        <//>
+      <//>
+    <//>`;
 }

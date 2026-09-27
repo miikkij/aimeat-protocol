@@ -11,6 +11,9 @@
  * @structure DecideKeyTest — a button and its result line
  * @usage html`<${DecideKeyTest} />` (config-tab.js SECTION_ACTIONS.decide)
  * @version-history
+ *   v1.1.0 — 2026-09-27 — Library components only: the button is an Action, its note a meta Note,
+ *     the answer a message Note (a refusal in the refusal colour, said as a status as before). The
+ *     file writes no class.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { h } from 'preact';
@@ -19,6 +22,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Row, Stack } from '/components/Layout.js';
 
 export function DecideKeyTest() {
   const [busy, setBusy] = useState(false);
@@ -41,13 +47,15 @@ export function DecideKeyTest() {
   };
 
   return html`
-    <div class="adm-cfg-action">
-      <button type="button" class="adm-btn-action" onClick=${run} disabled=${busy}>
-        ${busy ? t('dashboard.decideKeyTesting') : t('dashboard.decideKeyTest')}
-      </button>
-      <small>${t('dashboard.decideKeyTestNote')}</small>
-      ${result && html`<p class=${result.ok ? 'adm-config-result-ok' : 'adm-config-result-err'} role="status">${result.text}</p>`}
-    </div>`;
+    <${Stack} gap="small" above="medium">
+      <${Row} wrap gap="medium">
+        <${Action} small onClick=${run} disabled=${busy}>
+          ${busy ? t('dashboard.decideKeyTesting') : t('dashboard.decideKeyTest')}
+        <//>
+        <${Note} kind="meta" inline>${t('dashboard.decideKeyTestNote')}<//>
+      <//>
+      ${result && html`<${Note} kind="message" error=${!result.ok} role="status">${result.text}<//>`}
+    <//>`;
 }
 
 export default DecideKeyTest;

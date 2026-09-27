@@ -9,6 +9,9 @@
  *   the lines already fetched, and "Show the next 200" asks the refusals door for a longer tail.
  * @structure credentialWord · whenText · matches · RefusalsSection
  * @version-history
+ *   v2.0.0 -- 2026-09-27 -- Library components only: the groupings are CountBars, the window and the
+ *     answer filters Tabs in the filter tone, the search the SearchLine, the log a List with its own
+ *     cut, the foot More. The page writes no class.
  *   v1.1.0 -- 2026-09-13 -- Compose the shared B1 heading; encode bar lengths as SVG data.
  *   v1.0.0 — 2026-09-05 — Initial (the Security page in the poster face).
  */
@@ -20,6 +23,14 @@ import { time as fmtTime, dateTime as fmtDateTime } from '/js/format.js';
 import { num } from './shared.js';
 import { downloadBlob } from '/js/utils.js';
 import { getAuthRefusals } from '/js/services/admin.js';
+import { Section } from '/components/Section.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Mark, Code } from '/components/Mark.js';
+import { Tabs } from '/components/Tabs.js';
+import { Row as Line } from '/components/Layout.js';
+import { List, Row, When, Cell, Desc, SearchLine, More } from '/components/List.js';
+import { CountBars, CountBarsSet } from '/components/CountBars.js';
 
 const html = htm.bind(h);
 const S = (key, params) => t('admin.security.refusals.' + key, params);
@@ -27,8 +38,6 @@ const S = (key, params) => t('admin.security.refusals.' + key, params);
 const WINDOW_MS = 24 * 3600 * 1000;
 const PAGE = 200;
 const MAX_LINES = 1000;
-/** The longest bar in a grouping, in px; the others scale to it. */
-const BAR_MAX_PX = 90;
 
 /** The credential kind the log wrote, in words. Kinds nobody named show as themselves. */
 export function credentialWord(kind) {
@@ -62,19 +71,6 @@ function matches(r, { window, status, q }, now) {
   return true;
 }
 
-function Grouping({ label, rows, keyOf, hotKeys, words }) {
-  const max = rows.reduce((m, r) => Math.max(m, r.count), 0) || 1;
-  return html`<div>
-    <div class="adm-sec-lbl">${label}</div>
-    ${rows.map((r, i) => html`
-      <div class="adm-sec-krow ${i === rows.length - 1 ? 'adm-sec-krow--last' : ''}" key=${r.key}>
-        <span class="adm-sec-key ${words ? 'adm-sec-key--words' : ''}">${keyOf ? keyOf(r) : r.key}</span>
-        ${words ? null : html`<svg class="adm-sec-bar ${hotKeys && hotKeys.includes(r.key) ? 'adm-sec-bar--hot' : ''}" width=${Math.max(4, Math.round(r.count / max * BAR_MAX_PX))} aria-hidden="true"></svg>`}
-        <span class="adm-sec-n">${num(r.count)}</span>
-      </div>`)}
-  </div>`;
-}
-
 export function RefusalsSection({ ov, switchPage, onError }) {
   const r = ov.refusals;
   const log = ov.now.log;
@@ -103,74 +99,57 @@ export function RefusalsSection({ ov, switchPage, onError }) {
     `refusals-${new Date().toISOString().slice(0, 10)}.json`,
   );
 
-  const chip = (on, label, onClick) => html`<button type="button" class="adm-sec-fchip ${on ? 'on' : ''}" onClick=${onClick}>${label}</button>`;
-  const answerChip = (l) => l.code === 'ATTEMPTS_REFUSED'
-    ? html`<span class="adm-badge adm-badge--danger">${S('walled')}</span>`
-    : html`<span class="adm-badge ${l.status === 401 ? 'adm-badge--warning' : 'adm-badge--danger'}">${l.status}</span>`;
+  // The answer: the wall in coral, a 401 to look at, a 403 refused outright.
+  const answerMark = (l) => l.code === 'ATTEMPTS_REFUSED'
+    ? html`<${Mark} kind="status" tone="danger">${S('walled')}<//>`
+    : html`<${Mark} kind="status" tone=${l.status === 401 ? 'attention' : 'danger'}>${l.status}<//>`;
 
   // The one fingerprint that keeps coming back, when there is one worth a sentence.
   const topDigest = r.by_digest && r.by_digest[0] && r.by_digest[0].count >= 3 ? r.by_digest[0] : null;
   const kindTotal = topDigest ? (r.by_credential.find(c => c.key === topDigest.kind) || { count: topDigest.count }).count : 0;
   const listedSources = r.by_source.reduce((s, x) => s + x.count, 0);
   const moreSources = r.sources_in_window - r.by_source.length;
+  // A status filter pressed again lets every answer through.
+  const pickStatus = (v) => setStatus(status === v ? 'all' : v);
 
   return html`
-    <section class="og-sec" id="adm-sec-02">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('title')}<small>02</small></h2>
-        <div class="og-doors">
-          ${log.enabled && lines.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${download}>${S('download')}</button>` : null}
-          <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${S('logSettings')}</button>
-        </div></div>
-      ${!log.enabled ? html`<div class="adm-sec-empty adm-sec-empty--last">${S('disabled')}</div>` : html`
-        <p class="adm-sec-lead">${S('lead', { n: num(lines.length) })}</p>
-        ${r.readable_lines === 0 ? html`<div class="adm-sec-empty adm-sec-empty--last">${S('none')}</div>` : html`
-          ${r.in_window === 0 ? html`<div class="adm-sec-empty">${S('noneInWindow')}</div>` : html`
-            <div class="adm-sec-cols">
-              <${Grouping} label=${S('byDoor')} rows=${r.by_door} />
+    <${Section} id="adm-sec-02" num="02" title=${S('title')} doors=${html`
+      ${log.enabled && lines.length ? html`<${Action} small soft onClick=${download}>${S('download')}<//>` : null}
+      <${Action} small soft onClick=${() => switchPage('config')}>${S('logSettings')}<//>`}>
+      ${!log.enabled ? html`<${Note} kind="quiet">${S('disabled')}<//>` : html`
+        <${Note} kind="lead">${S('lead', { n: num(lines.length) })}<//>
+        ${r.readable_lines === 0 ? html`<${Note} kind="quiet">${S('none')}<//>` : html`
+          ${r.in_window === 0 ? html`<${Note} kind="quiet">${S('noneInWindow')}<//>` : html`
+            <${CountBarsSet}>
+              <${CountBars} label=${S('byDoor')} rows=${r.by_door} />
+              <${CountBars} label=${S('bySource')} rows=${r.by_source} keyOf=${(x) => ipText(x.key)} hot=${r.walled_sources}
+                more=${moreSources > 0 ? { name: S('moreSources', { n: num(moreSources) }), count: r.in_window - listedSources } : null} />
               <div>
-                <${Grouping} label=${S('bySource')} rows=${r.by_source} keyOf=${(x) => ipText(x.key)} hotKeys=${r.walled_sources} />
-                ${moreSources > 0 ? html`<div class="adm-sec-krow adm-sec-krow--last"><span class="adm-sec-key adm-sec-key--words">${S('moreSources', { n: num(moreSources) })}</span><span class="adm-sec-n">${num(r.in_window - listedSources)}</span></div>` : null}
+                <${CountBars} label=${S('byCredential')} rows=${r.by_credential} keyOf=${(x) => credentialWord(x.key)} words=${true} />
+                ${topDigest ? html`<${Note} kind="hint">${S(topDigest.refused_403 > topDigest.refused_401 ? 'fingerprint403' : 'fingerprint', { digest: topDigest.key, count: num(topDigest.count), total: num(kindTotal), kind: credentialWord(topDigest.kind) })}<//>` : null}
               </div>
-              <div>
-                <${Grouping} label=${S('byCredential')} rows=${r.by_credential} keyOf=${(x) => credentialWord(x.key)} words=${true} />
-                ${topDigest ? html`<p class="adm-sec-note">${S(topDigest.refused_403 > topDigest.refused_401 ? 'fingerprint403' : 'fingerprint', { digest: topDigest.key, count: num(topDigest.count), total: num(kindTotal), kind: credentialWord(topDigest.kind) })}</p>` : null}
-              </div>
-            </div>`}
+            <//>`}
 
-          <div class="adm-sec-filters">
-            ${chip(window === '24h', S('filter24'), () => setWindow('24h'))}
-            ${chip(window === 'all', S('filterAll', { n: num(lines.length) }), () => setWindow('all'))}
-            <span class="adm-sec-sep"></span>
-            ${chip(status === '401', '401', () => setStatus(status === '401' ? 'all' : '401'))}
-            ${chip(status === '403', '403', () => setStatus(status === '403' ? 'all' : '403'))}
-            ${chip(status === 'walled', S('walled'), () => setStatus(status === 'walled' ? 'all' : 'walled'))}
-            <span class="adm-sec-sep"></span>
-            <input type="text" class="adm-sec-search" placeholder=${S('search')} value=${q} onInput=${(e) => setQ(e.target.value)} />
-          </div>
+          <${Line} wrap gap="medium" above="section" below="small">
+            <${Tabs} tone="filter" value=${window} onSelect=${setWindow}
+              items=${[{ value: '24h', label: S('filter24') }, { value: 'all', label: S('filterAll', { n: num(lines.length) }) }]} />
+            <${Tabs} tone="filter" value=${status} onSelect=${pickStatus}
+              items=${[{ value: '401', label: '401' }, { value: '403', label: '403' }, { value: 'walled', label: S('walled') }]} />
+            <${SearchLine} text beside placeholder=${S('search')} value=${q} onInput=${(e) => setQ(e.target.value)} />
+          <//>
 
-          <table class="adm-sec-tbl">
-            <thead>
-              <tr><th>${S('time')}</th><th>${S('answer')}</th><th>${S('door')}</th><th>${S('source')}</th><th>${S('credential')}</th><th>${S('reason')}</th></tr>
-            </thead>
-            <tbody>
-              ${shown.length === 0 ? html`<tr><td colspan="6" class="adm-sec-reason">${S('noneMatch')}</td></tr>` : shown.map((l, i) => html`
-                <tr key=${l.ts + i}>
-                  <td class="adm-sec-when">${whenText(l.ts, now)}</td>
-                  <td class="adm-sec-answer">${answerChip(l)} <span class="adm-sec-code">${l.code || ''}</span></td>
-                  <td><span class="adm-sec-route">${l.method || ''} ${l.path || ''}</span></td>
-                  <td class="adm-sec-source"><span class="adm-sec-route">${ipText(l.ip)}</span></td>
-                  <td>${credentialWord(l.credential)}${l.credential_digest ? html` <span class="adm-sec-code">${l.credential_digest}</span>` : null}</td>
-                  <td class="adm-sec-reason">${(l.reason || '').slice(0, 160)}${l.principal && l.principal.sub && !l.principal.anonymous ? ` · ${l.principal.sub}` : ''}</td>
-                </tr>`)}
-            </tbody>
-          </table>
-          <div class="adm-sec-foot">
-            <div class="og-doors">
-              ${lines.length >= limit && limit < MAX_LINES
-                ? html`<button type="button" class="og-door" disabled=${busy} onClick=${more}>${S('next')}</button>`
-                : null}
-            </div>
-            <span class="adm-sec-mono">${S('note', { shown: num(lines.length), window: num(r.in_window) })}</span>
-          </div>`}`}
-    </section>`;
+          <${List} cols="when-state-path-where-kind-desc" empty=${S('noneMatch')}
+            head=${[S('time'), S('answer'), S('door'), S('source'), S('credential'), S('reason')]}
+            rows=${shown} render=${(l, i) => html`
+              <${Row} key=${l.ts + i}>
+                <${When}>${whenText(l.ts, now)}<//>
+                <${Cell} line>${answerMark(l)} ${l.code ? html`<${Code}>${l.code}<//>` : null}<//>
+                <${Cell} code>${l.method || ''} ${l.path || ''}<//>
+                <${Cell} code>${ipText(l.ip)}<//>
+                <${Cell} line>${credentialWord(l.credential)}${l.credential_digest ? html` <${Code}>${l.credential_digest}<//>` : null}<//>
+                <${Desc}>${(l.reason || '').slice(0, 160)}${l.principal && l.principal.sub && !l.principal.anonymous ? ` · ${l.principal.sub}` : ''}<//>
+              <//>`} />
+          <${More} label=${S('next')} disabled=${busy} onMore=${lines.length >= limit && limit < MAX_LINES ? more : null}
+            note=${S('note', { shown: num(lines.length), window: num(r.in_window) })} />`}`}
+    <//>`;
 }

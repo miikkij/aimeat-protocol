@@ -9,6 +9,8 @@
  * @structure ThemeCssTab (default)
  * @usage html`<${ThemeCssTab} theme=${theme} warnings=${w} readOnly=${false} onSaved=${fn} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — No class written any more: Action, Loud (control), the meta Note (admin
+ *     page group G8).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles S6).
  */
 import { h } from 'preact';
@@ -19,6 +21,8 @@ import { apiGet, apiPut } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { Band } from '/components/Band.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
 import { Hint } from '/components/Hint.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { ConfirmDialog } from '/components/Modal.js';
@@ -92,10 +96,10 @@ export default function ThemeCssTab({ theme, readOnly, onSaved }) {
       ${!readOnly && html`
         ${state.error && html`<${ErrorNote} text=${state.error} />`}
         <${ActionRow}>
-          <button type="button" class="poster-action" disabled=${css === saved} onClick=${() => setCss(saved)}>${t('themes.undo')}</button>
-          ${saved && html`<button type="button" class="poster-action" onClick=${() => setRemoving(true)}>${t('themes.removeCss')}</button>`}
-          <button type="button" class="poster-slab poster-slab--control" disabled=${state.busy || css === saved} onClick=${() => (hidden.length ? setConfirming(true) : save(css))}>${t('themes.save')}</button>
-          ${state.saved && html`<span class="text-meta">${t('themes.saved')}</span>`}
+          <${Action} disabled=${css === saved} onClick=${() => setCss(saved)}>${t('themes.undo')}<//>
+          ${saved && html`<${Action} onClick=${() => setRemoving(true)}>${t('themes.removeCss')}<//>`}
+          <${Loud} control disabled=${state.busy || css === saved} onClick=${() => (hidden.length ? setConfirming(true) : save(css))}>${t('themes.save')}<//>
+          ${state.saved && html`<${Note} kind="meta" inline>${t('themes.saved')}<//>`}
         <//>`}
     <//>
     ${confirming && html`<${ConfirmDialog} open=${true} onClose=${() => setConfirming(false)} danger=${true}

@@ -9,6 +9,7 @@
  * @structure STEP_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, flush? } } · WrapperPair({ without })
  * @usage import { STEP_DEMOS } from './demos-steps.js';
  * @version-history
+ *   v1.3.0 — 2026-09-27 — PromptCard's loud and quiet.
  *   v1.2.0 — 2026-09-23 — The wrapper pair is a decision now, not an extra of the library.
  *   v1.1.0 — 2026-09-23 — The demos of the deleted parts go with them (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
@@ -53,9 +54,11 @@ export const STEP_DEMOS = {
     { name: 'open', render: (ex) => html`<${StepCard} num=${ex.num} title=${ex.title}><${StepLede}>${ex.children}<//><//>` },
   ] },
   'prompt-card': { variants: [
-    { name: 'default', render: (ex) => html`<${PromptCard} label=${ex.label} prompt=${ex.prompt} className=${ex.className}
+    { name: 'loud: the copy is the next move', render: (ex) => html`<${PromptCard} label=${ex.label} prompt=${ex.prompt} loud
         copyLabel=${ex.copyLabel} copiedLabel=${ex.copiedLabel} />` },
-    { name: 'secondary copy button', render: (ex) => html`<${PromptCard} label=${ex.label} prompt=${ex.prompt} className="btn-outline"
+    { name: 'quiet: already copied, or one way among others', render: (ex) => html`<${PromptCard} label=${ex.label} prompt=${ex.prompt} quiet
+        copyLabel=${ex.copyLabel} copiedLabel=${ex.copiedLabel} />` },
+    { name: 'secondary copy button (an older caller\'s class)', render: (ex) => html`<${PromptCard} label=${ex.label} prompt=${ex.prompt} className="btn-outline"
         copyLabel=${ex.copyLabel} copiedLabel=${ex.copiedLabel} />` },
   ] },
   'paste-box': { variants: [

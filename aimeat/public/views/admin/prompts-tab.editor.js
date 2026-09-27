@@ -16,6 +16,9 @@
  * @structure PromptEditor
  * @usage html`<${PromptEditor} prompt=${p} versions=${v} onSave=${fn} ... />`
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only: the head is SubHeading, Marks and Actions, the
+ *     facts are Facts, the texts TextArea with their labels and hints, the foot Loud with the note's
+ *     TextField, the versions a List; no class written.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
@@ -23,6 +26,15 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { dt, num, Spinner } from './shared.js';
 import { promptChips } from './prompts-tab.list.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Marks } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Facts } from '/components/Facts.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { EmptyState } from '/components/EmptyState.js';
+import { List, Row as ListRow, Name, Desc, Doors } from '/components/List.js';
+import { Row, Stack, Split } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const P = (key, params) => t('admin.prompts.' + key, params);
@@ -42,79 +54,69 @@ export function PromptEditor({
   prompt, draft, versions, saving, loading,
   onDraft, onLocale, onSave, onTakeCurrent, onToggleActive, onVersions, onRestore,
 }) {
-  if (loading) return html`<div class="adm-pr-editor"><${Spinner} text=${t('dashboard.loading')} /></div>`;
-  if (!prompt) return html`<div class="adm-pr-editor"><p class="adm-pr-empty">${P('pickOne')}</p></div>`;
+  if (loading) return html`<${Spinner} text=${t('dashboard.loading')} />`;
+  if (!prompt) return html`<${EmptyState} text=${P('pickOne')} />`;
 
   const orphan = prompt.source_kind === 'orphan';
 
   return html`
-    <div class="adm-pr-editor">
-      <div class="adm-pr-head">
-        <span class="adm-pr-title">${prompt.name}</span>
-        <span class="adm-pr-desc">${prompt.description}</span>
-        <div class="adm-pr-headrow">
-          <span class="adm-pr-chips">${promptChips(prompt)}</span>
-          <span class="og-doors">
+    <${Stack} gap="large">
+      <${Stack} gap="small">
+        <${SubHeading} level=${3}>${prompt.name}<//>
+        <${Note}>${prompt.description}<//>
+        <${Row} wrap justify="between">
+          <${Marks}>${promptChips(prompt)}<//>
+          <${Actions}>
             ${!orphan && html`
-              <button type="button" class="og-door og-door--quiet" disabled=${saving}
-                onClick=${onTakeCurrent}>${P('takeOne')}</button>`}
-            <button type="button" class="og-door og-door--quiet" disabled=${saving}
-              onClick=${onToggleActive}>${prompt.active ? P('switchOff') : P('switchOn')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${onVersions}>${P('versions')}</button>
-          </span>
-        </div>
-      </div>
+              <${Action} small soft disabled=${saving} onClick=${onTakeCurrent}>${P('takeOne')}<//>`}
+            <${Action} small soft disabled=${saving} onClick=${onToggleActive}>${prompt.active ? P('switchOff') : P('switchOn')}<//>
+            <${Action} small soft onClick=${onVersions}>${P('versions')}<//>
+          <//>
+        <//>
+      <//>
 
-      <div class="adm-pr-facts">
-        <span class="k">${P('fact.handedAt')}</span>
-        <span class="adm-pr-mono">${(prompt.usedIn || []).join(' · ') || prompt.id}</span>
-        <span class="k">${P('fact.filledWith')}</span>
-        <span class="adm-pr-mono">${(prompt.variables || []).join(' · ') || P('fact.noVariables')}</span>
-        <span class="k">${P('fact.onUpdate')}</span>
-        <span>${updateLine(prompt.source_kind)}</span>
-        <span class="k">${P('fact.lastChange')}</span>
-        <span>${P('fact.lastChangeValue', { when: dt(prompt.updatedAt), who: prompt.updatedBy || '-', v: num(prompt.version) })}</span>
-      </div>
+      <${Facts} rows=${[
+    { key: 'at', k: P('fact.handedAt'), v: (prompt.usedIn || []).join(' · ') || prompt.id, mono: true },
+    { key: 'with', k: P('fact.filledWith'), v: (prompt.variables || []).join(' · ') || P('fact.noVariables'), mono: true },
+    { key: 'update', k: P('fact.onUpdate'), v: updateLine(prompt.source_kind) },
+    { key: 'last', k: P('fact.lastChange'), v: P('fact.lastChangeValue', { when: dt(prompt.updatedAt), who: prompt.updatedBy || '-', v: num(prompt.version) }) },
+  ]} />
 
-      <div class="adm-pr-body">
-        <label class="adm-pr-label" for="adm-pr-en">${P('textLabel')}</label>
-        <textarea id="adm-pr-en" class="adm-pr-text" rows="16" value=${draft.content}
-          onInput=${(e) => onDraft('content', e.target.value)}></textarea>
-        <p class="adm-pr-hint">${P('textHint')}</p>
+      <${Stack} gap="medium">
+        <${TextArea} id="adm-pr-en" code rows=${16} label=${P('textLabel')} hint=${P('textHint')}
+          value=${draft.content} onInput=${(v) => onDraft('content', v)} />
 
         ${LANGUAGES.map(l => html`
-          <div class="adm-pr-lang" key=${l.tag}>
-            <label class="adm-pr-label" for=${'adm-pr-' + l.tag}>${P('langLabel', { language: P(l.key) })}</label>
-            <textarea id=${'adm-pr-' + l.tag} class="adm-pr-text" rows="6"
-              placeholder=${P('langPh', { language: P(l.key) })}
-              value=${(draft.locales && draft.locales[l.tag]) || ''}
-              onInput=${(e) => onLocale(l.tag, e.target.value)}></textarea>
-          </div>`)}
-        <p class="adm-pr-hint">${P('langHint')}</p>
+          <${TextArea} key=${l.tag} id=${'adm-pr-' + l.tag} code rows=${6}
+            label=${P('langLabel', { language: P(l.key) })}
+            placeholder=${P('langPh', { language: P(l.key) })}
+            value=${(draft.locales && draft.locales[l.tag]) || ''}
+            onInput=${(v) => onLocale(l.tag, v)} />`)}
+        <${Note}>${P('langHint')}<//>
+      <//>
 
-        <div class="adm-pr-foot">
-          <button type="button" class="adm-btn" disabled=${saving} onClick=${onSave}>
-            ${saving ? P('saving') : P('save')}
-          </button>
-          <label class="adm-pr-notefield">
-            <input type="text" value=${draft.changeNote || ''} placeholder=${P('notePh')}
-              onInput=${(e) => onDraft('changeNote', e.target.value)} />
-          </label>
-        </div>
+      <${Split}>
+        <${Row} wrap gap="large">
+          <${Loud} control disabled=${saving} onClick=${onSave}>${saving ? P('saving') : P('save')}<//>
+          <${TextField} value=${draft.changeNote || ''} placeholder=${P('notePh')} ariaLabel=${P('notePh')}
+            onInput=${(v) => onDraft('changeNote', v)} />
+        <//>
+      <//>
 
-        ${versions !== null && html`
-          <div class="adm-pr-versions">
-            <p class="adm-pr-note">${P('versionsLead')}</p>
-            ${versions.length === 0
-              ? html`<p class="adm-pr-note">${P('versionsNone')}</p>`
-              : versions.map(v => html`
-                <div class="adm-pr-vrow" key=${v.version}>
-                  <span><b>v${num(v.version)}</b> ${v.changeNote ? html`<span class="adm-pr-note">${v.changeNote}</span>` : ''}</span>
-                  <span class="adm-pr-vwhen">${dt(v.changedAt)} · ${v.changedBy}</span>
-                  <button type="button" class="og-door og-door--quiet" disabled=${saving}
-                    onClick=${() => onRestore(v.version)}>${P('restore')}</button>
-                </div>`)}
-          </div>`}
-      </div>
-    </div>`;
+      ${versions !== null && html`
+        <${Split} gap="small">
+          <${Note}>${P('versionsLead')}<//>
+          ${versions.length === 0
+    ? html`<${Note}>${P('versionsNone')}<//>`
+    : html`
+            <${List} cols="name-desc-doors" dense>
+              ${versions.map(v => html`
+                <${ListRow} key=${v.version}>
+                  <${Name} meta=${v.changeNote || undefined}>v${num(v.version)}<//>
+                  <${Desc}>${dt(v.changedAt)} · ${v.changedBy}<//>
+                  <${Doors}><${Action} small soft disabled=${saving} onClick=${() => onRestore(v.version)}>${P('restore')}<//><//>
+                <//>`)}
+            <//>`}
+        <//>`}
+    <//>`;
 }

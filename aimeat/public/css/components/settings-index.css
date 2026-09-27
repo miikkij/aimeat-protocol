@@ -1,0 +1,53 @@
+/**
+ * @file settings-index.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A long list of settings: the tools pinned under the page's bar (the search with its
+ *   magnifier, the filters, the unsaved status), the index beside the settings that stays in sight,
+ *   one line per setting, and the unsaved changes as old → new. Drawn by
+ *   components/SettingsIndex.js. Values from main's views/admin.css (.adm-cfg-tools,
+ *   .adm-cfg-searchwrap, .adm-cfg-pending-mini, .adm-cfg-listbox, .adm-cfg-pending-was,
+ *   .adm-cfg-body, .adm-cfg-rail, .adm-cfg-frow, .adm-cfg-fname, .adm-cfg-fdesc, .adm-cfg-fsrc,
+ *   .adm-cfg-fedit, .adm-cfg-edited-dot), under the component's own names; the index is the
+ *   library's contents rail. `--settings-index-top` is where the pinned row stops (under the
+ *   operator frame's bar, 62px).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
+ */
+
+/* The pinned row: under the page's bar, with the save controls in it while something is unsaved,
+   so nothing overlays the settings being edited. */
+.settings-index-tools { position: sticky; top: var(--settings-index-top, 62px); z-index: 39; background: var(--bg); display: flex; gap: 18px; align-items: center; margin: 0 0 14px; padding: 2px 0 10px; flex-wrap: wrap; }
+.settings-index-search { flex: 1; min-width: min(280px, 100%); display: flex; align-items: center; gap: 10px; }
+.settings-index-magnifier { width: 16px; height: 16px; stroke: var(--text); fill: none; stroke-width: 2.5; flex: none; }
+.settings-index-status { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+
+/* The index beside the settings stays in sight under the pinned row. */
+.settings-index-body { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 36px; align-items: start; }
+.settings-index-side { position: sticky; top: calc(var(--settings-index-top, 62px) + 60px); max-height: calc(100dvh - 190px); overflow-y: auto; }
+.settings-index-main { min-width: 0; }
+
+/* One setting: its name, key and what it does; where its value comes from; the editor; the end. */
+.setting-line { display: grid; grid-template-columns: minmax(0, 1.4fr) auto minmax(220px, 1fr) auto; gap: 0 18px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.setting-line-name { min-width: 0; font-size: .88rem; font-weight: 600; color: var(--text); }
+.setting-line-flag { color: var(--warn-fg); font-size: .8rem; }
+.setting-line-code { display: block; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--accent); background: none; padding: 0; }
+.setting-line-desc { display: block; font-size: .78rem; font-weight: 400; line-height: 1.45; color: var(--text-dim); margin-top: 1px; }
+.setting-line-source { white-space: nowrap; }
+.setting-line-edit { display: flex; align-items: center; gap: 10px; justify-content: flex-end; min-width: 0; flex-wrap: wrap; }
+
+/* The unsaved changes as old → new. */
+.setting-changes { margin: 0 0 14px; }
+.setting-changes ul { margin: 0; padding-left: 18px; font-size: .8rem; max-height: 40vh; overflow-y: auto; }
+.setting-changes li { margin: 2px 0; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.setting-changes-was { text-decoration: line-through; opacity: .7; margin: 0 4px; }
+
+@media (max-width: 1100px) {
+  .settings-index-body { grid-template-columns: 1fr; }
+  .settings-index-side { position: static; max-height: none; }
+}
+@media (max-width: 860px) {
+  .setting-line { grid-template-columns: 1fr; gap: 4px 0; }
+  .setting-line-edit { justify-content: flex-start; }
+}

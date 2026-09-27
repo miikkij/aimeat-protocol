@@ -23,6 +23,9 @@
  *   - FederationTab (default) — one read, six sections, and the actions
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v3.0.0 — 2026-09-27 — The page and its parts draw library components and write no class;
+ *     admin-federation.css goes. Section 07's paste stands in the settings box with its own line
+ *     breaks, and its copy is the action link that says it copied.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face. One read (GET /v1/admin/federation/overview) that carries
@@ -47,10 +50,13 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Spinner, ErrorBox, useToast, Toast, Row } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section } from '/components/Section.js';
+import { Action } from '/components/Action.js';
+import { SettingBox } from '/components/Box.js';
+import { Beside } from '/components/Layout.js';
+import { Note } from '/components/Note.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
@@ -68,28 +74,16 @@ function AskAi({ overview }) {
     url: getNodeUrl(), peers: overview.peers.total, standing: overview.standing,
   });
   return html`
-    <section class="og-sec" id="adm-fed-07">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>07</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-two">
-        <div class="adm-half">
-          <p class="adm-fed-lead">${S('ai.lead')}</p>
-          ${Row({ title: S('ai.tool'), why: S('ai.toolWhy'), chip: null, value: 'aimeat_admin_federation', last: true })}
-        </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-fed-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+    <${Section} id="adm-fed-07" num="07" title=${S('ai.title')}
+      doors=${html`<${Action} small soft copy=${paste}>${S('ai.copy')}<//>`}>
+      <${Beside} wide side=${html`<${SettingBox} label=${S('ai.label')} pre>${paste}<//>`}>
+        <${Note} kind="lead">${S('ai.lead')}<//>
+        ${Row({ title: S('ai.tool'), why: S('ai.toolWhy'), chip: null, value: 'aimeat_admin_federation', last: true })}
+      <//>
+    <//>`;
 }
 
 export default function FederationTab({ data, reload }) {
-  useViewCSS('/css/views/admin-federation.css');
   const livePeers = data.livePeers || [];
   const requests = data.federation || [];
 
@@ -245,7 +239,7 @@ export default function FederationTab({ data, reload }) {
   const peers = livePeers.map(p => ({ ...p, versions_behind: byId.get(p.node_id)?.versions_behind ?? null }));
   const history = requests.filter(r => r.status !== 'pending');
 
-  return html`<div class="adm-fed">
+  return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
     <${WhereWeStand} data=${overview}
@@ -274,6 +268,5 @@ export default function FederationTab({ data, reload }) {
 
     <${AskAi} overview=${overview} />
     <${Reference} />
-    <${ConfirmUI} />
-  </div>`;
+    <${ConfirmUI} />`;
 }

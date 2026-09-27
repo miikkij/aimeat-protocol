@@ -2,8 +2,13 @@
  * @file public/views/admin/extensions-tab.action-editor.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Installed-extension action script editor for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
+ * @description Installed-extension action script editor for the admin Extensions tab: pick one of the
+ *   extension's actions, read its script, change it and save it (Tab indents, Ctrl+S or Cmd+S saves).
+ *   Extracted from the tab file to satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — The library's parts (admin page group G7): the editor stands in the dashed
+ *     field Box, the actions are a row of Tabs (the open one chosen), the script a typewriter TextArea
+ *     that owns its Tab-indent and its Ctrl+S save, the answer the form message. No class, no style.
  *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
  */
 import { h } from 'preact';
@@ -11,8 +16,14 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { getActionScript, updateActionScript } from '/js/services/admin.js';
+import { Box } from '/components/Box.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextArea } from '/components/TextField.js';
+import { Action } from '/components/Action.js';
+import { Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Stack, Row } from '/components/Layout.js';
 
 // ── Action Script Editor ──
 function ActionScriptEditor({ extName, actions, onUpdated }) {
@@ -44,53 +55,25 @@ function ActionScriptEditor({ extName, actions, onUpdated }) {
   }
 
   return html`
-    <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-      <div class="adm-flex-center adm-mb-sm" style="flex-wrap:wrap">
-        <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
-        ${actions.map(a => html`
-          <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
-            style="font-size:.75rem${selectedAction === a.id ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-            ${a.method} ${escHtml(a.id)}
-          </button>
-        `)}
-      </div>
+    <${Box} tone="field">
+      <${Label} block>${t('dashboard.servicesScriptEditor')}<//>
+      <${Tabs} label=${t('dashboard.servicesScriptEditor')} value=${selectedAction} onSelect=${loadScript}
+        items=${actions.map(a => ({ value: a.id, label: `${a.method} ${a.id}` }))} />
 
-      ${loading && html`<p class="adm-text-dim adm-text-base">${t('dashboard.loading')}...</p>`}
+      ${loading ? html`<${Note} kind="loading">${t('dashboard.loading')}...<//>` : null}
 
-      ${selectedAction && !loading && html`
-        <div style="margin-top:4px">
-          <div class="adm-flex-between adm-mb-xs">
-            <code style="font-size:.8rem;color:var(--text-dim)">${extName}/${selectedAction}</code>
-          </div>
-          <textarea class="adm-textarea adm-input-full" value=${script} onInput=${e => setScript(e.target.value)}
-            style="height:320px;font-size:12px"
-            spellcheck="false"
-            onKeyDown=${e => {
-              if (e.key === 'Tab') {
-                e.preventDefault();
-                const ta = e.target;
-                const start = ta.selectionStart;
-                const end = ta.selectionEnd;
-                const val = ta.value;
-                ta.value = val.substring(0, start) + '  ' + val.substring(end);
-                ta.selectionStart = ta.selectionEnd = start + 2;
-                setScript(ta.value);
-              }
-              if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                handleSave();
-              }
-            }}
-          />
-          <div class="adm-flex-center" style="margin-top:6px">
-            <button class="adm-btn-action adm-text-sm" onClick=${handleSave} disabled=${saving}>
-              ${saving ? '...' : t('dashboard.servicesScriptSave')}</button>
-            <span style="font-size:.75rem" class="adm-text-dim">Ctrl+S</span>
-            ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
-          </div>
-        </div>
-      `}
-    </div>
+      ${selectedAction && !loading ? html`
+        <${Stack}>
+          <${Code}>${extName}/${selectedAction}<//>
+          <${TextArea} code indent rows=${14} ariaLabel=${`${extName}/${selectedAction}`} value=${script}
+            onInput=${setScript} onSave=${handleSave} />
+          <${Row} gap="medium" wrap>
+            <${Action} small onClick=${handleSave} disabled=${saving}>${saving ? '...' : t('dashboard.servicesScriptSave')}<//>
+            <${Note} inline>Ctrl+S<//>
+            ${msg ? html`<${Note} kind="message" error=${!msg.ok}>${msg.text}<//>` : null}
+          <//>
+        <//>` : null}
+    <//>
   `;
 }
 

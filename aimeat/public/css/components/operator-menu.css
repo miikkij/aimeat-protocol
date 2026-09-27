@@ -1,0 +1,103 @@
+/**
+ * @file operator-menu.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's side menu of the admin pages: the poster's ink as the ground in both
+ *   modes, a heading that names the operator's side, the node id, the groups under a small capital
+ *   word in the sun colour, the counts on the right, the chosen item on the sun. Drawn by
+ *   components/OperatorMenu.js.
+ *   The ground, ink and grey are theme hooks (--operator-menu-*): the defaults are theme.css's
+ *   light-mode ink and paper, pinned here so the dark mode cannot flip them; that inversion against
+ *   the paper Settings menu is how the operator's side is known at once.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Moved out of views/admin.css (.adm-sidebar, .adm-nav-group, .adm-nav-item,
+ *     .cnt, .node-id) with every value unchanged, under the component's own names; the heading is new.
+ */
+
+.operator-menu {
+  --operator-menu-ground-default: #1A1A2E;   /* the poster ink, fixed in both modes (by design) */
+  --operator-menu-ink-default: #FAFAF8;      /* the poster paper, fixed with it */
+  width: 220px;
+  background: var(--operator-menu-ground, var(--operator-menu-ground-default));
+  border-right: none;
+  padding: 16px 0;
+  flex-shrink: 0;
+  /* App-shell: sticks to the top of the .page-content scroll region; its height caps at that region
+     (the viewport minus the fixed header), so the menu scrolls inside instead of running past it. */
+  position: sticky;
+  top: 0;
+  height: calc(100dvh - var(--nav-height, 56px));
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.operator-menu-title {
+  padding: 4px 18px 0;
+  margin-bottom: 4px;
+  color: var(--operator-menu-ink, var(--operator-menu-ink-default));
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: var(--shape-case-label);
+  letter-spacing: var(--shape-tracking-label);
+}
+.operator-menu-node {
+  padding: 0 18px;
+  padding-top: 4px;
+  color: var(--operator-menu-dim, #9AA0B0);
+  font-size: .66rem;
+  font-family: var(--font-mono);
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+/* The group label wears the sun on ink, the same pairing the poster rail uses. */
+.operator-menu-group {
+  font-size: .6rem;
+  text-transform: var(--shape-case-label);
+  letter-spacing: .14em;
+  color: var(--sun);
+  padding: 0 18px;
+  margin-top: 16px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+.operator-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px;
+  color: var(--operator-menu-ink, var(--operator-menu-ink-default));
+  font-size: .82rem;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-weight: 600;
+  transition: background .1s, color .1s;
+}
+.operator-menu-item:hover { background: var(--operator-menu-hover, rgba(250, 250, 248, 0.08)); }
+/* The chosen item sits on the sun with ink words, as on the settings side. */
+.operator-menu-item--active {
+  background: var(--sun);
+  color: var(--on-sun);
+  font-weight: 800;
+}
+.operator-menu-item--active:hover { background: var(--sun); }
+.operator-menu-label { flex: 1; }
+.operator-menu-count {
+  font-family: var(--font-mono);
+  background: none;
+  color: var(--operator-menu-dim, #9AA0B0);
+  font-size: .66rem;
+  padding: 0;
+  font-weight: 500;
+}
+.operator-menu-item--active .operator-menu-count { color: var(--on-sun); }
+
+/* A phone has no room beside the page: the menu goes, as on main. */
+@media (max-width: 768px) {
+  .operator-menu { display: none; }
+}

@@ -13,20 +13,22 @@
  * @structure CommandPalette({ navigate })
  * @usage import { CommandPalette } from '/views/command-palette.js';  html`<${CommandPalette} navigate=${navigate} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — The list is the QuickFind component (components/QuickFind.js), which owns
+ *     the field's focus, ↑↓ and Enter, the pointer's choice and the groups; the palette passes the
+ *     places and what taking one does, and writes no class. A group's name is the row label
+ *     (page group G9).
  *   v1.0.2 — 2026-09-13 — Escape closes the palette after a query has been typed too: a search box is
  *     not a half-written form, so the dialog's guard is off here ("↵ open · Esc close" stays true).
  *   v1.0.1 — 2026-08-29 — A free-text organism type shows as written, not as a raw locale key.
  *   v1.0.0 — 2026-06-22 — Initial: Cmd-K quick-switcher over librarian search + organism names + recents.
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
-import { SearchBar } from '/components/SearchBar.js';
-import { Spinner } from '/components/Spinner.js';
-import { EmptyState } from '/components/EmptyState.js';
+import { QuickFind } from '/components/QuickFind.js';
 import { librarianSearch } from '/js/services/memory.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import { getOwner } from '/js/services/auth.js';
@@ -58,8 +60,6 @@ export function CommandPalette({ navigate }) {
   const [hits, setHits] = useState(null);     // librarian content hits
   const [orgs, setOrgs] = useState([]);       // caller's organisms (for name match)
   const [busy, setBusy] = useState(false);
-  const [sel, setSel] = useState(0);
-  const inputRef = useRef(null);
 
   // Global Cmd/Ctrl-K to open (ignore when typing in a field, except to toggle); Esc handled by Modal.
   useEffect(() => {
@@ -73,12 +73,12 @@ export function CommandPalette({ navigate }) {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  // On open: load recents + the caller's organisms (for name matching), focus the input.
+  // On open: load recents + the caller's organisms (for name matching). The finder focuses its own
+  // field when it appears.
   useEffect(() => {
-    if (!open) { setQ(''); setHits(null); setSel(0); return; }
+    if (!open) { setQ(''); setHits(null); return; }
     const me = getOwner();
     if (me) listOrganisms({ member: me }).then(r => setOrgs((r?.data?.organisms) || [])).catch(err => { swallowed('command-palette: onKey', err); });
-    setTimeout(() => inputRef.current?.querySelector('input')?.focus(), 30);
   }, [open]);
 
   // Debounced content search.
@@ -90,7 +90,7 @@ export function CommandPalette({ navigate }) {
     setBusy(true);
     const tid = setTimeout(async () => {
       const r = await librarianSearch(query, 30, 'own').catch(err => { swallowed('command-palette: onKey', err); return []; });
-      if (!cancelled) { setHits(r || []); setBusy(false); setSel(0); }
+      if (!cancelled) { setHits(r || []); setBusy(false); }
     }, 200);
     return () => { cancelled = true; clearTimeout(tid); };
   }, [q, open]);
@@ -109,45 +109,37 @@ export function CommandPalette({ navigate }) {
   })).filter(it => it.orgId);
   const recents = (!query) ? listRecents(8).filter(r => r.type === 'workspace' && r.data?.orgId)
     .map(r => ({ kind: 'recent', orgId: r.data.orgId, wsId: r.data.wsId, label: r.label, sub: r.sub })) : [];
-  const items = [...orgMatches, ...contentItems, ...recents];
-
   const choose = (it) => {
     if (!it) return;
     openTarget(navigate, { orgId: it.orgId, wsId: it.wsId, query: it.kind === 'hit' ? query : '' });
     setOpen(false);
   };
-  const onInputKey = (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(s + 1, items.length - 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(s - 1, 0)); }
-    else if (e.key === 'Enter') { e.preventDefault(); choose(items[sel]); }
-  };
 
   if (!open) return null;
-  let idx = -1;
-  const row = (it) => { idx++; const i = idx; return html`
-    <button class=${'cmdk-item' + (i === sel ? ' is-sel' : '')} key=${it.kind + (it.orgId || '') + (it.wsId || '') + it.label}
-      onMouseEnter=${() => setSel(i)} onClick=${() => choose(it)}>
-      <span class="cmdk-item-label">${it.kind === 'org' ? '🏢 ' : it.kind === 'recent' ? '🕘 ' : '📄 '}${it.label}</span>
-      ${it.sub ? html`<span class="cmdk-item-sub">${it.sub}</span>` : null}
-      ${it.snippet ? html`<span class="cmdk-item-snippet">${it.snippet}</span>` : null}
-    </button>`; };
+  // Each place carries its sign and a key; the finder draws them, moves the choice with ↑↓ and takes
+  // it with Enter.
+  const place = (it) => ({
+    ...it,
+    key: it.kind + (it.orgId || '') + (it.wsId || '') + it.label,
+    mark: it.kind === 'org' ? '🏢' : it.kind === 'recent' ? '🕘' : '📄',
+  });
 
   return html`
-    <${Modal} open=${open} onClose=${() => setOpen(false)} title=${t('search.paletteTitle') || 'Search everything'} className="cmdk-modal"
+    <${Modal} open=${open} onClose=${() => setOpen(false)} title=${t('search.paletteTitle') || 'Search everything'}
       guard=${false}>
-      <div class="cmdk" ref=${inputRef} onKeyDown=${onInputKey}>
-        <${SearchBar} value=${q} onInput=${e => setQ(e.target.value)} placeholder=${t('search.palettePlaceholder') || 'Search organisms, workspaces, records…'} />
-        <div class="cmdk-hint section-desc">${t('search.openHint') || '↵ open · Esc close'}</div>
-        <div class="cmdk-list">
-          ${busy && !items.length ? html`<${Spinner} text=${t('search.searching') || 'Searching…'} />` : null}
-          ${!busy && query.length >= 2 && !items.length ? html`<${EmptyState} text=${t('search.noMatches') || 'No matches'} />` : null}
-          ${orgMatches.length ? html`<div class="cmdk-group">${t('organisms.title') || 'Organisms'}</div>` : null}
-          ${orgMatches.map(row)}
-          ${contentItems.length ? html`<div class="cmdk-group">${t('search.results') || 'Results'}</div>` : null}
-          ${contentItems.map(row)}
-          ${recents.length ? html`<div class="cmdk-group">${t('search.recents') || 'Recent'}</div>` : null}
-          ${recents.map(row)}
-        </div>
-      </div>
+      <${QuickFind}
+        value=${q}
+        onInput=${setQ}
+        placeholder=${t('search.palettePlaceholder') || 'Search organisms, workspaces, records…'}
+        hint=${t('search.openHint') || '↵ open · Esc close'}
+        busy=${busy}
+        busyLabel=${t('search.searching') || 'Searching…'}
+        emptyLabel=${query.length >= 2 ? (t('search.noMatches') || 'No matches') : null}
+        groups=${[
+          { key: 'orgs', label: t('organisms.title') || 'Organisms', items: orgMatches.map(place) },
+          { key: 'hits', label: t('search.results') || 'Results', items: contentItems.map(place) },
+          { key: 'recents', label: t('search.recents') || 'Recent', items: recents.map(place) },
+        ]}
+        onPick=${choose} />
     </${Modal}>`;
 }

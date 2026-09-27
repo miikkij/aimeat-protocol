@@ -1,0 +1,17 @@
+/**
+ * @file move-buttons.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The two buttons that move a thing up or down (components/MoveButtons.js): bare ink
+ *   chevrons, stacked or side by side, the one that cannot move in the rule's grey. The values are
+ *   main's .adm-pt-move and .adm-pt-move--menu (views/admin-portal.css).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G2).
+ */
+
+.move-buttons { display: inline-flex; flex-direction: column; gap: 1px; padding-top: 1px; vertical-align: middle; }
+.move-buttons--across { flex-direction: row; gap: 8px; padding-top: 0; }
+.move-buttons button { padding: 0; border: 0; background: none; line-height: 0; color: var(--text); cursor: pointer; }
+.move-buttons button:disabled { color: var(--border); cursor: default; }
+.move-buttons svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: square; }

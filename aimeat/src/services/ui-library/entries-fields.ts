@@ -8,6 +8,7 @@
  * @structure FIELD_ENTRIES
  * @usage import { FIELD_ENTRIES } from './entries-fields.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — TextArea's indent and onSave, which the admin pages added (the script editor).
  *   v1.1.0 — 2026-09-27 — The entries field, text-field and choice, written from the headers of
  *     components/Field.js, TextField.js and Choice.js (the catalogue pass); form-fields, select-field,
  *     file-drop, tag-input and model-picker moved here unchanged from entries-settings.ts, with their ids.
@@ -68,7 +69,7 @@ export const FIELD_ENTRIES: UiEntryWritten[] = [
         summary: 'Where a person types: TextField is one line on an underline that turns coral on focus, TextArea several lines in a thin frame. Its options: an identifier in the typewriter face, a secret typed hidden with an eye at the right end that shows it, a search, a short or medium width, buttons in one row after it (in a thin dashed frame with `box`), and the underline in the danger colour when the form refused it.',
         module: '/components/TextField.js', sheet: '/css/components/text-field.css',
         data: {
-            shape: `TextField({ value, onInput, onChange, onEnter, onEscape, onBlur, onFocus, onKeyDown, onPaste, onClick, placeholder, type, code, secret, showLabel, hideLabel, unmanaged, noManager, search, note, size, actions, box, invalid, min, max, step, maxLength, inputMode, autoComplete, spellCheck, name, list, required, disabled, readOnly, autoFocus, ariaLabel, title, id, inputRef, ${FIELD_WORDS} }) · TextArea({ value, onInput, onChange, onSend, onEscape, onBlur, onFocus, onKeyDown, onPaste, placeholder, rows, code, grow, invalid, maxLength, spellCheck, name, required, disabled, readOnly, autoFocus, ariaLabel, title, id, inputRef, ${FIELD_WORDS} })`,
+            shape: `TextField({ value, onInput, onChange, onEnter, onEscape, onBlur, onFocus, onKeyDown, onPaste, onClick, placeholder, type, code, secret, showLabel, hideLabel, unmanaged, noManager, search, note, size, actions, box, invalid, min, max, step, maxLength, inputMode, autoComplete, spellCheck, name, list, required, disabled, readOnly, autoFocus, ariaLabel, title, id, inputRef, ${FIELD_WORDS} }) · TextArea({ value, onInput, onChange, onSend, onSave, onEscape, onBlur, onFocus, onKeyDown, onPaste, placeholder, rows, code, grow, indent, invalid, maxLength, spellCheck, name, required, disabled, readOnly, autoFocus, ariaLabel, title, id, inputRef, ${FIELD_WORDS} })`,
             fields: {
                 value: 'what the field holds',
                 onInput: '(value, event) on every key',
@@ -76,6 +77,8 @@ export const FIELD_ENTRIES: UiEntryWritten[] = [
                 onEnter: 'TextField: (value, event) on Enter, not while an input method is composing',
                 onEscape: '(event) on Escape; a search without it empties itself',
                 onSend: 'TextArea: (value, event) on Ctrl+Enter or Cmd+Enter',
+                onSave: 'TextArea: (value, event) on Ctrl+S or Cmd+S; the browser\'s own save of the page does not open',
+                indent: 'TextArea: a script editor, where Tab puts two spaces in at the caret instead of leaving the field',
                 onPaste: '(text, event) with the pasted words',
                 'onBlur, onFocus, onClick': 'the value first, then the event (onBlur); the browser\'s event (the others)',
                 onKeyDown: 'any other key; it runs first, and a preventDefault() in it stops Enter and Escape',
@@ -113,6 +116,7 @@ export const FIELD_ENTRIES: UiEntryWritten[] = [
             { name: 'search', prop: 'search', when: 'a search over a list; with `note`, the count at its end' },
             { name: 'dashed box', prop: 'box', when: 'a key or a name typed in place with its one action, in the thin dashed frame' },
             { name: 'refused', prop: 'invalid', when: 'the form refused what is in it' },
+            { name: 'script editor', prop: 'TextArea code indent onSave', when: 'a script a person writes and saves in place: Tab indents, Ctrl+S saves (the operator\'s Extensions page)' },
         ],
         example: { label: 'Name', value: 'Harbour Studio', hint: 'Shown to the people you invite.' },
         note: 'The fields themselves are the Form fields\' classes in form-fields.css: .og-input (the underline), .og-textarea (the frame), the code cuts (.og-input--code, .og-textarea--code) and the refused ones (.og-input--invalid, .og-textarea--invalid). `search` with a `note` draws the Search line (search-line.css), `box` the Field row (field-row.css), `actions` the field line (field.css). The secret\'s eye moved in from the apps form (.ap-secret, .ap-secret-eye); the short width is the middle of the page copies it replaces (wp-num, pf-or-input-sm, bp-field--narrow, pf-agd-tag-add-input), the medium width is ct-in--short\'s.',

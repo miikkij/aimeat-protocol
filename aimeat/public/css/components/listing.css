@@ -12,6 +12,35 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.24.0 — 2026-09-27 — The cuts of the operator pages' lists of admin group G1:
+ *     when-state-path-where-kind-desc (Security's refusal log), state-name-who-when-doors (its
+ *     refused-and-kept incidents, with main's 1100px rule) and name-state-meta-meta-doors
+ *     (Compliance's register), with main's columns.
+ *   v1.23.0 — 2026-09-27 — The cuts of the operator pages' tables (admin page group G3):
+ *     name-state-n-trend (Statistics' counters), name-desc-n-n-n-n (what was sent), name-n-n-n-bar
+ *     (Usage's models, Database's tables), name-n-n-n-n-n-state (who spent) and name-n-bar-desc
+ *     (Metrics' memory ledger), with main's column widths and 1100px rules.
+ *   v1.22.0 — 2026-09-27 — The cuts of the operator pages' lists (admin page group G4): n-name-n-when-doors
+ *     (Owners), n-name-tags-n-when-doors and name-kind-state-when (Organism ownership),
+ *     name-who-tags-n-when-doors and name-n-n-bar-doors (Agents), name-n-code-code-bar, name-n-n-bar and
+ *     name-n-desc (Agent integration), name-desc-state-mark-when-when-doors (GHII) and n-name-state
+ *     (Organisation sign-in's steps), with main's column widths and narrow rules.
+ *   v1.21.0 — 2026-09-27 — The cuts of the operator pages' tables (admin page group G7):
+ *     name-ver-who-n-kinds-doors (Cortex), name-words-when (a cortex's versions), name-n-where-state-doors,
+ *     name-kind-words and name-words (CSM), name-who-kind-n-seen-review-when-doors (Knowledge) and
+ *     tag-name-desc (an extension's actions), with main's column widths and narrow columns.
+ *   v1.20.0 — 2026-09-27 — The cuts of the operator pages' tables (page group G6): name-desc-code-n
+ *     (Email), name-code-when-when (Push), when-name-kind-who, name-when-who-state-when-doors and
+ *     when-name-kind-state-n-desc (Scheduler), name-state-kind-code-when-desc-edit-doors,
+ *     name-who-code-desc-desc, state-name-code-desc and name-code-state-when-doors (Federation,
+ *     Genesis), with main's column widths; the peers' cut becomes one block per peer at 1100px.
+ *   v1.19.0 — 2026-09-27 — The cuts of the operator pages' tables (page group G5): Actions, Capabilities,
+ *     Agent tasks, chat sessions, Applications, Boards, Memory (records, reach, versions), Realtime
+ *     (rooms, a room's people) and Work, with main's column widths.
+ *   v1.18.0 — 2026-09-27 — The cuts of the operator pages' tables (page group G8): name-ver-kind-n-state,
+ *     name-id-who-ver-n-when, name-id-score-n-mark-doors, name-id-who-when-mark, name-state-words-when
+ *     (Packages), name-where-what-who-when-doors (MSM) and name-tags-when-doors (Skills), with main's
+ *     column widths.
  *   v1.17.0 — 2026-09-26 — The cut state-name-who-doors for App development's pitfall lists (a
  *     severity or a tier in its own column), and n-name-doors for the Apps page's condition rows,
  *     each with its old narrow-screen columns (page group G6).
@@ -456,6 +485,178 @@
   .listing--n-name-doors { grid-template-columns: 3.6rem minmax(0, 1fr); }
   .listing--n-name-doors > .listing-row > :nth-child(2) { border-bottom: 0; padding-bottom: .2rem; }
   .listing--n-name-doors > .listing-row > :nth-child(3) { grid-column: 2; justify-content: flex-start; padding-top: 0; }
+}
+
+/* The operator pages' tables (page group G8): the Packages page's packages, installs, store listings,
+   review queue and decisions, and the MSM page's manifests, each with main's columns
+   (admin-packages.css .adm-pk-prow / -irow / -lrow / -qrow / -hrow, admin-msm.css .adm-msm-tbl). They
+   stack on a phone as every listing does, each cell saying its column (List labels). */
+.listing--name-ver-kind-n-state { grid-template-columns: minmax(0, 1fr) 9.25rem 6.75rem 5.25rem 5.75rem; }
+.listing--name-id-who-ver-n-when { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 7.5rem 9.25rem 4.9rem 8.25rem; }
+.listing--name-id-score-n-mark-doors { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 6.25rem 5.1rem 5.25rem 6.75rem; }
+.listing--name-id-who-when-mark { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 8.75rem 7.5rem 3rem; }
+.listing--name-state-words-when { grid-template-columns: minmax(0, 1.3fr) 6.75rem minmax(0, 1fr) 8.25rem; }
+.listing--name-where-what-who-when-doors { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, .7fr) minmax(0, .8fr) auto; }
+/* The Skills page's rows: the name, its tags, the day it changed, the doors (admin-skills.css .adm-sk-rtop). */
+.listing--name-tags-when-doors { grid-template-columns: minmax(0, 1fr) 16.25rem 5.6rem auto; }
+
+/* The operator pages' lists of page group G4 (Owners, Agents, GHII, Agent integration, Organism
+   ownership, Organisation sign-in), with main's column widths (admin-owners.css .adm-own-tr,
+   admin-agents.css .adm-ag-row / -orow, admin-ghii.css .adm-gh-row, admin-agent-integration.css
+   .adm-agi-row / -brow, admin-organism-ownership.css .adm-oo-row / -tr, admin-sso.css .adm-sso-step).
+   The numbered lists keep their numeral on a phone: the name, then its day and its doors under it. */
+.listing--n-name-n-when-doors { grid-template-columns: 2.4rem minmax(0, 1fr) 4.5rem 7rem auto; }
+.listing--n-name-tags-n-when-doors { grid-template-columns: 2.4rem minmax(0, 1fr) minmax(0, 15rem) 4.5rem 6.5rem auto; }
+.listing--name-who-tags-n-when-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 7.6rem) minmax(0, 18.25rem) 3.6rem 6.5rem auto; }
+.listing--name-n-n-bar-doors { grid-template-columns: minmax(0, 1fr) 6rem 6rem 9.4rem auto; }
+.listing--name-n-code-code-bar { grid-template-columns: minmax(0, 15.6rem) 5rem minmax(0, 10.6rem) minmax(0, 1fr) 11.25rem; }
+.listing--name-n-n-bar { grid-template-columns: minmax(0, 16.25rem) 5.6rem 5rem minmax(0, 1fr); }
+.listing--name-n-desc { grid-template-columns: minmax(0, 16.25rem) 6.9rem minmax(0, 1fr); }
+.listing--name-desc-state-mark-when-when-doors { grid-template-columns: minmax(8rem, 1.6fr) minmax(0, 1fr) auto 4.75rem minmax(0, 1fr) 7.25rem minmax(0, 1.2fr); }
+.listing--name-kind-state-when { grid-template-columns: minmax(0, 1fr) 5.5rem 5rem 6rem; }
+.listing--n-name-state { grid-template-columns: 2.75rem minmax(0, 1fr) 9.4rem; }
+/* A bar in a list cell stands in the middle of its line. */
+:is(.listing--name-n-n-bar-doors, .listing--name-n-code-code-bar, .listing--name-n-n-bar) > .listing-row > :nth-child(4):not(.listing-open),
+.listing--name-n-code-code-bar > .listing-row > :nth-child(5) { align-content: center; }
+@media (max-width: 1100px) {
+  /* Organism ownership: the created day goes (main hid it at 1100). */
+  .listing--n-name-tags-n-when-doors { grid-template-columns: 2.4rem minmax(0, 1fr) minmax(0, 12rem) 4rem auto; }
+  .listing--n-name-tags-n-when-doors > .listing-row > :nth-child(5) { display: none; }
+}
+@media (max-width: 860px) {
+  .listing--n-name-n-when-doors { grid-template-columns: 2rem minmax(0, 1fr) 3.5rem; }
+  .listing--n-name-n-when-doors > .listing-row > :nth-child(-n+4) { border-bottom: 0; padding-bottom: .15rem; }
+  .listing--n-name-n-when-doors > .listing-row > :nth-child(4) { grid-column: 2 / -1; padding-top: 0; }
+  .listing--n-name-n-when-doors > .listing-row > :nth-child(5) { grid-column: 2 / -1; justify-content: flex-start; padding-top: 0; }
+  /* Organism ownership: the numeral, the name; the owners and the doors under the name (main hid
+     the people count at 700 and the day at 1100). */
+  .listing--n-name-tags-n-when-doors { grid-template-columns: 2rem minmax(0, 1fr); }
+  .listing--n-name-tags-n-when-doors > .listing-row > :is(:nth-child(4), :nth-child(5)) { display: none; }
+  .listing--n-name-tags-n-when-doors > .listing-row > :nth-child(-n+3) { border-bottom: 0; padding-bottom: .15rem; }
+  .listing--n-name-tags-n-when-doors > .listing-row > :nth-child(3) { grid-column: 2; padding-top: 0; }
+  .listing--n-name-tags-n-when-doors > .listing-row > :nth-child(6) { grid-column: 2; justify-content: flex-start; padding-top: 0; }
+  /* A step: its number, then its words; the state under the words. */
+  .listing--n-name-state { grid-template-columns: 2.2rem minmax(0, 1fr); }
+  .listing--n-name-state > .listing-row > :nth-child(-n+2) { border-bottom: 0; padding-bottom: .15rem; }
+  .listing--n-name-state > .listing-row > :nth-child(3) { grid-column: 2; padding-top: 0; justify-content: flex-start; justify-items: start; text-align: left; }
+  .listing--name-kind-state-when { grid-template-columns: minmax(0, 1fr) 4.5rem 3.5rem; }
+  .listing--name-kind-state-when > .listing-row > :nth-child(4) { display: none; }
+}
+
+/* The operator pages' tables (admin page group G7): the Cortex page's cortexes and one cortex's
+   versions, the CSM page's registered CSMs, one CSM's fields and what a CSM refuses, the Knowledge
+   page's packages, and an extension's actions, each with main's columns (admin-cortex.css
+   .adm-cx-tbl / .adm-cx-vrow, admin-csm.css .adm-csm-row / .adm-csm-frow / .adm-csm-ref,
+   admin-knowledge.css .adm-kn-tbl, admin-extensions.css .adm-ex-act). */
+.listing--name-ver-who-n-kinds-doors { grid-template-columns: minmax(0, 1fr) 6.5rem minmax(0, 9rem) 4.5rem minmax(0, 9rem) auto; }
+.listing--name-n-where-state-doors { grid-template-columns: minmax(0, 13.75rem) 9.4rem minmax(0, 1fr) 9.4rem auto; }
+.listing--name-who-kind-n-seen-review-when-doors { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 4.5rem minmax(0, .8fr) minmax(0, 1fr) 6.5rem auto; }
+.listing--name-kind-words { grid-template-columns: minmax(0, 12rem) 7.5rem minmax(0, 1fr); }
+.listing--name-words { grid-template-columns: minmax(0, 13rem) minmax(0, 1fr); }
+.listing--name-words-when { grid-template-columns: 7.5rem minmax(0, 1fr) auto; }
+.listing--tag-name-desc { grid-template-columns: 3.9rem minmax(0, 1fr) minmax(0, 6rem); }
+@media (max-width: 1100px) {
+  .listing--name-n-where-state-doors { grid-template-columns: minmax(0, 11.9rem) 8.1rem minmax(0, 1fr) 8.1rem auto; }
+}
+@media (max-width: 900px) {
+  .listing--name-kind-words { grid-template-columns: minmax(0, 1fr) auto; }
+  .listing--name-kind-words > .listing-row > :nth-child(1), .listing--name-kind-words > .listing-row > :nth-child(2) { border-bottom: 0; padding-bottom: .1rem; }
+  .listing--name-kind-words > .listing-row > :nth-child(3) { grid-column: 1 / -1; padding-top: 0; }
+}
+@media (max-width: 760px) {
+  .listing--tag-name-desc { grid-template-columns: 3.25rem minmax(0, 1fr); }
+  .listing--tag-name-desc > .listing-row > :nth-child(1), .listing--tag-name-desc > .listing-row > :nth-child(2) { border-bottom: 0; padding-bottom: .1rem; }
+  .listing--tag-name-desc > .listing-row > :nth-child(3) { grid-column: 1 / -1; padding-top: 0; text-align: left; }
+}
+
+/* The operator pages' tables (page group G6): Email's automatic messages (name-desc-code-n), Push's
+   subscriptions (name-code-when-when), Scheduler's agenda, register and run log, Federation's peers,
+   book, directory and request history, and Genesis' peers (name-code-state-when-doors), each with
+   main's columns (admin-email.css .adm-em-row, admin-push.css .adm-pu-srow, admin-scheduler.css
+   .adm-sch-arow / -row / -lrow, admin-federation.css .adm-fed-tbl). They stack on a phone as every
+   listing does, each cell saying its column (List labels). */
+.listing--name-desc-code-n { grid-template-columns: minmax(0, 1fr) minmax(0, 18.75rem) minmax(0, 9.4rem) 5.75rem; }
+.listing--name-code-when-when { grid-template-columns: minmax(6.9rem, 1fr) minmax(0, 2.4fr) 9.25rem 9.25rem; }
+.listing--when-name-kind-who { grid-template-columns: 8.75rem minmax(0, 1fr) minmax(0, 10.6rem) minmax(0, 12.5rem); }
+.listing--name-when-who-state-when-doors { grid-template-columns: minmax(10rem, 1fr) minmax(0, 10.6rem) minmax(0, 9.4rem) minmax(0, 10rem) minmax(0, 7.5rem) auto; }
+.listing--when-name-kind-state-n-desc { grid-template-columns: 9.4rem minmax(0, 1fr) minmax(0, 7.5rem) minmax(0, 8.1rem) 5.6rem minmax(0, 14.4rem); }
+.listing--name-who-code-desc-desc { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 8rem) minmax(0, 1fr) minmax(0, 1fr); }
+.listing--state-name-code-desc { grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 1fr) minmax(0, 10rem); }
+.listing--name-code-state-when-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 8rem) 9rem auto; }
+/* Federation's peers: eight columns, the policy switches a fixed 13rem (a minimum let the longest
+   line widen the column past the page). Main turned the table into one block per peer at 1100px,
+   not at the phone's 860px: at 1024 the row's own actions stood past the edge of the page. */
+.listing--name-state-kind-code-when-desc-edit-doors { grid-template-columns: minmax(8rem, 1.2fr) minmax(0, 1fr) minmax(0, 5.5rem) minmax(0, 7rem) minmax(0, 7.5rem) minmax(0, 1.2fr) 13rem auto; }
+@media (max-width: 1100px) {
+  .listing--name-state-kind-code-when-desc-edit-doors { grid-template-columns: minmax(0, 1fr); }
+  .listing--name-state-kind-code-when-desc-edit-doors > .listing-row--head > div { display: none; }
+  .listing--name-state-kind-code-when-desc-edit-doors > .listing-row > div:where(:not(.listing-open)) { border-bottom: 0; padding-top: 0; padding-bottom: .3rem; }
+  .listing--name-state-kind-code-when-desc-edit-doors > .listing-row > div:where(:not(.listing-open)):first-child { padding-top: .8rem; }
+  .listing--name-state-kind-code-when-desc-edit-doors > .listing-row > div:last-child { padding-bottom: .8rem; border-bottom: 1px solid var(--border); }
+  .listing--name-state-kind-code-when-desc-edit-doors > .listing-row > .listing-doors { justify-content: flex-start; flex-wrap: wrap; white-space: normal; }
+  .listing--name-state-kind-code-when-desc-edit-doors.list--labels > .listing-row > [data-label]:not(:first-child)::before {
+    content: attr(data-label) ': '; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim);
+    text-transform: var(--shape-case-label); letter-spacing: var(--shape-tracking-label);
+  }
+}
+
+/* The operator pages' tables (page group G5), each with main's columns: Actions (admin
+   actions-tab.js table), Capabilities (capabilities-tab.js table), Agent tasks (agent-tasks-tab.js
+   table), the chat sessions (chat-instances-tab.js table), Applications (admin-apps.css .adm-ap-tbl),
+   Boards (admin-boards.css .adm-brd-row), Memory's records, its reach and a record's versions
+   (admin-memory.css .adm-mem-row-top, .adm-mem-rung, .adm-mem-hrow), Realtime's rooms and a room's
+   people (admin-realtime.css .adm-rt-row, .adm-rt-prow) and Work's items (admin-work.css
+   .adm-work-row). They stack on a phone as every listing does. */
+.listing--id-name-who-state-n-tags { grid-template-columns: minmax(0, 11rem) minmax(0, 1.4fr) minmax(0, 9rem) 7rem 5rem minmax(0, 1fr); }
+.listing--id-name-in-out-state-mark-n-n { grid-template-columns: minmax(0, 11rem) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 6.5rem 2.5rem 5rem 4rem; }
+.listing--id-name-state-n-when-when { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 6rem 4.5rem 9rem 9rem; }
+.listing--name-kind-id-when-state-doors { grid-template-columns: minmax(0, 1fr) 7rem minmax(0, 11rem) 9.5rem 5.5rem auto; }
+.listing--name-who-n-n-n-when-doors { grid-template-columns: minmax(0, 1.6fr) minmax(0, 9rem) 5rem 4.5rem 4rem 8.5rem auto; }
+.listing--name-who-state-count-when-doors { grid-template-columns: minmax(0, 1fr) 9.5rem 7.5rem 7.5rem 5.5rem auto; }
+.listing--name-who-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 13.75rem) auto; }
+.listing--tag-n-name-doors { grid-template-columns: 8rem 4.75rem minmax(0, 1fr) auto; }
+.listing--tag-when-who-n { grid-template-columns: 3.75rem 9.5rem minmax(0, 1fr) 5.5rem; }
+.listing--n-name-who-count-when-doors { grid-template-columns: 2.2rem minmax(0, 1fr) 15rem 6rem 6rem auto; }
+.listing--name-id-when { grid-template-columns: minmax(0, 1fr) 10rem 6rem; }
+.listing--n-id-state-name-who-n-when { grid-template-columns: 2.2rem 11.5rem 6.5rem minmax(0, 1fr) 14rem 5rem 7rem; }
+
+/* The operator pages' tables of admin page group G3 (Statistics, Usage, Database, Metrics), with
+   main's column widths: a counter with its state, its number and its days (admin-stats.css
+   .adm-st-crow); what was sent and whether it arrived (the .adm-st-tbl of section 05); the models,
+   and the database's tables, ranked with a share bar (admin-usage.css .adm-us-brow,
+   admin-database.css .adm-db-row); who spent (the .adm-us-tbl of section 04); the memory ledger
+   (admin-metrics-poster.css .adm-mx-ledger). They stack on a phone as every listing does, each cell
+   saying its column (List labels). */
+.listing--name-state-n-trend { grid-template-columns: minmax(0, 1fr) 7.5rem 9.4rem 13.1rem; }
+.listing--name-desc-n-n-n-n { grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr) repeat(4, minmax(4.5rem, auto)); }
+.listing--name-n-n-n-bar { grid-template-columns: minmax(0, 1fr) 6.9rem 6rem 6rem 14.4rem; }
+.listing--name-n-n-n-n-n-state { grid-template-columns: minmax(0, 1fr) repeat(5, minmax(4rem, auto)) auto; }
+.listing--name-n-bar-desc { grid-template-columns: 14.4rem 6.9rem 10rem minmax(0, 1fr); }
+:is(.listing--name-state-n-trend, .listing--name-n-n-n-bar) > .listing-row > :nth-child(4):not(.listing-open),
+:is(.listing--name-n-n-n-bar) > .listing-row > :nth-child(5):not(.listing-open),
+.listing--name-n-bar-desc > .listing-row > :nth-child(3):not(.listing-open) { align-content: center; }
+@media (max-width: 1100px) {
+  /* The days and the share go under the row (main's 1100px rules). */
+  .listing--name-state-n-trend { grid-template-columns: minmax(0, 1fr) 6.9rem 7.5rem; }
+  .listing--name-state-n-trend > .listing-row > :nth-child(4) { grid-column: 1 / -1; }
+  .listing--name-n-n-n-bar { grid-template-columns: minmax(0, 1fr) 6.25rem 5.6rem 5.6rem; }
+  .listing--name-n-n-n-bar > .listing-row > :nth-child(5) { grid-column: 1 / -1; }
+}
+
+/* The operator pages' lists of admin group G1 (Security, Compliance), with main's columns
+   (admin-security.css .adm-sec-tbl and .adm-sec-irow, admin-compliance.css .adm-cmp-tbl): the refusal
+   log (the time, the answer, the door kept at 15rem so a path reads as one, the source, the
+   credential, the reason that gives), the refused-and-kept incidents (the state, what, who, when, the
+   doors; at 1100px who and when stand under what and the doors under them), and the register (what,
+   its class, its models, who answered, the door). They stack on a phone as every listing does. */
+.listing--when-state-path-where-kind-desc { grid-template-columns: minmax(0, max-content) minmax(0, max-content) minmax(15rem, 1.2fr) minmax(0, max-content) minmax(0, .8fr) minmax(0, 1.4fr); }
+.listing--state-name-who-when-doors { grid-template-columns: 6rem minmax(0, 1fr) 13.75rem 11.9rem auto; }
+.listing--name-state-meta-meta-doors { grid-template-columns: minmax(0, 1fr) max-content minmax(0, max-content) minmax(0, max-content) auto; }
+@media (min-width: 861px) and (max-width: 1100px) {
+  .listing--state-name-who-when-doors { grid-template-columns: 6rem minmax(0, 1fr); }
+  .listing--state-name-who-when-doors > .listing-row > :nth-child(-n+4) { border-bottom: 0; padding-bottom: .2rem; }
+  .listing--state-name-who-when-doors > .listing-row > :is(:nth-child(3), :nth-child(4)) { grid-column: 2; padding-top: 0; }
+  .listing--state-name-who-when-doors > .listing-row > :nth-child(5) { grid-column: 1 / -1; justify-content: flex-start; padding-top: .2rem; }
 }
 
 @media (max-width: 860px) {

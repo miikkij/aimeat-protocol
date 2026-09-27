@@ -116,8 +116,6 @@
   <link rel="stylesheet" href="/css/components/card-menu.css">
   <link rel="stylesheet" href="/css/components/install-cta.css">
   <link rel="stylesheet" href="/css/components/own-aimeat.css">
-  <link rel="stylesheet" href="/css/views/app-grant.css">
-  <link rel="stylesheet" href="/css/views/invite-accept.css">
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/components/contact-card.css">
@@ -225,7 +223,6 @@
   <link rel="stylesheet" href="/css/components/gaii-chip.css">
   <link rel="stylesheet" href="/css/views/agents-detail.css">
   <link rel="stylesheet" href="/css/components/task-graph.css">
-  <link rel="stylesheet" href="/css/views/fleet.css">
   <link rel="stylesheet" href="/css/components/schedule-calendar.css">
   <link rel="stylesheet" href="/css/views/scheduler.css">
   <link rel="stylesheet" href="/css/components/week-rhythm.css">
@@ -233,6 +230,7 @@
   <link rel="stylesheet" href="/css/views/scheduler-poster.css">
   <link rel="stylesheet" href="/css/components/offer-map.css">
   <link rel="stylesheet" href="/css/components/step-strip.css">
+  <link rel="stylesheet" href="/css/components/shots.css">
   <link rel="stylesheet" href="/css/components/offer-request.css">
   <link rel="stylesheet" href="/css/components/rating-stars.css">
   <link rel="stylesheet" href="/css/views/offers-poster.css">
@@ -254,42 +252,6 @@
   <link rel="stylesheet" href="/css/components/proof-ledger.css">
   <link rel="stylesheet" href="/css/components/changelog.css">
   <link rel="stylesheet" href="/css/views/libraries-poster.css">
-  <link rel="stylesheet" href="/css/views/admin.css">
-  <link rel="stylesheet" href="/css/views/admin-agents.css">
-  <link rel="stylesheet" href="/css/views/admin-email.css">
-  <link rel="stylesheet" href="/css/views/admin-extensions.css">
-  <link rel="stylesheet" href="/css/views/admin-agent-integration.css">
-  <link rel="stylesheet" href="/css/views/admin-scheduler.css">
-  <link rel="stylesheet" href="/css/views/admin-skills.css">
-  <link rel="stylesheet" href="/css/views/admin-csm.css">
-  <link rel="stylesheet" href="/css/views/admin-boards.css">
-  <link rel="stylesheet" href="/css/views/admin-memory.css">
-  <link rel="stylesheet" href="/css/views/admin-security.css">
-  <link rel="stylesheet" href="/css/views/admin-cors.css">
-  <link rel="stylesheet" href="/css/views/admin-prompts.css">
-  <link rel="stylesheet" href="/css/views/admin-apps.css">
-  <link rel="stylesheet" href="/css/views/admin-portal.css">
-  <link rel="stylesheet" href="/css/views/admin-cortex.css">
-  <link rel="stylesheet" href="/css/views/admin-msm.css">
-  <link rel="stylesheet" href="/css/views/admin-discovery.css">
-  <link rel="stylesheet" href="/css/views/admin-hooks.css">
-  <link rel="stylesheet" href="/css/views/admin-stats.css">
-  <link rel="stylesheet" href="/css/views/admin-usage.css">
-  <link rel="stylesheet" href="/css/views/admin-sso.css">
-  <link rel="stylesheet" href="/css/views/admin-knowledge.css">
-  <link rel="stylesheet" href="/css/views/admin-federation.css">
-  <link rel="stylesheet" href="/css/views/admin-compliance.css">
-  <link rel="stylesheet" href="/css/views/admin-maintenance.css">
-  <link rel="stylesheet" href="/css/views/admin-subdomains.css">
-  <link rel="stylesheet" href="/css/views/admin-database.css">
-  <link rel="stylesheet" href="/css/views/admin-owners.css">
-  <link rel="stylesheet" href="/css/views/admin-organism-ownership.css">
-  <link rel="stylesheet" href="/css/views/admin-work.css">
-  <link rel="stylesheet" href="/css/views/admin-realtime.css">
-  <link rel="stylesheet" href="/css/views/admin-metrics-poster.css">
-  <link rel="stylesheet" href="/css/views/admin-ghii.css">
-  <link rel="stylesheet" href="/css/views/admin-push.css">
-  <link rel="stylesheet" href="/css/views/admin-packages.css">
   <link rel="stylesheet" href="/css/views/public-knowledge-viewer.css">
   <link rel="stylesheet" href="/css/views/public-workspace-viewer.css">
   <link rel="stylesheet" href="/css/views/start.css">
@@ -303,6 +265,22 @@
   <link rel="stylesheet" href="/css/components/crumb-trail.css">
   <link rel="stylesheet" href="/css/components/page-head.css">
   <link rel="stylesheet" href="/css/components/figure-strip.css">
+  <link rel="stylesheet" href="/css/components/readings.css">
+  <link rel="stylesheet" href="/css/components/pick-field.css">
+  <link rel="stylesheet" href="/css/components/status-page-preview.css">
+  <link rel="stylesheet" href="/css/components/search-preview.css">
+  <link rel="stylesheet" href="/css/components/save-bar.css">
+  <link rel="stylesheet" href="/css/components/move-buttons.css">
+  <link rel="stylesheet" href="/css/components/count-bars.css">
+  <link rel="stylesheet" href="/css/components/print-page.css">
+  <link rel="stylesheet" href="/css/components/settings-index.css">
+  <link rel="stylesheet" href="/css/components/day-chart.css">
+  <link rel="stylesheet" href="/css/components/trend-line.css">
+  <link rel="stylesheet" href="/css/components/operator-menu.css">
+  <link rel="stylesheet" href="/css/components/operator-frame.css">
+  <link rel="stylesheet" href="/css/components/ask-page.css">
+  <link rel="stylesheet" href="/css/components/solo-window.css">
+  <link rel="stylesheet" href="/css/components/quick-find.css">
   <link rel="stylesheet" href="/css/components/page-section.css">
   <link rel="stylesheet" href="/css/components/fold-row.css">
   <link rel="stylesheet" href="/css/components/setting-box.css">
@@ -658,6 +636,23 @@
       "/components/NumberBand.js": "/components/NumberBand.js",
       "/components/Facts.js": "/components/Facts.js",
       "/components/FigureStrip.js": "/components/FigureStrip.js",
+      "/components/Readings.js": "/components/Readings.js",
+      "/components/PickField.js": "/components/PickField.js",
+      "/components/StatusPagePreview.js": "/components/StatusPagePreview.js",
+      "/components/SearchPreview.js": "/components/SearchPreview.js",
+      "/components/SaveBar.js": "/components/SaveBar.js",
+      "/components/MoveButtons.js": "/components/MoveButtons.js",
+      "/components/CountBars.js": "/components/CountBars.js",
+      "/components/PrintPage.js": "/components/PrintPage.js",
+      "/components/SettingsIndex.js": "/components/SettingsIndex.js",
+      "/components/DayChart.js": "/components/DayChart.js",
+      "/components/TrendLine.js": "/components/TrendLine.js",
+      "/components/OperatorMenu.js": "/components/OperatorMenu.js",
+      "/components/OperatorFrame.js": "/components/OperatorFrame.js",
+      "/components/AskPage.js": "/components/AskPage.js",
+      "/components/SoloWindow.js": "/components/SoloWindow.js",
+      "/components/QuickFind.js": "/components/QuickFind.js",
+      "/components/OwnAimeat.js": "/components/OwnAimeat.js",
       "/components/Figure.js": "/components/Figure.js",
       "/components/FoldSection.js": "/components/FoldSection.js",
       "/components/SettingsPage.js": "/components/SettingsPage.js",
@@ -784,6 +779,7 @@
       "/components/StepCard.js": "/components/StepCard.js",
       "/components/StepList.js": "/components/StepList.js",
       "/components/StepStrip.js": "/components/StepStrip.js",
+      "/components/Shots.js": "/components/Shots.js",
       "/components/OfferMap.js": "/components/OfferMap.js",
       "/components/Suggestion.js": "/components/Suggestion.js",
       "/components/SwatchPicker.js": "/components/SwatchPicker.js",

@@ -3,6 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Sections 03 and 05 of the Federation page: the peers, and the nodes asking to join.
+ *   The sections draw library components and pass them data; they write no class.
  *
  *   THE STATE COLUMN SAYS WHAT TO DO, not what the database calls it. `pending` and `approved` are
  *   two doors' words for the same thing — added, not switched on — and a peer with no verification
@@ -17,11 +18,18 @@
  *   2026-08-23 and corrected on 2026-09-03, it explains its own clamp, and the row's summary reads
  *   out of the same flags rather than replacing it: the summary is what a peer may do, the panel is
  *   where it is changed. → federation-peer-policy.js
+ *
+ *   A STUCK ROW IS MARKED WITH A RULE, NOT A FILL (main's admin-federation.css): a peer that cannot
+ *   carry anything yet wears the List's warn rail at its start, on the same ground as every other row.
  * @structure
  *   - PeerTable (03) — one row per peer, with the policy cell kept as it was
  *   - AskingToJoin (05) — the pending requests, and the door to the history
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components, no class: the peers, the requests and the history
+ *     are Lists (each cell says its column on a narrow screen; the peers turn into one block each at
+ *     1100px, as before), the state and the version keep their status colours as Tinted words, the
+ *     empty lines are quiet notes, the requests stand in the settings box.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
@@ -32,6 +40,14 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, dt } from './shared.js';
 import PeerPolicyCell, { TierLadderLegend } from './federation-peer-policy.js';
+import { Section } from '/components/Section.js';
+import { List, Row as ListRow, Name, Desc, Cell, When, Doors } from '/components/List.js';
+import { Tinted } from '/components/Figure.js';
+import { Action } from '/components/Action.js';
+import { SettingBox } from '/components/Box.js';
+import { Split, Space } from '/components/Layout.js';
+import { Note } from '/components/Note.js';
+import { Label } from '/components/Mark.js';
 
 const S = (key, params) => t('admin.fed.' + key, params);
 
@@ -46,6 +62,9 @@ const MAY = [
   ['allow_federated_auth', 'signin'],
 ];
 
+/** The state words' tones: fine, needs a look, or bad. */
+const TONE = { good: 'fine', wait: 'warn', bad: 'danger' };
+
 /**
  * What this peer may do here, and what it may not, in one cell.
  *
@@ -56,10 +75,9 @@ function MayDo({ peer }) {
   const may = MAY.filter(([f]) => peer[f] === true).map(([, w]) => S('peers.may_' + w));
   const mayNot = MAY.filter(([f]) => peer[f] !== true).map(([, w]) => S('peers.may_' + w));
   return html`
-    <span class="adm-fed-may">
-      ${may.length ? may.join(' · ') : html`<span class="adm-fed-maynot">${S('peers.mayNothing')}</span>`}
-      ${mayNot.length ? html`<br /><span class="adm-fed-maynot">${S('peers.mayNot', { list: mayNot.join(', ') })}</span>` : null}
-    </span>`;
+    <${Desc} sub=${mayNot.length ? S('peers.mayNot', { list: mayNot.join(', ') }) : undefined}>
+      ${may.length ? may.join(' · ') : html`<${Tinted} tone="dim">${S('peers.mayNothing')}<//>`}
+    <//>`;
 }
 
 /** The state word, chosen by what the operator would do about it rather than by the schema. */
@@ -75,81 +93,64 @@ function stateOf(p) {
   return { word: p.status || '—', why: null, tone: '' };
 }
 
+/** A version, how far behind the newest it is (in the warn colour), or that it is the newest. */
+function Version({ version, behind, newest }) {
+  const same = !behind && version && newest && version === newest;
+  return html`
+    <${Cell} meta sub=${same ? S('peers.newest') : undefined}>
+      ${version || '—'}
+      ${behind ? html` <${Tinted} strong tone="warn">${S('peers.behind', { n: num(behind), of: newest })}<//>` : null}
+    <//>`;
+}
+
 export function PeerTable({ peers, overview, onActivate, onPromote, onRemove, onEmergency, onPolicy, onAdd, onTest }) {
   const newest = overview.newest_version;
 
   return html`
-    <section class="og-sec" id="adm-fed-03">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('peers.title')}<small>03</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onAdd}>${S('peers.add')}</button>
-          <button type="button" class="og-door og-door--quiet" onClick=${onTest}>${S('peers.test')}</button>
-        </div>
-      </div>
-      <p class="adm-intro">${S('peers.lead')}</p>
+    <${Section} id="adm-fed-03" num="03" title=${S('peers.title')}
+      doors=${html`
+        <${Action} small soft onClick=${onAdd}>${S('peers.add')}<//>
+        <${Action} small soft onClick=${onTest}>${S('peers.test')}<//>`}>
+      <${Note} kind="lead">${S('peers.lead')}<//>
       <${TierLadderLegend} />
 
-      ${!peers.length
-    ? html`<div class="adm-fed-empty">${S('peers.empty')}</div>`
-    : html`<div class="adm-fed-scroll"><table class="adm-fed-tbl">
-      <thead><tr>
-        <th>${S('peers.colNode')}</th>
-        <th>${S('peers.colState')}</th>
-        <th>${S('peers.colRung')}</th>
-        <th>${S('peers.colVersion')}</th>
-        <th>${S('peers.colHeard')}</th>
-        <th>${S('peers.colMay')}</th>
-        <th>${S('peers.colChange')}</th>
-        <th class="acts"></th>
-      </tr></thead>
-      <tbody>
+      <${List} cols="name-state-kind-code-when-desc-edit-doors" labels empty=${S('peers.empty')}
+        head=${[S('peers.colNode'), S('peers.colState'), S('peers.colRung'), S('peers.colVersion'),
+          S('peers.colHeard'), S('peers.colMay'), S('peers.colChange'), '']}>
         ${peers.map(p => {
-      const st = stateOf(p);
-      const behind = p.versions_behind;
-      return html`<tr key=${p.node_id} class=${st.stuck ? 'adm-fed-row--stuck' : ''}>
-            <td>
-              <b class="mono">${p.node_id}</b>
-              <span class="adm-fed-url">${p.url || '—'}</span>
-            </td>
-            <td>
-              <span class="adm-fed-state adm-fed-state--${st.tone}">${st.word}</span>
-              ${st.why ? html`<span class="adm-fed-sub">${st.why}</span>` : null}
-            </td>
-            <td data-col=${S('peers.colRung')}>${t('dashboard.fedTier_' + (p.tier || 'member')) || p.tier || 'member'}</td>
-            <td class="mono" data-col=${S('peers.colVersion')}>
-              ${p.software_version || '—'}
-              ${behind
-        ? html`<span class="adm-fed-behind">${S('peers.behind', { n: num(behind), of: newest })}</span>`
-        : p.software_version && newest && p.software_version === newest
-          ? html`<span class="adm-fed-same">${S('peers.newest')}</span>`
-          : null}
-            </td>
-            <td class="adm-fed-when" data-col=${S('peers.colHeard')}>${dt(p.last_seen)}</td>
-            <td><${MayDo} peer=${p} /></td>
-            <td><${PeerPolicyCell} peer=${p} onUpdate=${(field, value) => onPolicy(p.node_id, field, value)} /></td>
-            <td class="acts">
+    const st = stateOf(p);
+    return html`
+          <${ListRow} key=${p.node_id} rail=${st.stuck ? 'warn' : undefined}>
+            <${Name} asKey meta=${p.url || '—'}>${p.node_id}<//>
+            <${Desc} sub=${st.why || undefined}>
+              <${Tinted} strong tone=${TONE[st.tone]}>${st.word}<//>
+            <//>
+            <${Desc}>${t('dashboard.fedTier_' + (p.tier || 'member')) || p.tier || 'member'}<//>
+            <${Version} version=${p.software_version} behind=${p.versions_behind} newest=${newest} />
+            <${When}>${dt(p.last_seen)}<//>
+            <${MayDo} peer=${p} />
+            <${Cell}><${PeerPolicyCell} peer=${p} onUpdate=${(field, value) => onPolicy(p.node_id, field, value)} /><//>
+            <${Doors}>
               ${(p.status === 'pending' || p.status === 'approved') && p.public_key
-        ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => onActivate(p.node_id)}>${S('peers.switchOn')}</button>`
-        : null}
+      ? html`<${Action} small soft onClick=${() => onActivate(p.node_id)}>${S('peers.switchOn')}<//>`
+      : null}
               ${p.tier === 'visiting'
-        ? html`<button type="button" class="og-door og-door--quiet"
-            title=${p.promotion_eligible ? S('peers.promoteReady') : S('peers.promoteNotYet', { why: (p.promotion_failing || []).join(', ') })}
-            onClick=${() => onPromote(p)}>${S('peers.promote')}</button>`
-        : null}
+      ? html`<${Action} small soft
+                  title=${p.promotion_eligible ? S('peers.promoteReady') : S('peers.promoteNotYet', { why: (p.promotion_failing || []).join(', ') })}
+                  onClick=${() => onPromote(p)}>${S('peers.promote')}<//>`
+      : null}
               ${(p.status === 'active' || p.status === 'degraded')
-        ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => onRemove(p.node_id)}>${S('peers.depeer')}</button>`
-        : null}
+      ? html`<${Action} small soft onClick=${() => onRemove(p.node_id)}>${S('peers.depeer')}<//>`
+      : null}
               ${(p.status === 'active' || p.status === 'degraded' || p.status === 'offline' || p.status === 'depeering')
-        ? html`<button type="button" class="og-door og-door--danger" onClick=${() => onEmergency(p.node_id)}>${S('peers.cutOff')}</button>`
-        : null}
-            </td>
-          </tr>`;
-    })}
-      </tbody>
-    </table></div>`}
-      <p class="adm-fed-note">${S('peers.relayNote')}</p>
-    </section>`;
+      ? html`<${Action} small tone="danger" onClick=${() => onEmergency(p.node_id)}>${S('peers.cutOff')}<//>`
+      : null}
+            <//>
+          <//>`;
+  })}
+      <//>
+      <${Note}>${S('peers.relayNote')}<//>
+    <//>`;
 }
 
 /**
@@ -164,77 +165,61 @@ export function AskingToJoin({ overview, historyOpen, onToggleHistory, history, 
   const sent = overview.requests.sent || [];
 
   return html`
-    <section class="og-sec" id="adm-fed-05">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('join.title')}<small>05</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onToggleHistory}>
-            ${historyOpen ? S('join.hideHistory') : S('join.showHistory', { n: num(overview.requests.history) })}
-          </button>
-        </div>
-      </div>
+    <${Section} id="adm-fed-05" num="05" title=${S('join.title')}
+      doors=${html`<${Action} small soft expanded=${!!historyOpen} onClick=${onToggleHistory}>
+        ${historyOpen ? S('join.hideHistory') : S('join.showHistory', { n: num(overview.requests.history) })}
+      <//>`}>
 
       ${!pending.length
-    ? html`<div class="adm-fed-empty">${S('join.none')}</div>`
-    : html`<div class="og-box poster-aside poster-aside--small">
-        <span class="og-box-label">${S('join.label', { n: num(pending.length) })}</span>
-        ${pending.map(r => html`
-          <div class="adm-fed-req" key=${r.id}>
-            <div>
-              <b class="mono">${r.from_node_id || r.from_node_url}</b>
-              <span class="adm-fed-url">${r.from_node_url || '—'}</span>
-              <p>${r.message || S('join.noMessage')}</p>
-              <p>${S('join.asked', { when: dt(r.created_at), tier: t('dashboard.fedTier_' + (r.tier || 'member')) || r.tier })}</p>
-            </div>
-            <div class="adm-fed-reqacts">
-              <button type="button" class="og-door og-door--quiet" onClick=${() => onApprove(r.id)}>${S('join.approve')}</button>
-              <button type="button" class="og-door og-door--danger" onClick=${() => onReject(r.id)}>${S('join.refuse')}</button>
-            </div>
-          </div>`)}
-      </div>`}
+    ? html`<${Note} kind="quiet">${S('join.none')}<//>`
+    : html`<${SettingBox} label=${S('join.label', { n: num(pending.length) })}>
+        <${List} cols="name-doors">
+          ${pending.map(r => html`
+            <${ListRow} key=${r.id}>
+              <${Name} asKey meta=${r.from_node_url || '—'}
+                desc=${[r.message || S('join.noMessage'), S('join.asked', { when: dt(r.created_at), tier: t('dashboard.fedTier_' + (r.tier || 'member')) || r.tier })]}>
+                ${r.from_node_id || r.from_node_url}
+              <//>
+              <${Doors}>
+                <${Action} small soft onClick=${() => onApprove(r.id)}>${S('join.approve')}<//>
+                <${Action} small tone="danger" onClick=${() => onReject(r.id)}>${S('join.refuse')}<//>
+              <//>
+            <//>`)}
+        <//>
+      <//>`}
 
       ${sent.length > 0 && html`
-        <div class="adm-fed-sent">
-          <div class="adm-fed-lbl">${S('join.sentLabel', { n: num(sent.length) })}</div>
-          <p class="adm-fed-note adm-fed-note--top">${S('join.sentWhy')}</p>
-          ${sent.map(r => html`
-            <div class="adm-fed-req adm-fed-req--sent" key=${r.id}>
-              <div>
-                <b class="mono">${r.to_node_id || r.target_url || '—'}</b>
-                <span class="adm-fed-url">${r.target_url || '—'}</span>
-                <p>${S('join.sentAsked', { when: dt(r.created_at) })}</p>
-              </div>
-              <div class="adm-fed-reqacts">
-                <button type="button" class="og-door og-door--danger" onClick=${() => onDelete(r.id)}>${S('join.withdraw')}</button>
-              </div>
-            </div>`)}
-        </div>`}
+        <${Split} above="large">
+          <${Label} block>${S('join.sentLabel', { n: num(sent.length) })}<//>
+          <${Note}>${S('join.sentWhy')}<//>
+          <${List} cols="name-doors">
+            ${sent.map(r => html`
+              <${ListRow} key=${r.id} faded>
+                <${Name} asKey meta=${r.target_url || '—'} desc=${S('join.sentAsked', { when: dt(r.created_at) })}>
+                  ${r.to_node_id || r.target_url || '—'}
+                <//>
+                <${Doors}>
+                  <${Action} small tone="danger" onClick=${() => onDelete(r.id)}>${S('join.withdraw')}<//>
+                <//>
+              <//>`)}
+          <//>
+        <//>`}
 
-      <p class="adm-fed-note">${S('join.twoPresses')}</p>
+      <${Note}>${S('join.twoPresses')}<//>
 
       ${historyOpen && html`
-        <div class="adm-fed-scroll adm-fed-after">
-          ${!history.length
-    ? html`<div class="adm-fed-empty">${S('join.historyEmpty')}</div>`
-    : html`<table class="adm-fed-tbl">
-        <thead><tr>
-          <th>${S('join.colNode')}</th>
-          <th>${S('join.colWhere')}</th>
-          <th>${S('join.colOutcome')}</th>
-          <th>${S('join.colWhen')}</th>
-          <th class="acts"></th>
-        </tr></thead>
-        <tbody>
-          ${history.map(r => html`<tr key=${r.id}>
-            <td><b class="mono">${r.from_node_id || '—'}</b></td>
-            <td class="mono">${r.target_url || r.from_node_url || '—'}</td>
-            <td>${S('join.outcome_' + r.status) || r.status}</td>
-            <td class="adm-fed-when">${dt(r.created_at)}</td>
-            <td class="acts"><button type="button" class="og-door og-door--danger"
-              onClick=${() => onDelete(r.id)}>${S('join.forget')}</button></td>
-          </tr>`)}
-        </tbody>
-      </table>`}
-        </div>`}
-    </section>`;
+        <${Space} above="large">
+          <${List} cols="name-code-state-when-doors" labels empty=${S('join.historyEmpty')}
+            head=${[S('join.colNode'), S('join.colWhere'), S('join.colOutcome'), S('join.colWhen'), '']}>
+            ${history.map(r => html`
+              <${ListRow} key=${r.id}>
+                <${Name} asKey>${r.from_node_id || '—'}<//>
+                <${Cell} meta>${r.target_url || r.from_node_url || '—'}<//>
+                <${Desc}>${S('join.outcome_' + r.status) || r.status}<//>
+                <${When}>${dt(r.created_at)}<//>
+                <${Doors}><${Action} small tone="danger" onClick=${() => onDelete(r.id)}>${S('join.forget')}<//><//>
+              <//>`)}
+          <//>
+        <//>`}
+    <//>`;
 }

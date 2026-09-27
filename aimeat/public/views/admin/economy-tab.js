@@ -9,6 +9,10 @@
  *   the daily cap is. Every policy row carries a sentence about what it does.
  * @structure EconomyTab — strip · morsels · trade · money · grant form
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only: the strip is the FigureStrip (the inflation
+ *     figure in coral when it is high), the sections Section with their sub-words as the count, the
+ *     policy rows Readings in Columns, the grant form TextFields and the Loud action with its
+ *     message. The page writes no class.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-08-31 — The poster face: sections with meaning sentences, morsels and money
  *     separated, the mint form explained. Replaces five equal-weight key-value cards.
@@ -21,8 +25,16 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { escHtml, fmtMoney } from '/js/utils.js';
-import { num } from './shared.js';
+import { num, Spinner } from './shared.js';
 import { mintMorsels } from '/js/services/admin.js';
+import { Section } from '/components/Section.js';
+import { Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Note } from '/components/Note.js';
+import { Loud } from '/components/Action.js';
+import { Columns } from '/components/Layout.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
 
 /** Format a { EUR: 15000000, USD: 9000000 } micro-units map as "15.00 EUR · 9.00 USD". */
 function fmtMoneyMap(m) {
@@ -32,12 +44,7 @@ function fmtMoneyMap(m) {
 }
 
 /** One policy row: the name, a sentence about what it does, and the value in mono. */
-function Row({ label, why, value }) {
-  return html`<div class="adm-mrow adm-mrow--two">
-    <span><b>${label}</b>${why ? html`<span class="adm-why">${why}</span>` : null}</span>
-    <span class="adm-mval">${value}</span>
-  </div>`;
-}
+const row = (key, label, why, value, last) => ({ key, name: label, why: why || undefined, value, last });
 
 export default function EconomyTab({ data, reload }) {
   // Hooks must run unconditionally before any early return (Rules of Hooks).
@@ -46,7 +53,7 @@ export default function EconomyTab({ data, reload }) {
   const [mintResult, setMintResult] = useState(null);
 
   const e = data.dash?.economy;
-  if (!e) return html`<div class="empty">${t('dashboard.loading')}</div>`;
+  if (!e) return html`<${Spinner} text=${t('dashboard.loading')} />`;
 
   async function doMint() {
     const amount = parseInt(mintAmount, 10);
@@ -67,75 +74,78 @@ export default function EconomyTab({ data, reload }) {
   const inflHigh = parseFloat(e.inflation_rate_30d_percent) >= 10;
   // Finnish writes decimals with a comma and a space before the percent sign (Kielitoimisto).
   const pct = (getLocale() === 'fi' ? String(e.inflation_rate_30d_percent).replace('.', ',') : String(e.inflation_rate_30d_percent)) + ' %';
+  const unit = (n) => num(n) + ' ' + t('dashboard.morselUnit');
 
   return html`
-    <div class="og">
-      <div class="og-strip">
-        <div><b>${num(e.total_morsels_in_circulation)}</b><span>${t('dashboard.ecoStripCirc')}</span><small>${t('dashboard.ecoStripCircSub')}</small></div>
-        <div><b>${num(e.total_minted_all_time)}</b><span>${t('dashboard.ecoStripMinted')}</span><small>${t('dashboard.ecoStripMintedSub', { n: num(e.total_burned_all_time) })}</small></div>
-        <div><b class=${inflHigh ? 'og-coral-num' : ''}>${pct}</b><span>${t('dashboard.ecoStripInfl')}</span><small>${t('dashboard.ecoStripInflSub')}</small></div>
-        <div><b>${num(e.transactions_today)}</b><span>${t('dashboard.ecoStripTx')}</span><small>${t('dashboard.ecoStripTxSub', { n: num(e.morsels_transacted_today) })}</small></div>
-      </div>
+    <${FigureStrip} items=${[
+      { key: 'circ', n: num(e.total_morsels_in_circulation), label: t('dashboard.ecoStripCirc'), sub: t('dashboard.ecoStripCircSub') },
+      { key: 'minted', n: num(e.total_minted_all_time), label: t('dashboard.ecoStripMinted'), sub: t('dashboard.ecoStripMintedSub', { n: num(e.total_burned_all_time) }) },
+      { key: 'infl', n: pct, tone: inflHigh ? 'notice' : undefined, label: t('dashboard.ecoStripInfl'), sub: t('dashboard.ecoStripInflSub') },
+      { key: 'tx', n: num(e.transactions_today), label: t('dashboard.ecoStripTx'), sub: t('dashboard.ecoStripTxSub', { n: num(e.morsels_transacted_today) }) },
+    ]} />
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.ecoMorselsTitle')}<small>${t('dashboard.ecoMorselsSub')}</small></h2></div>
-        <p class="adm-intro">${t('dashboard.ecoMorselsIntro')}</p>
-        <div class="adm-two">
-          <div>
-            <${Row} label=${t('dashboard.welcomeBonus')} why=${t('dashboard.ecoWhyWelcome')} value=${num(e.welcome_bonus) + ' ' + t('dashboard.morselUnit')} />
-            <${Row} label=${t('dashboard.dailyAllowance')} why=${t('dashboard.ecoWhyDaily')} value=${num(e.daily_allowance) + ' ' + t('dashboard.morselUnit')} />
-            <${Row} label=${t('dashboard.allowanceCap')} why=${t('dashboard.ecoWhyCap')} value=${num(e.daily_allowance_cap) + ' ' + t('dashboard.morselUnit')} />
-          </div>
-          <div>
-            <${Row} label=${t('dashboard.burnRate')} why=${t('dashboard.ecoWhyBurnRate')} value=${e.burn_rate} />
-            <${Row} label=${t('dashboard.maxOperatorMint')} why=${t('dashboard.ecoWhyMintCap')} value=${num(e.max_operator_mint_per_day) + ' ' + t('dashboard.morselUnit')} />
-            <${Row} label=${t('dashboard.dailyAllowancesIssued')} why=${t('dashboard.ecoWhyAllowancesToday')} value=${num(e.daily_allowances_issued_today)} />
-          </div>
+    <${Section} title=${t('dashboard.ecoMorselsTitle')} count=${t('dashboard.ecoMorselsSub')}>
+      <${Note} kind="lead">${t('dashboard.ecoMorselsIntro')}<//>
+      <${Columns}>
+        <div>
+          <${Readings} rows=${[
+            row('welcome', t('dashboard.welcomeBonus'), t('dashboard.ecoWhyWelcome'), unit(e.welcome_bonus)),
+            row('daily', t('dashboard.dailyAllowance'), t('dashboard.ecoWhyDaily'), unit(e.daily_allowance)),
+            row('cap', t('dashboard.allowanceCap'), t('dashboard.ecoWhyCap'), unit(e.daily_allowance_cap)),
+          ]} />
         </div>
-      </section>
+        <div>
+          <${Readings} rows=${[
+            row('burn', t('dashboard.burnRate'), t('dashboard.ecoWhyBurnRate'), e.burn_rate),
+            row('mintcap', t('dashboard.maxOperatorMint'), t('dashboard.ecoWhyMintCap'), unit(e.max_operator_mint_per_day)),
+            row('issued', t('dashboard.dailyAllowancesIssued'), t('dashboard.ecoWhyAllowancesToday'), num(e.daily_allowances_issued_today)),
+          ]} />
+        </div>
+      <//>
+    <//>
 
-      ${c && html`
-        <section class="og-sec">
-          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.ecoTradeTitle')}<small>${t('dashboard.ecoTradeSub')}</small></h2></div>
-          <div class="adm-two">
-            <div>
-              <${Row} label=${t('dashboard.ecoCheckout')}
-                why=${c.enabled
+    ${c && html`
+      <${Section} title=${t('dashboard.ecoTradeTitle')} count=${t('dashboard.ecoTradeSub')}>
+        <${Columns}>
+          <div>
+            <${Readings} rows=${[
+              row('checkout', t('dashboard.ecoCheckout'),
+                c.enabled
                   ? (c.fee_mode === 'operator' ? t('dashboard.ecoFeeOperator', { p: c.fee_percent }) : t('dashboard.ecoFeeBurn', { p: c.fee_percent }))
-                  : t('dashboard.ecoCheckoutOff')}
-                value=${t('dashboard.ecoSessionsN', { n: num(c.checkout_sessions.total) })} />
-              <${Row} label=${t('dashboard.commerceSessions')}
-                why=${t('dashboard.ecoSessionsSub', { open: num(c.checkout_sessions.open), done: num(c.checkout_sessions.completed), cancelled: num(c.checkout_sessions.cancelled), expired: num(c.checkout_sessions.expired) })}
-                value=${''} />
-            </div>
-            <div>
-              <${Row} label=${t('dashboard.ecoSales')} why=${t('dashboard.ecoAllTimeToday', { n: num(c.sales_volume_today) })} value=${num(c.sales_volume_all_time) + ' ' + t('dashboard.morselUnit')} />
-              <${Row} label=${t('dashboard.ecoOperatorFees')} why=${t('dashboard.ecoAllTimeToday', { n: num(c.operator_fees_today) })} value=${num(c.operator_fees_all_time) + ' ' + t('dashboard.morselUnit')} />
-            </div>
+                  : t('dashboard.ecoCheckoutOff'),
+                t('dashboard.ecoSessionsN', { n: num(c.checkout_sessions.total) })),
+              row('sessions', t('dashboard.commerceSessions'),
+                t('dashboard.ecoSessionsSub', { open: num(c.checkout_sessions.open), done: num(c.checkout_sessions.completed), cancelled: num(c.checkout_sessions.cancelled), expired: num(c.checkout_sessions.expired) }),
+                ''),
+            ]} />
           </div>
-        </section>
-
-        <section class="og-sec">
-          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.ecoMoneyTitle')}<small>${t('dashboard.ecoMoneySub')}</small></h2></div>
-          <p class="adm-intro">${t('dashboard.ecoMoneyIntro')}</p>
-          <div class="adm-half">
-            <${Row} label=${t('dashboard.commerceMoneyVolume')} value=${fmtMoneyMap(c.money_volume) || '—'} />
-            <${Row} label=${t('dashboard.commerceMoneyFees')} value=${fmtMoneyMap(c.operator_money_fees) || '—'} />
+          <div>
+            <${Readings} rows=${[
+              row('sales', t('dashboard.ecoSales'), t('dashboard.ecoAllTimeToday', { n: num(c.sales_volume_today) }), unit(c.sales_volume_all_time)),
+              row('fees', t('dashboard.ecoOperatorFees'), t('dashboard.ecoAllTimeToday', { n: num(c.operator_fees_today) }), unit(c.operator_fees_all_time)),
+            ]} />
           </div>
-        </section>`}
+        <//>
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.mintMorsels')}<small>04</small></h2></div>
-        <p class="adm-intro">${t('dashboard.ecoMintIntro', { cap: num(e.max_operator_mint_per_day) })}</p>
-        <div class="adm-mint">
-          <label class="adm-fld adm-fld--wide"><span>${t('dashboard.gaii')}</span>
-            <input type="text" value=${mintGaii} onInput=${ev => setMintGaii(ev.target.value)} placeholder="agent#owner@node" /></label>
-          <label class="adm-fld"><span>${t('dashboard.amount')}</span>
-            <input type="number" value=${mintAmount} onInput=${ev => setMintAmount(ev.target.value)} placeholder="100" min="1" /></label>
-          <button class="adm-btn" onClick=${doMint}>${t('dashboard.mint')}</button>
-        </div>
-        ${mintResult && html`<div class=${'adm-mint-result' + (mintResult.ok ? '' : ' bad')}>${escHtml(mintResult.msg)}</div>`}
-      </section>
-    </div>
+      <${Section} title=${t('dashboard.ecoMoneyTitle')} count=${t('dashboard.ecoMoneySub')}>
+        <${Note} kind="lead">${t('dashboard.ecoMoneyIntro')}<//>
+        <${Columns}>
+          <div><${Readings} rows=${[row('volume', t('dashboard.commerceMoneyVolume'), null, fmtMoneyMap(c.money_volume) || '—')]} /></div>
+          <div><${Readings} rows=${[row('moneyfees', t('dashboard.commerceMoneyFees'), null, fmtMoneyMap(c.operator_money_fees) || '—')]} /></div>
+        <//>
+      <//>`}
+
+    <${Section} num="04" title=${t('dashboard.mintMorsels')}>
+      <${Note} kind="lead">${t('dashboard.ecoMintIntro', { cap: num(e.max_operator_mint_per_day) })}<//>
+      <${Fields} cols=${2}>
+        <${TextField} label=${t('dashboard.gaii')} value=${mintGaii} onInput=${setMintGaii} placeholder="agent#owner@node" />
+        <${TextField} label=${t('dashboard.amount')} type="number" size="short" value=${mintAmount} onInput=${setMintAmount} placeholder="100" min="1" />
+      <//>
+      <${FormActions}>
+        <${Loud} control onClick=${doMint}>${t('dashboard.mint')}<//>
+        ${mintResult && html`<${Note} kind="message" error=${!mintResult.ok}>${escHtml(mintResult.msg)}<//>`}
+      <//>
+    <//>
   `;
 }

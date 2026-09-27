@@ -13,23 +13,35 @@
  *   GET /v1/site/blocks. Nothing here names a block or restates what one is; a hand-built list would
  *   drift from the registry the day a part is added, and the operator would meet the difference as
  *   a refusal.
+ *
+ *   Every part is a library component; the page passes data and writes no class.
  * @structure SettingField · PartRow · PartsList · AddPart
  * @usage html`<${PartsList} blocks=${blocks} catalog=${catalog} ... />`
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): the List (cut n-name-doors) with
+ *     its opened Panel for the parts, a count Mark for the number, the library's MoveButtons for the arrows,
+ *     Check, Select, TextField and TextArea for the settings, the library's PickField for "add a
+ *     part", Mark buttons for the quick picks.
  *   v1.0.0 — 2026-09-12 — Initial, with the page's editor rewritten around it.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Badge } from './shared.js';
+import { List, Row, Name, Cell, Doors } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { MoveButtons } from '/components/MoveButtons.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Check } from '/components/Check.js';
+import { Select } from '/components/Select.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Field } from '/components/Field.js';
+import { PickField } from '/components/PickField.js';
+import { Row as Line, Stack, Space } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const P = (key, params) => t('admin.portal.' + key, params);
-
-/** The two arrows are drawn, not typed: an arrow glyph in a button is not an icon. */
-const CHEVRON_UP = html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>`;
-const CHEVRON_DOWN = html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>`;
 
 /** A part's own name within the page. The id unless that is taken, and then id-2, id-3… */
 export function freeKey(blocks, id) {
@@ -61,54 +73,36 @@ export function partSummary(def) {
 
 /** One setting, drawn from what the part declared it to be. */
 function SettingField({ name, def, value, onChange }) {
-  const label = html`<span class="adm-elabel">${name}</span>`;
-  const help = html`<p class="adm-pt-note">${def.description}</p>`;
-
   if (def.type === 'boolean') {
-    return html`<div class="adm-mb-sm">
-      <label class="adm-flex-center">
-        <input type="checkbox" checked=${value === undefined ? def.default === true : !!value}
-          onChange=${(e) => onChange(e.target.checked)} />
-        ${label}
-      </label>${help}</div>`;
+    return html`<${Check} checked=${value === undefined ? def.default === true : !!value} hint=${def.description}
+      onChange=${(on) => onChange(on)}>${name}<//>`;
   }
   if (def.type === 'enum') {
-    return html`<div class="adm-mb-sm">${label}
-      <select class="adm-input" value=${value ?? def.default ?? ''} onChange=${(e) => onChange(e.target.value)}>
-        ${def.values.map(v => html`<option value=${v} key=${v}>${v}</option>`)}
-      </select>${help}</div>`;
+    return html`<${Select} label=${name} hint=${def.description} value=${value ?? def.default ?? ''}
+      options=${def.values} onChange=${(v) => onChange(v)} />`;
   }
   if (def.type === 'number') {
-    return html`<div class="adm-mb-sm">${label}
-      <input class="adm-input" type="number" min=${def.min} max=${def.max}
-        value=${value ?? def.default ?? ''}
-        onInput=${(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
-      ${help}</div>`;
+    return html`<${TextField} type="number" label=${name} hint=${def.description} min=${def.min} max=${def.max}
+      value=${value ?? def.default ?? ''} onInput=${(v) => onChange(v === '' ? undefined : Number(v))} />`;
   }
   if (def.type === 'string[]') {
     // A closed list is a set of checkboxes, because the order and the membership are the whole
     // setting and a free-text field would only let the operator get it wrong.
     const current = Array.isArray(value) ? value : [...(def.default ?? [])];
     if (def.values) {
-      return html`<div class="adm-mb-sm">${label}
-        <div class="adm-flex adm-flex-wrap">
+      return html`<${Field} group label=${name} hint=${def.description}>
+        <${Line} wrap>
           ${def.values.map(v => html`
-            <label class="adm-flex-center" key=${v}>
-              <input type="checkbox" checked=${current.includes(v)}
-                onChange=${(e) => onChange(e.target.checked ? [...current, v] : current.filter(x => x !== v))} />
-              <span>${v}</span>
-            </label>`)}
-        </div>${help}</div>`;
+            <${Check} key=${v} inline checked=${current.includes(v)}
+              onChange=${(on) => onChange(on ? [...current, v] : current.filter(x => x !== v))}>${v}<//>`)}
+        <//>
+      <//>`;
     }
-    return html`<div class="adm-mb-sm">${label}
-      <input class="adm-input" value=${current.join(', ')}
-        onInput=${(e) => onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))} />
-      ${help}</div>`;
+    return html`<${TextField} label=${name} hint=${def.description} value=${current.join(', ')}
+      onInput=${(v) => onChange(v.split(',').map(s => s.trim()).filter(Boolean))} />`;
   }
-  return html`<div class="adm-mb-sm">${label}
-    <input class="adm-input" value=${value ?? def.default ?? ''} maxLength=${def.maxLength}
-      onInput=${(e) => onChange(e.target.value || undefined)} />
-    ${help}</div>`;
+  return html`<${TextField} label=${name} hint=${def.description} value=${value ?? def.default ?? ''} maxLength=${def.maxLength}
+    onInput=${(v) => onChange(v || undefined)} />`;
 }
 
 /** The chips over a row: what is set on this part, and whether it is shown at all. */
@@ -130,46 +124,36 @@ function partChips({ block, settings, passage }) {
 }
 
 /** One part: its number, the arrows, what it is, its chips, and what you can do to it. */
-function PartRow({ block, def, idx, number, total, open, passage, onMove, onToggle, onRemove, onOpen, onProp, onPassage, last }) {
+function PartRow({ block, def, idx, number, total, open, passage, onMove, onToggle, onRemove, onOpen, onProp, onPassage }) {
   const settings = def ? Object.entries(def.props ?? {}) : [];
   const editable = settings.length > 0 || block.id === 'common.freeform';
-  const cls = ['adm-pt-row', block.hidden ? 'adm-pt-row--hidden' : '', last && !open ? 'adm-pt-row--last' : ''].filter(Boolean).join(' ');
+  const editor = html`
+    <${Stack} gap="small">
+      ${block.id === 'common.freeform' && html`
+        <${TextArea} code rows=${8} label=${P('parts.yourWords')} placeholder=${P('parts.yourWordsPh')}
+          value=${passage ?? ''} onInput=${(v) => onPassage(block.key, v)} />`}
+      ${settings.map(([name, sdef]) => html`
+        <${SettingField} key=${name} name=${name} def=${sdef}
+          value=${block.props?.[name]} onChange=${(v) => onProp(idx, name, v)} />`)}
+    <//>`;
   return html`
-    <div class=${cls}>
-      <span class=${'adm-pt-num' + (block.hidden ? ' adm-pt-num--off' : '')}>${block.hidden ? '' : number}</span>
-      <span class="adm-pt-move">
-        <button type="button" disabled=${idx === 0} onClick=${() => onMove(idx, -1)} title=${P('parts.moveUp')}
-          aria-label=${P('parts.moveUp')}>${CHEVRON_UP}</button>
-        <button type="button" disabled=${idx === total - 1} onClick=${() => onMove(idx, 1)} title=${P('parts.moveDown')}
-          aria-label=${P('parts.moveDown')}>${CHEVRON_DOWN}</button>
-      </span>
-      <span>
-        <span class="adm-pt-name">${partName(def, block.id)}</span>
-        <span class="adm-why">${partSummary(def)}</span>
-        <span class="adm-pt-chips">${partChips({ block, settings, passage })}</span>
-      </span>
-      <span class="adm-pt-acts">
-        ${editable && html`<button type="button" class="og-door og-door--quiet" onClick=${() => onOpen(open ? null : block.key)}>
+    <${Row} faded=${block.hidden} open=${open} panel=${editor}>
+      <${Cell} line>
+        ${block.hidden ? null : html`<${Mark} kind="count">${number}<//>`}
+        <${MoveButtons} first=${idx === 0} last=${idx === total - 1} onUp=${() => onMove(idx, -1)} onDown=${() => onMove(idx, 1)}
+          upLabel=${P('parts.moveUp')} downLabel=${P('parts.moveDown')} />
+      <//>
+      <${Name} desc=${partSummary(def)} tag=${partChips({ block, settings, passage })}>${partName(def, block.id)}<//>
+      <${Doors}>
+        ${editable && html`<${Action} small row soft onClick=${() => onOpen(open ? null : block.key)}>
           ${open ? P('parts.close') : (block.id === 'common.freeform' ? P('parts.write') : P('parts.settings'))}
-        </button>`}
-        <button type="button" class="og-door og-door--quiet" onClick=${() => onToggle(idx)}>
+        <//>`}
+        <${Action} small row soft onClick=${() => onToggle(idx)}>
           ${block.hidden ? P('parts.show') : P('parts.hide')}
-        </button>
-        <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${() => onRemove(idx)}>${P('parts.remove')}</button>
-      </span>
-      ${open && html`
-        <div class="adm-pt-editor">
-          ${block.id === 'common.freeform' && html`
-            <label class="adm-elabel">${P('parts.yourWords')}</label>
-            <textarea class="adm-pt-textarea" rows="8"
-              placeholder=${P('parts.yourWordsPh')}
-              value=${passage ?? ''}
-              onInput=${(e) => onPassage(block.key, e.target.value)}></textarea>`}
-          ${settings.map(([name, sdef]) => html`
-            <${SettingField} key=${name} name=${name} def=${sdef}
-              value=${block.props?.[name]} onChange=${(v) => onProp(idx, name, v)} />`)}
-        </div>`}
-    </div>`;
+        <//>
+        <${Action} small row soft tone="danger" onClick=${() => onRemove(idx)}>${P('parts.remove')}<//>
+      <//>
+    <//>`;
 }
 
 /** The parts of this page, in the order they appear on it. */
@@ -177,16 +161,15 @@ export function PartsList({ blocks, catalog, passages, open, onOpen, onMove, onT
   const defOf = (id) => catalog.find(b => b.id === id);
   let shown = 0;
   return html`
-    <div>
+    <${List} cols="n-name-doors" empty=${P('parts.none')}>
       ${blocks.map((b, idx) => {
         if (!b.hidden) shown += 1;
         return html`<${PartRow} key=${b.key} block=${b} def=${defOf(b.id)} idx=${idx} number=${shown}
           total=${blocks.length} open=${open === b.key} passage=${passages[b.key]}
           onMove=${onMove} onToggle=${onToggle} onRemove=${onRemove} onOpen=${onOpen}
-          onProp=${onProp} onPassage=${onPassage} last=${idx === blocks.length - 1} />`;
+          onProp=${onProp} onPassage=${onPassage} />`;
       })}
-      ${blocks.length === 0 && html`<p class="adm-pt-empty">${P('parts.none')}</p>`}
-    </div>`;
+    <//>`;
 }
 
 /**
@@ -195,48 +178,34 @@ export function PartsList({ blocks, catalog, passages, open, onOpen, onMove, onT
  * what the part is.
  */
 export function AddPart({ catalog, blocks, onAdd }) {
-  const [q, setQ] = useState('');
-  const [openList, setOpenList] = useState(false);
-
   const usedCount = (id) => blocks.filter(b => b.id === id).length;
   const full = (c) => !c.container && c.max_per_surface != null && usedCount(c.id) >= c.max_per_surface;
-  const needle = q.trim().toLowerCase();
-  const matches = catalog
-    .filter(c => !needle
-      || partName(c, c.id).toLowerCase().includes(needle)
-      || c.id.toLowerCase().includes(needle)
-      || (c.summary ?? '').toLowerCase().includes(needle))
-    .slice(0, 40);
+  const items = catalog.map(c => ({
+    id: c.id,
+    name: partName(c, c.id),
+    sub: full(c) ? P('parts.addFull', { n: c.max_per_surface }) : partSummary(c),
+    disabled: full(c),
+    summary: c.summary ?? '',
+  }));
+  const match = (it, needle) => String(it.name).toLowerCase().includes(needle)
+    || it.id.toLowerCase().includes(needle)
+    || it.summary.toLowerCase().includes(needle);
 
   const quick = ['common.freeform', 'portal.board', 'common.band']
     .map(id => catalog.find(c => c.id === id))
     .filter(Boolean)
     .filter(c => !full(c));
 
-  const add = (c) => { if (full(c)) return; onAdd(c.id); setQ(''); setOpenList(false); };
+  const add = (c) => { if (!c || full(c)) return; onAdd(c.id); };
 
   return html`
-    <div class="adm-pt-pick">
-      <div class="adm-pt-fld">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
-        <input type="text" value=${q} placeholder=${P('parts.addPh')}
-          onInput=${(e) => { setQ(e.target.value); setOpenList(true); }}
-          onFocus=${() => setOpenList(true)}
-          onBlur=${() => setTimeout(() => setOpenList(false), 150)} />
-      </div>
-      ${openList && html`
-        <div class="adm-pt-pick-list">
-          ${matches.length === 0 && html`<div class="adm-pt-pick-none">${P('parts.addNone')}</div>`}
-          ${matches.map(c => html`
-            <button type="button" key=${c.id} disabled=${full(c)} onClick=${() => add(c)}>
-              <b>${partName(c, c.id)}</b>
-              <small>${full(c) ? P('parts.addFull', { n: c.max_per_surface }) : partSummary(c)}</small>
-            </button>`)}
-        </div>`}
-      <div class="adm-pt-quick">
-        <span>${P('parts.addQuick')}</span>
-        ${quick.map(c => html`
-          <button type="button" key=${c.id} class="adm-pt-chip" onClick=${() => add(c)}>${partName(c, c.id)}</button>`)}
-      </div>
-    </div>`;
+    <${Space} above="large">
+      <${PickField} search items=${items} match=${match} max=${40} placeholder=${P('parts.addPh')} ariaLabel=${P('parts.addPh')}
+        emptyLabel=${P('parts.addNone')} noMatchLabel=${P('parts.addNone')}
+        onPick=${(it) => add(catalog.find(c => c.id === it.id))} />
+      <${Line} wrap above="medium">
+        <${Note} kind="hint" inline>${P('parts.addQuick')}<//>
+        ${quick.map(c => html`<${Mark} key=${c.id} onClick=${() => add(c)}>${partName(c, c.id)}<//>`)}
+      <//>
+    <//>`;
 }

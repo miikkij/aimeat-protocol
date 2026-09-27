@@ -7,11 +7,15 @@
  *   tool returns too, and six sections in the order an operator asks: what is happening at the door
  *   right now (every number with a sentence and a zone the server decided from this instance's own
  *   history), the numeral strip, who was turned away (grouped, then listed), what was refused and
- *   kept (with the one ink slab, Resolve), who holds the keys, what the doors are set to (read as
+ *   kept (with the one loud action, Resolve), who holds the keys, what the doors are set to (read as
  *   sentences with a door to change them), and the paste for the operator's own AI.
  * @structure SecurityTab({ switchPage }) — load · alertLine · RightNow · Strip · the sections from
  *   security-tab.refusals.js and security-tab.sections.js · the actions (resolve, delete, payload)
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only: the status is the Verdict with the Readings beside
+ *     it, the strip the FigureStrip whose figures are doors (the open incidents in coral), the two
+ *     account sections side by side in Columns. The page writes no class, and its own sheet
+ *     (admin-security.css) is gone.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v2.0.0 — 2026-09-05 — The poster face and the one read; the Statistics tab's three security
@@ -26,7 +30,6 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, fmtUp, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -34,6 +37,12 @@ import { getSecurityOverview, resolveSecurityIncident, deleteSecurityIncident } 
 import { authHeaders } from '/js/services/auth.js';
 import { RefusalsSection, ipText } from './security-tab.refusals.js';
 import { IncidentsSection, AccountsSection, SettingsSection, AskAiSection } from './security-tab.sections.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Columns } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const S = (key, params) => t('admin.security.' + key, params);
@@ -58,63 +67,57 @@ export function alertLine(ov) {
 /** Section 01: the status word, its sentence, the log line, and the five headline numbers as rows. */
 function RightNow({ ov, switchPage }) {
   const n = ov.now;
-  const row = (key, zone, value, last) => html`
-    <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${S('now.' + key)}</b><span class="adm-why">${S('now.' + key + 'Why')}</span></span>
-      <span><${Badge} type=${zone} label=${zone === 'unknown' ? S('now.word.unknown') : undefined} /></span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  const row = (key, zone, value, last) => ({
+    key,
+    name: S('now.' + key),
+    why: S('now.' + key + 'Why'),
+    mark: html`<${Badge} type=${zone} label=${zone === 'unknown' ? S('now.word.unknown') : undefined} />`,
+    value,
+    last,
+  });
   const meanText = n.refusals.mean_per_day != null
     ? S('now.refusalsMean', { mean: num(n.refusals.mean_per_day), hours: num(Math.round(n.refusals.readable_hours || 0)) })
     : S('now.refusalsNoMean');
   const topText = n.sources.top_source && n.sources.top_share != null
     ? S('now.sourcesTop', { share: Math.round(n.sources.top_share * 100), source: ipText(n.sources.top_source) })
     : '';
-  const wordClass = n.status === 'open' ? 'danger' : n.status === 'watch' ? 'watch' : '';
+  const wordTone = n.status === 'open' ? 'danger' : n.status === 'watch' ? 'watch' : undefined;
   const logLine = (n.log.enabled ? S('now.logOn', { mb: Math.round(n.log.max_bytes / 1048576) }) : S('now.logOff'))
     + (n.uptime_seconds != null ? ' · ' + S('now.restarted', { ago: fmtUp(n.uptime_seconds) }) : '');
   return html`
-    <section class="og-sec og-sec--first" id="adm-sec-01">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('metrics')}>${S('now.toMetrics')}</button></div></div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${wordClass}">${S('now.word.' + n.status)}</div>
-          <p class="adm-alert-line">${alertLine(ov)}</p>
-          <div class="adm-ov-up">${logLine}</div>
-        </div>
-        <div>
-          ${row('refusals', n.refusals.zone, `${num(n.refusals.value)} · ${meanText}`)}
-          ${row('sources', n.sources.zone, topText ? `${num(n.sources.value)} · ${topText}` : num(n.sources.value))}
-          ${row('rateLimit', n.rate_limit_hits.zone, num(n.rate_limit_hits.value))}
-          ${row('scope', n.scope_denials.zone, num(n.scope_denials.value))}
-          ${row('open', n.open_incidents.zone, num(n.open_incidents.value), true)}
-        </div>
-      </div>
-    </section>`;
+    <${Section} first id="adm-sec-01" num="01" title=${S('now.title')}
+      doors=${html`<${Action} small soft onClick=${() => switchPage('metrics')}>${S('now.toMetrics')}<//>`}>
+      <${Verdict} word=${S('now.word.' + n.status)} tone=${wordTone} line=${alertLine(ov)} stamp=${logLine}>
+        <${Readings} rows=${[
+          row('refusals', n.refusals.zone, `${num(n.refusals.value)} · ${meanText}`),
+          row('sources', n.sources.zone, topText ? `${num(n.sources.value)} · ${topText}` : num(n.sources.value)),
+          row('rateLimit', n.rate_limit_hits.zone, num(n.rate_limit_hits.value)),
+          row('scope', n.scope_denials.zone, num(n.scope_denials.value)),
+          row('open', n.open_incidents.zone, num(n.open_incidents.value), true),
+        ]} />
+      <//>
+    <//>`;
 }
 
-/** The numeral strip: five cells, each a door to the section or the page that explains it. */
+/** The numeral strip: five figures, each a door to the section or the page that explains it. */
 function Strip({ ov, switchPage }) {
   const n = ov.now, r = ov.refusals, a = ov.accounts, i = ov.incidents;
   const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const cell = (onClick, value, label, sub, hot) => html`
-    <button type="button" onClick=${onClick}><b class=${hot ? 'og-coral-num' : ''}>${value}</b><span>${label}</span>${sub ? html`<small>${sub}</small>` : null}</button>`;
-  return html`<div class="og-strip">
-    ${cell(() => go('adm-sec-02'), num(n.refusals.value), S('strip.refusals'),
-      n.refusals.mean_per_day != null ? S('strip.refusalsSub', { mean: num(n.refusals.mean_per_day) }) : S('strip.refusalsSubNoMean'))}
-    ${cell(() => go('adm-sec-02'), num(n.sources.value), S('strip.sources'), r.by_source[0] ? S('strip.sourcesSub', { n: num(r.by_source[0].count) }) : '')}
-    ${cell(() => go('adm-sec-03'), num(i.open), S('strip.open'), S('strip.openSub', { total: num(i.total), resolved: num(i.total - i.open) }), i.open > 0)}
-    ${cell(() => switchPage('owners'), num(a.operators.length), S('strip.operators'),
-      S('strip.operatorsSub', { total: num(a.owners_total), deactivated: num(a.deactivated.length) }))}
-    ${cell(() => switchPage('ghii'), num(a.two_step_on), S('strip.twoStep'),
-      S('strip.twoStepSub', { total: num(a.owners_total), rest: num(Math.max(0, a.owners_total - a.two_step_on)) }))}
-  </div>`;
+  const cell = (key, onClick, value, label, sub, hot) => ({ key, onClick, n: value, label, sub: sub || undefined, tone: hot ? 'notice' : undefined });
+  return html`<${FigureStrip} wrap items=${[
+    cell('refusals', () => go('adm-sec-02'), num(n.refusals.value), S('strip.refusals'),
+      n.refusals.mean_per_day != null ? S('strip.refusalsSub', { mean: num(n.refusals.mean_per_day) }) : S('strip.refusalsSubNoMean')),
+    cell('sources', () => go('adm-sec-02'), num(n.sources.value), S('strip.sources'), r.by_source[0] ? S('strip.sourcesSub', { n: num(r.by_source[0].count) }) : ''),
+    cell('open', () => go('adm-sec-03'), num(i.open), S('strip.open'), S('strip.openSub', { total: num(i.total), resolved: num(i.total - i.open) }), i.open > 0),
+    cell('operators', () => switchPage('owners'), num(a.operators.length), S('strip.operators'),
+      S('strip.operatorsSub', { total: num(a.owners_total), deactivated: num(a.deactivated.length) })),
+    cell('twostep', () => switchPage('ghii'), num(a.two_step_on), S('strip.twoStep'),
+      S('strip.twoStepSub', { total: num(a.owners_total), rest: num(Math.max(0, a.owners_total - a.two_step_on)) })),
+  ]} />`;
 }
 
 export default function SecurityTab(props) {
   const { switchPage } = props;
-  useViewCSS('/css/views/admin-security.css');
   const [ov, setOv] = useState(null);
   const [failed, setFailed] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
@@ -152,24 +155,21 @@ export default function SecurityTab(props) {
   };
 
   if (!ov) {
-    return html`<div class="og adm-sec">
+    return html`
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      ${failed ? html`<div class="adm-sec-empty adm-sec-empty--last">${S('loadFailed')}</div>` : html`<${Spinner} />`}
-    </div>`;
+      ${failed ? html`<${Note} kind="quiet">${S('loadFailed')}<//>` : html`<${Spinner} />`}`;
   }
 
   return html`
-    <div class="og adm-sec">
-      <${ConfirmUI} />${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <p class="adm-intro">${S('intro')}</p>
-      <${RightNow} ov=${ov} switchPage=${switchPage} />
-      <${Strip} ov=${ov} switchPage=${switchPage} />
-      <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
-      <${IncidentsSection} ov=${ov} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} />
-      <div class="adm-two">
-        <${AccountsSection} ov=${ov} switchPage=${switchPage} />
-        <${SettingsSection} ov=${ov} switchPage=${switchPage} />
-      </div>
-      <${AskAiSection} />
-    </div>`;
+    <${ConfirmUI} />${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+    <${Note} kind="lead">${S('intro')}<//>
+    <${RightNow} ov=${ov} switchPage=${switchPage} />
+    <${Strip} ov=${ov} switchPage=${switchPage} />
+    <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
+    <${IncidentsSection} ov=${ov} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} />
+    <${Columns}>
+      <${AccountsSection} ov=${ov} switchPage=${switchPage} />
+      <${SettingsSection} ov=${ov} switchPage=${switchPage} />
+    <//>
+    <${AskAiSection} />`;
 }

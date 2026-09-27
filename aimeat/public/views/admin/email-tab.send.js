@@ -6,13 +6,19 @@
  *   message, and the message to a group. Both go out through the SMTP server the page describes
  *   above them, so both say what the server answered rather than only that a button was pressed.
  *   The group send prints its recipient count before it is pressed, from the numbers the status
- *   route now returns.
+ *   route now returns. The sections draw library components and pass them data; they write no class.
  *
  * @structure
- *   - TestSend({ locale, sent }) — section 02, one address, three message types
+ *   - TestSend({ locale }) — section 02, one address, three message types
  *   - GroupSend({ recipients }) — section 04, operators or everyone, subject and message
+ *   - Reply({ label, head, rows, hint }) — the box on the right: what the server said, or who a
+ *     group send reaches
  *
  * @version-history
+ *   v2.0.0 — 2026-09-27 — The sections draw library components (Section, Beside, TextField,
+ *     TextArea, Tabs, Loud, Box, Readings, Note) and write no class. The message type and the group
+ *     are a chooser of tabs; the server's reply is a box whose head carries the time and the answer
+ *     as marks.
  *   v1.1.0 — 2026-09-13 — Compose shared poster send-section headings.
  *   v1.0.0 — 2026-09-12 — Initial, with the Email page in the poster face.
  */
@@ -22,6 +28,16 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
+import { Section } from '/components/Section.js';
+import { Beside, Stack } from '/components/Layout.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Field, FormActions } from '/components/Field.js';
+import { Tabs } from '/components/Tabs.js';
+import { Loud } from '/components/Action.js';
+import { Box } from '/components/Box.js';
+import { Readings } from '/components/Readings.js';
+import { Note } from '/components/Note.js';
+import { Mark, Label } from '/components/Mark.js';
 import { num } from './shared.js';
 import { sendTestEmail, sendGroupEmail } from '/js/services/admin.js';
 
@@ -29,6 +45,18 @@ const E = (key, params) => t('admin.email.' + key, params);
 
 /** The three message types a test can be sent as; the node has a template for each. */
 const TEST_TYPES = ['notification', 'verification', 'magic_link'];
+
+/** The box on the right with its row label over it and its hint under it. */
+function Reply({ label, marks, end, rows, hint }) {
+  return html`
+    <${Stack} gap="none">
+      <${Label} block>${label}<//>
+      <${Box} marks=${marks} end=${end}>
+        <${Readings} rows=${rows} />
+      <//>
+      <${Note}>${hint}<//>
+    <//>`;
+}
 
 /** Section 02: one real message through the configured server. */
 export function TestSend({ locale }) {
@@ -57,46 +85,39 @@ export function TestSend({ locale }) {
     setSending(false);
   }
 
+  const reply = result
+    ? html`<${Reply} label=${E('test.lastTitle')}
+        marks=${html`<${Mark} kind="time">${result.at}<//>`}
+        end=${html`<${Mark} kind="status" tone=${result.ok ? 'fine' : 'danger'}>${result.ok ? '250 OK' : E('test.failed')}<//>`}
+        rows=${[
+          { key: 'said', name: result.ok ? E('test.accepted') : E('test.notAccepted'), value: E('test.byServer') },
+          { key: 'took', name: E('test.took'), value: E('test.seconds', { n: result.seconds ?? 0 }) },
+          { key: 'type', name: E('test.typeRow'), value: result.type, last: true },
+        ]}
+        hint=${result.ok ? E('test.hintOk') : E('test.hintBad')} />`
+    : html`<${Reply} label=${E('test.lastTitle')} rows=${[{ key: 'none', name: E('test.none'), value: '—', last: true }]}
+        hint=${E('test.hintIdle')} />`;
+
   return html`
-    <section class="og-sec">
-      <div class="og-sec-h"><h2 class="poster-section-title">${E('test.title')}<small>02</small></h2></div>
-      <p class="adm-em-lead">${E('test.lead')}</p>
-      <div class="adm-em-two">
-        <div>
-          <div class="adm-em-lbl">${E('test.to')}</div>
-          <div class="adm-em-fld">
-            <input type="email" value=${to} placeholder=${E('test.toPlaceholder')}
-              onInput=${e => setTo(e.target.value)} />
-          </div>
-          <div class="adm-em-lbl">${E('test.type')}</div>
-          <div class="adm-em-pick">
-            ${TEST_TYPES.map(id => html`
-              <button type="button" class=${type === id ? 'on' : ''} onClick=${() => setType(id)}>
-                ${E('kind.' + id)}
-              </button>`)}
-          </div>
-          <div class="adm-em-act">
-            <button class="adm-btn" onClick=${send} disabled=${sending || !to}>
+    <${Section} num="02" title=${E('test.title')}>
+      <${Note} kind="lead">${E('test.lead')}<//>
+      <${Beside} narrow side=${reply}>
+        <${Stack} gap="large">
+          <${TextField} type="email" label=${E('test.to')} value=${to} placeholder=${E('test.toPlaceholder')}
+            onInput=${setTo} onEnter=${send} />
+          <${Field} label=${E('test.type')} group>
+            <${Tabs} tone="filter" value=${type} onSelect=${setType}
+              items=${TEST_TYPES.map((id) => ({ value: id, label: E('kind.' + id) }))} />
+          <//>
+          <${FormActions}>
+            <${Loud} control onClick=${send} disabled=${sending || !to}>
               ${sending ? E('test.sending') : E('test.send')}
-            </button>
-            <p>${E('test.note')}</p>
-          </div>
-        </div>
-        <div>
-          <div class="adm-em-lbl">${E('test.lastTitle')}</div>
-          ${result
-    ? html`<div class="adm-em-box">
-            <div class="adm-em-box-t"><span>${result.at}</span><span>${result.ok ? '250 OK' : E('test.failed')}</span></div>
-            <div class="adm-em-box-row">${result.ok ? E('test.accepted') : E('test.notAccepted')}<span>${E('test.byServer')}</span></div>
-            <div class="adm-em-box-row">${E('test.took')}<span>${E('test.seconds', { n: result.seconds ?? 0 })}</span></div>
-            <div class="adm-em-box-row">${E('test.typeRow')}<span>${result.type}</span></div>
-          </div>
-          <p class="adm-em-hint">${result.ok ? E('test.hintOk') : E('test.hintBad')}</p>`
-    : html`<div class="adm-em-box"><div class="adm-em-box-row">${E('test.none')}<span>—</span></div></div>
-          <p class="adm-em-hint">${E('test.hintIdle')}</p>`}
-        </div>
-      </div>
-    </section>`;
+            <//>
+            <${Note} slab>${E('test.note')}<//>
+          <//>
+        <//>
+      <//>
+    <//>`;
 }
 
 /** Section 04: one message to everyone in the group who has an address. */
@@ -125,43 +146,34 @@ export function GroupSend({ recipients }) {
     setSending(false);
   }
 
+  const who = html`<${Reply} label=${E('group.whoTitle')}
+    rows=${[
+      { key: 'ops', name: E('group.operators'), value: E('group.ofN', { n: num(r.operators_with_address ?? 0), total: num(r.operators ?? 0) }) },
+      { key: 'all', name: E('group.everyone'), value: E('group.ofN', { n: num(r.with_address ?? 0), total: num(r.accounts ?? 0) }), last: true },
+    ]}
+    hint=${E('group.whoHint')} />`;
+
   return html`
-    <section class="og-sec">
-      <div class="og-sec-h"><h2 class="poster-section-title">${E('group.title')}<small>04</small></h2></div>
-      <p class="adm-em-lead">${E('group.lead')}</p>
-      <div class="adm-em-two">
-        <div>
-          <div class="adm-em-lbl">${E('group.group')}</div>
-          <div class="adm-em-pick">
-            <button type="button" class=${group === 'operators' ? 'on' : ''} onClick=${() => setGroup('operators')}>${E('group.operators')}</button>
-            <button type="button" class=${group === 'all' ? 'on' : ''} onClick=${() => setGroup('all')}>${E('group.everyone')}</button>
-          </div>
-          <div class="adm-em-lbl">${E('group.subject')}</div>
-          <div class="adm-em-fld">
-            <input type="text" value=${subject} placeholder=${E('group.subjectPlaceholder')}
-              onInput=${e => setSubject(e.target.value)} />
-          </div>
-          <div class="adm-em-lbl">${E('group.body')}</div>
-          <div class="adm-em-fld">
-            <textarea rows="4" value=${body} placeholder=${E('group.bodyPlaceholder')}
-              onInput=${e => setBody(e.target.value)}></textarea>
-          </div>
-          <div class="adm-em-act">
-            <button class="adm-btn" onClick=${send} disabled=${sending || !subject || !body || !reach}>
+    <${Section} num="04" title=${E('group.title')}>
+      <${Note} kind="lead">${E('group.lead')}<//>
+      <${Beside} narrow side=${who}>
+        <${Stack} gap="large">
+          <${Field} label=${E('group.group')} group>
+            <${Tabs} tone="filter" value=${group} onSelect=${setGroup}
+              items=${[{ value: 'operators', label: E('group.operators') }, { value: 'all', label: E('group.everyone') }]} />
+          <//>
+          <${TextField} label=${E('group.subject')} value=${subject} placeholder=${E('group.subjectPlaceholder')}
+            onInput=${setSubject} />
+          <${TextArea} label=${E('group.body')} rows=${4} value=${body} placeholder=${E('group.bodyPlaceholder')}
+            onInput=${setBody} />
+          <${FormActions}>
+            <${Loud} control onClick=${send} disabled=${sending || !subject || !body || !reach}>
               ${sending ? E('group.sending') : reach ? E('group.send', { n: num(reach) }) : E('group.nobody')}
-            </button>
-            <p>${E('group.note')}</p>
-            ${result && html`<span class="adm-em-said ${result.ok ? 'is-ok' : 'is-bad'}">${result.text}</span>`}
-          </div>
-        </div>
-        <div>
-          <div class="adm-em-lbl">${E('group.whoTitle')}</div>
-          <div class="adm-em-box">
-            <div class="adm-em-box-row">${E('group.operators')}<span>${E('group.ofN', { n: num(r.operators_with_address ?? 0), total: num(r.operators ?? 0) })}</span></div>
-            <div class="adm-em-box-row">${E('group.everyone')}<span>${E('group.ofN', { n: num(r.with_address ?? 0), total: num(r.accounts ?? 0) })}</span></div>
-          </div>
-          <p class="adm-em-hint">${E('group.whoHint')}</p>
-        </div>
-      </div>
-    </section>`;
+            <//>
+            <${Note} slab>${E('group.note')}<//>
+            ${result && html`<${Note} kind="message" error=${!result.ok}>${result.text}<//>`}
+          <//>
+        <//>
+      <//>
+    <//>`;
 }

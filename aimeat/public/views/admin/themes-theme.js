@@ -12,6 +12,8 @@
  * @structure ThemeScreen (default) · StylesTab
  * @usage html`<${ThemeScreen} themeId=${id} policy=${p} vocabulary=${v} onBack=${fn} onCopied=${fn} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — No class written any more: the action links are Action, the loud actions
+ *     Loud (control), a style's facts the meta Note (admin page group G8).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles S2).
  */
 import { h } from 'preact';
@@ -32,6 +34,8 @@ import { Modal } from '/components/Modal.js';
 import { FormField } from '/components/FormField.js';
 import { TextInput } from '/components/TextInput.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Note } from '/components/Note.js';
 import { StyleMarks, useOpenAtTop } from './themes-bits.js';
 import StyleScreen from './themes-style.js';
 import ComponentsTab from './themes-components.js';
@@ -51,27 +55,27 @@ function StylesTab({ theme, readOnly, onOpen, onChange, onRename }) {
     <${Band}>
       <${Hint}>${t('themes.stylesHint')}<//>
       ${!readOnly && html`<${ActionRow}>
-        <button type="button" class="poster-slab poster-slab--control" onClick=${() => copy(theme.styles.find((s) => s.id === theme.defaultStyle) || theme.styles[0])}>${t('themes.newStyle')}</button>
-        <button type="button" class="poster-action" onClick=${onRename}>${t('themes.renameTheme')}</button>
+        <${Loud} control onClick=${() => copy(theme.styles.find((s) => s.id === theme.defaultStyle) || theme.styles[0])}>${t('themes.newStyle')}<//>
+        <${Action} onClick=${onRename}>${t('themes.renameTheme')}<//>
       <//>`}
       ${theme.styles.map((s) => html`
         <${NamedRow} key=${s.id} label=${s.name}><div>
           <${StyleMarks} swatch=${s.swatch} name=${s.name} />
-          <p class="text-meta">${[
+          <${Note} kind="meta">${[
             // The switch below says whether the look picker offers it. Without a switch (a built-in
             // theme) only the exception is said: a style the picker leaves out.
             s.retired ? t('themes.retired') : readOnly && !theme.offeredStyles.includes(s.id) ? t('themes.notInPill') : '',
             theme.defaultStyle === s.id ? t('themes.isDefaultStyle') : '',
             s.onlyMode === 'light' ? t('themes.factLightOnly') : s.onlyMode === 'dark' ? t('themes.factDarkOnly') : '',
             s.contrastMissing?.length ? t('themes.contrastMisses', { n: s.contrastMissing.length }) : '',
-          ].filter(Boolean).join(' · ')}</p>
+          ].filter(Boolean).join(' · ')}<//>
           ${!readOnly && !s.retired && html`
             <${SettingsSwitch} checked=${theme.offeredStyles.includes(s.id)} onChange=${() => toggleOffer(s.id)}>${t('themes.offerInPill')}<//>`}
           <${ActionRow}>
-            <button type="button" class="poster-action" onClick=${() => onOpen(s.id)}>${t('themes.open')}</button>
-            ${!readOnly && html`<button type="button" class="poster-action" onClick=${() => copy(s)}>${t('themes.copy')}</button>`}
-            ${!readOnly && theme.defaultStyle !== s.id && !s.retired && html`<button type="button" class="poster-action" onClick=${() => put({ defaultStyle: s.id })}>${t('themes.makeDefault')}</button>`}
-            ${!readOnly && theme.defaultStyle !== s.id && html`<button type="button" class="poster-action" onClick=${() => retire(s)}>${s.retired ? t('themes.bringBack') : t('themes.retire')}</button>`}
+            <${Action} onClick=${() => onOpen(s.id)}>${t('themes.open')}<//>
+            ${!readOnly && html`<${Action} onClick=${() => copy(s)}>${t('themes.copy')}<//>`}
+            ${!readOnly && theme.defaultStyle !== s.id && !s.retired && html`<${Action} onClick=${() => put({ defaultStyle: s.id })}>${t('themes.makeDefault')}<//>`}
+            ${!readOnly && theme.defaultStyle !== s.id && html`<${Action} onClick=${() => retire(s)}>${s.retired ? t('themes.bringBack') : t('themes.retire')}<//>`}
           <//>
         </div><//>`)}
     <//>`;
@@ -85,8 +89,8 @@ function RenameDialog({ theme, onClose, onSaved }) {
     try { await apiPut(`/v1/themes/${encodeURIComponent(theme.id)}`, { name }); onSaved(); } catch (e) { setError(e.message || String(e)); }
   };
   const footer = html`
-    <button type="button" class="poster-action" onClick=${onClose}>${t('themes.cancel')}</button>
-    <button type="button" class="poster-slab poster-slab--control" onClick=${save}>${t('themes.save')}</button>`;
+    <${Action} onClick=${onClose}>${t('themes.cancel')}<//>
+    <${Loud} control onClick=${save}>${t('themes.save')}<//>`;
   return html`<${Modal} open=${true} onClose=${onClose} size="sm" title=${t('themes.rename')} footer=${footer}>
     <${FormField} label=${t('themes.name')} hint=${t('themes.nameHint')}>
       <${TextInput} id="theme-rename" maxLength="60" value=${name} onInput=${(e) => setName(e.target.value)} />
@@ -152,7 +156,7 @@ export default function ThemeScreen({ themeId, policy, vocabulary, onBack, onCop
     <${PageIntro} title=${theme.name} sub=${facts} />
     ${readOnly
       ? html`<${Hint}>${t('themes.builtinHint')}<//>
-        <p><button type="button" class="poster-slab poster-slab--control" onClick=${copyTheme}>${t('themes.copyToChange')}</button></p>`
+        <${Actions}><${Loud} control onClick=${copyTheme}>${t('themes.copyToChange')}<//><//>`
       : ''}
     ${error && html`<${ErrorNote} text=${error} />`}
     <${ModeTabs}>

@@ -7,6 +7,7 @@
  * @structure FIELD_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { FIELD_DEMOS } from './demos-fields.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — The script editor (TextArea indent and onSave), in the operator's frame.
  *   v1.1.0 — 2026-09-27 — The demos of field, text-field and choice; select-field, check-line, tag-input,
  *     model-picker, file-drop, form-fields and field-row moved in from demos-settings.js, drawn by calling
  *     Select, Check, TagInput, ModelList and ModelPicker, FileDrop, Fields and TextField (the catalogue pass).
@@ -25,6 +26,7 @@ import { ModelList, ModelPicker } from '/components/ModelPicker.js';
 import { FileDrop } from '/components/FileDrop.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
+import { OperatorFrame } from '/components/OperatorFrame.js';
 
 const html = htm.bind(h);
 const noop = () => {};
@@ -112,6 +114,8 @@ export const FIELD_DEMOS = {
     { name: 'many lines', render: () => root(html`<${TextArea} label="What it sends" rows=${4} value="Read every workspace I belong to and list the open questions first." onInput=${noop} />`) },
     { name: 'many lines of code, refused', render: () => root(html`<${TextArea} label="Config" code rows=${4} value=${'{ "role": "worker",\n  "tools": [ }'} message="The JSON does not parse: line 2." error onInput=${noop} />`) },
     { name: 'growing', render: () => root(html`<${TextArea} ariaLabel="Message" grow=${132} placeholder="Write to invoice-drafter…" value="" onInput=${noop} onSend=${noop} />`) },
+    { name: 'a script editor: Tab indents, Ctrl+S saves (an operator page)', render: () => html`<${OperatorFrame} title="Extensions"><${TextArea} label="Action: fetch the timetable" code indent rows=${6}
+      value=${'export default async function (ctx) {\n  const res = await ctx.fetch("https://timetables.nordic-ferries.example/v2/routes");\n  return res.json();\n}'} onInput=${noop} onSave=${noop} /><//>` },
     { name: 'long', render: () => root(html`<${TextField} label="The address the Nordic Ferries booking agent reads its timetables from" hint=${LONG_HINT} value="https://timetables.nordic-ferries.example/v2/routes/helsinki-tallinn/winter-season" onInput=${noop} />`) },
   ] },
   choice: { variants: [

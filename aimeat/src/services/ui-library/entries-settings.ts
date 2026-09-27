@@ -8,6 +8,9 @@
  * @structure SETTINGS_ENTRIES
  * @usage import { SETTINGS_ENTRIES } from './entries-settings.js';
  * @version-history
+ *   v1.87.0 — 2026-09-27 — What the admin pages added: PageSection band; the Listing's operator cuts; the Search
+ *     line's find; a Board notice's title without onOpen. The Listing and the Search line no longer speak of admin
+ *     markup (the admin pages draw the List now).
  *   v1.86.1 — 2026-09-27 — SignedOutDoor draws its own names (.signed-out-door-*, formerly .pf-door-*).
  *   v1.86.0 — 2026-09-27 — The Score chart, Offer map, Offer request, Rating stars, Week rhythm, Job chips, Workflow
  *     steps, Morsel flow, Schedule calendar and Ecosystem automation move to entries-views-work.ts (this file had
@@ -237,17 +240,19 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'An open section of a Settings page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body.',
         module: '/components/PageSection.js', sheet: '/css/components/page-section.css',
         data: {
-            shape: 'PageSection({ id, num, title, count, doors, first, plain, children })',
+            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, children })',
             fields: {
                 id: 'the section\'s anchor, which the rail scrolls to', num: 'the small number beside the title', title: 'the section\'s name',
                 count: 'a count instead of the number', doors: 'the section\'s actions at the right of its head (Action links)',
-                first: 'the first section under the page head: no rule on top', plain: 'no head at all: the rule on top (none with first) and the body', children: 'the body',
+                first: 'the first section under the page head: no rule on top', plain: 'no head at all: the rule on top (none with first) and the body',
+                band: 'the title\'s dark band spans the whole column, as the classic pages drew it (P&L, Nodes, Organisms, Notebook, Federation, Chat sessions)', children: 'the body',
             },
         },
         useFor: ['Each open part of a Settings page. Section without fold is the same component; a lead inside it is Note kind="lead".'],
         variants: [
             { name: 'first', class: 'og-sec--first', prop: 'first', when: 'the first section under the page head' },
             { name: 'plain', prop: 'plain', when: 'a box that stands as a section of its own without a title (a member\'s "Leave" on an organism\'s settings)' },
+            { name: 'band', class: 'og-sec-h--band', prop: 'band', when: 'the title\'s band across the whole column (the classic pages)' },
             { name: 'split', class: 'og-split', prop: 'Split (Layout.js)', when: 'a part of a section set off by a hairline: its last actions, a group inside it' },
             { name: 'side split', class: 'og-split--side', prop: 'Split side (Layout.js)', when: 'the line at the part\'s start and the part indented: a quieter side door' },
         ],
@@ -291,22 +296,24 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     // first, unused until the tabs move onto them.
     {
         id: 'listing', name: 'Listing', kind: 'component', status: 'active',
-        summary: 'Things in rows of columns under a heading row: the name in bold with a small typewriter line, a grey description, who or where, the doors on the right; a row can open a framed panel under it. On a phone one column, or the narrow columns of its cut (listing--cols). In Settings & Controls the List component (components/List.js) draws it: List with its cut and head, Row, and the Name, Desc, Who, Num, When, Cell, Doors and Panel cells; a page writes none of these classes.',
+        summary: 'Things in rows of columns under a heading row: the name in bold with a small typewriter line, a grey description, who or where, the doors on the right; a row can open a framed panel under it. On a phone one column, or the narrow columns of its cut (listing--cols). The List component (components/List.js) draws it in Settings & Controls and on the operator pages: List with its cut and head, Row, and the Name, Desc, Who, Num, When, Cell, Doors and Panel cells; a page writes none of these classes.',
         module: null, sheet: '/css/components/listing.css', classes: ['listing', 'listing-row', 'listing-name', 'listing-desc', 'listing-who', 'listing-doors', 'listing-open', 'listing-meta'],
-        data: { shape: 'List({ cols, keepCols, head }) › Row({ open }) › Name · Desc · Who · Doors · Panel (components/List.js) · as markup in the admin: <div class="listing listing--<cut>"><div class="listing-row listing-row--head">…</div><div class="listing-row"><div class="listing-name">…</div><div class="listing-desc">…</div><div class="listing-doors">…</div></div></div>', fields: { name: 'the thing (Name)', desc: 'what it is (Desc)', who: 'whose it is or where (Who)', doors: 'what a person can do with it (Doors)', open: 'the panel one row opens (Panel, Row open)' } },
-        useFor: ['A list of things a person owns or can install, when each needs a few columns: in Settings through the List, in the admin pages as markup.'],
-        variants: [{ name: 'head', class: 'listing-row--head', prop: 'List head', when: 'the heading row' }, { name: 'open', class: 'is-open', prop: 'Row open', when: 'the row whose panel is open' }, { name: 'cols', class: 'listing--cols', prop: 'List keepCols', when: 'the list keeps the columns of its cut on a narrow screen instead of stacking' }, { name: 'meta', class: 'listing-meta', when: 'the grey typewriter line under a name outside a Listing row (Jouni\'s decision "Meta line"; the Box\'s BoxLine meta draws it)' }],
+        data: { shape: 'List({ cols, keepCols, head }) › Row({ open }) › Name · Desc · Who · Num · When · Cell · Doors · Panel (components/List.js)', fields: { cols: 'the cut, named by its columns (List cols)', name: 'the thing (Name)', desc: 'what it is (Desc)', who: 'whose it is or where (Who)', doors: 'what a person can do with it (Doors)', open: 'the panel one row opens (Panel, Row open)' } },
+        useFor: ['A list of things a person owns or can install, when each needs a few columns: in Settings and on the operator pages, through the List.'],
+        variants: [{ name: 'head', class: 'listing-row--head', prop: 'List head', when: 'the heading row' }, { name: 'open', class: 'is-open', prop: 'Row open', when: 'the row whose panel is open' }, { name: 'cols', class: 'listing--cols', prop: 'List keepCols', when: 'the list keeps the columns of its cut on a narrow screen instead of stacking' }, { name: 'meta', class: 'listing-meta', when: 'the grey typewriter line under a name outside a Listing row (Jouni\'s decision "Meta line"; the Box\'s BoxLine meta draws it)' },
+            { name: 'operator cuts', class: 'listing--n-name-n-when-doors', prop: 'List cols="<cut>"', when: 'the operator pages\' tables, each with main\'s column widths and narrow rules (2026-09-27): id-name-in-out-state-mark-n-n, id-name-state-n-when-when, id-name-who-state-n-tags, n-id-state-name-who-n-when, n-name-n-when-doors, n-name-state, n-name-tags-n-when-doors, n-name-who-count-when-doors, name-code-state-when-doors, name-code-when-when, name-desc-code-n, name-desc-n-n-n-n, name-desc-state-mark-when-when-doors, name-id-score-n-mark-doors, name-id-when, name-id-who-ver-n-when, name-id-who-when-mark, name-kind-id-when-state-doors, name-kind-state-when, name-kind-words, name-n-bar-desc, name-n-code-code-bar, name-n-desc, name-n-n-bar, name-n-n-bar-doors, name-n-n-n-bar, name-n-n-n-n-n-state, name-n-where-state-doors, name-state-kind-code-when-desc-edit-doors, name-state-meta-meta-doors, name-state-n-trend, name-state-words-when, name-tags-when-doors, name-ver-kind-n-state, name-ver-who-n-kinds-doors, name-when-who-state-when-doors, name-where-what-who-when-doors, name-who-code-desc-desc, name-who-doors, name-who-kind-n-seen-review-when-doors, name-who-n-n-n-when-doors, name-who-state-count-when-doors, name-who-tags-n-when-doors, name-words, name-words-when, state-name-code-desc, state-name-who-when-doors, tag-n-name-doors, tag-name-desc, tag-when-who-n, when-name-kind-state-n-desc, when-name-kind-who, when-state-path-where-kind-desc' }],
         example: { rows: [['aimeat-writing', 'How prose is written', 'sandbox']] },
-        note: 'Built on 2026-09-25 with the look six Settings tabs draw as identical copies; the Settings listings moved onto it the same day, each with a cut named by its columns. No module of its own: the class names are shared with the admin pages, and in Settings the List (entry list) draws them.',
+        note: 'Built on 2026-09-25 with the look six Settings tabs draw as identical copies; the Settings listings moved onto it the same day, each with a cut named by its columns. On 2026-09-27 the operator pages\' tables moved onto the List too, each with its own cut here (the operator cuts variant). No module of its own: the List (entry list) draws these classes everywhere.',
     },
     {
         id: 'search-line', name: 'Search line', kind: 'component', status: 'active',
-        summary: 'The field that searches a list, across the row, and how many it found in small grey typewriter letters at its end. In Settings & Controls the List\'s SearchLine (components/List.js) draws it, with the clear mark, a button or a hint after the field.',
+        summary: 'The field that searches a list, across the row, and how many it found in small grey typewriter letters at its end. The List\'s SearchLine (components/List.js) draws it, with the clear mark, a button or a hint after the field, and on the operator pages the magnifier before it.',
         module: null, sheet: '/css/components/search-line.css', classes: ['search-line'],
-        data: { shape: 'SearchLine({ value, onInput, onEnter, onClear, placeholder, note, text, beside, children }) (components/List.js) · as markup in the admin: <div class="search-line"><input class="og-input"><small>12 of 40</small></div>', fields: { input: 'what to look for (value, onInput)', small: 'how many it found (note)' } },
+        data: { shape: 'SearchLine({ value, onInput, onEnter, onClear, placeholder, note, text, beside, find, children }) (components/List.js)', fields: { input: 'what to look for (value, onInput)', small: 'how many it found (note)', find: 'the magnifier before the field' } },
         useFor: ['Above a list a person can search.'],
-        variants: [{ name: 'beside', class: 'search-line--beside', prop: 'SearchLine beside', when: 'one of several lines side by side in a row, under each other on a phone' }], example: { found: '12 of 40' },
-        note: 'Built on 2026-09-25 with the look six Settings tabs drew as identical copies; since then the Settings tabs\' search fields over a list sit in it, with a button or a count beside the field where the place has one. No module of its own: the class is shared with the admin pages, and in Settings the List\'s SearchLine draws it.',
+        variants: [{ name: 'beside', class: 'search-line--beside', prop: 'SearchLine beside', when: 'one of several lines side by side in a row, under each other on a phone' },
+            { name: 'find', class: 'search-line-glass', prop: 'SearchLine find', when: 'an operator page\'s search: the ink magnifier before the field (main\'s admin Cortex and Knowledge searches)' }], example: { found: '12 of 40' },
+        note: 'Built on 2026-09-25 with the look six Settings tabs drew as identical copies; since then the Settings tabs\' search fields over a list sit in it, with a button or a count beside the field where the place has one, and since 2026-09-27 the operator pages\' searches too. No module of its own: the List\'s SearchLine draws it.',
     },
     {
         id: 'switch', name: 'Switch', kind: 'component', status: 'active',
@@ -476,16 +483,17 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         data: {
             shape: 'BoardNotice({ kind, title, onOpen, words, who, whoNote, board, time, left, counts }) · BoardNoticeText({ children })',
             fields: {
-                kind: 'the notice\'s category, as a Tag; none draws the grey dot', title: 'the notice\'s title, a button', onOpen: 'opens the notice',
+                kind: 'the notice\'s category, as a Tag; none draws the grey dot', title: 'the notice\'s title: a button with onOpen, bold words without it', onOpen: 'opens the notice; without it the title opens nothing and is not a button',
                 words: 'the first words of the notice', who: 'who posted it', whoNote: 'their standing, after the name',
                 board: '{ name, onOpen }: the board it is on, a coral word that opens it', time: 'when it was posted', left: 'how long it has left',
                 counts: 'its replies and thanks, on a line of their own', children: 'BoardNoticeText: the notice\'s own text on its page',
             },
         },
-        useFor: ['The notices of a board, and of an organism\'s board preview; BoardNoticeText for one notice\'s text on its page, with its replies as Message tone="board" under it.'],
+        useFor: ['The notices of a board, of an organism\'s board preview and of the operator\'s Boards page; BoardNoticeText for one notice\'s text on its page, with its replies as Message tone="board" under it.'],
         variants: [
             { name: 'no category', class: 'board-notice-kind--none', prop: 'kind omitted', when: 'a notice with no category: a grey dot' },
             { name: 'text', class: 'board-notice-text', prop: 'BoardNoticeText', when: 'a notice\'s own text on its page, at a reading size' },
+            { name: 'title only', class: 'board-notice-title--still', prop: 'title without onOpen', when: 'a place with no notice page to open (the operator\'s Boards page): the title in bold, not a button' },
         ],
         example: { kind: 'News', title: 'The ferry timetable changes on Monday', words: 'The morning boat leaves at 07:10 from now on.', who: 'second', board: { name: 'Harbour' }, time: 'today 09:12', counts: '2 replies' },
         note: 'Moved on 2026-09-25 from boards-poster.css with its class names; on 2026-09-26 the Boards page\'s notice row and the organism\'s board preview became the BoardNotice component and the bp- names its own (board-notice*).',

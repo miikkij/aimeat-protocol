@@ -19,6 +19,13 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.2.0 — 2026-09-27 — On the library components (page group G5): the sections are Sections, the
+ *     verdict and its five readings the Verdict and Readings, the strip the FigureStrip whose taken-down
+ *     and parked figures are filter buttons, the search the Search line with its magnifier, the
+ *     filters the filter Tabs, the table the List whose column names sort it (List head onSort), each
+ *     app an AppRow (a List row with its ⋯ menu), the four states a List with step figures, the danger
+ *     and delete notes SettingBoxes, the dialogs' fields TextFields and their actions the action link
+ *     and the loud control. The page sheet admin-apps.css goes; the file writes no class and no style.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external spacing.
@@ -36,9 +43,19 @@ import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, fmtBytes, Badge, Spinner, ErrorBox, useToast, Toast } from './shared.js';
 import { Modal } from '/components/Modal.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name, Cell, SearchLine } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Figure } from '/components/Figure.js';
+import { SettingBox } from '/components/Box.js';
+import { Note } from '/components/Note.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextField } from '/components/TextField.js';
+import { Row as Line, Stack, Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import * as adminService from '/js/services/admin.js';
 import { AppRow } from './apps-tab.row.js';
@@ -63,98 +80,83 @@ function RightNow({ facts, number, onFilter }) {
   const line = facts.down > 0
     ? A('now.lineModerated', { n: num(facts.all), owners: num(facts.owners), down: num(facts.down) })
     : A('now.lineQuiet', { n: num(facts.all), owners: num(facts.owners) });
-  const row = (title, why, chip, value, last) => html`
-    <div class=${'adm-mrow' + (last ? ' adm-mrow--last' : '')}>
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span>${chip}</span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  const row = (key, title, why, chip, value, last) => ({ key, name: title, why, mark: chip, value, last });
   return html`
-    <section class="og-sec og-sec--first" id="adm-ap-now">
-      <div class="og-sec-h"><h2 class="poster-section-title">${A('now.title')}<small>${number}</small></h2>
-        <div class="og-doors">
-          <a class="og-door og-door--quiet" href="/v1/app-store" target="_blank" rel="noopener">${A('now.openWall')}</a>
-        </div></div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status">${word}</div>
-          <p class="adm-alert-line">${line}</p>
-          <div class="adm-ov-up">${A('now.stored', { size: fmtBytes(facts.bytes) })}<br />${facts.newest}</div>
-        </div>
-        <div>
-          ${row(A('now.downRow'), A('now.downWhy'),
+    <${Section} first id="adm-ap-now" num=${number} title=${A('now.title')}
+      doors=${html`<${Action} small soft href="/v1/app-store" newTab>${A('now.openWall')}<//>`}>
+      <${Verdict} word=${word} line=${line}
+        stamp=${html`${A('now.stored', { size: fmtBytes(facts.bytes) })}<br />${facts.newest}`}>
+        <${Readings} rows=${[
+          row('down', A('now.downRow'), A('now.downWhy'),
             facts.down > 0
               ? html`<${Badge} type="critical" label=${num(facts.down)} />`
               : html`<${Badge} type="healthy" label=${A('now.none')} />`,
-            A('now.operatorOnly'))}
-          ${row(A('now.parkedRow'), A('now.parkedWhy'),
-            html`<${Badge} type="muted" label=${num(facts.parked)} />`, A('now.ownersOwn'))}
-          ${row(A('now.codeRow'), A('now.codeWhy'),
+            A('now.operatorOnly')),
+          row('parked', A('now.parkedRow'), A('now.parkedWhy'),
+            html`<${Badge} type="muted" label=${num(facts.parked)} />`, A('now.ownersOwn')),
+          row('code', A('now.codeRow'), A('now.codeWhy'),
             html`<${Badge} type=${facts.coded > 0 ? 'info' : 'muted'} label=${num(facts.coded)} />`,
-            A('now.accessCode'))}
-          ${row(A('now.seoRow'), A('now.seoWhy'),
+            A('now.accessCode')),
+          row('seo', A('now.seoRow'), A('now.seoWhy'),
             html`<${Badge} type=${facts.seoBlocked > 0 ? 'watch' : 'muted'} label=${A('now.byYou', { n: num(facts.seoBlocked) })} />`,
-            A('now.ofN', { n: num(facts.notIndexed) }))}
-          ${row(A('now.neverRow'), A('now.neverWhy'),
-            html`<${Badge} type="muted" label=${num(facts.never)} />`, A('now.zeroOpens'), true)}
-        </div>
-      </div>
-      <div class="og-strip">
-        <div><b>${num(facts.all)}</b><span>${A('strip.apps')}</span><small>${A('strip.appsSub')}</small></div>
-        <button type="button" onClick=${() => onFilter('down')}>
-          <b class="adm-ap-coral">${num(facts.down)}</b><span>${A('strip.down')}</span><small>${A('strip.downSub')}</small></button>
-        <button type="button" onClick=${() => onFilter('parked')}>
-          <b>${num(facts.parked)}</b><span>${A('strip.parked')}</span><small>${A('strip.parkedSub')}</small></button>
-        <div><b>${fmtBytes(facts.bytes)}</b><span>${A('strip.stored')}</span><small>${A('strip.storedSub', { size: fmtBytes(facts.largest) })}</small></div>
-      </div>
-    </section>`;
+            A('now.ofN', { n: num(facts.notIndexed) })),
+          row('never', A('now.neverRow'), A('now.neverWhy'),
+            html`<${Badge} type="muted" label=${num(facts.never)} />`, A('now.zeroOpens'), true),
+        ]} />
+      <//>
+      <${FigureStrip} wrap items=${[
+        { key: 'apps', n: num(facts.all), label: A('strip.apps'), sub: A('strip.appsSub') },
+        { key: 'down', n: num(facts.down), tone: 'notice', label: A('strip.down'), sub: A('strip.downSub'), onClick: () => onFilter('down') },
+        { key: 'parked', n: num(facts.parked), label: A('strip.parked'), sub: A('strip.parkedSub'), onClick: () => onFilter('parked') },
+        { key: 'stored', n: fmtBytes(facts.bytes), label: A('strip.stored'), sub: A('strip.storedSub', { size: fmtBytes(facts.largest) }) },
+      ]} />
+    <//>`;
 }
 
 /** Section 04: the four states, and the one action that cannot be undone. */
 function FourStates({ facts, number }) {
-  const step = (n, key, value, last) => html`
-    <div class=${'adm-ap-step' + (last ? ' adm-ap-step--last' : '')}>
-      <span class="adm-ap-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
-      <span><b>${A('states.' + key)}</b><span class="adm-why">${A('states.' + key + 'Why')}</span></span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  const step = (n, key, value) => html`
+    <${Row} key=${key}>
+      <${Cell}><${Figure} small step n=${n} /><//>
+      <${Name} desc=${A('states.' + key + 'Why')}>${A('states.' + key)}<//>
+      <${Cell} meta>${value}<//>
+    <//>`;
   return html`
-    <section class="og-sec" id="adm-ap-states">
-      <div class="og-sec-h"><h2 class="poster-section-title">${A('states.title')}<small>${number}</small></h2></div>
-      <p class="adm-ap-lead">${A('states.lead')}</p>
-      ${step(1, 'down', A('states.count', { n: num(facts.down) }))}
-      ${step(2, 'parked', A('states.count', { n: num(facts.parked) }))}
-      ${step(3, 'code', A('states.count', { n: num(facts.coded) }))}
-      ${step(4, 'seo', A('states.count', { n: num(facts.notIndexed) }), true)}
-      <div class="og-box adm-ap-danger-note poster-aside poster-aside--small">
-        <span class="og-box-label">${A('states.dangerLabel')}</span>
-        ${A('states.danger')}
-      </div>
-    </section>`;
+    <${Section} id="adm-ap-states" num=${number} title=${A('states.title')}>
+      <${Note} kind="lead">${A('states.lead')}<//>
+      <${List} cols="mark-name-meta" keepCols>
+        ${step(1, 'down', A('states.count', { n: num(facts.down) }))}
+        ${step(2, 'parked', A('states.count', { n: num(facts.parked) }))}
+        ${step(3, 'code', A('states.count', { n: num(facts.coded) }))}
+        ${step(4, 'seo', A('states.count', { n: num(facts.notIndexed) }))}
+      <//>
+      <${Space} above="large">
+        <${SettingBox} label=${A('states.dangerLabel')}>
+          ${A('states.danger')}
+        <//>
+      <//>
+    <//>`;
 }
 
 /** Section 05: what this operator has taken down, with the reason they gave. */
 function TakenDown({ apps, number }) {
   const down = apps.filter(a => a.operator_hidden);
   return html`
-    <section class="og-sec" id="adm-ap-log">
-      <div class="og-sec-h"><h2 class="poster-section-title">${A('log.title')}<small>${number}</small></h2></div>
+    <${Section} id="adm-ap-log" num=${number} title=${A('log.title')}>
       ${down.length === 0
-        ? html`<p class="adm-ap-note">${A('log.none')}</p>`
-        : down.map((a, i) => html`
-          <div class=${'adm-mrow' + (i === down.length - 1 ? ' adm-mrow--last' : '')} key=${a.filename}>
-            <span>
-              <b>${escHtml(a.manifest?.name || a.filename)}</b>
-              <span class="adm-why">${a.operator_hide_reason ? `"${escHtml(a.operator_hide_reason)}"` : A('log.noReason')}</span>
-            </span>
-            <span><${Badge} type="critical" label=${A('chip.down')} /></span>
-            <span class="adm-mval">${dt(a.operator_hidden_at)} · ${escHtml(a.operator_hidden_by || '-')}</span>
-          </div>`)}
-    </section>`;
+        ? html`<${Note} kind="quiet">${A('log.none')}<//>`
+        : html`<${Readings} rows=${down.map((a, i) => ({
+          key: a.filename,
+          name: escHtml(a.manifest?.name || a.filename),
+          why: a.operator_hide_reason ? `"${escHtml(a.operator_hide_reason)}"` : A('log.noReason'),
+          mark: html`<${Badge} type="critical" label=${A('chip.down')} />`,
+          value: `${dt(a.operator_hidden_at)} · ${escHtml(a.operator_hidden_by || '-')}`,
+          last: i === down.length - 1,
+        }))} />`}
+    <//>`;
 }
 
 export default function AppsAdminTab() {
-  useViewCSS('/css/views/admin-apps.css');
   const [apps, setApps] = useState(null);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
@@ -293,94 +295,76 @@ export default function AppsAdminTab() {
 
   let counter = 0;
   const n = () => String(++counter).padStart(2, '0');
-  const col = (key, label, right) => html`
-    <th class=${right ? 'r' : ''}>
-      <button type="button" class=${sort === key ? 'adm-ap-sorted' : ''} onClick=${() => setSort(key)}>${label}</button>
-    </th>`;
+  // A column's name is the button that sorts the list by it, coral while the list is sorted so.
+  const col = (key, label, right) => ({ label, num: !!right, onSort: () => setSort(key), sorted: sort === key });
 
   return html`
-    <div class="adm-ap">
-      ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
-      <p class="adm-ap-intro">${A('intro')}</p>
-      ${error && html`<${ErrorBox} message=${error} />`}
+    ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
+    <${Note}>${A('intro')}<//>
+    ${error && html`<${ErrorBox} message=${error} />`}
 
-      <${RightNow} facts=${facts} number=${n()} onFilter=${(key) => { setFilter(key); setQuery(''); }} />
+    <${RightNow} facts=${facts} number=${n()} onFilter=${(key) => { setFilter(key); setQuery(''); }} />
 
-      <section class="og-sec" id="adm-ap-find">
-        <div class="og-sec-h"><h2 class="poster-section-title">${A('find.title')}<small>${n()}</small></h2>
-          <div class="og-doors"><span class="adm-ap-note">${A('find.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
+    <${Section} id="adm-ap-find" num=${n()} title=${A('find.title')}
+      doors=${html`<${Note} kind="meta" inline>${A('find.count', { n: num(shown.length), total: num(facts.all) })}<//>`}>
 
-        <div class="adm-ap-tools">
-          <span class="adm-ap-find">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
-            <input type="text" value=${query} placeholder=${A('searchPh')} onInput=${e => setQuery(e.target.value)} />
-          </span>
-          ${[['all', facts.all], ['down', facts.down], ['parked', facts.parked], ['coded', facts.coded], ['never', facts.never]]
-            .map(([key, count]) => html`
-              <button type="button" key=${key} class=${'adm-ap-filter' + (filter === key ? ' on' : '')}
-                onClick=${() => setFilter(key)}>${A('filter.' + key, { n: num(count) })}</button>`)}
-        </div>
-
-        <div class="adm-ap-scroll">
-          <table class="adm-ap-tbl">
-            <thead>
-              <tr>
-                ${col('name', A('col.app'))}
-                ${col('owner', A('col.owner'))}
-                ${col('size', A('col.size'), true)}
-                ${col('opened', A('col.opened'), true)}
-                ${col('forks', A('col.forks'), true)}
-                ${col('published', A('col.published'), true)}
-                <th class="r"></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${shown.map(a => html`
-                <${AppRow} key=${a.owner + '/' + a.filename} app=${a} busy=${busy}
-                  onHide=${(app) => setHiding({ owner: app.owner, filename: app.filename, name: app.manifest?.name || app.filename, reason: '' })}
-                  onRestore=${doRestore}
-                  onDelete=${(app) => setDeleting({ owner: app.owner, filename: app.filename, name: app.manifest?.name || app.filename, typed: '' })}
-                  onSeo=${doSeo} />`)}
-            </tbody>
-          </table>
-        </div>
-        ${shown.length === 0 && html`<p class="adm-ap-note adm-ap-note--spaced">${A('noMatch')}</p>`}
-      </section>
-
-      <${CopyScan} result=${scanResult} apps=${apps} scanning=${scanning} onScan=${runCopyScan} number=${n()} />
-      <${FourStates} facts=${facts} number=${n()} />
-      <${TakenDown} apps=${apps} number=${n()} />
-
-      <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${A('hideTitle')}
-        footer=${hiding && html`
-          <button type="button" class="poster-action" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
-          <button type="button" class="poster-slab poster-slab--control" disabled=${busy} onClick=${doHide}>${A('takeDown')}</button>`}>
-        ${hiding && html`
-          <p>${A('hideAsk', { name: escHtml(hiding.name), owner: escHtml(hiding.owner) })}</p>
-          <p class="adm-ap-note">${A('hideExplain')}</p>
-          <label class="adm-ap-field">
-            <span>${A('reasonLabel')}</span>
-            <input class="adm-input" type="text" value=${hiding.reason} placeholder=${A('reasonPh')}
-              onInput=${e => setHiding({ ...hiding, reason: e.target.value })} />
-          </label>`}
+      <${Line} wrap gap="large" align="end" below="medium">
+        <${SearchLine} find text value=${query} placeholder=${A('searchPh')} onInput=${e => setQuery(e.target.value)} />
+        <${Tabs} tone="filter" value=${filter} onSelect=${(key) => setFilter(key)}
+          items=${[['all', facts.all], ['down', facts.down], ['parked', facts.parked], ['coded', facts.coded], ['never', facts.never]]
+            .map(([key, count]) => ({ value: key, label: A('filter.' + key, { n: num(count) }) }))} />
       <//>
 
-      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${A('deleteTitle')}
-        footer=${deleting && html`
-          <button type="button" class="poster-action" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
-          <button type="button" class="poster-slab poster-slab--control poster-slab--danger"
-            disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}</button>`}>
-        ${deleting && html`
-          <p>${A('deleteAsk', { name: escHtml(deleting.name), owner: escHtml(deleting.owner) })}</p>
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${A('deleteWarnLabel')}</span>
+      <${List} cols="name-who-n-n-n-when-doors" labels head=${[
+        col('name', A('col.app')),
+        col('owner', A('col.owner')),
+        col('size', A('col.size'), true),
+        col('opened', A('col.opened'), true),
+        col('forks', A('col.forks'), true),
+        col('published', A('col.published')),
+        '',
+      ]}>
+        ${shown.map(a => html`
+          <${AppRow} key=${a.owner + '/' + a.filename} app=${a} busy=${busy}
+            onHide=${(app) => setHiding({ owner: app.owner, filename: app.filename, name: app.manifest?.name || app.filename, reason: '' })}
+            onRestore=${doRestore}
+            onDelete=${(app) => setDeleting({ owner: app.owner, filename: app.filename, name: app.manifest?.name || app.filename, typed: '' })}
+            onSeo=${doSeo} />`)}
+      <//>
+      ${shown.length === 0 && html`<${Note} kind="quiet">${A('noMatch')}<//>`}
+    <//>
+
+    <${CopyScan} result=${scanResult} apps=${apps} scanning=${scanning} onScan=${runCopyScan} number=${n()} />
+    <${FourStates} facts=${facts} number=${n()} />
+    <${TakenDown} apps=${apps} number=${n()} />
+
+    <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${A('hideTitle')}
+      footer=${hiding && html`
+        <${Action} onClick=${() => setHiding(null)}>${t('common.cancel')}<//>
+        <${Loud} control disabled=${busy} onClick=${doHide}>${A('takeDown')}<//>`}>
+      ${hiding && html`
+        <${Stack} gap="medium">
+          <span>${A('hideAsk', { name: escHtml(hiding.name), owner: escHtml(hiding.owner) })}</span>
+          <${Note}>${A('hideExplain')}<//>
+          <${TextField} label=${A('reasonLabel')} value=${hiding.reason} placeholder=${A('reasonPh')}
+            onInput=${(v) => setHiding({ ...hiding, reason: v })} />
+        <//>`}
+    <//>
+
+    <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${A('deleteTitle')}
+      footer=${deleting && html`
+        <${Action} onClick=${() => setDeleting(null)}>${t('common.cancel')}<//>
+        <${Loud} control danger
+          disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}<//>`}>
+      ${deleting && html`
+        <${Stack} gap="medium">
+          <span>${A('deleteAsk', { name: escHtml(deleting.name), owner: escHtml(deleting.owner) })}</span>
+          <${SettingBox} label=${A('deleteWarnLabel')}>
             ${A('deleteWarn')}
-          </div>
-          <label class="adm-ap-field">
-            <span>${A('deleteTypeLabel', { filename: deleting.filename })}</span>
-            <input class="adm-input mono" type="text" value=${deleting.typed} placeholder=${deleting.filename}
-              onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
-          </label>`}
-      <//>
-    </div>`;
+          <//>
+          <${TextField} code label=${A('deleteTypeLabel', { filename: deleting.filename })} value=${deleting.typed}
+            placeholder=${deleting.filename}
+            onInput=${(v) => setDeleting({ ...deleting, typed: v })} />
+        <//>`}
+    <//>`;
 }

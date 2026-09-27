@@ -1,7 +1,7 @@
 {
   "_note": "Shape literals in the component sheets where a theme shape value exists (src/services/themes/shapes.ts): recorded debt, not approval. A count may only go down: after a component reads the shape values, lower its counts or remove the file. Seeded 2026-09-24 on Jouni's word; only his decision permits re-seeding with pnpm check:shape-tokens --record.",
   "_measured": {
-    "date": "2026-09-26T22:34:08.885Z",
+    "date": "2026-09-27T02:30:13.751Z",
     "files": 40,
     "literals": 107,
     "kinds": {

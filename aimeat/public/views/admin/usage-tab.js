@@ -20,6 +20,8 @@
  *   the page used to reconcile by itself and could not. Asking the provider what the operator's own
  *   keys spent is a second, deliberate press: it costs an outbound round trip, and a page that
  *   phones a third party on every render stops loading when that third party is slow.
+ *
+ *   The page draws library components only and writes no class (admin page group G3).
  * @structure
  *   - Period — the chips, in section 01's header
  *   - WhatItCostsYou (01) — the word, the five rows, the strip, the door that asks the provider
@@ -27,6 +29,9 @@
  *   - UsageTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only: Section, Verdict and Readings, FigureStrip, the
+ *     filter Tabs for the period, Action for the doors and the copy, SettingBox for the paste,
+ *     Beside for the checks and the paste; admin-usage.css goes.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face and six numbered sections, over one read that says whose
@@ -39,16 +44,22 @@
  *   v1.0.0 — 2026-07-11 — Initial: unified operator usage tab (agent LLM ledger + AI apps spend),
  *     with per-user drill-down on the ledger's top-spenders table.
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { num, Badge, Row, Spinner, ErrorBox } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { num, Badge, Spinner, ErrorBox } from './shared.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tabs } from '/components/Tabs.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Row, Beside } from '/components/Layout.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -82,12 +93,11 @@ function rangeFor(period) {
  */
 function Period({ period, onPick }) {
   return html`
-    <div class="adm-us-period">
-      <span class="adm-us-period-l">${S('period.label')}</span>
-      ${PRESETS.map(p => html`
-        <button type="button" class="adm-us-fchip ${period === p ? 'on' : ''}"
-          onClick=${() => onPick(p)}>${S('period.' + p)}</button>`)}
-    </div>`;
+    <${Row} wrap>
+      <${Note} kind="meta" inline>${S('period.label')}<//>
+      <${Tabs} tone="filter" label=${S('period.label')} value=${period} onSelect=${onPick}
+        items=${PRESETS.map(p => ({ value: p, label: S('period.' + p) }))} />
+    <//>`;
 }
 
 /**
@@ -117,119 +127,82 @@ function WhatItCostsYou({ data, control, onAskProvider, asking }) {
   };
 
   return html`
-    <section class="og-sec og-sec--first" id="adm-us-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        ${control}
-      </div>
+    <${Section} first id="adm-us-01" num="01" title=${S('now.title')} doors=${control}>
+      <${Verdict}
+        word=${blind ? S('now.wordBlind') : S('now.wordBill', { n: usd(money.house?.cost_usd) })}
+        tone=${blind ? 'danger' : undefined}
+        line=${blind ? S('now.lineBlind') : S('now.lineClear', { n: usd(money.own?.cost_usd) })}
+        stamp=${stamp}
+        doors=${html`<${Action} small tone="danger" disabled=${asking} onClick=${onAskProvider}>
+          ${asking ? S('now.asking') : S('now.askProvider')}
+        <//>`}>
+        <${Readings} rows=${[
+    {
+      key: 'chat', name: S('now.chatKey'),
+      why: chat.enabled ? S('now.chatKeyWhy') : S('now.chatKeyOffWhy'),
+      mark: chat.enabled
+        ? html`<${Badge} type="danger" label=${S('now.notMeasured')} />`
+        : html`<${Badge} type="muted" label=${S('now.off')} />`,
+      value: chat.spend ? spendValue(chat) : (chat.model || S('now.notAsked')),
+    },
+    {
+      key: 'house', name: S('now.houseKey'), why: S('now.houseKeyWhy'),
+      mark: html`<${Badge} type=${(money.house?.cost_usd || 0) > 0 ? 'warning' : 'success'} label=${usd(money.house?.cost_usd)} />`,
+      value: house.spend
+        ? spendValue(house)
+        : S('now.housePeople', { n: num(money.house?.people || 0), of: num(money.accounts || 0) }),
+    },
+    {
+      key: 'ceiling', name: S('now.ceiling'), why: S('now.ceilingWhy', { grant: usd(money.grant_usd) }),
+      mark: html`<${Badge} type="muted" label=${S('now.ceilingChip')} />`,
+      value: S('now.ceilingValue', { max: usd(money.ceiling_usd), drawn: usd(money.drawn_usd) }),
+    },
+    {
+      key: 'own', name: S('now.ownKeys'), why: S('now.ownKeysWhy'),
+      mark: html`<${Badge} type="info" label=${S('now.notYours')} />`,
+      value: S('now.ownValue', { n: usd(money.own?.cost_usd), people: num(money.own?.people || 0) }),
+    },
+    {
+      key: 'ledger', name: S('now.ledger'), why: S('now.ledgerWhy'), last: true,
+      mark: html`<${Badge} type="muted" label=${S('now.allKeys')} />`,
+      value: S('now.ledgerValue', { n: usd(money.ledger?.cost_usd), calls: num(money.ledger?.calls || 0) }),
+    },
+  ]} />
+      <//>
 
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${blind ? 'danger' : ''}">
-            ${blind ? S('now.wordBlind') : S('now.wordBill', { n: usd(money.house?.cost_usd) })}
-          </div>
-          <p class="adm-alert-line">
-            ${blind ? S('now.lineBlind') : S('now.lineClear', { n: usd(money.own?.cost_usd) })}
-          </p>
-          <div class="adm-ov-up">${stamp}</div>
-          <div class="adm-us-acts">
-            <button type="button" class="og-door og-door--danger" disabled=${asking}
-              onClick=${onAskProvider}>
-              ${asking ? S('now.asking') : S('now.askProvider')}
-            </button>
-          </div>
-        </div>
-
-        <div>
-          ${Row({
-    title: S('now.chatKey'),
-    why: chat.enabled ? S('now.chatKeyWhy') : S('now.chatKeyOffWhy'),
-    chip: chat.enabled
-      ? html`<${Badge} type="danger" label=${S('now.notMeasured')} />`
-      : html`<${Badge} type="muted" label=${S('now.off')} />`,
-    value: chat.spend ? spendValue(chat) : (chat.model || S('now.notAsked')),
-  })}
-          ${Row({
-    title: S('now.houseKey'),
-    why: S('now.houseKeyWhy'),
-    chip: html`<${Badge} type=${(money.house?.cost_usd || 0) > 0 ? 'warning' : 'success'}
-      label=${usd(money.house?.cost_usd)} />`,
-    value: house.spend
-      ? spendValue(house)
-      : S('now.housePeople', { n: num(money.house?.people || 0), of: num(money.accounts || 0) }),
-  })}
-          ${Row({
-    title: S('now.ceiling'),
-    why: S('now.ceilingWhy', { grant: usd(money.grant_usd) }),
-    chip: html`<${Badge} type="muted" label=${S('now.ceilingChip')} />`,
-    value: S('now.ceilingValue', { max: usd(money.ceiling_usd), drawn: usd(money.drawn_usd) }),
-  })}
-          ${Row({
-    title: S('now.ownKeys'),
-    why: S('now.ownKeysWhy'),
-    chip: html`<${Badge} type="info" label=${S('now.notYours')} />`,
-    value: S('now.ownValue', { n: usd(money.own?.cost_usd), people: num(money.own?.people || 0) }),
-  })}
-          ${Row({
-    title: S('now.ledger'),
-    why: S('now.ledgerWhy'),
-    chip: html`<${Badge} type="muted" label=${S('now.allKeys')} />`,
-    value: S('now.ledgerValue', { n: usd(money.ledger?.cost_usd), calls: num(money.ledger?.calls || 0) }),
-    last: true,
-  })}
-        </div>
-      </div>
-
-      <div class="og-strip">
-        <div>
-          <b>${usd(money.house?.cost_usd)}</b><span>${S('strip.yourBill')}</span>
-          <small>${S('strip.yourBillSub')}</small>
-        </div>
-        <div>
-          <b class=${blind ? 'adm-us-coral' : ''}>${blind ? '1' : '0'}</b>
-          <span>${S('strip.unmeasured')}</span>
-          <small>${blind ? S('strip.unmeasuredSub') : S('strip.unmeasuredNone')}</small>
-        </div>
-        <div>
-          <b>${usd(money.ceiling_usd)}</b><span>${S('strip.ceiling')}</span>
-          <small>${S('strip.ceilingSub', { n: num(money.accounts || 0), grant: usd(money.grant_usd) })}</small>
-        </div>
-        <div>
-          <b class="adm-us-dim">${usd(money.ledger?.cost_usd)}</b><span>${S('strip.allKeys')}</span>
-          <small>${S('strip.allKeysSub')}</small>
-        </div>
-      </div>
-    </section>`;
+      <${FigureStrip} wrap items=${[
+    { key: 'bill', n: usd(money.house?.cost_usd), label: S('strip.yourBill'), sub: S('strip.yourBillSub') },
+    {
+      key: 'unmeasured', n: blind ? '1' : '0', tone: blind ? 'notice' : undefined, label: S('strip.unmeasured'),
+      sub: blind ? S('strip.unmeasuredSub') : S('strip.unmeasuredNone'),
+    },
+    {
+      key: 'ceiling', n: usd(money.ceiling_usd), label: S('strip.ceiling'),
+      sub: S('strip.ceilingSub', { n: num(money.accounts || 0), grant: usd(money.grant_usd) }),
+    },
+    { key: 'all', n: usd(money.ledger?.cost_usd), tone: 'dim', label: S('strip.allKeys'), sub: S('strip.allKeysSub') },
+  ]} />
+    <//>`;
 }
 
 /** Section 06: what an agent can do with this, and the paste. */
 function AskAi({ from, to }) {
   const paste = buildUsagePrompt({ url: getNodeUrl(), from, to });
   return html`
-    <section class="og-sec" id="adm-us-06">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-us-ai">
-        <div>
-          <p class="adm-us-lead">${S('ai.lead')}</p>
-          ${Row({ title: S('ai.read'), why: S('ai.readWhy'), chip: null, value: 'aimeat_admin_usage' })}
-          ${Row({ title: S('ai.provider'), why: S('ai.providerWhy'), chip: null, value: 'ask_provider: true' })}
-          ${Row({ title: S('ai.own'), why: S('ai.ownWhy'), chip: null, value: 'aimeat_usage_report', last: true })}
-        </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-us-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+    <${Section} id="adm-us-06" num="06" title=${S('ai.title')}
+      doors=${html`<${Action} small soft copy=${paste}>${S('ai.copy')}<//>`}>
+      <${Beside} wide side=${html`<${SettingBox} label=${S('ai.label')} pre>${paste}<//>`}>
+        <${Note} kind="lead">${S('ai.lead')}<//>
+        <${Readings} rows=${[
+    { key: 'read', name: S('ai.read'), why: S('ai.readWhy'), mark: null, value: 'aimeat_admin_usage' },
+    { key: 'provider', name: S('ai.provider'), why: S('ai.providerWhy'), mark: null, value: 'ask_provider: true' },
+    { key: 'own', name: S('ai.own'), why: S('ai.ownWhy'), mark: null, value: 'aimeat_usage_report', last: true },
+  ]} />
+      <//>
+    <//>`;
 }
 
 export default function UsageTab() {
-  useViewCSS('/css/views/admin-usage.css');
   const [period, setPeriod] = useState('30d');
   const [data, setData] = useState(null);
   const [calls, setCalls] = useState(null);
@@ -279,12 +252,12 @@ export default function UsageTab() {
 
   const control = html`<${Period} period=${period} onPick=${setPeriod} />`;
 
-  return html`<div class="adm-us">
+  return html`<${Fragment}>
     <${WhatItCostsYou} data=${data} control=${control} onAskProvider=${askProvider} asking=${asking} />
     <${WhereItWent} models=${data.models} />
     <${ByDay} days=${data.days} />
     <${WhoSpent} people=${data.people} houseSpenders=${house?.top_house_spenders} />
     <${WhatWasCalled} calls=${calls} />
     <${AskAi} from=${data.from} to=${data.to} />
-  </div>`;
+  <//>`;
 }

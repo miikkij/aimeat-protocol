@@ -1,0 +1,67 @@
+/**
+ * @file quick-find.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Find a place and jump to it (components/QuickFind.js): the field, the line about the
+ *   keys, and the places in named groups, the chosen one on the dim ground inside a hairline. Colours
+ *   from the style, the corner from the theme; a group's name is the row label (poster.css).
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial: the values of profile.css .cmdk* (the command palette), under the
+ *     component's own names; the corner reads the theme's control corner, the group name is the row
+ *     label (page group G9).
+ */
+
+.quick-find {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: min(92vw, 40rem);
+}
+
+.quick-find-hint {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.quick-find-list {
+  max-height: 50vh;
+  overflow: auto;
+  margin-top: 0.2rem;
+}
+
+.quick-find-group {
+  margin: 0.6rem 0 0.2rem;
+}
+
+.quick-find-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--shape-corner-control);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+
+.quick-find-item.is-sel,
+.quick-find-item:hover {
+  background: var(--bg-dim);
+  border-color: var(--border);
+}
+
+.quick-find-label { font-size: 0.9rem; font-weight: 600; }
+.quick-find-sub { font-size: 0.75rem; color: var(--muted); }
+.quick-find-snippet {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+  max-height: 2.6em;
+  overflow: hidden;
+}

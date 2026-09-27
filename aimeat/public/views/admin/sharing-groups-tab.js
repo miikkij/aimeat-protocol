@@ -8,6 +8,8 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-07-18 -- Vaihe 2d: hand-rolled <table> → canonical admin <DataTable>
  *     (rows/headers model); cell content preserved verbatim.
+ *   v1.2.0 -- 2026-09-27 -- On the library components (page group G5): the owner is the table's own
+ *     typewriter cell, the date the dim Tinted; the page writes no class and no style.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -18,6 +20,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { num, dt, Empty, StatsGrid, DataTable } from './shared.js';
 import { apiGet } from '/js/api.js';
+import { Tinted } from '/components/Figure.js';
 
 export default function SharingGroupsTab() {
   const [groups, setGroups] = useState([]);
@@ -44,25 +47,23 @@ export default function SharingGroupsTab() {
   useEffect(() => onLiveUpdate(['groups'], () => loadGroups({ showSpinner: false })), [loadGroups]);
 
   return html`
-    <div>
-      <!-- Stats summary -->
-      <${StatsGrid} items=${[{ label: t('dashboard.sharingGroupsTotal'), value: total }]} />
+    <!-- Stats summary -->
+    <${StatsGrid} items=${[{ label: t('dashboard.sharingGroupsTotal'), value: total }]} />
 
-      <!-- Table -->
-      ${groups.length === 0 && !loading && html`<${Empty} text=${t('dashboard.sharingGroupsEmpty')} />`}
+    <!-- Table -->
+    ${groups.length === 0 && !loading && html`<${Empty} text=${t('dashboard.sharingGroupsEmpty')} />`}
 
-      ${groups.length > 0 && html`
-        <${DataTable}
-          headers=${[t('dashboard.sharingGroupsName'), t('dashboard.sharingGroupsOwner'), t('dashboard.sharingGroupsMembers'), t('dashboard.sharingGroupsEntries'), t('dashboard.sharingGroupsCreated')]}
-          rows=${groups.map(g => [
-            escHtml(g.name),
-            html`<span class="mono" style="font-size:.8rem">${escHtml(g.owner_gaii)}</span>`,
-            num(g.member_count),
-            num(g.entry_count),
-            html`<span style="color:var(--text-dim)">${dt(g.created_at)}</span>`,
-          ])}
-        />
-      `}
-    </div>
+    ${groups.length > 0 && html`
+      <${DataTable}
+        headers=${[t('dashboard.sharingGroupsName'), t('dashboard.sharingGroupsOwner'), t('dashboard.sharingGroupsMembers'), t('dashboard.sharingGroupsEntries'), t('dashboard.sharingGroupsCreated')]}
+        rows=${groups.map(g => [
+          escHtml(g.name),
+          { text: escHtml(g.owner_gaii), mono: true },
+          num(g.member_count),
+          num(g.entry_count),
+          html`<${Tinted} tone="dim">${dt(g.created_at)}<//>`,
+        ])}
+      />
+    `}
   `;
 }

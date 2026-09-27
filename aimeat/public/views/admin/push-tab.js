@@ -6,15 +6,21 @@
  *   the order an operator asks: is it on, how do I switch it on when it is not, can I test it here,
  *   what sends a push, what does it say, and who receives it. The four writes go through the same
  *   routes as before. Two things the page could not say before it can now: whether the VAPID keys
- *   are set, and which of the four trigger types AIMEAT_PUSH_NOTIFY_TYPES actually lists.
+ *   are set, and which of the four trigger types AIMEAT_PUSH_NOTIFY_TYPES actually lists. The page
+ *   draws library components and passes them data; it writes no class.
  *
  * @structure
- *   - PushTab({ data, reload }) — the sections, the strip and the actions
+ *   - PushTab({ data, reload, switchPage }) — the sections, the strip and the actions
  *   - TRIGGERS: the four mailbox event types the code can send, checked against the live setting
- *   - Templates: one row per message, opened in place, edits held in state until Save
+ *   - Templates: one List row per message, opened in place, edits held in state until Save
  *   - subscribe / test / unsubscribe / saveTemplate / resetTemplates: call admin service
  *
  * @version-history
+ *   v3.0.0 — 2026-09-27 — The page draws library components (Section, Verdict, Readings,
+ *     FigureStrip, StepList, Tabs, List, TextField, TextArea, Loud, Action, Note, Code) and writes no
+ *     class; admin-push.css goes. A template is a List row that opens its fields in the raised box
+ *     under it, the language chips are filter tabs, and a subscription row says each column's name
+ *     on a phone. A subscription unused for 30 days keeps its coral date.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: three cards and an accordion become five numbered
  *     sections. The page says whether the VAPID keys are set instead of a sentence saying they are
@@ -32,11 +38,22 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
-import { num, when, Row, Badge, Empty, useToast, Toast } from './shared.js';
+import { num, when, Badge, Empty, useToast, Toast } from './shared.js';
 import * as api from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { StepList } from '/components/StepList.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, Row as ListRow, Name, Cell, When } from '/components/List.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { FormActions } from '/components/Field.js';
+import { Loud, Action } from '/components/Action.js';
+import { Stack, Row } from '/components/Layout.js';
+import { Note } from '/components/Note.js';
+import { Code } from '/components/Mark.js';
 
 const P = (key, vars) => t('dashboard.pushPage.' + key, vars);
 
@@ -53,10 +70,10 @@ const daysSince = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime
 /** First and last few characters, which is enough to tell one deployed key pair from another. */
 const keyEnds = (k) => (k && k.length > 16 ? `${k.slice(0, 6)}…${k.slice(-4)}` : (k || ''));
 
+/** The keys to set, as the lines to copy into the node's environment. */
+const VAPID_LINES = 'AIMEAT_VAPID_PUBLIC_KEY="…"\nAIMEAT_VAPID_PRIVATE_KEY="…"\nAIMEAT_VAPID_SUBJECT="mailto:operator@example.com"';
+
 export default function PushTab({ data, reload, switchPage }) {
-  // A no-op these days: the sheet is a <link> in spa.html, and a view stylesheet that is only
-  // named here loads nowhere. The call stays because every other tab makes it.
-  useViewCSS('/css/views/admin-push.css');
   const push = data.push;
 
   // Every hook runs before the early return below (Rules of Hooks).
@@ -229,182 +246,141 @@ export default function PushTab({ data, reload, switchPage }) {
     ? (subCount === 0 ? P('lineOnNoSubs') : (subCount === 1 ? P('lineOnOne') : P('lineOn', { n: num(subCount) })))
     : (vapidOk ? P('lineOffSwitch') : P('lineOffKeys'));
 
+  /** One template, opened: its placeholders, its two fields, and Save. */
+  const editor = (tpl, isWebPush) => {
+    const key = `${tpl.id}::${tpl.locale}`;
+    const titleField = isWebPush ? 'title' : 'subject';
+    return html`
+      <${Stack} gap="medium">
+        ${tpl.placeholders?.length ? html`
+          <${Row} wrap align="baseline">
+            <${Note} kind="meta" inline>${P('placeholders')}<//>
+            ${tpl.placeholders.map((p) => html`<${Code} key=${p}>${p}<//>`)}
+          <//>` : null}
+        <${TextField} label=${isWebPush ? P('fieldTitle') : P('fieldSubject')} value=${fieldOf(tpl, titleField)}
+          onInput=${(v) => setField(tpl, titleField, v)} />
+        <${TextArea} label=${P('fieldBody')} rows=${isWebPush ? 2 : 5} value=${fieldOf(tpl, 'body')}
+          onInput=${(v) => setField(tpl, 'body', v)} />
+        <${FormActions}>
+          <${Loud} control disabled=${saving === key || !isDirty(tpl)} onClick=${() => saveTemplate(tpl)}>
+            ${saving === key ? t('dashboard.saving') : t('dashboard.save')}<//>
+          ${!isDirty(tpl) && html`<${Note} slab>${P('nothingToSave')}<//>`}
+        <//>
+      <//>`;
+  };
+
+  const languages = html`<${Tabs} tone="filter" value=${tplLocale} onSelect=${setTplLocale} label=${P('messages')}
+    items=${locales.map((l) => ({ value: l, label: l.toUpperCase() }))} />`;
+
   return html`
-    <div class="og adm-pu">
-      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${P('now')}<small>${no.now}</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('email')}>${P('toEmail')}</button>
-          </div>
-        </div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status ${serviceOn ? '' : 'danger'}">${statusWord}</div>
-            <p class="adm-alert-line">${statusLine}</p>
-            <div class="adm-ov-up">${(data.dash || {}).node_id || ''}</div>
-          </div>
-          <div>
-            <${Row} title=${P('rowService')} why=${P('rowServiceWhy')}
-              chip=${html`<${Badge} type=${switchOn ? 'healthy' : 'critical'} label=${switchOn ? P('on') : P('off')} />`}
-              value=${'AIMEAT_PUSH_ENABLED=' + (switchOn ? 'true' : 'false')} />
-            <${Row} title=${P('rowKeys')} why=${P('rowKeysWhy')}
-              chip=${html`<${Badge} type=${vapidOk ? 'healthy' : 'critical'} label=${vapidOk ? P('set') : P('missing')} />`}
-              value=${vapidOk ? keyEnds(push.vapid_public_key) : P('notSet')} />
-            <${Row} title=${P('rowSubs')} why=${P('rowSubsWhy')}
-              chip=${html`<${Badge} type="muted" label=${num(subCount)} />`}
-              value=${owners.size === 1 ? P('nOwnersOne') : P('nOwners', { n: num(owners.size) })} />
-            <${Row} title=${P('rowThis')} why=${P('rowThisWhy')}
-              chip=${html`<${Badge} type=${thisBrowser ? 'healthy' : 'muted'}
-                label=${thisBrowser === null ? P('checking') : (thisBrowser ? P('subscribed') : P('no'))} />`}
-              value=${thisBrowser ? P('viaServiceWorker') : '–'} last=${true} />
-          </div>
-        </div>
-      </section>
+    <${Section} num=${no.now} title=${P('now')} first
+      doors=${html`<${Action} small soft onClick=${() => switchPage('email')}>${P('toEmail')}<//>`}>
+      <${Verdict} word=${statusWord} tone=${serviceOn ? undefined : 'danger'} line=${statusLine}
+        stamp=${(data.dash || {}).node_id || ''}>
+        <${Readings} rows=${[
+          { key: 'service', name: P('rowService'), why: P('rowServiceWhy'),
+            mark: html`<${Badge} type=${switchOn ? 'healthy' : 'critical'} label=${switchOn ? P('on') : P('off')} />`,
+            value: 'AIMEAT_PUSH_ENABLED=' + (switchOn ? 'true' : 'false') },
+          { key: 'keys', name: P('rowKeys'), why: P('rowKeysWhy'),
+            mark: html`<${Badge} type=${vapidOk ? 'healthy' : 'critical'} label=${vapidOk ? P('set') : P('missing')} />`,
+            value: vapidOk ? keyEnds(push.vapid_public_key) : P('notSet') },
+          { key: 'subs', name: P('rowSubs'), why: P('rowSubsWhy'),
+            mark: html`<${Badge} type="muted" label=${num(subCount)} />`,
+            value: owners.size === 1 ? P('nOwnersOne') : P('nOwners', { n: num(owners.size) }) },
+          { key: 'this', name: P('rowThis'), why: P('rowThisWhy'), last: true,
+            mark: html`<${Badge} type=${thisBrowser ? 'healthy' : 'muted'}
+              label=${thisBrowser === null ? P('checking') : (thisBrowser ? P('subscribed') : P('no'))} />`,
+            value: thisBrowser ? P('viaServiceWorker') : '–' },
+        ]} />
+      <//>
+    <//>
 
-      <div class="og-strip">
-        <div><b>${num(subCount)}</b><span>${P('stripSubs')}</span><small>${P('stripSubsSub')}</small></div>
-        <div><b>${num(owners.size)}</b><span>${P('stripOwners')}</span><small>${P('stripOwnersSub')}</small></div>
-        <div><b class=${stale ? 'og-coral-num' : ''}>${num(stale)}</b><span>${P('stripStale')}</span><small>${P('stripStaleSub', { d: STALE_DAYS })}</small></div>
-        <div><b>${num(edited)}</b><span>${P('stripEdited', { all: num(templates.length) })}</span><small>${P('stripEditedSub')}</small></div>
-      </div>
+    <${FigureStrip} wrap items=${[
+      { key: 'subs', n: num(subCount), label: P('stripSubs'), sub: P('stripSubsSub') },
+      { key: 'owners', n: num(owners.size), label: P('stripOwners'), sub: P('stripOwnersSub') },
+      { key: 'stale', n: num(stale), tone: stale ? 'notice' : undefined, label: P('stripStale'), sub: P('stripStaleSub', { d: STALE_DAYS }) },
+      { key: 'edited', n: num(edited), label: P('stripEdited', { all: num(templates.length) }), sub: P('stripEditedSub') },
+    ]} />
 
-      ${showSetup && html`
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${P('setup')}<small>${no.setup}</small></h2></div>
-        <p class="adm-pu-lead">${P('setupLead')}</p>
-        <div class="adm-pu-steps">
-          <div class="adm-pu-step">
-            <b>1</b>
-            <div>
-              <p>${P('step1')}</p>
-              <div class="adm-pu-cmd">npx web-push generate-vapid-keys</div>
-            </div>
-          </div>
-          <div class="adm-pu-step">
-            <b>2</b>
-            <div>
-              <p>${P('step2')}</p>
-              <div class="adm-pu-cmd">AIMEAT_VAPID_PUBLIC_KEY="…"<br />AIMEAT_VAPID_PRIVATE_KEY="…"<br />AIMEAT_VAPID_SUBJECT="mailto:operator@example.com"</div>
-            </div>
-          </div>
-          <div class="adm-pu-step">
-            <b>3</b>
-            <div><p>${P('step3')}</p></div>
-          </div>
-        </div>
-        <p class="adm-pu-note">${P('setupNote')}</p>
-      </section>`}
+    ${showSetup && html`
+    <${Section} num=${no.setup} title=${P('setup')}>
+      <${Note} kind="lead">${P('setupLead')}<//>
+      <${StepList} steps=${[
+        html`<${Stack} gap="tight">${P('step1')}<${Code} block>npx web-push generate-vapid-keys<//><//>`,
+        html`<${Stack} gap="tight">${P('step2')}<${Code} block>${VAPID_LINES}<//><//>`,
+        P('step3'),
+      ]} />
+      <${Note}>${P('setupNote')}<//>
+    <//>`}
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${P('browser')}<small>${no.browser}</small></h2></div>
-        <p class="adm-pu-lead">${P('browserLead')}</p>
-        <div class="adm-pu-acts">
-          ${thisBrowser
-    ? html`<button type="button" class="og-door og-door--quiet" disabled=${busy === 'test' || !subs.length} onClick=${sendTest}>
-        ${busy === 'test' ? P('testSending') : P('testBtn')}</button>`
-    : html`<button class="adm-btn" disabled=${!vapidOk || busy === 'subscribe'} onClick=${subscribe}>
-        ${busy === 'subscribe' ? P('subscribing') : P('subscribeBtn')}</button>`}
-          ${thisBrowser && html`<button type="button" class="og-door og-door--quiet og-door--danger" disabled=${busy === 'unsubscribe'} onClick=${unsubscribe}>
-            ${busy === 'unsubscribe' ? P('unsubscribing') : P('unsubscribeBtn')}</button>`}
-          ${!vapidOk && html`<span class="adm-pu-waiting">${P('waitingForKeys')}</span>`}
-        </div>
-        ${said && html`<p class="adm-pu-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.msg}</p>`}
-        <p class="adm-pu-note">${P('browserNote')}</p>
-      </section>
+    <${Section} num=${no.browser} title=${P('browser')}>
+      <${Note} kind="lead">${P('browserLead')}<//>
+      <${FormActions}>
+        ${thisBrowser
+    ? html`<${Action} small soft disabled=${busy === 'test' || !subs.length} onClick=${sendTest}>
+        ${busy === 'test' ? P('testSending') : P('testBtn')}<//>`
+    : html`<${Loud} control disabled=${!vapidOk || busy === 'subscribe'} onClick=${subscribe}>
+        ${busy === 'subscribe' ? P('subscribing') : P('subscribeBtn')}<//>`}
+        ${thisBrowser && html`<${Action} small soft tone="danger" disabled=${busy === 'unsubscribe'} onClick=${unsubscribe}>
+          ${busy === 'unsubscribe' ? P('unsubscribing') : P('unsubscribeBtn')}<//>`}
+        ${!vapidOk && html`<${Note} slab>${P('waitingForKeys')}<//>`}
+      <//>
+      ${said && html`<${Note} kind="message" error=${!said.ok}>${said.msg}<//>`}
+      <${Note}>${P('browserNote')}<//>
+    <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${P('triggers')}<small>${no.triggers}</small></h2></div>
-        <p class="adm-pu-lead">${P('triggersLead')}</p>
-        ${TRIGGERS.map((type, i) => {
+    <${Section} num=${no.triggers} title=${P('triggers')}>
+      <${Note} kind="lead">${P('triggersLead')}<//>
+      <${Readings} rows=${TRIGGERS.map((type, i) => {
     const live = liveTypes.includes(type);
-    return html`<${Row}
-            title=${html`<span class="adm-pu-code">${type}</span>`}
-            why=${P('trigger_' + type)}
-            chip=${html`<${Badge} type=${live ? 'healthy' : 'critical'} label=${live ? P('sends') : P('off')} />`}
-            value=${live ? P('inTheList') : P('notInTheList')}
-            last=${i === TRIGGERS.length - 1} />`;
-  })}
-        <p class="adm-pu-note">${P('triggersNote')} <span class="adm-pu-code">${liveTypes.join(',') || P('emptyList')}</span></p>
-      </section>
+    return {
+      key: type,
+      name: html`<${Code}>${type}<//>`,
+      why: P('trigger_' + type),
+      mark: html`<${Badge} type=${live ? 'healthy' : 'critical'} label=${live ? P('sends') : P('off')} />`,
+      value: live ? P('inTheList') : P('notInTheList'),
+      last: i === TRIGGERS.length - 1,
+    };
+  })} />
+      <${Note}>${P('triggersNote')} <${Code}>${liveTypes.join(',') || P('emptyList')}<//><//>
+    <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${P('messages')}<small>${no.messages}</small></h2>
-          <div class="og-doors">
-            <span class="adm-pu-chips">
-              ${locales.map((l) => html`<button type="button" class="adm-pu-chip ${tplLocale === l ? 'on' : ''}"
-                onClick=${() => setTplLocale(l)}>${l.toUpperCase()}</button>`)}
-            </span>
-            <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${askReset}>${P('resetBtn')}</button>
-          </div>
-        </div>
-        <p class="adm-pu-lead">${P('messagesLead')}</p>
-
+    <${Section} num=${no.messages} title=${P('messages')}
+      doors=${html`${languages}<${Action} small soft tone="danger" onClick=${askReset}>${P('resetBtn')}<//>`}>
+      <${Note} kind="lead">${P('messagesLead')}<//>
+      <${List} cols="name-tags-doors" keepCols>
         ${localeTpls.map((tpl) => {
     const isWebPush = String(tpl.id).startsWith('web_push');
     const open = openTpl === tpl.id;
-    const key = `${tpl.id}::${tpl.locale}`;
     return html`
-          <div class="adm-pu-tpl">
-            <button type="button" class="adm-pu-tplh" onClick=${() => setOpenTpl(open ? null : tpl.id)}>
-              <span><b>${isWebPush ? P('tplWebPush') : P('tplEmail')}</b>
-                <span class="adm-why">${isWebPush ? P('tplWebPushWhy') : P('tplEmailWhy')}</span></span>
-              <span><${Badge} type=${tpl.is_default ? 'muted' : 'watch'} label=${tpl.is_default ? P('default') : P('edited')} /></span>
-              <span class="adm-pu-caret">${open ? '↑' : '↓'}</span>
-            </button>
-            ${open && html`
-            <div class="adm-pu-open">
-              ${tpl.placeholders?.length ? html`
-              <div class="adm-pu-ph">
-                <em>${P('placeholders')}</em>
-                ${tpl.placeholders.map((p) => html`<span>${p}</span>`)}
-              </div>` : null}
-              <div class="adm-pu-fld">
-                <div class="adm-pu-fldl">${isWebPush ? P('fieldTitle') : P('fieldSubject')}</div>
-                <input type="text" value=${fieldOf(tpl, isWebPush ? 'title' : 'subject')}
-                  onInput=${(e) => setField(tpl, isWebPush ? 'title' : 'subject', e.target.value)} />
-              </div>
-              <div class="adm-pu-fld">
-                <div class="adm-pu-fldl">${P('fieldBody')}</div>
-                <textarea rows=${isWebPush ? 2 : 5} value=${fieldOf(tpl, 'body')}
-                  onInput=${(e) => setField(tpl, 'body', e.target.value)}></textarea>
-              </div>
-              <div class="adm-pu-acts">
-                <button class="adm-btn" disabled=${saving === key || !isDirty(tpl)} onClick=${() => saveTemplate(tpl)}>
-                  ${saving === key ? t('dashboard.saving') : t('dashboard.save')}</button>
-                ${!isDirty(tpl) && html`<span class="adm-pu-waiting">${P('nothingToSave')}</span>`}
-              </div>
-            </div>`}
-          </div>`;
+          <${ListRow} key=${tpl.id} open=${open} onToggle=${() => setOpenTpl(open ? null : tpl.id)}
+            panel=${open ? editor(tpl, isWebPush) : null}>
+            <${Name} desc=${isWebPush ? P('tplWebPushWhy') : P('tplEmailWhy')}>${isWebPush ? P('tplWebPush') : P('tplEmail')}<//>
+            <${Cell}><${Badge} type=${tpl.is_default ? 'muted' : 'watch'} label=${tpl.is_default ? P('default') : P('edited')} /><//>
+            <${Cell} sign>${open ? '↑' : '↓'}<//>
+          <//>`;
   })}
-      </section>
+      <//>
+    <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${P('subs')}<small>${no.subs}</small></h2></div>
-        ${!subs.length
-    ? html`<div class="adm-pu-empty">${t('dashboard.noSubscriptions')}</div>`
-    : html`
-        <div class="adm-pu-shead">
-          <span>${P('colOwner')}</span><span>${P('colEndpoint')}</span><span>${P('colCreated')}</span><span>${P('colUsed')}</span>
-        </div>
-        ${subs.map((s) => {
+    <${Section} num=${no.subs} title=${P('subs')}>
+      <${List} cols="name-code-when-when" labels empty=${t('dashboard.noSubscriptions')}
+        head=${[P('colOwner'), P('colEndpoint'), P('colCreated'), P('colUsed')]}>
+        ${subs.map((s, i) => {
     const age = daysSince(s.last_used_at);
     return html`
-          <div class="adm-pu-srow">
-            <span><b>${s.owner_name || '–'}</b></span>
-            <span class="adm-pu-ep">${s.endpoint || '–'}</span>
-            <span class="adm-pu-when" data-l=${P('colCreated')}>${when(s.created_at)}</span>
-            <span class="adm-pu-when ${age !== null && age >= STALE_DAYS ? 'is-stale' : ''}" data-l=${P('colUsed')}>
-              ${s.last_used_at ? when(s.last_used_at) : P('never')}</span>
-          </div>`;
-  })}`}
-        <p class="adm-pu-note">${P('subsNote')}</p>
-      </section>
+          <${ListRow} key=${s.endpoint || i}>
+            <${Name}>${s.owner_name || '–'}<//>
+            <${Cell} meta>${s.endpoint || '–'}<//>
+            <${When}>${when(s.created_at)}<//>
+            <${When} warn=${age !== null && age >= STALE_DAYS}>${s.last_used_at ? when(s.last_used_at) : P('never')}<//>
+          <//>`;
+  })}
+      <//>
+      <${Note}>${P('subsNote')}<//>
+    <//>
 
-      <${ConfirmUI} />
-    </div>
-  `;
+    <${ConfirmUI} />`;
 }

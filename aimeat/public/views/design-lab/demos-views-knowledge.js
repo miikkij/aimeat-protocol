@@ -11,6 +11,8 @@
  * @structure KNOWLEDGE_VIEW_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { KNOWLEDGE_VIEW_DEMOS } from './demos-views-knowledge.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — PagePreview's email and live page (the live one reads /v1/portal from the node
+ *     the lab runs on), in the operator's frame.
  *   v1.1.1 — 2026-09-27 — The instruction block's demos are keyed by its entry id instruction-block
  *     (formerly hello-mcp).
  *   v1.1.0 — 2026-09-27 — The demos of the organism pages' views, the Memory and Access pages' views, the
@@ -51,6 +53,7 @@ import { ProofLedger } from '/components/ProofLedger.js';
 import { ChangeLog } from '/components/ChangeLog.js';
 import { QuestionDesk } from '/components/QuestionDesk.js';
 import { GaiiChip } from '/components/GaiiChip.js';
+import { OperatorFrame } from '/components/OperatorFrame.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -205,6 +208,13 @@ export const KNOWLEDGE_VIEW_DEMOS = {
   'page-preview': { variants: [
     { name: 'a page', render: () => html`<${SettingsRoot}><${PagePreview} title="Lumo Bakery portfolio" srcdoc=${'<h1>Lumo Bakery</h1><p>Seasonal bread, baked at five. The autumn menu starts on 1 October.</p>'} /><//>` },
     { name: 'loading', render: () => html`<${SettingsRoot}><${PagePreview} title="Lumo Bakery portfolio" loading loadingLabel="Loading the page…" /><//>` },
+    // What the admin pages added (2026-09-27), in the operator's frame as those pages draw it.
+    { name: 'an email (nothing in it runs)', render: () => html`<${OperatorFrame} title="Email"><${PagePreview} email title="The welcome letter"
+      srcdoc=${'<h2>Welcome to Harbour Studio</h2><p>Your account is ready. Sign in to see the client briefs.</p>'} /><//>` },
+    { name: 'the live front page (read from this node)', render: () => html`<${OperatorFrame} title="Portal"><${PagePreview} live title="Your front page" src="/v1/portal" href="/v1/portal"
+      openLabel="Open the front page" wideLabel="Wide" phoneLabel="Phone" foldLabel="Fold away" unfoldLabel="Show" note="Saved changes show here at once."
+      markedNote="The numbers match the list." marks=${{ root: '.ld', count: 4 }} refresh=${1} /><//>` },
+    { name: 'live, nothing to show', render: () => html`<${OperatorFrame} title="Portal"><${PagePreview} live title="Your front page" empty="The front page is behind a sign-in, so there is nothing to show here." /><//>` },
   ] },
   'number-band': { variants: [
     { name: 'four numbers', render: () => html`<${SettingsRoot}><${NumberBand} items=${[

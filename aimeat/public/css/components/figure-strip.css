@@ -10,6 +10,9 @@
  *   Drawn by components/FigureStrip.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — A figure that is a button (a filter or a door: the admin's Overview,
+ *     Applications, Owners, Security, CORS and Compliance strips), its rules moved from admin.css
+ *     (.adm .og-strip > button) with their values.
  *   v1.4.0 — 2026-09-26 — Drawn by components/FigureStrip.js. The figure colours and places the pages'
  *     own rules carried become its tones and options, each with the look it had: notice, a number in
  *     coral (skills .is-coral, companies .og-coral, access and data wallet .is-low, 4 pages); dim, a
@@ -52,7 +55,14 @@
 .og-strip--flush { margin-top: 0; }
 .og-strip--lead { margin: 0 0 1.5rem; }
 
+/* A figure that is a way on (a filter, a door to its page) keeps the figure's whole anatomy as a
+   button; under the pointer its word is underlined (formerly admin.css .adm .og-strip > button). */
+.og-strip > button { flex: 1 1 0; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: .6rem; min-width: 0; background: none; border: 0; border-right: 1px solid var(--border); padding: .9rem 1.1rem .9rem 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.og-strip > * + button, .og-strip > button + div { padding-left: 1.1rem; }
+.og-strip > button:last-child { border-right: 0; }
+.og-strip > button:hover span { text-decoration: underline; text-decoration-thickness: 2px; }
+
 @media (max-width: 1100px) {
   .og-strip { flex-wrap: wrap; }
-  .og-strip > div { flex-basis: 50%; border-right: 0; }
+  .og-strip > div, .og-strip > button { flex-basis: 50%; border-right: 0; }
 }

@@ -9,6 +9,7 @@
  *   the columns stack. A reply under a notice is the Message component's board tone (message.css).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.0 — 2026-09-27 — .board-notice-title--still: a title that opens nothing (additive, G5).
  *   v1.2.0 — 2026-09-26 — The rows are the BoardNotice component: the bp- names became its own
  *     (board-notice*), the values unchanged; the reply beside the grey edge moved to message.css
  *     (the Message's board tone).
@@ -23,6 +24,9 @@
 .board-notice-body { min-width: 0; }
 .board-notice-title { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); text-align: left; display: block; overflow-wrap: anywhere; }
 .board-notice-title:hover { color: var(--accent); }
+/* A title that opens nothing (BoardNotice without onOpen; the admin Boards page) is words. */
+.board-notice-title--still { cursor: default; }
+.board-notice-title--still:hover { color: var(--text); }
 .board-notice-body p { margin: .25rem 0 0; font-size: .88rem; line-height: 1.55; color: var(--text); max-width: 66ch; overflow-wrap: anywhere; }
 .board-notice-by { margin-top: .35rem; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
 .board-notice-by b { color: var(--text); font-weight: 500; }

@@ -21,6 +21,7 @@
  *     in a line of words (15rem, the whole width on a phone); `fill` a meter that takes the rest of its
  *     line beside a field; `thin` the thin cut of a progress through steps. `early` (with `quota`):
  *     it warns before it is full, in the warn colour from 60 % (the AI daily budget bar on main).
+ *     `tone` = 'notice' (coral) | 'ink' | 'dim' (grey): a share bar's band instead of the sun.
  *   - Tinted({ tone, strong, children }): words or a number in a state colour inside other words:
  *     tone = 'fine' | 'notice' | 'warn' | 'danger' | 'dim' | 'faint' (a word that says nothing is
  *     there, in the rule's grey: "never"); `strong` sets them in bold; `whole` keeps them on one line,
@@ -31,6 +32,9 @@
  *        html`<${Meter} quota pct=${pct} figure=${`${money(spent)} / ${money(budget)} · ${pct} %`} />`
  *        html`<${Tinted} strong tone="notice">${x('visWebOff')}<//>`
  * @version-history
+ *   v1.5.0 — 2026-09-27 — Meter's `tone`: 'notice' (coral), 'ink' or 'dim' (grey) fill instead of the
+ *     sun, a share bar that says which band it is (main's admin Agent integration readiness ladder
+ *     and the ink share bar of admin Agents); additive, page group G4 (admin).
  *   v1.4.0 — 2026-09-27 — Result: one figure centred, its words over it and a line under it (the P&L's
  *     result before taxes, as main drew it).
  *   v1.3.0 — 2026-09-26 — Tinted's `whole` option: words kept on one line (the Access page's secret
@@ -52,6 +56,7 @@ const cx = (...parts) => parts.filter(Boolean).join(' ');
 const has = (x) => x !== undefined && x !== null && x !== false;
 const FIGURE_TONES = new Set(['fine', 'notice', 'dim']);
 const TINTS = new Set(['fine', 'notice', 'warn', 'danger', 'dim', 'faint']);
+const METER_TONES = new Set(['notice', 'ink', 'dim']);
 
 /**
  * A result: one figure centred in its box, its words over it and a line under it (the P&L's result
@@ -78,11 +83,14 @@ export function Sticker({ figure, children }) {
   return html`<div class="poster-sticker"><b class="poster-stat-number poster-stat-number--small">${figure}</b>${children}</div>`;
 }
 
-export function Meter({ pct, quota, early, figure, beside, fill, thin }) {
+export function Meter({ pct, quota, early, figure, beside, fill, thin, tone }) {
   const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  // tone (added by page group G4, admin): the fill in coral, ink or grey instead of the sun (main's
+  // readiness ladder on the admin Agent integration page, and the ink share bar of admin Agents).
   const cls = cx('poster-box', 'poster-box--meter', quota && 'poster-box--quota', quota && p >= 90 && 'is-full',
     quota && early && p >= 60 && p < 90 && 'is-warn', 'meter',
-    has(figure) && 'meter--figure', beside && 'meter--beside', fill && 'meter--fill', thin && 'meter--thin');
+    has(figure) && 'meter--figure', beside && 'meter--beside', fill && 'meter--fill', thin && 'meter--thin',
+    !quota && METER_TONES.has(tone) && `meter--${tone}`);
   return html`<div class=${cls}><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width=${p} height="100" /></svg>${has(figure) ? html`<span class="poster-meter-figure">${figure}</span>` : null}</div>`;
 }
 

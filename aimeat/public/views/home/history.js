@@ -17,6 +17,7 @@
  * @structure default HomeHistoryView; internal: Day
  * @usage routed at /v1/home?history=1 by spa.html
  * @version-history
+ *   2026-09-27: "Sign in" is the Loud component, the same button (page group G9, a move).
  *   2026-09-23: Composed from library components (PageFrame, PageIntro, ErrorNote, ActionRow,
  *     BackLink, DayList, DayGroup, DayEmpty, ArchiveSection, ArchiveMore, ArchiveError), which emit
  *     the markup this file wrote (UI consolidation phase 1, a move).
@@ -38,6 +39,7 @@ import { PageFrame } from '/components/PageFrame.js';
 import { PageIntro } from '/components/PageIntro.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Loud } from '/components/Action.js';
 import { BackLink } from '/components/BackLink.js';
 import { DayGroup, DayList, DayEmpty } from '/components/DayGroup.js';
 import { ArchiveSection, ArchiveMore, ArchiveError } from '/components/ArchiveSection.js';
@@ -157,9 +159,9 @@ export default function HomeHistoryView({ navigate }) {
         <${PageIntro} title=${tr('home.history.signInTitle', 'Your record is yours to read')}
           sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
         <${ActionRow}>
-          <button type="button" class="poster-slab" onClick=${() => navigate('/v1/portal')}>
+          <${Loud} onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
-          </button>
+          <//>
         <//>
       <//>`;
   }

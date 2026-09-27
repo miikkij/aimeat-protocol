@@ -11,6 +11,10 @@
  * @structure RoomDetail({ room, idleMs, onClose, onCloseRoom })
  * @usage imported by realtime-tab.js
  * @version-history
+ *   v1.2.0 — 2026-09-27 — On the library components (page group G5): the panel is the raised Box
+ *     with the room's name, its tags and the ✕ in its head; each part a heavy Split with its
+ *     SubHeading; the facts Facts; the people and the documents Lists; the close the loud danger
+ *     action. The file writes no class and no style.
  *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v1.0.0 — 2026-09-12 — Initial (the Realtime page in the poster face).
  */
@@ -20,6 +24,14 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { fmtBytes, when } from './shared.js';
 import { split } from './realtime-tab.model.js';
+import { Box } from '/components/Box.js';
+import { Marks, Mark, Code } from '/components/Mark.js';
+import { Icon, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Facts } from '/components/Facts.js';
+import { List, Row, Name, Cell, When } from '/components/List.js';
+import { Split } from '/components/Layout.js';
+import { SubHeading } from '/components/SubHeading.js';
 
 const R = (key, params) => t('dashboard.realtimePage.' + key, params);
 
@@ -30,85 +42,71 @@ function dur(ms) {
 }
 
 export default function RoomDetail({ room, idleMs, onClose, onCloseRoom }) {
-  return html`
-    <div class="adm-rt-panel">
-      <div class="adm-rt-phead">
-        <div>
-          <div class="adm-rt-crumb">${R('crumb')}</div>
-          <h3>${room.name}<small>${room.id}</small></h3>
-          <div class="adm-rt-chips">
-            ${room.empty
-    ? html`<span class="adm-rt-chip">${R('badgeEmpty')}</span>`
-    : html`<span class="adm-rt-chip adm-rt-chip--live">${R('badgeLive')}</span>`}
-            ${room.appType && html`<span class="adm-rt-chip">${room.appType}</span>`}
-            <span class="adm-rt-chip">${room.isPublic ? R('public') : R('private')}</span>
-            ${room.maxPeers !== null && html`<span class="adm-rt-chip">${R('maxPeers', { n: room.maxPeers })}</span>`}
-            ${(room.tags || []).map(tag => html`<span class="adm-rt-chip">${tag}</span>`)}
-          </div>
-        </div>
-        <button type="button" class="adm-rt-x" onClick=${onClose} aria-label=${t('common.close') || 'Close'}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="2" y1="2" x2="12" y2="12"></line>
-            <line x1="12" y1="2" x2="2" y2="12"></line>
-          </svg>
-        </button>
-      </div>
+  const marks = html`<${Marks}>
+    <${Code}>${room.id}<//>
+    ${room.empty
+    ? html`<${Mark}>${R('badgeEmpty')}<//>`
+    : html`<${Mark} tone="fine">${R('badgeLive')}<//>`}
+    ${room.appType && html`<${Mark}>${room.appType}<//>`}
+    <${Mark}>${room.isPublic ? R('public') : R('private')}<//>
+    ${room.maxPeers !== null && html`<${Mark}>${R('maxPeers', { n: room.maxPeers })}<//>`}
+    ${(room.tags || []).map(tag => html`<${Mark} key=${tag}>${tag}<//>`)}
+  <//>`;
 
-      <div class="adm-rt-psec poster-row--thing">
-        <div class="adm-rt-sub">${R('theRoom')}</div>
-        <dl class="adm-rt-kv">
-          <dt>${R('openedBy')}</dt>
-          <dd>${room.createdBy || '—'}<em>${when(room.createdAt)}${room.ageMs !== null ? ` · ${R('ago', { time: dur(room.ageMs) })}` : ''}</em></dd>
-          <dt>${R('lastHeard')}</dt>
-          <dd>${room.heardMs !== null ? R('ago', { time: dur(room.heardMs) }) : '—'}<em>${
+  return html`
+    <${Box} tone="raised" name=${room.name} marks=${marks}
+      end=${html`<${Icon} small label=${t('common.close') || 'Close'} onClick=${onClose}>✗<//>`}>
+      <${Note} kind="meta" mono>${R('crumb')}<//>
+
+      <${Split} heavy>
+        <${SubHeading} level=${4}>${R('theRoom')}<//>
+        <${Facts} rows=${[
+          { k: R('openedBy'), v: room.createdBy || '—', sub: `${when(room.createdAt)}${room.ageMs !== null ? ` · ${R('ago', { time: dur(room.ageMs) })}` : ''}` },
+          { k: R('lastHeard'), v: room.heardMs !== null ? R('ago', { time: dur(room.heardMs) }) : '—', sub:
   room.closesInMs !== null
     ? R('closesIn', { time: dur(room.closesInMs) })
-    : (idleMs ? R('idleRule', { time: dur(idleMs) }) : R('idleRuleUnknown'))}</em></dd>
-          <dt>${R('whereItLives')}</dt>
-          <dd>${R('inMemory')}<em>${R('inMemoryWhy')}</em></dd>
-        </dl>
-      </div>
+    : (idleMs ? R('idleRule', { time: dur(idleMs) }) : R('idleRuleUnknown')) },
+          { k: R('whereItLives'), v: R('inMemory'), sub: R('inMemoryWhy') },
+        ]} />
+      <//>
 
-      <div class="adm-rt-psec poster-row--thing">
-        <div class="adm-rt-sub">${R('whoIsInIt')}</div>
+      <${Split} heavy>
+        <${SubHeading} level=${4}>${R('whoIsInIt')}<//>
         ${room.peers.length === 0
-    ? html`<p class="adm-rt-note">${R('nobodyLeft')}</p>`
+    ? html`<${Note}>${R('nobodyLeft')}<//>`
     : html`
-          <div class="adm-rt-prow adm-rt-prow--head">
-            <div>${R('colPerson')}</div><div>${R('colConnection')}</div><div>${R('colJoined')}</div>
-          </div>
-          ${room.peers.map(p => html`
-            <div class="adm-rt-prow">
-              <div class="adm-rt-person"><i></i>${p.nick || R('someone')}</div>
-              <div class="adm-rt-id">${p.peerId}</div>
-              <div class="adm-rt-when">${p.joinedMs !== null ? dur(p.joinedMs) : '—'}</div>
-            </div>`)}
-          <p class="adm-rt-note">${R('nickNote')}</p>`}
-      </div>
+          <${List} cols="name-id-when" dense head=${[R('colPerson'), R('colConnection'), R('colJoined')]} labels>
+            ${room.peers.map(p => html`
+              <${Row} key=${p.peerId}>
+                <${Name} dot="active">${p.nick || R('someone')}<//>
+                <${Cell} meta>${p.peerId}<//>
+                <${When}>${p.joinedMs !== null ? dur(p.joinedMs) : '—'}<//>
+              <//>`)}
+          <//>
+          <${Note}>${R('nickNote')}<//>`}
+      <//>
 
-      <div class="adm-rt-psec poster-row--thing">
-        <div class="adm-rt-sub">${R('sharedDocs')}</div>
+      <${Split} heavy>
+        <${SubHeading} level=${4}>${R('sharedDocs')}<//>
         ${room.docList.length === 0
-    ? html`<p class="adm-rt-note">${R('noDocs')}</p>`
+    ? html`<${Note}>${R('noDocs')}<//>`
     : html`
-          <div class="adm-rt-prow adm-rt-prow--head">
-            <div>${R('colDoc')}</div><div>${R('colSnapshot')}</div><div></div>
-          </div>
-          ${room.docList.map(d => html`
-            <div class="adm-rt-prow">
-              <div class="adm-rt-person">${d.id}</div>
-              <div class="adm-rt-id">${fmtBytes(d.bytes)}</div>
-              <div></div>
-            </div>`)}
-          <p class="adm-rt-note">${R('docNote')}</p>`}
-      </div>
+          <${List} cols="path-size" dense head=${[R('colDoc'), R('colSnapshot')]} labels>
+            ${room.docList.map(d => html`
+              <${Row} key=${d.id}>
+                <${Name}>${d.id}<//>
+                <${Cell} meta>${fmtBytes(d.bytes)}<//>
+              <//>`)}
+          <//>
+          <${Note}>${R('docNote')}<//>`}
+      <//>
 
-      <div class="adm-rt-psec poster-row--thing">
-        <div class="adm-rt-sub">${R('closingIt')}</div>
-        <p class="adm-rt-note">${room.peerCount === 0 ? R('closingWhyEmpty')
+      <${Split} heavy>
+        <${SubHeading} level=${4}>${R('closingIt')}<//>
+        <${Note}>${room.peerCount === 0 ? R('closingWhyEmpty')
     : room.peerCount === 1 ? R('closingWhyOne')
-      : R('closingWhy', { count: room.peerCount })}</p>
-        <button type="button" class="adm-rt-slab" onClick=${onCloseRoom}>${R('close')}</button>
-      </div>
-    </div>`;
+      : R('closingWhy', { count: room.peerCount })}<//>
+        <${Loud} danger onClick=${onCloseRoom}>${R('close')}<//>
+      <//>
+    <//>`;
 }

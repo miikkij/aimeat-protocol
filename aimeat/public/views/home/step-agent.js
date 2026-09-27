@@ -17,6 +17,9 @@
  * @structure StepAgent({ state, onChanged }) — the open step 2.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   2026-09-27: The step writes no class: its buttons are Loud, `quiet` while it is not their turn,
+ *     and the prompt's copy is PromptCard `loud`/`quiet`; the markup is the same (page group G9, a
+ *     move).
  *   2026-09-24: The name form's wrapper no longer wears the masthead's name class (Jouni's decision
  *     "The agent step's name form").
  *   2026-09-24: A button that is not the next thing to do (no name yet, the prompt copied, started)
@@ -57,6 +60,7 @@ import { PasteLabel } from '/components/PasteBox.js';
 import { Hint } from '/components/Hint.js';
 import { TextInput } from '/components/TextInput.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Loud } from '/components/Action.js';
 import { NamedValue } from '/components/NamedValue.js';
 import { ModeTabs, ModeTab } from '/components/ModeTabs.js';
 import { StepList } from '/components/StepList.js';
@@ -177,7 +181,7 @@ export function StepAgent({ onChanged, showToast }) {
             value=${agentName}
             onInput=${(e) => setAgentName(e.target.value)} />
           <${ActionRow}>
-            <button type="button" class=${cleanName ? 'poster-slab' : 'poster-action'}
+            <${Loud} quiet=${!cleanName}
               disabled=${!cleanName}
               onClick=${() => {
                 setAgentName(cleanName); setNamed(true);
@@ -192,7 +196,7 @@ export function StepAgent({ onChanged, showToast }) {
                 }) }).catch((e) => swallowed('home/step-agent: name record', e));
               }}>
               ${tr('home.agent.nameSubmit', 'That is its name')}
-            </button>
+            <//>
           <//>
         </div>
       ` : html`
@@ -213,16 +217,16 @@ export function StepAgent({ onChanged, showToast }) {
           <${PromptCard}
             label=${tr('home.agent.promptLabel', 'The prompt')}
             prompt=${prompt}
-            className=${waiting ? 'poster-action' : 'poster-slab'}
+            loud=${!waiting} quiet=${waiting}
             copyLabel=${tr('home.agent.copy', 'Copy the prompt')}
             copiedLabel=${tr('home.agent.copied', 'Copied. Paste it in your AI chat')}
             onCopied=${() => setWaiting(true)} />
         ` : html`
           <${StepList} steps=${steps} />
           <${ActionRow}>
-            <button type="button" class=${waiting ? 'poster-action' : 'poster-slab'} onClick=${() => setWaiting(true)}>
+            <${Loud} quiet=${waiting} onClick=${() => setWaiting(true)}>
               ${tr('home.agent.doneManual', 'I have started it')}
-            </button>
+            <//>
           <//>`}
 
         ${waiting && pending.length === 0 && html`
