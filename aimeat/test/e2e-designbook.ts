@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.7 — 2026-09-26 — At propose, a @function with a typed parameter is refused with the reason and
+ *     one with plain parameters passes, and the refusal of an at-rule names the blocks of
+ *     @font-feature-values among what passes.
  *   v1.8.6 — 2026-09-26 — At propose, an at-rule and a counter spelled with a Kelvin sign are read as a
  *     browser reads them: the at-rule is off the list, and the counter is not the component's own.
  *   v1.8.5 — 2026-09-26 — At propose, a declaration that names a counter, an anchor or a view
@@ -764,6 +767,17 @@ const GOOD_BODY = {
         assert(refusedWith(kelvin, /carries no @Keyframes: it uses only @media/), `an at-rule spelled with a Kelvin sign is off the list: ${said(kelvin)}`);
         const counter = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n.wkgrid-cell { counter-increment: w\\212a grid-step; }` }));
         assert(refusedWith(counter, /names the counter "wKgrid-step"/), `a counter spelled with a Kelvin sign is not the component's own: ${said(counter)}`);
+    });
+
+    await test('a @function with a typed parameter is refused with the reason, one with plain parameters passes, and a refused at-rule names the blocks of @font-feature-values', async () => {
+        const stamp = Date.now() % 100000;
+        const typed = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n@function --wkgrid-gap(--x <length>) { result: var(--x); }` }));
+        assert(refusedWith(typed, /gives a parameter a type or a default, or names the type it returns\. The CSS parser the bench reads with cannot read those/),
+            `a typed @function is refused with the reason: ${said(typed)}`);
+        const plain = await proposeComponent(`comp-fn-${stamp}`, componentBody({ css: `${componentBody().css}\n@function --wkgrid-gap(--x, --y) { result: var(--x); }` }));
+        assert(plain.status === 201, `a @function with plain parameters passes: ${said(plain)}`);
+        const unlisted = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n@document url-prefix() { .wkgrid-cell { min-height: 40px; } }` }));
+        assert(refusedWith(unlisted, /and inside @font-feature-values its own blocks, such as @styleset and @swash\./), `the list names the blocks of @font-feature-values: ${said(unlisted)}`);
     });
 
     // A component the second owner proposed, stored when it passed an older bench: `.wkgrid ~ p`

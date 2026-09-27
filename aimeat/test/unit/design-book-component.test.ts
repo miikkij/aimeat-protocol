@@ -5,6 +5,9 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.19.0 — 2026-09-26 — A @function whose parameter carries a type or a default, or that says what it
+ *     returns, is refused in a sentence saying the parser cannot read those, one with plain parameters
+ *     passes, and the refusal of an at-rule names the blocks of @font-feature-values among what passes.
  *   v1.18.0 — 2026-09-26 — Every name is read in ASCII lower case: an at-rule, a defined name, a counter,
  *     an element and an attribute spelled with a Kelvin sign read as a browser reads them, and ASCII
  *     capitals still read as their lower case.
@@ -588,6 +591,25 @@ describe('the component bench', () => {
       [{ type: 'function', name: 'reversed', words: ['b'] }, { type: 'number' }, { type: 'comma' }, { type: 'word', name: '--c' }],
       [{ type: 'function', name: 'var', words: ['--e'] }, { type: 'other', text: '"f"' }],
     ]);
+  });
+
+  // css-tree reads a custom function's parameters by name only, and keeps a type, a default or a
+  // `returns` as raw text. The bench refuses what it cannot read, and says so of a @function.
+  it('refuses a @function with a typed or defaulted parameter or a "returns", saying the parser cannot read them, and says the blocks of @font-feature-values pass inside it', () => {
+    for (const fn of [
+      '@function --wkgrid-gap(--x <length>) { result: var(--x); }', '@function --wkgrid-gap(--x: 4px) { result: var(--x); }',
+      '@function --wkgrid-gap() returns <length> { result: 4px; }',
+    ]) {
+      expect(bad({ css: `${WEEK_GRID.css}\n${fn}` }), fn).toThrow(new RegExp(`"${fn.split(' {')[0].replace(/[()]/g, '\\$&')}" gives a parameter a type or a default, or names the type it returns\\. `
+        + 'The CSS parser the bench reads with cannot read those, and the bench vouches only for a stylesheet it reads whole\\. '
+        + 'Name the parameters without types or defaults, and leave out "returns": "@function --wkgrid-gap\\(--a, --b\\) \\{ result: … \\}"\\.'));
+    }
+    expect(readStylesheet('@function --a(--b <length>) { result: 1px; }').rawFunction).toBe('@function --a(--b <length>)');
+    expect(readStylesheet('@function --a(--b, --c) { result: 1px; }').rawFunction).toBeNull();
+    expect(() => validateComponentBody({ ...WEEK_GRID, css: `${WEEK_GRID.css}\n@function --wkgrid-gap(--x, --y) { result: var(--x); }` })).not.toThrow();
+    // Every refusal of an at-rule says what passes, the blocks of @font-feature-values inside it included.
+    expect(bad({ css: `@tomorrow (x) { .wkgrid-cell { color: var(--ak-accent); } }\n${WEEK_GRID.css}` }))
+      .toThrow(/under a name that starts with its prefix, and inside @font-feature-values its own blocks, such as @styleset and @swash\./);
   });
 
   // CSS and HTML match a name in ASCII lower case: A to Z become a to z and nothing else changes. To a

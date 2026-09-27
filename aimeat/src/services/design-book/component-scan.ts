@@ -35,6 +35,8 @@
  *   StylesheetOpen · NameKind · NameDefinition · nameKindOf · DeclarationRead · ValuePart · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.10.0 — 2026-09-26 — readStylesheet notes the first @function whose prelude css-tree keeps as raw
+ *     text (`rawFunction`): a parameter with a type or a default value, or a `returns`.
  *   v2.9.0 — 2026-09-26 — Every name, in the markup and in the stylesheet, is read in ASCII lower case
  *     (asciiLower), the way CSS and HTML match names: A to Z become a to z and nothing else changes,
  *     so a Kelvin sign (U+212A) stays itself and `@\212a eyframes` reads as the at-rule no browser knows.
@@ -403,6 +405,11 @@ export interface StylesheetReading {
   selectors: Array<{ text: string; selector: ComplexSelector | null; nested: boolean }>;
   /** The first part the parser could not read (a parse error, or text it kept raw), or null. */
   unreadable: string | null;
+  /**
+   * The first @function whose prelude the parser keeps as raw text, as written, or null. css-tree
+   * reads a custom function's parameters by name only: a type, a default value or `returns` it keeps raw.
+   */
+  rawFunction: string | null;
 }
 
 /** How deep brackets and blocks may nest before css-tree is not run at all. No component needs more. */
@@ -502,7 +509,9 @@ const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(nod
  * the parser keeps as raw text, is reported as unreadable.
  */
 export function readStylesheet(css: string): StylesheetReading {
-  const reading: StylesheetReading = { atRules: [], definitions: [], functions: [], readsPageTokens: false, depth: 0, open: null, declarations: [], selectors: [], unreadable: null };
+  const reading: StylesheetReading = {
+    atRules: [], definitions: [], functions: [], readsPageTokens: false, depth: 0, open: null, declarations: [], selectors: [], unreadable: null, rawFunction: null,
+  };
   const tokens: Token[] = [];
   tokenize(css, (type, start, end) => { tokens.push({ type, start, end }); });
   // Every bracket and block still open, the innermost last: the token that closes it, where its
@@ -575,6 +584,7 @@ export function readStylesheet(css: string): StylesheetReading {
         // Raw text a pseudo holds that is only words and numbers is read, not refused (pseudoOf).
         else if ((node.type === 'PseudoClassSelector' || node.type === 'PseudoElementSelector') && wordsOnly(node)) return this.skip;
         else if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes++;
+        else if (node.type === 'Atrule' && node.prelude?.type === 'Raw' && nameOf(node.name) === 'function') reading.rawFunction ??= quoted(`@function ${node.prelude.value}`);
         else if (node.type === 'Rule' && keyframes === 0) reading.selectors.push(...selectorsOfRule(node, css, styleRules > 0));
         else if (node.type === 'Declaration' && !this.atrulePrelude) reading.declarations.push(declarationOf(node, css));
         if (node.type === 'Rule') styleRules++;
