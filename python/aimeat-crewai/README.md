@@ -556,12 +556,14 @@ is refused there by design. So a local hold with the node's gate off says exactl
 decision id, rather than pretending somebody was notified. `v.report()` is written to be put
 straight into what the crew hands back: a gate that stops an action silently is worse than no gate.
 
-When a person later confirms or overrides a decision, record it — this is what turns the register
-into something thresholds can be tuned from:
+When a person later confirms or overrides a decision, record it. This is what turns the register
+into something thresholds can be tuned from. The node refuses a review by the agent that asked for
+the decision (`OWN_DECISION`), so the owner records the verdict in person or through another of
+their agents, and the review's `by` names whoever recorded it:
 
 ```python
 from aimeat_crewai import review
-review(v.decision_id, "overridden", note="Sent it by hand instead.", agent_name="mailer")
+review(v.decision_id, "overridden", note="Sent it by hand instead.", agent_name="reviewer")
 ```
 
 ### Tuning the thresholds (0.27.1+)
