@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.8 — 2026-09-26 — At propose, a list of the component with a <summary> whose counter-increment
+ *     writes "list-item 0" passes, and an <li> outside a list, display: list-item, a display through
+ *     var() and a counter-increment that can reach a <summary> are refused, each saying why.
  *   v1.8.7 — 2026-09-26 — At propose, a @function with a typed parameter is refused with the reason and
  *     one with plain parameters passes, and the refusal of an at-rule names the blocks of
  *     @font-feature-values among what passes.
@@ -778,6 +781,27 @@ const GOOD_BODY = {
         assert(plain.status === 201, `a @function with plain parameters passes: ${said(plain)}`);
         const unlisted = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n@document url-prefix() { .wkgrid-cell { min-height: 40px; } }` }));
         assert(refusedWith(unlisted, /and inside @font-feature-values its own blocks, such as @styleset and @swash\./), `the list names the blocks of @font-feature-values: ${said(unlisted)}`);
+    });
+
+    await test('a list item stays inside a list of the component: an <li> outside one, display: list-item, a display through var() and a counter-increment that can reach a <summary> are refused, each saying why', async () => {
+        const stamp = Date.now() % 100000;
+        const wrong: string[] = [];
+        const listed = await proposeComponent(`comp-list-${stamp}`, componentBody({
+            html: '<div class="wkgrid"><ol class="wkgrid-list"><li class="wkgrid-item">a</li></ol><details class="wkgrid-more"><summary class="wkgrid-s">More</summary></details></div>',
+            css: `${componentBody().css}\n.wkgrid-s { counter-increment: wkgrid-step list-item 0; }`,
+        }));
+        if (listed.status !== 201) wrong.push(`a list of the component, and a <summary> whose counter-increment writes list-item 0, pass: ${said(listed)}`);
+        const disclosure = '<details class="wkgrid"><summary class="wkgrid-s">More</summary></details>';
+        for (const [patch, expected] of [
+            [{ html: '<div class="wkgrid"><li class="wkgrid-item">a</li></div>' }, 'An <li> stands inside <div>, outside a list of the component: a browser numbers it as an item of the page\'s own list'],
+            [{ css: `${componentBody().css}\n.wkgrid-cell { display: list-item; }` }, 'makes an element a list item'],
+            [{ css: `${componentBody().css}\n.wkgrid-cell { display: var(--wkgrid-d); }` }, 'writes display through var()'],
+            [{ html: disclosure, css: `${componentBody().css}\n.wkgrid-s { counter-increment: wkgrid-step; }` }, 'The markup carries a <summary>, which a browser makes a list item that counts 0'],
+        ] as Array<[Record<string, unknown>, string]>) {
+            const r = await proposeComponent(`comp-bad-${stamp}`, componentBody(patch));
+            if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${JSON.stringify(patch).slice(0, 90)}: ${said(r)}`);
+        }
+        assert(wrong.length === 0, `the lists of the component pass, and each of the others is refused, saying why: ${wrong.join('; ')}`);
     });
 
     // A component the second owner proposed, stored when it passed an older bench: `.wkgrid ~ p`
