@@ -27156,13 +27156,15 @@ paths:
         it) and a stylesheet that loads anything, reaches outside its prefix, fixes itself over the
         page, moves at idle or carries a literal colour. A rule nested inside another starts with
         `&`, which stands for the elements of the rule it is nested in; at the top of the
-        stylesheet `&` is the page and is refused. A stylesheet carries no `@scope`: inside it `&`
-        stands for the elements its prelude chooses, and the component's own classes already keep
-        every rule inside it. It carries no `@layer`, `@page` or `@view-transition`, each of which
-        acts on the whole page, and a name it defines with `@keyframes`, `@property` or
-        `@counter-style` starts with its prefix (`@keyframes wkgrid-spin`, `@property --wkgrid-x`),
-        because the whole page shares that name; an animation or counter style the page defines is
-        still used by its name. A component whose builder judged it `general`
+        stylesheet `&` is the page and is refused. The at-rules a stylesheet may carry are a list:
+        `@media`, `@supports`, `@container` and `@starting-style`, which condition its own rules, and
+        `@keyframes`, `@property`, `@counter-style`, `@font-palette-values`, `@position-try`,
+        `@function` and `@font-feature-values` under a name that starts with its prefix
+        (`@keyframes wkgrid-spin`, `@property --wkgrid-x`), because the whole page shares that name.
+        Every other at-rule is refused, known or unknown, `@scope`, `@layer`, `@page`,
+        `@view-transition`, `@import` and `@font-face` among them, and the refusal says what the
+        list is. An animation, a counter style or a font palette the page defines is still used by
+        its name. A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
