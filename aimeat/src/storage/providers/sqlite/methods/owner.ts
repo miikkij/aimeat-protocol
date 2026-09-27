@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- deleteOwner writes the erasure's pseudonym in place of the person on the
+ *     ledger lines of other people that name them, as counterparty or as the one who acted
+ *     (repos/ledger-erasure.ts). The lines stay for those people's books.
  *   v1.13.0 -- 2026-09-26 -- The work settlement names the owner's agents as well, so their work is
  *     found for an account with no GHII row.
  *   v1.12.0 -- 2026-09-26 -- deleteOwner settles the person's work first (repos/work-erasure.ts): open
@@ -54,7 +57,8 @@ import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
 import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
 import { settleErasedPartyWork } from '../repos/work-erasure.js';
-import { erasedPartyPseudonym } from '../../../erased-party.js';
+import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
+import { erasedPartyPseudonym, erasedAccountParty } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
@@ -161,6 +165,9 @@ export const ownerMethods = {
       // The AI provenance records stay too, for the content that outlives the account. The name
       // leaves the two columns every owner read keys on, under the same pseudonym.
       pseudonymiseProvenanceOwner(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
+      // So do the other side's ledger lines: the person's own went with the passes above, and the
+      // lines in other people's ledgers name them by the same pseudonym (repos/ledger-erasure.ts).
+      pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiiRows.map(r => r.ghii), pseudonym, agentGaiis));
 
       // 4. Delete GHII records for this owner
       this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);

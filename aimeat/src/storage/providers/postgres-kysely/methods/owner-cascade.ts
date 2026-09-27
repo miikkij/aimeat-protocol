@@ -29,12 +29,16 @@
  *   - cascadeDeleteIdentityData(db, gaii) — every owner-scoped table for ONE identity (GHII or GAII)
  *   - pseudonymisePurchasePartiesDb(db, name, ghiis, pseudonym) — the kept receipts, without the name
  *   - pseudonymiseProvenanceOwnerDb(db, name, ghiis, pseudonym) — the kept AI provenance, without it
+ *   - pseudonymiseLedgerPartyDb(db, party) — the other side's ledger lines, without the name
  *   - settleLeavingPartyWorkDb(db, party) — open work cancelled, held morsels back, finished work kept
  *   - settleErasedPartyWorkDb(db, name, ghiis, pseudonym, agents) — that rule for an erased account
  *   - settleDeletedAgentWorkDb(db, gaii) — that rule for one agent its owner deletes
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.8.0 — 2026-09-26 — pseudonymiseLedgerPartyDb: deleteOwnerCascade writes the erasure's
+ *     pseudonym in place of the person on the ledger lines of other people that name them, as
+ *     counterparty or as the one who acted. The lines stay for those people's books.
  *   v1.7.0 — 2026-09-26 — One work rule for any party that leaves (LeavingParty in erased-party.ts):
  *     identityMethods.deleteAgent settles the agent's work with it, keeping the agent's identity on
  *     what stays, and the erasure finds its agents' work by their GAII too. Work leaves the
@@ -261,6 +265,35 @@ export async function pseudonymiseProvenanceOwnerDb(
 }
 
 /**
+ * Write the erasure's pseudonym in place of an erased person on every ledger line that still names
+ * them, and keep the lines.
+ *
+ * The rule and its reasons are written on the SQLite twin, pseudonymiseLedgerParty in
+ * ../../sqlite/repos/ledger-erasure.ts. The person's own lines go with the per-identity passes; the
+ * lines in other people's ledgers stay for their books, and each column that names the person
+ * (`counterpartyGaii`, and `initiatorGaii` where they acted) takes the one pseudonym the erasure
+ * writes on the work, the receipts and the provenance records. A ledger line carries no hash or
+ * signature of its own; the dispute log does, and keeps them as stored. A party with no pseudonym is
+ * kept as stored.
+ *
+ * Postgres LIKE escapes with a backslash by default, which is how partyIdentities escapes. Written
+ * out twice rather than looped over the two columns, so each statement names its own column.
+ */
+export async function pseudonymiseLedgerPartyDb(db: Db, party: LeavingParty): Promise<number> {
+  const { exact, suffixPatterns, pseudonym } = party;
+  if (!pseudonym) return 0;
+  const counterparty = await db.updateTable('Transaction')
+    .set({ counterpartyGaii: pseudonym })
+    .where(eb => eb.or([eb('counterpartyGaii', 'in', exact), ...suffixPatterns.map(p => eb('counterpartyGaii', 'like', p))]))
+    .executeTakeFirst();
+  const initiator = await db.updateTable('Transaction')
+    .set({ initiatorGaii: pseudonym })
+    .where(eb => eb.or([eb('initiatorGaii', 'in', exact), ...suffixPatterns.map(p => eb('initiatorGaii', 'like', p))]))
+    .executeTakeFirst();
+  return Number(counterparty?.numUpdatedRows ?? 0) + Number(initiator?.numUpdatedRows ?? 0);
+}
+
+/**
  * Settle every work row a leaving party is on: an erased account, or one agent its owner deletes.
  *
  * The rule and its reasons are written on the SQLite twin, settleLeavingPartyWork in
@@ -397,6 +430,9 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // The AI provenance records stay too, for the content that outlives the account. The name leaves
   // the two columns every owner read keys on, under the same pseudonym.
   await pseudonymiseProvenanceOwnerDb(db, name, ghiis.map(g => g.ghii), pseudonym);
+  // So do the other side's ledger lines: the person's own went with the passes above, and the lines
+  // in other people's ledgers name them by the same pseudonym.
+  await pseudonymiseLedgerPartyDb(db, erasedAccountParty(name, ghiis.map(g => g.ghii), pseudonym, agents.map(a => a.gaii)));
 
   await db.deleteFrom('Ghii').where('ownerName', '=', name).execute();
 

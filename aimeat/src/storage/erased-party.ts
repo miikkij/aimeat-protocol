@@ -19,6 +19,11 @@
  *   When the erased person asked for it, the morsels held were their own, and they go with the
  *   account.
  *
+ *   A line in somebody else's ledger is the same kind of record: it is that person's book entry for
+ *   money that moved between them and the erased person, so it stays, with the erased person named by
+ *   the same pseudonym as counterparty, and as the one who acted where they did. The erased person's
+ *   own lines go with the account.
+ *
  *   WHY THE NAME CANNOT STAY IN IT. A deleted username is released for reuse (decision 2026-08-10),
  *   and every purchase read keys on `name@node`. A receipt that kept the name therefore belonged to
  *   whoever registered that name next: the receipts, the paid content in them and a valid licence.
@@ -40,6 +45,8 @@
  *   import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
  *   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The other side's ledger lines take the same pseudonym in both cascades
+ *     (sqlite repos/ledger-erasure.ts, postgres pseudonymiseLedgerPartyDb). No change to the rule.
  *   v1.3.0 — 2026-09-26 — LeavingParty: the work rule serves a deleted agent too. Its owner is still
  *     here, so its held morsels go back to the owner and the rows keep its identity as stored.
  *   v1.2.0 — 2026-09-26 — Work: open requests are cancelled and the requester's held morsels go back,
