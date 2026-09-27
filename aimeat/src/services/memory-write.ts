@@ -72,12 +72,12 @@
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { memoryCeilings } from './memory-ceilings.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 import { isKeyArchived } from './archive.js';
-import { provenanceForWrite } from './ai-provenance.js';
+import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
 import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
 import { emitChange } from './event-bus.js';
 import { enqueueMemoryReplication } from './memory-replication.js';
@@ -417,6 +417,7 @@ export async function writeMemoryRecord(
     }
 
     // 5. Provenance names WHO WROTE it, not whose namespace it lands in.
+    const held: AiProvenanceRecordRow[] = [];
     const aiProvenanceId = await provenanceForWrite(storage, {
         principal: caller.principal,
         content: memoryContentBytes(input.value),
@@ -428,10 +429,11 @@ export async function writeMemoryRecord(
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
         enabled: config.aiProvenance,
+        held,
     });
 
     const now = new Date().toISOString();
-    const record = await storage.setMemory({
+    const prepared: MemoryRecord = {
         key: input.key,
         ownerGaii: caller.targetGaii,
         value: input.value,
@@ -444,7 +446,29 @@ export async function writeMemoryRecord(
         version: existing ? existing.version + 1 : 1,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
+    };
+    const record = await storage.transaction(async () => {
+        let landed: MemoryRecord | null;
+        if (input.expectedVersion === undefined) {
+            landed = await storage.setMemory(prepared);
+        } else if (input.expectedVersion === 0) {
+            if (!storage.createMemoryIfAbsent) throw new Error('Storage must support atomic memory creation');
+            landed = await storage.createMemoryIfAbsent(prepared);
+        } else {
+            if (!storage.setMemoryIfVersion) throw new Error('Storage must support atomic memory updates');
+            landed = await storage.setMemoryIfVersion(prepared, input.expectedVersion);
+        }
+        if (landed) await storeHeldProvenance(storage, held);
+        return landed;
     });
+    if (!record) {
+        const current = (await storage.getMemory(caller.targetGaii, input.key))?.version ?? 0;
+        return {
+            ok: false, status: 409, code: 'VERSION_CONFLICT',
+            message: `Key "${input.key}" is at version ${current}, and this write expected ${input.expectedVersion}. Read it again and retry.`,
+            details: { key: input.key, currentVersion: current, expectedVersion: input.expectedVersion },
+        };
+    }
 
     // 6. The live update. A write over MCP used to reach storage with nobody hearing about it, so an
     //    app watching its owner's memory saw the agent's work only after a reload. No ownerGaii
