@@ -8,6 +8,7 @@
  * @structure PAGE_KIT_ENTRIES
  * @usage import { PAGE_KIT_ENTRIES } from './entries-page-kit.js';
  * @version-history
+ *   v1.3.0 — 2026-09-27 — Section's group (the admin Config domains' band).
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Layout's Columns, Beside start and stick; Tabs'
  *     TabPanel; Section's band.
  *   v1.1.0 — 2026-09-27 — settings-page, section-component, folds, tab-row, layout and contents-tree
@@ -60,7 +61,7 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
         summary: 'One door to a section of a Settings page, open or folded. Open, it is PageSection: the heavy rule on top, the ink section title with a small coral number or count, the actions at the right, the body. With fold, it is FoldSection: one row that opens in place.',
         module: '/components/Section.js', sheet: '/css/components/page-section.css', classes: ['og-sec', 'og-sec--first', 'og-sec-h'],
         data: {
-            shape: 'Section({ id, num, title, count, doors, first, plain, band, fold, sub, lead, open, onToggle, clip, wrap, inner, children }) · PageSection · FoldSection (both re-exported)',
+            shape: 'Section({ id, num, title, count, doors, first, plain, band, group, fold, sub, lead, open, onToggle, clip, wrap, inner, children }) · PageSection · FoldSection (both re-exported)',
             fields: {
                 id: 'the section\'s anchor, which the rail scrolls to', num: 'the small number beside the title', title: 'the section\'s name',
                 count: 'an open section: a count instead of the number', doors: 'an open section: its actions at the right of the head',
@@ -78,6 +79,7 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'first', class: 'og-sec--first', prop: 'first', when: 'the first section under the page head' },
             { name: 'plain', prop: 'plain', when: 'a box that stands as a section of its own without a title' },
             { name: 'band', prop: 'band', when: 'the title\'s band across the column, as the classic pages drew it (PageSection band)' },
+            { name: 'group', prop: 'group', when: 'a section holding a group of sections: a smaller band across the column (PageSection group)' },
             { name: 'fold', prop: 'fold', when: 'a section closed by default, one row until opened (FoldSection)' },
             { name: 'fold inner', prop: 'fold inner', when: 'one of several folds under one rule inside a part' },
         ],

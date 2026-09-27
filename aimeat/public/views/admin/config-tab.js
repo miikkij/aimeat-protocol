@@ -28,6 +28,8 @@
  *   - fieldEditor — one field's editor by its type
  *   - ConfigTab (default)
  * @version-history
+ *   v3.0.1 -- 2026-09-27 -- Each domain opens with its band across the column again (Section group),
+ *     and the index is the rail's light tone, both as main drew them (Jouni).
  *   v3.0.0 -- 2026-09-27 -- Library components only: the page is a SettingsIndex (pinned search and
  *     filters, the index as the contents rail, the old → new list), each field a SettingLine with
  *     its source as a status Mark and its editor a Check, TextField or TextArea, the groups Section,
@@ -59,7 +61,6 @@ import { saveConfig, deleteConfig } from '/js/services/admin.js';
 import { DecideKeyTest } from './decide-key-test.js';
 import { SettingsIndex, SettingLine, ChangeList } from '/components/SettingsIndex.js';
 import { Section } from '/components/Section.js';
-import { SubHeading } from '/components/SubHeading.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Code } from '/components/Mark.js';
@@ -329,9 +330,8 @@ export default function ConfigTab({ data, reload }) {
       index=${index}
       indexLabel=${tr('dashboard.cfgToc', 'Sections')}
       empty=${tr('dashboard.cfgNoMatches', 'No setting matches.')}>
-      ${domainOrder.map(domain => html`
-        <div key=${domain}>
-          <${SubHeading} level=${3}>${domainLabel(domain)}<//>
+      ${domainOrder.map((domain, di) => html`
+        <${Section} group key=${domain} first=${di === 0} title=${domainLabel(domain)}>
           ${byDomain.get(domain).map(([g, items]) => {
             const helpKey = 'dashboard.cfgHelp_' + g;
             const helpText = t(helpKey);
@@ -356,7 +356,7 @@ export default function ConfigTab({ data, reload }) {
                 ${SectionAction && html`<${SectionAction} />`}
               <//>`;
           })}
-        </div>`)}
+        <//>`)}
     <//>
   `;
 }

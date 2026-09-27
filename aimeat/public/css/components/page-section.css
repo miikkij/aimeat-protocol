@@ -9,6 +9,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-27 — .og-sec--group: a section holding a group of sections, its band in main's admin
+ *     Config domain cut (Section `group`).
  *   2026-09-27 — .og-sec-h--band: the headline's band spans the column (PageSection `band`).
  *   v1.4.1 — 2026-09-26 — The side split's line reads var(--shape-frame) (2px in AIMEAT), not a literal
  *     (check:shape-tokens; fix pass).
@@ -27,6 +29,11 @@
 /* The band cut (PageSection/Section `band`): the headline's dark band spans the column, as the classic
    pages drew their section titles on main (a block .poster-section-title). */
 .og-sec-h--band > .poster-section-title { flex: 1 1 100%; }
+/* A section that holds a group of sections (Section `group`): its band in the smaller cut main's
+   admin Config drew over each domain (.adm-cfg-domain, --poster-section-size .95rem); the sections
+   inside keep their own size. */
+.og-sec--group > .og-sec-h { --poster-section-size: .95rem; margin-bottom: 0; }
+.og-sec--group.og-sec--first { padding-top: 0; }
 .pf .og .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 .og-hint { margin: .6rem 0 0; font-size: .85rem; line-height: 1.5; font-weight: 600; color: var(--text-dim); }
 .og-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }

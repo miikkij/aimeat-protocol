@@ -7,7 +7,7 @@
  *   unsaved the words and actions that say so), the index of the groups beside the settings that
  *   stays in sight while the settings scroll, one line per setting, and the list of unsaved changes
  *   as old → new. A page passes data, handlers and its parts; it never writes a class. The index is
- *   the library's contents rail (components/Rail.js); the look of the rest is
+ *   the library's contents rail in its light tone (components/Rail.js); the look of the rest is
  *   css/components/settings-index.css (main's admin Config page: .adm-cfg-tools, .adm-cfg-searchwrap,
  *   .adm-cfg-pending-mini, .adm-cfg-listbox, .adm-cfg-body, .adm-cfg-rail, .adm-cfg-frow and its
  *   cells in views/admin.css).
@@ -36,6 +36,8 @@
  *          <//>
  *        <//>`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — The index is the rail's light tone, as main drew it (Jouni: the dark look
+ *     belongs only to the operator menu).
  *   v1.0.0 — 2026-09-27 — Initial: the admin Config page's pinned tools, left index, field rows and
  *     old → new list (views/admin/config-tab.js) as a component; the index is now the contents rail
  *     (admin group G1).
@@ -76,7 +78,7 @@ export function SettingsIndex({ search, filters, status, before, index = [], ind
         : html`
           <div class="settings-index-body">
             <div class="settings-index-side">
-              <${Rail} title=${indexLabel} groups=${groups.map((g) => ({ label: g.label, rule: false, items: g.items }))} />
+              <${Rail} tone="light" title=${indexLabel} groups=${groups.map((g) => ({ label: g.label, rule: false, items: g.items }))} />
             </div>
             <div class="settings-index-main">${children}</div>
           </div>`}
