@@ -103,7 +103,7 @@ export function registerRecoveryRoutes(
         const emailChanged = ghiiRecord.emailHash !== emailHash;
         await storage.updateGHII(ghii, {
             notificationEmail: normalizedEmail,
-            ...(emailChanged ? { emailVerifiedAt: undefined, magicLinkEnabled: false } : {}),
+            ...(emailChanged ? { emailVerifiedAt: null, magicLinkEnabled: false } : {}),
         });
 
         // Send verification email if service is available

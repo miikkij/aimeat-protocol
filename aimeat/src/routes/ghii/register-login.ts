@@ -553,7 +553,7 @@ export function registerRegisterLoginRoutes(
                     `Account temporarily locked due to too many failed login attempts. Try again after ${ghiiRecord.passwordLockedUntil}`));
                 return;
             }
-            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
             ghiiRecord.passwordFailedAttempts = 0;
             ghiiRecord.passwordLockedUntil = undefined;
         }
@@ -572,7 +572,7 @@ export function registerRegisterLoginRoutes(
 
         // Reset failed attempts on successful login
         if (ghiiRecord.passwordFailedAttempts) {
-            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
         }
 
         // Transparent scrypt parameter upgrade (v1 -> v2)
@@ -606,7 +606,7 @@ export function registerRegisterLoginRoutes(
                 // Lock expired — reset counters
                 await storage.updateGHII(ghiiRecord.ghii, {
                     totpFailedAttempts: 0,
-                    totpLockedUntil: undefined,
+                    totpLockedUntil: null,
                 });
                 ghiiRecord.totpFailedAttempts = 0;
                 ghiiRecord.totpLockedUntil = undefined;
@@ -628,7 +628,7 @@ export function registerRegisterLoginRoutes(
                         totpLastUsedAt: new Date().toISOString(),
                         totpLastUsedCode: totp_code,
                         totpFailedAttempts: 0,
-                        totpLockedUntil: undefined,
+                        totpLockedUntil: null,
                     });
                 }
             }
@@ -644,7 +644,7 @@ export function registerRegisterLoginRoutes(
                     await storage.updateGHII(ghiiRecord.ghii, {
                         totpBackupCodes: updatedCodes,
                         totpFailedAttempts: 0,
-                        totpLockedUntil: undefined,
+                        totpLockedUntil: null,
                     });
                 }
             }

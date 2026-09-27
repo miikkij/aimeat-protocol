@@ -11,7 +11,7 @@
  *     deleteExpiredEmailVerifications deleted: no caller.
  */
 import type {
-  PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, PersonalNodeRecord, MailboxItemRecord,
+  PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, GHIIPatch, PersonalNodeRecord, MailboxItemRecord,
   MaintenanceState, EmailVerificationRecord, ChatInstanceRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -197,10 +197,14 @@ export const identityNodesMethods = {
     return row ? this.deserializeGHII(row) : null;
   },
 
-  async updateGHII(this: SqliteStorage, ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
+  async updateGHII(this: SqliteStorage, ghii: string, updates: GHIIPatch): Promise<GHIIRecord | null> {
     const existing = await this.getGHII(ghii);
     if (!existing) return null;
-    const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+    // Match PostgreSQL's patch contract. Null clears an optional field and reads as absent;
+    // undefined is not an instruction to clear a value already stored on the account.
+    const patch = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, value === null ? undefined : value])) as Partial<GHIIRecord>;
+    const updated = { ...existing, ...patch, updatedAt: new Date().toISOString() };
     this.db.prepare(
       `UPDATE ghiis SET username = ?, nodeId = ?, displayName = ?, bio = ?, avatar = ?, locale = ?, region = ?, timezone = ?,
        passwordHash = ?, verificationLevel = ?, ownerName = ?, createdAt = ?, updatedAt = ?,

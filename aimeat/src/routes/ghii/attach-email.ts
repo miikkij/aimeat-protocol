@@ -75,7 +75,7 @@ export function registerAttachEmailRoute(
                     `Account temporarily locked due to too many failed login attempts. Try again after ${ghiiRecord.passwordLockedUntil}`));
                 return;
             }
-            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
         }
 
         const valid = await verifyPassword(password, ghiiRecord.passwordHash);
@@ -90,7 +90,7 @@ export function registerAttachEmailRoute(
             return;
         }
         if (ghiiRecord.passwordFailedAttempts) {
-            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
         }
 
         // This endpoint is only for accounts still short of email verification. Once verified there is

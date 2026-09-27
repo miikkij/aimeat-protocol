@@ -28,7 +28,7 @@
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
-import type { AgentRecord, GHIIRecord, OwnerRecord } from '../../../interface.js';
+import type { AgentRecord, GHIIRecord, GHIIPatch, OwnerRecord } from '../../../interface.js';
 import type { Agent, Ghii, Owner } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError } from '../helpers.js';
@@ -291,7 +291,7 @@ export const identityMethods = {
     if (opts?.level !== undefined) query = query.where('verificationLevel', '>=', opts.level);
     return (await query.execute()).map(toGHIIRecord);
   },
-  async updateGHII(this: PostgresKyselyStorage, ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
+  async updateGHII(this: PostgresKyselyStorage, ghii: string, updates: GHIIPatch): Promise<GHIIRecord | null> {
     try {
       const data = { ...updates } as Record<string, unknown>;
       // `passwordFailedAttempts` / `passwordLockedUntil` USED to be deleted here as "not columns".
@@ -301,11 +301,11 @@ export const identityMethods = {
       // totp equivalents were always there). See also the empty-update guard below.
       delete data.semantic;   // not a column
       // A key present with an UNDEFINED value is not a column to set, and Kysely throws on one. The
-      // sqlite provider never noticed, because it spreads the patch over the whole row and rewrites
+      // sqlite provider originally never noticed, because it spread the patch over the whole row and rewrote
       // every column, so `{ x: undefined }` reaches the database as NULL and reads as "cleared".
       // Over here the same patch was a 500. PUT /v1/ghii/cors sent exactly that to clear the origin
       // list, so the account CORS setting could be cleared on one backend and crashed on the other.
-      // Dropping the key means "leave this column alone"; a caller that wants to CLEAR passes null.
+      // Both providers now preserve undefined; a caller that wants to CLEAR passes null.
       for (const [k, v] of Object.entries(data)) if (v === undefined) delete data[k];
       if (data.createdAt) data.createdAt = new Date(data.createdAt as string);
       if (data.updatedAt) data.updatedAt = new Date(data.updatedAt as string);

@@ -112,7 +112,7 @@ export const memoryMethods = {
         value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [], ttlHours: record.ttlHours,
         version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null, trackable,
-        groupId: updGroupId,
+        groupId: updGroupId, workspaceRef: record.workspaceRef ?? null,
         byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
         // Write-through, deliberately NOT inherited from `existing`: a new value is new content, and
         // keeping the old provenance id would assert something about bytes that no longer exist.
