@@ -15,9 +15,15 @@
  *   - loadOwnerEcoApps(storage, owner) — the owner's ecosystem apps, read-once per operation
  *   - resolveOwnerIdentities(storage, nodeId, owner) — GHII first, then agent GAIIs, then eco GEAIs
  *     (the priority order the owner-scope GHII-first dedup relies on)
+ *   - identitiesActingFor(storage, owner, self) — the same order after the identity the session
+ *     resolved; the person's own work endpoints read it
  *   - accountPrincipals(storage, owner) — every principal one account holds, its bare name included
  * @usage const agents = await loadOwnerAgents(storage, owner);   // 0 extra reads inside a read scope
  * @version-history
+ *   v1.2.0 — 2026-09-26 — identitiesActingFor: the person's own identity, then their agents' GAIIs and
+ *     their ecosystem apps' GEAIs. resolveOwnerIdentities is it with the GHII first. The work inbox,
+ *     the sent list and the Work tab read it, so work on an action an ecosystem app of the person
+ *     published reaches the person as their agents' work does (secaudit 2026-09, R4 3).
  *   v1.1.0 — 2026-09-26 — accountPrincipals: the bare account name, the GHII, the agents' GAIIs and the
  *     ecosystem apps' GEAIs of one account. A cortex teardown deletes what an activation wrote under
  *     each of them (routes/cortex/activation.ts).
@@ -53,8 +59,18 @@ export function loadOwnerEcoApps(storage: Storage, owner: string): Promise<EcoAp
  * lists resolve through the IdentityMap, so composing this alongside other agent-scoped work is free.
  */
 export async function resolveOwnerIdentities(storage: Storage, nodeId: string, owner: string): Promise<string[]> {
+  return identitiesActingFor(storage, owner, `${owner}@${nodeId}`);
+}
+
+/**
+ * The identities a person's own endpoints read, `self` first: `self` is the person's own identity as the
+ * session resolved it (resolveIdentity, their GHII), then each agent's GAII, then each ecosystem app's
+ * GEAI. Every one of them acts in the person's name, on permissions the person granted and can pull,
+ * so what they hold is the person's to see. The work inbox, the sent list and the Work tab read it.
+ */
+export async function identitiesActingFor(storage: Storage, owner: string, self: string): Promise<string[]> {
   const [agents, ecoApps] = await Promise.all([loadOwnerAgents(storage, owner), loadOwnerEcoApps(storage, owner)]);
-  return [`${owner}@${nodeId}`, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+  return [self, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
 }
 
 /**

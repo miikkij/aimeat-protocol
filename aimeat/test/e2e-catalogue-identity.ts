@@ -13,6 +13,9 @@
  *   person activates over REST publishes its actions under the same GHII.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=catalogue-identity
  * @version-history
+ *   v1.4.0 — 2026-09-26 — An ecosystem app of the person activates their cortex: its action is under
+ *     the app's GEAI, the work on it reaches the person's inbox and Work tab, and deactivation by the
+ *     person takes the action away.
  *   v1.3.0 — 2026-09-26 — Deactivation removes a cortex's actions whoever deactivates it: the person
  *     after their agent activated it, and an operator after the owner did (secaudit 2026-09, R3 7c).
  *   v1.2.0 — 2026-09-26 — A cortex a person activates publishes its action under their GHII: another
@@ -318,6 +321,58 @@ await test("An operator deactivates another owner's cortex: none of its actions 
     assert(left.length === 0, `an action of the deactivated cortex is still published under ${JSON.stringify(left)}`);
     const del = await json(`/v1/cortex/${name}`, { ...auth(aTok), method: 'DELETE' });
     assert(del.status === 200, `uninstall: ${del.status} ${JSON.stringify(del.body)}`);
+});
+
+// An ecosystem app acting for a person activates their cortex with cortex:write, so the cortex's
+// action is published under the app's GEAI. A person's work endpoints read the identities of their
+// ecosystem apps beside their agents', so the work on that action reaches the person.
+await test("An ecosystem app of the person activates their cortex: the work on its action reaches the person's inbox and Work tab", async () => {
+    const app = `catecoapp${ts}`;
+    const hello = await json('/v1/ecosystem-apps/hello', {
+        method: 'POST',
+        body: JSON.stringify({ owner: aName, app, display_name: 'Cortex helper', public_key: Buffer.from('cat-eco-key').toString('base64'), scopes: ['cortex:write'] }),
+    });
+    assert(hello.status === 200, `hello: ${hello.status} ${JSON.stringify(hello.body)}`);
+    const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+        ...auth(aTok), method: 'POST', body: JSON.stringify({ action: 'approve', scopes: ['cortex:write'] }),
+    });
+    assert(approve.status === 200 && approve.body.data?.status === 'approved', `approve: ${approve.status} ${JSON.stringify(approve.body)}`);
+    const geai = approve.body.data.geai as string;
+    const tok = await json('/v1/ecosystem-apps/token', {
+        method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(tok.status === 200 && typeof tok.body.access_token === 'string', `app token: ${tok.status} ${JSON.stringify(tok.body)}`);
+    const appTok = tok.body.access_token as string;
+
+    const name = `catcortexeco${ts}`;
+    const actionId = `cortex-${name}-proofread`;
+    const inst = await json('/v1/cortex', { ...auth(aTok), method: 'POST', body: JSON.stringify({ manifest: oneActionCortex(name) }) });
+    assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
+    const on = await json(`/v1/cortex/${name}/activate`, { ...auth(appTok), method: 'POST' });
+    assert(on.status === 200, `the app activates: ${on.status} ${JSON.stringify(on.body)}`);
+    const published = await publishedUnder(name, actionId);
+    assert(JSON.stringify(published) === JSON.stringify([geai]), `the app's activation publishes under its GEAI: ${JSON.stringify(published)}`);
+
+    const req = await json('/v1/work/request', {
+        ...auth(bTok), method: 'POST',
+        body: JSON.stringify({ action_id: actionId, provider_gaii: geai, input: { text: 'teh text' } }),
+    });
+    assert(req.status === 201, `request: ${req.status} ${JSON.stringify(req.body)}`);
+    const tc = req.body.data.tracking_code as string;
+    const inbox = await json('/v1/work/inbox', auth(aTok));
+    const overview = await json('/v1/work/overview', auth(aTok));
+
+    // Taken down before the assertions, so a red run leaves nothing published behind it.
+    const off = await json(`/v1/cortex/${name}/deactivate`, { ...auth(aTok), method: 'POST' });
+    const left = await publishedUnder(name, actionId);
+    await json(`/v1/cortex/${name}`, { ...auth(aTok), method: 'DELETE' });
+    await json(`/v1/ecosystem-apps/${app}`, { ...auth(aTok), method: 'DELETE' });
+
+    assert((inbox.body.data?.items ?? []).some((w: any) => w.tracking_code === tc),
+        `the person's inbox lacks the work on their app's action: ${JSON.stringify(inbox.body.data)}`);
+    assert((overview.body.data?.inbox ?? []).some((w: any) => w.tracking_code === tc),
+        `the person's Work tab lacks it: ${JSON.stringify(overview.body.data?.inbox)}`);
+    assert(off.status === 200 && left.length === 0, `deactivation left the app's action published: ${off.status} ${JSON.stringify(left)}`);
 });
 
 await test('Publishing a service without a credential is refused (401)', async () => {

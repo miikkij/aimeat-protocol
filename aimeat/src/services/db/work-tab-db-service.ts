@@ -12,12 +12,15 @@
  * @structure WorkTabService.overview(isOwnerSession, ownerName, caller) → { inbox, sent }
  * @usage const ov = await createWorkTabService(storage).overview(isOwner, ownerName, resolveIdentity(req.auth, nodeId));
  * @version-history
+ *   v1.2.0 — 2026-09-26 — An owner session's tab reads the person's ecosystem apps' identities beside
+ *     their agents' (owner-identity.ts identitiesActingFor), as the inbox and the sent list do.
  *   v1.1.0 — 2026-09-26 — The caller is the resolved identity, and an owner session's tab reads the
  *     person's own GHII beside their agents', where the work on an action they published is.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Work tab's inbox + sent reads into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import { identitiesActingFor } from './owner-identity.js';
 
 const OPEN_INBOX_STATUSES = ['pending', 'accepted', 'in_progress'];
 
@@ -32,7 +35,8 @@ export class WorkTabService {
   /**
    * The Work tab mount for one caller in a single read scope. `caller` is the resolved identity
    * (resolveIdentity): a person's GHII, an agent's GAII. Owner sessions see their own work and the
-   * work of all their agents (one provider IN-query + one requester IN-query, agents resolved once);
+   * work of all their agents and ecosystem apps (one provider IN-query + one requester IN-query, the
+   * identities resolved once);
    * an agent session sees only its own. Sub-object shapes mirror GET /v1/work/inbox and
    * /v1/work/sent exactly.
    */
@@ -42,8 +46,7 @@ export class WorkTabService {
       let requesterItems: Awaited<ReturnType<typeof this.storage.listWorkByRequester>>;
 
       if (isOwnerSession) {
-        const agents = await this.storage.getAgentsByOwner(ownerName);
-        const identities = [caller, ...agents.map(a => a.gaii)];
+        const identities = await identitiesActingFor(this.storage, ownerName, caller);
         [providerItems, requesterItems] = await Promise.all([
           this.storage.listWorkByProviders(identities),
           this.storage.listWorkByRequesters(identities),
