@@ -125,6 +125,7 @@
     "lint": "eslint src/ public/ --max-warnings 0 --cache --cache-location node_modules/.cache/eslint/",
     "lint:tests": "eslint test/",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/backend.tsbuildinfo",
+    "typecheck:audit-tests": "tsc --noEmit -p tsconfig.audit-tests.json",
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json --incremental --tsBuildInfoFile node_modules/.cache/tsc/frontend.tsbuildinfo",
     "typecheck:sdk": "tsc --noEmit -p tsconfig.sdk.json --incremental --tsBuildInfoFile node_modules/.cache/tsc/sdk.tsbuildinfo",
     "check:fast": "tsx scripts/check-fast.ts",

@@ -28,7 +28,9 @@ async function rest(path: string, method = 'GET', token?: string, body?: unknown
     method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000),
   });
-  return { status: response.status, body: await response.json() };
+  // The HTTP boundary is validated by the assertions below, not a generated static response.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { status: response.status, body: await response.json() as Record<string, any> };
 }
 
 async function sign(key: string, text: string) {
@@ -168,4 +170,3 @@ await test('A refreshed credential for the same principal can resume its session
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);
 process.exitCode = failed > 0 ? 1 : 0;
-

@@ -49,7 +49,7 @@ describe.each(names)('%s batch writes', name => {
       expect(reads.mock.calls.length).toBe(before.batch);
       expect(singleReads.mock.calls.length).toBe(before.single);
       expect(agentReads).toHaveBeenCalledTimes(1);
-      const stored = await storage.getMemoryByKeys(principal, items.map(item => item.key));
+      const stored = await storage.getMemoryByKeys!(principal, items.map(item => item.key));
       expect(stored).toHaveLength(1000);
       expect(stored.every(row => !!row.aiProvenanceId)).toBe(true);
       expect(await storage.getMemory(principal, 'audit.denied')).toBeNull();
@@ -70,4 +70,3 @@ describe.each(names)('%s batch writes', name => {
     } finally { fail.mockRestore(); }
   });
 });
-

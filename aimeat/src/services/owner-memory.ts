@@ -50,8 +50,8 @@ export interface OwnerScopeListOpts {
 
 /**
  * List memory across the owner's GHII + all the owner's agents, deduped by key (GHII first, then
- * agents in storage order). The owner sees all their own data regardless of visibility — exactly the
- * set `aimeat_memory_list { owner_scope: true }` returns.
+ * agents in storage order). Ecosystem identities join this REST/workflow union. The MCP listing
+ * deliberately keeps its owner-plus-agents set and does not deduplicate same-key copies.
  */
 export async function listOwnerScopeMemory(
   storage: Storage, nodeId: string, ownerName: string, opts?: OwnerScopeListOpts,
