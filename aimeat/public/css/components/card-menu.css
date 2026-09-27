@@ -90,4 +90,4 @@
 .card-menu-list--framed { box-sizing: border-box; gap: 2px; min-width: 220px; padding: 6px 0; background: var(--bg); border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow-action); }
 .card-menu-list--framed .card-menu-item { border: 0; border-radius: var(--shape-corner-control); background: transparent; padding: 8px 10px; font-family: var(--font-body); font-weight: var(--weight-bold); font-size: .9rem; white-space: nowrap; }
 .card-menu-list--framed .card-menu-item:hover,
-.card-menu-list--framed .card-menu-item:focus-visible { background: var(--sun); color: var(--on-sun); }
+.card-menu-list--framed .card-menu-item:focus-visible { background: var(--shape-chosen-ground); color: var(--on-sun); }

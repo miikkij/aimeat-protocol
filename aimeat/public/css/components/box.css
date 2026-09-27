@@ -120,7 +120,7 @@
    name, the heavy ink frame with the old page's 8px corner on its grey ground (its --bg-subtle is the
    site's --bg-surface), 22px under what is above it (the old app catalogue's .od-attest). Its label
    is the coral small capitals 6px over what follows (.od-attest-head). */
-.box.box--statement { margin: 22px 0 8px; padding: 16px 18px 18px; border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: 8px; background: var(--bg-surface); }
+.box.box--statement { margin: 22px 0 8px; padding: 16px 18px 18px; border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner-soft); background: var(--bg-surface); }
 .box.box--statement > .poster-label.poster-label--block { margin: 0 0 6px; font-family: var(--font-body); font-size: .72rem; font-weight: 800; letter-spacing: var(--shape-tracking-label); line-height: normal; text-transform: var(--shape-case-label); color: var(--accent); }
 .box--statement > .poster-label--block + .poster-quiet--chapter { margin: 6px 0; }
 /* Its row of doors stands 18px under its last field (.od-attest .od-actions). */

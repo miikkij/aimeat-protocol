@@ -27,8 +27,8 @@
 }
 .stops-row:first-child { border-top: 0; padding-top: 0; }
 .stops-label { flex: 0 0 176px; font-size: .72rem; color: var(--accent); text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label); font-weight: 800; }
-.stops-value { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.75rem; line-height: normal; letter-spacing: var(--font-poster-tracking); color: var(--text); }
-.stops-row--on .stops-value { background: var(--sun); color: var(--on-sun, var(--text)); padding: 2px 10px; }
+.stops-value { font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: 1.75rem; line-height: normal; letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.stops-row--on .stops-value { background: var(--shape-chosen-ground); color: var(--on-sun, var(--text)); padding: 2px 10px; }
 .stops-note { font-size: 1rem; font-weight: 700; color: var(--text); }
 .stops-picture {
   display: block; flex: none; box-sizing: border-box; margin-top: 14px; max-width: 260px; max-height: 160px; object-fit: cover; object-position: top center;

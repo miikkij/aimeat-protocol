@@ -28,8 +28,8 @@
 /* The app catalogue's search preview (SearchCard, appcat sections-c): one thin rounded frame, the name
    as the coral line, the sentence in the grey, the picture or the dashed "none yet" under them (the
    old .dtl-seo-preview; its --border-subtle is the site's --border, its --text-muted the --text-dim). */
-.search-card { padding: 12px; border: 1px solid var(--border); border-radius: 10px; line-height: normal; }
+.search-card { padding: 12px; border: 1px solid var(--border); border-radius: var(--shape-corner-card); line-height: normal; }
 .search-card-title { font-weight: 600; color: var(--accent); }
 .search-card-desc { margin: 2px 0 8px; font-size: .85rem; color: var(--text-dim); }
-.search-card-img { display: block; width: 100%; max-width: 100%; border-radius: 8px; }
-.search-card-none { padding: 14px; border: 1px dashed var(--border); border-radius: 8px; text-align: center; font-size: .8rem; color: var(--text-dim); }
+.search-card-img { display: block; width: 100%; max-width: 100%; border-radius: var(--shape-corner-soft); }
+.search-card-none { padding: 14px; border: 1px dashed var(--border); border-radius: var(--shape-corner-soft); text-align: center; font-size: .8rem; color: var(--text-dim); }

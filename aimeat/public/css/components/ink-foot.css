@@ -24,7 +24,7 @@
 .poster-foot a:hover { text-decoration: underline; }
 /* The word under the facts (InkFoot brand, appcat): the old app catalogue's footer brand. */
 .poster-foot-brand {
-  grid-column: 1 / -1; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .8rem;
+  grid-column: 1 / -1; font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: .8rem;
   letter-spacing: .08em; text-transform: var(--shape-case-heading); color: var(--sun); line-height: normal;
 }
 @media (max-width: 900px) { .poster-foot { margin: 3.5rem -1.1rem 0; padding: 2rem 1.1rem; grid-template-columns: 1fr; gap: 1rem; } }

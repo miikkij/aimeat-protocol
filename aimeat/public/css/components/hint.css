@@ -82,7 +82,7 @@
 .note-report.note-report--chapter { margin-top: 10px; font-size: .82rem; }
 /* The state line (Note kind="state"): the one sentence that says where a thing stands, on a ground
    tinted by its state (the old app catalogue's search state, .dtl-seo-state). */
-.state-line { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--bg-surface); font-size: .88rem; line-height: 1.45; color: var(--text); }
+.state-line { margin: 0 0 12px; padding: 8px 10px; border-radius: var(--shape-corner-soft); background: var(--bg-surface); font-size: .88rem; line-height: 1.45; color: var(--text); }
 /* A chapter's grey line (Note hint `chapter`, appcat sections-c): the old detail's .dtl-ai-status, at
    the reading of the words around it, 10px under what is above it, its one line's room kept. */
 .poster-hint.poster-hint--chapter { margin-top: 10px; min-height: 1.1em; line-height: normal; }
