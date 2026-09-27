@@ -21,12 +21,15 @@
  *   a memory component writes into the owner's memory, which costs an agent or an app the words the
  *   memory door asks; without them the install waits for the owner, and a translation part needs
  *   none of them. Part I: a package's cortex that is live when the package goes is taken down
- *   first, so the actions its activation published leave with it.
+ *   first, so the actions its activation published leave with it; a cortex in the standard manifest
+ *   form registers the schema lock and prompt it names, and they leave with the package too.
  * @structure Setup · Part A msm register + read back · Part B memory register + read back ·
  *   Part C the parse ladder · Part D status hashing · Part E uninstall · Part F refusals ·
  *   Part G reserved keys · Part H the owner-write words · Part I a cortex component
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-components
  * @version-history
+ *   v1.5.0 -- 2026-09-26 -- Part I2: a package's cortex in the standard form (components under `spec`)
+ *     registers its schema lock and prompt, the record lists them, and removing the package takes both.
  *   v1.4.0 -- 2026-09-26 -- Part I: removing a package whose cortex is live takes the cortex down
  *     first; no action its activation published stays in the catalogue, and the record goes.
  *   v1.3.0 -- 2026-09-25 -- Part H: without the words, the install, the migration and the update
@@ -913,8 +916,76 @@ await test('I1. Removing a package takes its active cortex down first: no action
     assert(record.status === 404, `the cortex record is gone: ${record.status}`);
 });
 
+let standardPkg!: Awaited<ReturnType<typeof createPackage>>;
+
+/** A cortex manifest in the standard form (its components under `spec`), with a schema lock and a prompt beside its lib. */
+function standardCortexManifest(name: string, namespace: string, keyPattern: string): string {
+    return `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+  description: A cortex a package carries, in the standard form
+spec:
+  version: "1.0.0"
+  components:
+    - type: lib
+      name: cx
+      filename: cx.js
+      exports: [hello]
+      api_surface: hello()
+    - type: schema
+      key_pattern: ${keyPattern}
+      apply_to: exact
+      schema:
+        type: object
+        required: [title]
+        properties:
+          title:
+            type: string
+    - type: prompt
+      name: ask
+      content: Ask about {{topic}}.
+      variables: [topic]
+`;
+}
+
+await test('I2. A package\'s cortex in the standard form registers its components, and removing the package takes its schema lock and prompt with it', async () => {
+    const keyPattern = `pkgcomp.lock${Date.now()}`;
+    standardPkg = await createPackage(A.token, `cortex-std-${Date.now()}`, [
+        {
+            id: 'cx', type: 'cortex', label: 'A cortex', dependencies: [],
+            content: JSON.stringify({ manifest: standardCortexManifest('cx', A.name, keyPattern), libs: { 'cx.js': "export function hello() { return 'std'; }" } }),
+        },
+    ]);
+    const inst = await install(A.token, standardPkg.encoded, 'standard cortex');
+    const name = inst.at('cx');
+    const promptKey = `__cortex__/${name}/prompts/ask`;
+    const noTitle = () => json('/v1/memory', { method: 'POST', headers: authH(A.token), body: JSON.stringify({ key: keyPattern, value: { body: 'no title' } }) });
+
+    const detail = await json(`/v1/cortex/${encodeURIComponent(name)}`, { headers: authH(A.token) });
+    const types = ((detail.body.data?.components ?? []) as any[]).map(c => c.type).sort();
+    const artifacts = detail.body.data?.activation_artifacts ?? {};
+    assert(JSON.stringify(types) === JSON.stringify(['lib', 'prompt', 'schema']), `the components the manifest names are registered: ${JSON.stringify(types)}`);
+    assert(JSON.stringify(artifacts.schemaKeys) === JSON.stringify([keyPattern]) && JSON.stringify(artifacts.promptKeys) === JSON.stringify([promptKey]),
+        `the record lists the lock and the prompt the registration wrote: ${JSON.stringify(artifacts)}`);
+    const refused = await noTitle();
+    assert(refused.status === 422, `the schema lock is in force while the package is installed: ${refused.status} ${JSON.stringify(refused.body.error ?? refused.body.data)}`);
+    const prompt = await json(`/v1/memory/${encodeURIComponent(promptKey)}`, { headers: authH(A.token) });
+    assert(prompt.status === 200 && JSON.stringify(prompt.body.data?.value?.variables) === '["topic"]', `the prompt record carries its variables: ${prompt.status} ${JSON.stringify(prompt.body.data?.value ?? prompt.body.error)}`);
+
+    const del = await json(`/v1/instances/${inst.id}`, {
+        method: 'DELETE', headers: authH(A.token), body: JSON.stringify({ removeComponents: true }),
+    });
+    assert(del.status === 200 && del.body.data?.componentsRemoved === 1, `uninstall: ${del.status} ${JSON.stringify(del.body.error ?? del.body.data)}`);
+    const accepted = await noTitle();
+    const promptAfter = await json(`/v1/memory/${encodeURIComponent(promptKey)}`, { headers: authH(A.token) });
+    assert(accepted.status === 201, `the schema lock outlived the package: ${accepted.status} ${JSON.stringify(accepted.body.error)}`);
+    assert(promptAfter.status === 404, `the prompt record outlived the package: ${promptAfter.status}`);
+});
+
 await test('Cleanup: delete the packages and both owners', async () => {
-    for (const p of [mainPkg, ladderPkg, publicPkg, reservedPkg, migPkg, ownedPkg, plainPkg, translationPkg, cortexPkg].filter(Boolean)) {
+    for (const p of [mainPkg, ladderPkg, publicPkg, reservedPkg, migPkg, ownedPkg, plainPkg, translationPkg, cortexPkg, standardPkg].filter(Boolean)) {
         const r = await json(`/v1/packages/${p.encoded}`, { method: 'DELETE', headers: authH(A.token) });
         assert(r.status === 200, `package delete ${p.groupId} → ${r.status}`);
     }
