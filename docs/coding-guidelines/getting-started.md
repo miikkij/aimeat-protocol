@@ -99,6 +99,10 @@ settings, including memory settings and restart behavior. Adapt it to the actual
 installation. `NODE_OPTIONS` controls the V8 heap ceiling. `LD_PRELOAD`, when
 used for jemalloc, must be set before starting Node. A Node-loaded `.env` is too late.
 
+An update of a running node is a stop, an install and a start. Every database change it brings runs
+by itself at start, and the node always starts; what a change cannot place on evidence stays as it
+is and becomes one incident on the admin Security page. Nobody runs a script by hand.
+
 Read [the deployment checklist](../security/deployment-checklist.md) and
 [observability guide](../../aimeat/docs/observability-guide.md).
 Repository work does not authorize changing a running deployment or creating a release.
