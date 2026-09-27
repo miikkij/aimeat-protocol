@@ -1551,9 +1551,9 @@
      "cells": [
       "<strong>Checked before it goes live</strong>",
       "A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix.",
-      "<code>aimeat_app_audit</code>"
+      "<code>aimeat_app_manage</code> action <code>audit</code>"
      ],
-     "plain": "Checked before it goes live A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix. aimeat_app_audit"
+     "plain": "Checked before it goes live A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix. aimeat_app_manage action audit"
     },
     {
      "slug": "g-10-build-spec-with-a-token",
@@ -1578,90 +1578,99 @@
      "cells": [
       "<strong>Fork and lineage</strong>",
       "Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history.",
-      "<code>aimeat_app_fork</code>, App Catalog &gt; fork permissions and lineage"
+      "<code>aimeat_app_fork</code>, <code>aimeat_app_manage</code> actions <code>settings</code> (forkable) and <code>lineage</code>, App Catalog &gt; fork permissions and lineage"
      ],
-     "plain": "Fork and lineage Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history. aimeat_app_fork, App Catalog > fork permissions and lineage"
+     "plain": "Fork and lineage Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history. aimeat_app_fork, aimeat_app_manage actions settings (forkable) and lineage, App Catalog > fork permissions and lineage"
     },
     {
      "slug": "g-10-copy-protection-options",
      "cells": [
       "<strong>Copy protection options</strong>",
       "Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy.",
-      "App Catalog &gt; Protection"
+      "<code>aimeat_app_manage</code> action <code>settings</code> (protection), App Catalog &gt; Protection"
      ],
-     "plain": "Copy protection options Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy. App Catalog > Protection"
+     "plain": "Copy protection options Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy. aimeat_app_manage action settings (protection), App Catalog > Protection"
     },
     {
      "slug": "g-10-parking-and-access-codes",
      "cells": [
       "<strong>Parking and access codes</strong>",
       "Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app.",
-      "<code>PATCH /v1/apps/:filename</code>, App Catalog &gt; Manage on server"
+      "<code>PATCH /v1/apps/:filename</code>, <code>aimeat_app_manage</code> action <code>settings</code>, App Catalog &gt; Manage on server"
      ],
-     "plain": "Parking and access codes Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app. PATCH /v1/apps/:filename, App Catalog > Manage on server"
+     "plain": "Parking and access codes Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app. PATCH /v1/apps/:filename, aimeat_app_manage action settings, App Catalog > Manage on server"
     },
     {
      "slug": "g-10-screenshots-icons-and-promotion",
      "cells": [
       "<strong>Screenshots, icons and promotion</strong>",
       "Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog.",
-      "<code>/v1/apps/:owner/:filename/screenshot</code>, <code>/v1/apps/:owner/:filename/icon</code>, App Catalog &gt; About and Promote"
+      "<code>/v1/apps/:owner/:filename/screenshot</code>, <code>/v1/apps/:owner/:filename/icon</code>, <code>aimeat_app_manage</code> actions <code>screenshot</code>, <code>screenshot_upload</code>, <code>screenshot_clear</code> and <code>settings</code> (name, descriptions), App Catalog &gt; About and Promote"
      ],
-     "plain": "Screenshots, icons and promotion Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. /v1/apps/:owner/:filename/screenshot, /v1/apps/:owner/:filename/icon, App Catalog > About and Promote"
+     "plain": "Screenshots, icons and promotion Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. /v1/apps/:owner/:filename/screenshot, /v1/apps/:owner/:filename/icon, aimeat_app_manage actions screenshot, screenshot_upload, screenshot_clear and settings (name, descriptions), App Catalog > About and Promote"
     },
     {
      "slug": "g-10-backup-and-restore",
      "cells": [
       "<strong>Backup and restore</strong>",
       "Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose.",
-      "<code>/v1/apps/backup</code>"
+      "<code>/v1/apps/backup</code> (with <code>?to=storage</code> an agent holding app:write writes the ZIP to private storage), <code>aimeat_app_manage</code> action <code>backup_export</code>; restoring is the owner's own act in App Catalog"
      ],
-     "plain": "Backup and restore Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. /v1/apps/backup"
+     "plain": "Backup and restore Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. /v1/apps/backup (with ?to=storage an agent holding app:write writes the ZIP to private storage), aimeat_app_manage action backup_export; restoring is the owner's own act in App Catalog"
     },
     {
      "slug": "g-10-search-engines-only-if-you-say-so",
      "cells": [
       "<strong>Search engines only if you say so</strong>",
       "Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates, and its name and description appear in the text the front page and the store send to a search engine that does not run JavaScript. A shared link shows a preview card with the app's screenshot.",
-      "<code>aimeat_app_seo_set</code>"
+      "<code>aimeat_app_manage</code> action <code>seo</code>"
      ],
-     "plain": "Search engines only if you say so Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates, and its name and description appear in the text the front page and the store send to a search engine that does not run JavaScript. A shared link shows a preview card with the app's screenshot. aimeat_app_seo_set"
+     "plain": "Search engines only if you say so Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates, and its name and description appear in the text the front page and the store send to a search engine that does not run JavaScript. A shared link shows a preview card with the app's screenshot. aimeat_app_manage action seo"
     },
     {
      "slug": "g-10-app-legal-pages",
      "cells": [
       "<strong>App legal pages</strong>",
       "Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing.",
-      "<code>/v1/apps/:owner/:filename/legal</code>, <code>aimeat_app_legal_set</code>"
+      "<code>/v1/apps/:owner/:filename/legal</code>, <code>aimeat_app_manage</code> action <code>legal</code>"
      ],
-     "plain": "App legal pages Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. /v1/apps/:owner/:filename/legal, aimeat_app_legal_set"
+     "plain": "App legal pages Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. /v1/apps/:owner/:filename/legal, aimeat_app_manage action legal"
     },
     {
      "slug": "g-10-visitors",
      "cells": [
       "<strong>Visitors</strong>",
       "See who opened your own app over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, as counts and never as names. Switch visitor measurement on to also count people against named AIs against other bots, and to see where people came from on a world map drawn from the node's own files. Measurement is off until the app's owner switches it on; switching it off keeps what was counted. The place needs the reverse proxy described under Signals. A record that a signed-in person opened an app names their account for 13 months; after that a nightly job keeps only counts without names, per app and per day.",
-      "<code>/v1/apps/visitors</code>, <code>aimeat_app_visitors</code>, <code>aimeat_app_visitors_measure</code>, App Catalog &gt; Visitors"
+      "<code>/v1/apps/visitors</code>, <code>aimeat_app_manage</code> actions <code>visitors</code> and <code>visitors_measure</code>, App Catalog &gt; Visitors"
      ],
-     "plain": "Visitors See who opened your own app over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, as counts and never as names. Switch visitor measurement on to also count people against named AIs against other bots, and to see where people came from on a world map drawn from the node's own files. Measurement is off until the app's owner switches it on; switching it off keeps what was counted. The place needs the reverse proxy described under Signals. A record that a signed-in person opened an app names their account for 13 months; after that a nightly job keeps only counts without names, per app and per day. /v1/apps/visitors, aimeat_app_visitors, aimeat_app_visitors_measure, App Catalog > Visitors"
+     "plain": "Visitors See who opened your own app over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, as counts and never as names. Switch visitor measurement on to also count people against named AIs against other bots, and to see where people came from on a world map drawn from the node's own files. Measurement is off until the app's owner switches it on; switching it off keeps what was counted. The place needs the reverse proxy described under Signals. A record that a signed-in person opened an app names their account for 13 months; after that a nightly job keeps only counts without names, per app and per day. /v1/apps/visitors, aimeat_app_manage actions visitors and visitors_measure, App Catalog > Visitors"
     },
     {
      "slug": "g-10-marks-and-authorship",
      "cells": [
       "<strong>Marks and authorship</strong>",
       "Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules.",
-      "<code>aimeat_app_marks_set</code>, App Catalog &gt; Marks and authorship"
+      "<code>aimeat_app_manage</code> action <code>marks</code>, App Catalog &gt; Marks and authorship"
      ],
-     "plain": "Marks and authorship Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules. aimeat_app_marks_set, App Catalog > Marks and authorship"
+     "plain": "Marks and authorship Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules. aimeat_app_manage action marks, App Catalog > Marks and authorship"
     },
     {
      "slug": "g-10-app-audit-history",
      "cells": [
       "<strong>App audit history</strong>",
       "Read the app's recorded changes and who made them, including changes made through delegated development rights.",
-      "<code>/v1/apps/:owner/:filename/audit</code>"
+      "<code>/v1/apps/:owner/:filename/audit</code>, <code>aimeat_app_manage</code> action <code>audit</code>"
      ],
-     "plain": "App audit history Read the app's recorded changes and who made them, including changes made through delegated development rights. /v1/apps/:owner/:filename/audit"
+     "plain": "App audit history Read the app's recorded changes and who made them, including changes made through delegated development rights. /v1/apps/:owner/:filename/audit, aimeat_app_manage action audit"
+    },
+    {
+     "slug": "g-10-manage-an-app-from-a-chat",
+     "cells": [
+      "<strong>Manage an app from a chat</strong>",
+      "Your AI changes and reads everything about one of your apps through one tool: its settings, search visibility, legal pages, visitors, screen layout, thumbnail, versions, fork tree, preview link, cost, bundled agents and backup. Each action takes only its own fields, and a wrong call is refused with every problem named at once. Revoking an app's permissions and restoring a backup stay with the owner.",
+      "<code>aimeat_app_manage</code>"
+     ],
+     "plain": "Manage an app from a chat Your AI changes and reads everything about one of your apps through one tool: its settings, search visibility, legal pages, visitors, screen layout, thumbnail, versions, fork tree, preview link, cost, bundled agents and backup. Each action takes only its own fields, and a wrong call is refused with every problem named at once. Revoking an app's permissions and restoring a backup stay with the owner. aimeat_app_manage"
     },
     {
      "slug": "g-10-installable-apps-and-their-notifications",
@@ -3362,6 +3371,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 333
+  "rows": 334
  }
 }

@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.10.0 -- 2026-09-27 -- The versions, screenshot, seo, marks, visitors, visitors_measure, legal and
+ *     audit tools moved into aimeat_app_manage (app-manage.ts).
  *   v1.9.0 -- 2026-09-25 -- aimeat_package_install_requests over GET /v1/package-install-requests(/:id)
  *     and POST /v1/package-install-requests/:id/decision.
  *   v1.8.1 -- 2026-09-13 -- aimeat_app_publish declares cortex_agents and sends them as cortex.agents,
@@ -12,7 +14,7 @@
  *   v1.8.0 -- 2026-09-11 -- aimeat_seo_announce over POST /v1/admin/seo/indexnow (plan: true reads
  *     GET /v1/admin/seo/indexnow/plan): the whole site to the search engines, one batch per host.
  *   v1.7.0 -- 2026-08-29 -- aimeat_app_legal_set over PATCH and GET /v1/apps/me/:filename/legal,
- *     carrying ai_provenance in the body (the route records it); aimeat_app_audit over
+ *     carrying ai_provenance in the body (the route records it); the audit tool (now aimeat_app_manage) over
  *     GET /v1/apps/me/:filename/audit?limit=N.
  *   v1.6.0 -- 2026-08-29 -- aimeat_app_marks_set: the badge and install-chip switches over PATCH.
  *   v1.5.0 -- 2026-08-23 -- aimeat_package_install, and aimeat_package_publish given the route's own
@@ -190,14 +192,6 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_app_delete'), async ({ filename, version }) => {
     const qs = version !== undefined ? `?version=${encodeURIComponent(String(version))}` : '';
     const resp = await client.delete(`/v1/apps/${encodeURIComponent(filename)}${qs}`);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_app_versions', descriptionFor('aimeat_app_versions'), {
-    owner: z.string().describe('Owner name of the app'),
-    filename: z.string().describe('App filename'),
-  }, annotationsFor('aimeat_app_versions'), async ({ owner, filename }) => {
-    const resp = await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/versions`);
     return envelopeResult(resp);
   });
 
@@ -412,14 +406,6 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.post('/v1/ai/image', body));
   });
 
-  // → POST /v1/apps/:owner/:filename/screenshot/capture — render the live app and store the picture.
-  mcp.tool('aimeat_app_screenshot', descriptionFor('aimeat_app_screenshot'), {
-    filename: z.string().describe('The published app to photograph (e.g. "pong.html").'),
-    owner: z.string().optional().describe('App owner. Omit for your own apps.'),
-  }, annotationsFor('aimeat_app_screenshot'), async ({ filename, owner: targetOwner }) => {
-    return out(await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/screenshot/capture`, {}));
-  });
-
   // → POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a new live version.
   mcp.tool('aimeat_app_draft_publish', descriptionFor('aimeat_app_draft_publish'), {
     filename: z.string().describe('App filename whose draft to publish.'),
@@ -441,107 +427,6 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
   }, annotationsFor('aimeat_app_draft_discard'), async ({ owner: targetOwner, filename }) => {
     return out(await client.delete(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft`));
-  });
-
-  // → PATCH /v1/apps/:filename — the app owner's own search-visibility switch and wording.
-  //   Only the fields the caller named travel: an absent field means "leave it alone", so flipping
-  //   the switch does not wipe a title written last month.
-  mcp.tool('aimeat_app_seo_set', descriptionFor('aimeat_app_seo_set'), {
-    filename: z.string().describe('The app to change, with its extension (e.g. "notes.html").'),
-    index: z.boolean().optional().describe('true makes the app findable in search engines; false takes it back out. Off until you ask.'),
-    title: z.string().optional().describe('Title for search results and social cards. Empty derives it from the app name.'),
-    description: z.string().optional().describe('Description for search results. Empty derives it from the app description.'),
-    keywords: z.array(z.string()).optional().describe('Keywords. Empty uses the app tags.'),
-    image: z.string().optional().describe('Absolute https URL for the social card. Empty uses the app screenshot.'),
-    lang: z.string().optional().describe('Language tag such as "fi". Empty reads what the app declares about itself.'),
-  }, annotationsFor('aimeat_app_seo_set'), async (args) => {
-    const seo: Record<string, unknown> = {};
-    for (const k of ['index', 'title', 'description', 'keywords', 'image', 'lang'] as const) {
-      if (args[k] !== undefined) seo[k] = args[k];
-    }
-    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { seo }));
-  });
-
-  // → PATCH /v1/apps/:filename — the app owner's badge and install-chip switches. Only the fields
-  //   the caller named travel; naming nothing is a question. The reviewer's name is not a field
-  //   here on purpose: it is reserved to the account holder in person, and the route refuses it
-  //   from any agent token, so a parameter would be one that always refuses.
-  mcp.tool('aimeat_app_marks_set', descriptionFor('aimeat_app_marks_set'), {
-    filename: z.string().describe('The app to change, with its extension (e.g. "notes.html").'),
-    badge: z.boolean().optional().describe('false takes the "publish your own app" badge off this app; true puts it back. On until you ask.'),
-    install: z.boolean().optional().describe('false stops offering visitors to install this app in their browser; true offers it again. On until you ask.'),
-  }, annotationsFor('aimeat_app_marks_set'), async (args) => {
-    const marks: Record<string, unknown> = {};
-    for (const k of ['badge', 'install'] as const) {
-      if (args[k] !== undefined) marks[k] = args[k];
-    }
-    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { marks }));
-  });
-
-  // → GET /v1/apps/visitors?filename=… — who opened one of the owner's own apps. The app is named
-  //   by filename alone: the route reads a bare filename as "one of mine", so this door never has
-  //   to know which account it acts in.
-  mcp.tool('aimeat_app_visitors', descriptionFor('aimeat_app_visitors'), {
-    filename: z.string().describe('One of your own apps, with its extension (e.g. "shop.html").'),
-    days: z.number().int().min(0).max(360).optional().describe('The trailing window in days, 0 to 360. 0 is today only. Default 30.'),
-  }, annotationsFor('aimeat_app_visitors'), async (args) => {
-    const days = args.days !== undefined ? `&days=${args.days}` : '';
-    return out(await client.get(`/v1/apps/visitors?filename=${encodeURIComponent(args.filename)}${days}`));
-  });
-
-  // → PUT /v1/apps/visitors/measurement — the switch, and the precision a person's place is kept at.
-  //   `geo` travels only when named: an absent one means "keep what it was".
-  mcp.tool('aimeat_app_visitors_measure', descriptionFor('aimeat_app_visitors_measure'), {
-    filename: z.string().describe('One of your own apps, with its extension (e.g. "shop.html").'),
-    on: z.boolean().describe('true starts counting who opens the app (people, named AIs, other bots); false stops and keeps what was counted.'),
-    geo: z.enum(['off', 'country', 'region', 'city']).optional().describe('How precisely a person\'s place is kept: off, country, region or city. Omit to keep what it was.'),
-  }, annotationsFor('aimeat_app_visitors_measure'), async (args) => {
-    const body: Record<string, unknown> = { filename: args.filename, on: args.on };
-    if (args.geo !== undefined) body.geo = args.geo;
-    return out(await client.put('/v1/apps/visitors/measurement', body));
-  });
-
-  // → PATCH /v1/apps/:filename { legal } — one of the app's own legal pages, set or removed; with no
-  //   kind, GET /v1/apps/:owner/:filename/legal reports where the app stands. The node MCP calls
-  //   the same service the route does.
-  mcp.tool('aimeat_app_legal_set', descriptionFor('aimeat_app_legal_set'), {
-    filename: z.string().describe('The app, with its extension (e.g. "shop.html").'),
-    kind: z.enum(['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'cookies', 'support']).optional()
-      .describe('Which page. Omit to only read where the app stands.'),
-    format: z.enum(['markdown', 'html', 'url']).optional().describe('markdown, html or url.'),
-    content: z.string().optional().describe('The page text, the HTML document, or the absolute https URL.'),
-    remove: z.boolean().optional().describe('true removes the named page.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_app_legal_set'), async (args) => {
-    if (!args.kind) {
-      // `me` in the owner slot: the node resolves the account from the token.
-      return out(await client.get(`/v1/apps/me/${encodeURIComponent(args.filename)}/legal`));
-    }
-    // Every declared field travels inside the kind object; the node reads `remove: true` as the
-    // same act as null. The provenance declaration goes in the body as PATCH takes it — the ROUTE
-    // records it (services/app-legal.ts mints the record), and the answer's
-    // `legal[kind].aiProvenanceId` is the echo, so the connector's carrier table is not consulted.
-    const doc: Record<string, unknown> = {};
-    if (args.format !== undefined) doc.format = args.format;
-    if (args.content !== undefined) doc.content = args.content;
-    if (args.remove !== undefined) doc.remove = args.remove;
-    const body: Record<string, unknown> = { legal: { [args.kind]: doc } };
-    if (args.ai_provenance) body.ai_provenance = args.ai_provenance;
-    if (args.ai_provenance_id) body.ai_provenance_id = args.ai_provenance_id;
-    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, body));
-  });
-
-  // → GET /v1/apps/:owner/:filename/audit — the owner's audit log of the app's settings.
-  mcp.tool('aimeat_app_audit', descriptionFor('aimeat_app_audit'), {
-    filename: z.string().describe('The app, with its extension.'),
-    limit: z.number().int().min(1).max(500).optional().describe('How many of the newest entries to return. Default 50.'),
-    playtest: z.boolean().optional().describe('Also open the app for real in a headless browser and report what it did. Slow (about a minute).'),
-  }, annotationsFor('aimeat_app_audit'), async (args) => {
-    // `?limit=N` makes the node answer newest-first, the same order the node MCP door gives.
-    // `?playtest=true` makes the node open the app as well; the run happens there, where the
-    // browser is, so this door is a pass-through like every other.
-    const playtest = args.playtest ? '&playtest=true' : '';
-    return out(await client.get(`/v1/apps/me/${encodeURIComponent(args.filename)}/audit?limit=${args.limit ?? 50}${playtest}`));
   });
 
   // → GET /v1/admin/seo/status — is this node findable, and what is left to do. Operator-only.

@@ -741,6 +741,8 @@ const ALL_SUITES = [
     'test/e2e-mcp-packages-tools.ts',
     // A tool published over MCP lands under the app filename, so both catalogues show it.
     'test/e2e-app-tools-key.ts',
+    // One tool for an app's settings and reads, each action on its own permission word.
+    'test/e2e-app-manage.ts',
     // The same sweep, three files further: the core doors nobody had called (the work lifecycle,
     // the memory owner-scope branches, both resource templates), the DM and data-package tools,
     // and the extension and app tools with their refusal arms.

@@ -15,6 +15,7 @@
  *   aimeat connect schema aimeat_onboarding_status
  *   aimeat connect call aimeat_message_send --json input.json
  * @version-history
+ *   2026-09-27 -- aimeat_app_manage (tool-call-defs-app-manage.ts) joins the table.
  *   v1.0.0 -- 2026-05-28 -- Add initial shell fallback for agent lifecycle tools
  *   v1.1.0 -- 2026-05-28 -- Read public tool metadata from the shared MCP catalog
  *   v1.2.0 -- 2026-05-28 -- Add app, extension, and cortex CLI fallback handlers
@@ -66,6 +67,7 @@ import { aiJobTools } from './tool-call-defs-ai-jobs.js';
 import { decideTools } from './tool-call-defs-decide.js';
 import { voiceTools } from './tool-call-defs-ai-voice.js';
 import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
+import { appManageCliTools } from './tool-call-defs-app-manage.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
 import { mcpProxyCliTools } from './tool-call-defs-mcp-proxy.js';
@@ -95,6 +97,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...decideTools,
     ...voiceTools,
     ...appDraftEditTools,
+    ...appManageCliTools,
     ...exchangeTools,
     ...connectionCliTools,
     ...mcpProxyCliTools,

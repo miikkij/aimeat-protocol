@@ -11,6 +11,8 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.7.0 — 2026-09-27 — GET /v1/cortex/:name and its /export call services/cortex-read.ts, which
+ *     aimeat_cortex_list calls too for `name` and `include_source`. The answers are unchanged.
  *   v1.6.3 — 2026-09-26 — The caller is built with this node's id, so it carries the resolved
  *     identity an activation publishes a cortex's actions under (secaudit 2026-09, R3 7c).
  *   v1.6.2 — 2026-09-24 — upsertCortex() and CortexUpsertResult moved to ./cortex/upsert.ts and are
@@ -56,6 +58,7 @@ import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes,
 } from '../services/cortex-lifecycle.js';
 import { upsertCortex } from './cortex/upsert.js';
+import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
 import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
@@ -230,46 +233,16 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── GET /v1/cortex/:name — get extension details ──
   router.get('/v1/cortex/:name', requireAuth(), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
-
-    // One 404 for "no such cortex" and "not yours to see": a different answer would confirm which
-    // private names exist. Same shape as the extension-instance read (instances.ts:162).
-    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+    // One 404 for "no such cortex" and "not yours to see" (services/cortex-read.ts), which
+    // aimeat_cortex_list answers with too.
+    const out = await cortexDetail(storage, config, callerOf(req), name);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
-    res.json(success(config.nodeId, {
-      name: ext.name,
-      namespace: ext.namespace,
-      short_name: ext.shortName,
-      api_version: ext.apiVersion,
-      version: ext.version,
-      description: ext.description,
-      author: ext.author,
-      license: ext.license,
-      tags: ext.tags,
-      labels: ext.labels,
-      aimeat_compat: ext.aimeatCompat,
-      status: ext.status,
-      visibility: ext.visibility,
-      installed_at: ext.installedAt,
-      activated_at: ext.activatedAt,
-      installed_by: ext.installedBy,
-      versions: (await listVersions(storage, 'cortex', name)).map(v => ({ version: v.version, created_at: v.createdAt })),
-      components: ext.components.map(c => {
-        const base: Record<string, unknown> = { type: c.type };
-        if ('name' in c) base.name = c.name;
-        if ('filename' in c) base.filename = c.filename;
-        if ('exports' in c) base.exports = c.exports;
-        if ('api_surface' in c) base.api_surface = c.api_surface;
-        if ('key_pattern' in c) base.key_pattern = c.key_pattern;
-        if ('apply_to' in c) base.apply_to = c.apply_to;
-        return base;
-      }),
-      activation_artifacts: ext.activationArtifacts,
-    }, [
-      ...(ext.status === 'inactive'
+    res.json(success(config.nodeId, out.data, [
+      ...(out.status === 'inactive'
         ? [{ description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(name)}/activate` }]
         : [{ description: 'Deactivate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(name)}/deactivate` }]),
       { description: 'Uninstall this extension', method: 'DELETE', url: `/v1/cortex/${encodeURIComponent(name)}` },
@@ -465,38 +438,15 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── GET /v1/cortex/:name/export — export manifest + lib files for editing ──
   router.get('/v1/cortex/:name/export', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
-
-    if (!ext) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+    // Only the installing owner (or an operator) reads the source, so a non-owner cannot load
+    // someone else's extension into the editor to overwrite it (services/cortex-read.ts).
+    const out = await cortexSource(storage, { ownerName: req.auth!.owner as string, isOperator: req.auth!.roles.includes('operator') }, name);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
-    // Ownership: export returns full source (manifest + libs) for editing — only the installing
-    // owner (or an operator) may read it, so a non-owner cannot load someone else's extension
-    // into the editor to overwrite or destroy it.
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
-      return;
-    }
-
-    // Collect lib file contents
-    const libs: Record<string, string> = {};
-    for (const comp of ext.components) {
-      if (comp.type === 'lib') {
-        const content = await storage.getCortexLibFile(name, comp.filename);
-        if (content) {
-          libs[comp.filename] = content;
-        }
-      }
-    }
-
-    res.json(success(config.nodeId, {
-      name: ext.name,
-      status: ext.status,
-      manifest: ext.manifest,
-      libs,
-    }, [
+    res.json(success(config.nodeId, out.data, [
       { description: 'Re-install after editing', method: 'POST', url: '/v1/cortex' },
       { description: 'Uninstall this extension', method: 'DELETE', url: `/v1/cortex/${encodeURIComponent(name)}` },
     ]));

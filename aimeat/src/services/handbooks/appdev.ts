@@ -34,8 +34,12 @@ one-off query.
 
 **Apps (HTML apps, versioned).** \`aimeat_app_publish\` (presigned upload for files > ~1 KB: omit
 content, PUT the file to the returned URL; inline for tiny files) · \`aimeat_app_list\` ·
-\`aimeat_app_get\` · \`aimeat_app_versions\` · \`aimeat_app_delete\`. All five take the app's OWNER and
-FILENAME, on every surface — MCP, the connector, and \`/local/call\`.
+\`aimeat_app_get\` · \`aimeat_app_delete\`. All four take the app's OWNER and FILENAME, on every
+surface — MCP, the connector, and \`/local/call\`. Everything else about one app is
+\`aimeat_app_manage\` with an \`action\`: settings (hide it, forking, access code, copy protection,
+name), seo, marks, legal, audit, versions, lineage, screenshot, visitors, ui_get/ui_set, cost,
+preview_link, bundled agents and backup_export. A call with a missing or foreign field is refused
+with every problem named at once.
 
 **Component packages are a different thing** and have their own tools: \`aimeat_package_list\` ·
 \`aimeat_package_get\` · \`aimeat_package_compose\` · \`aimeat_package_status_set\` ·

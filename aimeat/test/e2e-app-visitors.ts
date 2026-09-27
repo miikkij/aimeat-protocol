@@ -14,6 +14,7 @@
  *   database from this process, and the node's real job, fired through the operator's door, folds
  *   the fourteen-month one and leaves the twelve-month one and a call of another kind alone.
  * @version-history
+ *   2026-09-27 — Tests 16-19 call aimeat_app_manage (actions visitors, visitors_measure).
  *   v1.1.0 — 2026-09-25 — Phase 5: core:usage-visit-retention on the runner's backend.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
@@ -385,35 +386,35 @@ async function mcpCall(token: string, name: string, args: Record<string, unknown
 const signalsAgentToken = await makeAgent(A, ['signals:read', 'signals:write']);
 const otherOwnersAgentToken = await makeAgent(B, ['signals:read', 'signals:write']);
 
-await test('16. aimeat_app_visitors answers what the REST door answers', async () => {
+await test('16. aimeat_app_manage visitors answers what the REST door answers', async () => {
   const viaRest = (await json(reportUrl(), { headers: authed(A.token) })).body.data;
-  const viaMcp = await mcpCall(signalsAgentToken, 'aimeat_app_visitors', { filename });
+  const viaMcp = await mcpCall(signalsAgentToken, 'aimeat_app_manage', { action: 'visitors', filename });
   assert(!viaMcp.isError && viaMcp.parsed, `the tool refused: ${viaMcp.raw} ${JSON.stringify(viaMcp.rpcError)}`);
   assert(viaMcp.parsed.app === APP_ID, `the agent's own account names the app, got ${viaMcp.parsed.app}`);
   assert(viaMcp.parsed.opens.total === viaRest.opens.total, 'same opens on both doors');
   assert(viaMcp.parsed.visitors.total === viaRest.visitors.total, 'same visitors on both doors');
 });
 
-await test('17. aimeat_app_visitors_measure switches it back on, and the REST door sees it', async () => {
-  const on = await mcpCall(signalsAgentToken, 'aimeat_app_visitors_measure', { filename, on: true, geo: 'region' });
+await test('17. aimeat_app_manage visitors_measure switches it back on, and the REST door sees it', async () => {
+  const on = await mcpCall(signalsAgentToken, 'aimeat_app_manage', { action: 'visitors_measure', filename, on: true, geo: 'region' });
   assert(!on.isError && on.parsed?.on === true && on.parsed?.geo === 'region', `the tool answered ${on.raw}`);
   const seen = (await json(reportUrl(), { headers: authed(A.token) })).body.data.measurement;
   assert(seen.on === true && seen.geo === 'region', `the REST door reads ${JSON.stringify(seen)}`);
 });
 
 await test('18. another owner\'s agent naming this filename reaches its own account, which has no such app', async () => {
-  const read = await mcpCall(otherOwnersAgentToken, 'aimeat_app_visitors', { filename });
+  const read = await mcpCall(otherOwnersAgentToken, 'aimeat_app_manage', { action: 'visitors', filename });
   assert(read.isError && read.raw.includes('APP_NOT_FOUND'), `expected APP_NOT_FOUND, got ${read.raw}`);
-  const write = await mcpCall(otherOwnersAgentToken, 'aimeat_app_visitors_measure', { filename, on: false });
+  const write = await mcpCall(otherOwnersAgentToken, 'aimeat_app_manage', { action: 'visitors_measure', filename, on: false });
   assert(write.isError && write.raw.includes('APP_NOT_FOUND'), `expected APP_NOT_FOUND, got ${write.raw}`);
   const still = (await json(reportUrl(), { headers: authed(A.token) })).body.data.measurement;
   assert(still.on === true, 'and this app\'s measurement is untouched');
 });
 
-await test('19. an agent without the signals scope cannot call either tool', async () => {
-  const read = await mcpCall(narrowAgentToken, 'aimeat_app_visitors', { filename });
+await test('19. an agent without the signals scope cannot call either action', async () => {
+  const read = await mcpCall(narrowAgentToken, 'aimeat_app_manage', { action: 'visitors', filename });
   assert(read.isError || read.rpcError, `expected a refusal without signals:read, got ${read.raw}`);
-  const write = await mcpCall(narrowAgentToken, 'aimeat_app_visitors_measure', { filename, on: false });
+  const write = await mcpCall(narrowAgentToken, 'aimeat_app_manage', { action: 'visitors_measure', filename, on: false });
   assert(write.isError || write.rpcError, `expected a refusal without signals:write, got ${write.raw}`);
   const still = (await json(reportUrl(), { headers: authed(A.token) })).body.data.measurement;
   assert(still.on === true, 'and nothing was switched');

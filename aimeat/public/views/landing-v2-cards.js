@@ -48,7 +48,7 @@ const PREAMBLE = `You are connected to aimeat.io over MCP as my AI. Build and pu
 
 Before writing a line: call aimeat_appdev_overview, read the Atelier build spec (GET /v1/prompts/build-app-atelier) and the skill node:aimeat-app-builder-atelier with aimeat_skill_get, read aimeat_appdev_pitfall_list, and search the Design Book with aimeat_designbook_search for the parts you will use. Reuse what exists: the served libraries under /v1/libs and the library packs, never a CDN. Pick one look for the whole app in light and dark. The app must work on a phone first.
 
-When it is built: publish it with aimeat_app_publish, run aimeat_app_audit and fix everything it names, take the screenshot, set the legal pages with aimeat_app_legal_set, switch search on with aimeat_app_seo_set, and hand me the address. Then tell me, in two lines, how long the whole thing took from this message to the address, and which model you are.`;
+When it is built: publish it with aimeat_app_publish, run aimeat_app_manage with action "audit" and fix everything it names, take the screenshot (action "screenshot"), set the legal pages (action "legal"), switch search on (action "seo"), and hand me the address. Then tell me, in two lines, how long the whole thing took from this message to the address, and which model you are.`;
 
 /** The four prompts. English on purpose: this is what gets pasted into an AI. */
 const PROMPTS = {

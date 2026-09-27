@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-27 -- aimeat_app_versions, aimeat_app_ui_get and aimeat_app_ui_set moved into
+ *     aimeat_app_manage (tool-call-defs-app-manage.ts).
  *   v1.10.0 -- 2026-09-23 -- aimeat_ui_component_list and aimeat_ui_component_get: the component
  *     catalogue of the node's own interface, the third door beside the two MCP ones.
  *   v1.9.0 -- 2026-09-19 -- aimeat_designbook_search given nothing asks the route for its map view,
@@ -49,7 +51,6 @@ import type { LevelDef } from '../../services/iam/model.js';
 import type { CommandDef } from '../../services/iam/app-commands.js';
 import type { ContributionProof } from '../../models/contribution-proof.js';
 import { appSettingsTools } from './tool-call-defs-apps-settings.js';
-import { uiReadQuery } from '../../mcp/catalog/definitions/app-ui.js';
 import { installExtensionOverHttp, installCortexOverHttp, extensionDetailPath } from './mcp/tools/extensions.js';
 
 /** What a caller states about one run, in the connector's own wire vocabulary. */
@@ -333,17 +334,6 @@ export const appTools: ConnectCliToolDefinition[] = [
         })}`),
     },
     {
-        name: 'aimeat_app_versions',
-        description: 'List one app\'s version history (version number, semver display version, size, created-at), identified by its owner and filename.',
-        input: {
-            owner: { type: 'string', required: true, description: 'Owner name of the app.' },
-            filename: { type: 'string', required: true, description: 'App filename.' },
-        },
-        handler: ({ client }, input) => client.get(
-            `/v1/apps/${encodeURIComponent(requiredString(input, 'owner'))}/${encodeURIComponent(requiredString(input, 'filename'))}/versions`,
-        ),
-    },
-    {
         name: 'aimeat_extension_list',
         description: 'List installed extensions.',
         input: {},
@@ -414,9 +404,20 @@ export const appTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_list',
-        description: 'List installed cortex models.',
-        input: {},
-        handler: ({ client }) => client.get('/v1/cortex'),
+        description: 'List installed cortex models, or read one (name) with its source (include_source).',
+        input: {
+            name: { type: 'string', description: 'One cortex, in full, instead of the list.' },
+            include_source: { type: 'boolean', description: 'With name: also its manifest and lib files. Your own cortex only; needs cortex:write.' },
+        },
+        handler: async ({ client }, input) => {
+            const name = optionalString(input, 'name');
+            if (!name) return client.get('/v1/cortex');
+            const detail = await client.get(`/v1/cortex/${encodeURIComponent(name)}`);
+            if (!optionalBoolean(input, 'include_source') || detail.ok === false) return detail;
+            const source = await client.get(`/v1/cortex/${encodeURIComponent(name)}/export`);
+            if (source.ok === false) return source;
+            return { ok: true, data: { ...(detail.data as object), source: source.data } };
+        },
     },
     {
         // Same repair as the extension install above: the catalog's YAML manifest, no invented
@@ -450,28 +451,6 @@ export const appTools: ConnectCliToolDefinition[] = [
         description: 'Delete a cortex model.',
         input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
         handler: ({ client }, input) => client.delete(`/v1/cortex/${encodeURIComponent(requiredString(input, 'name'))}`),
-    },
-    // ── Arranging one Atelier app's screen (TARGET-074). Third-door rule: a parameter that
-    // exists on the MCP surfaces and not here is dropped in silence.
-    {
-        name: 'aimeat_app_ui_get',
-        handler: ({ client, config }, input) => client.get(
-            `/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/ui${uiReadQuery(input.detail)}`),
-    },
-    {
-        name: 'aimeat_app_ui_set',
-        handler: ({ client, config }, input) => {
-            const layout = input.layout as Record<string, unknown>;
-            const note = optionalString(input, 'note');
-            return client.put(
-                `/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/ui`,
-                {
-                    layout: note ? { ...layout, meta: { ...(layout?.meta as object ?? {}), note } } : layout,
-                    ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
-                    ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
-                },
-            );
-        },
     },
     // ── The Design Book (TARGET-074 phase 5). Same third-door rule as the mosaic pair above. ──
     {

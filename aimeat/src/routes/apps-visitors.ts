@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Who opened one of my apps, when, and from where: the REST door on
  *   services/app-visitors.ts. The App Catalog's Visitors section and the two MCP tools
- *   (aimeat_app_visitors, aimeat_app_visitors_measure) answer from the same service.
+ *   (aimeat_app_manage, actions "visitors" and "visitors_measure") answer from the same service.
  *
  *   ONLY THE APP'S OWN ACCOUNT. The report is built from a usage cut keyed by the VISITOR, read
  *   with no visitor pinned, so the ownership check here is the whole reason that read is safe: the

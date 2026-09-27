@@ -11,22 +11,17 @@
  *   opening a dashboard.
  *
  *   Neither does the work itself. `aimeat_seo_status` calls buildSeoStatus(), the same function
- *   GET /v1/admin/seo/status renders, and `aimeat_app_seo_set` calls applyOwnerSeoUpdate(), the same
- *   function PATCH /v1/apps/:filename calls — so the operator-field stripping, the merge, the note
- *   and the IndexNow announcement happen where they were written once.
+ *   GET /v1/admin/seo/status renders. An app's own search visibility is action "seo" of
+ *   aimeat_app_manage (src/mcp/app-manage.ts), which calls the same service PATCH /v1/apps/:filename
+ *   calls.
  *
- *   WHAT IS DELIBERATELY NOT HERE, and is a pre-existing gap rather than an omission of this work:
- *   there is no MCP door for most of an app's other settings. `parked`, `forkable`, `access_code`,
- *   `protection` and the display name are HTTP-only on PATCH /v1/apps/:filename, so an agent cannot
- *   park its owner's app or set an access code. That door should exist; adding it is a separate
- *   piece of work with its own three surfaces to keep in step, and quietly half-building it here
- *   would leave a tool whose name promised settings and delivered one field. The badge and the
- *   install chip got their own door on 2026-08-29 (app-marks.ts, `aimeat_app_marks_set`), built
- *   the same way as this one.
+ *   An app's other settings (parked, forkable, access code, protection, name) are action
+ *   "settings" of aimeat_app_manage since 2026-09-27; they were reachable only over HTTP before.
  *
  * @structure registerSeoTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   v1.3.0 — 2026-09-27 — aimeat_app_seo_set moved into aimeat_app_manage (action "seo", src/mcp/app-manage.ts).
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the status and the announcement ask the
  *     operator:admin word as well as the account (services/owner-lifecycle.ts
  *     resolveOperatorAgentName), and are registered on that word rather than on app:write.
@@ -43,7 +38,6 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { buildSeoStatus, announceNote } from '../routes/admin-seo.js';
-import { ownerAppSeo } from '../services/app-seo.js';
 import { planAnnouncement, announceEverything } from '../services/indexnow-site.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
@@ -117,47 +111,6 @@ export function registerSeoTools(
           note: announceNote(scope, run.urlCount, run.hosts, run.failed),
         }, null, 2) }],
         ...(run.failed.length === run.hosts ? { isError: true } : {}),
-      };
-    },
-  );
-
-  mcp.tool(
-    'aimeat_app_seo_set',
-    descriptionFor('aimeat_app_seo_set'),
-    {
-      filename: z.string().describe('The app to change, with its extension (e.g. "notes.html").'),
-      index: z.boolean().optional().describe('true makes the app findable in search engines; false takes it back out. Off until you ask.'),
-      title: z.string().optional().describe('Title for search results and social cards. Empty derives it from the app\'s name.'),
-      description: z.string().optional().describe('Description for search results. Empty derives it from the app\'s own description.'),
-      keywords: z.array(z.string()).optional().describe('Keywords. Empty uses the app\'s tags.'),
-      image: z.string().optional().describe('Absolute https URL for the social card. Empty uses the app\'s own screenshot.'),
-      lang: z.string().optional().describe('Language tag such as "fi". Empty reads what the app declares about itself.'),
-    },
-    annotationsFor('aimeat_app_seo_set'),
-    async (args: {
-      filename: string; index?: boolean; title?: string;
-      description?: string; keywords?: string[]; image?: string; lang?: string;
-    }) => {
-      // Only the fields the caller actually named. An absent field means "leave it alone", so a
-      // call that flips the switch does not wipe a title written last month, and naming NOTHING is
-      // a question rather than a write.
-      const seo: Record<string, unknown> = {};
-      for (const k of ['index', 'title', 'description', 'keywords', 'image', 'lang'] as const) {
-        if (args[k] !== undefined) seo[k] = args[k];
-      }
-
-      // The caller's OWN app bucket, resolved inside the service along with the lookup and the
-      // refusals. An agent acts for its owner, so this is that owner's catalogue — never a filename
-      // plus a caller-supplied owner, which would be a door onto somebody else's app.
-      const out = await ownerAppSeo(storage, config,
-        { callerGaii: getAgentGaii(), filename: args.filename, seo });
-      if ('error' in out) {
-        return { content: [{ type: 'text' as const, text: out.error }], isError: true };
-      }
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify({
-          filename: args.filename, state: out.state, ...(out.note ? { note: out.note } : {}), seo: out.seo,
-        }, null, 2) }],
       };
     },
   );

@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — aimeat_cortex_list takes name and include_source: one cortex in full, and its source.
  *   v1.1.0 — 2026-09-13 — aimeat_extension_get takes include_source (each action's script, for the
  *     installer's own sessions holding ext:write), and aimeat_cortex_install takes update (redeploy in
  *     place) and names lib_urls. Over MCP an installed extension's code could not be read back and a
@@ -97,10 +98,13 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_list',
-        description: 'List installed cortex extensions (browser-side UI/IIFE bundles) with name, version, status, visibility, namespace, tags, and author. Cortex code runs in the browser (not server-side like a regular extension), so it cannot be invoked here — manage its lifecycle with aimeat_cortex_activate / _deactivate / _delete. Install with aimeat_cortex_install.',
+        description: 'List installed cortex extensions (browser-side UI/IIFE bundles) with name, version, status, visibility, namespace, tags, and author. Cortex code runs in the browser (not server-side like a regular extension), so it cannot be invoked here — manage its lifecycle with aimeat_cortex_activate / _deactivate / _delete. Install with aimeat_cortex_install. Give `name` to read one cortex in full (its components, versions and what its activation created), and add include_source: true to get its manifest and lib files, which is what you edit before replacing it with aimeat_cortex_install update: true; the source belongs to the owner who installed it, and reading it needs the cortex:write permission.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: {},
+        input: {
+            name: { type: 'string', description: 'One cortex, in full, instead of the list.' },
+            include_source: { type: 'boolean', description: 'With name: also its manifest and lib files, for editing. Your own cortex only; needs cortex:write.' },
+        },
     },
     {
         name: 'aimeat_cortex_install',

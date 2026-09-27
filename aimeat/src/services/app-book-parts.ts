@@ -6,7 +6,7 @@
  *
  *   Measured on 2026-09-20, three builds: two read a Design Book fill and built their working
  *   screen from it, and none made the two calls the specification asked for afterwards
- *   (aimeat_designbook_adopt to record the use, aimeat_app_ui_set to store the arrangement). A
+ *   (aimeat_designbook_adopt to record the use, aimeat_app_manage action "ui_set" to store the arrangement). A
  *   builder stops when the app is live. So the Book's counters stayed at zero for parts that WERE
  *   used, and the owner's AI could not rearrange a screen whose arrangement lived only in the
  *   page's code. Two calls a builder is measured to forget are two calls the publish makes.
