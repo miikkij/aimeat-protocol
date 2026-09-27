@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- deleteOwner deletes the person's own ledger lines filed under the bare
+ *     account name (the ones written before 2026-08-16), as it deletes those under the GHII.
  *   v1.15.0 -- 2026-09-26 -- deleteOwner takes the cortexes the person installed, after the actions
  *     under their own identities (repos/cortex-erasure.ts): each record, with what its activation made
  *     and the lib files, kept versions and dependency edges keyed by its name (secaudit 2026-09, R4
@@ -155,6 +157,9 @@ export const ownerMethods = {
       // owner session's raw `sub`), which neither pass above walks, and the name is released for
       // reuse, so the next holder of the name could change or delete it.
       this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(name);
+      // 3d. The person's own ledger lines from before 2026-08-16, which were filed under the bare
+      // account name. They are theirs, so they go with the account, like the lines under the GHII.
+      this.db.prepare('DELETE FROM wallet_transactions WHERE gaii = ?').run(name);
 
       // 3d. The cortexes this person installed, now that the actions under their own identities are
       // gone: each record, with what its activation made and what is keyed by its name

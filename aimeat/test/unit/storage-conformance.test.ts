@@ -21,6 +21,8 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- deleteOwner takes the person's own ledger lines filed under the bare
+ *     account name, on every provider.
  *   v1.14.0 -- 2026-09-26 -- deleteOwner takes the cortexes the person installed on every provider:
  *     the record, its lib files, kept versions and dependency edges, and what its activation made (the
  *     action under the identity it names, the schema lock, the board and its posts, and the prompt and
@@ -413,6 +415,14 @@ async function reopenSqlite(): Promise<void> {
     await (again as unknown as { close?: () => void | Promise<void> }).close?.();
 }
 
+interface SqliteHandle { prepare(sql: string): { run(...args: unknown[]): unknown; all(...args: unknown[]): unknown[]; get(...args: unknown[]): unknown } }
+
+/** The connection under a SQLite storage, for rows the Storage interface does not read as they are stored. */
+const sqliteDb = (storage: Storage): SqliteHandle => (storage as unknown as { db: SqliteHandle }).db;
+
+/** The pool under a Postgres storage, for the same reason. */
+const pgPool = (storage: Storage): pg.Pool => (storage as unknown as { pool: pg.Pool }).pool;
+
 /**
  * Run the deploy migration again over what is in the database now, the way a deploy runs it on a
  * database that has not had it: forget the record that it ran, then start. SQLite moves a database
@@ -428,6 +438,44 @@ async function rerunIdentityMigration(provider: string, storage: Storage): Promi
     const pool = (storage as unknown as { pool: pg.Pool }).pool;
     await pool.query('DELETE FROM "_kysely_migrations" WHERE name = $1', [IDENTITY_MIGRATION]);
     await runMigrations(pool);
+}
+
+interface LineAsStored { txId: string; gaii: string; type: string; counterpartyGaii: string | null; initiatorGaii: string | null; trackingCode: string | null }
+
+/**
+ * A ledger line written into the table as given. addTransaction files a line under the person's GHII;
+ * a line written before 2026-08-16 for a person in person sits under the bare account name.
+ */
+async function insertLineAsStored(provider: string, storage: Storage, l: {
+    txId: string; gaii: string; type: string; amount: number; timestamp: string;
+    counterpartyGaii?: string; initiatorGaii?: string; trackingCode?: string;
+}): Promise<void> {
+    if (provider === 'sqlite') {
+        sqliteDb(storage).prepare(
+            `INSERT INTO wallet_transactions (id, gaii, type, amount, counterpartyGaii, trackingCode, initiatorGaii, timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(l.txId, l.gaii, l.type, l.amount, l.counterpartyGaii ?? null, l.trackingCode ?? null, l.initiatorGaii ?? null, l.timestamp);
+        return;
+    }
+    await pgPool(storage).query(
+        `INSERT INTO "Transaction" ("txId", "gaii", "type", "amount", "counterpartyGaii", "trackingCode", "initiatorGaii", "timestamp")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [l.txId, l.gaii, l.type, l.amount, l.counterpartyGaii ?? null, l.trackingCode ?? null, l.initiatorGaii ?? null, new Date(l.timestamp)],
+    );
+}
+
+/** Every ledger line whose id starts with `prefix`, as stored, the column it is filed under included. */
+async function linesAsStored(provider: string, storage: Storage, prefix: string): Promise<LineAsStored[]> {
+    if (provider === 'sqlite') {
+        return sqliteDb(storage).prepare(
+            `SELECT id AS txId, gaii, type, counterpartyGaii, initiatorGaii, trackingCode FROM wallet_transactions
+              WHERE id LIKE ? ORDER BY id`,
+        ).all(`${prefix}%`) as LineAsStored[];
+    }
+    const r = await pgPool(storage).query(
+        `SELECT "txId", "gaii", "type", "counterpartyGaii", "initiatorGaii", "trackingCode" FROM "Transaction"
+          WHERE "txId" LIKE $1 ORDER BY "txId"`, [`${prefix}%`]);
+    return r.rows as LineAsStored[];
 }
 
 /** Everything the cascade must leave empty, read back through the Storage interface. */
@@ -950,6 +998,19 @@ describe('storage providers agree on what they do, not just on their signatures'
                 .toEqual(lines.map(([, type]) => `${type}:1`).sort());
 
             for (const n of [keeper, again, live]) await storage.deleteOwner(n);
+        }
+    }, 60_000);
+
+    // An account's own lines written before 2026-08-16 sit under the bare account name. They are the
+    // person's own, so they go with the account.
+    it('deleteOwner takes the person\'s own ledger lines filed under the bare account name', async () => {
+        for (const { name, storage } of provs) {
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const owner = `confbare${tag}`;
+            await seedOwner(storage, owner);
+            await insertLineAsStored(name, storage, { txId: `tx-bare-${tag}`, gaii: owner, type: 'earned', amount: 3, timestamp: new Date().toISOString() });
+            await storage.deleteOwner(owner);
+            expect.soft(await linesAsStored(name, storage, `tx-bare-${tag}`), `${name}: a line filed under the bare account name survived the account`).toEqual([]);
         }
     }, 60_000);
 
