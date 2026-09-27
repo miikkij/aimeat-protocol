@@ -1,4 +1,5 @@
-# GPU override: CUDA images and an NVIDIA GPU for each model. Needs the NVIDIA container runtime.
+# GPU override: CUDA images and an NVIDIA GPU for each model. Needs the NVIDIA container runtime and
+# an NVIDIA driver of 580 or newer: the images carry torch built for CUDA 13.0.
 #
 #   docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
 #
@@ -13,16 +14,16 @@ x-gpu: &gpu
 services:
   laya:
     <<: *gpu
-    build: { context: ./laya, args: { TORCH: cu128 } }
-    image: aimeat-systemone/laya:0.3.11-cu128
+    build: { context: ./laya, args: { TORCH: cu130 } }
+    image: aimeat-systemone/laya:0.3.11-cu130
     environment: { LAYA_DEVICE: cuda }
   von:
     <<: *gpu
-    build: { context: ./von, args: { TORCH: cu128 } }
-    image: aimeat-systemone/von:1.1.1-cu128
+    build: { context: ./von, args: { TORCH: cu130 } }
+    image: aimeat-systemone/von:1.1.1-cu130
     environment: { VON_DEVICE: cuda }
   jeff:
     <<: *gpu
-    build: { context: ./jeff, args: { TORCH: cu128 } }
-    image: aimeat-systemone/jeff:0.1.0-cu128
+    build: { context: ./jeff, args: { TORCH: cu130 } }
+    image: aimeat-systemone/jeff:0.1.0-cu130
     environment: { JEFF_DEVICE: cuda, JEFF_BACKEND: torch, JEFF_QUANT: fp32 }

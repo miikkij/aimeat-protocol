@@ -1,7 +1,7 @@
 # Laya (Apache 2.0, Convai Innovations) as a container: POST /v1/systemone on port 8000.
 #
 #   docker build --build-arg TORCH=cpu   -t aimeat-systemone/laya:0.3.11-cpu   .
-#   docker build --build-arg TORCH=cu128 -t aimeat-systemone/laya:0.3.11-cu128 .
+#   docker build --build-arg TORCH=cu130 -t aimeat-systemone/laya:0.3.11-cu130 .
 #
 # The weights (all three checkpoints) are inside the image and the hub is switched off at run time,
 # so the container needs no network to start. The weights layer comes before torch, so the CPU and

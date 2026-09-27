@@ -1,6 +1,6 @@
 # What the jeff image installs: jeff's own dependencies (its pyproject.toml at the pinned commit),
 # plus ONNX for its CPU arm. jeff itself runs from its source on PYTHONPATH.
-# lock.sh turns this into hash-pinned requirements-cpu.txt and -cu128.txt.
+# lock.sh turns this into hash-pinned requirements-cpu.txt and -cu130.txt.
 torch
 gliformer>=0.1.1
 fastapi>=0.115

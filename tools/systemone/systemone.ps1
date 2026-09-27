@@ -11,7 +11,7 @@
   gitignored. For the same models in Docker instead, see docker\ and README.md.
 
   It installs what the Docker images carry: every package at the version in that model's lock
-  (docker\<model>\requirements-cu128.txt), jeff's source at the images' commit, and the weights at
+  (docker\<model>\requirements-cu130.txt), jeff's source at the images' commit, and the weights at
   the images' commit. Each model gets a random key at install, kept in .runtime\<model>\api-key,
   and answers only a call that carries it.
 
@@ -23,7 +23,8 @@
   .\systemone.ps1 down all
 
 .NOTES
-  Windows, Python 3.12 (py launcher) and, for the GPU, an NVIDIA card. README.md beside this file.
+  Windows, Python 3.12 (py launcher) and, for the GPU, an NVIDIA card with driver 580 or newer
+  (torch is built for CUDA 13.0). README.md beside this file.
 #>
 [CmdletBinding()]
 param(
@@ -88,11 +89,11 @@ function New-Venv([string]$name) {
 
 # The model's Docker lock with the versions only, as pip constraints: pip then installs the same
 # version of every package the Linux image carries. torch among them is the CUDA build the lock
-# names (torch==2.11.0+cu128), which pip finds on PyTorch's index; PyPI's torch for Windows is
+# names (torch==2.14.0+cu130), which pip finds on PyTorch's index; PyPI's torch for Windows is
 # CPU-only. The hashes stay out: pip reads one hash in a constraints file as hash checking for
 # every package, and Windows needs one the Linux lock never names (colorama, for click and tqdm).
 function New-Constraints([string]$name) {
-  $lock = Join-Path $PSScriptRoot "docker\$name\requirements-cu128.txt"
+  $lock = Join-Path $PSScriptRoot "docker\$name\requirements-cu130.txt"
   $out = Join-Path $Root "$name\constraints.txt"
   Get-Content $lock | Where-Object { $_ -match '^[A-Za-z0-9][A-Za-z0-9._-]*==\S+' } |
     ForEach-Object { ($_ -split '\s+')[0] } | Set-Content -Path $out -Encoding ascii
@@ -147,12 +148,12 @@ function Install-Provider([string]$name) {
   switch ($name) {
     'laya' {
       Write-Host '[laya] installing laya[serve] 0.3.11'
-      Invoke-Native '[laya] pip' { & $py -m pip install --constraint $c --extra-index-url https://download.pytorch.org/whl/cu128 'laya[serve]==0.3.11' }
+      Invoke-Native '[laya] pip' { & $py -m pip install --constraint $c --extra-index-url https://download.pytorch.org/whl/cu130 'laya[serve]==0.3.11' }
     }
     'von' {
       # von-sdk 1.1.1 carries the server (`von serve`), as in the image.
       Write-Host '[von] installing von-sdk 1.1.1'
-      Invoke-Native '[von] pip' { & $py -m pip install --constraint $c --extra-index-url https://download.pytorch.org/whl/cu128 'von-sdk==1.1.1' }
+      Invoke-Native '[von] pip' { & $py -m pip install --constraint $c --extra-index-url https://download.pytorch.org/whl/cu130 'von-sdk==1.1.1' }
     }
     'jeff' {
       $src = Join-Path $Root 'jeff\src'
@@ -166,7 +167,7 @@ function Install-Provider([string]$name) {
       Invoke-Native '[jeff] fetch' { git -C $src fetch --quiet origin 34b32f99a727c47b679adde33f4702a001e02979 }
       Invoke-Native '[jeff] checkout' { git -C $src checkout --quiet 34b32f99a727c47b679adde33f4702a001e02979 }
       Write-Host '[jeff] installing its dependencies'
-      Invoke-Native '[jeff] pip' { & $py -m pip install --constraint $c --extra-index-url https://download.pytorch.org/whl/cu128 'gliformer==0.1.2' 'fastapi==0.141.1' 'uvicorn[standard]==0.53.0' 'pydantic==2.13.5' 'httpx==0.28.1' 'huggingface-hub==1.32.0' 'modal==1.5.5' }
+      Invoke-Native '[jeff] pip' { & $py -m pip install --constraint $c --extra-index-url https://download.pytorch.org/whl/cu130 'gliformer==0.1.2' 'fastapi==0.141.1' 'uvicorn[standard]==0.53.0' 'pydantic==2.13.5' 'httpx==0.28.1' 'huggingface-hub==1.32.0' 'modal==1.5.5' }
     }
   }
   Save-Weights $name

@@ -1,7 +1,7 @@
 # jeff (MIT) as a container: POST /v1/systemone on port 8000, GLiFormer underneath.
 #
 #   docker build --build-arg TORCH=cpu   -t aimeat-systemone/jeff:0.1.0-cpu   .
-#   docker build --build-arg TORCH=cu128 -t aimeat-systemone/jeff:0.1.0-cu128 .
+#   docker build --build-arg TORCH=cu130 -t aimeat-systemone/jeff:0.1.0-cu130 .
 #
 # jeff is not on PyPI, so the source comes from the repository at a fixed commit. No key is baked
 # in: JEFF_API_KEYS is given at run time, and the server refuses calls without one.

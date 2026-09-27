@@ -1,4 +1,4 @@
-# What the von image installs. lock.sh turns it into hash-pinned requirements-cpu.txt and -cu128.txt.
+# What the von image installs. lock.sh turns it into hash-pinned requirements-cpu.txt and -cu130.txt.
 torch
 von-sdk==1.1.1
 huggingface_hub>=1.0
