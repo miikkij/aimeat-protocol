@@ -10,11 +10,14 @@
  *   while the step runs again after a retry, for an ai step and an extension step; a finished agent
  *   task, which decides only the agent step whose current attempt it was dispatched for; an answer
  *   that comes after its step ended, which writes nothing; and an error inside the engine while it
- *   takes an answer in, which is not a failure of the attempt. The model, the extension's action and
- *   a datapackage step's read of its source are stand-ins that stay open until the case lets them
- *   answer; the publish is a stand-in that answers at once. The same code path with a real provider
- *   is test/e2e-workflows.ts.
+ *   takes an answer in, which is not a failure of the attempt and still saves the answer's cost and
+ *   the release of its hold. The model, the extension's action and a datapackage step's read of its
+ *   source are stand-ins that stay open until the case lets them answer; the publish is a stand-in
+ *   that answers at once. The same code path with a real provider is test/e2e-workflows.ts.
  * @version-history
+ *   v1.7.0 — 2026-09-26 — When the engine's save fails as it takes an answer in, the run's spent
+ *     amount includes the call and its hold is gone; when that save fails too, one error line names
+ *     the run, the step and the amount (secaudit 2026-09, R4).
  *   v1.6.0 — 2026-09-26 — An answer that comes after its step ended writes nothing: an ai and an
  *     extension step's result and a datapackage step's version, after an earlier attempt turned the
  *     step green, and an ai step's result after a cancel (secaudit 2026-09, R4).
@@ -736,6 +739,44 @@ describe('an error inside the engine while it takes an answer in is the engine\'
             run = await readRun(storage);
             expect(run.steps.left.state).toBe('green');
             expect(run.status).toBe('done');
+        } finally {
+            errors.mockRestore();
+        }
+    });
+
+    it('the engine\'s save fails once as it takes an answer in: the run\'s spent amount includes that call, and its hold is gone', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left')], 0.05), { left: stepAt('pending', { estimate: 0.02 }) });
+        const engine = engineFor(storage);
+        await engine.sweep();
+        expect(reservedUsd(await readRun(storage))).toBeCloseTo(0.02, 10);
+
+        const errors = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+        try {
+            faults.runWritesToFail = 1;
+            await answer(0, 0.01, 'the answer');
+            const run = await readRun(storage);
+            expect(spentUsd(run)).toBeCloseTo(0.01, 10);
+            expect(reservedUsd(run)).toBe(0);
+            expect(run.steps.left.openCalls).toBeUndefined();
+        } finally {
+            errors.mockRestore();
+        }
+    });
+
+    it('when the save of the answer\'s cost fails too, one error line names the run, the step and the amount', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left')], 0.05), { left: stepAt('pending', { estimate: 0.02 }) });
+        const engine = engineFor(storage);
+        await engine.sweep();
+
+        const errors = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+        try {
+            faults.runWritesToFail = 2;
+            await answer(0, 0.01, 'the answer');
+            const named = errors.mock.calls.map(call => String(call[0]))
+                .filter(line => line.includes(RUN) && line.includes('"left"') && line.includes('$0.01'));
+            expect(named).toHaveLength(1);
         } finally {
             errors.mockRestore();
         }

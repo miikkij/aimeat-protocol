@@ -97,6 +97,9 @@
  *   v1.17.0 — 2026-09-26 — onPushTerminal makes the write an answer carries (an ai or extension step's
  *     result, a datapackage step's version) under the run's lock and only while the step waits for an
  *     answer: once the step has ended, an answer settles its cost and hold (secaudit 2026-09, R4).
+ *   v1.18.0 — 2026-09-26 — When the engine fails while onPushTerminal takes an answer in, the answer's
+ *     cost and the release of its hold are saved on their own from the run as last saved, and the
+ *     error goes on to the caller (engine-answer.ts settleAnswer; secaudit 2026-09, R4).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -118,7 +121,7 @@ import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine
 import {
   dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
 } from './engine-steps.js';
-import { writeResult, type ResultWrite } from './engine-answer.js';
+import { writeResult, settleAnswer, type ResultWrite } from './engine-answer.js';
 import { validateHumanAnswer, applyHumanAnswer, sweepHumanStep } from './engine-human.js';
 import {
   spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls,
@@ -669,54 +672,65 @@ export class WorkflowEngine {
    * otherwise leaves the step to the current attempt: it never uses up a retry or turns it red.
    * `write` is the write the answer makes. The engine makes it only while the step waits for an
    * answer, before it asks about the output, and a write that fails fails the answer. Once the step
-   * has ended, an answer settles its cost and hold and writes nothing.
+   * has ended, an answer settles its cost and hold and writes nothing. When the engine itself fails
+   * while it takes the answer in, the answer's cost and the release of its hold are still saved.
    */
   async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number, write?: ResultWrite): Promise<void> {
     await this.withLock(runId, async () => {
-      const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
-      if (!rec) return;
-      const run = rec.value as WorkflowRun;
-      const rs = run.steps[stepId];
-      if (!rs) return;
-      // What the call cost is kept whatever became of the step while it ran (a cancel, a timeout, a
-      // retry, the watchdog finding its output first): the owner paid for it, and the cap and the next
-      // run's estimate count it. Only now does the hold it carried go (run-cost.ts aiCallAnswered).
-      const answered = aiCallAnswered(rs, call, costUsd);
-      // The step was given a retry after this answer's attempt started, and the current attempt runs.
-      const earlier = call !== undefined && call !== rs.attempt;
-      // The step waits for an answer, so the engine makes this answer's write now, under the run's lock.
-      if (ok && rs.state === 'dispatched') ok = await writeResult(write, `workflow ${workflowId} run ${runId}: step "${stepId}"`);
-      if (rs.state !== 'dispatched' || (earlier && !ok)) {
-        // Not awaiting this answer. A live run may now have room for an ai step that waited.
-        const live = run.status === 'running' || run.status === 'waiting-step';
-        if (answered && live) await this.tick(ownerGhii, run);
-        else if (answered) await this.persist(ownerGhii, run);
-        return;
-      }
+      try {
+        const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
+        if (!rec) return;
+        const run = rec.value as WorkflowRun;
+        const rs = run.steps[stepId];
+        if (!rs) return;
+        // What the call cost is kept whatever became of the step while it ran (a cancel, a timeout, a
+        // retry, the watchdog finding its output first): the owner paid for it, and the cap and the next
+        // run's estimate count it. Only now does the hold it carried go (run-cost.ts aiCallAnswered).
+        const answered = aiCallAnswered(rs, call, costUsd);
+        // The step was given a retry after this answer's attempt started, and the current attempt runs.
+        const earlier = call !== undefined && call !== rs.attempt;
+        // The step waits for an answer, so the engine makes this answer's write now, under the run's lock.
+        if (ok && rs.state === 'dispatched') ok = await writeResult(write, `workflow ${workflowId} run ${runId}: step "${stepId}"`);
+        if (rs.state !== 'dispatched' || (earlier && !ok)) {
+          // Not awaiting this answer. A live run may now have room for an ai step that waited.
+          const live = run.status === 'running' || run.status === 'waiting-step';
+          if (answered && live) await this.tick(ownerGhii, run);
+          else if (answered) await this.persist(ownerGhii, run);
+          return;
+        }
 
-      const r = this.resolvedMap(run).get(stepId);
-      const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
-      const reads = new Set<string>(rs.reads);
-      const output = await evalSignal(r?.success_signal, ctx, reads);
-      const now = new Date().toISOString();
-      rs.outputObserved = output.observed;
-      rs.reads = [...reads];
-      recordProgress(rs, output.observed);
+        const r = this.resolvedMap(run).get(stepId);
+        const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
+        const reads = new Set<string>(rs.reads);
+        const output = await evalSignal(r?.success_signal, ctx, reads);
+        const now = new Date().toISOString();
+        rs.outputObserved = output.observed;
+        rs.reads = [...reads];
+        recordProgress(rs, output.observed);
 
-      const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
-      if (ok && output.ok) {
-        rs.state = 'green'; rs.endedAt = now;
-      } else if (earlier) {
-        // An earlier attempt succeeded, and its output is not there: the current attempt decides.
-      } else if (stepDef.retry && rs.attempt < stepDef.retry.max) {
-        rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
-        rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
-      } else {
-        rs.state = 'output-red'; rs.endedAt = now;
-        failDownstream(run, stepId);
-        await this.onStepFail(ownerGhii, run, stepId, 'output-red');
+        const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
+        if (ok && output.ok) {
+          rs.state = 'green'; rs.endedAt = now;
+        } else if (earlier) {
+          // An earlier attempt succeeded, and its output is not there: the current attempt decides.
+        } else if (stepDef.retry && rs.attempt < stepDef.retry.max) {
+          rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
+          rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
+        } else {
+          rs.state = 'output-red'; rs.endedAt = now;
+          failDownstream(run, stepId);
+          await this.onStepFail(ownerGhii, run, stepId, 'output-red');
+        }
+        await this.tick(ownerGhii, run);
+      } catch (err) {
+        // An error inside the engine: the answer's cost and the release of its hold are saved on their
+        // own, from the run as last saved (engine-answer.ts settleAnswer). The error goes on to the caller.
+        await settleAnswer({
+          read: async () => (await this.storage.getMemory(ownerGhii, runKey(workflowId, runId)))?.value as WorkflowRun | undefined,
+          save: saved => this.persist(ownerGhii, saved),
+        }, `workflow ${workflowId} run ${runId}: step "${stepId}"`, stepId, costUsd, call);
+        throw err;
       }
-      await this.tick(ownerGhii, run);
     });
   }
 
