@@ -26,4 +26,3 @@ export async function enrichThreadTitles<T extends { threadId: string }>(
     return { ...thread, title, linkedTaskId: title !== null ? thread.threadId : null };
   }));
 }
-
