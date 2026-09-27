@@ -181,7 +181,9 @@ const safeAddColumn = (table: string, column: string, type: string) => {
 
 The Kysely backend evolves via numbered SQL files in `providers/postgres-kysely/migrations/*.sql`, applied on boot and tracked in `_kysely_migrations`:
 
-- Migrations are **append-only** — never edit an already-shipped migration file; add a new numbered one.
+- Migrations are **append-only** — never edit an already-shipped migration file; add a new numbered one. `pnpm check:migration-hashes` (in `check:fast`) holds this: every file is listed with its sha256 in `aimeat/security/migration-hashes.json`, a new file gets its line in the same commit (`pnpm check:migration-hashes --add`), and a file or a line that is on origin/main does not change.
+- A file that must not run any more is **superseded**, not edited: add the replacement and name the pair in `SUPERSEDED` in `providers/postgres-kysely/migrate.ts`. On a database that has not applied the old file, the runner records it with `superseded_by` and never runs it; the replacement brings a database that did apply it to the same end state. 0085 → 0086 is the first pair.
+- **A migration that can destroy or hide data acts only on positive evidence.** What it cannot decide stays as it is and goes to the operator's page (one incident, `services/security-incident.ts`), never to a script somebody has to remember to run. Nothing in it throws on data: the node always starts. The SQLite half of such a migration writes its own `migration:<file>` row in `system_settings` in the same transaction as the change.
 - Make DDL idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`) so a partially-applied environment recovers cleanly.
 - Keep `db-types.ts` in lockstep with the migration in the same commit.
 - Remember **PG jsonb does not preserve key order** — don't rely on `JSON.stringify` equality for dedup.
