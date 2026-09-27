@@ -184,17 +184,41 @@
           "resolved": "resuelto"
         },
         "type": {
-          "zip_import": "Importación ZIP rechazada"
+          "zip_import": "Importación ZIP rechazada",
+          "held_account_names": "Registros que la actualización no movió"
         },
         "source": {
           "workspace_import": "importación de espacio de trabajo",
           "organism_import": "importación de organismo",
-          "app_backup": "copia de seguridad de una app"
+          "app_backup": "copia de seguridad de una app",
+          "full_identity_move": "actualización al iniciar"
         },
         "kept": "{size} guardados",
         "notKept": "no guardado, demasiado grande",
         "resolvedOn": "resuelto el {date}",
-        "payload": "Contenido"
+        "payload": "Contenido",
+        "held": {
+          "lead": "Al iniciar, la actualización pasó los registros más antiguos de cada persona a su cuenta. Estos registros son anteriores a la cuenta que tiene ahora el nombre de usuario. Pueden ser de esa persona o de alguien que tuvo el nombre antes, así que quedan tal como estaban hasta que decidas cada nombre.",
+          "counts": "Acciones: {actions} · Trabajos: {work} · Líneas de su propio historial de pagos: {own} · Líneas en el historial de pagos de otras personas: {naming}",
+          "holder": "Titular desde el {date}: {ghii}",
+          "holderNoAddress": "Titular desde el {date}: una cuenta que aún no tiene dirección completa",
+          "bound": "Ganchos vinculados a sus acciones: {list}",
+          "gateWord": "{hook} (compuerta)",
+          "gateOpen": "La compuerta {hook} está vinculada a una acción que ya no existe, así que deja pasar todo hasta que la vuelvas a vincular en la página Ganchos.",
+          "toDecide": "por decidir",
+          "decidedHolder": "del titular actual",
+          "decidedPrevious": "de un titular anterior",
+          "decideHolder": "Pertenece al titular actual",
+          "decidePrevious": "Era de un titular anterior",
+          "confirmHolder": "¿Pasar los registros de {name} a {ghii}, la cuenta que tiene ahora el nombre de usuario? Sus acciones, sus trabajos y las líneas de su propio historial de pagos pasan a esa cuenta, y los ganchos vinculados a sus acciones los siguen.",
+          "confirmPrevious": "¿Tratar los registros de {name} como los de una cuenta eliminada? Sus acciones se eliminan y su trabajo abierto se cancela. Su trabajo terminado, sus disputas y las líneas antiguas en el historial de pagos de otras personas llevan un seudónimo en lugar del nombre de usuario. No se puede deshacer.",
+          "decided": "Decidido",
+          "bindingsLeft": "Estos vínculos de ganchos apuntan a acciones que ya no existen: {list}.",
+          "bindingsLeftGate": "Una compuerta entre ellos deja pasar todo hasta que la vuelvas a vincular en la página Ganchos.",
+          "untied": "Quedan tal como están en el historial de pagos de otras personas: {list}. Ninguna cuenta tiene estos nombres y nada los vincula a una persona.",
+          "untiedOne": "{value} (1 línea)",
+          "untiedMany": "{value} ({lines} líneas)"
+        }
       },
       "accounts": {
         "title": "Cuentas y roles",

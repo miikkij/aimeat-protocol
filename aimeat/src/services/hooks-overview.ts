@@ -26,10 +26,17 @@
  *     the form a binding is stored in now
  *   - moveAccountNameHookBindings(config, storage) — at start, once per node, each `id#name` to the
  *     `id#<GHII>` its action is published under after the deploy migration
+ *   - followActionsToFullIdentity(config, storage, ghiiOf, byRef) — the move of those bindings, for
+ *     the start and for the operator's decision on a held name
+ *   - accountNameRef(ref) — the id and the account of a reference `id#name`
  *   - HOOK_GUARDS — which part of the node each moment belongs to
  * @usage
  *   const overview = await buildHooksOverview(config, storage);
  * @version-history
+ *   v1.6.0 — 2026-09-26 — followActionsToFullIdentity(): the move of `id#name` bindings, out of
+ *     moveAccountNameHookBindings, so the operator's decision that a held name is its holder's moves
+ *     them the same way. A binding left at start is logged as staying, since the move to the full
+ *     identity (0086) may have left its action under the bare name for the operator.
  *   v1.5.0 — 2026-09-26 — moveAccountNameHookBindings(): at start, after the deploy migration has
  *     moved a person's actions to their GHII, a binding stored as `id#<account name>` is stored as
  *     `id#<GHII>` when the action is published there, once per node under its own record
@@ -428,7 +435,7 @@ export interface MovedHookBindings {
 export const HOOK_BINDINGS_FULL_IDENTITY_KEY = 'migrations.hook-bindings-full-identity';
 
 /** The id and the account of a reference `id#name` whose provider is a bare account name; else null. */
-function accountNameRef(ref: unknown): { id: string; name: string } | null {
+export function accountNameRef(ref: unknown): { id: string; name: string } | null {
   if (typeof ref !== 'string') return null;
   const cut = ref.indexOf('#');
   if (cut <= 0) return null;
@@ -437,17 +444,70 @@ function accountNameRef(ref: unknown): { id: string; name: string } | null {
 }
 
 /**
+ * Store each binding `id#name` of an account in `ghiiOf` as `id#<GHII>` when the action `id` is
+ * published under that GHII, on the running node and in the store. A binding of another account, and
+ * one whose action is not published under the GHII, stays as it is and is listed in `left`.
+ *
+ * ONE implementation for the two times this happens: at start, after the move to the full identity
+ * (moveAccountNameHookBindings below), and when the operator decides that a name the move left is its
+ * holder's (services/held-account-names.ts). `saved` is false when a moment could not be stored; the
+ * change applies to the running node until it stops.
+ */
+export async function followActionsToFullIdentity(
+  config: AimeatConfig,
+  storage: Storage,
+  ghiiOf: ReadonlyMap<string, string | null>,
+  byRef: ReadonlyMap<string, ActionRecord>,
+): Promise<{ moved: MovedHookBindings['moved']; left: MovedHookBindings['left']; saved: boolean }> {
+  const moved: MovedHookBindings['moved'] = [];
+  const left: MovedHookBindings['left'] = [];
+  let saved = true;
+  for (const hook of HOOK_NAMES) {
+    const refs = config.extensionHooks[hook] ?? [];
+    let changed = false;
+    const next = refs.map((ref) => {
+      const parsed = accountNameRef(ref);
+      if (!parsed || !ghiiOf.has(parsed.name)) return ref;
+      const ghii = ghiiOf.get(parsed.name);
+      const to = ghii ? `${parsed.id}#${ghii}` : null;
+      const found = to ? byRef.get(to) : undefined;
+      if (to && found && qualifiedRef(found) === to) {
+        moved.push({ hook, from: ref, to });
+        changed = true;
+        return to;
+      }
+      left.push({ hook, ref });
+      return ref;
+    });
+    if (!changed) continue;
+    config.extensionHooks[hook] = next;
+    try {
+      await storage.setConfigValue(`hooks.${hook}`, JSON.stringify(next));
+    } catch (err) {
+      saved = false;
+      logger.error(`hooks-overview: the moved binding of ${hook} could not be saved. It applies until the node stops.`, { error: String(err) });
+    }
+  }
+  for (const { hook, from, to } of moved) {
+    logger.info(`hooks-overview: "${from}" on ${hook} is stored as ${to}, where its action is published now`);
+  }
+  return { moved, left, saved };
+}
+
+/**
  * Move each stored binding that names an action by the bare account name of the person who published
  * it (`id#name`) to the form that action is stored in now, `id#<GHII>`.
  *
  * WHY. An action a person published in person was stored under their bare account name, so a binding
  * to it was stored as `id#name`: setHookActions and the settle above both store the action's own
- * `id#provider`. The deploy migration moves those actions to the person's GHII (Postgres 0085, and
- * sqlite/schema-identity-backfill.ts), and runs when the store opens, before this. So at start:
+ * `id#provider`. The move to the full identity (Postgres 0086, and sqlite/schema-identity-backfill.ts)
+ * moves those actions to the person's GHII when the store opens, before this. So at start:
  *   - `id#name` becomes `id#<GHII of that account>` when the action `id` is published under that
- *     GHII. That is the action the binding was made for: the migration moved it there because that
- *     account held the name when the action was written.
- *   - Any other `id#name` stays as it was. It names no published action, and the Hooks page says so.
+ *     GHII. That is the action the binding was made for: the move put it there because that account
+ *     held the name when the action was written.
+ *   - Any other `id#name` stays as it was. Its action was a deleted account's and is gone, or the move
+ *     left it under the bare name for the operator to decide. The incident the node opens for what the
+ *     move left lists every such binding (services/held-account-names.ts).
  *
  * ONCE PER NODE, under its own record (HOOK_BINDINGS_FULL_IDENTITY_KEY), for the reason the settle
  * above gives: a later start must not let what is published by then decide what a binding names. The
@@ -480,39 +540,14 @@ export async function moveAccountNameHookBindings(config: AimeatConfig, storage:
   }
   out.ran = true;
 
-  let saved = true;
-  for (const hook of HOOK_NAMES) {
-    const refs = config.extensionHooks[hook] ?? [];
-    let changed = false;
-    const next = refs.map((ref) => {
-      const parsed = accountNameRef(ref);
-      if (!parsed) return ref;
-      const ghii = ghiiOf.get(parsed.name);
-      const to = ghii ? `${parsed.id}#${ghii}` : null;
-      const found = to ? byRef.get(to) : undefined;
-      if (to && found && qualifiedRef(found) === to) {
-        out.moved.push({ hook, from: ref, to });
-        changed = true;
-        return to;
-      }
-      out.left.push({ hook, ref });
-      return ref;
-    });
-    if (!changed) continue;
-    config.extensionHooks[hook] = next;
-    try {
-      await storage.setConfigValue(`hooks.${hook}`, JSON.stringify(next));
-    } catch (err) {
-      saved = false;
-      logger.error(`hooks-overview: the moved binding of ${hook} could not be saved. It applies until the node stops, and the next start moves it again.`, { error: String(err) });
-    }
-  }
-
-  for (const { hook, from, to } of out.moved) {
-    logger.info(`hooks-overview: "${from}" on ${hook} is stored as ${to}, where its action is published now`);
-  }
+  const { moved, left, saved } = await followActionsToFullIdentity(config, storage, ghiiOf, byRef);
+  out.moved = moved;
+  out.left = left;
   for (const { hook, ref } of out.left) {
-    logger.warn(`hooks-overview: "${ref}" on ${hook} names no action published under that account's full identity, so it names nothing. Publish the action, then bind it again.`);
+    logger.warn(`hooks-overview: "${ref}" on ${hook} stays as it is: no action is published under that account's full identity with this id. The Security page lists it with what the move to the full identity left.`);
+  }
+  if (!saved) {
+    logger.warn('hooks-overview: a moved binding was not saved, so the record is not written and the next start moves it again.');
   }
 
   if (saved) {

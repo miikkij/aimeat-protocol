@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
+ *   v1.7.0 — 2026-09-26 — heldNameMethods bound (what migration 0086 left for the operator).
  *   v1.6.0 — 2026-09-19 — aiDecisionMethods bound (TARGET-080, AIMEAT.decide).
  *   v1.5.0 — 2026-09-09 — marketplaceMethods unbound and its module deleted: no caller.
  *   v1.4.0 — 2026-09-06 — secretMethods bound (the owner's secrets vault).
@@ -89,6 +90,7 @@ import { dependencyMethods } from './methods/dependencies.js';
 import { componentVersionMethods } from './methods/component-versions.js';
 import { passkeyMethods } from './methods/passkeys.js';
 import { secretMethods } from './methods/secrets.js';
+import { heldNameMethods } from './methods/held-names.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -152,6 +154,7 @@ Object.assign(
   componentVersionMethods,
   passkeyMethods,
   secretMethods,
+  heldNameMethods,
   identityMethods,
   walletMethods,
   sessionMethods,

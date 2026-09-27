@@ -13,6 +13,8 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.12.0 — 2026-09-26 — resolveHeldName: one name of the incident the update at start opens,
+ *     decided through the incident resolve endpoint with { name, resolution }.
  *   v1.11.0 — 2026-09-12 — searchAdminMemory (the node-wide content search the FTS primitive has
  *     always backed and no admin surface called), getAdminMemoryRecord (one record with its value)
  *     and restoreAdminMemory (out of the bin). getAdminMemory gains the archive, bin and order
@@ -59,6 +61,8 @@ export const getCorsOverview         = ()   => apiGet('/v1/admin/cors/overview')
 export const getSecurityIncidents    = ()   => apiGet('/v1/admin/security/incidents');
 export const getAuthRefusals         = (limit = 200) => apiGet(`/v1/admin/auth-refusals?limit=${limit}`);
 export const resolveSecurityIncident = (id) => apiPost(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`);
+/** One name of the incident the update at start opened: 'holder' or 'previous'. */
+export const resolveHeldName         = (id, name, resolution) => apiPost(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`, { name, resolution });
 export const deleteSecurityIncident  = (id) => apiDelete(`/v1/admin/security/incidents/${encodeURIComponent(id)}`);
 export const getAgentDetail  = (gaii)   => apiGet(`/v1/agents/${encodeURIComponent(gaii)}`);
 export const getOwnerDetail  = (name)   => apiGet(`/v1/owners/${encodeURIComponent(name)}`);

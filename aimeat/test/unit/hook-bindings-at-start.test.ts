@@ -14,6 +14,7 @@
  * @structure one real SQLite file, seeded, then opened by initializeConfig as a node opens it
  * @usage cd aimeat && pnpm exec vitest run test/unit/hook-bindings-at-start.test.ts
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The store forgets the record of 0086, the migration that replaces 0085.
  *   v1.2.0 — 2026-09-26 — A binding stored as `id#<account name>` follows its action to the
  *     account's GHII in the same start that moves the action (secaudit 2026-09: R3 row 5).
  *   v1.1.0 — 2026-09-26 — The start records that the bindings are settled, once per node (A8-3).
@@ -86,9 +87,12 @@ describe('a node settles the hook bindings its store holds when it starts', () =
         });
         await seed.createAction({ ...published, id: 'own-gate', providerGaii: 'opr', createdAt: '2026-09-02T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z' });
         await seed.setConfigValue('hooks.pre_agent_registration', JSON.stringify(['own-gate#opr']));
-        // A store written before the deploy migration existed carries no record that it ran.
-        (seed as unknown as { db: { prepare(sql: string): { run(...a: unknown[]): unknown } } }).db
-            .prepare('DELETE FROM system_settings WHERE key = ?').run('migration:0085_actions_work_full_identity.sql');
+        // A store written before the deploy migration existed carries no record that it ran: neither
+        // 0085's nor that of 0086, which replaces it.
+        const db = (seed as unknown as { db: { prepare(sql: string): { run(...a: unknown[]): unknown } } }).db;
+        for (const key of ['migration:0085_actions_work_full_identity.sql', 'migration:0086_full_identity_on_evidence.sql', 'migration:0086:held']) {
+            db.prepare('DELETE FROM system_settings WHERE key = ?').run(key);
+        }
         seed.close();
 
         Object.assign(config, { storageProvider: 'sqlite', sqlitePath: file, dbUrl: null, perfTrace: false });

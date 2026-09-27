@@ -1090,17 +1090,41 @@
           "resolved": "resolved"
         },
         "type": {
-          "zip_import": "ZIP import refused"
+          "zip_import": "ZIP import refused",
+          "held_account_names": "Records the update did not move"
         },
         "source": {
           "workspace_import": "workspace import",
           "organism_import": "organism import",
-          "app_backup": "app backup"
+          "app_backup": "app backup",
+          "full_identity_move": "update at start"
         },
         "kept": "{size} kept",
         "notKept": "not kept, too large",
         "resolvedOn": "resolved {date}",
-        "payload": "Payload"
+        "payload": "Payload",
+        "held": {
+          "lead": "At start, the update moved each person's older records to their account. These records are older than the account that holds the username now. They may be that person's, or a previous holder's of the name, so they stay exactly as they were until you decide each name.",
+          "counts": "Actions: {actions} · Work items: {work} · Lines of its own payment history: {own} · Lines in other people's payment history: {naming}",
+          "holder": "Held since {date} by {ghii}",
+          "holderNoAddress": "Held since {date} by an account with no full address yet",
+          "bound": "Hooks bound to its actions: {list}",
+          "gateWord": "{hook} (a gate)",
+          "gateOpen": "The gate {hook} is bound to an action that no longer exists, so it lets everything pass until you bind it again on the Hooks page.",
+          "toDecide": "to decide",
+          "decidedHolder": "the current holder's",
+          "decidedPrevious": "a previous holder's",
+          "decideHolder": "It belongs to the current holder",
+          "decidePrevious": "It was a previous holder's",
+          "confirmHolder": "Move the records of {name} to {ghii}, the account that holds the username now? Its actions, its work items and the lines of its own payment history move there, and the hooks bound to its actions follow them.",
+          "confirmPrevious": "Settle the records of {name} as a deleted account's? Its actions are deleted and its open work is cancelled. Its finished work, its disputes and the older lines in other people's payment history keep a pseudonym in place of the username. This cannot be undone.",
+          "decided": "Decided",
+          "bindingsLeft": "These hook bindings point at actions that no longer exist: {list}.",
+          "bindingsLeftGate": "A gate among them lets everything pass until you bind it again on the Hooks page.",
+          "untied": "Left as they are in other people's payment history: {list}. No account holds these names, and nothing ties them to a person.",
+          "untiedOne": "{value} (1 line)",
+          "untiedMany": "{value} ({lines} lines)"
+        }
       },
       "accounts": {
         "title": "Accounts and roles",

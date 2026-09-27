@@ -32,6 +32,8 @@
  *   v1.5.0 — 2026-07-13 — Split the method bodies into ./methods/<group>.ts modules
  *     (prototype-assignment + interface-merge) so every file is ≤800 lines; bodies
  *     are byte-identical, `db`/`chunkedUploads` widened to public for the groups.
+ *   v1.11.0 — 2026-09-26 — heldNameMethods bound (what the move to the full identity left for the
+ *     operator).
  *   v1.10.0 — 2026-09-19 — aiDecisionMethods bound (TARGET-080, AIMEAT.decide).
  *   v1.9.0 — 2026-09-06 — secretMethods bound (the owner's secrets vault).
  *   v1.8.0 — 2026-09-04 — passkeyMethods bound.
@@ -81,6 +83,7 @@ import { dependencyMethods } from './methods/dependencies.js';
 import { componentVersionMethods } from './methods/component-versions.js';
 import { passkeyMethods } from './methods/passkeys.js';
 import { secretMethods } from './methods/secrets.js';
+import { heldNameMethods } from './methods/held-names.js';
 
 /**
  * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
@@ -236,6 +239,7 @@ Object.assign(
   secretMethods,
   agentV2MessagingMethods,
   agentV2TasksMethods,
+  heldNameMethods,
 );
 
 // Applied after the merge so it wraps every method group, including any added later.

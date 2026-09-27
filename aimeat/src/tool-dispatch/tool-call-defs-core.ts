@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   v1.7.0 -- 2026-09-26 -- aimeat_admin_incident_resolve forwards `name` and `resolution`, to decide
+ *     one name of the incident the move to the full identity opened.
  *   v1.6.0 -- 2026-09-06 -- Nine doors that had been dead repaired (see the commit), and the nine
  *     board entries extracted unchanged to tool-call-defs-boards.ts, which is what brought this
  *     file back under the line ceiling.
@@ -475,8 +477,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }) => client.get('/v1/admin/security/overview'),
     },
     {
+        // With `name` and `resolution`: one name of the incident the move to the full identity opened.
         name: 'aimeat_admin_incident_resolve',
-        handler: ({ client }, input) => client.post(`/v1/admin/security/incidents/${encodeURIComponent(requiredString(input, 'id'))}/resolve`),
+        handler: ({ client }, input) => client.post(`/v1/admin/security/incidents/${encodeURIComponent(requiredString(input, 'id'))}/resolve`,
+            input.name !== undefined || input.resolution !== undefined
+                ? { name: optionalString(input, 'name'), resolution: optionalString(input, 'resolution') } : undefined),
     },
     {
         // `part` is validated against the two literals rather than interpolated, because it lands in

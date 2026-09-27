@@ -54336,10 +54336,23 @@ paths:
     post:
       operationId: resolveSecurityIncident
       tags: [Admin]
-      summary: Mark a security incident resolved
+      summary: Mark a security incident resolved, or decide one name of it
       description: |
-        Operator-only. Sets an incident's status to `resolved` and stamps `resolvedAt`.
-        Requires the `operator` role. Returns 404 if the incident does not exist.
+        Operator-only. Without a body, sets an incident's status to `resolved` and stamps `resolvedAt`.
+
+        The move to the full identity at start leaves as they were the rows stored under a bare
+        account name that are older than the account holding that name now, and opens one incident
+        of type `held_account_names` that lists each such name (`names`), the hook bindings that name
+        nothing now (`bindings_left`) and the ledger values nothing ties to a person (`untied`). With
+        `{ name, resolution }` this endpoint decides one name: `holder` moves its actions, its work and
+        its own ledger lines to the full identity of the account that holds the name, and the hook
+        bindings to its actions with them; `previous` settles them as a deleted account's (actions
+        deleted, open work cancelled with the held morsels going back only to an account that existed
+        when the row was written, finished work, disputes and the older lines naming it under one
+        pseudonym, its own lines deleted). The incident closes when its last name is decided;
+        resolving it without a name before that answers 409. Deciding a name again the same way
+        answers what that decision did; deciding it the other way answers 409.
+        Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
         - BearerAuth: []
       parameters:
@@ -54347,9 +54360,18 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, description: 'An account name from the incident''s `names`.' }
+                resolution: { type: string, enum: [holder, previous], description: 'holder: the rows are the account''s that holds the name now. previous: they were a previous holder''s.' }
       responses:
         '200':
-          description: Incident resolved
+          description: Incident resolved, or one name of it decided
           content:
             application/json:
               schema:
@@ -54360,14 +54382,46 @@ paths:
                       data:
                         type: object
                         properties:
-                          resolved: { type: boolean }
+                          resolved: { type: boolean, description: Without a body. }
                           id: { type: string }
+                          resolved_at: { type: string, format: date-time, description: Without a body. }
+                          name: { type: string, description: With a name. }
+                          resolution: { type: string, enum: [holder, previous], description: With a name. }
+                          done:
+                            type: object
+                            description: With a name. What the decision did; a counter that does not apply stays 0.
+                            properties:
+                              actions_moved: { type: integer }
+                              actions_left: { type: integer, description: 'holder: the full identity already publishes that id, so it stays.' }
+                              actions_deleted: { type: integer }
+                              work_moved: { type: integer }
+                              work_cancelled: { type: integer }
+                              work_returned: { type: integer }
+                              work_kept: { type: integer }
+                              work_deleted: { type: integer }
+                              own_lines_moved: { type: integer }
+                              own_lines_deleted: { type: integer }
+                              naming_lines: { type: integer }
+                          bindings_moved:
+                            type: array
+                            description: With a name. The hook bindings moved to the holder's full identity.
+                            items:
+                              type: object
+                              properties:
+                                hook: { type: string }
+                                from: { type: string }
+                                to: { type: string }
+                          incident_status: { type: string, enum: [open, resolved], description: With a name. }
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /v1/admin/security/incidents/{id}:
     delete:
       operationId: deleteSecurityIncident
@@ -54375,7 +54429,8 @@ paths:
       summary: Delete a security incident
       description: |
         Operator-only. Removes an incident and best-effort deletes its quarantined blob.
-        Requires the `operator` role. Returns 404 if the incident does not exist.
+        Requires the `operator` role. Returns 404 if the incident does not exist, and 409 for an
+        incident with a name still to decide, which closes only when every name is decided.
       security:
         - BearerAuth: []
       parameters:
@@ -54404,6 +54459,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   # ── Calibrator ──────────────────────────
   /v1/calibrator/templates:
     get:
