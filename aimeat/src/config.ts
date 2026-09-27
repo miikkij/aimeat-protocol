@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.16.0 — 2026-09-28 — aiModelDefaults(): the node's AI key and model defaults, config-ai-models.ts. A pure move.
  *   v1.15.0 — 2026-09-24 — themesDefaults(): the operator's theme choices (Themes & Styles), config-themes.ts.
  *   v1.14.0 — 2026-09-19 — decideDefaults(): the decision provider (TARGET-080), config-decide.ts.
  *   v1.13.0 — 2026-09-18 — geoHeaders (AIMEAT_GEO_HEADERS): the reverse proxy tells this node where
@@ -65,6 +66,7 @@ import { parseSiteContacts } from './config-site-contacts.js';
 import { loadConnectionsConfig } from './config-load-connections.js';
 import { securityDoorDefaults } from './config-security.js';
 import { aiJobDefaults } from './config-ai-jobs.js';
+import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
 import { themesDefaults } from './config-themes.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
@@ -328,16 +330,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     gooseProvider: process.env.AIMEAT_GOOSE_PROVIDER ?? '',
     gooseModel: process.env.AIMEAT_GOOSE_MODEL ?? '',
     gooseEnvPassthrough: (process.env.AIMEAT_GOOSE_ENV_PASSTHROUGH ?? '').split(',').map(s => s.trim()).filter(Boolean),
-    openrouterInstanceKey: process.env.AIMEAT_OPENROUTER_INSTANCE_KEY ?? '',
-    chatFreeAllowanceUsd: parseFloat(process.env.AIMEAT_CHAT_FREE_ALLOWANCE_USD ?? '0') || 0,
-    modelFreeFallback: process.env.AIMEAT_MODEL_FREE_FALLBACK ?? 'openrouter/free',
-    modelDefaultChat: process.env.AIMEAT_MODEL_DEFAULT_CHAT ?? '',
-    modelDefaultReasoning: process.env.AIMEAT_MODEL_DEFAULT_REASONING ?? '',
-    modelDefaultExecution: process.env.AIMEAT_MODEL_DEFAULT_EXECUTION ?? '',
-    modelDefaultVision: process.env.AIMEAT_MODEL_DEFAULT_VISION ?? '',
-    modelDefaultStt: process.env.AIMEAT_MODEL_DEFAULT_STT ?? '',
-    modelDefaultImage: process.env.AIMEAT_MODEL_DEFAULT_IMAGE ?? '',
-    sttLanguageDefault: process.env.AIMEAT_STT_LANGUAGE_DEFAULT ?? '',
+    // The node's AI key and model defaults (config-ai-models.ts, a pure move under the 800-line ceiling).
+    ...aiModelDefaults(),
     screenshotOnDemandPerHour: parseInt(process.env.AIMEAT_SCREENSHOT_ONDEMAND_PER_HOUR ?? '20', 10),
 
     // AI jobs — a model call with a handle (config-ai-jobs.ts, a pure move under the 800-line ceiling).
