@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.6.1 — 2026-09-26 — At propose, a pseudo whose argument is words passes (:state(on),
+ *     ::part(label)), and :host() is refused as the page.
  *   v1.6.0 — 2026-09-26 — At propose, a rule nested behind "&" passes, one nested without it is
  *     refused with the forms that pass, and "&" at the top of the stylesheet is refused as the page.
  *   v1.5.6 — 2026-09-26 — A stylesheet holding "</" is refused at propose: a page reads it inside a
@@ -570,6 +572,14 @@ const GOOD_BODY = {
         assert(refusedWith(top, /names the page itself/), `"&" at the top of the stylesheet is the page: ${said(top)}`);
         const beside = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); & ~ p { color: var(--ak-accent); } }' }));
         assert(refusedWith(beside, /beside it/), `a nested rule reaching beside the component is refused: ${said(beside)}`);
+    });
+
+    await test('a pseudo whose argument is words and numbers passes the bench, and one that names the page is refused', async () => {
+        const stamp = Date.now() % 100000;
+        const stated = await proposeComponent(`comp-state-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid-cell:state(on)::part(label) { color: var(--ak-accent); }' }));
+        assert(stated.status === 201, `:state(on) and ::part(label) pass: ${said(stated)}`);
+        const hosted = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid-cell:host(.page) { color: var(--ak-accent); }' }));
+        assert(refusedWith(hosted, /names the page itself/), `:host() names the page: ${said(hosted)}`);
     });
 
     await test('a GENRE grows out of an app: a look of its own, judged general, kept by its owner AND opened for forking by its owner; it stops being offered when the app closes', async () => {

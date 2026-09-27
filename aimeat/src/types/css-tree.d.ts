@@ -12,6 +12,8 @@
  *   the text raw.
  * @usage import { parse, walk, tokenize, tokenTypes, ident } from 'css-tree';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The token types of a number, a dimension, a percentage and a comma, which
+ *     the bench reads in a pseudo's argument of words and numbers.
  *   v1.0.0 — 2026-09-26 — Initial, for the component bench's stylesheet reader.
  */
 declare module 'css-tree' {
@@ -80,7 +82,8 @@ declare module 'css-tree' {
     readonly Ident: number; readonly Function: number; readonly AtKeyword: number; readonly Url: number; readonly BadUrl: number;
     readonly WhiteSpace: number; readonly Comment: number; readonly LeftParenthesis: number; readonly RightParenthesis: number;
     readonly LeftSquareBracket: number; readonly RightSquareBracket: number; readonly LeftCurlyBracket: number;
-    readonly RightCurlyBracket: number;
+    readonly RightCurlyBracket: number; readonly Number: number; readonly Dimension: number; readonly Percentage: number;
+    readonly Comma: number;
   };
   /** A name with its escapes resolved: `u\72 l` is `url`. */
   export const ident: { decode(text: string): string };
