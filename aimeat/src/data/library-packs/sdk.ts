@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.16.0 — 2026-09-28 — aimeat-webhook joins SDK_PACKS from its own file, library-packs/sdk-webhook.ts.
  *   v1.15.8 — 2026-09-26 — aimeat-workflows moved unchanged to library-packs/sdk-workflows.ts and is
  *     spread back in at the same place (max-file-lines).
  *   v1.15.7 — 2026-09-26 — aimeat-workflows' aiDoc: costCapMorsels is removed in 4.0.0.
@@ -94,6 +95,7 @@ import { LIVING_PACKS } from './sdk-living.js';
 import { PROMPT_PACKS } from './sdk-prompt.js';
 import { DECIDE_PACKS } from './sdk-decide.js';
 import { WORKFLOWS_PACKS } from './sdk-workflows.js';
+import { WEBHOOK_PACKS } from './sdk-webhook.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   ...CALENDAR_PRINT_PACKS,
@@ -190,6 +192,7 @@ export const SDK_PACKS: LibraryPack[] = [
     promptGroup: 'core',
     promptLine: '- aimeat-push.js — show your app own notifications on the person device, under its own name and icon (`AIMEAT.push`)',
   },
+  ...WEBHOOK_PACKS,
   {
     id: 'aimeat-onto',
     kind: 'sdk',

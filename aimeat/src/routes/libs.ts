@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.10.0 - 2026-09-28 - Serve aimeat-webhook.js: an app sends to or reads an owner-allowlisted URL.
  * v2.9.0 - 2026-09-18 - Serve calendar computation and paged printing libraries.
  * v2.8.0 - 2026-09-15 - aimeat-push.js joins SDK_LIB_NAMES: an installed app turns on notifications
  *   for its own origin (register /sw.js, permission, VAPID key, subscribe), holding `push:receive`.
@@ -209,6 +210,9 @@ const SDK_LIB_NAMES = [
   // aimeat-prompt.js — the prompt-driven workflow as one component: show a prompt, copy it, take
   // the answer back. No node calls of its own.
   'prompt',
+  // aimeat-webhook.js — an app POSTs a JSON payload to an owner-allowlisted URL, or reads one,
+  // through the living-hooks extension (the same code path the living library uses).
+  'webhook',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

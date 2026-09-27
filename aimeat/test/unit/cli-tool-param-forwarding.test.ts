@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-09-28 — aimeat_mail_read probes with an attachment_id, beside which store, filename, mime_type and key travel.
  *   2026-09-27 — aimeat_cortex_list probes with a name, beside which include_source travels; the stale aimeat_app_legal_set entry is gone.
  *   v1.5.0 — 2026-09-25 — aimeat_workspace_suggestions: the decide branch is probed with a suggestion,
  *     and `ws` / `status` ride only on the list branch.
@@ -124,6 +125,10 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     aimeat_package_install_requests: { always: { request_id: 'zqxrequest_idzqx' } },
     // include_source reads the source of ONE cortex, so it only travels beside `name`.
     aimeat_cortex_list: { always: { name: 'zqxnamezqx' } },
+    // store, filename, mime_type and key are about ONE attachment: without attachment_id the call is
+    // the message read, which carries none of them. Held constant, every probe takes the attachment
+    // branch; attachment_id itself is still probed on its own.
+    aimeat_mail_read: { always: { attachment_id: 'zqxattachmentzqx' } },
 };
 
 /**

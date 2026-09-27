@@ -6,7 +6,9 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
- *   v1.1.0 — 2026-09-13 — aimeat_mail_send says a send that did not go out comes back as an error
+ *   v1.2.0 — 2026-09-28 — aimeat_mail_read takes store, filename, mime_type and key; the description
+ *     no longer says the node reads an attached PDF on its own, because no code path did.
+ *   v1.1.0 — 2026-09-13 —aimeat_mail_send says a send that did not go out comes back as an error
  *     with the provider's reason. It said a successful answer meant the provider accepted the
  *     message, which was false for a failed send, the one case that answered as a success.
  *   v1.0.0 — 2026-08-26 — Initial. The whole subsystem was REST-and-browser only until now, which
@@ -56,13 +58,17 @@ export const connectionTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_mail_read',
-        description: "Open one message from a connected mailbox, or fetch one of its attachments. A Gmail message arrives as a TREE of parts and the text is base64url, which is NOT base64: '-' for '+', '_' for '/', and the padding is often missing. Prefer text/plain and fall back to stripping the HTML. An attachment part carries a reference rather than bytes — pass attachment_id to fetch it, and only when you need it, because that is a real download against the person's own allowance and most of the time the answer is already in the text. A PDF attached to a mail is a file this node can read on its own; do not transcribe one by eye.",
+        description: "Open one message from a connected mailbox, or fetch one of its attachments. A Gmail message arrives as a TREE of parts and the text is base64url, which is NOT base64: '-' for '+', '_' for '/', and the padding is often missing. Prefer text/plain and fall back to stripping the HTML. An attachment part carries a reference rather than bytes — pass attachment_id to fetch it, and only when you need it, because that is a real download against the person's own allowance and most of the time the answer is already in the text. One answer is capped at 4 MB, about 3 MB of attachment; with store: true the attachment is instead written to your private storage, up to the node's per-file limit, and the answer is its storage key, file name, type and size. Pass filename and mime_type from the message parts when you store from Gmail, which does not send them with the attachment. Storing needs storage:write.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             connection_id: { type: 'string', required: true, description: 'Which connected mailbox.' },
             message_id: { type: 'string', required: true, description: 'The message, from aimeat_mail_search.' },
             attachment_id: { type: 'string', description: 'Fetch this attachment instead of the message body.' },
+            store: { type: 'boolean', description: "With attachment_id: store the attachment as your private file (up to the node's per-file limit) and answer its storage key, instead of its bytes. Needs storage:write." },
+            filename: { type: 'string', description: 'With store: the file name, from the message parts (Gmail does not send it with the attachment).' },
+            mime_type: { type: 'string', description: 'With store: the file type, from the message parts.' },
+            key: { type: 'string', description: 'With store: the storage key. Default mail/<provider>/<message id>/<file name>.' },
         },
     },
     {

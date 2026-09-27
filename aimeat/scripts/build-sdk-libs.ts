@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.12.0 — 2026-09-28 — Register aimeat-webhook (an app sends to or reads an owner-allowlisted URL).
  *   v1.11.0 - 2026-09-18 - Register the calendar and print libraries.
  *   v1.10.0 — 2026-09-15 — Register aimeat-push (an installed app receives notifications on its own
  *     origin, under its own name and icon; needs the push:receive app grant).
@@ -98,6 +99,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'living', entry: 'living/index.js' },
   { name: 'onto', entry: 'onto/index.js' },
   { name: 'push', entry: 'push/index.js' },
+  { name: 'webhook', entry: 'webhook/index.js' },
   { name: 'prompt', entry: 'prompt/index.js' },
 ];
 

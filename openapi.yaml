@@ -51618,13 +51618,63 @@ paths:
         description: >
           Parameters for that resource. Gmail's `messages` takes `limit` (default 25, max 100),
           `query` (Gmail's own search syntax) and `page_token`; `message` takes `id` and an optional
-          `format` of `full` or `raw`.
+          `format` of `full` or `raw`. `attachment` takes `message_id` and `attachment_id`.
+
+
+          One answer is capped at 4 MB, which is about 3 MB of attachment after base64. With
+          `store: true` on the `attachment` resource the node instead stores the attachment as a
+          private file of the caller's owner, up to the node's per-file storage limit, and answers 201
+          with its key. `filename` and `mime_type` come from the message parts (Gmail does not send
+          them with the attachment); `key` defaults to `mail/<provider>/<message id>/<file name>`.
+          Storing also needs `storage:write`, and meets the same per-file limit and account quota as
+          any upload.
         content:
           application/json:
             schema:
               type: object
               additionalProperties: true
+              properties:
+                message_id:
+                  type: string
+                attachment_id:
+                  type: string
+                store:
+                  type: boolean
+                  description: With resource `attachment`, store the attachment instead of answering its bytes.
+                filename:
+                  type: string
+                mime_type:
+                  type: string
+                key:
+                  type: string
       responses:
+        '201':
+          description: "The attachment was stored (`store: true`). The answer names the file, not its bytes."
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          provider:
+                            type: string
+                          resource:
+                            type: string
+                          stored:
+                            type: object
+                            properties:
+                              key:
+                                type: string
+                              filename:
+                                type: string
+                              mime_type:
+                                type: string
+                              size:
+                                type: integer
         '200':
           description: What the provider answered, unchanged.
           content:
@@ -51659,7 +51709,11 @@ paths:
         '409':
           description: The connection was revoked, or its stored permission can no longer be read.
         '413':
-          description: More than 4 MB of answer. Ask for a smaller window.
+          description: >
+            More than 4 MB of answer; ask for a smaller window. With `store: true`: the attachment is
+            larger than the node's per-file limit, or the account's storage quota is full.
+        '422':
+          description: "With `store: true`, the attachment is not a file (an attached message or a link)."
         '502':
           description: The provider could not be reached, or could not answer.
   /v1/connections/attempts/{id}/metrics:
