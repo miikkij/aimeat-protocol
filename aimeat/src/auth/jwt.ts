@@ -9,6 +9,8 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.6.0 — 2026-09-26 — verifyJWT carries the token's `iat`, so the credential check can refuse an
+ *     ecosystem app's token issued before the app record it names was made (auth/middleware.ts).
  *   v1.5.1 — 2026-09-26 — The old-key read (spellingHashOf) names its removal: the first release made
  *     90 days after 3.20.0 reaches the nodes, when every token revoked before v1.5.0 has expired.
  *     No flag, because turning it off early would bring a revoked token back (invariant 16).
@@ -152,6 +154,7 @@ export interface VerifiedToken {
   node: string;
   roles: string[];
   exp: number;
+  iat?: number;        // when the token was issued, in seconds (every minted token carries it)
   scopes: string[];
   anonymous?: boolean;
   sessionId?: string;  // P3-7: Server-side session tracking
@@ -195,6 +198,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       node: payload.node as string,
       roles: payload.roles as string[],
       exp: payload.exp as number,
+      iat: payload.iat as number | undefined,
       // The other end of the same door. issueJWT has always written this claim, so a token
       // without one is not an old token — it is not one of ours.
       scopes: (payload.scopes as string[]) ?? [],

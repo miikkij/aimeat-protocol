@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- deleteOwner takes the ecosystem apps the person connected, as it takes the
+ *     agents: each app's identity data, its record with the pinned key, and the automation recipes
+ *     set for it. The apps' identities are named to the work settlement and the ledger rule beside
+ *     the agents'.
  *   v1.16.0 -- 2026-09-26 -- deleteOwner deletes the person's own ledger lines filed under the bare
  *     account name (the ones written before 2026-08-16), as it deletes those under the GHII.
  *   v1.15.0 -- 2026-09-26 -- deleteOwner takes the cortexes the person installed, after the actions
@@ -133,8 +137,11 @@ export const ownerMethods = {
       const ghiiRows = this.db.prepare('SELECT ghii FROM ghiis WHERE ownerName = ?').all(name) as { ghii: string }[];
       const agentRows = this.db.prepare('SELECT gaii FROM agents WHERE owner = ?').all(name) as { gaii: string }[];
       const agentGaiis = agentRows.map(r => r.gaii);
+      // The ecosystem apps the person connected act for them under `eco:<app>#<name>@<node>`, as agents do.
+      const ecoGeais = (this.db.prepare('SELECT geai FROM ecosystem_apps WHERE owner = ?').all(name) as { geai: string }[]).map(r => r.geai);
+      const actors = [...agentGaiis, ...ecoGeais];
       const pseudonym = erasedPartyPseudonym();
-      settleErasedPartyWork(this.db, name, ghiiRows.map(r => r.ghii), pseudonym, id => this.resolveGhii(id), {}, agentGaiis);
+      settleErasedPartyWork(this.db, name, ghiiRows.map(r => r.ghii), pseudonym, id => this.resolveGhii(id), {}, actors);
 
       // 1-2. Cascade delete all agent-related data for each agent
       for (const gaii of agentGaiis) {
@@ -143,6 +150,15 @@ export const ownerMethods = {
 
       // 3. Delete all agents for this owner
       this.db.prepare('DELETE FROM agents WHERE owner = ?').run(name);
+
+      // 3a. An ecosystem app goes as an agent does: what it holds, then its record with the key pinned
+      // at its first connection, and the automation recipes the person set for it. Every credential of
+      // the app stops with its record (auth/middleware.ts ecosystemAppGone).
+      for (const geai of ecoGeais) {
+        this.cascadeDeleteAgentData(geai);
+      }
+      this.db.prepare('DELETE FROM ecosystem_apps WHERE owner = ?').run(name);
+      this.db.prepare('DELETE FROM eco_automation_recipes WHERE owner = ?').run(name);
 
       // 3b. Data owned by the GHII itself, not by an agent. cascadeDeleteAgentData above runs per
       // AGENT gaii, so everything written under the person's own identity — which is most of what a
@@ -182,7 +198,7 @@ export const ownerMethods = {
       pseudonymiseProvenanceOwner(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
       // So do the other side's ledger lines: the person's own went with the passes above, and the
       // lines in other people's ledgers name them by the same pseudonym (repos/ledger-erasure.ts).
-      pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiiRows.map(r => r.ghii), pseudonym, agentGaiis));
+      pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiiRows.map(r => r.ghii), pseudonym, actors));
 
       // 4. Delete GHII records for this owner
       this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);

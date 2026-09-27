@@ -21,6 +21,9 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- deleteOwner takes the ecosystem apps the person connected on every
+ *     provider: the record with its pinned key, what the app wrote, the actions it published and the
+ *     automation recipe set for it. Another person's app stays as it was.
  *   v1.16.0 -- 2026-09-26 -- The move to the full identity (0086) on positive evidence only: a row
  *     older than the account that holds its name now stays as it is and is recorded with its counts,
  *     and so is a ledger value nothing ties to a person; 0085 does not run on a database that never
@@ -317,6 +320,52 @@ async function seedCortexErasure(s: Storage) {
         }
     }
     return { person, other, cortexOf };
+}
+
+/**
+ * Two people, each with an ecosystem app connected: the app's record with its pinned key, a record it
+ * wrote under its own identity, an action it published and the automation recipe the person set for
+ * it. The first person is erased; the second person's app must stay as it is.
+ */
+async function seedEcoErasure(s: Storage) {
+    const node = 'aimeat-conformance-001';
+    const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const person = `confeco${tag}`, other = `confecoo${tag}`;
+    const now = new Date().toISOString();
+    const appOf = (who: string) => ({ who, app: 'helper', geai: `eco:helper#${who}@${node}`, key: 'conf.eco.note', action: `conf-eco-${who}` });
+    for (const who of [person, other]) {
+        await s.createOwner({ name: who, displayName: who, publicKey: 'pk', roles: ['owner'], createdAt: now });
+        await s.createGHII({
+            username: who, nodeId: node, ghii: `${who}@${node}`, displayName: who, verificationLevel: 0,
+            ownerName: who, totpEnabled: false, morselBalance: 0, loginCount: 0, createdAt: now, updatedAt: now,
+        });
+        const a = appOf(who);
+        await s.createEcosystemApp({
+            app: a.app, owner: who, geai: a.geai, publicKey: `pinned-key-of-${who}`, scopes: ['memory:write'],
+            status: 'active', morselBalance: 0, createdAt: now, lastSeen: now,
+        });
+        await s.setMemory({ key: a.key, ownerGaii: a.geai, value: { from: 'the app' }, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+        await s.createAction({
+            id: a.action, providerGaii: a.geai, displayName: a.action, description: 'conformance', inputSchema: {},
+            outputSchema: {}, pricing: { baseMorsels: 0 }, tags: [], createdAt: now, updatedAt: now,
+        });
+        await s.upsertAutomationRecipe({
+            id: randomUUID(), owner: who, app: a.app, trigger: { kind: 'data-published', keyGlob: 'conf.eco.*' },
+            agents: [], enabled: true, createdAt: now, updatedAt: now,
+        });
+    }
+    return { person, other, appOf };
+}
+
+/** What is left of one seeded ecosystem app, read back through the Storage interface. */
+async function ecoLeft(s: Storage, a: ReturnType<Awaited<ReturnType<typeof seedEcoErasure>>['appOf']>) {
+    return {
+        record: !!(await s.getEcosystemApp(a.geai)),
+        listed: (await s.getEcosystemAppsByOwner(a.who)).length,
+        memory: !!(await s.getMemory(a.geai, a.key)),
+        actions: (await s.listActionsByProvider(a.geai)).length,
+        recipe: !!(await s.getAutomationRecipe(a.who, a.app)),
+    };
 }
 
 /** What is left of one seeded cortex, read back through the Storage interface. */
@@ -620,6 +669,23 @@ describe('storage providers agree on what they do, not just on their signatures'
             });
             expect.soft(await cortexLeft(storage, p.cortexOf(p.other)), `${name}: somebody else's cortex changed`).toEqual({
                 record: true, lib: true, versions: 1, edges: 1, action: true, schema: true, board: true, posts: 1, prompt: true, seed: true,
+            });
+            await storage.deleteOwner(p.other);
+        }
+    }, 60_000);
+
+    // An ecosystem app acts under an identity built from the account name, which is released for
+    // reuse: the app's record with its pinned key goes with the account, and so do what it wrote,
+    // the actions it published and the automation recipe set for it. Somebody else's app stays.
+    it('deleteOwner takes the ecosystem apps the person connected, with what they hold', async () => {
+        for (const { name, storage } of provs) {
+            const p = await seedEcoErasure(storage);
+            await storage.deleteOwner(p.person);
+            expect.soft(await ecoLeft(storage, p.appOf(p.person)), `${name}: the erased person's app left something`).toEqual({
+                record: false, listed: 0, memory: false, actions: 0, recipe: false,
+            });
+            expect.soft(await ecoLeft(storage, p.appOf(p.other)), `${name}: somebody else's app changed`).toEqual({
+                record: true, listed: 1, memory: true, actions: 1, recipe: true,
             });
             await storage.deleteOwner(p.other);
         }
