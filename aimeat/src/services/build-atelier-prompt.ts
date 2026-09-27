@@ -28,7 +28,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
- *   v1.29.0 — 2026-09-20 — The mosaic section ends with the working screen of a genre fork being a
+ *   v1.30.0 — 2026-09-28 — Twelve layout rules for a settings page and a queue page follow "COMPOSE" (build-atelier-layout-rules.ts).
+ *   v1.29.0 — 2026-09-20 —The mosaic section ends with the working screen of a genre fork being a
  *     mosaic inside the genre (build-atelier-people.ts), which is what lets a Design Book part land.
  *   v1.28.0 — 2026-09-19 — "The Design Book first" says where the list of what the Book holds is:
  *     at the end of part `libraries`, joined when the part is served (build-atelier-book.ts).
@@ -140,6 +141,7 @@ import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
 import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
 import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_MOSAIC_IN_GENRE, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
 import { buildAtelierLibrarySection } from '../data/library-packs.js';
+import { atelierLayoutRules } from './build-atelier-layout-rules.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -431,6 +433,7 @@ function composeBody(config: AimeatConfig): string {
     + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
     + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
     + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'
+    + atelierLayoutRules()
     + 'THE FIRST MOVE IS A PRESET, not a blank page: `GET ' + base + '/v1/apps/ui/catalogue` '
     + 'carries `layouts` — finished, fillable shapes (cover, dashboard, browse, work-queue, '
     + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '

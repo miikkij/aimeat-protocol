@@ -7,6 +7,7 @@
  *   that lands in `start` by default can push it over the limit without anybody deciding so.
  * @usage cd aimeat && pnpm vitest run test/unit/build-atelier-layers.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The layout rules for a settings page and a queue page land in one part with their numbers.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -44,6 +45,15 @@ describe('the Atelier specification in parts', () => {
     expect(start).toMatch(/Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code/);
     expect(start).toMatch(/aimeat_handbook_get \{ tier: "build-app-atelier\/<id>" \}/);
     expect(start).toMatch(/spec_token: atelier-[0-9a-f]{12}/);
+  });
+
+  it('carries the layout rules for a settings page and a queue page in one part, with the numbers', () => {
+    const parts = ATELIER_PARTS.map(p => atelierPiece(full, p.id, config.baseUrl)!.text);
+    const holding = parts.filter(t => t.includes('A SETTINGS PAGE AND A QUEUE PAGE HAVE RULES'));
+    expect(holding.length).toBe(1);
+    for (const fact of ['42rem', '60ch', '840 px', '--ak-main-max', 'component-settings-group', '"3 of 10"']) {
+      expect(holding[0], fact).toContain(fact);
+    }
   });
 
   it('answers null for an id it does not have', () => {
