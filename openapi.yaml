@@ -5623,8 +5623,8 @@ components:
             yet started). The call starts only when what the run has spent, what its open calls hold
             and that estimate stay within this, so ai steps that fit together still run side by side.
             A call holds its share until it answers (`openCalls` on the run step), also when its
-            step was moved on meanwhile by a timeout, a retry, the watchdog finding its output or a
-            cancel; a retry's call beside one still open holds its own share. A step that does not
+            step was moved on meanwhile by a timeout, a retry or a cancel; a retry's call beside
+            one still open holds its own share. A step that does not
             fit stays `pending` while a call is open; with none open, the run ends with status
             `stopped`, `costCap` holds the cap, the spend and the step's estimate, and `reason` says
             it in words. A step expected to cost more than this whole amount starts alone, when no
@@ -5755,12 +5755,14 @@ components:
               openCalls:
                 type: array
                 description: >-
-                  Under maxCostUsd: the model calls of this ai step that have started and not yet
-                  answered, one per attempt, each with what the node set aside for it from the cap
-                  before it started (the step's estimateUsd, else its share of the cap nobody held).
-                  A call keeps its hold until it answers, whatever became of the step meanwhile; a
-                  restart of the node clears them on a run still in flight, because the calls ended
-                  with it.
+                  The calls of this ai, extension or datapackage step that have started and not yet
+                  answered, one per attempt, each with what the node set aside for it from the
+                  maxCostUsd cap before it started (for an ai step under the cap, the step's
+                  estimateUsd, else its share of the cap nobody held; 0 for any other call). A call
+                  keeps its hold until it answers, whatever became of the step meanwhile. While the
+                  call of the step's current attempt is open, the watchdog does not end the step by
+                  its output: only that call's answer or the step's timeout ends it. A restart of the
+                  node clears them on a run still in flight, because the calls ended with it.
                 items:
                   type: object
                   properties:

@@ -44,6 +44,9 @@
  *   v1.15.0 — 2026-09-26 — A model call keeps its hold until it answers, also after the watchdog has
  *     moved its step on, and a step waiting for room starts only after that answer. A call's hold is
  *     read from the step's openCalls. This case waits for the watchdog's pass, up to a minute.
+ *   v1.16.0 — 2026-09-26 — While an ai step's call is open, the watchdog's pass leaves the step to the
+ *     answer although its result key already holds the run before's value, and the step takes its
+ *     own call's answer (secaudit 2026-09, R4).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -1508,13 +1511,13 @@ async function run() {
     }
   });
 
-  // The watchdog can move an ai step on while its model call still runs: time it out, give it a
-  // retry, or find its result key already filled. The call runs on and is paid for, so what it holds
-  // of maxCostUsd stays until it answers, and a step waiting for room waits for that answer. Here the
-  // key is filled by the run before, which is what the watchdog finds on its pass (once a minute).
-  await test('maxCostUsd: a call the watchdog moved on keeps its hold until it answers, and the waiting step starts after that', async () => {
+  // While an ai step's model call runs, the watchdog does not end the step by its output, also when
+  // the step's result key is already filled, here by the run before: only the call's answer or the
+  // step's timeout ends it. The call holds its share of maxCostUsd until it answers, and a step
+  // waiting for room waits for that answer. The watchdog passes once a minute.
+  await test('maxCostUsd: while a call is open the watchdog leaves its step to the answer, the call keeps its hold, and the waiting step starts after it answers', async () => {
     const provider = await startFakeAiProvider(0);
-    const answer = (cost: number) => chatJson('the answer', { usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost } });
+    const answer = (cost: number, text = 'the answer') => chatJson(text, { usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost } });
     const spent = (run: any): number => Object.values(run.steps as Record<string, { costUsd?: number }>)
       .reduce((sum, s) => sum + (s.costUsd ?? 0), run.signalCostUsd ?? 0);
     const held = (run: any): number => Object.values(run.steps as Record<string, { openCalls?: Array<{ reservedUsd?: number }> }>)
@@ -1557,25 +1560,29 @@ async function run() {
       const until = Date.now() + 5000;
       while (provider.requestsFor('chat').length < 1 && Date.now() < until) await sleep(50);
 
-      // The watchdog's pass finds left's result key filled and turns left green while its call is open.
-      let moved = await readRun(runId);
+      // The watchdog's pass finds left's result key filled by the run before. It records what the
+      // signal saw, and leaves left to its open call.
+      let passed = await readRun(runId);
       const passBy = Date.now() + 75_000;
-      while (moved?.steps?.left?.state !== 'green' && Date.now() < passBy) { await sleep(500); moved = await readRun(runId); }
+      while (!passed?.steps?.left?.outputObserved && Date.now() < passBy) { await sleep(500); passed = await readRun(runId); }
       await sleep(500);
-      moved = await readRun(runId);
+      passed = await readRun(runId);
       const beside = provider.requestsFor('chat').length;
-      provider.setDefault('chat', answer(0.01));
-      assert(moved?.steps?.left?.state === 'green', `the watchdog moved left on while its call was open: ${JSON.stringify(moved?.steps?.left)}`);
+      provider.setDefault('chat', answer(0.01, 'the answer of this run'));
+      assert(!!passed?.steps?.left?.outputObserved, `the watchdog passed within 75 s: ${JSON.stringify(passed?.steps?.left)}`);
+      assert(passed.steps.left.state === 'dispatched', `the watchdog left the step to its open call: ${JSON.stringify(passed.steps.left)}`);
       assert(beside === 1, `the waiting step did not start beside the open call: ${beside} calls`);
-      assert(moved.steps.right.state === 'pending' && moved.status === 'waiting-step', `right waits for the call to answer: ${moved.status} ${JSON.stringify(moved.steps.right)}`);
-      assert(Math.abs(held(moved) - 0.02) < 1e-9 && spent(moved) === 0, `the open call still holds its share, and nothing is spent yet: ${JSON.stringify(moved.steps)}`);
+      assert(passed.steps.right.state === 'pending' && passed.status === 'waiting-step', `right waits for the call to answer: ${passed.status} ${JSON.stringify(passed.steps.right)}`);
+      assert(Math.abs(held(passed) - 0.02) < 1e-9 && spent(passed) === 0, `the open call still holds its share, and nothing is spent yet: ${JSON.stringify(passed.steps)}`);
 
-      // The call answers, one cent: that leaves room for right's two, and right starts.
+      // The call answers, one cent: left takes its own answer, which leaves room for right's two, and right starts.
       provider.releaseHeld();
       const done = await waitForRunEnd('cost-held', runId);
       assert(done.status === 'done' && Math.abs(spent(done) - 0.02) < 1e-9 && held(done) === 0,
         `right started once the call answered, and the run holds nothing: ${done.status} ${JSON.stringify(done.steps)}`);
       assert(provider.requestsFor('chat').length === 2, `each step asked the model once: ${provider.requestsFor('chat').length}`);
+      const left = (await json('/v1/memory/wfheld.left', { headers: auth })).body?.data?.value;
+      assert(left === 'the answer of this run', `left holds its own call's answer, not the run before's: ${JSON.stringify(left)}`);
     } finally {
       await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
       await json('/v1/workflows/cost-held?withRuns=true', { method: 'DELETE', headers: auth });

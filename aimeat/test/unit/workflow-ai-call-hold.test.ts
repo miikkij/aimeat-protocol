@@ -3,18 +3,26 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a run holds of its spending limit (maxCostUsd) while an ai step's model call is
- *   open, and what it has spent, through the engine over an in-memory storage: the watchdog finding
- *   the step's output while its call runs, a timeout, a retry beside a call still open, a failing
- *   call, a cancel, a restart, a cost that arrives after the run finished, and a watchdog pass that
- *   comes between a run's first save and its first step. Then a late answer of an earlier attempt,
- *   while the step runs again after a retry, for an ai step and an extension step; a finished agent
- *   task, which decides only the agent step whose current attempt it was dispatched for; an answer
- *   that comes after its step ended, which writes nothing; and an error inside the engine while it
- *   takes an answer in, which is not a failure of the attempt and still saves the answer's cost and
- *   the release of its hold. The model, the extension's action and a datapackage step's read of its
- *   source are stand-ins that stay open until the case lets them answer; the publish is a stand-in
- *   that answers at once. The same code path with a real provider is test/e2e-workflows.ts.
+ *   open, and what it has spent, through the engine over an in-memory storage: the step's output
+ *   already there while its call runs, a timeout, a retry beside a call still open, a failing call, a
+ *   cancel, a restart, a cost that arrives after the run finished, and a watchdog pass that comes
+ *   between a run's first save and its first step. Then a late answer of an earlier attempt, while
+ *   the step runs again after a retry, for an ai step and an extension step; a finished agent task,
+ *   which decides only the agent step whose current attempt it was dispatched for; an answer that
+ *   comes after its step ended, which writes nothing; an error inside the engine while it takes an
+ *   answer in, which is not a failure of the attempt and still saves the answer's cost and the
+ *   release of its hold; and the watchdog, which leaves an ai, extension or datapackage step to the
+ *   answer of its current call while that call is open. The model, the extension's action and a
+ *   datapackage step's read of its source are stand-ins that stay open until the case lets them
+ *   answer; the publish is a stand-in that answers at once. The same code path with a real provider
+ *   is test/e2e-workflows.ts.
  * @version-history
+ *   v1.8.0 — 2026-09-26 — While the call of a step's current attempt is open, the watchdog does not
+ *     end the step by an output an earlier run left: the step takes its own answer, for a capped and
+ *     an uncapped ai step, an extension step and a datapackage step. After a restart the watchdog
+ *     ends the step by its output again. The two A6-11 cases whose watchdog pass ended a step while
+ *     its call was open follow the rule: the answer ends the first, the timeout the second
+ *     (secaudit 2026-09, R4).
  *   v1.7.0 — 2026-09-26 — When the engine's save fails as it takes an answer in, the run's spent
  *     amount includes the call and its hold is gone; when that save fails too, one error line names
  *     the run, the step and the amount (secaudit 2026-09, R4).
@@ -225,7 +233,7 @@ beforeEach(() => {
 });
 
 describe('an ai step\'s call holds its share of the limit until it answers', () => {
-    it('the watchdog finds the output while the call runs: the call keeps its hold, and the waiting step starts when it answers', async () => {
+    it('the output is there while the call runs: the watchdog leaves the step to its answer, the call keeps its hold, and the waiting step starts when it answers', async () => {
         const storage = memStorage();
         await seed(storage, defOf([ai('left'), ai('right')], 0.03), {
             left: stepAt('dispatched', { holds: 0.02, estimate: 0.02, startedMsAgo: 10_000 }),
@@ -237,7 +245,7 @@ describe('an ai step\'s call holds its share of the limit until it answers', () 
 
         await engine.sweep();
         let run = await readRun(storage);
-        expect(run.steps.left.state).toBe('green');
+        expect(run.steps.left.state).toBe('dispatched');
         expect(run.steps.right.state).toBe('pending');
         expect(model.calls).toHaveLength(0);
         expect(reservedUsd(run)).toBeCloseTo(0.02, 10);
@@ -246,6 +254,7 @@ describe('an ai step\'s call holds its share of the limit until it answers', () 
 
         await callAnswers(engine, 'left', true, 0.01);
         run = await readRun(storage);
+        expect(run.steps.left.state).toBe('green');
         expect(run.steps.left.costUsd).toBeCloseTo(0.01, 10);
         expect(run.steps.right.state).toBe('dispatched');
         expect(model.calls).toHaveLength(1);
@@ -405,20 +414,22 @@ describe('an ai step\'s call holds its share of the limit until it answers', () 
     it('a cost that arrives after the run finished counts on the run, and in the next run\'s estimate', async () => {
         const storage = memStorage();
         await seed(storage, defOf([ai('left')], 0.03), {
-            left: stepAt('dispatched', { holds: 0.02, estimate: 0.02, startedMsAgo: 10_000 }),
+            left: stepAt('dispatched', { holds: 0.02, estimate: 0.02, startedMsAgo: 120_000 }),
         });
+        // The output is already there, and the call is open past the step's minute: the timeout ends it.
         await put(storage, OWNER, 'out.left', 'written by the run before');
         const engine = engineFor(storage);
 
         await engine.sweep();
         let run = await readRun(storage);
-        expect(run.status).toBe('done');
+        expect(run.steps.left.state).toBe('timed-out');
+        expect(run.status).toBe('partial');
         expect(reservedUsd(run)).toBeCloseTo(0.02, 10);
         expect(spentUsd(run)).toBe(0);
 
         await callAnswers(engine, 'left', true, 0.025);
         run = await readRun(storage);
-        expect(run.status).toBe('done');
+        expect(run.status).toBe('partial');
         expect(run.steps.left.costUsd).toBeCloseTo(0.025, 10);
         expect(reservedUsd(run)).toBe(0);
         expect(spentUsd(run)).toBeCloseTo(0.025, 10);
@@ -780,5 +791,94 @@ describe('an error inside the engine while it takes an answer in is the engine\'
         } finally {
             errors.mockRestore();
         }
+    });
+});
+
+describe('while the call of a step\'s current attempt is open, the watchdog leaves the step to its answer', () => {
+    it('an ai step whose key holds an earlier run\'s value is not turned green, and the step takes its own answer\'s value', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left')], 0.05), { left: stepAt('pending', { estimate: 0.02 }) });
+        await put(storage, OWNER, 'out.left', 'written by the run before');
+        const engine = engineFor(storage);
+
+        // The first pass starts the step's model call; the next pass finds the earlier run's value.
+        await engine.sweep();
+        expect(model.calls).toHaveLength(1);
+        await engine.sweep();
+        let run = await readRun(storage);
+        expect(run.steps.left.state).toBe('dispatched');
+        expect(run.status).toBe('waiting-step');
+
+        await answer(0, 0.01, 'the answer of this run');
+        run = await readRun(storage);
+        expect(run.steps.left.state).toBe('green');
+        expect(run.status).toBe('done');
+        expect(await valueAt(storage, 'out.left')).toBe('the answer of this run');
+    });
+
+    it('an ai step with no spending limit: the same', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left')], 0), { left: stepAt('pending') });
+        await put(storage, OWNER, 'out.left', 'written by the run before');
+        const engine = engineFor(storage);
+
+        await engine.sweep();
+        await engine.sweep();
+        expect((await readRun(storage)).steps.left.state).toBe('dispatched');
+
+        await answer(0, 0.01, 'the answer of this run');
+        expect((await readRun(storage)).steps.left.state).toBe('green');
+        expect(await valueAt(storage, 'out.left')).toBe('the answer of this run');
+    });
+
+    it('an extension step: the step takes its own result, not the earlier value', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([extension('left')], 0.05), { left: stepAt('pending') });
+        await put(storage, OWNER, 'out.left', 'written by the run before');
+        const engine = engineFor(storage);
+
+        await engine.sweep();
+        expect(sandbox.runs).toHaveLength(1);
+        await engine.sweep();
+        expect((await readRun(storage)).steps.left.state).toBe('dispatched');
+
+        sandbox.runs[0].resolve({ result: 'the result of this run', reads: [], writes: [] });
+        await settle();
+        expect((await readRun(storage)).steps.left.state).toBe('green');
+        expect(await valueAt(storage, 'out.left')).toBe('the result of this run');
+    });
+
+    it('a datapackage step: the step waits for its own publish', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([datapackage('pkg')], 0.05), { pkg: stepAt('pending') });
+        await put(storage, OWNER, 'in.rows', [{ n: 1 }]);
+        await put(storage, OWNER, 'out.pkg', 'written by the run before');
+        held.key = 'in.rows';
+        const engine = engineFor(storage);
+
+        await engine.sweep();
+        expect(held.reads).toHaveLength(1);
+        await engine.sweep();
+        expect((await readRun(storage)).steps.pkg.state).toBe('dispatched');
+
+        held.reads[0]();
+        await settle();
+        expect((await readRun(storage)).steps.pkg.state).toBe('green');
+        expect(packages.published).toEqual(['rows']);
+    });
+
+    it('after a restart, which clears the marks, the watchdog ends the step by its output again', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left')], 0.05), {
+            left: stepAt('dispatched', { holds: 0.02, estimate: 0.02, startedMsAgo: 10_000 }),
+        });
+        await put(storage, OWNER, 'out.left', 'written before the restart');
+        const engine = engineFor(storage);
+
+        await engine.resumeInflight();
+        await engine.sweep();
+        const run = await readRun(storage);
+        expect(run.steps.left.state).toBe('green');
+        expect(run.status).toBe('done');
     });
 });

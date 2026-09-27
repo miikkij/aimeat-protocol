@@ -65,6 +65,8 @@
  *   v1.16.1 — 2026-09-26 — WorkflowDef.maxCostUsd says a call holds its share until it answers, the
  *     estimate is one attempt, and a step expected to cost more than the cap starts alone
  *     (secaudit 2026-09, A6-11).
+ *   v1.16.2 — 2026-09-26 — openCalls marks every call of an ai, extension or datapackage step, and
+ *     the watchdog leaves a step whose current call is open to its answer (secaudit 2026-09, R4).
  */
 import { z } from 'zod';
 import { SignalSchema, type Signal } from './workflow-signals.js';
@@ -423,8 +425,7 @@ export interface WorkflowDef {
    * across the ai steps not yet started), and the call starts only when what the run has spent, what
    * its open calls hold and that estimate stay within this. So ai steps that fit together still start
    * together. A call holds its share until it answers, even when its step was moved on meanwhile (a
-   * timeout, a retry, the watchdog finding its output, a cancel), and a retry's call beside one still
-   * open holds its own. A step that does not fit waits while a call is open; with none open, the run
+   * timeout, a retry, a cancel), and a retry's call beside one still open holds its own. A step that does not fit waits while a call is open; with none open, the run
    * ends `stopped`, with the cap, the spend and the step's estimate in `costCap` and in words in
    * `reason`. A step expected to cost more than this whole amount starts alone, when no call is open
    * and the run has spent less than this, and what it really cost counts as usual. A call already
@@ -520,13 +521,13 @@ export interface WorkflowRunStep {
    */
   estimateUsd?: number;
   /**
-   * Under a cost cap: the model calls of this ai step that have started and not yet answered, one per
-   * attempt. `reservedUsd` is what the engine set aside for the call from the cap before it started
-   * (the step's `estimateUsd`, else its share of the cap nobody held). A call keeps its mark and its
-   * hold until it answers, whatever became of the step meanwhile (a timeout, a retry, the watchdog
-   * finding its output, a cancel), because it runs on and is paid for; `costUsd` then says what it
-   * cost. A restart clears the marks of a run still in flight, because the calls ended with the
-   * process.
+   * The calls of this ai, extension or datapackage step that have started and not yet answered, one
+   * per attempt. `reservedUsd` is what the engine set aside for the call from the cost cap before it
+   * started (for an ai step under a cap, the step's `estimateUsd`, else its share of the cap nobody
+   * held; 0 for any other call). A call keeps its mark and its hold until it answers, whatever became
+   * of the step meanwhile (a timeout, a retry, a cancel), because it runs on and is paid for; `costUsd`
+   * then says what it cost. While the call of the current attempt is open, the watchdog does not end
+   * the step by its output. A restart clears the marks of a run still in flight.
    */
   openCalls?: Array<{ attempt: number; reservedUsd: number }>;
 }
