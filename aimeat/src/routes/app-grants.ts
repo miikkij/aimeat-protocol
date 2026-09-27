@@ -20,6 +20,8 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.18.0 — 2026-09-26 — The refresh mints for a grant only while an account holds its owner name,
+ *     is not deactivated, and is not newer than the grant (auth/credential-age.ts ownerRefuses).
  *   v1.17.1 — 2026-09-26 — The app owner behind a grant target comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -113,6 +115,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
+import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
@@ -741,7 +744,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       const raw = String(req.body?.refresh_token ?? '');
       if (!raw) return res.status(400).json(error(config.nodeId, 'INVALID_GRANT', 'refresh_token required'));
       const grant = await storage.getAppGrantByRefreshHash(hashToken(raw));
-      if (!grant || grant.revoked || !grant.refreshTokenHash) {
+      // A grant counts only while the account it was given by holds the owner name and is not newer
+      // than the grant (auth/credential-age.ts): the refresh mints nothing for an earlier account's app.
+      if (!grant || grant.revoked || !grant.refreshTokenHash
+        || ownerRefuses(await storage.getOwner(grant.owner), recordIssuedAt(grant.createdAt))) {
         return res.status(401).json(error(config.nodeId, 'INVALID_GRANT', 'Grant revoked or refresh token invalid'));
       }
       // Rotate the refresh token (one-time use).

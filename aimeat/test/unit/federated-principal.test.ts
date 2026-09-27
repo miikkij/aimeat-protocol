@@ -15,6 +15,9 @@
  *   owner: no owner role, and a name (its home GHII) that no local account can have.
  * @usage cd aimeat && pnpm exec vitest run test/unit/federated-principal.test.ts
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The account check (credentialRevoked) asks no local account of a visitor,
+ *     also when a local account of the same local part is made after the visitor's token; a local
+ *     owner token of the same age is refused.
  *   v1.3.0 — 2026-09-26 — runAsNode: in a process that serves two nodes, a request is answered for
  *     the node that serves it, through what it awaits, and code outside a request for the node
  *     registered at boot.
@@ -35,7 +38,9 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 import { initNodeKeys, issueJWT, verifyJWT, type VerifiedToken } from '../../src/auth/jwt.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
-import { isOwnerPrincipal, requireRole, requireScope } from '../../src/auth/middleware.js';
+import { credentialRevoked, initSessionAuth, isOwnerPrincipal, requireRole, requireScope } from '../../src/auth/middleware.js';
+import type { Storage } from '../../src/storage/interface.js';
+import type { AimeatConfig } from '../../src/config.js';
 import { homeIdentityOf, isForeignPrincipal, localAccountName, localAccountOf, resolveIdentity, runAsNode, setThisNodeId } from '../../src/utils/gaii.js';
 
 const NODE = 'aimeat-local-001-dev';
@@ -231,5 +236,36 @@ describe('a process that serves two nodes', () => {
         expect(localAccountName(`alice@${HOME}`)).toBe('alice');
         expect(localAccountName(`alice@${NODE}`)).toBe(`alice@${NODE}`);
         expect(localAccountOf(`alice@${NODE}`)).toBeNull();
+    });
+});
+
+// A credential counts only while an account of THIS node holds its owner name and was made before it
+// (auth/credential-age.ts). A visitor's owner is its home GHII, an account of another node that this
+// owners table does not hold, so the check asks nothing of it: the visitor keeps working with no
+// local account at all, and a local account of the same local part made later changes nothing.
+describe('the account check and a visitor', () => {
+    const owners = new Map<string, { name: string; roles: string[]; createdAt: string; disabledAt: string | null }>();
+    const accounts = { getOwner: async (name: string) => owners.get(name) ?? null } as unknown as Storage;
+    const namesakeMadeNow = () => {
+        owners.set('alice', { name: 'alice', roles: ['owner'], createdAt: new Date(Date.now() + 1000).toISOString(), disabledAt: null });
+    };
+    beforeAll(() => initSessionAuth(accounts, { nodeId: NODE } as AimeatConfig));
+    afterAll(() => { initSessionAuth(null as unknown as Storage); setThisNodeId(null); });
+
+    it('keeps a visitor, with no local account and after a local namesake is made', async () => {
+        owners.clear();
+        const token = await legacyVisitorToken();
+        const v = await verifyJWT(token);
+        expect(await credentialRevoked(token, v!)).toBe(false);
+        namesakeMadeNow();
+        expect(await credentialRevoked(token, v!)).toBe(false);
+    });
+
+    it('refuses a local owner token of the same age, whose account was made after it', async () => {
+        owners.clear();
+        const token = await issueJWT({ sub: 'alice', owner: 'alice', node: NODE, roles: ['owner'], scopes: [] }, 3600);
+        const v = await verifyJWT(token);
+        namesakeMadeNow();
+        expect(await credentialRevoked(token, v!)).toBe(true);
     });
 });

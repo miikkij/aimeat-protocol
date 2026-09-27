@@ -26,6 +26,11 @@
  *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.9.0 — 2026-09-26 — 62: when an account is deleted, its owner token, its agent's token, the
+ *     agent's MCP access token, an app grant's access token and a personal access token are refused
+ *     before the name is registered again, after it is, and after the new holder connects an agent of
+ *     the same name; none writes or reads the new holder's records, and the grant's refresh token
+ *     mints nothing.
  *   v1.8.0 — 2026-09-26 — 61: when an account is deleted, its ecosystem apps go with it: the name
  *     registered again lists none and reads nothing they wrote, and the old app's token is refused,
  *     also after the new holder connects an app of the same name; the new holder's own app works.
@@ -88,7 +93,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -1346,6 +1351,104 @@ await test('61. When an account is deleted, its ecosystem apps go with it: the f
 
     assert(found.length === 0, found.join('; '));
     assert(control.status === 201, `the new holder's own app is refused: ${control.status} ${JSON.stringify(control.body?.error)}`);
+});
+
+// Every credential acts for the account its owner claim names, and the name is released for reuse.
+// A deleted account's owner token, its agent's token, the agent's MCP access token, an app grant's
+// tokens and a personal access token are refused from the deletion on: before the name is registered
+// again, after it is, and after the new holder connects an agent of the same name, which gets the same
+// identity. None writes or reads the new holder's records, and the app's refresh token mints nothing.
+await test('62. When an account is deleted, every credential it issued is refused: before the name is registered again, after, and after an agent of the same name is connected', async () => {
+    const first = await setupOwner('credgone');
+    const scopes = ['memory:read', 'memory:write'];
+    const agent = await setupAgent(first, 'worker', scopes);
+    // The agent's MCP access token too: an OAuth token has no session row behind it.
+    const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `Account deletion ${first.name}`, redirect_uris: [] }) });
+    assert(client.status === 201, `mcp register ${client.status}`);
+    const at = new Date().toISOString();
+    const q = new URLSearchParams({
+        response_type: 'code', client_id: client.body.client_id, gaii: agent.gaii,
+        signature: await signMsg(agent.privateKey, agent.gaii + NODE_ID + at), timestamp: at,
+    });
+    const code = (await json(`/v1/mcp/authorize?${q}`)).body.code as string;
+    const mcp = await json('/v1/mcp/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+    });
+    assert(mcp.status === 200 && typeof mcp.body.access_token === 'string', `mcp token ${mcp.status}: ${JSON.stringify(mcp.body)}`);
+    // An app the account granted memory:read: its access token, and the refresh token that mints more.
+    const appFile = `credgone-${Date.now().toString(36)}.html`;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(first.token),
+        body: JSON.stringify({ filename: appFile, content: Buffer.from('<h1>granted</h1>', 'utf8').toString('base64'), name: 'Granted', description: 'An app the account granted', category: 'utility', tags: [] }),
+    });
+    assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const redirect = 'http://localhost:9911/callback';
+    const verifier = randomBytes(32).toString('base64url');
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${new URLSearchParams({
+        app: `${first.name}/${appFile}`, response_type: 'code', scope: 'memory:read', redirect_uri: redirect,
+        code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256',
+    })}`, { redirect: 'manual' });
+    const requestId = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+    const consent = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(first.token), body: JSON.stringify({ request_id: requestId }) });
+    const grantCode = new URL(consent.body.data.redirect_url).searchParams.get('code') ?? '';
+    const granted = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: grantCode, code_verifier: verifier, redirect_uri: redirect }),
+    });
+    assert(granted.body.ok === true, `grant token: ${JSON.stringify(granted.body?.error)}`);
+    let appRefresh = granted.body.data.refresh_token as string;
+    // A personal access token with the owner's full access, presented as a Bearer token.
+    const made = await json('/v1/access/tokens', { method: 'POST', headers: auth(first.token), body: JSON.stringify({ label: 'account deletion', grant_owner: true }) });
+    assert(made.status === 201, `access token ${made.status}: ${JSON.stringify(made.body?.error)}`);
+
+    const key = `acctdoor.cred.${Date.now().toString(36)}`;
+    const found: string[] = [];
+    let attempt = 0;
+    const tryAll = async (when: string, secret?: string) => {
+        const held = [
+            ['owner', first.token], ['agent', agent.token], ['agent MCP', mcp.body.access_token as string],
+            ['app', granted.body.data.access_token as string], ['access', made.body.data.token as string],
+        ] as const;
+        for (const [who, token] of held) {
+            // The app holds memory:read alone, so only the others are asked to write.
+            if (who !== 'app') {
+                const wrote = await json('/v1/memory', {
+                    method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${key}.${who.replace(' ', '')}.${attempt++}`, value: { from: `the deleted account's ${who}` } }),
+                });
+                if (wrote.status !== 401) found.push(`${when}: the ${who} token wrote (${wrote.status}${wrote.body.data?.owner_gaii ? `, under ${wrote.body.data.owner_gaii}` : ''})`);
+            }
+            if (!secret) continue;
+            // An agent reads its owner's records with owner_scope; an owner session, an app grant and a
+            // full-access token read them as their own.
+            const read = await json(`/v1/memory/${encodeURIComponent(secret)}${who === 'agent' || who === 'agent MCP' ? '?owner_scope=true' : ''}`, { headers: auth(token) });
+            if (read.status !== 401) found.push(`${when}: the ${who} token read the new holder's record (${read.status}${read.body.data?.value ? `, ${JSON.stringify(read.body.data.value)}` : ''})`);
+        }
+        const refreshed = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: appRefresh }) });
+        if (refreshed.status !== 401) {
+            found.push(`${when}: the app's refresh token minted a new access token (${refreshed.status})`);
+            if (refreshed.body.data?.refresh_token) appRefresh = refreshed.body.data.refresh_token;
+        }
+    };
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    await tryAll('(a) before the name is registered again');
+
+    const again = await registerAgain(first.name);
+    const secret = `${key}.secret`;
+    const kept = await json('/v1/memory', {
+        method: 'POST', headers: auth(again.token), body: JSON.stringify({ key: secret, value: { of: 'the new holder' }, visibility: 'private' }),
+    });
+    assert(kept.status === 201, `the new holder writes: ${kept.status} ${JSON.stringify(kept.body?.error)}`);
+    await tryAll('(b) after the name is registered again', secret);
+
+    const sameName = await setupAgent(again, 'worker', scopes);
+    assert(sameName.gaii === agent.gaii, `an agent of the same name gets the same identity: ${sameName.gaii}`);
+    await tryAll('(c) after the new holder connects an agent of the same name', secret);
+    const control = await json(`/v1/memory/${encodeURIComponent(secret)}?owner_scope=true`, { headers: auth(sameName.token) });
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+
+    assert(found.length === 0, found.join('; '));
+    assert(control.status === 200, `the new holder's own agent is refused: ${control.status} ${JSON.stringify(control.body?.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

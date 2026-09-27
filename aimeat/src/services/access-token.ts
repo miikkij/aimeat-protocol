@@ -9,12 +9,15 @@
  * @structure PAT_PREFIX; ResolvedPat; resolvePat(storage, rawToken).
  * @usage import { resolvePat, PAT_PREFIX } from '../services/access-token.js'
  * @version-history
+ * v1.2.0 - 2026-09-26 - A PAT made before the account that now holds its owner name resolves to null,
+ *   as one of a deleted or deactivated account does (auth/credential-age.ts ownerRefuses).
  * v1.1.0 - 2026-08-23 - A deactivated owner's PATs resolve to null (BR-04); the owner record was
  *   already read here, so the check costs nothing extra per request.
  * v1.0.0 - 2026-06-03 - Initial (plan 2026-06-03-agent-access-tokens).
  */
 import type { Storage } from '../storage/interface.js';
 import { hashToken } from './owner-session.js';
+import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 
 /** Raw PATs carry this prefix so they're distinguishable from JWTs / session tokens. */
 export const PAT_PREFIX = 'aimeat_pat_';
@@ -37,10 +40,11 @@ export async function resolvePat(storage: Storage, rawToken: string): Promise<Re
   if (!pat) return null;
   if (pat.expiresAt && Date.now() >= Date.parse(pat.expiresAt)) return null;
   const ownerRecord = await storage.getOwner(pat.owner);
-  if (!ownerRecord) return null;
-  // A deactivated owner's PATs answer exactly like revoked ones (BR-04): the owner record is
-  // already in hand here, so this is the whole per-request cost on the PAT path.
-  if (ownerRecord.disabledAt) return null;
+  // A PAT answers like a revoked one when no account holds its owner name, when the account is
+  // deactivated (BR-04), and when the account was made after the PAT: the name was released and
+  // registered again, and the PAT was the earlier account's (auth/credential-age.ts). The owner
+  // record is read here anyway, so this check adds no read to the PAT code path.
+  if (!ownerRecord || ownerRefuses(ownerRecord, recordIssuedAt(pat.createdAt))) return null;
 
   let sub: string;
   let roles: string[];

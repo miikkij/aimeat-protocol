@@ -9,6 +9,9 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.7.0 — 2026-09-26 — issueJWT writes the issue time in milliseconds (`iat_ms`) beside `iat`, from
+ *     one clock reading, and verifyJWT carries it as `iatMs`, so a credential's age is compared with
+ *     an account or a record to the millisecond (auth/credential-age.ts).
  *   v1.6.0 — 2026-09-26 — verifyJWT carries the token's `iat`, so the credential check can refuse an
  *     ecosystem app's token issued before the app record it names was made (auth/middleware.ts).
  *   v1.5.1 — 2026-09-26 — The old-key read (spellingHashOf) names its removal: the first release made
@@ -117,10 +120,14 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     if (ownerRecord?.disabledAt) throw new AccountDisabledError(payload.owner);
   }
 
+  // The issue time to the millisecond, beside `iat`, which counts whole seconds. The account and
+  // record checks compare a credential's age with it exactly (auth/credential-age.ts).
+  const issuedMs = Date.now();
   const builder = new SignJWT({
     owner: payload.owner,
     node: payload.node,
     roles: payload.roles,
+    iat_ms: issuedMs,
     // Fail closed. This was `?? ['*']`, so forgetting the field minted a credential over the whole
     // account — which is how proving control of a mailbox returned a wildcard token, and how every
     // MCP OAuth session came back as one. An owner or operator session is unaffected either way,
@@ -137,7 +144,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
-    .setIssuedAt()
+    .setIssuedAt(Math.floor(issuedMs / 1000))
     .setExpirationTime(`${ttlSeconds}s`);
 
   // P3-7: Embed session ID for server-side session tracking
@@ -155,6 +162,7 @@ export interface VerifiedToken {
   roles: string[];
   exp: number;
   iat?: number;        // when the token was issued, in seconds (every minted token carries it)
+  iatMs?: number;      // the same, in milliseconds (`iat_ms`, on every token minted from 2026-09-26 on)
   scopes: string[];
   anonymous?: boolean;
   sessionId?: string;  // P3-7: Server-side session tracking
@@ -199,6 +207,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       roles: payload.roles as string[],
       exp: payload.exp as number,
       iat: payload.iat as number | undefined,
+      iatMs: typeof payload.iat_ms === 'number' ? payload.iat_ms : undefined,
       // The other end of the same door. issueJWT has always written this claim, so a token
       // without one is not an old token — it is not one of ours.
       scopes: (payload.scopes as string[]) ?? [],

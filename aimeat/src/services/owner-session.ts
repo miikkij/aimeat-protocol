@@ -11,6 +11,9 @@
  *   establishOwnerSession() for login; refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ * v1.2.0 - 2026-09-26 - Refresh answers 401 SESSION_REVOKED and ends the session row when no account
+ *   holds the session's owner name, or the account holding it was made after the session
+ *   (auth/credential-age.ts ownerRefuses); a deactivated account still answers 403 ACCOUNT_DISABLED.
  * v1.1.0 - 2026-08-23 - Deactivated accounts (BR-04): establish throws AccountDisabledError before
  *   any row or cookie exists; refresh answers 403 ACCOUNT_DISABLED and ends the session row.
  * v1.0.0 - 2026-06-03 - Initial implementation (plan 2026-06-03-owner-session-refresh-tokens).
@@ -20,6 +23,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { issueJWT, AccountDisabledError } from '../auth/jwt.js';
+import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 
 /** Name of the httpOnly refresh-token cookie. Scoped to /v1/auth on the wire. */
 export const REFRESH_COOKIE = 'aimeat_rt';
@@ -189,13 +193,16 @@ export async function refreshOwnerSession(
     return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'Session has been revoked' };
   }
 
-  // Deactivated account (BR-04): the refresh cookie dies with everything else. revokeAllSessions
-  // already marked the row, so this branch is the belt for a row created between flag and revoke.
+  // The account the session was made for: deleted, deactivated (BR-04), or newer than the session
+  // because the name was released and registered again (auth/credential-age.ts). The refresh cookie
+  // ends with the account. revokeAllSessions already marked the rows of a deactivated account, so for
+  // that account this check covers a row created between the flag and the revocation.
   const ownerRecord = await storage.getOwner(session.owner);
-  if (ownerRecord?.disabledAt) {
+  if (ownerRefuses(ownerRecord, recordIssuedAt(session.issuedAt))) {
     await storage.revokeSession(session.sessionId);
     clearRefreshCookie(req, res);
-    return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: 'This account has been deactivated' };
+    if (ownerRecord?.disabledAt) return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: 'This account has been deactivated' };
+    return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'The account this session was made for no longer exists' };
   }
 
   const now = Date.now();

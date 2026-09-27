@@ -14,6 +14,11 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-26 — credentialRevoked asks the account question (accountRefuses): a credential counts
+ *     only while an account holds its owner name, the account is not deactivated, and the account is
+ *     not newer than the credential (auth/credential-age.ts), in one read per token; an app grant's
+ *     token counts from the grant's creation. The ecosystem app check compares to the millisecond
+ *     when the token carries its issue time in milliseconds.
  *   2026-09-26 — credentialRevoked asks a fifth question: an ecosystem app's token counts only while
  *     the app record it names is there, active, and not newer than the token (ecosystemAppGone), so
  *     every credential of an app goes with its record, also when its account is deleted.
@@ -93,9 +98,10 @@ import { isForeignPrincipal, setThisNodeId } from '../utils/gaii.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { deny401, deny403, denyScope403, setDenyConfig } from './deny.js';
+import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { askOperator } from '../services/operator-principal.js';
 
@@ -239,29 +245,32 @@ async function sessionRevoked(verified: VerifiedToken): Promise<boolean> {
  *
  * One keyed read per app-token request, uncached for the same reason sessionRevoked() is: the row is
  * written by whoever pressed Revoke, and "immediately" is the promise being kept. A grant that has
- * disappeared counts as revoked — an app whose grant row is gone has nothing to act for.
+ * disappeared counts as revoked — an app whose grant row is gone has nothing to act for. Returns the
+ * grant while it stands, null for a token that names none, and false for a revoked or missing one.
  */
-async function appGrantRevoked(verified: VerifiedToken): Promise<boolean> {
-  if (!verified.app_grant || !_sessionStorage) return false;
+async function standingAppGrant(verified: VerifiedToken): Promise<AppGrantRecord | null | false> {
+  if (!verified.app_grant || !_sessionStorage) return null;
   const grant = await _sessionStorage.getAppGrant(verified.app_grant);
-  return !grant || grant.revoked === true;
+  return !grant || grant.revoked === true ? false : grant;
 }
 
 /**
- * Is the OWNER this credential acts for deactivated? (BR-04.) Every principal family — owner
- * session, agent, ecosystem app, app grant, MCP OAuth token — carries the bare local owner name in
- * `owner`, and deactivation is a statement about the person, so one read answers for all of them.
- * Uncached for the same reason the session check is: an IdP saying "this person left" means now.
+ * Does the ACCOUNT this credential acts for refuse it? Every principal family — owner session, agent,
+ * ecosystem app, app grant, MCP OAuth token — carries the bare local owner name in `owner`, so one
+ * read answers for all of them (auth/credential-age.ts ownerRefuses): no account holds the name, the
+ * account is deactivated (BR-04), or the account was made after the credential, because the name was
+ * released and registered again. An app grant's tokens are minted from the grant, a refreshed one
+ * long after it, so for them the grant's creation is the credential's. Uncached for the same reason
+ * the session check is: an IdP saying "this person left" means now.
  *
- * Federated principals are excluded: their `owner` is the bare local-part of a name owned by a
- * DIFFERENT node (register-login.ts sets it from the remote identity), so reading the local owners
- * table would answer about the wrong person in both directions. Their home node refuses the
- * attestation instead (federation-auth.ts).
+ * Federated principals are excluded: their `owner` is their home GHII, an account of a DIFFERENT
+ * node that this owners table does not hold, and their home node refuses the attestation instead
+ * (federation-auth.ts). So are an anonymous identity and a token that names no owner.
  */
-async function ownerDisabled(verified: VerifiedToken): Promise<boolean> {
-  if (isForeignPrincipal(verified) || !verified.owner || !_sessionStorage) return false;
+async function accountRefuses(verified: VerifiedToken, grant: AppGrantRecord | null): Promise<boolean> {
+  if (isForeignPrincipal(verified) || verified.anonymous || !verified.owner || !_sessionStorage) return false;
   const owner = await _sessionStorage.getOwner(verified.owner);
-  return !!owner?.disabledAt;
+  return ownerRefuses(owner, grant ? recordIssuedAt(grant.createdAt) : tokenIssuedAt(verified));
 }
 
 /**
@@ -275,7 +284,7 @@ async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
   if (!verified.roles.includes('ecosystem') || !_sessionStorage) return false;
   const app = await _sessionStorage.getEcosystemApp(verified.sub);
   if (!app || app.status !== 'active') return true;
-  return verified.iat !== undefined && Math.floor(Date.parse(app.createdAt) / 1000) > verified.iat;
+  return madeAfter(app.createdAt, tokenIssuedAt(verified));
 }
 
 /**
@@ -284,8 +293,9 @@ async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
  *   - the exact token was revoked          (POST /v1/auth/revoke)
  *   - its session row was revoked          (sign out, sign out everywhere, deleting the agent)
  *   - its app grant was revoked            (the owner pressed Revoke on the app)
- *   - the owner it acts for is deactivated (BR-04 — SCIM active:false, the admin disable endpoint)
  *   - its ecosystem app is gone            (disconnected, or its account deleted)
+ *   - the account it acts for refuses it   (deleted, deactivated as BR-04 asks, or newer than the
+ *                                           credential because the name was registered again)
  *
  * Exported because verifying a JWT is not only Express's job. The WebSocket upgrade for the connect
  * tunnel (src/index-start.ts) cannot run middleware on a raw socket, so it verified the token by
@@ -296,12 +306,13 @@ async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
 export async function credentialRevoked(token: string, verified: VerifiedToken): Promise<boolean> {
   if (await isRevoked(token)) return true;
   if (await sessionRevoked(verified)) return true;
-  if (await appGrantRevoked(verified)) return true;
+  const grant = await standingAppGrant(verified);
+  if (grant === false) return true;
   if (await ecosystemAppGone(verified)) return true;
-  // Fourth question (BR-04): a deactivated owner's credentials are dead even when the token
-  // itself was never individually revoked — MCP OAuth tokens carry no session row at all, and
-  // this is the only door that catches them.
-  return ownerDisabled(verified);
+  // The account question: a credential dies with its account even when the token itself was never
+  // revoked. An MCP OAuth token carries no session row at all, and the erasure deletes the session
+  // rows of the account on Postgres, so this is the check that ends those tokens.
+  return accountRefuses(verified, grant);
 }
 
 /**
