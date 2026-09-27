@@ -5,6 +5,9 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.8.0 — 2026-09-26 — A rule nested behind "&" reads "&" as the parent rule's own elements, and
+ *     "&" at the top of the stylesheet as the page; a rule nested without "&" is refused with the
+ *     forms that pass.
  *   v1.7.0 — 2026-09-26 — A stylesheet holding "</" is refused, in a comment or in a string, and the
  *     preview and the snippet bench a stored one again; "<\/" inside a string passes.
  *   v1.6.0 — 2026-09-26 — The stylesheet is read by the CSS parser (e82c9f26d729): a string passes
@@ -333,7 +336,8 @@ describe('the component bench', () => {
     expect(bad(rule('*.wkgrid'))).toThrow(/names the page itself/);
     // The column combinator is not one the CSS parser reads, so the bench cannot follow it.
     expect(bad(rule('.wkgrid || td'))).toThrow(/does not read as a selector/);
-    expect(bad(rule('.wkgrid-x { & ~ p'))).toThrow(/starts at one of its own classes/);
+    // Nested, "&" is .wkgrid-x, so this is `.wkgrid-x ~ p`: it reaches beside the component.
+    expect(bad(rule('.wkgrid-x { & ~ p'))).toThrow(/beside it/);
     // …and what a component legitimately writes still passes: inside it, and between its own parts.
     for (const ok of [
       '.wkgrid > *', '.wkgrid li', '.wkgrid-row + .wkgrid-row', '.wkgrid-cell ~ .wkgrid-cell-today',
@@ -343,6 +347,35 @@ describe('the component bench', () => {
     ]) {
       expect(() => validateComponentBody({ ...WEEK_GRID, ...rule(ok) }), ok).not.toThrow();
     }
+  });
+
+  // CSS nesting: inside a style rule, "&" is that rule's own elements, and every selector of that
+  // rule is checked on its own. At the top of the stylesheet "&" is the page.
+  it('reads "&" in a nested rule as the parent rule\'s own elements, and at the top as the page', () => {
+    const nest = (inner: string) => ({ css: `${WEEK_GRID.css}\n.wkgrid-row { color: var(--ak-ink); ${inner} }` });
+    for (const ok of [
+      '& .wkgrid-cell { color: var(--ak-accent); }', '&:hover { color: var(--ak-accent); }', '& > span { color: var(--ak-accent); }',
+      '&.wkgrid-on { color: var(--ak-accent); }', '& + & { margin-top: 4px; }', '& + .wkgrid-row { margin-top: 4px; }',
+      '&::after { content: ""; }', '@media (max-width: 480px) { & .wkgrid-cell { min-height: 32px; } }',
+      '& .wkgrid-cell { &:hover { color: var(--ak-accent); } }',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, ...nest(ok) }), ok).not.toThrow();
+    }
+    // A nested rule reaches what the rule it stands for reaches: inside .wkgrid-row, `& ~ p` is `.wkgrid-row ~ p`.
+    expect(bad(nest('& ~ p { color: var(--ak-accent); }'))).toThrow(/beside it/);
+    expect(bad(nest('& + p { color: var(--ak-accent); }'))).toThrow(/beside it/);
+    expect(bad(nest('&:has(~ p) { color: var(--ak-accent); }'))).toThrow(/looks only down/);
+    expect(bad(nest('& :root { color: var(--ak-accent); }'))).toThrow(/names the page itself/);
+    // The parent rule is checked too: under `p`, "&" is every paragraph on the page.
+    expect(bad({ css: `${WEEK_GRID.css}\np { & .wkgrid-cell { color: var(--ak-accent); } }` })).toThrow(/starts at one of its own classes/);
+    // At the top of the stylesheet "&" is the page, wherever it stands in the selector.
+    expect(bad({ css: `${WEEK_GRID.css}\n& .wkgrid-cell { color: var(--ak-accent); }` })).toThrow(/starts at one of its own classes/);
+    expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid & { color: var(--ak-accent); }` })).toThrow(/names the page itself/);
+    expect(bad({ css: `${WEEK_GRID.css}\n@media (min-width: 1px) { & p { color: var(--ak-accent); } }` })).toThrow(/starts at one of its own classes/);
+    // Nesting without "&" stays refused, and the refusal shows the forms that pass.
+    expect(bad(nest('.wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}", "&:hover \{ … \}"/);
+    expect(bad(nest('> .wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}"/);
+    expect(readStylesheet('.a { & .b { c: d } }').selectors.map(s => [s.text, s.nested])).toEqual([['.a', false], ['& .b', true]]);
   });
 
   it('wears the page it lands in: a literal colour is refused with the tokens named, a fallback is fine', () => {
