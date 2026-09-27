@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.10.0 (2026-09-26): check:migration-hashes, a migration file on main never changes.
  *  - 1.9.0 (2026-09-26): check:identity-shortening, an identity is cut to an account name only in utils/gaii.ts.
  *  - 1.8.0 (2026-09-24): check:supply-chain, the CI workflows and the local model files.
  *  - 1.7.0 (2026-09-24): check:shape-tokens, a component sheet reads the theme's shape values.
@@ -57,6 +58,9 @@ export const FAST_CHECKS = [
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.
     { script: 'check:identity-shortening', label: 'An identity is cut to an account name only by localAccountName or localAccountOf' },
     { script: 'check:storage-parity', label: 'Owner-scoped tables are in both deletion cascades' },
+    // From round 6 of the September 2026 security work: the runner records only a migration file's
+    // name, so a file changed after main had it left databases with two results under one name.
+    { script: 'check:migration-hashes', label: 'A migration file on main never changes, and a new one is listed in the same commit' },
     { script: 'check:ext-entrypoints', label: 'Extension sandbox entry points use the shared context builder' },
     { script: 'check:shared-impl', label: 'MCP tools call what REST calls' },
     { script: 'check:surface-focus', label: 'The v2 surfaces are still projections' },
