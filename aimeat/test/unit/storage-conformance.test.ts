@@ -21,6 +21,10 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.10.0 -- 2026-09-26 -- The deploy migration runs once for each database and keeps what an
+ *     erasure wrote: a second start after an erasure, and the migration run again over it, leave every
+ *     pseudonym, status, balance and ledger line as it was, on every provider. Running it again means
+ *     forgetting its record on either provider (secaudit 2026-09: R3 7a).
  *   v1.9.0 -- 2026-09-26 -- deleteAgent settles the agent's work on every provider: open work is
  *     cancelled, the requester's held morsels and the agent's own go back with a ledger line, and
  *     what stays keeps the agent's identity as stored.
@@ -308,14 +312,28 @@ async function seedWorkErasure(s: Storage) {
 const IDENTITY_MIGRATION = '0085_actions_work_full_identity.sql';
 
 /**
- * Run the deploy migration again over what is in the database now, the way a deploy runs it.
- * SQLite migrates in place every time a database is opened (sqlite/schema.ts), so a second open IS
- * the deploy. Postgres applies each file once: forget this one, and the runner applies it again.
+ * The row sqlite/schema-identity-backfill.ts writes into system_settings when it has moved a
+ * database, named after the Postgres file it mirrors. Written out here rather than imported, so this
+ * file reads the same against any version of the backfill.
+ */
+const SQLITE_IDENTITY_RECORD = 'migration:0085_actions_work_full_identity.sql';
+
+/** A second start of a SQLite node: the same database file opened again. */
+async function reopenSqlite(): Promise<void> {
+    const again = await createStorage({ provider: 'sqlite', sqlitePath: SQLITE_PATH });
+    await (again as unknown as { close?: () => void | Promise<void> }).close?.();
+}
+
+/**
+ * Run the deploy migration again over what is in the database now, the way a deploy runs it on a
+ * database that has not had it: forget the record that it ran, then start. SQLite moves a database
+ * when it opens it and records that in system_settings; Postgres records each file it applied.
  */
 async function rerunIdentityMigration(provider: string, storage: Storage): Promise<void> {
     if (provider === 'sqlite') {
-        const again = await createStorage({ provider: 'sqlite', sqlitePath: SQLITE_PATH });
-        await (again as unknown as { close?: () => void | Promise<void> }).close?.();
+        const db = (storage as unknown as { db: { prepare(sql: string): { run(...args: unknown[]): unknown } } }).db;
+        db.prepare('DELETE FROM system_settings WHERE key = ?').run(SQLITE_IDENTITY_RECORD);
+        await reopenSqlite();
         return;
     }
     const pool = (storage as unknown as { pool: pg.Pool }).pool;
@@ -638,6 +656,40 @@ describe('storage providers agree on what they do, not just on their signatures'
 
             for (const n of [owner, requester, reused]) await storage.deleteOwner(n);
             await storage.deleteAction(federated, owner);
+        }
+    }, 60_000);
+
+    // The deploy migration runs once for each database, as the Postgres runner applies a file once,
+    // and it never reads an erasure's pseudonym as an account name. So what an erasure wrote stays as
+    // it was: after a second start, and after the migration is run again over it. One pseudonym for
+    // each erasure, across the work, the dispute and the ledger.
+    it('a second start, and the deploy migration run again, keep what an erasure wrote', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const p = await seedWorkErasure(storage);
+            await storage.deleteOwner(p.erased);
+            const codes = [...p.heldFor.map(w => w.trackingCode), p.asked.trackingCode, p.tc('done-provided'), p.tc('done-asked'), p.tc('disputed')];
+            const written = async () => ({
+                work: await Promise.all(codes.map(async tc => {
+                    const w = await storage.getWork(tc);
+                    return [tc, w?.status, w?.providerGaii, w?.requesterGaii];
+                })),
+                openedBy: (await storage.getDisputeByTrackingCode(p.tc('disputed')))?.openedBy,
+                actors: (await storage.getDisputeAuditLog(p.disputeId)).map(e => e.actor),
+                balance: (await storage.getGHII(p.O.ghii))?.morselBalance,
+                ledger: (await storage.getTransactions(p.O.ghii, 500)).map(t => `${t.type}:${t.trackingCode}:${t.amount}:${t.counterpartyGaii}`).sort(),
+            });
+            const before = await written();
+            expect.soft(before.openedBy, `${name}: the erasure wrote a pseudonym`).toMatch(erasedRe);
+
+            if (name === 'sqlite') {
+                await reopenSqlite();
+                expect.soft(await written(), `${name}: a second start changed what the erasure wrote`).toEqual(before);
+            }
+            await rerunIdentityMigration(name, storage);
+            expect.soft(await written(), `${name}: the deploy migration run again changed what the erasure wrote`).toEqual(before);
+
+            await storage.deleteOwner(p.other);
         }
     }, 60_000);
 

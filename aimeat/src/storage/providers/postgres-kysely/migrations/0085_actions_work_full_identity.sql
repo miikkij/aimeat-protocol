@@ -17,7 +17,13 @@
 -- A copy of another node's action (id `<node>:<id>`, tag `federated:<node>`) names a person of that
 -- node and is left as it is.
 --
--- Mirrors sqlite/schema-identity-backfill.ts, which SQLite runs on every open.
+-- A BARE NAME has no `@` and no `#`, and does not start with `erased:`. A value that starts with
+-- `erased:` is a pseudonym an erasure wrote in place of a person (storage/erased-party.ts,
+-- ERASED_PARTY_PREFIX). It has no `@` and no `#` either, so every step leaves it out by name, and
+-- no pseudonym is ever read as an account name or changed.
+--
+-- Mirrors sqlite/schema-identity-backfill.ts, which SQLite runs once for each database and records
+-- in system_settings, as this runner records this file in "_kysely_migrations".
 
 -- 1. Actions of an account that held the name when they were written, to that account's GHII.
 WITH target AS (
@@ -25,7 +31,7 @@ WITH target AS (
            (SELECT g."ghii" FROM "Ghii" g WHERE g."ownerName" = o."name" ORDER BY g."createdAt" LIMIT 1) AS ghii
     FROM "Action" a
     JOIN "Owner" o ON o."name" = a."providerGaii" AND o."createdAt" <= a."createdAt"
-    WHERE strpos(a."providerGaii", '@') = 0 AND strpos(a."providerGaii", '#') = 0
+    WHERE strpos(a."providerGaii", '@') = 0 AND strpos(a."providerGaii", '#') = 0 AND left(a."providerGaii", 7) <> 'erased:'
       AND strpos(a."actionId", ':') = 0
       AND NOT EXISTS (SELECT 1 FROM unnest(COALESCE(a."tags", ARRAY[]::text[])) AS t(tag) WHERE t.tag LIKE 'federated:%')
 )
@@ -36,7 +42,7 @@ WHERE a."id" = t."id" AND t.ghii IS NOT NULL
 
 -- 2. The actions of an account that is gone.
 DELETE FROM "Action" a
-WHERE strpos(a."providerGaii", '@') = 0 AND strpos(a."providerGaii", '#') = 0
+WHERE strpos(a."providerGaii", '@') = 0 AND strpos(a."providerGaii", '#') = 0 AND left(a."providerGaii", 7) <> 'erased:'
   AND strpos(a."actionId", ':') = 0
   AND NOT EXISTS (SELECT 1 FROM unnest(COALESCE(a."tags", ARRAY[]::text[])) AS t(tag) WHERE t.tag LIKE 'federated:%')
   AND NOT EXISTS (SELECT 1 FROM "Owner" o WHERE o."name" = a."providerGaii" AND o."createdAt" <= a."createdAt");
@@ -48,7 +54,7 @@ FROM (
            (SELECT g."ghii" FROM "Ghii" g WHERE g."ownerName" = o."name" ORDER BY g."createdAt" LIMIT 1) AS ghii
     FROM "Work" w2
     JOIN "Owner" o ON o."name" = w2."providerGaii" AND o."createdAt" <= w2."createdAt"
-    WHERE strpos(w2."providerGaii", '@') = 0 AND strpos(w2."providerGaii", '#') = 0
+    WHERE strpos(w2."providerGaii", '@') = 0 AND strpos(w2."providerGaii", '#') = 0 AND left(w2."providerGaii", 7) <> 'erased:'
 ) t
 WHERE w."id" = t."id" AND t.ghii IS NOT NULL;
 
@@ -58,7 +64,7 @@ FROM (
            (SELECT g."ghii" FROM "Ghii" g WHERE g."ownerName" = o."name" ORDER BY g."createdAt" LIMIT 1) AS ghii
     FROM "Work" w2
     JOIN "Owner" o ON o."name" = w2."requesterGaii" AND o."createdAt" <= w2."createdAt"
-    WHERE strpos(w2."requesterGaii", '@') = 0 AND strpos(w2."requesterGaii", '#') = 0
+    WHERE strpos(w2."requesterGaii", '@') = 0 AND strpos(w2."requesterGaii", '#') = 0 AND left(w2."requesterGaii", 7) <> 'erased:'
 ) t
 WHERE w."id" = t."id" AND t.ghii IS NOT NULL;
 
@@ -77,9 +83,11 @@ DECLARE
     is_open BOOLEAN;
 BEGIN
     FOR person IN
-        SELECT "providerGaii" AS name FROM "Work" WHERE strpos("providerGaii", '@') = 0 AND strpos("providerGaii", '#') = 0
+        SELECT "providerGaii" AS name FROM "Work"
+        WHERE strpos("providerGaii", '@') = 0 AND strpos("providerGaii", '#') = 0 AND left("providerGaii", 7) <> 'erased:'
         UNION
-        SELECT "requesterGaii" FROM "Work" WHERE strpos("requesterGaii", '@') = 0 AND strpos("requesterGaii", '#') = 0
+        SELECT "requesterGaii" FROM "Work"
+        WHERE strpos("requesterGaii", '@') = 0 AND strpos("requesterGaii", '#') = 0 AND left("requesterGaii", 7) <> 'erased:'
     LOOP
         cutoff := (SELECT o."createdAt" FROM "Owner" o WHERE o."name" = person.name);
         pseudonym := 'erased:' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 24);
