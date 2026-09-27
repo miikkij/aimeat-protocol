@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   v1.x -- 2026-09-27 -- definitions/app-manage.ts: aimeat_app_manage replaces the app-visitors and
+ *     app-ui slices and six app tools of organisms-workspaces-apps.ts.
  *   2026-09-24 -- definitions/themes.ts: aimeat_theme_list, aimeat_theme_get and aimeat_theme_save.
  *   2026-09-23 -- definitions/ui-library.ts: aimeat_ui_component_list and aimeat_ui_component_get.
  *   v1.x -- 2026-08-28 -- definitions/crew.ts: the five aimeat_crew_* tools (read, validate, try,
@@ -53,7 +55,7 @@ import { voiceTools } from './definitions/ai-voice.js';
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
-import { appVisitorsTools } from './definitions/app-visitors.js';
+import { appManageTools } from './definitions/app-manage.js';
 import { extensionsCortexTools } from './definitions/extensions-cortex.js';
 import { packagesTools } from './definitions/packages.js';
 import { commerceTools } from './definitions/commerce.js';
@@ -61,7 +63,6 @@ import { exchangeTools } from './definitions/exchange.js';
 import { complianceTools } from './definitions/compliance.js';
 import { dataMapTools } from './definitions/data-map.js';
 import { surfaceLayoutTools } from './definitions/surface-layout.js';
-import { appUiTools } from './definitions/app-ui.js';
 import { designbookTools } from './definitions/designbook.js';
 import { uiLibraryTools } from './definitions/ui-library.js';
 import { themeTools } from './definitions/themes.js';
@@ -78,7 +79,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,
-    ...appVisitorsTools,
+    ...appManageTools,
     // Extensions, the per-app IAM door and the cortex packs. They used to sit inside the slice
     // above and moved out when that file passed the line ceiling. One entry changes relative
     // position as a result — the operator-only aimeat_admin_mint, which used to come after them and
@@ -92,7 +93,6 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...complianceTools,
     ...dataMapTools,
     ...surfaceLayoutTools,
-    ...appUiTools,
     ...designbookTools,
     ...uiLibraryTools,
     ...themeTools,

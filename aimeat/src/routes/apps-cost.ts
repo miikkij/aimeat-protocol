@@ -10,6 +10,9 @@
  *   Attribution is by the entitlement's `appId`; the caller only ever sees entitlements whose consumer is
  *   their own owner (strictly cross-owner, per resolveIdentity).
  *
+ *   The view is built by appCostView() in services/app-cost.ts, which the MCP tool calls too; this
+ *   file holds the auth and the envelope.
+ *
  *   LLM-usage attribution (ledger) is intentionally out of scope for slice-1: the usage ledger has no
  *   appId dimension yet, so this composes the entitlement spend (which IS the per-app metered consumption
  *   record). The ledger fold is a later addition (an appId dimension on usage events).
@@ -21,6 +24,8 @@
  *   v1.0.0 — 2026-07-20 — Initial per-app cost/contract surface (EXCHANGE G3): entitlements + budgets + rake.
  *   v1.0.1 — 2026-09-26 — ownerOf is localAccountName (utils/gaii.ts), which keeps an identity of
  *     another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-09-27 — toContractView, spendTotals, the entitlement filter and the roll-up moved
+ *     unchanged to appCostView() in services/app-cost.ts, so the MCP tool calls the same code.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -28,45 +33,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, localAccountName } from '../utils/gaii.js';
-import { commerceFeePercent } from '../services/marketplace-fee.js';
-import { percentFee } from '../commerce/money.js';
-import { listEntitlementsByApp, type MeteredEntitlement } from '../services/metered-entitlements.js';
-
-/** Owner (bare name) behind any principal form in a `consumerGaii` (owner GHII / GAII / bare). */
-function ownerOf(gaii: string): string {
-  return localAccountName(gaii);
-}
-
-/** Shape one entitlement for the surface: contract terms + live consumption + the platform rake. */
-function toContractView(config: AimeatConfig, e: MeteredEntitlement) {
-  const rakePct = e.rakePercent ?? commerceFeePercent(config);
-  const remaining = e.budget.capUnits === null ? null : Math.max(0, e.budget.capUnits - e.budget.spentUnits);
-  return {
-    entitlement_id: e.entitlementId,
-    capability: e.capabilityLabel,
-    provider: e.providerGhii,
-    contract_ref: e.contractRef,
-    state: e.state,
-    unit: e.unit,
-    currency: e.currency,
-    price_per_call: e.pricePerCall,
-    pricing: e.pricing ?? { model: 'per_call' },
-    rake_percent: rakePct,
-    rake_per_call: percentFee(e.pricePerCall, rakePct),
-    escrow_party: e.escrowParty,
-    budget: {
-      cap_units: e.budget.capUnits,
-      spent_units: e.budget.spentUnits,
-      remaining_units: remaining,
-      calls: e.budget.calls,
-    },
-    // Estimate of what the remaining budget still buys (0 when uncapped or price-free).
-    estimated_calls_remaining: e.budget.capUnits === null || e.pricePerCall <= 0
-      ? null
-      : Math.floor((remaining ?? 0) / e.pricePerCall),
-  };
-}
+import { resolveIdentity } from '../utils/gaii.js';
+import { appCostView } from '../services/app-cost.js';
 
 export function appsCostRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -78,45 +46,14 @@ export function appsCostRouter(config: AimeatConfig, storage: Storage): Router {
    */
   router.get('/v1/apps/cost', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const appId = typeof req.query.app_id === 'string' ? req.query.app_id : '';
-    if (!appId) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'app_id query parameter is required'));
-    const owner = req.auth!.owner;
-    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
-
-    // Only surface entitlements whose CONSUMER is this owner (strictly cross-owner).
-    const all = await listEntitlementsByApp(storage, appId);
-    const mine = all.filter(e => ownerOf(e.consumerGaii) === owner);
-
-    const contracts = mine.map(e => toContractView(config, e));
-
-    // Roll-up totals, split by unit (morsels vs money never mix).
-    const totals = { morsels: spendTotals(mine, 'morsels'), money: spendTotals(mine, 'money') };
-    const active = mine.filter(e => e.state === 'active').length;
-
-    res.json(success(config.nodeId, {
-      app_id: appId,
-      owner_ghii: ownerGhii,
-      active_contracts: active,
-      total_contracts: mine.length,
-      totals,
-      contracts,
-      // Billing posture is declared by the app's own tool manifest (apps.{appId}.tools) — the catalog
-      // reads that alongside this; here we surface only the sourcing cost the app incurs.
-      note: 'EXCHANGE sourcing cost; end-user billing/recoup posture lives in the app tool manifest.',
-    }, [
-      { description: 'App tool pricing manifest (recoup posture)', method: 'GET', url: `/v1/memory/apps.${appId}.tools` },
-      { description: 'Owner LLM usage ledger', method: 'GET', url: '/v1/ledger/usage' },
-    ]));
+    const result = await appCostView(storage, config, {
+      owner: req.auth!.owner,
+      ownerGhii: resolveIdentity(req.auth!, config.nodeId),
+      appId,
+    });
+    if (!result.ok) return res.status(result.status).json(error(config.nodeId, result.code, result.message));
+    res.json(success(config.nodeId, result.view, result.links));
   });
 
   return router;
-}
-
-/** Sum spend + calls for entitlements of one unit. */
-function spendTotals(list: MeteredEntitlement[], unit: 'morsels' | 'money') {
-  const of = list.filter(e => e.unit === unit);
-  return {
-    spent_units: of.reduce((s, e) => s + e.budget.spentUnits, 0),
-    calls: of.reduce((s, e) => s + e.budget.calls, 0),
-    contracts: of.length,
-  };
 }

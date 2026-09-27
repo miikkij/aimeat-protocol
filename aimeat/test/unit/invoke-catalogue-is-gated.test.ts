@@ -16,6 +16,7 @@
  *   absent from the tables, or the reverse — this is the one that says so.
  *
  * @version-history
+ *   2026-09-27 — The exemption bound is 17, for aimeat_app_manage.
  *   v1.2.0 — 2026-09-24 — The bound falls to 16: the operator's writes left the exemptions for the
  *     operator:admin word (security audit A8-1).
  *   v1.1.0 — 2026-09-08 — The exemption bound grows to 26 for aimeat_admin_cors_set.
@@ -76,7 +77,10 @@ describe('the invoke catalogue is a gated surface', () => {
         // handlers asked was the ACCOUNT's, so every agent the operator connected held all of it.
         // The operator's writes ride operator:admin now, a word no wildcard carries and the operator
         // ticks per agent (security audit A8-1).
-        expect(exempt.length).toBeLessThanOrEqual(16);
+        // 17 since 2026-09-27: aimeat_app_manage. Its actions need different words, some none, so the
+        // tool carries none and each action is checked: on the node by its handler
+        // (catalog/action-scopes.ts), and through invoke by the REST endpoint the action calls.
+        expect(exempt.length).toBeLessThanOrEqual(17);
         expect(mutating.length).toBeGreaterThan(100);
     });
 });

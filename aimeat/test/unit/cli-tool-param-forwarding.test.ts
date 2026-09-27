@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-09-27 — aimeat_cortex_list probes with a name, beside which include_source travels; the stale aimeat_app_legal_set entry is gone.
  *   v1.5.0 — 2026-09-25 — aimeat_workspace_suggestions: the decide branch is probed with a suggestion,
  *     and `ws` / `status` ride only on the list branch.
  *   v1.4.0 — 2026-09-25 — aimeat_package_install_requests holds a request id constant, so `decision`
@@ -121,6 +122,8 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // A decision is made ON a request, so `decision` alone is refused before the wire. With a
     // request named it goes to the decision door, which is the branch that carries it.
     aimeat_package_install_requests: { always: { request_id: 'zqxrequest_idzqx' } },
+    // include_source reads the source of ONE cortex, so it only travels beside `name`.
+    aimeat_cortex_list: { always: { name: 'zqxnamezqx' } },
 };
 
 /**
@@ -158,11 +161,6 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
     },
     aimeat_crew_publish: {
         revision: 'Conditional, not dropped: the probe sets doc as well, which publishes; revision is only read when there is no doc (restore). Both reach the node in test/e2e-agent-crew.ts.',
-    },
-    aimeat_app_legal_set: {
-        format: 'Conditional, not dropped: sent inside the kind object, so only with `kind`, which names the page the format belongs to. Without a kind the tool READS the state (GET .../legal) and has nothing to attach a format to. With a kind all three travel — proven by the probe run that sets kind.',
-        content: 'Same condition.',
-        remove: 'Same condition: `remove: true` rides inside the kind object, and the node reads it as null for that kind.',
     },
     aimeat_workspace_access: {
         message: "Conditional, not dropped: `message` rides only on action='request', and the probe holds "

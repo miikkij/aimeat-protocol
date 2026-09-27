@@ -53,6 +53,7 @@ import { join, relative } from 'node:path';
 import { scopeMentions } from './inventory/scope-mentions.js';
 import { readVocabulary, demandedScopes } from './inventory/scope-vocabulary.js';
 import { TOOL_SCOPES } from '../src/mcp/catalog/scopes.js';
+import { actionScopeWords } from '../src/mcp/catalog/action-scopes.js';
 
 const AIMEAT = process.cwd();
 const SRC = join(AIMEAT, 'src');
@@ -94,7 +95,8 @@ function findings(): Finding[] {
     const vocabulary = readVocabulary(AIMEAT);
     const files = sources();
     const mentions = scopeMentions(files, vocabulary, AIMEAT, DEFINITION_FILES);
-    const mcpWords = new Set(Object.values(TOOL_SCOPES));
+    const actionWords = actionScopeWords();
+    const mcpWords = new Set([...Object.values(TOOL_SCOPES), ...actionWords.map(a => a.word)]);
     const demanded = demandedScopes(files);
 
     const out: Finding[] = [];
@@ -122,7 +124,8 @@ function findings(): Finding[] {
     for (const word of mcpWords) {
         if (vocabulary.has(word)) continue;
         const tools = Object.entries(TOOL_SCOPES).filter(([, w]) => w === word).map(([t]) => t);
-        seen.set(word, [...(seen.get(word) ?? []), ...tools.map(t => `TOOL_SCOPES[${t}]`)]);
+        const actions = actionWords.filter(a => a.word === word).map(a => `TOOL_ACTION_SCOPES[${a.tool}.${a.action}]`);
+        seen.set(word, [...(seen.get(word) ?? []), ...tools.map(t => `TOOL_SCOPES[${t}]`), ...actions]);
     }
     for (const [word, where] of [...seen.entries()].sort()) {
         out.push({

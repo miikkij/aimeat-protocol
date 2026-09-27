@@ -36,6 +36,7 @@
  *   - Phase 8: aimeat_app_delete, both refusal arms and the real delete
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-extensions-apps
  * @version-history
+ *   2026-09-27 — The versions tests call aimeat_app_manage (action versions).
  *   v1.2.0 — 2026-09-13 — Test 23b: upload mode carries cortex_agents to the PUT and refuses a
  *     malformed one before handing out a URL.
  *   v1.1.0 — 2026-09-08 — Test 21 asserts the tool's own ceiling now that /v1/mcp admits it.
@@ -327,7 +328,7 @@ await test('3. An agent with no ext or app word is handed none of those tools', 
     // aimeat_extension_get and aimeat_app_versions are deliberately ungated — they read what a
     // published extension and a published app already say in public.
     assert(names.includes('aimeat_extension_get'), 'aimeat_extension_get is a read and needs no word');
-    assert(names.includes('aimeat_app_versions'), 'aimeat_app_versions is a read and needs no word');
+    assert(names.includes('aimeat_app_manage'), 'aimeat_app_manage is offered without a word; its versions action needs none');
 });
 
 await test('4. …and the author\'s agent IS handed the gated ones', async () => {
@@ -689,8 +690,8 @@ await test('27. aimeat_app_draft_discard throws a draft away, and refuses when t
     assert(text.includes('version two'), `discarding a draft moved the live app: ${text.slice(0, 120)}`);
 });
 
-await test('28. aimeat_app_versions lists both versions, newest included', async () => {
-    const r = await callTool(authorSession, 'aimeat_app_versions', { owner: author.owner, filename: APP });
+await test('28. aimeat_app_manage versions lists both versions, newest included', async () => {
+    const r = await callTool(authorSession, 'aimeat_app_manage', { action: 'versions', owner: author.owner, filename: APP });
     assert(!r.isError, `app_versions refused: ${r.text}`);
     assert(r.data.total === 2, `total: ${r.text.slice(0, 300)}`);
     const numbers = (r.data.versions ?? []).map((v: any) => v.version_number).sort();
@@ -704,8 +705,8 @@ await test('28. aimeat_app_versions lists both versions, newest included', async
         `the tool and the route disagree on the count: ${r.data.total} vs ${(rest.body.data.versions ?? []).length}`);
 });
 
-await test('29. aimeat_app_versions refuses an app that is not there', async () => {
-    const r = await callTool(authorSession, 'aimeat_app_versions', { owner: author.owner, filename: `no-such-${STAMP}.html` });
+await test('29. aimeat_app_manage versions refuses an app that is not there', async () => {
+    const r = await callTool(authorSession, 'aimeat_app_manage', { action: 'versions', owner: author.owner, filename: `no-such-${STAMP}.html` });
     assert(r.isError, 'an unknown app answered with versions');
     assert(r.text.includes('not found'), `wrong refusal: ${r.text}`);
 });
@@ -724,7 +725,7 @@ await test('31. Deleting a version that does not exist refuses and names the ver
     assert(r.text.includes('version 99'), `the refusal must name the version: ${r.text}`);
 
     // Refuse before you write: both real versions are still there.
-    const still = await callTool(authorSession, 'aimeat_app_versions', { owner: author.owner, filename: APP });
+    const still = await callTool(authorSession, 'aimeat_app_manage', { action: 'versions', owner: author.owner, filename: APP });
     assert(still.data.total === 2, `a refused delete removed a version: ${still.data.total}`);
 });
 

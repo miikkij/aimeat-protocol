@@ -238,7 +238,7 @@ export default function AppsTab({ session, showToast, onStats }) {
     return `Help me look after my AIMEAT apps through the MCP tools. My apps (first ${Math.min(15, (apps || []).length)} of ${(apps || []).length}):
 - ${names || '(none yet)'}
 
-What you can do here, all through the tools: aimeat_app_list and aimeat_app_get read an app; aimeat_app_publish updates it; aimeat_app_draft_* edit the next version without touching the live one; aimeat_app_versions lists what shipped; aimeat_app_screenshot sets the picture; aimeat_app_seo_set decides whether search engines see it; aimeat_app_legal_set writes its legal pages; aimeat_app_marks_set sets the served chrome; aimeat_app_audit reads its log.
+What you can do here, all through the tools: aimeat_app_list and aimeat_app_get read an app; aimeat_app_publish updates it; aimeat_app_draft_* edit the next version without touching the live one; aimeat_app_manage does the rest, one action at a time: versions lists what shipped, screenshot sets the picture, seo decides whether search engines see it, legal writes its legal pages, marks sets the served chrome, settings hides it or sets its access code, audit reads its log.
 
 Start by asking me which app and what I want changed. Fill a data map (aimeat_datamap_set) or declare AI use when an app has neither, and say what you did.`;
   }

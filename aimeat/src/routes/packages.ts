@@ -440,7 +440,7 @@ export function packagesRouter(
   // else's code onto your node is a decision and not a refresh.
   //
   // `packages:write` on a route that writes nothing, for the reason the scope map gives beside
-  // aimeat_app_audit: the package domain offers the owner one word, and there is no `packages:read`
+  // the audit action of aimeat_app_manage: the package domain offers the owner one word, and there is no `packages:read`
   // for anybody to grant. An agent that may pull a package may ask whether a newer one exists; an
   // agent that may not, has no business making this node reach out to another one on its behalf.
   router.get('/v1/packages/:groupId/upstream-check', requireAuth(), requireScope('packages:write'), async (req, res) => {

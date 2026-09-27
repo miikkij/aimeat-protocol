@@ -5,6 +5,7 @@
  * @description MCP tool registrations for cortex model lifecycle -- listing,
  *   installing, activating, deactivating, and deleting cortex models.
  * @version-history
+ *   2026-09-27 -- aimeat_cortex_list takes name (GET /v1/cortex/:name) and include_source (/export).
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
@@ -24,9 +25,17 @@ import { installCortexOverHttp } from './extensions.js';
 export function registerCortexTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
-  mcp.tool('aimeat_cortex_list', descriptionFor('aimeat_cortex_list'), {}, annotationsFor('aimeat_cortex_list'), async () => {
-    const resp = await client.get('/v1/cortex');
-    return envelopeResult(resp);
+  mcp.tool('aimeat_cortex_list', descriptionFor('aimeat_cortex_list'), {
+    name: z.string().optional().describe('One cortex, in full, instead of the list.'),
+    include_source: z.boolean().optional().describe('With name: also its manifest and lib files, for editing. Your own cortex only; needs cortex:write.'),
+  }, annotationsFor('aimeat_cortex_list'), async ({ name, include_source }) => {
+    // → GET /v1/cortex, GET /v1/cortex/:name, or GET /v1/cortex/:name/export for the source.
+    if (!name) return envelopeResult(await client.get('/v1/cortex'));
+    const detail = await client.get(`/v1/cortex/${encodeURIComponent(name)}`);
+    if (!include_source || detail.ok === false) return envelopeResult(detail);
+    const source = await client.get(`/v1/cortex/${encodeURIComponent(name)}/export`);
+    if (source.ok === false) return envelopeResult(source);
+    return envelopeResult({ ok: true, data: { ...(detail.data as object), source: source.data } });
   });
 
   mcp.tool('aimeat_cortex_install', descriptionFor('aimeat_cortex_install'), {
