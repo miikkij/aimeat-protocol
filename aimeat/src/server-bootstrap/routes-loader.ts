@@ -533,10 +533,7 @@ export async function mountRoutes(
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));
-  app.use(catalogueRouter(config, storage, directoryService, () => {
-    // realtimeManager may be initialized later; use closure to capture the reference
-    return null;
-  }));
+  app.use(catalogueRouter(config, storage, directoryService));
   app.use(workRouter(config, storage, peers, mailboxNotificationService));
   app.use(walletRouter(config, storage));
   app.use(usageRouter(config, storage));
@@ -609,7 +606,7 @@ export async function mountRoutes(
   app.use(validateRouter(config));
   app.use(unfurlRouter(config));                        // GET /v1/unfurl(/image) — link previews
   app.use(mcpRouter(config, storage, peers));
-  app.use(siteRouter(config, storage, siteService, provenance));    // Node Portal — GET / + /v1/site/*
+  app.use(siteRouter(config, storage, siteService, provenance));    // Portal settings; bootstrap owns GET /
 
   // Site LB sync — manual trigger endpoint + background job
   if (config.siteLbEnabled && config.siteLbOriginUrl) {
