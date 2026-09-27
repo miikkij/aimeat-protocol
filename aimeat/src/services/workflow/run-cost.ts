@@ -62,6 +62,8 @@
  *   // after the pass: if (stopWhenNoRoomComes(run, [...waiting], now)) stopped = true;
  *   // when a call answers: aiCallAnswered(run.steps[stepId], attempt, costUsd);
  * @version-history
+ *   v1.4.1 — 2026-09-26 — aiCallAnswered says that every answer names its attempt, and that only an ai
+ *     step's call under a cap carries a mark (secaudit 2026-09, R3 problem 2).
  *   v1.4.0 — 2026-09-26 — The estimate is what one attempt cost (attemptMaxUsd, else the step's cost
  *     split over its attempts), and a step expected to cost more than the whole cap starts alone while
  *     the run has spent less than the cap (secaudit 2026-09, A6-11).
@@ -216,9 +218,9 @@ export function admitAiStep(run: WorkflowRun, stepId: string): 'start' | 'wait' 
 /**
  * A model call of the step has answered. What it cost is kept on the step (`costUsd`, and
  * `attemptMaxUsd` when it is the most one attempt has cost), and its mark goes with the hold it
- * carried, whatever became of the step while it ran. `attempt` is the attempt the call was started
- * for; an answer without one (a step that is not an ai step) has no mark. Returns whether the step
- * changed.
+ * carried, whatever became of the step while it ran. `attempt` is the attempt the answer was
+ * dispatched for. Only a model call an ai step started under a cap carries a mark, so the answer of
+ * any other step changes nothing here. Returns whether the step changed.
  */
 export function aiCallAnswered(rs: WorkflowRunStep, attempt: number | undefined, costUsd: unknown): boolean {
   let changed = false;
