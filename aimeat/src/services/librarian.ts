@@ -21,10 +21,13 @@
  *     route from (owner session OR memory:read grant), so app/agent grants with memory:read reach the
  *     owner's full read surface. Corrected the stale "MongoDB $text" note (it is a substring scan).
  *   v1.2.0 — 2026-09-16 — A credential record is titled and snippeted from its redacted value.
+ *   v1.3.0 — 2026-09-26 — No hit is a Design Book part: a part is found and read through the Design
+ *     Book, the one door that reads it (utils/own-door-keys.ts).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { shownMemoryValue } from './secret-records.js';
+import { ownDoorRefusal } from '../utils/own-door-keys.js';
 
 export interface LibrarianHit {
   key: string;
@@ -155,7 +158,9 @@ export async function librarianSearch(
     ownersSearched = ownerGaiis.length;
   }
 
-  const hits: LibrarianHit[] = raw.map(({ record, score }) => {
+  // ONE CAPABILITY, ONE DOOR: a Design Book part is public, and it is found and read through the
+  // Design Book (its search, and GET /v1/designbook/:id), so no hit here is one.
+  const hits: LibrarianHit[] = raw.filter(({ record }) => !ownDoorRefusal(record.ownerGaii, record.key, config.nodeId)).map(({ record, score }) => {
     const m = ORG_KEY.exec(record.key);
     const pkg = PKG_KEY.exec(record.key);
     const v = (record.value && typeof record.value === 'object') ? record.value as Record<string, unknown> : null;

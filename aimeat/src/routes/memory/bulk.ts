@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-26 — copy refuses a Design Book part with 403 DESIGN_BOOK_PART, naming
+ *     GET /v1/designbook/:id, the one door that reads a part (utils/own-door-keys.ts).
  *   v1.6.0 — 2026-09-26 — import and copy ask the organism rule (services/organism-namespace-access.ts)
  *     for an `organism.*` key, as the shared writer does for every other write door; import lists a
  *     refused entry under failed[] with its code (secaudit 2026-09, A6-9).
@@ -35,6 +37,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
+import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
@@ -516,6 +519,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     if (!source_gaii || !key) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_gaii and key are required'));
+      return;
+    }
+    // ONE CAPABILITY, ONE DOOR: a copy would hand a Design Book part over as the caller's own, past the
+    // Book's own door, which benches a component again before it hands one out (utils/own-door-keys.ts).
+    const ownDoor = ownDoorRefusal(source_gaii, key, config.nodeId);
+    if (ownDoor) {
+      res.status(403).json(error(config.nodeId, ownDoor.code, ownDoor.message, 403, { door: ownDoor.door }));
       return;
     }
     // The porting path writes its pointer as a PUBLIC record, so this door could copy another

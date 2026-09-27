@@ -9,6 +9,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.0 — 2026-09-26 — A Design Book part through the generic memory doors: the public read (plain,
+ *     soft, signed in), aimeat_memory_read_public on the node MCP, POST /v1/memory/copy and the
+ *     librarian's public search each refuse it or leave it out, naming GET /v1/designbook/{id}; the
+ *     planting of a stored component is one helper for both tests.
  *   v1.7.0 — 2026-09-26 — A stored component that no longer passes (written into the node's own
  *     database, since no door stores one): get says why on the REST door and the node MCP, and shows
  *     its markup and stylesheet only to its proposer; search, the map and discover leave it out; the
@@ -645,10 +649,12 @@ const GOOD_BODY = {
         assert(refusedWith(slash, /ignores the "\/" at the end of <div …\/>, so the <div> stays open/), `a "/" on a <div> says what a browser does with it: ${said(slash)}`);
     });
 
-    await test('a stored component that no longer passes: get says why and shows its markup only to its proposer, search, the map and discover leave it out, the preview and the adopt say why, and its proposer is told once', async () => {
-        // Nothing reachable over HTTP stores a part the bench refuses, so this writes one into the
-        // node's own database, the way e2e-app-visitors backdates a visit: a part stored when it
-        // passed an older bench. `.wkgrid ~ p` reaches the page beside the component.
+    // A component the second owner proposed, stored when it passed an older bench: `.wkgrid ~ p`
+    // reaches the page beside the component. Nothing reachable over HTTP stores a part the bench
+    // refuses, so this writes one into the node's own database, the way e2e-app-visitors backdates a
+    // visit, as a published part under the Book's own system identity.
+    const stale = componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid ~ p { color: var(--ak-accent); }' });
+    async function plantStaleComponent(id: string): Promise<void> {
         const sqlitePath = pinnedSqlitePath();
         const dbUrl = serverDbUrl();
         // An in-memory backend lives inside the server process, and a second handle would open a
@@ -656,9 +662,6 @@ const GOOD_BODY = {
         const canOpenBackend = (PROVIDER === 'sqlite' && !!sqlitePath) || (PROVIDER === 'postgres-kysely' && !!dbUrl);
         assert(canOpenBackend === true, `backend "${PROVIDER}" is not reachable from this process`);
         const storage = await createStorage({ provider: PROVIDER, sqlitePath, dbUrl });
-        const stamp = Date.now() % 100000;
-        const id = `comp-stale-${stamp}`;
-        const stale = componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid ~ p { color: var(--ak-accent); }' });
         const now = new Date().toISOString();
         await storage.setMemory({
             key: `atelier.book.part.${id}`, ownerGaii: `system@${NODE_ID}`,
@@ -669,6 +672,12 @@ const GOOD_BODY = {
             }),
             visibility: 'public', tags: ['designbook', 'kind:component', 'status:published'], ttlHours: null, version: 1, createdAt: now, updatedAt: now, trackable: true,
         });
+    }
+
+    await test('a stored component that no longer passes: get says why and shows its markup only to its proposer, search, the map and discover leave it out, the preview and the adopt say why, and its proposer is told once', async () => {
+        const stamp = Date.now() % 100000;
+        const id = `comp-stale-${stamp}`;
+        await plantStaleComponent(id);
         const why = /"\.wkgrid ~ p" reaches from the component to an element beside it/;
 
         // get: the bench's result for everyone, the markup and the stylesheet for the proposer alone.
@@ -722,6 +731,46 @@ const GOOD_BODY = {
         assert(!(operatorBell.body.data.notifications as any[]).some(n => String(n.title).includes(id)), 'nobody else is told');
 
         // Clean up: the proposer deletes it, and with it what the node remembered about telling them.
+        const del = await json(`/v1/designbook/${id}`, { method: 'DELETE', headers: auth(other.token) });
+        assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    });
+
+    await test('the generic memory doors do not serve a Design Book part: the public read, its tool, the copy and the public search name the Book\'s own door', async () => {
+        const stamp = Date.now() % 100000;
+        const id = `comp-door-${stamp}`;
+        const key = `atelier.book.part.${id}`;
+        const system = `system@${NODE_ID}`;
+        await plantStaleComponent(id);
+        const namesTheDoor = (text: string) => /Design Book part/.test(text) && text.includes(`GET /v1/designbook/${id}`);
+        const publicRead = `/v1/memory/${encodeURIComponent(system)}/${encodeURIComponent(key)}`;
+
+        // The public read, with no session, soft as the SDK reads, and signed in: a refusal, and none of the part.
+        for (const [who, path, headers] of [
+            ['no session', publicRead, {}], ['no session, soft', `${publicRead}?soft=1`, {}], ['another owner', publicRead, auth(op.token)],
+        ] as const) {
+            const r = await json(path, { headers });
+            assert(r.status === 403 && r.body.error?.code === 'DESIGN_BOOK_PART' && namesTheDoor(r.body.error.message) && !JSON.stringify(r.body).includes('wkgrid ~ p'),
+                `${who}: the public read refuses the part and names the Book's door: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+        }
+        // Its tool on the node MCP.
+        const reader = await connectAgent(other, `dbdoor${stamp}`, ['memory:read', 'memory:write']);
+        const viaTool = await mcpCall(reader, 'aimeat_memory_read_public', { gaii: system, key });
+        assert(viaTool.isError && viaTool.text.startsWith('DESIGN_BOOK_PART: ') && namesTheDoor(viaTool.text) && !viaTool.text.includes('wkgrid ~ p'),
+            `the tool refuses the part and names the Book's door: ${viaTool.text.slice(0, 300)}`);
+        // The copy into the caller's own memory, which would hand the value over as the caller's own.
+        const copy = await json('/v1/memory/copy', { method: 'POST', headers: auth(reader), body: JSON.stringify({ source_gaii: system, key }) });
+        assert(copy.status === 403 && copy.body.error?.code === 'DESIGN_BOOK_PART' && namesTheDoor(copy.body.error.message),
+            `the copy is refused: ${copy.status} ${JSON.stringify(copy.body?.error)}`);
+        const copied = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(reader) });
+        assert(copied.status === 404, `and nothing landed in the caller's memory: ${copied.status}`);
+        // The public search across the node.
+        const search = await json('/v1/librarian/search?q=wkgrid&scope=public&limit=100', { headers: auth(op.token) });
+        assert(search.status === 200 && !(search.body.data.hits as any[]).some(h => h.key === key),
+            `the public search leaves it out: ${search.status} ${JSON.stringify((search.body.data?.hits ?? []).map((h: any) => h.key))}`);
+        // The Book's own door answers for it.
+        const book = await json(`/v1/designbook/${id}`);
+        assert(book.status === 200 && book.body.data.part.id === id && book.body.data.bench?.passes === false, `the Book's own door reads it: ${book.status}`);
+
         const del = await json(`/v1/designbook/${id}`, { method: 'DELETE', headers: auth(other.token) });
         assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
     });

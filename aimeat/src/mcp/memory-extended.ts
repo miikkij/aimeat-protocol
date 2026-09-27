@@ -23,6 +23,9 @@
  *   v1.4.0 -- 2026-09-18 -- An empty search says what it covered and what an empty answer means. It
  *     carried the snippet hint regardless, so an agent asked for a record that did not exist kept
  *     looking in other places: eleven and twelve calls in the cold-agent baseline.
+ *   v1.5.0 -- 2026-09-26 -- aimeat_memory_read_public answers a Design Book part with DESIGN_BOOK_PART,
+ *     naming aimeat_designbook_get and GET /v1/designbook/:id, the one door that reads a part
+ *     (utils/own-door-keys.ts), as GET /v1/memory/:gaii/:key does.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -31,12 +34,14 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { toolError } from './tool-error.js';
 import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
+import { ownDoorRefusal } from '../utils/own-door-keys.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
     storage: Storage,
-    _config: AimeatConfig,
+    config: AimeatConfig,
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
@@ -121,6 +126,11 @@ export function registerMemoryExtendedTools(
         },
         annotationsFor('aimeat_memory_read_public'),
         async ({ gaii, key }) => {
+            // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which
+            // benches a component again before it hands one out (utils/own-door-keys.ts).
+            const ownDoor = ownDoorRefusal(gaii, key, config.nodeId);
+            if (ownDoor) return toolError(ownDoor.code, ownDoor.message);
+
             const record = await storage.getMemory(gaii, key);
 
             if (!record) {
