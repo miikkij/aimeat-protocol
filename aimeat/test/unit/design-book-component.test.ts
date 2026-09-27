@@ -5,6 +5,9 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.14.0 — 2026-09-26 — @layer, @page and @view-transition are refused, each by name; a @keyframes,
+ *     @property or @counter-style whose name does not start with the prefix is refused with the
+ *     prefixed form, and one whose name does passes, as does a use of the page's own names.
  *   v1.13.0 — 2026-09-26 — A stylesheet carrying @scope is refused wherever it stands, its name escaped
  *     or in capitals included, and the refusal shows the rule on the component's own classes; a string
  *     or a comment naming @scope passes.
@@ -408,6 +411,51 @@ describe('the component bench', () => {
     // What a string or a comment holds is text.
     for (const css of [`${WEEK_GRID.css}\n.wkgrid-cell::after { content: "@scope (body)"; }`, `${WEEK_GRID.css}\n/* no @scope here */`]) {
       expect(() => validateComponentBody({ ...WEEK_GRID, css }), css).not.toThrow();
+    }
+  });
+
+  // A component's stylesheet reaches only the component. These three act on the whole page by nature.
+  it.each([
+    ['layer', '@layer wkgrid-base { .wkgrid-cell { color: var(--ak-accent); } }', /carries no @layer: the order of cascade layers belongs to the whole page.*":where\(\.wkgrid-cell\) \{ … \}"/],
+    ['layer', '@layer wkgrid-base, wkgrid-top;', /carries no @layer: /],
+    ['layer', '.wkgrid { @LAYER wkgrid-base { & .wkgrid-cell { color: var(--ak-accent); } } }', /carries no @layer: /],
+    ['page', '@page { margin: 0; }', /carries no @page: it sets how the whole page prints.*How a page prints is the page's to say/],
+    ['page', '@\\70 age :first { margin: 0; }', /carries no @page: /],
+    ['view-transition', '@view-transition { navigation: auto; }', /carries no @view-transition: it sets how the whole page changes to the next one/],
+  ])('refuses @%s, which acts on the whole page: %s', (_name, rule, message) => {
+    expect(bad({ css: `${WEEK_GRID.css}\n${rule}` })).toThrow(message);
+  });
+
+  // A name one of these at-rules defines is shared by the whole page, so a component defines names
+  // of its own only, and says which form passes.
+  it.each([
+    ['@keyframes fade { from { opacity: 0; } to { opacity: 1; } }',
+      /defines the animation "fade" with @keyframes, a name the whole page shares.*"@keyframes wkgrid-fade", and use it as "animation-name: wkgrid-fade"/],
+    ['@-webkit-keyframes fade { from { opacity: 0; } }', /defines the animation "fade" with @-webkit-keyframes.*"@-webkit-keyframes wkgrid-fade"/],
+    ['@keyframes "ak-fade" { from { opacity: 0; } }', /defines the animation "ak-fade" with @keyframes.*"@keyframes wkgrid-ak-fade"/],
+    ['@keyframes \\61 k-fade { from { opacity: 0; } }', /defines the animation "ak-fade" with @keyframes/],
+    ['@keyframes wkgridx { from { opacity: 0; } }', /defines the animation "wkgridx" with @keyframes/],
+    ['@keyframes wkgrid-a, fade { from { opacity: 0; } }', /"@keyframes wkgrid-a, fade" does not name one animation.*"@keyframes wkgrid-spin"/],
+    ['@property --ak-ink { syntax: "*"; inherits: false; }',
+      /defines the custom property "--ak-ink" with @property, a name the whole page shares.*"@property --wkgrid-ak-ink", and use it as "var\(--wkgrid-ak-ink\)"/],
+    ['@property wkgrid-x { syntax: "*"; inherits: false; }', /defines the custom property "wkgrid-x" with @property.*"@property --wkgrid-wkgrid-x"/],
+    ['@counter-style decimal { system: numeric; symbols: "0" "1"; }',
+      /defines the counter style "decimal" with @counter-style, a name the whole page shares.*"@counter-style wkgrid-decimal", and use it as "list-style-type: wkgrid-decimal"/],
+    ['@counter-style DISC { system: cyclic; symbols: "*"; }', /defines the counter style "disc" with @counter-style/],
+  ])('refuses %s: the name it defines does not start with the prefix', (rule, message) => {
+    expect(bad({ css: `${WEEK_GRID.css}\n${rule}` })).toThrow(message);
+  });
+
+  it('passes @keyframes, @property and @counter-style under names of its own, and the page\'s own names where it uses them', () => {
+    for (const css of [
+      '@keyframes wkgrid-spin { from { opacity: 0; } to { opacity: 1; } }\n.wkgrid-cell { animation: wkgrid-spin 1s; }',
+      '@keyframes wkgrid { from { opacity: 0; } }', '@keyframes "wkgrid-in" { from { opacity: 0; } }', '@-webkit-keyframes WKGRID-spin { from { opacity: 0; } }',
+      '@keyframes \\77 kgrid-out { to { opacity: 0; } }',
+      '@property --wkgrid-x { syntax: "<length>"; inherits: false; initial-value: 0px; }',
+      '@counter-style wkgrid-count { system: cyclic; symbols: "*"; }\n.wkgrid-row { list-style-type: wkgrid-count; }',
+      '.wkgrid-cell { animation: ak-fade 1s; }', '.wkgrid-row { counter-increment: ak-step; list-style-type: decimal; }',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css: `${WEEK_GRID.css}\n${css}` }), css).not.toThrow();
     }
   });
 

@@ -35,6 +35,10 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.12.0 — 2026-09-26 — A component's stylesheet reaches only the component: @layer, @page and
+ *     @view-transition are refused, each in a sentence of its own, and the name a @keyframes, @property
+ *     or @counter-style defines starts with the component's prefix, the refusal showing the prefixed
+ *     form. A name the stylesheet only uses may be the page's own.
  *   v1.11.0 — 2026-09-26 — A stylesheet carrying @scope is refused in a sentence of its own, which shows
  *     the same rule written on the component's own classes: inside @scope, "&" stands for the elements
  *     its prelude chooses, and a component's own classes already keep every rule inside it.
@@ -103,7 +107,7 @@
 import { createHash } from 'node:crypto';
 import { DesignBookError } from './errors.js';
 import {
-  MAX_NESTING, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem,
+  MAX_NESTING, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem, type NameDefinition, type NameKind,
 } from './component-scan.js';
 import { escapeHtml } from '../site-tags.js';
 
@@ -238,6 +242,43 @@ const LOADING_AT_RULES = new Set(['import', 'font-face', 'namespace']);
 const SCOPE_REFUSAL = (prefix: string) => 'A component\'s stylesheet carries no @scope, and a component does not need it: its own classes already keep every rule inside it. '
   + 'Inside @scope, "&" stands for the elements its prelude chooses, and they can be outside the component. '
   + `Write the same rule on the component's own classes: "@scope (.${prefix}) { .${prefix}-cell { … } }" is ".${prefix} .${prefix}-cell { … }", or "& .${prefix}-cell { … }" inside ".${prefix} { … }".`;
+
+/** At-rules that act on the whole page by nature, each refused with what a component does instead. */
+const PAGE_AT_RULES = new Map<string, (prefix: string) => string>([
+  ['layer', prefix => 'A component\'s stylesheet carries no @layer: the order of cascade layers belongs to the whole page, and a component\'s stylesheet reaches only the component. '
+    + `To lose to the page where the two disagree, write the selector inside :where(): ":where(.${prefix}-cell) { … }".`],
+  ['page', () => 'A component\'s stylesheet carries no @page: it sets how the whole page prints, and a component\'s stylesheet reaches only the component. How a page prints is the page\'s to say.'],
+  ['view-transition', () => 'A component\'s stylesheet carries no @view-transition: it sets how the whole page changes to the next one, and a component\'s stylesheet reaches only the component. '
+    + 'How a page changes to the next is the page\'s to say.'],
+]);
+
+/**
+ * What @keyframes, @property and @counter-style define. The whole page shares the name, so a
+ * component defines names of its own only: its prefix, or its prefix and a dash (after the "--" of a
+ * custom property). A name it only USES may be the page's own.
+ */
+const DEFINED: Record<NameKind, { noun: string; stem: string; dashes: string; use: (name: string) => string; still: string }> = {
+  keyframes: { noun: 'animation', stem: 'spin', dashes: '', use: n => `animation-name: ${n}`, still: 'An animation the page defines is still used by its name.' },
+  property: { noun: 'custom property', stem: 'x', dashes: '--', use: n => `var(${n})`, still: 'The page\'s tokens are still read by their names.' },
+  'counter-style': { noun: 'counter style', stem: 'count', dashes: '', use: n => `list-style-type: ${n}`, still: 'A counter style the page defines is still used by its name.' },
+};
+
+/** Is the name this at-rule defines one of the component's own? */
+function ownDefinition(d: NameDefinition, prefix: string): boolean {
+  const { dashes } = DEFINED[d.kind];
+  return d.name !== null && d.name.startsWith(dashes) && ownClass(d.name.slice(dashes.length), prefix);
+}
+
+/** Why the name an at-rule defines is refused, with the same name under the component's prefix. */
+function definitionRefusal(d: NameDefinition, prefix: string): string {
+  const def = DEFINED[d.kind];
+  const stem = (d.name ?? '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || def.stem;
+  const own = `${def.dashes}${prefix}-${stem}`;
+  const found = d.name === null
+    ? `"${d.text}" does not name one ${def.noun} the bench can read.`
+    : `The stylesheet defines the ${def.noun} "${d.name.slice(0, 40)}" with @${d.atRule}, a name the whole page shares, so the page's own ${def.noun} of that name would change.`;
+  return `${found} A component defines names of its own only: start the name with its prefix, "@${d.atRule} ${own}", and use it as "${def.use(own)}". ${def.still}`;
+}
 /** Functions that take an address: url() as a token or a function, and the ones that take it as a plain string. */
 const loads = (fn: string) => fn === 'url' || fn === 'src' || fn === 'image' || fn.endsWith('image-set');
 /** Properties that bind a behaviour, in the browsers that had them. */
@@ -258,6 +299,15 @@ function checkStyles(css: string, prefix: string): void {
   const sheet = readStylesheet(css);
   if (sheet.atRules.some(name => LOADING_AT_RULES.has(name))) refuse('A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).');
   if (sheet.atRules.includes('scope')) refuse(SCOPE_REFUSAL(prefix));
+  // A COMPONENT'S STYLESHEET REACHES ONLY THE COMPONENT: no at-rule that acts on the whole page, and
+  // every name it defines for the whole page (an animation, a custom property, a counter style) is
+  // its own. What it uses by name may be the page's own.
+  for (const name of sheet.atRules) {
+    const pageWide = PAGE_AT_RULES.get(name);
+    if (pageWide) refuse(pageWide(prefix));
+  }
+  const foreign = sheet.definitions.find(d => !ownDefinition(d, prefix));
+  if (foreign) refuse(definitionRefusal(foreign, prefix));
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
   if (sheet.functions.some(loads)) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
   if (sheet.depth > MAX_NESTING) {
@@ -286,7 +336,7 @@ function checkStyles(css: string, prefix: string): void {
   // EVERY RULE STAYS INSIDE THE COMPONENT, read to the END of its selector: a rule styles what its
   // last compound names, and the first class says only where it starts. `.wkgrid ~ p` starts at the
   // component and styles every paragraph after it on the page. Every entry of every selector list,
-  // in every rule, nested rules and @media, @supports and @layer included. In a NESTED rule "&" is
+  // in every rule, nested rules, @media and @supports included. In a NESTED rule "&" is
   // the elements of the rule it stands in, whose own selectors are in this list and checked here,
   // so a nested rule may start at "&"; at the top of the stylesheet "&" is the page.
   for (const { text, selector, nested } of sheet.selectors) {
