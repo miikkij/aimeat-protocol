@@ -98,7 +98,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:d236654e8e4fb6823a920267"
+      "digest": "sha256:62d63861bec4c762fe7d7ffb"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
