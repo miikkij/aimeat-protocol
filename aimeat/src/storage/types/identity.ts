@@ -442,6 +442,11 @@ export interface GHIIRecord {
   allowedOrigins?: string[];        // undefined = inherit from node default
 }
 
+/** GHII updates: absent/undefined preserves; null clears an optional field; a value replaces. */
+export type GHIIPatch = {
+  [K in keyof GHIIRecord]?: GHIIRecord[K] | (undefined extends GHIIRecord[K] ? null : never);
+};
+
 export interface ChatInstanceRecord {
   id: string;              // Full identifier: "claude-myapp#jouni@node" or "anon-claude-1709337600#anonymous@node"
   platform: string;        // "claude" | "chatgpt" | "grok" | "copilot" | "gemini" | ...

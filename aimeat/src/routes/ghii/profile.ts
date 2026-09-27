@@ -325,7 +325,7 @@ export function registerProfileRoutes(
             updates.notificationEmail = notification_email;
             const newHash = normalized ? createHash('sha256').update(normalized).digest('hex') : '';
             if (ghiiRecord.emailHash !== newHash) {
-                updates.emailVerifiedAt = undefined;
+                updates.emailVerifiedAt = null;
                 updates.magicLinkEnabled = false;
             }
         }

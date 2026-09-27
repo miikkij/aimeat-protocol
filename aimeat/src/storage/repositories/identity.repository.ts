@@ -15,13 +15,14 @@
  *   v1.1.0 — 2026-07-16 — Add getGHIIsByGhiis batch primitive (Phase 3 fan-out→IN; matches list).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import type { GHIIRecord, ChatInstanceRecord, EmailVerificationRecord } from '../interface.js';
+import type { GHIIRecord, GHIIPatch, ChatInstanceRecord, EmailVerificationRecord } from '../interface.js';
 
 export interface IdentityRepository {
   createGHII(record: GHIIRecord): Promise<GHIIRecord>;
   getGHII(ghii: string): Promise<GHIIRecord | null>;
   getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null>;
-  updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null>;
+  /** Omitted/undefined fields are preserved; null clears optional fields. */
+  updateGHII(ghii: string, updates: GHIIPatch): Promise<GHIIRecord | null>;
   getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null>;
   /**
    * ALL GHII records sharing an email hash. Normally 0 or 1 (the one-verified-email-per-account-per-node
