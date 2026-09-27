@@ -29,11 +29,17 @@
  *   ONE CAPABILITY, ONE IMPLEMENTATION: REST routes and the node MCP call this class; the
  *   connector and CLI doors proxy the routes. Adoption WRITES THROUGH AppUiService — the same
  *   validated, versioned, provenance-stamped path every layout write takes.
- * @structure DesignBookService — propose() · get() · list() · adopt() · setStatus() · partKey()
+ * @structure DesignBookService — propose() · get() · storedPart() · list() · adopt() · setStatus() · partKey() · noticeKey()
  * @usage
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.10.0 — 2026-09-26 — A COMPONENT is benched again when it is read (component.ts componentBench):
+ *     get() answers `bench`, and a component that no longer passes keeps its markup and stylesheet
+ *     from every reader but its proposer; list(), and so the search and the map, leave it out, and
+ *     only the aging round asks for it too. storedPart() is the part as stored, for the node's own
+ *     renderers. delete() takes the part's notice record with it (component-notice.ts). keep()
+ *     says a component's markup closes every element it opens and a nested rule starts with "&".
  *   v1.9.1 — 2026-09-26 — adopt() and keep() take the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.9.0 — 2026-09-20 — A genre may grow out of an app (grown-genre.ts): propose answers whether
  *     it earned the shelf, the map lists the ones whose app still stands, and grownGenre() is what
@@ -86,17 +92,20 @@ import { POST_MAX } from '../../data/atelier-effects.js';
 import { getAppTemplateIndex } from '../../data/app-templates.js';
 import { buildDesignBookMap } from './map.js';
 import { DesignBookReasons } from './reasons.js';
-import { componentSnippet, type ComponentBody } from './component.js';
+import { componentAsRead, componentBench, componentSnippet, type ComponentBenchRead, type ComponentBody } from './component.js';
 import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
 
 export const PART_KEY_PREFIX = 'atelier.book.part.';
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
+/** Which stored body of a component its proposer was told no longer passes (component-notice.ts). */
+export const NOTICE_KEY_PREFIX = 'atelier.book.notice.';
 /** How many apps a usage record remembers, so a republish is not counted as a new use. */
 const USAGE_APPS_KEPT = 200;
 export const PART_KEY_RE = /^atelier\.book\.part\.[a-z0-9][a-z0-9-]{2,60}$/;
 
 export function partKey(id: string): string { return `${PART_KEY_PREFIX}${id}`; }
 function usageKey(id: string): string { return `${USAGE_KEY_PREFIX}${id}`; }
+export function noticeKey(id: string): string { return `${NOTICE_KEY_PREFIX}${id}`; }
 
 /** What the propose-time bench actually proved, named by kind — the record says which bench ran. */
 function proposeChecksFor(input: PartInput): string[] {
@@ -174,10 +183,15 @@ export class DesignBookService {
    *  identity, which for an owner session is ALREADY the GHII (no `#`); only an agent-shaped
    *  principal needs resolving to the owner it acts for. */
   private async ownerOf(caller: string): Promise<string> {
+    const owner = await this.ownerOrNull(caller);
+    if (!owner) throw new DesignBookError('BAD_IDENTITY', 'Failed to parse the caller identity.', 401);
+    return owner;
+  }
+
+  /** The same owner GHII, or null for an identity that does not parse. */
+  private async ownerOrNull(caller: string): Promise<string | null> {
     if (!caller.includes('#')) return caller;
-    const scope = await resolveAppOwnerScope(this.storage, this.config, caller);
-    if (!scope) throw new DesignBookError('BAD_IDENTITY', 'Failed to parse the caller identity.', 401);
-    return scope.ownerGhii;
+    return (await resolveAppOwnerScope(this.storage, this.config, caller))?.ownerGhii ?? null;
   }
 
   /** The Book's single home: the node's own system identity, which no token can act as. */
@@ -334,25 +348,56 @@ export class DesignBookService {
    * One part, whole, with its usage count and what builders wrote about it: `taken` is how often
    * a builder reached for it, `kept` how many of those apps an owner was satisfied with, and the
    * rows carry the reasons, the ones for passing it over included.
+   *
+   * A COMPONENT is benched again (component.ts componentBench) and answers `bench`. One that no
+   * longer passes keeps its markup and its stylesheet from every `reader` but its proposer (the
+   * proposer's owner, or an agent acting for them), who needs them to fix it. A reader with no
+   * session is null, which is also what a caller that names nobody gets.
    */
-  async get(id: string): Promise<{
+  async get(id: string, reader: string | null = null): Promise<{
     part: DesignBookPart; version: number; usage: number; owner: string;
     reasons: Awaited<ReturnType<DesignBookReasons['forPart']>>;
+    bench?: ComponentBenchRead;
   }> {
     const record = await this.findRecord(id);
     if (!record) {
       throw new DesignBookError('NOT_FOUND',
         `No Design Book part "${id}". List what exists with the search — the Book only answers for addresses it holds.`, 404);
     }
-    const part = this.parsePart(record);
+    let part = this.parsePart(record);
+    let bench: ComponentBenchRead | undefined;
+    if (part.kind === 'component') {
+      const now = componentBench(part.body);
+      const proposer = !now.passes && reader !== null && (await this.ownerOrNull(reader)) === part.proposed_by_owner;
+      const read = componentAsRead(part.body, now, proposer);
+      part = { ...part, body: read.body };
+      bench = read.bench;
+    }
     return {
       part, version: record.version, usage: await this.usageOf(id), owner: part.proposed_by_owner,
       reasons: await new DesignBookReasons(this.storage, this.config).forPart(id),
+      ...(bench ? { bench } : {}),
     };
   }
 
-  /** The catalogue view: public parts, filtered in memory (the Book is a bounded, curated set). */
-  async list(filters: { kind?: string; status?: string; q?: string; limit?: number } = {}): Promise<PartSummaryRow[]> {
+  /**
+   * The part exactly as stored, for the node's own renderers (the preview and the browser bench),
+   * which bench a component again before they show any of it. A reader is answered by get().
+   */
+  async storedPart(id: string): Promise<DesignBookPart> {
+    const record = await this.findRecord(id);
+    if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
+    return this.parsePart(record);
+  }
+
+  /**
+   * The catalogue view: public parts, filtered in memory (the Book is a bounded, curated set). A
+   * component that no longer passes the bench is left out, because nobody can take it; the aging
+   * round alone asks for it too (`withFailing`), so it fades like any part nobody takes.
+   */
+  async list(
+    filters: { kind?: string; status?: string; q?: string; limit?: number } = {}, { withFailing = false }: { withFailing?: boolean } = {},
+  ): Promise<PartSummaryRow[]> {
     const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
     const items = await this.storage.listMemory(this.bookOwner(), { prefix: PART_KEY_PREFIX, tags: ['designbook'] });
     const rows: PartSummaryRow[] = [];
@@ -373,6 +418,7 @@ export class DesignBookService {
         const hay = `${part.id} ${part.title} ${part.summary} ${part.tags.join(' ')}`.toLowerCase();
         if (!hay.includes(q)) continue;
       }
+      if (part.kind === 'component' && !withFailing && !componentBench(part.body).passes) continue;
       rows.push({
         id: part.id, kind: part.kind, title: part.title, summary: part.summary, tags: part.tags,
         status: part.status, proposed_by: part.proposed_by, updated_at: part.updated_at,
@@ -622,7 +668,7 @@ export class DesignBookService {
         ? `This version made ${out.made.length} thing${out.made.length === 1 ? '' : 's'} by hand because the Book had nothing for it: ${out.made.map(m => m.name).join(', ')}. `
           + 'NOW is when they are offered to the next builder, and you do it, in this conversation: for each one, take its markup and its styles out of the app (aimeat_app_get, then read the page) and propose it, '
           + `aimeat_designbook_propose with kind "component" and body { prefix, html, css, use, judgement: { reach, why }, from_app: "${filename}" }. `
-          + 'The component carries no script (the app that takes it wires the behaviour), every class starts with its prefix, and every colour is a var(--ak-…) token so it wears whatever page it lands in. '
+          + 'The component carries no script (the app that takes it wires the behaviour), every class starts with its prefix, its markup closes every element it opens, a rule nested inside another starts with "&", and every colour is a var(--ak-…) token so it wears whatever page it lands in. '
           + 'JUDGE EACH ONE HONESTLY: reach "general" when another kind of app would use it (a grid a person ticks), "special" when it belongs to this app alone (a flute fingering chart), with the reason. '
           + 'A general one from this app is published by itself; a special one stays listed and yours. An ARRANGEMENT you composed goes in as kind "fill", its own words turned back into <placeholders>. '
           + 'Tell the owner in a line what went onto the shelf and what you judged special.'
@@ -736,6 +782,8 @@ export class DesignBookService {
     } else {
       await this.storage.deleteMemory(this.bookOwner(), record.key);
     }
+    // And what the node remembered about telling the proposer it no longer passes (component-notice.ts).
+    await this.storage.deleteMemory(this.bookOwner(), noticeKey(id));
     return { id, deleted: true };
   }
 }

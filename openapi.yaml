@@ -27098,7 +27098,8 @@ paths:
         are what everyone builds from. PUBLIC for the published shelf — a caller without a
         session sees published parts only; signing in adds the parts still in proposal.
         Retired parts appear in NO default listing (dead is invisible); ask for them by name
-        with status=retired.
+        with status=retired. A component whose stored markup or stylesheet no longer passes the
+        bench this node runs appears in no listing and not on the map, because nobody can take it.
       tags: [Apps]
       security: []
       parameters:
@@ -27126,9 +27127,12 @@ paths:
         because the Book had nothing for it: body `{ prefix, html, css, use, judgement: { reach:
         general|special, why }, from_app? }`, markup and a stylesheet under one class prefix, every
         colour a `var(--ak-…)` token and NO script (its preview is served from this node). Its
-        bench reads the markup against an allowlist of elements and attributes and refuses a
-        stylesheet that loads anything, reaches outside its prefix, fixes itself over the page,
-        moves at idle or carries a literal colour. A component whose builder judged it `general`
+        bench reads the markup against an allowlist of elements and attributes, and refuses markup
+        that leaves an element open where it ends (it would take in whatever the page writes after
+        it) and a stylesheet that loads anything, reaches outside its prefix, fixes itself over the
+        page, moves at idle or carries a literal colour. A rule nested inside another starts with
+        `&`, which stands for the elements of the rule it is nested in; at the top of the
+        stylesheet `&` is the page and is refused. A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
@@ -27146,8 +27150,9 @@ paths:
                 part:
                   type: object
                   description: >-
-                    { id, kind: layout|fill|look|motion|illustration|genre|ambient|effect, title,
-                    summary, body, tags? } — the kind decides the body: a whole mosaic layout
+                    { id, kind: layout|fill|look|motion|illustration|genre|ambient|effect|component,
+                    title, summary, body, tags? }. The kind decides the body: { prefix, html, css,
+                    use, judgement: { reach: general|special, why }, from_app? } (component), a whole mosaic layout
                     (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only
                     (motion), { style, palette_words? } (illustration), { template } naming a
                     served genre template, or { app: { owner, filename }, judgement: { reach:
@@ -27236,12 +27241,17 @@ paths:
         builders who reached for it, `kept` counts the apps among them whose owner said the app
         turned out well (the number that says more than "an AI favoured it"), `passed_over` those
         who looked and left, and the rows carry each one's own sentence. Accounts, not measurements.
+        A COMPONENT also answers `bench`, the bench this node runs, run again on the stored body:
+        `{ passes: true }`, or `{ passes: false, why, note }` when it no longer passes. Then nobody
+        can take it, and `part.body` carries its `html` and `css` only for its proposer (the
+        proposing owner, or an agent acting for them), who needs them to fix it and propose it again
+        under the same id; every other reader gets the body without them.
       tags: [Apps]
       security: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: "{ part, version, usage, owner, reasons: { taken, kept, passed_over, took: [{ app, version, why, at, kept }], passed: [...] } }" }
+        '200': { description: "{ part, version, usage, owner, reasons: { taken, kept, passed_over, took: [{ app, version, why, at, kept }], passed: [...] }, bench? }; `bench` for a component only: { passes: true } or { passes: false, why, note }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -27257,7 +27267,9 @@ paths:
         public record already); the browsable gallery at /v1/design-book embeds this per card.
         Answers text/html, not the JSON envelope. A genre that grew out of an app answers 302 to
         the app's own address instead: it is a published page with script in it, and it is never
-        served from the node's origin.
+        served from the node's origin. A component is benched again first: one that no longer
+        passes is a page saying so and why, in the bench's words, with none of its markup or
+        stylesheet.
       tags: [Apps]
       security: []
       parameters:
@@ -27295,7 +27307,10 @@ paths:
         versioned, provenance-stamped door — the replaced layout is archived, so putting it back
         is one restore. Published parts are adoptable by anyone; a proposed one only by its own
         proposer. Adopting is the usage signal that keeps a part alive. Requires memory:write,
-        and the app must belong to the caller's owner.
+        and the app must belong to the caller's owner. A COMPONENT is taken before the app exists:
+        the answer carries `snippet` { html, css, use, prefix }, nothing is written, and the app
+        need not be published yet. The component is benched again first, and one that no longer
+        passes answers 422 BODY_INVALID with the bench's reason.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -27313,12 +27328,12 @@ paths:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
                 ai_provenance_id: { type: string }
       responses:
-        '200': { description: "{ id, filename, version, replaced_version, kind }" }
+        '200': { description: "{ id, filename, version, replaced_version, kind, snippet? }; `snippet` { html, css, use, prefix } for a component" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not published and not yours, or the app belongs to another owner }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: 'GENRE_IS_FORKED — a genre is forked from its template, never adopted; NO_LAYOUT — the app has no stored arrangement to season' }
-        '422': { description: The merged arrangement failed the validator on the app's own look (an ambient too loud for it), in the validator's words }
+        '422': { description: "The merged arrangement failed the validator on the app's own look (an ambient too loud for it), in the validator's words; or a component no longer passes the bench, with the bench's reason" }
 
   /v1/designbook/{id}/bench:
     post:

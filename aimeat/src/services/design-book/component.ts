@@ -27,9 +27,18 @@
  *   bench can prove a component renders and cannot prove anybody else wants it: a flute fingering
  *   chart passes every check and belongs to one app. Only a general one is published on its own
  *   (service.ts); a special one stays proposed, listed and usable by whoever made it.
- * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
+ *
+ *   A STORED BODY IS BENCHED AGAIN before anything reads it (componentBench): the bench learns with
+ *   a deploy. One that no longer passes says why, in the bench's own words, wherever it is refused;
+ *   its markup and stylesheet go only to its proposer (componentAsRead), who needs them to fix it.
+ * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentBench(body) · componentDigest(body) ·
+ *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.10.0 — 2026-09-26 — componentBench answers why a stored body no longer passes, once per body and
+ *     process, through the same checks a proposal passes (benchTexts). The preview sentence and the
+ *     snippet's refusal carry that reason, the preview's escaped, and componentAsRead withholds the
+ *     markup and the stylesheet of a failing body from anyone but its proposer.
  *   v1.9.0 — 2026-09-26 — A repeated attribute, a missing space between two attributes and a "/"
  *     ending a <div> are each refused in words of their own: a browser keeps the first of two, and
  *     ignores the "/" and leaves the element open.
@@ -88,10 +97,12 @@
  *     and an attribute the two could read differently is refused.
  *   v1.0.0 — 2026-09-20 — Initial.
  */
+import { createHash } from 'node:crypto';
 import { DesignBookError } from './errors.js';
 import {
   MAX_NESTING, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem,
 } from './component-scan.js';
+import { escapeHtml } from '../site-tags.js';
 
 export const COMPONENT_LIMITS = { html: 12_000, css: 12_000, use: 600, why: 400, whyMin: 20 } as const;
 
@@ -396,18 +407,25 @@ function selectorEscape(x: ComplexSelector | null, prefix: string, nested: boole
   return null;
 }
 
-export function validateComponentBody(raw: unknown): ComponentBody {
-  const o = (raw ?? {}) as Record<string, unknown>;
-  const prefix = str(o.prefix).trim();
+/**
+ * The bench proper: the prefix, the markup under it and the stylesheet under it. What a proposal
+ * passes before it lands, and what a stored body passes again before anything reads it.
+ */
+function benchTexts(prefix: string, html: string, css: string): void {
   if (!PREFIX_RE.test(prefix)) refuse('A component names its class prefix: 2-12 lowercase letters and digits, starting with a letter, like "wkgrid". Every class it uses starts with it.');
   if (prefix === 'ak' || prefix === 'aimeat') refuse(`"${prefix}" is the kit's prefix. Choose one of the component's own.`);
-
-  const html = str(o.html).trim();
-  const css = str(o.css).trim();
   if (!html || html.length > COMPONENT_LIMITS.html) refuse(`A component carries its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
   if (!css || css.length > COMPONENT_LIMITS.css) refuse(`A component carries its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
   checkMarkup(html, prefix);
   checkStyles(css, prefix);
+}
+
+export function validateComponentBody(raw: unknown): ComponentBody {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const prefix = str(o.prefix).trim();
+  const html = str(o.html).trim();
+  const css = str(o.css).trim();
+  benchTexts(prefix, html, css);
 
   const use = str(o.use).replace(/\s+/g, ' ').trim();
   if (use.length < 20 || use.length > COMPONENT_LIMITS.use) {
@@ -432,34 +450,81 @@ export function validateComponentBody(raw: unknown): ComponentBody {
 
 /**
  * What an app gets when it takes the component: the two texts to paste, and how to wire it. They
- * are benched again first (benchedNow): a builder pastes them into a page as they come, so a body
- * that no longer passes is refused here, not handed out.
+ * are benched again first (componentBench): a builder pastes them into a page as they come, so a
+ * body that no longer passes is refused here, not handed out, with the bench's reason.
  */
 export function componentSnippet(body: ComponentBody): { html: string; css: string; use: string; prefix: string } {
-  const shown = benchedNow(body);
-  if (!shown) return refuse('This component no longer passes the Design Book\'s bench, so it is not handed out. Its proposer can propose it again as the bench asks.');
+  const shown = componentBench(body);
+  if (!shown.passes) return refuse(`This component no longer passes the Design Book's bench, so it is not handed out. The bench says: ${shown.why} Its proposer can propose it again as the bench asks.`);
   return { html: shown.html, css: shown.css, use: body.use, prefix: body.prefix };
 }
 
+/** What the bench says of a body today: it passes, with the texts it read, or why it does not. */
+export type ComponentBench = { passes: true; html: string; css: string } | { passes: false; why: string };
+
+/** The bench's answer by the body's digest, so a stored body is benched once per process, not on every read of the shelf. */
+const BENCHED = new Map<string, string | null>();
+/** How many answers are kept. The Book is a bounded, curated set; past this, the oldest answer goes first. */
+const BENCHED_KEPT = 1000;
+
+/** The three texts the bench reads, trimmed as it reads them. */
+function benchedTexts(body: unknown): { prefix: string; html: string; css: string } {
+  const o = (body ?? {}) as Record<string, unknown>;
+  return { prefix: str(o.prefix).trim(), html: str(o.html).trim(), css: str(o.css).trim() };
+}
+
+/** The digest of the texts the bench reads: two bodies with one digest get one answer. */
+export function componentDigest(body: unknown): string {
+  const { prefix, html, css } = benchedTexts(body);
+  return createHash('sha256').update(JSON.stringify([prefix, html, css])).digest('base64');
+}
+
 /**
- * The markup and the stylesheet as the bench reads them TODAY, or null when they no longer pass.
- * A body is benched when it is proposed and stored as it passed; the bench has learned since
- * (v1.2.0), and what this node serves or hands out cannot lean on a check made under older rules.
+ * The markup and the stylesheet as the bench reads them TODAY, or why they no longer pass, in the
+ * bench's own words. A body is benched when it is proposed and stored as it passed; the bench has
+ * learned since, and what this node serves, lists or hands out cannot lean on a check made under
+ * older rules. The answer depends on nothing but the body, so it is kept by the body's digest.
  */
-function benchedNow(body: ComponentBody): { html: string; css: string } | null {
-  const o = (body ?? {}) as unknown as Record<string, unknown>;
-  const prefix = str(o.prefix).trim();
-  const html = str(o.html).trim();
-  const css = str(o.css).trim();
-  if (!PREFIX_RE.test(prefix) || !html || !css) return null;
+export function componentBench(body: unknown): ComponentBench {
+  const { prefix, html, css } = benchedTexts(body);
+  const key = componentDigest(body);
+  let why = BENCHED.get(key);
+  if (why === undefined) {
+    why = benchWhy(prefix, html, css);
+    if (BENCHED.size >= BENCHED_KEPT) BENCHED.delete(BENCHED.keys().next().value as string);
+    BENCHED.set(key, why);
+  }
+  return why === null ? { passes: true, html, css } : { passes: false, why };
+}
+
+/** The propose bench's own checks (benchTexts), as an answer: null when the texts pass, and why when they do not. */
+function benchWhy(prefix: string, html: string, css: string): string | null {
   try {
-    checkMarkup(html, prefix);
-    checkStyles(css, prefix);
+    benchTexts(prefix, html, css);
+    return null;
   } catch (err) {
-    if (err instanceof DesignBookError) return null;
+    if (err instanceof DesignBookError) return err.message;
     throw err;
   }
-  return { html, css };
+}
+
+/** What a reader of a component is told about the bench (DesignBookService.get). */
+export type ComponentBenchRead = { passes: true } | { passes: false; why: string; note: string };
+
+/**
+ * A component's body as one reader gets it, with the bench's answer. A body that no longer passes
+ * keeps its markup and its stylesheet from everyone but its proposer, who needs them to fix it:
+ * nobody can take it, and a text the bench refuses is not handed out to paste.
+ */
+export function componentAsRead(body: Record<string, unknown>, bench: ComponentBench, proposer: boolean): { body: Record<string, unknown>; bench: ComponentBenchRead } {
+  if (bench.passes) return { body, bench: { passes: true } };
+  if (proposer) {
+    return { body, bench: { passes: false, why: bench.why, note: 'This component no longer passes the bench, for the reason in `why`. Its markup and stylesheet are here as stored, for you to fix: propose it again under the same id. Until then nobody can take it, and search and the map leave it out.' } };
+  }
+  const rest = { ...body };
+  delete rest.html;
+  delete rest.css;
+  return { body: rest, bench: { passes: false, why: bench.why, note: 'This component no longer passes the bench, for the reason in `why`. Nobody can take it, search and the map leave it out, and only its proposer is shown its markup and stylesheet.' } };
 }
 
 /**
@@ -468,11 +533,12 @@ function benchedNow(body: ComponentBody): { html: string; css: string } | null {
  * `theme` is the ground the reader is on: a component reads the page's tokens, so the same markup
  * is a different picture in the dark, and the gallery asks for the one its reader is looking at.
  *
- * What it shows is benched again first (benchedNow): a stored body that no longer passes is a
- * sentence saying so, and none of its markup or stylesheet reaches the page.
+ * What it shows is benched again first (componentBench): a stored body that no longer passes is a
+ * sentence saying so and why, and none of its markup or stylesheet reaches the page. The reason can
+ * quote the stored body, so it is escaped: it is text on this node's page, never markup.
  */
 export function componentPreviewHtml(body: ComponentBody, theme: 'light' | 'dark' = 'light'): string {
-  const shown = benchedNow(body);
+  const shown = componentBench(body);
   return [
     `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
@@ -481,11 +547,11 @@ export function componentPreviewHtml(body: ComponentBody, theme: 'light' | 'dark
     '.dbc-stage { max-width: 960px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 24px; }',
     '.dbc-surface { background: var(--ak-surface); border: var(--ak-line-w, 1px) solid var(--ak-line); border-radius: var(--ak-radius); padding: 16px; }',
     '</style>',
-    shown ? `<style>${shown.css.replace(/<\//g, '<\\/')}</style>` : '',
+    shown.passes ? `<style>${shown.css.replace(/<\//g, '<\\/')}</style>` : '',
     '</head><body class="ak-root"><div class="dbc-stage">',
-    ...(shown
+    ...(shown.passes
       ? [`<div>${shown.html}</div>`, `<div class="dbc-surface">${shown.html}</div>`]
-      : ['<p>This component no longer passes the Design Book\'s bench, so it is not shown. Its proposer can propose it again as the bench asks.</p>']),
+      : [`<p>This component no longer passes the Design Book's bench, so it is not shown. The bench says: ${escapeHtml(shown.why)} Its proposer can propose it again as the bench asks.</p>`]),
     '</div></body></html>',
   ].join('\n');
 }
