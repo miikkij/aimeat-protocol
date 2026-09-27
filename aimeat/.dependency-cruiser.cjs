@@ -27,6 +27,13 @@
 module.exports = {
     forbidden: [
         {
+            name: 'shared-dispatch-has-no-cli-runtime',
+            comment: 'Credential stores and shell setup belong to the CLI adapter, not node dispatch.',
+            severity: 'error',
+            from: { path: '^src/(tool-dispatch/|services/node-(invoke|capabilities)[.]ts$)' },
+            to: { path: '^src/(cli|routes)/', dependencyTypesNot: ['type-only'] },
+        },
+        {
             name: 'manifest-is-transport-independent',
             comment: 'The shared extension builder belongs below routes and CLI adapters.',
             severity: 'error',

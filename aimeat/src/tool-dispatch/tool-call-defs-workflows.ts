@@ -1,0 +1,116 @@
+/**
+ * @file cli/connect/tool-call-defs-workflows.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Agent-workflow tools for the shell / local-call dispatch: save, get, run, answer a
+ *   waiting human-input step, and list what is waiting.
+ * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts
+ * @usage import { workflowTools } from './tool-call-defs-workflows.js';
+ * @version-history
+ *   v1.3.2 -- 2026-09-26 -- aimeat_workflow_save's description says an ai step starts only when what
+ *     it is expected to cost fits in what is left of maxCostUsd (secaudit 2026-09, A6-11).
+ *   v1.3.1 -- 2026-09-26 -- maxCostUsd counts the judging of a run's llm signals too (secaudit
+ *     2026-09, A6-11); aimeat_workflow_save's description says so.
+ *   v1.3.0 -- 2026-09-25 -- aimeat_workflow_save's description names maxCostUsd, the per-run cap on
+ *     what a run's ai steps spend in US dollars.
+ *   v1.2.0 -- 2026-09-06 -- aimeat_workflow_answer stops reading the legacy `answer` object. It
+ *     never worked (the route reads picks/other) and the dispatch refuses an undeclared name now,
+ *     so the compatibility the comment promised could not happen.
+ *   v1.1.0 -- 2026-08-30 -- aimeat_workflow_run forwards `vars` and `target`. This is the door a
+ *     fleet daemon calls, and it sent only { mode }: a workflow that declares input ran at its
+ *     defaults, every time, with nothing to say so.
+ *   v1.0.0 -- 2026-08-16 -- Pure extraction from tool-call-defs-apps.ts (max-file-lines). Handlers
+ *     unchanged; aimeat_workflow_answer had just been corrected to POST { picks, other } as the
+ *     route reads, instead of { answer }, which it had never accepted.
+ */
+import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
+import type { ApiResponse } from './api-client.js';
+import { requiredString, optionalString, optionalArray, requiredRecord, optionalRecord } from './tool-call-helpers.js';
+
+export const workflowTools: ConnectCliToolDefinition[] = [
+    // ── Agent Workflows (shell-callable parity with the MCP + connector surfaces) ──
+    {
+        name: 'aimeat_workflow_save',
+        description: 'Create/update a workflow. `definition` is the full descriptor (title, description, trigger, vars[], steps[], on_step_fail, llm?, maxCostUsd?); validated against the offer contract + DAG on save. maxCostUsd (US dollars, per run) caps what a run spends on AI, its ai steps and the judging of its llm signals together: an ai step starts only when what it is expected to cost fits in what is left, and otherwise waits for the running ai steps or stops the run.',
+        input: {
+            id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
+            definition: { type: 'object', required: true, description: 'The workflow descriptor.' },
+        },
+        handler: ({ client }, input) => client.put(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}`, requiredRecord(input, 'definition')),
+    },
+    {
+        name: 'aimeat_workflow_get',
+        description: 'Inspect workflows. Omit id to list; pass an id for its definition + derived blueprint + recent runs.',
+        input: { id: { type: 'string', description: 'Omit to list; pass for one workflow.' } },
+        handler: async ({ client }, input) => {
+            const id = optionalString(input, 'id');
+            if (!id) return client.get('/v1/workflows');
+            const enc = encodeURIComponent(id);
+            const [def, bp, runs] = await Promise.all([
+                client.get(`/v1/workflows/${enc}`),
+                client.get(`/v1/workflows/${enc}/blueprint`),
+                client.get(`/v1/workflows/${enc}/runs`),
+            ]);
+            const recentRuns = (((runs.data as { runs?: unknown[] } | undefined)?.runs) ?? []).slice(0, 5);
+            return { ok: def.ok, data: { definition: def.data ?? def, blueprint: bp.ok === false ? null : (bp.data ?? null), recentRuns } } as ApiResponse;
+        },
+    },
+    {
+        name: 'aimeat_workflow_run',
+        description: 'Run a workflow. mode="signals-only" evaluates signals against memory (no dispatch — instant health check); mode="full" executes the steps.',
+        input: {
+            id: { type: 'string', required: true, description: 'The workflow id.' },
+            mode: { type: 'string', required: true, description: 'signals-only | full' },
+            vars: { type: 'object', description: 'The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this.' },
+            target: { type: 'string', description: 'With mode="full": "sandbox" writes every key behind a per-run prefix. Default "live".' },
+        },
+        handler: ({ client }, input) => {
+            const vars = optionalRecord(input, 'vars');
+            const target = optionalString(input, 'target');
+            return client.post(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}/run`, {
+                mode: requiredString(input, 'mode'),
+                ...(vars ? { vars } : {}),
+                ...(target ? { target } : {}),
+            });
+        },
+    },
+    {
+        // → POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer — answer a paused human-input step.
+        name: 'aimeat_workflow_answer',
+        description: 'Answer a paused human-input step of a workflow run (resumes the run).',
+        input: {
+            workflow_id: { type: 'string', description: 'The workflow id. (`id` is accepted as the older spelling this door used.)' },
+            id: { type: 'string', description: 'Older spelling of workflow_id.' },
+            run_id: { type: 'string', required: true, description: 'The run id (from aimeat_workflow_pending_inputs).' },
+            step_id: { type: 'string', required: true, description: 'The paused step id awaiting input.' },
+            picks: { type: 'array', description: 'Option ids from the pinned question (may be empty when answering with `other` alone).' },
+            other: { type: 'string', description: 'Free-text answer; only when the question allows it.' },
+        },
+        // NOT A DROPPED PARAMETER — A BROKEN TOOL. The route reads { picks, other } and this door
+        // sent { answer: {...} }, so every human-input answer from /local/call was accepted as an
+        // empty body and the run stayed parked.
+        //
+        // The `answer` object is no longer read. It never worked, so there is no caller to keep
+        // working, and withDeclaredInputOnly refuses an undeclared parameter now — a handler still
+        // reaching for `answer` could only ever have been reading a field the dispatch had already
+        // refused. A caller sending it gets a refusal naming `picks` and `other`.
+        handler: ({ client }, input) => {
+            const workflowId = optionalString(input, 'workflow_id') ?? requiredString(input, 'id');
+            const picks = optionalArray(input, 'picks') ?? [];
+            const other = optionalString(input, 'other');
+            const body: JsonObject = { picks };
+            if (other !== undefined) body.other = other;
+            return client.post(
+                `/v1/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(requiredString(input, 'run_id'))}/steps/${encodeURIComponent(requiredString(input, 'step_id'))}/answer`,
+                body,
+            );
+        },
+    },
+    {
+        // → GET /v1/workflows/pending-inputs — every run of the caller's workflows awaiting human input.
+        name: 'aimeat_workflow_pending_inputs',
+        description: 'List workflow runs paused awaiting human input (answer them with aimeat_workflow_answer).',
+        input: {},
+        handler: ({ client }) => client.get('/v1/workflows/pending-inputs'),
+    },
+];
