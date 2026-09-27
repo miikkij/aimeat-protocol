@@ -14,7 +14,11 @@
     "test/unit/workflow-lock-lifecycle.test.ts",
     "test/unit/extension-vm-fetch-contract.test.ts",
     "test/unit/storage-patch-contract.test.ts",
-    "test/unit/storage-owner-relations.test.ts"
+    "test/unit/storage-owner-relations.test.ts",
+    "test/unit/owner-reuse-contract.test.ts",
+    "test/unit/existing-install-seeds.test.ts",
+    "test/unit/recovery-boundaries.test.ts",
+    "test/fixtures/tally-crash-child.ts"
   ],
   "exclude": ["node_modules", "dist", "src/generated/prisma-postgres"]
 }
