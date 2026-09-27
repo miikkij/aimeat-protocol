@@ -33,6 +33,8 @@
  *   - Phase 6: MCP resources — the memory mapper in resources/list, the storage blob in resources/read
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-core-doors
  * @version-history
+ *   v1.1.0 — 2026-09-26 — 8b: aimeat_action_execute refuses a provider named by a bare account name
+ *     with INVALID_INPUT, and no work is stored under it.
  *   v1.0.0 — 2026-09-08 — Initial: the five uncalled core tools, five branches of the memory tools,
  *     and both resource templates.
  */
@@ -329,6 +331,18 @@ await test('8. aimeat_action_execute commissions the work and holds the escrow',
     assert(rest.body.data.provider_gaii === provider.gaii, `provider on the record: ${rest.body.data.provider_gaii}`);
     assert(rest.body.data.requester_gaii === requester.gaii, `requester on the record: ${rest.body.data.requester_gaii}`);
     assert(rest.body.data.cost.total === r.data.cost.total, 'the tool and the route report different costs');
+});
+
+await test('8b. aimeat_action_execute refuses a provider named by a bare account name (INVALID_INPUT), as its REST twin does', async () => {
+    // The provider's owner published nothing under the bare name, and no endpoint accepts work
+    // addressed to it, so the MCP tool must refuse it before it creates anything.
+    const r = await callTool(reqSession, 'aimeat_action_execute', {
+        action_id: ACTION_ID, provider_gaii: providerOwner.owner, input: { url: 'https://example.com/bare-name' },
+    });
+    assert(r.isError && r.text.startsWith('INVALID_INPUT'), `expected INVALID_INPUT, got: ${r.text}`);
+    const sent = await json('/v1/work/sent', { headers: authed(requester.token) });
+    const named = (sent.body.data?.items ?? []).filter((w: any) => w.provider_gaii === providerOwner.owner);
+    assert(named.length === 0, `work was stored under the bare name: ${JSON.stringify(named)}`);
 });
 
 await test('9. An anonymous caller is refused the same work door (401)', async () => {

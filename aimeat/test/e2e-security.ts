@@ -5,6 +5,8 @@
  *   Security tab composite (owner-only) with GHII CORS input validation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-security
  * @version-history
+ *   v1.3.0 — 2026-09-26 — 7e: a provider named by a bare account name is refused with INVALID_INPUT on
+ *            POST /v1/work/request and in POST /v1/work/batch, and no work is stored under it.
  *   v1.2.0 — 2026-09-26 — 7b-7d: work between a person and their own agent is refused both ways
  *            (SAME_OWNER_WORK), and another owner still asks the same agent (secaudit 2026-09, R3 7d).
  *   v1.1.0 — 2026-07-29 — Add 11b (GET /v1/security/overview is owner-only — an agent gets 403 and
@@ -539,6 +541,39 @@ await test('7d. Another owner in person may still request work from Agent C', as
         }),
     });
     assert(status === 201, `a different owner must still be able to ask: ${status} ${JSON.stringify(body)}`);
+});
+
+// A provider is named by its full identity. A bare account name identifies no principal, so no caller
+// could accept that work, and what the requester holds for it would wait until it expired.
+await test('7e. A provider named by a bare account name is refused (INVALID_INPUT), on the single and the batch endpoint', async () => {
+    const single = await json('/v1/work/request', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerBToken}` },
+        body: JSON.stringify({
+            action_id: 'same-owner-person-action',
+            provider_gaii: ownerAName,
+            input: { text: 'asked of a bare name' },
+        }),
+    });
+    assert(single.status === 400 && single.body.error?.code === 'INVALID_INPUT',
+        `expected 400 INVALID_INPUT, got ${single.status}: ${JSON.stringify(single.body)}`);
+
+    const batch = await json('/v1/work/batch', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerBToken}` },
+        body: JSON.stringify({ requests: [{
+            action_id: 'same-owner-person-action',
+            provider_gaii: ownerAName,
+            input: { text: 'asked of a bare name in a batch' },
+        }] }),
+    });
+    const item = batch.body.data?.results?.[0];
+    assert(batch.status === 201 && item?.code === 'INVALID_INPUT' && !item?.tracking_code,
+        `the batch item must be refused: ${batch.status} ${JSON.stringify(batch.body.data ?? batch.body)}`);
+
+    const sent = await json('/v1/work/sent', { headers: { Authorization: `Bearer ${ownerBToken}` } });
+    const named = (sent.body.data?.items ?? []).filter((w: any) => w.provider_gaii === ownerAName);
+    assert(named.length === 0, `work was stored under the bare name: ${JSON.stringify(named)}`);
 });
 
 // ─── Test 8: Path Traversal ───
