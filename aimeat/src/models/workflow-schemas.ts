@@ -62,6 +62,9 @@
  *     attempt with what it holds, in place of the step's reservedUsd (secaudit 2026-09, A6-11).
  *   v1.16.0 — 2026-09-26 — WorkflowRunStep.attemptMaxUsd, the most one attempt cost, which later
  *     estimates read (secaudit 2026-09, A6-11).
+ *   v1.16.1 — 2026-09-26 — WorkflowDef.maxCostUsd says a call holds its share until it answers, the
+ *     estimate is one attempt, and a step expected to cost more than the cap starts alone
+ *     (secaudit 2026-09, A6-11).
  */
 import { z } from 'zod';
 import { SignalSchema, type Signal } from './workflow-signals.js';
@@ -415,13 +418,17 @@ export interface WorkflowDef {
   /**
    * The most one run may spend on the owner's AI, in US dollars: through its ai steps, and through the
    * node's model judging its `llm` signals. The engine adds up what each call cost, as the node
-   * recorded it. Before an ai step starts, the engine sets aside what the step is expected to cost
-   * (its `estimateUsd`, else an equal share of the cap nobody holds, split across the ai steps not yet
-   * started), and the step starts only when what the run has spent, what its running ai steps hold and
-   * that estimate stay within this. So ai steps that fit together still start together. A step that
-   * does not fit waits while another ai step runs; with none running, the run ends `stopped`, with the
-   * cap, the spend and the step's estimate in `costCap` and in words in `reason`. A step already
-   * running finishes. A step that costs more than its estimate takes the run past this by the
+   * recorded it. Before an ai step's model call starts, the engine sets aside what one attempt of the
+   * step is expected to cost (its `estimateUsd`, else an equal share of the cap nobody holds, split
+   * across the ai steps not yet started), and the call starts only when what the run has spent, what
+   * its open calls hold and that estimate stay within this. So ai steps that fit together still start
+   * together. A call holds its share until it answers, even when its step was moved on meanwhile (a
+   * timeout, a retry, the watchdog finding its output, a cancel), and a retry's call beside one still
+   * open holds its own. A step that does not fit waits while a call is open; with none open, the run
+   * ends `stopped`, with the cap, the spend and the step's estimate in `costCap` and in words in
+   * `reason`. A step expected to cost more than this whole amount starts alone, when no call is open
+   * and the run has spent less than this, and what it really cost counts as usual. A call already
+   * started finishes. A step that costs more than its estimate takes the run past this by the
    * difference. Once the spend has reached this the judge is not asked, and its leaf passes as it does
    * when the judge is unavailable. Absent or null: no cap. The owner's daily AI budget bounds every AI
    * call as well, whatever this says.
