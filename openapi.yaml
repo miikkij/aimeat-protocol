@@ -7769,7 +7769,12 @@ paths:
     get:
       operationId: exportOwnerData
       summary: Data protection export
-      description: Export all owner data (GDPR Art. 20, CCPA). Returns all agents, memory, transactions.
+      description: |
+        Export all owner data (GDPR Art. 20, CCPA). Returns all agents, memory, transactions.
+        `work_provided` and `work_requested` at the top level hold the person's own work, filed under
+        their GHII: the work on actions they published in person, and the requests they made in
+        person. Each agent carries its own `work_provided` and `work_requested` beside them, and
+        `disputes` covers the work in both.
       tags: [Identity]
       security:
         - BearerAuth: []
