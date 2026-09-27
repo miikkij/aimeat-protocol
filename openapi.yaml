@@ -44544,10 +44544,18 @@ paths:
       description: >
         Aggregates the owner's AIMEAT-managed schedules (ai / agent_task /
         extension), the owner's extension cron jobs, and each agent's
-        self-reported internal scheduler mirror.
+        self-reported internal scheduler mirror. With `detail=true` each managed
+        and extension schedule also carries `prompt`, `system_prompt` and
+        `task_title`: what it tells the model or the agent on every fire.
       tags: [Schedules]
       security:
         - BearerAuth: []
+      parameters:
+        - name: detail
+          in: query
+          required: false
+          schema: { type: string, enum: ['true'] }
+          description: "`true` adds each schedule's prompt (an ai schedule's instruction, an agent_task schedule's task description), system prompt and task title."
       responses:
         '200':
           description: Aggregated schedules
@@ -44719,9 +44727,18 @@ paths:
                 purpose: { type: string }
                 constraints: { type: array, items: { $ref: '#/components/schemas/ScheduleConstraint' } }
                 input: { type: object }
+                prompt:
+                  type: string
+                  description: >
+                    New prompt, put where the kind keeps it: an ai schedule's `input.prompt`, or an
+                    agent_task schedule's `input.taskTemplate.description`. The rest of the input
+                    stays. Applied on top of `input` when both are sent. Other kinds refuse 400 NO_PROMPT;
+                    an empty prompt is refused 400 INVALID_INPUT.
       responses:
         '200':
           description: Schedule updated
+        '400':
+          description: INVALID_CRON, INVALID_INPUT (an empty prompt) or NO_PROMPT (a kind that has no prompt)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }

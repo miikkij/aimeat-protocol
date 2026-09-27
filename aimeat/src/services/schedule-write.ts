@@ -40,6 +40,8 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-09-27 — An edit takes `prompt` and puts it where the kind keeps it (services/schedule-prompt.ts):
+ *     an ai schedule's prompt, an agent_task schedule's task description. Other kinds refuse NO_PROMPT.
  *   v1.2.0 — 2026-09-26 — An `ai` schedule reads no record the node keeps for itself and writes its
  *     answer over none: create and edit refuse such an input or output key with 403 RESERVED_KEY
  *     (services/ai-job-keys.ts, the rule the AI job asks too). The fire asks again, for schedules
@@ -59,6 +61,7 @@ import { emitChange } from './event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
 import { checkScheduleGate, isValidCron, type ScheduleKind } from './schedule-gate.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
+import { withSchedulePrompt } from './schedule-prompt.js';
 
 export interface ScheduleWriteDeps {
     storage: Storage;
@@ -91,6 +94,8 @@ export type ScheduleWriteErrorCode =
     | 'INVALID_EXTENSION_JOB' | 'EXTENSION_NOT_FOUND'
     | 'INVALID_AI_JOB' | 'NAMESPACE_DENIED' | 'RESERVED_KEY'
     | 'INVALID_TASK_TEMPLATE'
+    // A prompt edit on a kind that runs with structured input (services/schedule-prompt.ts).
+    | 'NO_PROMPT'
     | 'INVALID_ECO_JOB' | 'ECO_APP_NOT_FOUND' | 'CAPABILITY_NOT_DECLARED'
     | 'SCHEDULER_UNAVAILABLE' | 'TRIGGER_FAILED';
 
@@ -458,6 +463,13 @@ export async function updateScheduleRecord(
             if (kept) return { ok: false, ...kept };
         }
         updates.input = patch.input as Record<string, unknown>;
+    }
+    // A new prompt goes where the kind keeps it (services/schedule-prompt.ts), on top of an input this
+    // same patch replaced, else on the stored one; the rest of the input stays as it was.
+    if (patch.prompt !== undefined) {
+        const next = withSchedulePrompt({ type: job.type, input: updates.input ?? job.input }, patch.prompt);
+        if (!next.ok) return next;
+        updates.input = next.input;
     }
 
     const updated = await storage.updateScheduledJob(id, updates);

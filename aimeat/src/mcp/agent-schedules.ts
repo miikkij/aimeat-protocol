@@ -18,6 +18,8 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.4.0 — 2026-09-27 — aimeat_schedule_list takes `detail` (each schedule's prompt, description, purpose
+ *     and input) and aimeat_schedule_update takes `prompt` (services/schedule-prompt.ts, via the update service).
  *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-05 — An extension schedule can carry the action's own `input` (and an
@@ -46,6 +48,7 @@ import { emitChange } from '../services/event-bus.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { schedulePromptOf } from '../services/schedule-prompt.js';
 
 export function registerAgentScheduleTools(
   mcp: McpServer,
@@ -149,9 +152,11 @@ export function registerAgentScheduleTools(
   mcp.tool(
     'aimeat_schedule_list',
     descriptionFor('aimeat_schedule_list'),
-    {},
+    {
+      detail: z.boolean().optional().describe('true also returns each schedule\x27s prompt, system prompt or task title, description, purpose and input.'),
+    },
     annotationsFor('aimeat_schedule_list'),
-    async () => {
+    async ({ detail }) => {
       const all = await storage.listScheduledJobs({ ownerScope });
       const mine = all.filter(j => j.createdByAgent || j.agentGaii === agentGaii);
       return text({
@@ -159,6 +164,8 @@ export function registerAgentScheduleTools(
           id: j.id, display_name: j.displayName, kind: j.type, cron: j.cron, timezone: j.timezone,
           enabled: j.enabled, last_run_at: j.lastRunAt, last_run_result: j.lastRunResult,
           next_run_at: j.nextRunAt, run_count: j.runCount, created_by_agent: j.createdByAgent,
+          // What the schedule tells the model or the agent on every fire (services/schedule-prompt.ts).
+          ...(detail ? { ...schedulePromptOf(j), description: j.description ?? null, purpose: j.purpose ?? null, input: j.input ?? null } : {}),
         })),
         total: mine.length,
       });
@@ -175,6 +182,7 @@ export function registerAgentScheduleTools(
       cron: z.string().optional(),
       timezone: z.string().optional(),
       display_name: z.string().optional(),
+      prompt: z.string().optional().describe('New prompt: an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates. Other kinds have none.'),
     },
     annotationsFor('aimeat_schedule_update'),
     async (a) => {
@@ -185,9 +193,10 @@ export function registerAgentScheduleTools(
         cron: a.cron,
         timezone: a.timezone,
         display_name: a.display_name,
+        prompt: a.prompt,
       });
       if (!out.ok) return err(`${out.code}: ${out.message}`);
-      return text({ updated: true, schedule_id: a.schedule_id });
+      return text({ updated: true, schedule_id: a.schedule_id, ...(a.prompt !== undefined && out.schedule ? { prompt: schedulePromptOf(out.schedule).prompt } : {}) });
     },
   );
 

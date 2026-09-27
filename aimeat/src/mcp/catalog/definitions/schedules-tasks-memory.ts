@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-27 — aimeat_schedule_list takes detail (each schedule's prompt); aimeat_schedule_update takes prompt.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.7.5 — 2026-09-26 — aimeat_workflow_save says an ai step's call holds its share of maxCostUsd
  *     until it answers, the share is one attempt, and a step expected to cost more than the whole cap
@@ -69,14 +70,16 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_schedule_list',
-        description: 'List the schedules you created (id, kind, cron, enabled, last/next run, run count). Use before updating or deleting one.',
+        description: 'List the schedules you created (id, kind, cron, enabled, last/next run, run count). Use before updating or deleting one. With detail: true each schedule also carries what it tells the model or the agent on every fire: `prompt` (an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates), `system_prompt`, `task_title`, and its description, purpose and input.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: {},
+        input: {
+            detail: { type: 'boolean', description: 'true also returns each schedule\x27s prompt, system prompt or task title, description, purpose and input.' },
+        },
     },
     {
         name: 'aimeat_schedule_update',
-        description: 'Update one of your schedules: pause/resume (enabled=false/true), change the cron, timezone, or display name. Re-arms the live cron immediately.',
+        description: 'Update one of your schedules: pause/resume (enabled=false/true), change the cron, timezone, display name, or prompt. A new prompt replaces an ai schedule\x27s instruction or the description of the task an agent_task schedule creates, and keeps the rest of its input; other kinds have no prompt and refuse NO_PROMPT. Read the current one first with aimeat_schedule_list detail: true. Re-arms the live cron immediately.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -85,6 +88,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             cron: { type: 'string', description: 'New cron expression.' },
             timezone: { type: 'string', description: 'New IANA timezone.' },
             display_name: { type: 'string', description: 'New label.' },
+            prompt: { type: 'string', description: 'New prompt: an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates.' },
         },
     },
     {

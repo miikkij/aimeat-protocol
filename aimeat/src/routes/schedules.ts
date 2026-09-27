@@ -31,6 +31,7 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-09-27 — GET /v1/schedules?detail=true names each schedule's prompt; PATCH takes `prompt` (services/schedule-prompt.ts).
  *   v1.8.0 — 2026-08-16 — The aggregate tells a manifest-declared extension job from the owner's own
  *     schedule by its id, not by whether it has an owner scope. Those jobs now carry the installer's
  *     scope (the executor refuses without it), which would otherwise have moved every one of them out
@@ -86,6 +87,7 @@ import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, trigg
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { isManifestDeclaredJob } from '../services/extension-schedules.js';
 import { nodeTimeZone } from '../services/display-prefs.js';
+import { schedulePromptOf } from '../services/schedule-prompt.js';
 
 // The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
 // 2026-08-11, so the MCP tools that create, edit and cancel schedules produce the same record this
@@ -191,6 +193,13 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/schedules', requireAuth(), requireScope('workflow:read'), async (req, res) => {
     try {
       const { schedules } = await aggregateSchedules(ownerGhii(req), req.auth!.owner as string);
+      // ?detail=true names each schedule's prompt beside its input (services/schedule-prompt.ts), the
+      // same answer aimeat_schedule_list gives with detail: true.
+      if (req.query.detail === 'true') {
+        const withPrompt = <T extends ScheduledJobRecord>(j: T) => ({ ...j, ...schedulePromptOf(j) });
+        res.json(success(config.nodeId, { ...schedules, managed: schedules.managed.map(withPrompt), extensions: schedules.extensions.map(withPrompt) }));
+        return;
+      }
       res.json(success(config.nodeId, schedules));
     } catch (err) {
       logger.error('Failed to aggregate schedules', { error: (err as Error).message });

@@ -8,6 +8,8 @@
  *   has no dedicated REST route (it is a structured memory write), so it writes the
  *   `agents.<name>.scheduler` mirror via /v1/memory.
  * @version-history
+ *   v1.3.0 -- 2026-09-27 -- aimeat_schedule_list takes `detail` (GET /v1/schedules?detail=true) and
+ *     aimeat_schedule_update takes `prompt` (PATCH /v1/schedules/:id), as the node MCP server does.
  *   v1.2.0 -- 2026-09-05 -- An extension schedule can carry the action's own `input` (and an
  *     `instance_id`), keeping parity with the server MCP surface and with the route, which has
  *     stored both since it was written.
@@ -53,8 +55,10 @@ export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry):
     return out(await client.post('/v1/schedules', a as Record<string, unknown>));
   });
 
-  mcp.tool('aimeat_schedule_list', descriptionFor('aimeat_schedule_list'), {}, annotationsFor('aimeat_schedule_list'), async () => {
-    return out(await client.get('/v1/schedules'));
+  mcp.tool('aimeat_schedule_list', descriptionFor('aimeat_schedule_list'), {
+    detail: z.boolean().optional().describe('true also returns each schedule\x27s prompt, system prompt or task title, description, purpose and input.'),
+  }, annotationsFor('aimeat_schedule_list'), async ({ detail }) => {
+    return out(await client.get(detail ? '/v1/schedules?detail=true' : '/v1/schedules'));
   });
 
   mcp.tool('aimeat_schedule_update', descriptionFor('aimeat_schedule_update'), {
@@ -63,6 +67,7 @@ export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry):
     cron: z.string().optional(),
     timezone: z.string().optional(),
     display_name: z.string().optional(),
+    prompt: z.string().optional().describe('New prompt: an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates. Other kinds have none.'),
   }, annotationsFor('aimeat_schedule_update'), async ({ schedule_id, ...rest }) => {
     return out(await client.patch(`/v1/schedules/${encodeURIComponent(schedule_id)}`, rest as Record<string, unknown>));
   });

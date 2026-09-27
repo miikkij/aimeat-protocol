@@ -416,6 +416,10 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   'aimeat_organism_create',
   'aimeat_organism_update',
   'aimeat_schedule_create',
+  // DECIDED, 2026-09-27, on the same footing as aimeat_schedule_create above: `prompt` is the
+  // instruction a schedule gives the model or the agent on every fire, not content a person reads.
+  // What a fire produces carries its own provenance, minted where it is written.
+  'aimeat_schedule_update',
   'aimeat_task_create',
 ];
 

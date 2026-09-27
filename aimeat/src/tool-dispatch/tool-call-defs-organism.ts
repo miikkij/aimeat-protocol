@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-09-27 -- aimeat_schedule_list forwards detail (GET /v1/schedules?detail=true); aimeat_schedule_update forwards prompt with the rest.
  *   v1.6.0 -- 2026-09-25 -- aimeat_workspace_space_add, _sections_set and _suggestions reach the node's
  *     member change doors; _update forwards `member_changes`; _write files a document under a section,
  *     and _object_delete takes a deleted one out, through the section door (workspace-section-filing.ts),
@@ -286,7 +287,8 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_schedule_list',
-        handler: ({ client }) => client.get('/v1/schedules'),
+        // → GET /v1/schedules, with ?detail=true for each schedule's prompt.
+        handler: ({ client }, input) => client.get(optionalBoolean(input, 'detail') ? '/v1/schedules?detail=true' : '/v1/schedules'),
     },
     {
         name: 'aimeat_schedule_update',
