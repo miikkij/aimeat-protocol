@@ -11,6 +11,9 @@
  *   - ALLOWED_CATEGORIES: whitelist validated on publish/update
  *
  * @version-history
+ *   v1.4.0 -- 2026-09-26 -- Publish, update and delete key the action on the caller's resolved
+ *     identity (resolveIdentity): a person's GHII, an agent's GAII. The work doors use the same one,
+ *     so the person who published an action takes the work on it (secaudit 2026-09: N6, F-1).
  *   v1.3.0 -- 2026-09-06 -- Review item 3.1: PUT runs the two checks POST runs. `category` was
  *     validated against ALLOWED_CATEGORIES and the trust floor for a PAID listing applied only at
  *     publish, so publish-free-then-edit was the way around both.
@@ -24,6 +27,7 @@ import { success, error } from '../middleware/envelope.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { ActionPublishSchema, ActionUpdateSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 const ALLOWED_CATEGORIES = [
   'language', 'translation', 'analysis', 'generation', 'coding',
@@ -44,7 +48,10 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const gaii = req.auth!.sub;
+    // The provider is the caller's resolved identity: a person's GHII, an agent's own GAII. Every work
+    // item on the action is addressed to it and every work door compares it, so the person who
+    // published an action is the one who takes the work on it.
+    const gaii = resolveIdentity(req.auth!, config.nodeId);
 
     // Min trust enforcement for paid actions
     if (pricing.base_morsels > 0) {
@@ -115,7 +122,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // DELETE /v1/actions/:id — remove an action (agent auth)
   router.delete('/v1/actions/:id', requireAuth(), requireExternalPrincipal(), requireScope('work:publish'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolveIdentity(req.auth!, config.nodeId);
     const deleted = await storage.deleteAction(req.params.id as string, gaii);
     if (!deleted) {
       res.status(404).json(error(config.nodeId, 'ACTION_NOT_FOUND', `Action not found: ${req.params.id}`));
@@ -168,7 +175,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
   // action listing without the word that governs it. Adding it can refuse an agent that used to
   // pass with a narrower grant; that refusal is the point.
   router.put('/v1/actions/:id', requireAuth(), requireExternalPrincipal(), requireScope('work:publish'), validateBody(ActionUpdateSchema, config.nodeId), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolveIdentity(req.auth!, config.nodeId);
     const id = req.params.id as string;
     const { display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, semantic, federate } = req.body ?? {};
 

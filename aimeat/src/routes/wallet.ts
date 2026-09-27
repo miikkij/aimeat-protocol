@@ -25,6 +25,8 @@
  *     unrecorded (balance − rows: what the daily pace credited without a row) and by_type.
  *   v1.4.0 — 2026-09-08 — The three `@context` blocks read DEFAULT_CONTEXT (utils/onto-context.ts)
  *     rather than repeating a two-prefix copy of it.
+ *   v1.5.0 — 2026-09-26 — `in_escrow` reads the person's own GHII beside their agents': a request made
+ *     in person is filed under it.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -69,15 +71,16 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     const balance = ghiiRecord.morselBalance ?? 0;
     const transactions = await storage.getTransactions(identity, 100_000);
 
-    // Escrow is tracked per-agent (work items reference GAIIs), so iterate agents. Cached 60s per
-    // owner — this is a full work-item scan per agent and the wallet polls on every load. The 'work'
-    // and 'wallet' write paths broadcast their domain (no owner), so the broad domain tags drop it.
+    // Escrow is tracked per identity (work items name the person's GHII or an agent's GAII), so iterate
+    // both. Cached 60s per owner — this is a full work-item scan per identity and the wallet polls on
+    // every load. The 'work' and 'wallet' write paths broadcast their domain (no owner), so the broad
+    // domain tags drop it.
     const inEscrow = await cached(
       `escrow:${ownerName}`, TTL.dashboard,
       async () => {
         const agents = await storage.getAgentsByOwner(ownerName);
         let total = 0;
-        for (const agent of agents) total += await calculateEscrow(storage, agent.gaii);
+        for (const id of [identity, ...agents.map(a => a.gaii)]) total += await calculateEscrow(storage, id);
         return total;
       },
       ['domain:work', 'domain:wallet'],

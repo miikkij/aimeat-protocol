@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.16.2 -- 2026-09-26 -- aimeat_action_execute's provider_gaii says what the catalogue entry says:
+ *     an agent's GAII, or a person's GHII when a person published the action.
  *   v1.16.1 -- 2026-09-26 -- aimeat_admin_hook_set's `actions` says each reference names an action
  *     already published on the node: publish it, then bind it (security audit A8-3).
  *   v1.16.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set (PUT /v1/federation/peers/:nodeId/
@@ -283,7 +285,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_action_execute', descriptionFor('aimeat_action_execute'), {
     agent_name: agentNameSchema,
     action_id: z.string().describe('Action identifier'),
-    provider_gaii: z.string().describe('GAII of the provider offering this action (required to route + escrow)'),
+    provider_gaii: z.string().describe('The provider_gaii the catalogue lists for the action: an agent\'s GAII, or a person\'s GHII when a person published it (required to route + escrow)'),
     input: z.record(z.string(), z.unknown()).optional().describe('Input parameters for the action'),
     ttl_hours: z.number().optional().describe('Hours before the work request expires (default 24)'),
   }, annotationsFor('aimeat_action_execute'), async ({ agent_name, action_id, provider_gaii, input, ttl_hours }) => {

@@ -11,6 +11,10 @@
  *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
  *
  * @version-history
+ *   v2.2.0 — 2026-09-26 — Every door names the caller by its resolved identity (resolveIdentity): a
+ *     person by their GHII, an agent by its GAII. A work item carries the same identity for its two
+ *     parties, so a person who asked for work or delivered it in person uses the dispute doors on it,
+ *     and the log names who acted the way the work item does.
  *   v2.1.0 — 2026-08-16 — The audit hash is computed over a CANONICAL serialisation, so it can be
  *     recomputed from the entry as it is read back. It could not be on the production backend:
  *     `DisputeAudit.data` is JSONB and Postgres returns its keys in its own order, so any entry whose
@@ -52,6 +56,7 @@ import { requireAuth, requireRole, requireExternalPrincipal, requireAnyScope } f
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { returnEscrow, settlePayment } from '../services/morsel.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
 
 function param(p: string | string[]): string {
@@ -121,12 +126,13 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/dispute — Open dispute
     router.post('/v1/work/:tc/dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), validateBody(DisputeOpenSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
             return;
         }
-        if (work.requesterGaii !== req.auth!.sub) {
+        if (work.requesterGaii !== me) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can open a dispute'));
             return;
         }
@@ -150,7 +156,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             id: disputeId,
             trackingCode: tc,
             status: 'open',
-            openedBy: req.auth!.sub,
+            openedBy: me,
             reason,
             createdAt: now,
             updatedAt: now,
@@ -158,7 +164,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateWork(tc, { status: 'disputed', updatedAt: now });
 
-        await appendAuditEntry(storage, disputeId, 'dispute_opened', req.auth!.sub, { reason });
+        await appendAuditEntry(storage, disputeId, 'dispute_opened', me, { reason });
 
         res.status(201).json(success(config.nodeId, {
             dispute_id: dispute.id,
@@ -179,14 +185,14 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // GET /v1/work/:tc/dispute — View dispute thread
     router.get('/v1/work/:tc/dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:read', 'work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
             return;
         }
 
-        const gaii = req.auth!.sub;
-        if (work.providerGaii !== gaii && work.requesterGaii !== gaii && !req.auth!.roles.includes('operator')) {
+        if (work.providerGaii !== me && work.requesterGaii !== me && !req.auth!.roles.includes('operator')) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not a party to this dispute'));
             return;
         }
@@ -221,9 +227,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/counter-dispute — Provider counter-disputes
     router.post('/v1/work/:tc/counter-dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), validateBody(CounterDisputeSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.providerGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can counter-dispute')); return; }
+        if (work.providerGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can counter-dispute')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
@@ -232,7 +239,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'contested', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'contested', updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 'counter_dispute', req.auth!.sub, { reason });
+        await appendAuditEntry(storage, dispute.id, 'counter_dispute', me, { reason });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'contested' }, [
             { description: 'Escalate to operator', method: 'POST', url: `/v1/work/${tc}/escalate` },
@@ -244,9 +251,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/redeliver — Re-deliver after dispute
     router.post('/v1/work/:tc/redeliver', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.providerGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can re-deliver')); return; }
+        if (work.providerGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can re-deliver')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
@@ -255,7 +263,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         if (output === undefined) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'output is required')); return; }
 
         await storage.updateWork(tc, { output, updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 're_delivery', req.auth!.sub, { output_provided: true });
+        await appendAuditEntry(storage, dispute.id, 're_delivery', me, { output_provided: true });
 
         res.json(success(config.nodeId, { tracking_code: tc, redelivered: true }, [
             { description: 'Requester can accept re-delivery', method: 'POST', url: `/v1/work/${tc}/accept-redelivery` },
@@ -266,9 +274,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/accept-fault — Provider accepts fault
     router.post('/v1/work/:tc/accept-fault', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.providerGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can accept fault')); return; }
+        if (work.providerGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can accept fault')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
@@ -278,7 +287,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 'accept_fault', req.auth!.sub, { full_refund: true });
+        await appendAuditEntry(storage, dispute.id, 'accept_fault', me, { full_refund: true });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'requester_refunded' }));
         emitChange('disputes');
@@ -287,9 +296,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/offer-partial — Provider offers partial refund
     router.post('/v1/work/:tc/offer-partial', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), validateBody(PartialOfferSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.providerGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can offer partial refund')); return; }
+        if (work.providerGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can offer partial refund')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
@@ -307,7 +317,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        await appendAuditEntry(storage, dispute.id, 'partial_offer', req.auth!.sub, { refund_morsels, message });
+        await appendAuditEntry(storage, dispute.id, 'partial_offer', me, { refund_morsels, message });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, offer: { refund_morsels, message } }, [
             { description: 'Requester accepts partial', method: 'POST', url: `/v1/work/${tc}/accept-partial` },
@@ -319,9 +329,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/accept-redelivery — Requester accepts re-delivery
     router.post('/v1/work/:tc/accept-redelivery', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.requesterGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can accept re-delivery')); return; }
+        if (work.requesterGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can accept re-delivery')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
@@ -331,7 +342,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 'accept_redelivery', req.auth!.sub, {});
+        await appendAuditEntry(storage, dispute.id, 'accept_redelivery', me, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'redelivery_accepted' }));
         emitChange('disputes');
@@ -340,9 +351,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/accept-partial — Requester accepts partial offer
     router.post('/v1/work/:tc/accept-partial', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.requesterGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can accept partial')); return; }
+        if (work.requesterGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can accept partial')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
@@ -378,7 +390,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 'partial_accepted', req.auth!.sub, { refund_morsels: refundAmount });
+        await appendAuditEntry(storage, dispute.id, 'partial_accepted', me, { refund_morsels: refundAmount });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', refund_morsels: refundAmount }));
         emitChange('disputes');
@@ -387,14 +399,15 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/reject-partial — Requester rejects partial offer
     router.post('/v1/work/:tc/reject-partial', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.requesterGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can reject partial')); return; }
+        if (work.requesterGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can reject partial')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
 
-        await appendAuditEntry(storage, dispute.id, 'partial_rejected', req.auth!.sub, {});
+        await appendAuditEntry(storage, dispute.id, 'partial_rejected', me, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: dispute.status, partial_rejected: true }, [
             { description: 'Escalate to operator', method: 'POST', url: `/v1/work/${tc}/escalate` },
@@ -405,9 +418,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/withdraw-dispute — Requester withdraws dispute
     router.post('/v1/work/:tc/withdraw-dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
-        if (work.requesterGaii !== req.auth!.sub) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can withdraw a dispute')); return; }
+        if (work.requesterGaii !== me) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can withdraw a dispute')); return; }
 
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
@@ -417,7 +431,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 'withdraw_dispute', req.auth!.sub, {});
+        await appendAuditEntry(storage, dispute.id, 'withdraw_dispute', me, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'withdrawn' }));
         emitChange('disputes');
@@ -426,11 +440,11 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/work/:tc/escalate — Escalate to operator
     router.post('/v1/work/:tc/escalate', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
 
-        const gaii = req.auth!.sub;
-        if (work.providerGaii !== gaii && work.requesterGaii !== gaii) {
+        if (work.providerGaii !== me && work.requesterGaii !== me) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not a party to this work item'));
             return;
         }
@@ -440,7 +454,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'escalated', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'escalated', updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 'escalated', gaii, {});
+        await appendAuditEntry(storage, dispute.id, 'escalated', me, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'escalated' }, [
             { description: 'View dispute thread', method: 'GET', url: `/v1/work/${tc}/dispute` },
@@ -451,6 +465,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/admin/disputes/:id/rule — Operator rules on dispute
     router.post('/v1/admin/disputes/:id/rule', requireAuth(), requireRole('operator'), validateBody(OperatorRulingSchema, config.nodeId), async (req, res) => {
         const disputeId = param(req.params.id);
+        const me = resolveIdentity(req.auth!, config.nodeId);
         const dispute = await storage.getDispute(disputeId);
         if (!dispute) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Dispute not found')); return; }
         if (dispute.status === 'resolved') { res.status(409).json(error(config.nodeId, 'DISPUTE_CLOSED', 'Dispute already resolved')); return; }
@@ -516,7 +531,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             updatedAt: new Date().toISOString(),
         });
         await storage.updateWork(dispute.trackingCode, { status: 'settled', updatedAt: new Date().toISOString() });
-        await appendAuditEntry(storage, dispute.id, 'operator_ruled', req.auth!.sub, { ruling, distribution, reason });
+        await appendAuditEntry(storage, dispute.id, 'operator_ruled', me, { ruling, distribution, reason });
 
         res.json(success(config.nodeId, {
             dispute_id: dispute.id,

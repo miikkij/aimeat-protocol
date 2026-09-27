@@ -12,6 +12,11 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.4.0 — 2026-09-26 — Every door names the caller by its resolved identity (resolveIdentity): a
+ *     person by their GHII, an agent by its GAII. A request stores it as the requester, the provider
+ *     doors compare it, and a person's inbox, sent list and Work tab read their own GHII beside their
+ *     agents'. An action a person publishes carries the same identity (routes/actions.ts), so they
+ *     take the work on it themselves (secaudit 2026-09: N6, F-1).
  *   v1.3.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-13 — Forwarding a work request to a remote node goes through safeFetch. The
  *     validateOutboundUrl() above it reads the first hop only, so a node that passed it could 302
@@ -35,7 +40,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
-import { isForeignPrincipal } from '../utils/gaii.js';
+import { isForeignPrincipal, resolveIdentity } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow } from '../services/morsel.js';
@@ -253,7 +258,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
   // POST /v1/work/request — submit a work request (spec path)
   router.post('/v1/work/request', requireAuth(), requireExternalPrincipal(), requireScope('work:request'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
-    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers, notificationService);
+    const result = await createWorkItem(config, storage, resolveIdentity(req.auth!, config.nodeId), req.body ?? {}, peers, notificationService);
     if ('forwarded' in result) {
       res.status(result.remoteStatus as number).json(result.remoteResult);
       return;
@@ -281,7 +286,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
   // POST /v1/work — legacy submit path (alias)
   router.post('/v1/work', requireAuth(), requireExternalPrincipal(), requireScope('work:request'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
-    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers, notificationService);
+    const result = await createWorkItem(config, storage, resolveIdentity(req.auth!, config.nodeId), req.body ?? {}, peers, notificationService);
     if ('forwarded' in result) {
       res.status(result.remoteStatus as number).json(result.remoteResult);
       return;
@@ -309,10 +314,11 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   // POST /v1/work/batch — batch work requests
   router.post('/v1/work/batch', requireAuth(), requireExternalPrincipal(), requireScope('work:request'), validateBody(WorkBatchSchema, config.nodeId), async (req, res) => {
     const { requests } = req.body ?? {};
+    const requester = resolveIdentity(req.auth!, config.nodeId);
 
     const results = [];
     for (const r of requests) {
-      const result = await createWorkItem(config, storage, req.auth!.sub, r, peers, notificationService);
+      const result = await createWorkItem(config, storage, requester, r, peers, notificationService);
       if ('forwarded' in result) {
         results.push({ forwarded: true, remote_result: result.remoteResult });
       } else if ('error' in result) {
@@ -336,13 +342,14 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // visitor from another node is the local part of their own name and names the local namesake.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
       && !isForeignPrincipal(req.auth);
+    const me = resolveIdentity(req.auth!, config.nodeId);
     let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
     if (isOwnerSession) {
-      // Owner sees work across all their agents — ONE providerGaii IN (…) query, not one per agent.
+      // The person's own work (their GHII) and all their agents' — ONE providerGaii IN (…) query.
       const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-      items = agents.length ? await storage.listWorkByProviders(agents.map(a => a.gaii)) : [];
+      items = await storage.listWorkByProviders([me, ...agents.map(a => a.gaii)]);
     } else {
-      items = await storage.listWorkByProvider(req.auth!.sub);
+      items = await storage.listWorkByProvider(me);
     }
     const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
 
@@ -370,13 +377,14 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // cover this. Found by the AI triage of 2026-09-13.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
       && !isForeignPrincipal(req.auth);
+    const me = resolveIdentity(req.auth!, config.nodeId);
     let items: Awaited<ReturnType<typeof storage.listWorkByRequester>>;
     if (isOwnerSession) {
-      // ONE requesterGaii IN (…) query across the owner's agents, not one per agent.
+      // ONE requesterGaii IN (…) query across the person's own GHII and their agents.
       const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-      items = agents.length ? await storage.listWorkByRequesters(agents.map(a => a.gaii)) : [];
+      items = await storage.listWorkByRequesters([me, ...agents.map(a => a.gaii)]);
     } else {
-      items = await storage.listWorkByRequester(req.auth!.sub);
+      items = await storage.listWorkByRequester(me);
     }
 
     res.json(success(config.nodeId, {
@@ -402,7 +410,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // Same reason as /v1/work/inbox above: an owner-name fan-out is not a visitor's own work.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
       && !isForeignPrincipal(req.auth);
-    const data = await workTabDb.overview(isOwnerSession, req.auth!.owner as string, req.auth!.sub as string);
+    const data = await workTabDb.overview(isOwnerSession, req.auth!.owner as string, resolveIdentity(req.auth!, config.nodeId));
     res.json(success(config.nodeId, data));
   });
 
@@ -415,7 +423,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       return;
     }
 
-    const gaii = req.auth!.sub;
+    const gaii = resolveIdentity(req.auth!, config.nodeId);
     if (work.providerGaii !== gaii && work.requesterGaii !== gaii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not a party to this work item'));
       return;
@@ -440,7 +448,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   // POST /v1/work/:tc/accept — accept work (provider, agent auth)
   router.post('/v1/work/:tc/accept', requireAuth(), requireExternalPrincipal(), requireScope('work:accept'), async (req, res) => {
     const tc = param(req.params.tc);
-    const accepted = await acceptWork({ storage, config }, req.auth!.sub, tc);
+    const accepted = await acceptWork({ storage, config }, resolveIdentity(req.auth!, config.nodeId), tc);
     if (!accepted.ok) {
       res.status(accepted.status).json(error(config.nodeId, accepted.code, accepted.message));
       return;
@@ -463,7 +471,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
       return;
     }
-    if (work.providerGaii !== req.auth!.sub) {
+    if (work.providerGaii !== resolveIdentity(req.auth!, config.nodeId)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can update work status'));
       return;
     }
@@ -504,7 +512,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
       return;
     }
-    if (work.providerGaii !== req.auth!.sub) {
+    if (work.providerGaii !== resolveIdentity(req.auth!, config.nodeId)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can reject work'));
       return;
     }
@@ -537,7 +545,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     const tc = param(req.params.tc);
     const { output } = req.body ?? {};
 
-    const delivered = await deliverWork({ storage, config }, req.auth!.sub, tc, output);
+    const delivered = await deliverWork({ storage, config }, resolveIdentity(req.auth!, config.nodeId), tc, output);
     if (!delivered.ok) {
       res.status(delivered.status).json(error(config.nodeId, delivered.code, delivered.message));
       return;
@@ -560,7 +568,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
       return;
     }
-    if (work.requesterGaii !== req.auth!.sub) {
+    if (work.requesterGaii !== resolveIdentity(req.auth!, config.nodeId)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the requester can rate work'));
       return;
     }
