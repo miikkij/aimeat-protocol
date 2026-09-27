@@ -5,6 +5,10 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.21.0 — 2026-09-26 — Where the markup carries a list, a counter-reset that does not name list-item and
+ *     `all: initial` or `all: unset` are refused, each saying why, and list-item, list-item 3,
+ *     reversed(list-item), revert and revert-layer pass; without a list, list-item in a counter-reset stays
+ *     refused. The case of a component's own nested list names list-item in its counter-reset.
  *   v1.20.0 — 2026-09-26 — A list item stays in a list of the component: an <li> outside a <ul> or <ol>, a
  *     display that holds list-item, reads through var() or inherits, and a counter-increment without
  *     "list-item 0" beside a <summary> are refused, each saying why; a list of the component, and
@@ -633,7 +637,7 @@ describe('the component bench', () => {
     // A list of the component holds its own items, and "list-item 0" keeps a <summary> counting 0.
     for (const [html, css] of [
       ['<ul class="wkgrid"><li class="wkgrid-i">a</li><li>b</li></ul>', ''],
-      ['<ol class="wkgrid"><li>a<ol class="wkgrid-sub"><li>b</li></ol></li></ol>', '.wkgrid { counter-reset: wkgrid-step; }'],
+      ['<ol class="wkgrid"><li>a<ol class="wkgrid-sub"><li>b</li></ol></li></ol>', '.wkgrid { counter-reset: wkgrid-step list-item; }'],
       [disclosure, '.wkgrid-s { counter-increment: wkgrid-step list-item 0; }'],
       [disclosure, '.wkgrid-s { display: block; } .wkgrid-p { counter-reset: wkgrid-step; }'],
       [WEEK_GRID.html, '.wkgrid-row { counter-increment: wkgrid-step; display: grid; } .wkgrid-cell { display: revert; }'],
@@ -642,6 +646,37 @@ describe('the component bench', () => {
     }
     // The reader gives every element the name of the element it stands in.
     expect(readMarkup('<ul><li>a</li></ul><li>b</li>').elements.map(e => [e.name, e.parent])).toEqual([['ul', null], ['li', 'ul'], ['li', null]]);
+  });
+
+  // A browser starts the numbering of a list with the counter-reset: list-item its default style gives
+  // every <ul>, <ol> and <menu>, and an author counter-reset replaces it (HTML rendering, 15.3.7).
+  // Where the markup carries a list, every counter-reset names list-item, so the list keeps its own.
+  it('keeps the reset of its own lists: where the markup carries a list, every counter-reset names list-item', () => {
+    const list = '<ol class="wkgrid"><li class="wkgrid-i">a</li></ol>';
+    for (const [decl, fix] of [
+      ['counter-reset: wkgrid-x', 'counter-reset: wkgrid-x list-item'], ['counter-reset: none', 'counter-reset: list-item'],
+      ['counter-reset: initial', 'counter-reset: list-item'], ['counter-reset: unset', 'counter-reset: list-item'],
+    ]) {
+      expect(bad({ html: list, css: `${WEEK_GRID.css}\n.wkgrid { ${decl}; }` }), decl).toThrow(new RegExp('The markup carries an <ol>, whose items a browser numbers from the counter-reset: list-item '
+        + `that its default style gives every <ul>, <ol> and <menu>\\. The declaration "${decl}" can reach that list and replace its reset, and a browser that numbers lists by the list-item counter `
+        + 'then numbers the list\'s items as items of the page\'s own list around the component, whose items after them count on from them\\. '
+        + `Where the markup carries a <ul>, <ol> or <menu>, every counter-reset also names list-item: "${fix}"\\.`));
+    }
+    for (const decl of ['all: initial', 'all: unset']) {
+      expect(bad({ html: list, css: `${WEEK_GRID.css}\n.wkgrid-i { ${decl}; }` }), decl).toThrow(new RegExp(`The markup carries an <ol>, and the declaration "${decl}" sets counter-reset to none wherever it reaches.*`
+        + 'Where the markup carries a <ul>, <ol> or <menu>, "all" takes only revert or revert-layer, which keep that reset\\.'));
+    }
+    for (const decl of [
+      'counter-reset: list-item', 'counter-reset: list-item 3', 'counter-reset: wkgrid-x list-item', 'counter-reset: reversed(list-item)', 'counter-reset: revert',
+      'counter-reset: revert-layer', 'all: revert', 'all: revert-layer',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, html: list, css: `${WEEK_GRID.css}\n.wkgrid { ${decl}; }` }), decl).not.toThrow();
+    }
+    // Where the markup carries no list, list-item in a counter-reset stays the page's, and the other forms pass.
+    expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid { counter-reset: list-item; }` })).toThrow(/names the counter "list-item"/);
+    for (const decl of ['counter-reset: wkgrid-x', 'counter-reset: none', 'all: unset']) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css: `${WEEK_GRID.css}\n.wkgrid { ${decl}; }` }), decl).not.toThrow();
+    }
   });
 
   // css-tree reads a custom function's parameters by name only, and keeps a type, a default or a
