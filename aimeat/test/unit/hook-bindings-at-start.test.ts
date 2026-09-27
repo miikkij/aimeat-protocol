@@ -14,6 +14,7 @@
  * @structure one real SQLite file, seeded, then opened by initializeConfig as a node opens it
  * @usage cd aimeat && pnpm exec vitest run test/unit/hook-bindings-at-start.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The start records that the bindings are settled, once per node (A8-3).
  *   v1.0.0 — 2026-09-26 — Initial (security audit A8-3).
  */
 import { describe, it, expect } from 'vitest';
@@ -24,6 +25,7 @@ import { loadConfig } from '../../src/config.js';
 import { initializeConfig } from '../../src/server-bootstrap/config-init.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { readHookRuns } from '../../src/services/hook-log.js';
+import { HOOK_BINDINGS_SETTLED_KEY } from '../../src/services/hooks-overview.js';
 import type { ActionRecord } from '../../src/storage/types/commerce.js';
 
 const published: ActionRecord = {
@@ -56,6 +58,8 @@ describe('a node settles the hook bindings its store holds when it starts', () =
             expect(runs.filter((r) => r.actionRef === 'gone').map((r) => [r.hook, r.answer]).sort()).toEqual([
                 ['post_settlement', 'missing'], ['pre_owner_registration', 'missing'],
             ]);
+            // Once per node: the record says so, and a later start reads it and changes nothing.
+            expect(await storage.getMemory(`system@${config.nodeId}`, HOOK_BINDINGS_SETTLED_KEY)).toBeTruthy();
         } finally {
             (storage as unknown as { close(): void }).close();
             rmSync(dir, { recursive: true, force: true });

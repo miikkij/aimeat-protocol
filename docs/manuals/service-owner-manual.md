@@ -312,14 +312,16 @@ attached action, in order, the node POSTs JSON to that URL:
 }
 ```
 
-`action_ref` is the reference as the hook keeps it, normally the action's id with the identity that
-published it.
+`action_ref` is the reference as the hook keeps it: the action's id with the identity that published
+it.
 
 Two ways to refuse: answer with a non-2xx status, or answer `200` with `{"allowed": false, "reason":
 "..."}`. Anything else lets the flow continue. Outbound calls are SSRF-guarded (a webhook pointing at
-a private address is skipped with a log line) and time out after 10 seconds. An action reference that
-does not resolve is skipped with a warning, so a deleted action fails open rather than locking
-registration.
+a private address is skipped with a log line) and time out after 10 seconds. When a hook runs, only
+an `id#providerGaii` reference names an action. One whose action was deleted is skipped with a
+warning, so a deleted action fails open rather than locking registration. A bare id names no action,
+whatever is published at that moment: nothing is called, and a blocking hook refuses until you bind
+the action again as `id#providerGaii`.
 
 ### Attaching one
 
@@ -340,10 +342,12 @@ action with the same id that somebody else publishes later does not change what 
 reference that no published action answers to is refused with `400 INVALID_INPUT`, and nothing is
 written: publish the action, then bind it.
 
-A binding the node finds in its store at start is brought to the same form. A bare id that one
-provider publishes is stored as its `id#providerGaii`. A bare id that no provider publishes is taken
-off its hook, and the Hooks page says so in its list of calls: publish the action, then bind it
-again.
+A binding the node finds in its store is brought to the same form once, at the first start that
+finds a bare id. A bare id that one provider publishes is stored as its `id#providerGaii`. A bare id
+that no provider publishes is taken off its hook, and the Hooks page says so in its list of calls:
+publish the action, then bind it again. A bare id that two providers publish stays, and names no
+action whatever they publish or delete later. `GET /v1/admin/hooks` (and `aimeat_admin_hooks`) lists
+the `id#providerGaii` of each under `ambiguous`: bind the one you mean.
 
 ### A worked example: refuse throwaway domains
 

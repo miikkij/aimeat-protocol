@@ -395,17 +395,20 @@ components:
           items:
             type: object
             properties:
-              ref: { type: string, description: The reference as the operator wrote it }
+              ref: { type: string, description: The reference as the binding stores it }
               name: { type: string, nullable: true }
-              published: { type: boolean, description: Whether an action with this reference exists here }
+              published: { type: boolean, description: Whether this reference names an action published here. A bare id never does. }
               has_address: { type: boolean, description: A published action without one is bound and does nothing }
               host: { type: string, nullable: true, description: The address's host, never the whole address }
               ambiguous:
                 type: array
                 items: { type: string }
                 description: >
-                  Present when the reference is a bare id that more than one provider publishes: the
-                  id#provider of each. Such a reference names none of them and nothing is called.
+                  Present when the reference is a bare id: the id#provider of each provider that
+                  publishes that id now, possibly none. When a hook runs, only an id#provider
+                  reference names an action, so a bare id names none of them, whatever is published:
+                  nothing is called, and a gate bound to it refuses. Bind the one you mean as
+                  id#provider.
         last:
           allOf:
             - $ref: '#/components/schemas/HookRun'
@@ -24969,7 +24972,8 @@ paths:
         It reports what is TRUE rather than what is configured, wherever the two can differ: a bound
         action that was deleted reads as not published, and one without a `webhookUrl` reads as
         carrying no address, because both look identical to a working binding from inside the
-        config.
+        config. A bare id reads as naming nothing, with `ambiguous`, because a hook calls only an
+        `id#provider` reference.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -25059,6 +25063,14 @@ paths:
         Every reference is stored as the `id#provider` of the action it names, and the answer's
         `actions` shows it so. Another owner who publishes the same id later cannot change what the
         binding names.
+
+        When a hook runs, only an `id#provider` reference names an action. A bare id in a stored
+        binding names none, whatever is published or deleted at that moment: nothing is called, a
+        gate bound to it refuses, and `GET /v1/admin/hooks` shows it with `ambiguous`, the
+        `id#provider` of each provider that publishes the id now. Bind the one you mean as
+        `id#provider`. A node settles the bindings in its store once, at the first start that finds
+        a bare id: one that a single provider publishes is stored as its `id#provider`, and one that
+        nobody publishes is taken off its moment.
 
         When the published actions cannot be read, nothing is bound and the answer is 500. An empty
         list clears the moment, the same as DELETE, and reads nothing.

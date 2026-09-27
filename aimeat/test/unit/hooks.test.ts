@@ -27,9 +27,18 @@
  *      it names. "a binding names an action that is already published" asserts that a reference
  *      nothing publishes is refused before anything is written, with a sentence that says to publish
  *      first; "bindings stored earlier, settled at start" asserts what the node does at start with a
- *      stored bare id: pinned when one provider publishes it, taken off when nobody does.
+ *      stored bare id: pinned when one provider publishes it, taken off when nobody does, once per
+ *      node.
+ *
+ *   6. When a hook runs, only an id#provider reference names an action. A bare id names none,
+ *      whatever is published at that moment: "stays naming nobody when one of the two providers
+ *      deletes its action" asserts that nobody is called and a gate refuses, whichever provider is
+ *      left, so no later publication or deletion decides what a stored binding names.
  *
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The executor resolves only id#provider references; a bare id calls nobody
+ *     and a gate bound to it refuses, whatever is published. The executor cases bind id#provider,
+ *     the form a binding is stored in. The stored bindings are settled once per node (A8-3).
  *   v1.3.0 — 2026-09-26 — A binding names an action that is already published: a reference nothing
  *     publishes is refused, an unreadable actions table refuses a binding, clearing reads nothing,
  *     and the stored bindings are settled at start (A8-3).
@@ -78,6 +87,10 @@ const action = (over: Partial<ActionRecord> = {}): ActionRecord => ({
   createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
   ...over,
 } as ActionRecord);
+
+/** The reference a binding stores for an action above: its id with its provider. The executor
+ *  resolves only this form; a bare id names no action at call time. */
+const ref = (id: string, provider = 'bot#alice@node') => `${id}#${provider}`;
 
 const cfg = (hooks: Partial<Record<HookName, string[]>> = {}): AimeatConfig => ({
   nodeId: 'aimeat-local-001-dev',
@@ -131,31 +144,36 @@ describe('resolving the actions', () => {
   it('resolves the published actions ONCE however many are bound', async () => {
     const actions = [action({ id: 'a' }), action({ id: 'b' }), action({ id: 'c' })];
     const { storage, listed } = fakeStorage(actions);
-    await executeHooks(cfg({ pre_owner_registration: ['a', 'b', 'c'] }), storage, 'pre_owner_registration', { name: 'alice' });
+    await executeHooks(cfg({ pre_owner_registration: [ref('a'), ref('b'), ref('c')] }), storage, 'pre_owner_registration', { name: 'alice' });
     expect(fetched).toHaveLength(3);
     // The hole: this was one full scan of the actions table PER BOUND ACTION, on the critical path
     // of every registration.
     expect(listed).toHaveLength(1);
   });
 
-  it('accepts both spellings of a reference: the bare id and the id with its provider', async () => {
+  it('calls the id with its provider, and a bare id of the one action published under it calls nobody', async () => {
     const { storage } = fakeStorage([action({ id: 'check', providerGaii: 'bot#alice@node' })]);
-    await executeHooks(cfg({ post_settlement: ['check', 'check#bot#alice@node'] }), storage, 'post_settlement', {});
-    expect(fetched).toHaveLength(2);
+    const r = await executeHooks(cfg({ post_settlement: ['check', 'check#bot#alice@node'] }), storage, 'post_settlement', {});
+    expect(r).toEqual({ allowed: true });
+    expect(fetched).toEqual(['https://hooks.example/check']);
+    const runs = await readHookRuns(storage);
+    // Newest first: the qualified reference answered, the bare id before it named nobody.
+    expect(runs.map((x) => [x.actionRef, x.answer])).toEqual([['check#bot#alice@node', 'ok'], ['check', 'missing']]);
+    expect(runs[1].reason).toContain('check#bot#alice@node');
   });
 
   it('a bound action that is not published is recorded as missing and stops nothing', async () => {
     const { storage } = fakeStorage([]);
-    const r = await executeHooks(cfg({ pre_owner_registration: ['gone'] }), storage, 'pre_owner_registration', { name: 'alice' });
+    const r = await executeHooks(cfg({ pre_owner_registration: [ref('gone')] }), storage, 'pre_owner_registration', { name: 'alice' });
     expect(r.allowed).toBe(true);
     expect(fetched).toHaveLength(0);
     const runs = await readHookRuns(storage);
-    expect(runs[0]).toMatchObject({ hook: 'pre_owner_registration', actionRef: 'gone', answer: 'missing', allowed: true });
+    expect(runs[0]).toMatchObject({ hook: 'pre_owner_registration', actionRef: ref('gone'), answer: 'missing', allowed: true });
   });
 
   it('a published action with no address is bound, does nothing, and says so', async () => {
     const { storage } = fakeStorage([action({ webhookUrl: undefined })]);
-    const r = await executeHooks(cfg({ pre_board_post: ['check'] }), storage, 'pre_board_post', { board_id: 'b1' });
+    const r = await executeHooks(cfg({ pre_board_post: [ref('check')] }), storage, 'pre_board_post', { board_id: 'b1' });
     expect(r.allowed).toBe(true);
     expect(fetched).toHaveLength(0);
     expect((await readHookRuns(storage))[0]).toMatchObject({ answer: 'no_address', allowed: true, actionName: 'Allowlist check' });
@@ -197,6 +215,42 @@ describe('a bare id two providers publish', () => {
     const r = await executeHooks(cfg({ post_agent_registration: ['gate'] }), storage, 'post_agent_registration', { name: 'bot' });
     expect(r).toEqual({ allowed: true });
     expect(fetched).toEqual([]);
+  });
+
+  // The bare binding was stored while two providers published the id. Then one of them deletes its
+  // action. Whichever is left, it must not decide what the binding names: a bare id names no action
+  // at call time, whatever is published at that moment.
+  it('stays naming nobody when one of the two providers deletes its action, whichever is left', async () => {
+    for (const left of [operatorsOwn, squatter]) {
+      fetched.length = 0;
+      const { storage } = fakeStorage([left]);
+      const gate = await executeHooks(cfg({ pre_owner_registration: ['gate'] }), storage, 'pre_owner_registration', { name: 'eve' });
+      expect(fetched).toEqual([]);
+      expect(gate).toMatchObject({ allowed: false, hookAction: 'gate' });
+      const run = (await readHookRuns(storage))[0];
+      expect(run).toMatchObject({ actionRef: 'gate', answer: 'missing', allowed: false });
+      expect(run.reason).toContain(`gate#${left.providerGaii}`);
+
+      const notify = await executeHooks(cfg({ post_agent_registration: ['gate'] }), storage, 'post_agent_registration', { name: 'bot' });
+      expect(notify).toEqual({ allowed: true });
+      expect(fetched).toEqual([]);
+
+      // The page shows it as it shows an id two providers publish: naming nothing, with the one
+      // that is left as the reference to choose.
+      const overview = await buildHooksOverview(cfg({ pre_owner_registration: ['gate'] }), storage);
+      const bound = overview.hooks.find(h => h.name === 'pre_owner_registration')!.actions[0];
+      expect(bound).toMatchObject({ ref: 'gate', published: false, name: null, host: null, ambiguous: [`gate#${left.providerGaii}`] });
+    }
+  });
+
+  it('stays naming nobody when both delete their actions, and a gate bound to it still refuses', async () => {
+    const { storage } = fakeStorage([]);
+    const r = await executeHooks(cfg({ pre_owner_registration: ['gate'] }), storage, 'pre_owner_registration', { name: 'eve' });
+    expect(r).toMatchObject({ allowed: false, hookAction: 'gate' });
+    expect(fetched).toEqual([]);
+    const overview = await buildHooksOverview(cfg({ pre_owner_registration: ['gate'] }), storage);
+    expect(overview.hooks.find(h => h.name === 'pre_owner_registration')!.actions[0])
+      .toMatchObject({ ref: 'gate', published: false, ambiguous: [] });
   });
 
   it('the id with its provider still names exactly one, whoever else publishes the id', async () => {
@@ -348,6 +402,7 @@ describe('bindings stored earlier, settled at start', () => {
     });
     const out = await settleStoredHookBindings(config, storage);
 
+    expect(out.ran).toBe(true);
     expect(config.extensionHooks.pre_owner_registration).toEqual(['mine#bot#opr@node', 'both', 'gone#bot#opr@node']);
     expect(JSON.parse(stored['hooks.pre_owner_registration'])).toEqual(['mine#bot#opr@node', 'both', 'gone#bot#opr@node']);
     expect(config.extensionHooks.post_settlement).toEqual([]);
@@ -370,31 +425,56 @@ describe('bindings stored earlier, settled at start', () => {
     expect(fetched).toEqual(['https://operator.example/mine']);
   });
 
+  // Settled once per node. A bare id two providers published at that start stays naming nobody:
+  // a later start must not let a deletion decide what it names, by pinning it to the provider that
+  // is left or by taking it off.
+  it('runs once: a later start leaves an id two providers published naming nobody, whatever was deleted since', async () => {
+    const published = [bothOpr, bothOther];
+    const { storage, stored, memory } = configStorage(published);
+    const config = cfg({ pre_owner_registration: ['both'], post_settlement: ['both'] });
+    expect((await settleStoredHookBindings(config, storage)).ran).toBe(true);
+    expect(memory.has('migrations.hook-bindings-settled')).toBe(true);
+    expect(config.extensionHooks.pre_owner_registration).toEqual(['both']);
+
+    for (const left of [[bothOpr], []]) {
+      published.splice(0, published.length, ...left);
+      const again = await settleStoredHookBindings(config, storage);
+      expect(again).toEqual({ ran: false, pinned: [], removed: [] });
+      expect(config.extensionHooks).toMatchObject({ pre_owner_registration: ['both'], post_settlement: ['both'] });
+      expect(stored).toEqual({});
+      fetched.length = 0;
+      expect(await executeHooks(config, storage, 'pre_owner_registration', { name: 'eve' })).toMatchObject({ allowed: false });
+      expect(fetched).toEqual([]);
+    }
+  });
+
   it('reads nothing and changes nothing when every stored reference names its provider', async () => {
-    const { storage, stored, listed } = configStorage([mine]);
+    const { storage, stored, listed, memory } = configStorage([mine]);
     const config = cfg({ pre_board_post: ['mine#bot#opr@node', 'gone#bot#opr@node'] });
     const out = await settleStoredHookBindings(config, storage);
-    expect(out).toEqual({ pinned: [], removed: [] });
+    expect(out).toEqual({ ran: false, pinned: [], removed: [] });
     expect(listed).toHaveLength(0);
     expect(stored).toEqual({});
+    expect(memory.size).toBe(0);
     expect(config.extensionHooks.pre_board_post).toEqual(['mine#bot#opr@node', 'gone#bot#opr@node']);
   });
 
-  it('changes nothing when the actions cannot be read, so the next start tries again', async () => {
-    const { storage, stored, deleted } = configStorage([mine], { unreadable: true });
+  it('changes nothing and records nothing when the actions cannot be read, so the next start tries again', async () => {
+    const { storage, stored, deleted, memory } = configStorage([mine], { unreadable: true });
     const config = cfg({ post_settlement: ['later', 'mine'] });
     const out = await settleStoredHookBindings(config, storage);
-    expect(out).toEqual({ pinned: [], removed: [] });
+    expect(out).toEqual({ ran: false, pinned: [], removed: [] });
     expect(config.extensionHooks.post_settlement).toEqual(['later', 'mine']);
     expect(stored).toEqual({});
     expect(deleted).toEqual([]);
+    expect(memory.has('migrations.hook-bindings-settled')).toBe(false);
   });
 });
 
 describe('a gate decides, and fails closed', () => {
   it('a 2xx lets the thing through and is recorded', async () => {
     const { storage } = fakeStorage([action()]);
-    const r = await executeHooks(cfg({ pre_owner_registration: ['check'] }), storage, 'pre_owner_registration', { name: 'alice', display_name: 'Alice' });
+    const r = await executeHooks(cfg({ pre_owner_registration: [ref('check')] }), storage, 'pre_owner_registration', { name: 'alice', display_name: 'Alice' });
     expect(r.allowed).toBe(true);
     const run = (await readHookRuns(storage))[0];
     expect(run).toMatchObject({ answer: 'ok', status: 200, allowed: true, subject: 'name: alice · display_name: Alice' });
@@ -404,15 +484,15 @@ describe('a gate decides, and fails closed', () => {
   it('{"allowed": false} refuses, with the reason the address gave', async () => {
     answers['https://hooks.example/check'] = { status: 200, ok: true, body: { allowed: false, reason: 'not on the list' } };
     const { storage } = fakeStorage([action()]);
-    const r = await executeHooks(cfg({ pre_owner_registration: ['check'] }), storage, 'pre_owner_registration', { name: 'mikko' });
-    expect(r).toMatchObject({ allowed: false, reason: 'not on the list', hookAction: 'check' });
+    const r = await executeHooks(cfg({ pre_owner_registration: [ref('check')] }), storage, 'pre_owner_registration', { name: 'mikko' });
+    expect(r).toMatchObject({ allowed: false, reason: 'not on the list', hookAction: ref('check') });
     expect((await readHookRuns(storage))[0]).toMatchObject({ answer: 'refused', allowed: false, reason: 'not on the list', subject: 'name: mikko' });
   });
 
   it('a non-2xx refuses', async () => {
     answers['https://hooks.example/check'] = { status: 403, ok: false, body: { why: 'no' } };
     const { storage } = fakeStorage([action()]);
-    const r = await executeHooks(cfg({ pre_agent_registration: ['check'] }), storage, 'pre_agent_registration', { name: 'bot' });
+    const r = await executeHooks(cfg({ pre_agent_registration: [ref('check')] }), storage, 'pre_agent_registration', { name: 'bot' });
     expect(r.allowed).toBe(false);
     expect((await readHookRuns(storage))[0]).toMatchObject({ answer: 'refused', status: 403, allowed: false });
   });
@@ -423,7 +503,7 @@ describe('a gate decides, and fails closed', () => {
       action({ id: 'a', webhookUrl: 'https://hooks.example/a' }),
       action({ id: 'b', webhookUrl: 'https://hooks.example/b' }),
     ]);
-    const r = await executeHooks(cfg({ pre_work_request: ['a', 'b'] }), storage, 'pre_work_request', { action_id: 'x' });
+    const r = await executeHooks(cfg({ pre_work_request: [ref('a'), ref('b')] }), storage, 'pre_work_request', { action_id: 'x' });
     expect(r.allowed).toBe(false);
     expect(fetched).toEqual(['https://hooks.example/a']);
     expect((await readHookRuns(storage))[0]).toMatchObject({ answer: 'no_answer', status: null, allowed: false });
@@ -432,7 +512,7 @@ describe('a gate decides, and fails closed', () => {
   it('a gate refuses when the address is blocked, rather than letting the thing through', async () => {
     blocked.add('https://hooks.example/check');
     const { storage } = fakeStorage([action()]);
-    const r = await executeHooks(cfg({ pre_federation_peer: ['check'] }), storage, 'pre_federation_peer', { target_node_id: 'peer' });
+    const r = await executeHooks(cfg({ pre_federation_peer: [ref('check')] }), storage, 'pre_federation_peer', { target_node_id: 'peer' });
     // The hole: this used to `continue`, so a gate bound to an address the node refuses to call
     // allowed everything while looking like it was guarding it.
     expect(r.allowed).toBe(false);
@@ -446,9 +526,9 @@ describe('a gate decides, and fails closed', () => {
       getMemory: async () => null,
       setMemory: async () => undefined,
     } as unknown as Storage;
-    expect(await executeHooks(cfg({ pre_owner_registration: ['check'] }), broken, 'pre_owner_registration', { name: 'a' }))
+    expect(await executeHooks(cfg({ pre_owner_registration: [ref('check')] }), broken, 'pre_owner_registration', { name: 'a' }))
       .toMatchObject({ allowed: false });
-    expect(await executeHooks(cfg({ post_settlement: ['check'] }), broken, 'post_settlement', {}))
+    expect(await executeHooks(cfg({ post_settlement: [ref('check')] }), broken, 'post_settlement', {}))
       .toEqual({ allowed: true });
   });
 });
@@ -461,7 +541,7 @@ describe('a notify hook is told, and stops nothing', () => {
       action({ id: 'a', webhookUrl: 'https://hooks.example/a' }),
       action({ id: 'b', webhookUrl: 'https://hooks.example/b' }),
     ]);
-    const r = await executeHooks(cfg({ post_work_delivery: ['a', 'b'] }), storage, 'post_work_delivery', { tracking_code: 'wk-1' });
+    const r = await executeHooks(cfg({ post_work_delivery: [ref('a'), ref('b')] }), storage, 'post_work_delivery', { tracking_code: 'wk-1' });
     expect(r).toEqual({ allowed: true });
     expect(fetched).toEqual(['https://hooks.example/a', 'https://hooks.example/b']);
     const runs = await readHookRuns(storage);
@@ -475,7 +555,7 @@ describe('the record', () => {
   it('keeps the newest runs and no more', async () => {
     const { storage } = fakeStorage([action()]);
     for (let i = 0; i < HOOK_RUNS_KEPT + 3; i++) {
-      await executeHooks(cfg({ post_settlement: ['check'] }), storage, 'post_settlement', { n: i });
+      await executeHooks(cfg({ post_settlement: [ref('check')] }), storage, 'post_settlement', { n: i });
     }
     const runs = await readHookRuns(storage);
     expect(runs).toHaveLength(HOOK_RUNS_KEPT);

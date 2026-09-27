@@ -12,6 +12,7 @@
  *     revocation/session auth storage
  *
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The comment at the settle says it runs once per node (security audit A8-3).
  *   v1.2.0 — 2026-09-26 — The stored hook bindings are settled once they are loaded
  *     (services/hooks-overview.ts settleStoredHookBindings): every reference names the one
  *     published action it was bound to, as a new binding does (security audit A8-3).
@@ -152,8 +153,9 @@ export async function initializeConfig(
   } catch { /* getAllConfigValues may fail for some backends — hooks stay at defaults */ }
 
   // A hook binds only an action that is already published, stored as its id#provider. A stored
-  // bare id is brought to that form here, before anything can call a hook: pinned when one provider
-  // publishes it, taken off its moment when nobody does. Reads nothing when there is nothing to settle.
+  // bare id is brought to that form here, once per node, before anything can call a hook: pinned when
+  // one provider publishes it, taken off its moment when nobody does. Reads nothing when there is
+  // nothing to settle.
   await settleStoredHookBindings(config, storage);
 
   // Wire storage into token revocation system for persistent revocation
