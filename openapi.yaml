@@ -27228,8 +27228,10 @@ paths:
         colour a `var(--ak-…)` token and NO script (its preview is served from this node). Its
         bench reads the markup against an allowlist of elements and attributes, and refuses markup
         that leaves an element open where it ends (it would take in whatever the page writes after
-        it) and a stylesheet that loads anything, reaches outside its prefix, fixes itself over the
-        page, moves at idle or carries a literal colour. A rule nested inside another starts with
+        it), a stylesheet that leaves a block, a bracket, a comment, a string or a rule open where it
+        ends (it would take in the page's own rules after it), and a stylesheet that loads anything,
+        reaches outside its prefix, fixes itself over the page, moves at idle or carries a literal
+        colour. A rule nested inside another starts with
         `&`, which stands for the elements of the rule it is nested in; at the top of the
         stylesheet `&` is the page and is refused. The at-rules a stylesheet may carry are a list:
         `@media`, `@supports`, `@container` and `@starting-style`, which condition its own rules, and
