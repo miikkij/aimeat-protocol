@@ -12,6 +12,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-09-26 — The move to the GHII runs once for each database, as its Postgres migration does,
+ *     and records that it ran (schema-identity-backfill.ts).
  *   2026-09-26 — Actions a person published and the work on them move to the GHII
  *     (schema-identity-backfill.ts, migration 0085).
  *   2026-09-26 — app_grants.ownerAddedScopes (migration 0084): the words the owner added by hand.
@@ -776,7 +778,8 @@ export function initializeSchema(db: Database.Database): void {
   `);
 
   // Actions a person published and the work on them move from the bare account name to the GHII
-  // (mirrors Postgres 0085). Finds nothing once the rows have moved.
+  // (mirrors Postgres 0085). Once for each database: it records in system_settings that it ran, and
+  // an open that finds the record changes nothing.
   moveActionsAndWorkToFullIdentity(db);
 }
 
