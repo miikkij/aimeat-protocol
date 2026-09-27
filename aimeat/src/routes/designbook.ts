@@ -13,6 +13,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.5.0 — 2026-09-26 — GET /v1/designbook/:id names its reader to the service, which answers a
+ *     component's `bench` and gives the markup and stylesheet of one that no longer passes only to
+ *     its proposer. The preview reads the part as stored (storedPart) and benches it itself.
  *   v1.4.2 — 2026-09-24 — A component's preview is served without the CSP nonce (1a0a15eb7b20):
  *     the nonce was stamped on every <script> in the page, the one a component body smuggled in
  *     included, and a component page has no script of its own that needs it.
@@ -136,10 +139,12 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // One part, whole — the body is what an adopt writes. Public for published parts, on the
-  // same reasoning as the listing; a part still in proposal needs a signed-in reader.
+  // same reasoning as the listing; a part still in proposal needs a signed-in reader. The reader is
+  // named to the service: a component that no longer passes the bench shows its markup and
+  // stylesheet only to its proposer.
   router.get('/v1/designbook/:id', async (req: Request, res: Response) => {
     try {
-      const out = await book.get(req.params.id as string);
+      const out = await book.get(req.params.id as string, isSignedIn(req) ? caller(req) : null);
       if (out.part.status !== 'published' && !isSignedIn(req)) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
       }
@@ -164,9 +169,11 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // and the map give every genre this address to look at, and the shelf lags the templates
       // (production held 19 of 23 on 2026-09-19, a fresh node holds none). The template is the
       // node's own HTML, the same a genre part would have pointed at.
-      let part: Awaited<ReturnType<typeof book.get>>['part'] | null = null;
+      // The part as stored: a component is benched again as the page is built (component.ts), and
+      // one that no longer passes is shown as the bench's reason, none of its markup.
+      let part: Awaited<ReturnType<typeof book.storedPart>> | null = null;
       try {
-        part = (await book.get(id)).part;
+        part = await book.storedPart(id);
       } catch (err) {
         if (!(err instanceof DesignBookError) || err.status !== 404) throw err;
       }

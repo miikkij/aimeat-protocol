@@ -35,6 +35,8 @@
  *     apps' do. No code changed here.
  *   v1.8.0 — 2026-09-26 — The comment at migrateMailReadConsent() says it tells owners about their
  *     agents too. No code changed here.
+ *   v1.9.0 — 2026-09-26 — After the Design Book seed, noticeFailingComponents(): a proposer whose stored
+ *     component no longer passes the bench this build runs is told once (design-book/component-notice.ts).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -55,6 +57,7 @@ import { seedManifestSchema } from '../services/manifest-schema.js';
 import { seedTemplateBundles } from '../services/template-bundles.js';
 import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedDesignBook } from '../services/design-book/lifecycle.js';
+import { noticeFailingComponents } from '../services/design-book/component-notice.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
@@ -160,9 +163,13 @@ export async function initializeServices(
     .catch(err => logger.error('Failed to seed template bundles', { error: err }));
 
   // Seed the Design Book's first published parts: the six leiskat, benched like any proposal —
-  // a fresh node's Book is never an empty shelf (TARGET-074 phase 5).
+  // a fresh node's Book is never an empty shelf (TARGET-074 phase 5). Then the bench this build
+  // runs reads every stored component again, and a proposer whose part no longer passes is told
+  // once: a deploy is what changes the bench.
   seedDesignBook(storage, config)
-    .catch(err => logger.error('Failed to seed the Design Book', { error: err }));
+    .catch(err => logger.error('Failed to seed the Design Book', { error: err }))
+    .then(() => noticeFailingComponents(storage, config))
+    .catch(err => logger.error('Failed to bench the Design Book\'s stored components again', { error: err }));
 
   // Seed knowledge packager prompt templates
   seedKnowledgeTemplates(storage, `system@${config.nodeId}`)

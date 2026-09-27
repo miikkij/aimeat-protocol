@@ -9,6 +9,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.7.0 — 2026-09-26 — A stored component that no longer passes (written into the node's own
+ *     database, since no door stores one): get says why on the REST door and the node MCP, and shows
+ *     its markup and stylesheet only to its proposer; search, the map and discover leave it out; the
+ *     preview and the adopt say why; the nightly Design Book job tells its proposer once.
  *   v1.6.3 — 2026-09-26 — At propose, a repeated attribute and a "/" on a <div> are refused in words
  *     of their own.
  *   v1.6.2 — 2026-09-26 — At propose, markup that leaves an element open where it ends is refused.
@@ -60,9 +64,13 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+// Where the node under test keeps its data, for the one test that writes a part no door would store.
+const PROVIDER = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;
 
 let passed = 0;
 let failed = 0;
@@ -98,6 +106,45 @@ async function setupOwner(label: string) {
     const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
     assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}`);
     return { name, token: tok.body.data.token as string, roles: (tok.body.data.roles ?? []) as string[] };
+}
+
+/** An agent of `owner`, approved by the owner through device authorization, with these scopes. */
+async function connectAgent(owner: { name: string; token: string }, agentName: string, scopes: string[]): Promise<string> {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: owner.name }) });
+    assert(da.status === 200, `device-authorize ${da.status}`);
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: owner.token }) });
+    assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body.error ?? v.body)}`);
+    const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    assert(t.status === 200 && typeof t.body.token === 'string', `device-token ${t.status}`);
+    return t.body.token as string;
+}
+
+/** One node-MCP tool call on a fresh session, as the holder of `token`: the tool's text, and whether it is an error. */
+async function mcpCall(token: string, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {
+    let session = '';
+    const rpc = async (method: string, params: Record<string, unknown>, id: number) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`,
+                ...(session ? { 'mcp-session-id': session, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        session = res.headers.get('mcp-session-id') ?? session;
+        const text = await res.text();
+        const events = text.split('\n').filter(l => l.startsWith('data:')).map(l => JSON.parse(l.slice(5).trim()));
+        return (events.find((e: any) => e.id === id) ?? (events.length ? events[0] : JSON.parse(text))) as any;
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'designbook-e2e', version: '1.0.0' } }, 1);
+    const out = await rpc('tools/call', { name, arguments: args }, 2);
+    return { isError: !!out?.result?.isError, text: String(out?.result?.content?.[0]?.text ?? JSON.stringify(out)) };
+}
+
+/** Run one of the node's scheduled jobs now, through the operator's door, and wait for it. */
+async function fireJob(operatorToken: string, jobId: string): Promise<void> {
+    const r = await json(`/v1/admin/scheduler/jobs/${jobId}/trigger`, { method: 'POST', headers: auth(operatorToken) });
+    assert(r.status === 200 && r.body.data.job.lastRunResult === 'success', `trigger ${jobId}: ${r.status} ${JSON.stringify(r.body?.data?.job?.lastRunError ?? r.body?.error)}`);
 }
 
 const APP = (filename: string) => [
@@ -596,6 +643,87 @@ const GOOD_BODY = {
         assert(refusedWith(twice, /the attribute "class" is written twice/), `a repeated attribute says so: ${said(twice)}`);
         const slash = await proposeComponent(`comp-bad-${stamp}`, componentBody({ html: '<div class="wkgrid"/>' }));
         assert(refusedWith(slash, /ignores the "\/" at the end of <div …\/>, so the <div> stays open/), `a "/" on a <div> says what a browser does with it: ${said(slash)}`);
+    });
+
+    await test('a stored component that no longer passes: get says why and shows its markup only to its proposer, search, the map and discover leave it out, the preview and the adopt say why, and its proposer is told once', async () => {
+        // Nothing reachable over HTTP stores a part the bench refuses, so this writes one into the
+        // node's own database, the way e2e-app-visitors backdates a visit: a part stored when it
+        // passed an older bench. `.wkgrid ~ p` reaches the page beside the component.
+        const sqlitePath = pinnedSqlitePath();
+        const dbUrl = serverDbUrl();
+        // An in-memory backend lives inside the server process, and a second handle would open a
+        // different, empty database: a failure here, since a test that passes by not running proves nothing.
+        const canOpenBackend = (PROVIDER === 'sqlite' && !!sqlitePath) || (PROVIDER === 'postgres-kysely' && !!dbUrl);
+        assert(canOpenBackend === true, `backend "${PROVIDER}" is not reachable from this process`);
+        const storage = await createStorage({ provider: PROVIDER, sqlitePath, dbUrl });
+        const stamp = Date.now() % 100000;
+        const id = `comp-stale-${stamp}`;
+        const stale = componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid ~ p { color: var(--ak-accent); }' });
+        const now = new Date().toISOString();
+        await storage.setMemory({
+            key: `atelier.book.part.${id}`, ownerGaii: `system@${NODE_ID}`,
+            value: JSON.stringify({
+                spec: 'aimeat.designbook.part/v1', id, kind: 'component', title: 'A week you tick', summary: 'Rows against seven days, every cell a button.',
+                body: stale, tags: [], status: 'published', proposed_by: `${other.name}@${NODE_ID}`, proposed_by_owner: `${other.name}@${NODE_ID}`,
+                bench: { checks: ['markup-allowlist', 'styles-scoped'], passed_at: now }, created_at: now, updated_at: now, published_at: now,
+            }),
+            visibility: 'public', tags: ['designbook', 'kind:component', 'status:published'], ttlHours: null, version: 1, createdAt: now, updatedAt: now, trackable: true,
+        });
+        const why = /"\.wkgrid ~ p" reaches from the component to an element beside it/;
+
+        // get: the bench's result for everyone, the markup and the stylesheet for the proposer alone.
+        for (const [who, token] of [['no session', ''], ['another owner', op.token]] as const) {
+            const r = await json(`/v1/designbook/${id}`, token ? { headers: auth(token) } : {});
+            assert(r.status === 200 && r.body.data.bench?.passes === false && why.test(r.body.data.bench.why ?? ''),
+                `${who}: get answers why it no longer passes: ${r.status} ${JSON.stringify(r.body?.data?.bench ?? r.body?.error)}`);
+            assert(r.body.data.part.body.html === undefined && r.body.data.part.body.css === undefined && r.body.data.part.body.use === stale.use,
+                `${who}: its markup and stylesheet are withheld: ${JSON.stringify(Object.keys(r.body.data.part.body))}`);
+        }
+        const mine = await json(`/v1/designbook/${id}`, { headers: auth(other.token) });
+        assert(mine.body.data.bench?.passes === false && mine.body.data.part.body.css === stale.css && mine.body.data.part.body.html === stale.html,
+            `its proposer gets them back to fix: ${JSON.stringify(Object.keys(mine.body.data.part.body))}`);
+        // The node MCP answers the same: an agent of the proposer gets them, another owner's agent does not.
+        const proposerAgent = await connectAgent(other, `dbread${stamp}`, ['memory:read']);
+        const otherAgent = await connectAgent(op, `dbread${stamp}`, ['memory:read']);
+        const viaMine = await mcpCall(proposerAgent, 'aimeat_designbook_get', { id });
+        const viaOther = await mcpCall(otherAgent, 'aimeat_designbook_get', { id });
+        const readMine = viaMine.isError ? null : JSON.parse(viaMine.text);
+        const readOther = viaOther.isError ? null : JSON.parse(viaOther.text);
+        assert(readMine?.bench?.passes === false && readMine.part.body.css === stale.css, `the proposer's agent reads it whole over MCP: ${viaMine.text.slice(0, 300)}`);
+        assert(readOther?.bench?.passes === false && why.test(readOther.bench.why ?? '') && readOther.part.body.css === undefined && readOther.part.body.html === undefined,
+            `another owner's agent is told why and not handed it: ${viaOther.text.slice(0, 300)}`);
+
+        // Search, the map every builder reads, and discover leave it out.
+        const listed = await json(`/v1/designbook?q=${id}`, { headers: auth(other.token) });
+        assert(listed.status === 200 && !listed.body.data.parts.some((p: any) => p.id === id), `search leaves it out: ${JSON.stringify(listed.body.data?.parts?.map((p: any) => p.id))}`);
+        const components = await json('/v1/designbook?kind=component&limit=200');
+        assert(!components.body.data.parts.some((p: any) => p.id === id), 'the component shelf leaves it out');
+        const map = await json('/v1/designbook?view=map');
+        assert(!map.body.data.map.includes(id), 'the map leaves it out');
+        const found = await json(`/v1/discover?scope=public&type=designbook&q=${id}&per_page=100`);
+        assert(found.status === 200 && !found.body.data.entries.some((e: any) => e.id === id), `discover leaves it out: ${found.status} ${JSON.stringify(found.body?.data?.entries?.map((e: any) => e.id))}`);
+
+        // The preview and the adopt say why, and hand out none of it.
+        const page = await (await fetch(`${BASE}/v1/designbook/${id}/preview`)).text();
+        assert(/no longer passes/.test(page) && page.includes('&quot;.wkgrid ~ p&quot; reaches from the component to an element beside it') && !page.includes('var(--ak-accent)'),
+            `the preview says why and shows none of it: ${page.slice(page.indexOf('no longer'), page.indexOf('no longer') + 300)}`);
+        const take = await json(`/v1/designbook/${id}/adopt`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ filename: 'not-built-yet.html' }) });
+        assert(take.status === 422 && take.body.error?.code === 'BODY_INVALID' && why.test(take.body.error.message), `the adopt says why: ${take.status} ${JSON.stringify(take.body?.error)}`);
+
+        // Its proposer is told once, by the nightly Design Book job, and not again.
+        const bell = async () => ((await json('/v1/notifications?limit=200', { headers: auth(other.token) })).body.data.notifications as any[])
+            .filter(n => n.type === 'app_designbook_component_failing' && String(n.title).includes(id));
+        await fireJob(op.token, 'core:designbook-aging');
+        const told = await bell();
+        assert(told.length === 1 && why.test(told[0].body) && told[0].link === `/v1/designbook/${id}/preview`, `its proposer is told why: ${JSON.stringify(told)}`);
+        await fireJob(op.token, 'core:designbook-aging');
+        assert((await bell()).length === 1, 'and told once');
+        const operatorBell = await json('/v1/notifications?limit=200', { headers: auth(op.token) });
+        assert(!(operatorBell.body.data.notifications as any[]).some(n => String(n.title).includes(id)), 'nobody else is told');
+
+        // Clean up: the proposer deletes it, and with it what the node remembered about telling them.
+        const del = await json(`/v1/designbook/${id}`, { method: 'DELETE', headers: auth(other.token) });
+        assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
     });
 
     await test('a GENRE grows out of an app: a look of its own, judged general, kept by its owner AND opened for forking by its owner; it stops being offered when the app closes', async () => {
@@ -1131,5 +1259,6 @@ const GOOD_BODY = {
     });
 
     console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-    if (failed > 0) process.exit(1);
+    // Exits either way: the handle on the node's database opened above would keep the process alive.
+    process.exit(failed > 0 ? 1 : 0);
 })();

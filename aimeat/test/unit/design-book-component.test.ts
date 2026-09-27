@@ -5,6 +5,8 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.12.0 — 2026-09-26 — The preview and the snippet say why a stored component no longer passes,
+ *     the preview's words escaped.
  *   v1.11.0 — 2026-09-26 — A repeated attribute, a missing space between attributes and a "/" on a
  *     <div> each get their own sentence.
  *   v1.10.0 — 2026-09-26 — Markup that leaves an element open where it ends is refused, with the
@@ -442,6 +444,20 @@ describe('the component bench', () => {
     expect(readMarkup('<div hidden hidden></div>').problem).toEqual({ kind: 'duplicate', element: 'div', attribute: 'hidden' });
     expect(readMarkup('<div class="a"id="b"></div>').problem).toEqual({ kind: 'no-space', element: 'div', attribute: 'id' });
     expect(readMarkup('<div class="a"/>').problem).toEqual({ kind: 'slash', element: 'div' });
+  });
+
+  // A stored component that no longer passes is not shown and not handed out, and both say why in
+  // the bench's own words. The preview is a page of this node, so what the bench quotes from the
+  // stored body is text on it, never markup.
+  it('says why a stored component no longer passes, in the preview and in the refusal to hand it out', () => {
+    const stored = { ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid ~ p { color: var(--ak-ink); }' } as unknown as ComponentBody;
+    expect(() => componentSnippet(stored)).toThrow(/no longer passes.*"\.wkgrid ~ p" reaches from the component to an element beside it/s);
+    const page = componentPreviewHtml(stored);
+    expect(page).toMatch(/no longer passes/);
+    expect(page).toContain('&quot;.wkgrid ~ p&quot; reaches from the component to an element beside it');
+    const quoted = componentPreviewHtml({ ...WEEK_GRID, html: '<div class="wkgrid"><td class="wkgrid-c"><img src=x onerror=alert(1)></td></div>' } as unknown as ComponentBody);
+    expect(quoted).toContain('&lt;td class=&quot;wkgrid-c&quot;&gt;&lt;img');
+    expect(quoted).not.toMatch(/<img|<td/i);
   });
 
   it('wears the page it lands in: a literal colour is refused with the tokens named, a fallback is fine', () => {
