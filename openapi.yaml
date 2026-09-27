@@ -27156,7 +27156,9 @@ paths:
         it) and a stylesheet that loads anything, reaches outside its prefix, fixes itself over the
         page, moves at idle or carries a literal colour. A rule nested inside another starts with
         `&`, which stands for the elements of the rule it is nested in; at the top of the
-        stylesheet `&` is the page and is refused. A component whose builder judged it `general`
+        stylesheet `&` is the page and is refused. A stylesheet carries no `@scope`: inside it `&`
+        stands for the elements its prelude chooses, and the component's own classes already keep
+        every rule inside it. A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide

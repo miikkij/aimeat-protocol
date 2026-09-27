@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.1 — 2026-09-26 — At propose, a stylesheet carrying @scope is refused, and the refusal shows the
+ *     rule written on the component's own classes.
  *   v1.8.0 — 2026-09-26 — A Design Book part through the generic memory doors: the public read (plain,
  *     soft, signed in), aimeat_memory_read_public on the node MCP, POST /v1/memory/copy and the
  *     librarian's public search each refuse it or leave it out, naming GET /v1/designbook/{id}; the
@@ -634,6 +636,12 @@ const GOOD_BODY = {
         assert(stated.status === 201, `:state(on) and ::part(label) pass: ${said(stated)}`);
         const hosted = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid-cell:host(.page) { color: var(--ak-accent); }' }));
         assert(refusedWith(hosted, /names the page itself/), `:host() names the page: ${said(hosted)}`);
+    });
+
+    await test('a stylesheet carrying @scope is refused, with how to write the rule on the component\'s own classes', async () => {
+        const scoped = await proposeComponent(`comp-bad-${Date.now() % 100000}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); @scope (body) { & p { color: var(--ak-accent); } } }' }));
+        assert(refusedWith(scoped, /carries no @scope, and a component does not need it.*"& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/),
+            `@scope is refused, with the form that passes: ${said(scoped)}`);
     });
 
     await test('markup that leaves an element open where it ends is refused, with the element named', async () => {
