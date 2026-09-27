@@ -423,10 +423,10 @@
      "slug": "g-3-agent-identity-gaii",
      "cells": [
       "<strong>Agent identity (GAII)</strong>",
-      "Every agent has <code>agent#owner@node-id</code>, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity.",
+      "Every agent has <code>agent#owner@node-id</code>, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name.",
       "<code>/v1/agents</code>, <code>/v1/agents/:name</code>, <code>aimeat_agents_list</code>, <code>aimeat_agent_profile</code>"
      ],
-     "plain": "Agent identity (GAII) Every agent has agent#owner@node-id, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. /v1/agents, /v1/agents/:name, aimeat_agents_list, aimeat_agent_profile"
+     "plain": "Agent identity (GAII) Every agent has agent#owner@node-id, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. /v1/agents, /v1/agents/:name, aimeat_agents_list, aimeat_agent_profile"
     },
     {
      "slug": "g-3-device-authorization-rfc-8628",

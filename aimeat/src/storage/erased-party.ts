@@ -35,10 +35,13 @@
  *   - partyIdentities(name, ghiis): every value a receipt may name this person by
  *   - isPartyIdentity(identity, name, ghiis): the same identities, as a test on one value
  *   - OPEN_WORK_STATUSES: the work statuses an erasure cancels
+ *   - LeavingParty, erasedAccountParty(), deletedAgentParty(): who leaves the work, and what stays
  * @usage
  *   import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
  *   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
  * @version-history
+ *   v1.3.0 — 2026-09-26 — LeavingParty: the work rule serves a deleted agent too. Its owner is still
+ *     here, so its held morsels go back to the owner and the rows keep its identity as stored.
  *   v1.2.0 — 2026-09-26 — Work: open requests are cancelled and the requester's held morsels go back,
  *     finished work stays under the pseudonym (isPartyIdentity, OPEN_WORK_STATUSES; secaudit 2026-09:
  *     A8-4, N6).
@@ -102,3 +105,45 @@ export function isPartyIdentity(identity: string, name: string, ghiis: string[])
  * cancelled, or a dispute that follows a delivery.
  */
 export const OPEN_WORK_STATUSES: readonly string[] = ['pending', 'accepted', 'in_progress'];
+
+/**
+ * A party leaving the work, and what the rows that stay keep of it. One rule for the two ways a party
+ * leaves: an account deleted with everything under it, and one agent its owner deletes. Both
+ * providers settle the work from this (sqlite repos/work-erasure.ts, postgres owner-cascade.ts).
+ */
+export interface LeavingParty {
+  /** The values a row's party column may hold for it: exact values, and LIKE suffix patterns. */
+  exact: string[];
+  suffixPatterns: string[];
+  /** The same test on one value. */
+  is(identity: string): boolean;
+  /**
+   * What the leaving side becomes on a row that stays: the erasure's pseudonym, or null to keep the
+   * identity as stored. A deleted agent keeps it, because its owner is still here. A pseudonym also
+   * replaces the name in a dispute on the row, and a leaving requester's callback address goes.
+   */
+  pseudonym: string | null;
+  /**
+   * Whether the morsels held for a request the leaving party made go back to it. An agent's go back
+   * to its owner's balance. A deleted account's balance goes with the account.
+   */
+  refundsItself: boolean;
+}
+
+/**
+ * A deleted account: every identity it can be named by, and the agents it had, which is how their
+ * work is found when the account has no GHII row to build the patterns from.
+ */
+export function erasedAccountParty(name: string, ghiis: string[], pseudonym: string, agents: string[] = []): LeavingParty {
+  const { exact, suffixPatterns } = partyIdentities(name, ghiis);
+  return {
+    exact: [...new Set([...exact, ...agents])], suffixPatterns,
+    is: id => isPartyIdentity(id, name, ghiis) || agents.includes(id),
+    pseudonym, refundsItself: false,
+  };
+}
+
+/** One agent its owner deletes: named by its GAII alone, and kept as stored. */
+export function deletedAgentParty(gaii: string): LeavingParty {
+  return { exact: [gaii], suffixPatterns: [], is: id => id === gaii, pseudonym: null, refundsItself: true };
+}

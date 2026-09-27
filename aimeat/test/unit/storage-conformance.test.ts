@@ -21,6 +21,9 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- deleteAgent settles the agent's work on every provider: open work is
+ *     cancelled, the requester's held morsels and the agent's own go back with a ledger line, and
+ *     what stays keeps the agent's identity as stored.
  *   v1.8.0 -- 2026-09-26 -- The deploy migration moves an action published under the bare account name,
  *     and the work on it, to the owner's GHII on every provider; an action whose name has no account,
  *     or only a newer one, goes; another node's copy stays; open work for a person whose account is
@@ -466,6 +469,43 @@ describe('storage providers agree on what they do, not just on their signatures'
                 expect.soft(await storage.listWorkByProvider(id), `${name}: work to do is left under ${id}`).toEqual([]);
                 expect.soft(await storage.listWorkByRequester(id), `${name}: work asked for is left under ${id}`).toEqual([]);
             }
+            await storage.deleteOwner(p.other);
+        }
+    }, 60_000);
+
+    // Deleting one agent settles its work by the same rule, and its owner is still here: what was held
+    // for a request to it goes back to the requester, what it held as a requester goes back to its
+    // owner, and every row that stays keeps the agent's identity as it was stored.
+    it('deleteAgent cancels the agent\'s open work, gives the held morsels back and keeps the rest as stored', async () => {
+        for (const { name, storage } of provs) {
+            const p = await seedWorkErasure(storage);
+            await storage.deleteAgent(p.E.gaii);
+
+            const toIt = await storage.getWork(p.tc('open-agent'));
+            expect.soft([toIt?.status, toIt?.providerGaii], `${name}: open work the agent was to do`).toEqual(['cancelled', p.E.gaii]);
+            const byIt = await storage.getWork(p.asked.trackingCode);
+            expect.soft([byIt?.status, byIt?.requesterGaii], `${name}: an open request the agent made`).toEqual(['cancelled', p.E.gaii]);
+            // 100 less 11 + 5 + 3 held, and the 5 held for the agent's work back.
+            expect.soft((await storage.getGHII(p.O.ghii))?.morselBalance, `${name}: the requester's held morsels did not come back`).toBe(86);
+            expect.soft((await storage.getGHII(p.E.ghii))?.morselBalance, `${name}: the owner's held morsels did not come back`).toBe(100);
+            const linesOf = async (ghii: string) => (await storage.getTransactions(ghii, 500))
+                .filter(t => t.type === 'escrow_return').map(t => `${t.trackingCode}:${t.amount}:${t.counterpartyGaii}`);
+            expect.soft(await linesOf(p.O.ghii), `${name}: the requester's escrow_return line`).toEqual([`${p.tc('open-agent')}:5:${p.E.gaii}`]);
+            expect.soft(await linesOf(p.E.ghii), `${name}: the owner's escrow_return line`).toEqual([`${p.asked.trackingCode}:7:${p.O.gaii}`]);
+
+            // Work the agent is not a party to is not touched.
+            expect.soft((await storage.getWork(p.tc('open-ghii')))?.status, `${name}: the owner's own open work changed`).toBe('pending');
+            expect.soft((await storage.getWork(p.tc('open-bare')))?.status, `${name}: open work under the bare name changed`).toBe('in_progress');
+            // Finished work and its dispute stay, with the agent named as it was.
+            const disputed = await storage.getWork(p.tc('disputed'));
+            expect.soft([disputed?.status, disputed?.requesterGaii], `${name}: disputed work`).toEqual(['contested', p.E.gaii]);
+            expect.soft((await storage.getDisputeByTrackingCode(p.tc('disputed')))?.openedBy, `${name}: who opened the dispute`).toBe(p.E.gaii);
+            expect.soft((await storage.getDisputeAuditLog(p.disputeId)).map(e => e.actor), `${name}: the dispute log`).toEqual([p.E.gaii, p.O.gaii]);
+            const own = await storage.getWork(p.tc('own'));
+            expect.soft([own?.status, own?.requesterGaii], `${name}: finished work between the owner and the agent`).toEqual(['delivered', p.E.gaii]);
+            expect.soft(await storage.getAgent(p.E.gaii), `${name}: the agent itself survived`).toBeNull();
+
+            await storage.deleteOwner(p.erased);
             await storage.deleteOwner(p.other);
         }
     }, 60_000);
