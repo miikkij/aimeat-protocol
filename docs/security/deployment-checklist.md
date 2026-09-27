@@ -14,6 +14,11 @@
 - [ ] Run `pnpm typecheck` and build the version you intend to deploy
 - [ ] Run `aimeat validate` to check environment configuration
 
+## Updating a Running Node
+
+- [ ] Stop the node, install the new version, start it. That is the whole update: every database change the version brings runs by itself at start, and the node starts whatever its data holds. There is no script to run by hand before or after.
+- [ ] After the start, open the admin Security page (or ask an agent with `aimeat_admin_security_overview`). A change that cannot place some data on evidence leaves that data as it is and opens one incident there. For the move of older records to each person's full identity, the incident lists each username whose records are older than the account that holds it now: decide each one on the page, or with `aimeat_admin_incident_resolve` and a `name` and a `resolution`.
+
 ## Network Security
 
 - [ ] Deploy behind a reverse proxy (nginx, Caddy, etc.)
