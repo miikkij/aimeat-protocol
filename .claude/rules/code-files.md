@@ -8,4 +8,5 @@ paths:
 ## Gates for this area
 
 - **File headers** (`@file`, `@description`, `@version-history`) on the `.ts`/`.js`/`.css` files you touch. Any existing source file shows the format.
+- **Comments use technical terms, never metaphors**: endpoint, route, MCP tool, code path, caller; not door, road, hand, floor. → `docs/coding-guidelines/code-style.md` (Comments)
 - **No file over 800 lines** (`aimeat/max-file-lines`, an error, so it blocks the commit). When one grows past it, split by **pure extraction**: move a coherent group out to a sibling and change nothing else, so the diff is a move and the tests still prove it. Do not shave comments or version history to squeeze under the limit; that is how a file loses the part explaining why it is the way it is.

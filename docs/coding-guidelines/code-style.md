@@ -210,6 +210,17 @@ See [Frontend Development Guide](../frontend-development-guide.md) for complete 
 
 ---
 
+## Comments
+
+A comment names software parts with the terms the industry uses: endpoint, route, handler, MCP
+tool, CLI command, function, module, memory key, request. It does not use metaphors for them:
+not "door" for an endpoint or a tool, not "road" for a code path, not "hand" for the author or
+caller, not "floor" for the shared environment. The full table is in
+[shell-and-git.md](./shell-and-git.md#the-words-in-a-commit-message), which applies the same rule
+to commit messages. Ruled by the developer on 2026-09-27.
+
+---
+
 ## Logging
 
 Use the Winston logger from `src/utils/logger.ts`:
@@ -236,3 +247,4 @@ Before submitting changes:
 - [ ] Express 5 params cast to `string`
 - [ ] Response envelope used for all API responses
 - [ ] Auth middleware applied to protected endpoints
+- [ ] Comments use technical terms, no metaphors (see Comments above)
