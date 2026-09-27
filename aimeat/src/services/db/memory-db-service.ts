@@ -41,6 +41,8 @@ export interface BulkWriteItem {
   ttlHours?: number | null;
   groupId?: string;
   workspaceRef?: string;
+  /** A source handle supplied by a backup; verified by the provenance preparation step. */
+  aiProvenanceId?: string;
 }
 
 /** Hard quota numbers for a bulk write (same limits the single-write route enforces). Overage-morsel
@@ -59,6 +61,8 @@ export interface BulkWriteOptions {
   /** Per-item schema/write-guard validation (injected by the route so the memory service stays free of
    *  the schema domain). Returning `{valid:false}` fails just that item — the batch continues. */
   validate?: (key: string, value: unknown) => Promise<{ valid: boolean }>;
+  /** Prepare metadata only for accepted rows, using the existing batched read. */
+  prepare?: (records: MemoryRecord[], existing: ReadonlyMap<string, MemoryRecord>) => Promise<void>;
 }
 
 export interface BulkItemResult {
@@ -163,7 +167,10 @@ export class MemoryDbService {
       if (!existing) runningKeys++;
     }
 
-    if (staged.length) await this.repo.writeMany(staged);
+    if (staged.length) {
+      if (opts.prepare) await opts.prepare(staged, existingByKey);
+      await this.repo.writeMany(staged);
+    }
 
     return {
       created: results.filter(r => r.status === 'created').length,

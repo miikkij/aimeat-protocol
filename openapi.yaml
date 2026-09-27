@@ -14684,7 +14684,9 @@ paths:
           description: Restrict the export to keys beginning with this prefix
       responses:
         '200':
-          description: 'JSON backup: { exported_at, node_id, count, entries[] }'
+          description: >-
+            JSON backup: { exported_at, node_id, count, entries[] }. Each entry includes its
+            ai_provenance_id when present, for same-node restores that can verify its owner and content.
           content:
             application/json:
               schema:
@@ -14704,6 +14706,8 @@ paths:
         `failed[]` and skipped without aborting the batch. Overage-morsel charging is NOT applied (an
         over-quota entry fails). Scope: the caller's own flat keyspace only — `organism.*` keys
         (workspace-guarded) and ecosystem principals are refused here and use their dedicated paths.
+        Accepted agent writes receive the same inferred provenance as individual memory writes.
+        Memory rows and newly created provenance records commit together; rejected entries create neither.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -14767,6 +14771,14 @@ paths:
         `organism.*` entry gets the organism rule POST /v1/memory applies (membership, the meta and
         member namespaces, the consent layer); a refused entry is listed under `failed` with its code
         (ACCESS_DENIED, CONSENT_REQUIRED, NOT_FOUND) and is not written.
+        A storage_ref must name an existing file in the target namespace. An archived organism or
+        workspace refuses new records as well as overwrites. Import records who restored
+        the key in its write tally; it does not infer that the importer generated the content.
+        An ai_provenance_id is retained only when it resolves on this node to the caller's account
+        and its content hash matches the imported value. Otherwise the content origin remains unstated.
+        Without a supplied handle, an existing matching origin is retained on overwrite.
+        Import emits its existing memory-written and live-update notifications; it does not replay
+        the single-write workflow, automation or federation dispatch.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -14793,6 +14805,9 @@ paths:
                         type: array
                         items: { type: string }
                       ttl_hours: { type: number }
+                      ai_provenance_id:
+                        type: string
+                        description: Same-node source handle; retained only for this account and the same content hash.
                 mode:
                   type: string
                   enum: [skip, overwrite, rename]

@@ -470,6 +470,7 @@ const ALL_SUITES = [
     // bulk/export/import/bulk-delete, discover and copy, TTL expiry on read, the anonymous
     // namespace refusals, the 413 and 422 arms, the CORS inheritance ladder and the bin listing.
     'test/e2e-memory-doors.ts',
+    'test/e2e-memory-batch-provenance.ts',
     // The remote MCP proxy: attach against a real upstream MCP server this suite starts
     // itself, the tool cache, calling, the cross-owner 404 and the scope split. Here and
     // not only in the unit suites because those run on SQLite alone, and this is what

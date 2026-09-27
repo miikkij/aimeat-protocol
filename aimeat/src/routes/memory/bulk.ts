@@ -33,14 +33,17 @@ import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
-import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
+import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { shownMemoryValue } from '../../services/secret-records.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
-import { type MemoryRouteCtx, isAnonymousGaii } from './shared.js';
+import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
+import { batchKeyRefusal, storageReferenceRefusal } from './batch-guards.js';
+import { writeMemoryBatch } from '../../services/memory-batch-write.js';
+import { isKeyArchived } from '../../services/archive.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -105,10 +108,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const key = e?.key;
       if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
       if (key.startsWith('organism.')) { preFailed.push({ key, status: 'failed', reason: 'organism.* keys use the workspace publish path' }); continue; }
-      if (isServerWrittenKey(key)) { preFailed.push({ key, status: 'failed', reason: serverWrittenKeyRefusal(key).message }); continue; }
-      if (!appMayWriteKey(req.auth!.roles, key)) { preFailed.push({ key, status: 'failed', reason: 'reserved key — managed by the account owner' }); continue; }
-      if (isSecretRecordKey(key)) { preFailed.push({ key, status: 'failed', reason: secretRecordWriteRefusal(key).message }); continue; }
-      if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { preFailed.push({ key, status: 'failed', reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
+      const keyRefusal = batchKeyRefusal(req.auth!.roles, gaii, key);
+      if (keyRefusal) { preFailed.push({ key, status: 'failed', reason: keyRefusal }); continue; }
       // An EXCHANGE listing source past an ODPS cap, compared with what is stored (2026-09-13).
       if (odpsWriteRefusal(key, e.value, undefined)) {
         const odps = odpsWriteRefusal(key, e.value, (await storage.getMemory(gaii, key))?.value);
@@ -117,11 +118,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // storage_ref integrity (parity with the single POST /v1/memory): a value pointing at a stored file
       // must name an existing one. The getStorageFile lookup runs ONLY for storage_ref entries, so a
       // normal bulk write (no storage_refs) pays nothing.
-      const val = e.value as { _type?: string; storage_key?: unknown } | undefined;
-      if (val && typeof val === 'object' && val._type === 'storage_ref') {
-        if (!val.storage_key || typeof val.storage_key !== 'string') { preFailed.push({ key, status: 'failed', reason: 'storage_ref requires a valid storage_key string' }); continue; }
-        if (!(await storage.getStorageFile(gaii, val.storage_key))) { preFailed.push({ key, status: 'failed', reason: `referenced storage file not found: ${val.storage_key}` }); continue; }
-      }
+      const refRefusal = await storageReferenceRefusal(storage, gaii, e.value);
+      if (refRefusal) { preFailed.push({ key, status: 'failed', reason: refRefusal }); continue; }
       items.push({
         key,
         value: e.value,
@@ -132,7 +130,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       });
     }
 
-    const result = await memoryDb.writeMany(gaii, items, {
+    const result = await writeMemoryBatch({ storage, config, memoryDb }, {
+      principal: resolve(req), targetGaii: gaii,
+    }, items, {
       mode,
       quota: {
         maxKeysPerOwner: config.memoryMaxKeysPerAgent,
@@ -140,11 +140,12 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         totalQuotaBytes: config.memoryQuotaMb * 1024 * 1024,
       },
       validate: (key, value) => validateMemoryWrite(key, value, storage),
-    });
+    }, 'bulk');
 
     // Fire the same reactive/live-update signals a single write does, for each entry actually written.
     for (const it of result.items) {
       if (it.status === 'created' || it.status === 'updated') {
+        recordMemoryTouch({ ownerGaii: gaii, key: it.key, writerPrincipal: resolve(req), kind: 'write' });
         emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(it.key)}`);
         emitMemoryWritten(gaii, it.key, it.status);
       }
@@ -204,6 +205,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         visibility: r.visibility,
         tags: r.tags,
         ...(r.ttlHours != null ? { ttl_hours: r.ttlHours } : {}),
+        ...(r.aiProvenanceId ? { ai_provenance_id: r.aiProvenanceId } : {}),
       })),
     }));
   });
@@ -252,19 +254,24 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const items: BulkWriteItem[] = [];
     const renameOf = new Map<string, string>();   // targetKey -> original key (for the summary/events)
     const survivors: { key: string; entry: Record<string, unknown> }[] = [];
+    // A container's archive marker is shared by its records. Resolve it once per request.
+    const archiveChecks = new Map<string, ReturnType<typeof isKeyArchived>>();
     for (const entry of entries) {
       const key = entry?.key;
       if (typeof key !== 'string' || !key) { failed.push({ key: String(key), reason: 'missing key' }); continue; }
-      if (isServerWrittenKey(key)) { failed.push({ key, reason: serverWrittenKeyRefusal(key).message }); continue; }
-      if (!appMayWriteKey(req.auth!.roles, key)) { failed.push({ key, reason: 'reserved key — managed by the account owner' }); continue; }
-      if (isSecretRecordKey(key)) { failed.push({ key, reason: secretRecordWriteRefusal(key).message }); continue; }
-      if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
+      const keyRefusal = batchKeyRefusal(req.auth!.roles, gaii, key);
+      if (keyRefusal) { failed.push({ key, reason: keyRefusal }); continue; }
       if (key.startsWith('organism.')) {
         // Membership, the organism's and a workspace's meta namespaces, the member namespaces and the
         // consent layer: the same answer POST /v1/memory gets. Without it a member stored a copy of a
         // workspace's manifest under their own name, and a non-member stored any organism key.
         const refusal = await organismWriteRefusal(req, gaii, key);
         if (refusal) { failed.push({ key, reason: `${refusal.code}: ${refusal.message}` }); continue; }
+        const container = /^organism\.[^.]+(?:\.w\.[^.]+)?/.exec(key)?.[0] ?? key;
+        let check = archiveChecks.get(container);
+        if (!check) { check = isKeyArchived(storage, key); archiveChecks.set(container, check); }
+        const archive = await check;
+        if (archive.archived) { failed.push({ key, reason: `ARCHIVED: This ${archive.level} is archived (read-only). Unarchive it before writing.` }); continue; }
         const undeclared = await undeclaredSpaceForKey(storage, key);
         if (undeclared) { failed.push({ key, reason: `UNDECLARED_SPACE: ${undeclared.message}` }); continue; }
       }
@@ -272,6 +279,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         const odps = odpsWriteRefusal(key, (entry as { value?: unknown }).value, (await storage.getMemory(gaii, key))?.value);
         if (odps) { failed.push({ key, reason: `${odps.code}: ${odps.message}` }); continue; }
       }
+      const refRefusal = await storageReferenceRefusal(storage, gaii, entry.value);
+      if (refRefusal) { failed.push({ key, reason: refRefusal }); continue; }
       survivors.push({ key, entry });
     }
 
@@ -297,10 +306,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         visibility: (['private', 'owner', 'group', 'members', 'public'].includes(s.entry.visibility as string) ? s.entry.visibility : 'private') as MemoryRecord['visibility'],
         tags: Array.isArray(s.entry.tags) ? s.entry.tags as string[] : [],
         ttlHours: typeof s.entry.ttl_hours === 'number' ? s.entry.ttl_hours : null,
+        ...(typeof s.entry.ai_provenance_id === 'string' ? { aiProvenanceId: s.entry.ai_provenance_id } : {}),
       });
     }
 
-    const result = await memoryDb.writeMany(gaii, items, {
+    const result = await writeMemoryBatch({ storage, config, memoryDb }, {
+      principal: resolve(req), targetGaii: gaii,
+    }, items, {
       // Renamed targets are all-new, so 'overwrite' still yields 'created' for them.
       mode: mode === 'rename' ? 'overwrite' : mode,
       quota: {
@@ -309,10 +321,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         totalQuotaBytes: Number.MAX_SAFE_INTEGER,   // preserve prior import behaviour (no total-bytes cap)
       },
       validate: (key, value) => validateMemoryWrite(key, value, storage),
-    });
+    }, 'import');
 
     for (const it of result.items) {
-      if (it.status === 'created' || it.status === 'updated') emitMemoryWritten(gaii, it.key, it.status);
+      if (it.status === 'created' || it.status === 'updated') {
+        recordMemoryTouch({ ownerGaii: gaii, key: it.key, writerPrincipal: resolve(req), kind: 'write' });
+        emitMemoryWritten(gaii, it.key, it.status);
+      }
       if (it.status === 'failed') failed.push({ key: renameOf.get(it.key) ?? it.key, reason: it.reason ?? 'failed' });
     }
 
