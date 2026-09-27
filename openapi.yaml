@@ -41791,6 +41791,9 @@ paths:
         Forward a work request to a remote node. This call carries `X-Forwarded-From`, so to the
         receiving node it IS a relay: it is signed with the same relay claim as
         POST /v1/federation/route and meets the same gate there, with the same RELAY_* refusals.
+        The signed payload names the requester in `cross_node_requester` by their full identity, a
+        person's GHII or an agent's GAII, and the claim names the same caller. The 1-morsel routing
+        fee is taken from that identity's owner.
       tags: [Federation]
       security:
         - BearerAuth: []
