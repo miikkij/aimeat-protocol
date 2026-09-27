@@ -82,6 +82,8 @@
  *     cancel did to the step meanwhile, and ticks a live run so a step waiting for room gets it. A run
  *     with a call open is `waiting-step`. resumeInflight clears every open call, since the calls
  *     ended with the process (secaudit 2026-09, A6-11).
+ *   v1.14.0 — 2026-09-26 — startRun takes the run's lock before its first save, so nothing advances
+ *     the run before its first tick (secaudit 2026-09, A6-11).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -271,12 +273,13 @@ export class WorkflowEngine {
     if (opts.mode === 'signals-only') {
       await this.runSignalsOnly(ownerGhii, run);
     } else {
-      await this.persist(ownerGhii, run);
-      // It runs again: a refusal still open for it is over, and the next one is told anew.
-      await clearRefusal(this.storage, this.config.nodeId, ownerGhii, workflowId);
-      // Under the run lock: an ecosystem action step's async reply (onPushTerminal, which also locks)
-      // must not advance the run before this initial tick has persisted the 'dispatched' state.
+      // Under the run lock from the first save on. The watchdog finds the run as soon as it is saved,
+      // and an ecosystem action step's async reply (onPushTerminal) can come at any time; both take
+      // this lock, so neither advances the run before this first tick has saved its 'dispatched' state.
       await this.withLock(runId, async () => {
+        await this.persist(ownerGhii, run);
+        // It runs again: a refusal still open for it is over, and the next one is told anew.
+        await clearRefusal(this.storage, this.config.nodeId, ownerGhii, workflowId);
         // fresh mode: wipe the workflow's prior-run output ONCE, before any step dispatches, so an
         // idempotent skip-existing crew regenerates it (parallel shared-namespace steps can't clobber).
         if (run.defSnapshot.fresh) await clearRunOutputs(this.stepDeps(), ownerGhii, run);
