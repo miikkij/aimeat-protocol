@@ -29,6 +29,8 @@
  *     and hands the sum to onPushTerminal whether it ends green or red, for the run's cost cap
  *     (WorkflowDef.maxCostUsd). A call the provider answered is spent even when the step fails.
  *   v1.4.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.5.0 — 2026-09-26 — The step tells onPushTerminal which attempt its model call was made for, so
+ *     what that call holds of the run's cost cap goes when it answers (secaudit 2026-09, A6-11).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -60,6 +62,8 @@ export function dispatchAiStep(
 ): void {
   const { workflowId, runId } = run;
   const stepId = step.id;
+  // The attempt this call is made for. What the call holds of the run's cost cap goes when it answers.
+  const attempt = run.steps[stepId]?.attempt ?? 0;
   // What this step's model calls cost, as the node recorded each: the run's cost cap adds it up. A
   // JSON retry is a second call, and a step that fails after the provider answered has still spent.
   let spentUsd = 0;
@@ -147,9 +151,9 @@ export function dispatchAiStep(
   };
 
   fire()
-    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, spentUsd))
+    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, spentUsd, attempt))
     .catch(err => {
       logger.warn(`workflow ${workflowId} run ${runId}: ai step "${stepId}" failed`, { error: String(err) });
-      return onPushTerminal(ownerGhii, workflowId, runId, stepId, false, spentUsd);
+      return onPushTerminal(ownerGhii, workflowId, runId, stepId, false, spentUsd, attempt);
     });
 }

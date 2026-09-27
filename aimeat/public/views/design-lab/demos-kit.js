@@ -9,6 +9,8 @@
  * @structure KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { KIT_DEMOS } from './demos-kit.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre, Meter's tones, Result and a
+ *     FigureStrip of buttons; the operator pages' parts in the operator's frame.
  *   v1.1.0 — 2026-09-27 — The kit's demos: action-component, mark, note, box, avatar, roads, figure; card moved in
  *     from demos-shell.js, facts, figure-strip, code-block, form-message, setting-box and loading-mark from
  *     demos-settings.js, each rewritten to call its component.
@@ -23,15 +25,19 @@ import { Note } from '/components/Note.js';
 import { Box, SettingBox, SettingRow, SettingConfirm, BoxList, BoxLine } from '/components/Box.js';
 import { Avatar } from '/components/Avatar.js';
 import { Roads, Road } from '/components/Roads.js';
-import { Figure, Sticker, Meter, Tinted } from '/components/Figure.js';
+import { Figure, Result, Sticker, Meter, Tinted } from '/components/Figure.js';
 import { Card, CardGrid } from '/components/Card.js';
 import { Facts, FactLine } from '/components/Facts.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { TextField } from '/components/TextField.js';
+import { OperatorFrame } from '/components/OperatorFrame.js';
 
 const html = htm.bind(h);
 const noop = () => {};
 const root = (children) => html`<${SettingsRoot}>${children}<//>`;
+/** A part of an admin page, in the operator's frame as the page draws it. */
+const op = (title, part) => html`<${OperatorFrame} title=${title}>${part}<//>`;
+const PASTE = 'I run an AIMEAT node and I am its operator.\nRead its usage for the last 30 days.\nTell me which agent costs the most, and why.';
 const LONG = 'A name long enough to wrap onto a second line on a narrow phone screen, as Nordic Ferries\' names do';
 const REQUEST = 'Read the skill aimeat-writing with aimeat_skill_get, then rewrite the About text of Lumo Bakery in plain words.';
 
@@ -51,10 +57,20 @@ export const KIT_DEMOS = {
     { name: 'link to a page', render: () => root(html`<${Actions}><${Action} small href="#" newTab>Open the app<//><${Action} small href="#" download="lumo-bakery.zip">Download<//><//>`) },
     { name: 'loud', render: () => root(html`<${Actions}><${Loud} onClick=${noop}>Connect an agent<//><${Loud} control onClick=${noop}>Save<//><${Loud} control danger onClick=${noop}>Delete<//><//>`) },
     { name: 'loud large', render: () => root(html`<${Loud} large onClick=${noop}>Start here<//>`) },
+    { name: 'loud quiet: before its turn, and when it can act', render: () => root(html`<${Actions}><${Loud} quiet control disabled>Save the name<//><${Loud} control onClick=${noop}>Save the name<//><//>`) },
     { name: 'icon', render: () => root(html`<${Actions}><${Icon} label="Remove" onClick=${noop}>✗<//><${Icon} small label="More" onClick=${noop}>⋯<//><${Icon} small pressed label="In the collection" onClick=${noop}>✓<//><//>`) },
     { name: 'row at the end, under a panel', render: () => root(html`<${Actions} end><${Action} small onClick=${noop}>Cancel<//><${Loud} control onClick=${noop}>Send<//><//>
       <${Actions} under><${Action} small onClick=${noop}>Close<//><//>`) },
     { name: 'long', render: () => root(html`<${Actions}><${Action} small onClick=${noop}>${LONG}<//><//>`) },
+    { name: 'plain: a toggle over a strip', render: () => root(html`<${Action} tone="plain" expanded=${false} onClick=${noop}>▶ toggle<//>`) },
+    { name: 'dashed in a sentence', render: () => root(html`<p>Paste the page, or let your AI write one: <${Action} tone="dashed" onClick=${noop}>generated<//>.</p>`) },
+    { name: 'inline in a sentence, and small', render: () => root(html`<p>Lumo Bakery tells its visitors that an AI wrote the menu. <${Action} tone="inline" href="#" newTab>Read Article 50 →<//></p>
+      <p><${Action} tone="inline" small href="#" newTab>Open →<//></p>`) },
+    { name: 'file', render: () => root(html`<${Action} tone="file" href="#" newTab>View odps.yaml<//>`) },
+    { name: 'loud mark: the sign alone on a phone', render: () => root(html`<${Loud} control mark="+" onClick=${noop}>Create an app<//>`) },
+    { name: 'chapter row', render: () => root(html`<${Actions} chapter><${Loud} control onClick=${noop}>Open<//><${Action} small onClick=${noop}>Edit the source<//><${Action} small disabled>Publish<//><//>`) },
+    { name: 'row apart', render: () => root(html`<p>Search engines may list Harbour Studio.</p><${Actions} apart><${Action} small onClick=${noop}>Hide it from search<//><//><p>The change reaches them within a day.</p>`) },
+    { name: 'tight row: a picker', render: () => root(html`<${Actions} tight><${Action} small onClick=${noop}>Attach a skill<//><${Mark}>aimeat-writing<//><${Action} small tone="danger" onClick=${noop}>Remove<//><//>`) },
   ] },
   mark: { variants: [
     { name: 'tags', render: () => root(html`<${Marks}><${Mark}>v1.4.0<//><${Mark} tone="sun">default<//><${Mark} tone="coral">new<//>
@@ -70,6 +86,13 @@ export const KIT_DEMOS = {
       <${Mark} live>MCP connected<//><//>`) },
     { name: 'label', render: () => root(html`<p><${Label}>Owner<//> sandbox</p><${Label} block>What your AI reads<//><p>The whole file, once a session.</p>`) },
     { name: 'code', render: () => root(html`<p>Ask your AI to run <${Code}>aimeat_skill_list<//> first.</p><${Code} block>${REQUEST}<//>`) },
+    { name: 'on tag', render: () => root(html`<${Marks}><${Mark} tone="on">Promoted<//><//>`) },
+    { name: 'heavy tag', render: () => root(html`<p>Privacy policy <${Mark} tone="heavy">Recommended<//></p>`) },
+    { name: 'need tags, spread', render: () => root(html`<${Marks} spread><${Mark} tone="need">cortex: bakery-orders<//><${Mark} tone="need">extension: invoice-pdf<//><//>`) },
+    { name: 'name tags', render: () => root(html`<${Marks}><${Mark} tone="name">bot<//><${Mark} tone="name">invoice-drafter<//><//>`) },
+    { name: 'word', render: () => root(html`<p>Terms of use <${Mark} kind="word" tone="ink">Markdown · 9/27/2026<//></p>
+      <p>Privacy policy <${Mark} kind="word" tone="notice">Missing<//></p><p>Imprint <${Mark} kind="word">not asked for<//></p>`) },
+    { name: 'ruled label', render: () => root(html`<${Label} ruled>Prompt preview<//><p>Rewrite the About text of Lumo Bakery in plain words.</p>`) },
     { name: 'empty', render: () => root(html`<${Marks}><//>`) },
     { name: 'long', render: () => root(html`<${Marks}><${Mark}>${LONG}<//><${Mark} tone="coral">short<//><//>`) },
   ] },
@@ -85,6 +108,31 @@ export const KIT_DEMOS = {
       <${Note} kind="aside" tone="irreversible">Deleting the board removes its 57 notices. This cannot be undone.<//>
       <${Note} kind="aside" tone="waiting">Finish the sign-in in the other window.<//>
       <${Note} kind="aside" tone="suggestion">Connect your phone to hear new messages.<//>`) },
+    { name: 'hint small', render: () => root(html`<${Actions}><${Action} small onClick=${noop}>Fork<//><${Action} small onClick=${noop}>Share<//><//><${Note} size="small">Fork makes your own copy; Share gives others the address.<//>`) },
+    { name: 'hint intro', render: () => root(html`<${Note} size="intro">Who opened Lumo Bakery in the last 30 days, counted once a day per visitor.<//>`) },
+    { name: 'hint note', render: () => root(html`<${FigureStrip} free items=${[{ n: 214, label: 'visits' }, { n: 61, label: 'visitors' }]} /><${Note} size="note">A visitor is counted once a day, so one person on two days counts twice.<//>`) },
+    { name: 'hint text', render: () => root(html`<${Note} size="text">An app that talks to a person with an AI must say so before the conversation starts, in words the person can read.<//>`) },
+    { name: 'hint chapter', render: () => root(html`<${Note} chapter>Your AI proposes a new About text; you keep it or throw it away.<//>`) },
+    { name: 'lead chapter', render: () => root(html`<${Note} kind="lead" chapter>Order bread for the week and pick it up on Friday morning.<//>`) },
+    { name: 'lead record', render: () => root(html`<${Note} kind="lead" size="record">Reviewed by sandbox on 2026-09-27.<//>`) },
+    { name: 'quiet small', render: () => root(html`<${Note} kind="quiet" size="small">Nothing beyond the platform itself.<//>`) },
+    { name: 'quiet chapter', render: () => root(html`<${Note} kind="quiet" chapter>No contracts yet.<//>`) },
+    { name: 'aside chapter', render: () => root(html`<${Note} kind="aside" chapter>The legal pages are yours to write; the node only shows them.<//>`) },
+    { name: 'aside disclosure', render: () => root(html`<${Note} kind="aside" tone="disclosure">This panel is written by an AI. Read it before you keep it.<//>`) },
+    { name: 'caption', render: () => root(html`<${Note} kind="caption">Choose who may use Lumo Bakery's data.<//>`) },
+    { name: 'caption sizes', render: () => root(html`<${Note} kind="caption" size="medium">3 apps, 2 drafts, 1 skill.<//>
+      <${Note} kind="caption" size="large">The app stays yours; the copy is a new app with its own address.<//>
+      <${Note} kind="caption" size="body">This extension reads the orders and writes an invoice as a PDF.<//>
+      <${Note} kind="caption" size="lead">These agents come with the app and work only inside it.<//>`) },
+    { name: 'caption faint and mono', render: () => root(html`<${Note} kind="caption" tone="faint">Not yet installed.<//><${Note} kind="caption" mono>sandbox/lumo-bakery.html<//>`) },
+    { name: 'report tones', render: () => root(html`<${Note} kind="report" tone="busy">Publishing…<//><${Note} kind="report" tone="ok">Published as v1.4.0.<//>
+      <${Note} kind="report" tone="err">The upload failed. Try again.<//><${Note} kind="report" tone="refused">The name is taken.<//>`) },
+    { name: 'report keep', render: () => root(html`<${Note} kind="report" keep><//><p>The line above holds its room while it says nothing.</p>`) },
+    { name: 'report chapter', render: () => root(html`<${Note} kind="report" chapter tone="busy">Your AI is writing a proposal…<//>`) },
+    { name: 'state', render: () => root(html`<${Note} kind="state">Search engines have not seen this app yet.<//><${Note} kind="state" tone="fine">Listed in search since 2026-09-20.<//>
+      <${Note} kind="state" tone="attention">Announced, not yet seen.<//><${Note} kind="state" tone="danger">Search engines refused the address.<//>`) },
+    { name: 'state small', render: () => root(html`<${Note} kind="state" size="small">Not offered<//> <${Note} kind="state" size="small" tone="fine">Offered on EXCHANGE<//>`) },
+    { name: 'state small mono', render: () => root(html`<${Note} kind="state" size="small" mono>2 contracts · 0.40 € a month<//>`) },
     { name: 'long', render: () => root(html`<${Note}>${LONG}. The hint wraps under itself and keeps its grey.<//>`) },
   ] },
   box: { variants: [
@@ -112,6 +160,14 @@ export const KIT_DEMOS = {
       <${SettingConfirm}><${TextField} label="Type the agent's name to confirm: bot" value="" onInput=${noop} /><${Loud} control danger disabled>Delete<//><//><//>`) },
     { name: 'empty', render: () => root(html`<${Box} />`) },
     { name: 'long', render: () => root(html`<${Box} name=${LONG} marks=${html`<${Mark}>shared<//>`}>${LONG}.<//>`) },
+    { name: 'setting box pre (an operator page)', render: () => op('Usage', html`<${SettingBox} pre label="For your own AI">${PASTE}<//>`) },
+    { name: 'tabbed', render: () => root(html`<${Box} tone="tabbed"><${TextField} label="Paste the app's HTML" value="<!doctype html>…" onInput=${noop} /><//>`) },
+    { name: 'part', render: () => root(html`<${Box} tone="part"><strong>Library file</strong><${Code} block>export function invoice(order) { … }<//>
+      <strong>Prompt</strong><${Code} block>${REQUEST}<//><//>`) },
+    { name: 'proposal', render: () => root(html`<${Box} tone="proposal" doors=${html`<${Loud} control onClick=${noop}>Keep<//><${Action} small onClick=${noop}>Throw away<//>`}>
+      <${Note} kind="report" chapter>Your AI proposes a new About text.<//><p>Fresh rolls every morning from 6, and a cake for Friday if you order by Wednesday.</p><//>`) },
+    { name: 'statement', render: () => root(html`<${Box} tone="statement" doors=${html`<${Loud} control onClick=${noop}>Sign<//>`}>
+      <${Label} block>Where the material comes from<//><p>I, sandbox, made the pictures and the words of Lumo Bakery myself.</p><//>`) },
   ] },
   avatar: { variants: [
     { name: 'initials and one letter', render: () => root(html`<p><${Avatar} text="HS" /> <${Avatar} text="L" /> <${Avatar} text="NF" /></p>`) },
@@ -141,6 +197,10 @@ export const KIT_DEMOS = {
     { name: 'tinted', render: () => root(html`<p><${Tinted} strong tone="fine">On<//> for the web, <${Tinted} tone="notice">off<//> for mail, <${Tinted} tone="warn">slow<//>,
       <${Tinted} tone="danger">down<//>, <${Tinted} tone="dim">unknown<//>, <${Tinted} tone="faint">never<//>, <${Tinted} whole>harbour-studio.apps.aimeat.io<//>.</p>`) },
     { name: 'empty meter', render: () => root(html`<${Meter} pct=${0} quota />`) },
+    { name: 'meter tones (an operator page)', render: () => op('Agent integration', html`<${Meter} tone="notice" pct=${25} figure="1 of 4 agents ready" />
+      <${Meter} tone="ink" pct=${60} figure="bot · 60 % of the calls" /><${Meter} tone="dim" pct=${15} figure="invoice-drafter · 15 %" />`) },
+    { name: 'result', render: () => root(html`<${Result} label="Result before taxes" n="+1,240 €" sub="September, Harbour Studio" tone="fine" />
+      <${Result} label="Result before taxes" n="-310 €" sub="August, Lumo Bakery" tone="danger" /><${Result} label="Result before taxes" n="0 €" />`) },
   ] },
   card: { variants: [
     { name: 'ruled tiles', render: () => root(html`<${CardGrid}>
@@ -165,6 +225,9 @@ export const KIT_DEMOS = {
     { name: 'figures', render: () => root(html`<${CardGrid} cols="figures"><${Card} tone="figure" figure="12" name="apps" onOpen=${noop} openLabel="Open Apps" /><${Card} tone="figure" figure="0" name="boards" /><//>`) },
     { name: 'two and one column', render: () => root(html`<${CardGrid} cols="two"><${Card} name="Last letter" meta="today" /><${Card} name=${LONG} meta="yesterday" /><//>
       <${CardGrid} cols="one"><${Card} tone="framed" mark="#" name="Charts" text="Draw your records as charts." onOpen=${noop} /><//>`) },
+    { name: 'strip: tiles in one sideways line', render: () => root(html`<${CardGrid} cols="strip">
+      ${['harbour-sounds', 'ferry-timetables', 'bakery-orders', 'invoice-drafter', 'weather-notes'].map((n) => html`<${Card} key=${n} tone="framed"
+        name=${'📦 ' + n} meta="2 libs · 1 schema" onOpen=${noop} openLabel=${n} />`)}<//>`) },
     { name: 'classic', render: () => html`<${Card} title="Storage" subtitle="What this node keeps"><p>Two files.</p><//>` },
     { name: 'classic glass', render: () => html`<${Card} variant="glass" title="Storage" subtitle="What this node keeps"><p>Two files.</p><//>` },
     { name: 'empty grid', render: () => root(html`<${CardGrid} />`) },
@@ -185,6 +248,12 @@ export const KIT_DEMOS = {
       { k: 'Tags', v: html`<${Marks}><${Mark}>bakery<//><${Mark}>orders<//><//>`, actions: html`<${Action} small onClick=${noop}>Edit tags<//>` },
       { k: 'Budget', v: html`<${Meter} quota pct=${40} figure="4 € / 10 €" />` },
     ]} />`) },
+    { name: 'tiles', render: () => root(html`<${Facts} tiles rows=${[
+      { k: 'Category', v: 'Food and drink' }, { k: 'Tags', v: 'bakery, orders' }, { k: 'Size', v: '42 KB' }, { k: 'Owner', v: 'sandbox@aimeat-local-001-dev', mono: true },
+    ]} />`) },
+    { name: 'readout', render: () => root(html`<${Facts} readout rows=${[
+      { k: 'Calls an AI', v: 'Yes, through the owner\'s OpenRouter key' }, { k: 'Says it is an AI', v: 'Yes, before the first answer' }, { k: 'Model', v: 'model default', missing: true },
+    ]} />`) },
     { name: 'empty', render: () => root(html`<${Facts} rows=${[]} />`) },
   ] },
   'figure-strip': { variants: [
@@ -201,6 +270,12 @@ export const KIT_DEMOS = {
     ]} />`) },
     { name: 'lead and flush', render: () => root(html`<${FigureStrip} lead items=${[{ n: 57, label: 'boards' }, { n: 3, label: 'yours' }]} /><${Box}><${FigureStrip} flush items=${[{ n: 4, label: 'rules' }]} /><//>`) },
     { name: 'loading', render: () => root(html`<${FigureStrip} loading=${4} />`) },
+    { name: 'free', render: () => root(html`<${FigureStrip} free items=${[{ n: 214, label: 'visits' }, { n: 61, label: 'visitors' }, { n: '3.5', label: 'visits a visitor' }]} />`) },
+    { name: 'figures that are buttons (an operator page)', render: () => op('Owners', html`<${FigureStrip} items=${[
+      { n: 3, label: 'owners', sub: 'show all', onClick: noop, title: 'Show every owner' },
+      { n: 1, tone: 'notice', label: 'disabled', sub: 'show them', onClick: noop, title: 'Show the disabled owners' },
+      { n: 12, label: 'agents', sub: 'on this node' },
+    ]} />`) },
   ] },
   'code-block': { variants: [
     { name: 'block', render: () => root(html`<${Code} block>aimeat_skill_get aimeat-writing\n# a second line long enough to wrap on a narrow screen, as the pages wrap it<//>`) },
@@ -220,6 +295,7 @@ export const KIT_DEMOS = {
       <${SettingConfirm}><${TextField} label="Type the name" value="Harbour" onInput=${noop} /><${Loud} control onClick=${noop}>Confirm<//><//><//>`) },
     { name: 'irreversible', render: () => root(html`<${SettingBox} irreversible label="Delete this board">
       <${SettingRow}><${Note} inline>Removes the board and its 57 notices. This cannot be undone.<//><${Action} small tone="danger" onClick=${noop}>Delete…<//><//><//>`) },
+    { name: 'pre: a prompt to paste (an operator page)', render: () => op('Statistics', html`<${SettingBox} pre label="For your own AI">${PASTE}<//>`) },
   ] },
   'loading-mark': { variants: [
     { name: 'default', render: () => root(html`<${Note} kind="loading" />`) },

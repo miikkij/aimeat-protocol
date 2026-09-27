@@ -16,12 +16,17 @@
  *   FORGETTING: the aging job answers "how does this go stale" for the Book itself — a published
  *   part nobody has adopted within the window is marked `aging` (still adoptable, visibly
  *   fading). Adoption is the heartbeat: DesignBookService.adopt() lifts an aging part straight
- *   back to published, so one real use un-fades it without an operator round.
+ *   back to published, so one real use un-fades it without an operator round. The same nightly
+ *   round tells a proposer, once, that their stored component no longer passes the bench
+ *   (component-notice.ts).
  * @structure seedDesignBook() · runDesignBookAgingJob() · AGING_AFTER_DAYS
  * @usage
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The aging round reads the components that no longer pass the bench too, which
+ *     every listing leaves out, so they fade like any part nobody takes; and it tells their proposers
+ *     once (component-notice.ts).
  *   v1.3.0 — 2026-09-15 — A seeded part follows its registry entry when this build changes it, keeping
  *     its status; a retired part and a part someone else holds are left alone.
  *   v1.2.0 — 2026-09-05 — The nine EFFECTS are seeded published, each at its defaults where the
@@ -46,6 +51,7 @@ import { defaultEffectTarget } from './validate.js';
 import { DesignBookService, type DesignBookPart } from './service.js';
 import { DesignBookError, validatePartInput, type PartKind } from './validate.js';
 import { stableStringify } from '../../utils/stable-json.js';
+import { noticeFailingComponents } from './component-notice.js';
 
 /** A published part with no adoption for this long fades to `aging`. One adopt un-fades it. */
 export const AGING_AFTER_DAYS = 60;
@@ -194,12 +200,13 @@ function presetTitle(presetId: string): string {
 /**
  * The nightly fade: published parts with zero adoptions past the window turn `aging`.
  * Operator-published parts fade exactly like seeded ones — the Book forgets by USE, not by rank.
+ * A component that no longer passes the bench fades too, and its proposer is told once.
  */
 export async function runDesignBookAgingJob(storage: Storage, config: AimeatConfig): Promise<void> {
   const book = new DesignBookService(storage, config);
   const system = systemGhiiFor(config.nodeId);
   const cutoff = Date.now() - AGING_AFTER_DAYS * 24 * 60 * 60 * 1000;
-  const rows = await book.list({ status: 'published', limit: 200 });
+  const rows = await book.list({ status: 'published', limit: 200 }, { withFailing: true });
   let faded = 0;
   for (const row of rows) {
     if (row.usage > 0) continue;
@@ -210,4 +217,5 @@ export async function runDesignBookAgingJob(storage: Storage, config: AimeatConf
     faded++;
   }
   if (faded > 0) logger.info(`design-book aging: ${faded} unadopted part(s) faded to aging`);
+  await noticeFailingComponents(storage, config);
 }

@@ -12,6 +12,10 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-09-26 — The move to the GHII runs once for each database, as its Postgres migration does,
+ *     and records that it ran (schema-identity-backfill.ts).
+ *   2026-09-26 — Actions a person published and the work on them move to the GHII
+ *     (schema-identity-backfill.ts, migration 0085).
  *   2026-09-26 — app_grants.ownerAddedScopes (migration 0084): the words the owner added by hand.
  *   2026-09-25 — federation_peers.relayClaim/.lastClaimedRelayAt/.lastUnclaimedRelayAt (migration
  *     0083): a peer's own relay-claim setting, and when it last relayed with a claim and without.
@@ -63,6 +67,7 @@ import { applySchemaTables2 } from './schema-tables-2.js';
 import { applySchemaTables3 } from './schema-tables-3.js';
 import { applySchemaTables4 } from './schema-tables-4.js';
 import { splitPushSubscriptionsPerDevice, relaxPushLastUsedAt, relaxInvitationsOrganismId } from './schema-rebuilds.js';
+import { moveActionsAndWorkToFullIdentity } from './schema-identity-backfill.js';
 
 export function initializeSchema(db: Database.Database): void {
   // CREATE TABLE/INDEX DDL, applied in numeric order (same order as the original single
@@ -771,5 +776,10 @@ export function initializeSchema(db: Database.Database): void {
     DELETE FROM memory_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 1);
     DELETE FROM memory_archive_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 0);
   `);
+
+  // Actions a person published and the work on them move from the bare account name to the GHII
+  // (mirrors Postgres 0085). Once for each database: it records in system_settings that it ran, and
+  // an open that finds the record changes nothing.
+  moveActionsAndWorkToFullIdentity(db);
 }
 

@@ -14,7 +14,7 @@
  *   The heights are measured, not guessed: the page's hook publishes the distance from the panes'
  *   top edge to the window's bottom as --conversation-desk-avail, and on a phone the visible height
  *   as --conversation-avail (views/profile/inbox-tab/use-thread-ux.js).
- * @structure Panes({ open, backLabel, onBack, side, children }) · Pane({ empty, page, children }) ·
+ * @structure Panes({ open, backLabel, onBack, side, head, label, framed, children }) · Pane({ empty, page, children }) ·
  *   PaneHead({ picture, name, nameTitle, presence, subject, via, address, before, children }) ·
  *   PaneDoor({ mark, label, title, pressed, onClick }) · PaneFields({ children }) ·
  *   ReplyBar({ label, text, onJump, cancelLabel, onCancel }) · PaneNote({ children }) ·
@@ -25,7 +25,14 @@
  *   `Pane page`: the pane as a page's column (the broadcast form, tracked responses, results): its
  *   height follows its words and its head is left out, as the page head already says it.
  *   A PaneDoor's words hide when the pane is narrow (below 620px of pane), its mark stays.
+ *   `Panes framed`: the same two panes on a page, in one frame (a list with its `head` beside the
+ *   thing opened from it; `label` names the list): html`<${Panes} framed label=${x('find')}
+ *     head=${searchAndFilters} side=${rows}>${editor}<//>`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — `Panes framed` + `head` + `label`: the admin System Prompts page's list beside
+ *     the open prompt (components/Panes.js, admin page group G3, folded in: one component for a list
+ *     beside the thing opened from it). Its look moved from panes.css into conversation-pane.css; the
+ *     messenger's panes draw as before.
  *   v1.0.0 — 2026-09-26 — Initial, moved with their values from css/views/inbox.css and
  *     inbox-poster.css (.inbox-body, .inbox-back, .inbox-side, .inbox-panel, .inbox-thread-head and
  *     its id, name, subject, via and address, .inbox-replybar*, .inbox-announce-note,
@@ -42,8 +49,23 @@ const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
 
 /** The two panes: the list (`side`) beside the open one (children). On a phone one at a time, the way
- *  back over the open one, and the open one over the whole screen. */
-export function Panes({ open, backLabel, onBack, side, children }) {
+ *  back over the open one, and the open one over the whole screen.
+ *  `framed` (added by admin page group G3's merge): a long list beside the one thing opened from it
+ *  in one frame, on a page rather than a messenger (the operator's System Prompts): `head` stands
+ *  over the list and does not scroll, the rows (`side`) scroll inside their pane, the opened thing
+ *  (children) scrolls on its own; `label` names the list pane for a screen reader. Under a wide
+ *  desktop (1400px) the list stands over the opened thing and is kept short; both stay in sight. */
+export function Panes({ open, backLabel, onBack, side, head, label, framed, children }) {
+  if (framed) {
+    return html`
+      <div class="conversation-panes-framed">
+        <div class="conversation-panes-framed-list" role="region" aria-label=${label}>
+          ${head ? html`<div class="conversation-panes-framed-head">${head}</div>` : null}
+          <div class="conversation-panes-framed-rows">${side}</div>
+        </div>
+        <div class="conversation-panes-framed-open">${children}</div>
+      </div>`;
+  }
   return html`
     <div class=${cx('conversation-panes', 'poster-row--thing', open && 'conversation-panes--open')}>
       <button type="button" class="conversation-panes-back" onClick=${onBack}>← ${backLabel}</button>

@@ -23,15 +23,20 @@
  *   three full scans of the actions table on the critical path of every registration.
  *
  *   A REFERENCE NAMES ONE ACTION OR NONE. The table is keyed (provider, id), so two owners can
- *   publish the same id. `id#provider` always names exactly one; a bare id names one only while
- *   exactly one provider publishes it. indexActionRefs() is the one place that decides this, for the
- *   executor, the page and the binding write alike: a bare id two providers publish resolves to
- *   nothing, the binding is refused, and a gate bound to one refuses rather than calling whichever
- *   row the scan returned last (security audit A8-3).
+ *   publish the same id. `id#provider` always names exactly one, and it is the form a binding is
+ *   stored in. A bare id (a reference without `#`) is resolved in two places only, both of them a
+ *   choice the operator makes or has made: when a binding is written (setHookActions) and when the
+ *   stored bindings are settled at start (settleStoredHookBindings), and there only while exactly one
+ *   provider publishes it. WHEN A HOOK RUNS, A BARE ID NAMES NO ACTION, whatever is published at that
+ *   moment: resolveHookRef() says so for the executor and the page alike, nobody is called, and a gate
+ *   bound to one refuses, as it refuses when it cannot tell what it is bound to. So no later
+ *   publication or deletion decides what a stored binding names (security audit A8-3).
  *
  * @structure
  *   - HOOK_NAMES / hookKind(name)         — the canonical list, and gate vs notify
+ *   - qualifiedRef(action) / isBareRef()  — the stored form of a reference, and the bare one
  *   - indexActionRefs(published)          — what each reference names, and the ambiguous bare ids
+ *   - resolveHookRef(ref, index)          — what a stored reference names when a hook runs
  *   - executeHooks(config, storage, ...)  — resolve, call in order, record, abort on refusal
  *   - listHooks(config)                   — what is bound to each moment
  *   - HookContext / HookResult            — the context passed through and the outcome
@@ -39,6 +44,10 @@
  *   const r = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
+ *   v1.3.0 — 2026-09-26 — SECURITY (audit A8-3): resolveHookRef(). When a hook runs, only an id#provider
+ *     reference names an action. A bare id names none, whatever is published at that moment: the
+ *     executor calls nobody and a gate refuses, and the page shows it with the id#provider of each
+ *     provider publishing the id now. indexActionRefs() also answers publishersOf for that list.
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-3): indexActionRefs(). A bare id resolved to whichever
  *     owner's action listActions() returned last, so a second owner publishing the same id could
  *     receive the moment's context. Now a bare id two providers publish names nothing: the executor
@@ -88,13 +97,30 @@ export interface HookResult {
     hookAction?: string;
 }
 
+/** The form a binding stores a reference in: the action's id with its provider. It names one action. */
+export function qualifiedRef(a: Pick<ActionRecord, 'id' | 'providerGaii'>): string {
+    return `${a.id}#${a.providerGaii}`;
+}
+
+/**
+ * A bare id: a reference without its provider. An id published through POST /v1/actions has no `#`
+ * in it, and a qualified reference always has one. The load at start checks only that a stored list
+ * is an array, so an entry is not assumed to be a string.
+ */
+export function isBareRef(ref: unknown): ref is string {
+    return typeof ref === 'string' && !ref.includes('#');
+}
+
 /** What the references a binding may hold name among the published actions. */
 export interface ActionRefIndex<T> {
     /** Every reference that names exactly one action: each `id#provider`, and each bare id only
-     *  one provider publishes. */
+     *  one provider publishes. The bare ones are for the moment a binding is written or settled;
+     *  when a hook runs, resolveHookRef() reads only the `id#provider` ones. */
     byRef: Map<string, T>;
     /** Each bare id two or more providers publish, with the `id#provider` reference of each. */
     ambiguous: Map<string, string[]>;
+    /** Each published id, with the `id#provider` reference of every provider that publishes it. */
+    publishersOf: Map<string, string[]>;
 }
 
 /**
@@ -113,18 +139,47 @@ export function indexActionRefs<T extends Pick<ActionRecord, 'id' | 'providerGai
     const byRef = new Map<string, T>();
     const byId = new Map<string, T[]>();
     for (const a of published) {
-        byRef.set(`${a.id}#${a.providerGaii}`, a);
+        byRef.set(qualifiedRef(a), a);
         byId.set(a.id, [...(byId.get(a.id) ?? []), a]);
     }
     const ambiguous = new Map<string, string[]>();
+    const publishersOf = new Map<string, string[]>();
     for (const [id, holders] of byId) {
+        publishersOf.set(id, holders.map(qualifiedRef));
         if (holders.length === 1) {
             if (!byRef.has(id)) byRef.set(id, holders[0]);
         } else {
-            ambiguous.set(id, holders.map((a) => `${a.id}#${a.providerGaii}`));
+            ambiguous.set(id, holders.map(qualifiedRef));
         }
     }
-    return { byRef, ambiguous };
+    return { byRef, ambiguous, publishersOf };
+}
+
+/** What a stored reference names when a hook runs. */
+export type ResolvedHookRef<T> =
+    /** The `id#provider` of a published action: the one action it names. */
+    | { kind: 'action'; action: T }
+    /** A bare id. It names no action, whatever is published at this moment. `claimants` is the
+     *  `id#provider` of each provider that publishes the id now, possibly none: what to bind instead. */
+    | { kind: 'bare'; claimants: string[] }
+    /** An `id#provider` nothing publishes now, such as an action deleted since it was bound. */
+    | { kind: 'missing' };
+
+/**
+ * What a stored reference names when a hook runs, for the executor and the page alike. Only the
+ * exact `id#provider` of a published action resolves. A bare id resolves to nothing here, even when
+ * one provider publishes it: whoever publishes or deletes that id later must not decide what a
+ * stored binding names. A bare id is resolved only when a binding is written or settled.
+ */
+export function resolveHookRef<T extends Pick<ActionRecord, 'id' | 'providerGaii'>>(
+    ref: unknown,
+    index: ActionRefIndex<T>,
+): ResolvedHookRef<T> {
+    if (typeof ref !== 'string') return { kind: 'missing' };
+    const found = index.byRef.get(ref);
+    if (found && ref === qualifiedRef(found)) return { kind: 'action', action: found };
+    if (isBareRef(ref)) return { kind: 'bare', claimants: index.publishersOf.get(ref) ?? [] };
+    return { kind: 'missing' };
 }
 
 /**
@@ -163,36 +218,40 @@ export async function executeHooks(
         }
         return { allowed: true };
     }
-    // Two accepted spellings, the bare id and the id with its provider's identity, and a bare id
-    // only while exactly one provider publishes it (indexActionRefs).
-    const { byRef, ambiguous } = indexActionRefs(published);
+    // Only the id with its provider's identity names an action here; a bare id names none, whatever
+    // is published at this moment (resolveHookRef).
+    const index = indexActionRefs(published);
 
     for (const actionRef of actions) {
         const started = Date.now();
-        const claimants = ambiguous.get(actionRef);
-        if (claimants) {
-            // Calling either would let whoever published last decide where this moment's context
-            // goes, so neither is called. A gate that cannot tell what it is bound to has not been
-            // satisfied, the same rule as an address that will not answer: it refuses.
-            logger.warn(`Extension hook ${hookName}: "${actionRef}" is published by ${claimants.length} providers, calling none`);
+        const bound = resolveHookRef(actionRef, index);
+        if (bound.kind === 'bare') {
+            // Calling whichever provider publishes the id now would let a publication or a deletion
+            // decide where this moment's context goes, so nobody is called. A gate that cannot tell
+            // what it is bound to has not been satisfied, the same rule as an address that will not
+            // answer: it refuses.
+            const claimants = bound.claimants;
+            logger.warn(`Extension hook ${hookName}: "${actionRef}" is a bare id, which names no one action, calling none`);
             await record(storage, hookName, actionRef, undefined, 'missing', null, Date.now() - started, kind !== 'gate', subject,
-                `More than one provider publishes this id: ${claimants.join(', ')}. Bind the one you mean as id#provider.`);
+                'A bare id names no one action when a hook runs. '
+                + (claimants.length > 0 ? `Published under this id now: ${claimants.join(', ')}. ` : 'Nothing is published under this id now. ')
+                + 'Bind the one you mean as id#provider.');
             if (kind === 'gate') {
                 return {
                     allowed: false,
-                    reason: `Hook action "${actionRef}" names more than one published action`,
+                    reason: `Hook action "${actionRef}" does not name one published action`,
                     hookAction: actionRef,
                 };
             }
             continue;
         }
-        const action = byRef.get(actionRef);
-        if (!action) {
+        if (bound.kind === 'missing') {
             logger.warn(`Extension hook ${hookName}: action "${actionRef}" not found, skipping`);
             await record(storage, hookName, actionRef, undefined, 'missing', null, Date.now() - started, true, subject,
                 'The bound action is not published on this node');
             continue;
         }
+        const action = bound.action;
 
         const webhookUrl = action.webhookUrl;
         if (!webhookUrl) {

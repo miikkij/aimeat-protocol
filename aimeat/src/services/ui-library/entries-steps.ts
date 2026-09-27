@@ -8,6 +8,7 @@
  * @structure STEP_ENTRIES
  * @usage import { STEP_ENTRIES } from './entries-steps.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — PromptCard's loud and quiet (the copy's weight as a meaning, not a class).
  *   v1.1.0 — 2026-09-23 — AgentCard, LinkRow, AppList, TeachNote and the step card's done and limit
  *     looks deleted with their code (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
@@ -17,34 +18,46 @@ import type { UiEntryWritten } from './types.js';
 export const STEP_ENTRIES: UiEntryWritten[] = [
     {
         id: 'step-card', name: 'StepCard', kind: 'component', status: 'active',
-        summary: 'One step of a numbered setup path: its number, title and lead, in an ink frame with the sun shadow.',
+        summary: 'One step of a numbered path: its number, title and lead, in an ink frame with the sun shadow. A step of a guide inside a dialog stands under the heavy ink rule with its number on ink; one numbered question of a form stands over a hairline, what it asks in line with its title.',
         module: '/components/StepCard.js', sheet: '/css/components/step-card.css',
         data: {
-            shape: 'StepCard({ num, title, children }) · StepLede({ children })',
-            fields: { num: 'the step number as text', title: 'the step headline', children: 'the step body: a StepLede, then its controls' },
+            shape: 'StepCard({ num, title, rule, question, children }) · StepLede({ children })',
+            fields: {
+                num: 'the step number as text', title: 'the step headline', children: 'the step body: a StepLede, then its controls',
+                rule: 'a step of a guide inside a dialog: no frame, the heavy ink rule on top, the number on ink, the title in the section face; the parts inside it take the prompt builder\'s look (a report line, hints, two boxed track cards, the idea as bold words over a heavy line, an underlined choice, framed pack pills with a tier word, the prompt label over an ink rule, the prompt box that scrolls after 150px, the copy slab)',
+                question: 'one numbered question of a form: no frame, a hairline under it, the number a 28px ink square, the lede and the fields 40px in, in line with the title (at the left edge under 900px)',
+            },
         },
-        useFor: ['A step a person does once, in order, on the way to something working.'],
+        useFor: ['A step a person does once, in order, on the way to something working.',
+            'The numbered steps of a guide in a dialog (rule), and the numbered questions of a long form (question).'],
         variants: [
             { name: 'open', class: 'poster-step--open', when: 'the step in progress; the others stay closed' },
+            { name: 'rule', class: 'poster-step--rule', prop: 'rule', when: 'a step of a guide inside a dialog (the prompt builder): under the heavy ink rule, its number on ink' },
+            { name: 'question', class: 'poster-step--question', prop: 'question', when: 'one numbered question of a form (the tool editor): a hairline under it, its fields in line with its title' },
         ],
         example: { num: '1', title: 'Your welcome mat', children: 'Copy the prompt below into your AI chat.' },
-        note: 'The done and limit looks were deleted on 2026-09-23 (Jouni\'s decision): only StepMatDone and StepBranchB drew them, and neither had been drawn since 07f7040c5 (2026-09-09).',
+        note: 'The done and limit looks were deleted on 2026-09-23 (Jouni\'s decision): only StepMatDone and StepBranchB drew them, and neither had been drawn since 07f7040c5 (2026-09-09). rule and question came with appcat on 2026-09-27: rule replaced the old app catalogue\'s prompt builder step (.pb-step, .pb-step-head, .pb-step-num and the .pb-* parts inside it, whose looks step-card.css now gives the components drawn in a ruled step), question its tool editor\'s group (.mz-group).',
     },
     {
         id: 'prompt-card', name: 'PromptCard', kind: 'component', status: 'active',
         summary: 'A prompt a person copies into their own AI: a coral label, the copy action, an optional corner menu, and the prompt text in a scroll box.',
         module: '/components/PromptCard.js', sheet: '/css/components/prompt-card.css',
         data: {
-            shape: 'PromptCard({ label, prompt, className, copyLabel, copiedLabel, onCopied, saveIntent, agents, onGiveToAgent, showPrompt })',
+            shape: 'PromptCard({ label, prompt, loud, quiet, className, copyLabel, copiedLabel, onCopied, saveIntent, agents, onGiveToAgent, showPrompt })',
             fields: {
-                label: 'what the prompt is', prompt: 'the text to copy', className: 'the copy button class (btn-primary while it is the next move)',
+                label: 'what the prompt is', prompt: 'the text to copy',
+                loud: 'the copy is the one thing this place is for: the loud action (the dark slab)', quiet: 'the copy is one way among others, or already done: the action link',
+                className: 'the copy button\'s class, kept for older callers; a page passes loud or quiet instead',
                 copyLabel: 'the copy button words', copiedLabel: 'the words after copying', saveIntent: 'offers "save as an open item" in the corner menu',
                 agents: 'connected agents it can be handed to', showPrompt: 'false folds the text away',
             },
         },
         useFor: ['The prompt-driven road: a person runs the prompt in their own chat and brings the result back.'],
-        variants: [],
-        example: { label: 'The prompt', prompt: 'Write me a one-page HTML welcome mat…', className: 'btn-primary', copyLabel: 'Copy the prompt', copiedLabel: 'Copied' },
+        variants: [
+            { name: 'loud', prop: 'loud', when: 'the copy is the next move: the dark slab (.poster-slab)' },
+            { name: 'quiet', prop: 'quiet', when: 'the prompt is copied, or one way among others: the action link (.poster-action)' },
+        ],
+        example: { label: 'The prompt', prompt: 'Write me a one-page HTML welcome mat…', loud: true, copyLabel: 'Copy the prompt', copiedLabel: 'Copied' },
     },
     {
         id: 'paste-box', name: 'PasteBox', kind: 'component', status: 'active',

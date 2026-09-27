@@ -44,6 +44,12 @@
  *     of the server's English-only description, and a priming line names what is happening before
  *     anything is asked. The INWARD honesty is untouched: scope sentences still say the whole
  *     namespace, per the v1.3.0 rule.
+ *   v1.5.0 — 2026-09-27 — Drawn from library components and writing no class (page group G9): the
+ *     card is AskPage (who asks, the question, the ways to answer), the badge a Status (fine for your
+ *     own app, attention for an outside one), the "updated" notice the sun-edged Box, the one-line
+ *     summary the dim Box, the details toggle an action link that says it is open, each scope a Check
+ *     in a row Box with its name as Code and "new" as the coral Tag, the promises ticked list lines,
+ *     Revoke the danger action link and Connect the loud action. css/views/app-grant.css is gone.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -55,6 +61,14 @@ import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, getStoredGhii } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { scopeSentence, areaLine, boundaryLines } from '/js/consent-vocab.js';
+import { AskPage } from '/components/AskPage.js';
+import { Action, Loud } from '/components/Action.js';
+import { Box } from '/components/Box.js';
+import { Check } from '/components/Check.js';
+import { Code, Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Space, Stack } from '/components/Layout.js';
+import { List, Row, Tick, Cell } from '/components/List.js';
 
 const html = htm.bind(h);
 /** t() with a literal fallback; {vars} are interpolated into the fallback too (missing-key safety). */
@@ -185,27 +199,21 @@ export default function AppGrant() {
 
   if (state.status === 'loading' || state.status === 'autoapprove') {
     const msg = state.status === 'autoapprove' ? tr('appGrant.signingIn', 'Signing you in…') : tr('common.loading', 'Loading…');
-    return html`<div class="agr-wrap"><p class="agr-muted">${msg}</p></div>`;
+    return html`<${AskPage} message=${msg} />`;
   }
   if (state.status === 'login') {
     return html`
-      <div class="agr-wrap">
-        <div class="agr-card">
-          <h1 class="agr-title">${tr('appGrant.loginTitle', 'Log in to continue')}</h1>
-          <p class="agr-muted">${tr('appGrant.loginBody', 'Log in on aimeat.io, then re-open the app’s link to approve access.')}</p>
-          <button class="btn-primary agr-btn" onClick=${doLogin}>${tr('appGrant.loginCta', 'Log in')}</button>
-        </div>
-      </div>`;
+      <${AskPage} title=${tr('appGrant.loginTitle', 'Log in to continue')}
+        doors=${html`<${Loud} onClick=${doLogin}>${tr('appGrant.loginCta', 'Log in')}<//>`}>
+        <${Note} kind="lead">${tr('appGrant.loginBody', 'Log in on aimeat.io, then re-open the app’s link to approve access.')}<//>
+      <//>`;
   }
   if (state.status === 'error') {
     return html`
-      <div class="agr-wrap">
-        <div class="agr-card">
-          <h1 class="agr-title">${tr('appGrant.errorTitle', 'Cannot grant access')}</h1>
-          <p class="agr-muted">${escHtml(state.error)}</p>
-          <button class="btn-outline agr-btn" onClick=${deny}>${tr('common.back', 'Back')}</button>
-        </div>
-      </div>`;
+      <${AskPage} title=${tr('appGrant.errorTitle', 'Cannot grant access')}
+        doors=${html`<${Action} onClick=${deny}>${tr('common.back', 'Back')}<//>`}>
+        <${Note} kind="lead">${escHtml(state.error)}<//>
+      <//>`;
   }
 
   const req = state.request;
@@ -223,74 +231,65 @@ export default function AppGrant() {
   const iconIsUrl = /^(https?:\/\/|\/)/.test(icon);
   const monogram = (Array.from(String(req.app_name || '?').trim())[0] || '?').toUpperCase();
 
+  // The guarantees, said as promises: each one a ticked line.
+  const boundaries = boundaryLines(t).map((line) => escHtml(line));
+  const promises = [
+    ...boundaries,
+    tr('appGrant.assureKey', 'It gets its own key, never your password.'),
+    !existingGrant && tr('appGrant.assureNext', 'Next time it signs you in without this screen.'),
+  ].filter(Boolean);
+
   return html`
-    <div class="agr-wrap">
-      <div class="agr-card">
-        <div class="agr-head">
-          <div class="agr-icon" aria-hidden="true">
-            ${icon
-              ? (iconIsUrl
-                ? html`<img class="agr-icon-img" src=${icon} alt="" />`
-                : html`<span class="agr-icon-glyph">${escHtml(icon)}</span>`)
-              : html`<span class="agr-icon-mono">${escHtml(monogram)}</span>`}
-          </div>
-          <div class="agr-head-text">
-            <div class="agr-app-name">${escHtml(req.app_name)}</div>
-            <div class="agr-app-origin">${escHtml(req.app_origin)}</div>
-          </div>
-          <span class="agr-badge ${ownApp ? 'agr-badge-own' : ''}">${ownApp ? tr('appGrant.ownBadge', 'Your app') : tr('appGrant.externalBadge', 'External app')}</span>
-        </div>
+    <${AskPage}
+      who=${{
+        // The app's own icon (an address or one sign), or the first letter of its name.
+        picture: icon && iconIsUrl ? html`<img src=${icon} alt="" />` : null,
+        text: icon ? escHtml(icon) : escHtml(monogram),
+        name: escHtml(req.app_name),
+        meta: escHtml(req.app_origin),
+        mark: html`<${Mark} kind="status" tone=${ownApp ? 'fine' : 'attention'}>${ownApp ? tr('appGrant.ownBadge', 'Your app') : tr('appGrant.externalBadge', 'External app')}<//>`,
+      }}
+      title=${existingGrant
+        ? tr('appGrant.manageTitle', 'Manage this app’s access')
+        : tr('appGrant.connectTitle', 'Connect {app} to your account', { app: req.app_name })}
+      doors=${html`
+        ${existingGrant
+          ? html`<${Action} tone="danger" onClick=${revoke} disabled=${submitting}>${tr('appGrant.revoke', 'Revoke access')}<//>`
+          : html`<${Action} onClick=${deny} disabled=${submitting}>${tr('appGrant.notNow', 'Not now')}<//>`}
+        <${Loud} onClick=${approve} disabled=${submitting || selected.size === 0}>
+          ${submitting ? tr('appGrant.approving', 'Allowing…') : (existingGrant ? tr('appGrant.saveCta', 'Save changes') : tr('appGrant.connectCta', 'Connect'))}
+        <//>`}>
+      ${!existingGrant && html`<${Note} kind="lead">${tr('consent.priming.appGrant', '{app} is asking to use part of your AIMEAT account.', { app: req.app_name })}<//>`}
+      ${addedScopes.length > 0 && html`<${Box} tone="edge"><${Note} kind="lead">${tr(
+        'appGrant.updatedNotice',
+        'This app has been updated and now asks for something new. Approve it again to keep using it.',
+      )}<//><//>`}
+      ${req.app_description && html`<${Note} kind="lead">${escHtml(req.app_description)}<//>`}
 
-        <h1 class="agr-title">${existingGrant
-          ? tr('appGrant.manageTitle', 'Manage this app’s access')
-          : tr('appGrant.connectTitle', 'Connect {app} to your account', { app: req.app_name })}</h1>
-        ${!existingGrant && html`<p class="agr-muted">${tr('consent.priming.appGrant', '{app} is asking to use part of your AIMEAT account.', { app: req.app_name })}</p>`}
-        ${addedScopes.length > 0 && html`<p class="agr-updated">${tr(
-          'appGrant.updatedNotice',
-          'This app has been updated and now asks for something new. Approve it again to keep using it.',
-        )}</p>`}
-        ${req.app_description && html`<p class="agr-lede">${escHtml(req.app_description)}</p>`}
+      <${Box} tone="dim"><b>${tr('appGrant.worksWith', 'Works with:')}</b> ${escHtml(summaryLine)}<//>
+      <${Action} small expanded=${details} onClick=${() => setDetails((v) => !v)}>
+        ${details
+          ? tr('appGrant.hideDetails', 'Hide the exact permissions')
+          : tr('appGrant.showDetails', 'Show the exact permissions ({n})', { n: req.scopes.length })}
+      <//>
 
-        <div class="agr-summary">
-          <span class="agr-summary-label">${tr('appGrant.worksWith', 'Works with:')}</span>
-          <span class="agr-summary-areas">${escHtml(summaryLine)}</span>
-        </div>
-        <button class="agr-details-toggle" aria-expanded=${details} onClick=${() => setDetails((v) => !v)}>
-          ${details
-            ? tr('appGrant.hideDetails', 'Hide the exact permissions')
-            : tr('appGrant.showDetails', 'Show the exact permissions ({n})', { n: req.scopes.length })}
-        </button>
+      ${details && html`
+        <${Stack} list gap="small" above="small">
+          ${req.scopes.map((s) => html`
+            <${Box} key=${s.scope} tone="row" packed>
+              <${Check} checked=${selected.has(s.scope)} onChange=${() => toggle(s.scope)} ariaLabel=${s.scope}
+                hint=${html`<${Code}>${escHtml(s.scope)}<//>`}>
+                ${escHtml(scopeSentence(s.scope, t, s.description))}
+                ${existingGrant && !existingGrant.scopes.includes(s.scope) && html` <${Mark} tone="coral">${tr('appGrant.newScope', 'new')}<//>`}
+              <//>
+            <//>`)}
+        <//>
+        <${Note}>${tr('appGrant.subsetHint', 'Uncheck anything you would rather not give. The app gets exactly what stays checked.')}<//>`}
 
-        ${details && html`
-          <ul class="agr-scopes">
-            ${req.scopes.map((s) => html`
-              <li class="agr-scope" key=${s.scope}>
-                <input type="checkbox" class="agr-scope-check" checked=${selected.has(s.scope)}
-                  onChange=${() => toggle(s.scope)} aria-label=${s.scope} />
-                <span class="agr-scope-text">
-                  <span class="agr-scope-desc">${escHtml(scopeSentence(s.scope, t, s.description))}
-                    ${existingGrant && !existingGrant.scopes.includes(s.scope) && html`<span class="agr-scope-newbadge">${tr('appGrant.newScope', 'new')}</span>`}
-                  </span>
-                  <span class="agr-scope-name">${escHtml(s.scope)}</span>
-                </span>
-              </li>`)}
-          </ul>
-          <p class="agr-details-hint">${tr('appGrant.subsetHint', 'Uncheck anything you would rather not give. The app gets exactly what stays checked.')}</p>`}
-
-        <ul class="agr-assure">
-          ${boundaryLines(t).map((line) => html`<li key=${line}>${escHtml(line)}</li>`)}
-          <li>${tr('appGrant.assureKey', 'It gets its own key, never your password.')}</li>
-          ${!existingGrant && html`<li>${tr('appGrant.assureNext', 'Next time it signs you in without this screen.')}</li>`}
-        </ul>
-
-        <div class="agr-actions">
-          ${existingGrant
-            ? html`<button class="btn-danger agr-btn" onClick=${revoke} disabled=${submitting}>${tr('appGrant.revoke', 'Revoke access')}</button>`
-            : html`<button class="btn-outline agr-btn" onClick=${deny} disabled=${submitting}>${tr('appGrant.notNow', 'Not now')}</button>`}
-          <button class="btn-primary agr-btn" onClick=${approve} disabled=${submitting || selected.size === 0}>
-            ${submitting ? tr('appGrant.approving', 'Allowing…') : (existingGrant ? tr('appGrant.saveCta', 'Save changes') : tr('appGrant.connectCta', 'Connect'))}
-          </button>
-        </div>
-      </div>
-    </div>`;
+      <${Space} above="medium">
+        <${List} cols="mark-name" keepCols small>
+          ${promises.map((line) => html`<${Row} key=${line}><${Tick} bare state="done" /><${Cell}>${line}<//><//>`)}
+        <//>
+      <//>
+    <//>`;
 }

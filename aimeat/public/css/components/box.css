@@ -11,6 +11,14 @@
  *   (css/components/figure.css). Reads colours and shapes from the theme tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.9.0 — 2026-09-27 — .box--statement (Box tone 'statement'): the old app catalogue's ODPS
+ *     provenance box (.od-attest), appcat parity (sections-d); additive.
+ *   v1.8.0 — 2026-09-27 — .box--proposal (Box tone 'proposal'): the old app catalogue's AI proposal
+ *     box (.dtl-ai-draft), appcat parity (sections-a); additive.
+ *   v1.7.1 — 2026-09-27 — .box--part (Box tone 'part'): one part of what an extension offers (the old
+ *     app catalogue's .cx-part), appcat parity (dialogs); additive.
+ *   v1.7.0 — 2026-09-27 — .box--tabbed (Box tone 'tabbed'): the sun edge of what a row of tabs governs
+ *     (the old app catalogue's .tab-content), for appcat; additive.
  *   v1.6.0 — 2026-09-26 — .box--dim (the grey ground, main's .pf-eco-tech), .box--scroll-page (32rem,
  *     main's .pj-struct-body), .box-beside (the doors at the right, main's .wp-verdict); fix pass.
  *   v1.5.0 — 2026-09-26 — BoxList and BoxLine (.box-list, .box-line and its parts), from main's AI tab
@@ -75,6 +83,26 @@
 .box--edge > .poster-label--block { margin-bottom: .25rem; }
 .box--edge > .og-lead { margin: 0 0 .2rem; }
 .box--edge > .og-lead:last-child { margin-bottom: 0; }
+/* tabbed (Box tone 'tabbed', appcat): what a row of tabs governs, the sun edge down its left and
+   1.25rem in (poster.css .poster-panel), nothing else; 16px under it (the old catalogue's .tab-content). */
+.poster-panel.box--tabbed { margin: 0 0 16px; }
+/* The first label in it starts at the tabs' own 14px (the old page's two margins met there). */
+.box--tabbed > .og-fields--plain:first-child > .og-field:first-child > .poster-label { margin-top: 0; }
+@media (max-width: 560px) { .poster-panel.box--tabbed { padding-left: .9rem; } }
+/* part (Box tone 'part', appcat): one part of what an extension offers (the old catalogue's .cx-part):
+   14px above and under, a hairline under it, .9rem words; a name (<strong>) bold on its own line 8px
+   over what follows, 14px under the part before it; inline code plain typewriter; code blocks in the
+   2px ink frame on the card ground, .75rem at 1.5, 8px over the copy word; an API scrolls after 320px. */
+.box.box--part { padding: 14px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.box--part strong { display: block; margin: 0 0 8px; font-size: .9rem; font-weight: var(--weight-bold); }
+.box--part > .layout-stack > strong:not(:first-child), .box--part strong:not(:first-child) { margin-top: 14px; }
+.box--part .code-inline { margin: 0; padding: 0; border: 0; background: none; font-family: var(--font-mono); font-size: .8rem; }
+.box--part .code-block {
+  box-sizing: border-box; display: block; width: 100%; margin: 0 0 8px; padding: 10px 12px;
+  border: var(--shape-frame) solid var(--text); border-radius: var(--shape-corner); background: var(--card-bg); color: var(--text);
+  font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.box--part .code-block.code-block--scroll { max-height: 320px; overflow: auto; }
 
 /* field: a field to fill in for one action, the thin dashed frame on the page's ground (Jouni's
    decision "Dashed field box"; main's Extensions .ex-test, its parts' places with it; page group G6). */
@@ -82,6 +110,21 @@
 .box--field > .poster-label--block { margin-bottom: .3rem; }
 .box--field > .og-doors { margin-top: .6rem; align-items: center; gap: 1rem; }
 .box--field > .og-doors .poster-hint { margin: 0; }
+/* The proposal box (Box tone 'proposal', appcat): a thing proposed and not yet kept, the heavy ink
+   frame on the page's ground (the old app catalogue's .dtl-ai-draft). */
+.box--proposal { margin-top: 12px; padding: 12px; border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner); background: transparent; }
+/* Its head is the line that says what it is, 8px over its doors (.wc-proposal-head; the status line's
+   10px above it stayed, as the old sheet's later rule kept it). */
+.box--proposal > .note-report:first-child { margin-bottom: 8px; }
+/* The statement box (Box tone 'statement', appcat sections-d): what the person states under their own
+   name, the heavy ink frame with the old page's 8px corner on its grey ground (its --bg-subtle is the
+   site's --bg-surface), 22px under what is above it (the old app catalogue's .od-attest). Its label
+   is the coral small capitals 6px over what follows (.od-attest-head). */
+.box.box--statement { margin: 22px 0 8px; padding: 16px 18px 18px; border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner-soft); background: var(--bg-surface); }
+.box.box--statement > .poster-label.poster-label--block { margin: 0 0 6px; font-family: var(--font-body); font-size: .72rem; font-weight: 800; letter-spacing: var(--shape-tracking-label); line-height: normal; text-transform: var(--shape-case-label); color: var(--accent); }
+.box--statement > .poster-label--block + .poster-quiet--chapter { margin: 6px 0; }
+/* Its row of doors stands 18px under its last field (.od-attest .od-actions). */
+.box--statement > .og-doors { margin-top: 18px; }
 
 /* BoxList, BoxLine: a stack of small boxes, one thing in each, its parts in a wrapping line (main's
    AI tab cards: .pf-aitr-list, .pf-aitr-row, .pf-aitr-policy, .pf-cmp-entries; page group G8). */

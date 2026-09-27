@@ -9,6 +9,7 @@
  * @structure SHAPE_ENTRIES
  * @usage import { SHAPE_ENTRIES } from './entries-shapes.js';
  * @version-history
+ *   v1.19.0 — 2026-09-27 — The action's plain tone, poster-action--plain (Action tone 'plain', appcat).
  *   v1.18.0 — 2026-09-27 — The box and the choice tile are box-shape and choice-shape: their old ids name the Box and
  *     Choice components (components/Box.js, Choice.js), which own box.css and choice.css and wear these shapes.
  *   v1.17.0 — 2026-09-26 — The Meter's figure (.poster-meter-figure), the Wallet meter's look, taken by the AI budget bars (a unification).
@@ -66,7 +67,7 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
         [{ name: 'thing', class: 'poster-row--thing', when: 'a row that is one thing a person has or does' }]),
     shape('label', 'Label', ['poster-label'], '<span class="poster-label">…</span>',
         'A small coral word in capitals that names what follows.', 'Above a value, a prompt or a group of controls.'),
-    shape('action', 'Action', ['poster-action', 'poster-tab', 'poster-action--small', 'poster-action--lower', 'poster-action--row', 'poster-action--more', 'poster-action--quiet', 'poster-action--back', 'poster-action--text', 'poster-action--danger', 'poster-action--notice', 'poster-action--jump', 'poster-tab--fold', 'poster-tab--tile', 'poster-tab--filter'], '<a class="poster-action" href="…">…</a>',
+    shape('action', 'Action', ['poster-action', 'poster-tab', 'poster-action--small', 'poster-action--lower', 'poster-action--row', 'poster-action--more', 'poster-action--quiet', 'poster-action--back', 'poster-action--text', 'poster-action--danger', 'poster-action--notice', 'poster-action--jump', 'poster-action--plain', 'poster-tab--fold', 'poster-tab--tile', 'poster-tab--filter'], '<a class="poster-action" href="…">…</a>',
         'An ink-underlined action in capitals; the same cut is the unselected tab. Its tones are the quiet ways on Jouni kept.', 'A secondary action or a door in a masthead, or a tab.',
         [
             { name: 'tab', class: 'poster-tab', when: 'one tab in a row; is-on puts the chosen one on the sun' },
@@ -80,6 +81,7 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
             { name: 'danger', class: 'poster-action--danger', when: 'an act that removes or revokes: coral words and line' },
             { name: 'notice', class: 'poster-action--notice', when: '"What does that mean?" under the AI notice: small coral typewriter words' },
             { name: 'jump', class: 'poster-action--jump', when: 'the jump to the latest message: a small ink block with a sun shadow' },
+            { name: 'plain', class: 'poster-action--plain', when: 'a small grey word with no line and no capitals (the app catalogue\'s "▶ toggle" over its strip; Action tone="plain", appcat)' },
             { name: 'fold tab', class: 'poster-tab--fold', when: 'a small switch in a row ("Recent", "Mine"): coral typewriter words, the chosen one on the sun' },
             { name: 'tile tab', class: 'poster-tab--tile', when: 'a choice among named looks (the background pattern): framed tiles, the chosen one on the sun' },
             { name: 'filter tab', class: 'poster-tab--filter', when: 'a filter over a list ("all", "failed", a kind with its count): small typewriter words in a grey frame, the chosen one on the sun' },

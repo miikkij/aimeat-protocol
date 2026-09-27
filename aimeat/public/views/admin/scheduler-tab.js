@@ -4,17 +4,22 @@
  * SPDX-License-Identifier: MIT
  * @description Admin dashboard Scheduler page in the poster face (design canvas "AIMEAT Admin
  *   Scheduler"). Four sections: what broke on its last run and what it said, what fires next, the
- *   whole register with a search and the route's own filters, and the run log.
+ *   whole register with a search and the route's own filters, and the run log. The page draws
+ *   library components and passes them data; it writes no class.
  *
  * @structure
  *   - default SchedulerTab({ data, reload }): the model, the four sections
  *   - nameOf / subOf / whoOf / lastWords: how one job says what it is
  *   - Broke: the failing jobs with their error sentence and two doors
  *   - Agenda: the next fires, in the order they fire
- *   - Register: search, six chips, one row per job, the state chip as the switch
+ *   - Register: search, six filter tabs, one row per job, the state tag as the switch
  *   - RunLog: the last fifty fires with what set each off and what it did
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.0.0 — 2026-09-27 — The page draws library components (FigureStrip, Section, Figure, List,
+ *     SearchLine, Tabs, Mark, Action, Note) and writes no class; admin-scheduler.css goes. The
+ *     failed count keeps its coral, a switched-off job its dimmed row, a failed run and a failed
+ *     result their coral words; the state tag is still the switch (on the sun while it runs).
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and the four fields the page had been reading under the
@@ -35,6 +40,15 @@ import { num, when, Empty, useToast, Toast } from './shared.js';
 import { triggerSchedulerJob, updateSchedulerJob, deleteSchedulerJob, pruneSchedulerLog } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 import { cronWords } from '/views/profile/scheduler/cron-words.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure, Tinted } from '/components/Figure.js';
+import { List, Row as ListRow, Name, Desc, Who, When, Cell, Num, Doors, SearchLine } from '/components/List.js';
+import { Tabs } from '/components/Tabs.js';
+import { Action } from '/components/Action.js';
+import { Mark, Label } from '/components/Mark.js';
+import { Beside, Split, Row, Stack } from '/components/Layout.js';
+import { Note } from '/components/Note.js';
 
 const S = (key, params) => t('admin.sched.' + key, params);
 
@@ -120,6 +134,13 @@ function took(ms) {
   return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
+/** The line under a list: what it shows, and what it leaves out. */
+function Foot({ left, right }) {
+  return html`<${Row} justify="between" wrap above="medium">
+    <${Note} kind="meta" inline>${left}<//><${Note} kind="meta" inline>${right}<//>
+  <//>`;
+}
+
 export default function SchedulerTab({ data, reload }) {
   const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
@@ -163,7 +184,7 @@ export default function SchedulerTab({ data, reload }) {
   if (!jobs.length) {
     return html`
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og adm-sch"><${Empty} text=${S('noJobs')} /></div>
+      <${Empty} text=${S('noJobs')} />
       <${ConfirmUI} />`;
   }
 
@@ -187,169 +208,140 @@ export default function SchedulerTab({ data, reload }) {
     return true;
   });
 
-  const chip = (key, label, cls = '') => html`
-    <button type="button" class="adm-sch-chip ${cls} ${filter === key ? 'on' : ''}"
-      onClick=${() => setFilter(key)}>${label}</button>`;
-  const logChip = (key, label, cls = '') => html`
-    <button type="button" class="adm-sch-chip ${cls} ${logFilter === key ? 'on' : ''}"
-      onClick=${() => setLogFilter(key)}>${label}</button>`;
+  // The filters that point at something wrong wear the coral while they are not chosen.
+  const chips = [
+    { value: 'all', label: S('chipAll', { n: num(m.total) }) },
+    { value: 'failing', label: S('chipFailing', { n: num(m.failing.length) }), attention: true },
+    { value: 'mine', label: S('chipMine', { n: num(m.mine) }) },
+    { value: 'owned', label: S('chipOwned', { n: num(m.owned) }) },
+    { value: 'extensions', label: S('chipExtensions', { n: num(m.extensions) }) },
+    { value: 'off', label: S('chipOff', { n: num(m.off) }) },
+  ];
+  const logChips = [
+    { value: 'all', label: S('chipAllRuns') },
+    { value: 'errors', label: S('chipErrors', { n: num(log.filter(e => e.result === 'error').length) }), attention: true },
+    { value: 'skipped', label: S('chipSkipped', { n: num(log.filter(e => e.result === 'skipped').length) }) },
+    { value: 'manual', label: S('chipByHand', { n: num(log.filter(e => e.trigger === 'manual').length) }) },
+    { value: 'activate', label: S('chipOnRestart', { n: num(log.filter(e => e.trigger === 'activate').length) }) },
+  ];
 
   return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <div class="og adm-sch">
 
-      <div class="og-strip">
-        <div><b>${num(m.total)}</b><span>${S('cntJobs')}</span><small>${S('cntJobsSub')}</small></div>
-        <div><b>${num(m.on)}</b><span>${S('cntOn')}</span><small>${S('cntOnSub', { n: num(m.off) })}</small></div>
-        <div class="adm-sch-bad"><b>${num(m.failing.length)}</b><span>${S('cntFailed')}</span><small>${S('cntFailedSub')}</small></div>
-        <div><b>${num(m.neverRun)}</b><span>${S('cntNever')}</span><small>${S('cntNeverSub')}</small></div>
-      </div>
+    <${FigureStrip} lead wrap items=${[
+      { key: 'jobs', n: num(m.total), label: S('cntJobs'), sub: S('cntJobsSub') },
+      { key: 'on', n: num(m.on), label: S('cntOn'), sub: S('cntOnSub', { n: num(m.off) }) },
+      // The one number an operator acts on is the one in coral.
+      { key: 'failed', n: num(m.failing.length), tone: 'notice', label: S('cntFailed'), sub: S('cntFailedSub') },
+      { key: 'never', n: num(m.neverRun), label: S('cntNever'), sub: S('cntNeverSub') },
+    ]} />
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('brokeTitle')}<small>01</small></h2></div>
-        ${m.failing.length === 0
-    ? html`<p class="adm-sch-note">${S('brokeNone')}</p>`
+    <${Section} num="01" title=${S('brokeTitle')} first>
+      ${m.failing.length === 0
+    ? html`<${Note} kind="quiet">${S('brokeNone')}<//>`
     : html`
-          <div class="adm-sch-top">
-            <div>
-              <div class="adm-sch-lbl">${S('brokeLabel')}</div>
-              <div class="adm-sch-hero poster-stat-number">${S('brokeHero', { n: num(m.failing.length), total: num(m.total) })}</div>
-              <p class="adm-sch-hero-sub">${S('brokeHeroSub')}</p>
-            </div>
-            <div><p class="adm-sch-lead">${S('brokeLead')}</p></div>
-          </div>
-          <div class="adm-sch-fails">
+        <${Beside} wide side=${html`<${Note} kind="lead">${S('brokeLead')}<//>`}>
+          <${Label} block>${S('brokeLabel')}<//>
+          <${Figure} n=${S('brokeHero', { n: num(m.failing.length), total: num(m.total) })} />
+          <${Note}>${S('brokeHeroSub')}<//>
+        <//>
+        <${Split} heavy above="section">
+          <${List} cols="name-desc-doors">
             ${m.failing.map(job => html`
-              <div class="adm-sch-frow" key=${job.id}>
-                <span class="adm-sch-fname">${nameOf(job)}<em>${subOf(job)}</em></span>
-                <span class="adm-sch-ferr">${job.lastRunError || S('noMessage')}
-                  <span class="adm-sch-fwhen">${S('failedAt', { when: clock(job.lastRunAt), ago: since(job.lastRunAt), took: took(job.lastRunDurationMs) })}
-                    ${job.enabled && job.nextRunAt ? ' ' + S('triesAgain', { when: clock(job.nextRunAt), in: until(job.nextRunAt) }) : ''}</span>
-                </span>
-                <span class="adm-sch-facts">
-                  <button type="button" class="adm-sch-door" onClick=${() => runNow(job.id)}>${S('runNow')}</button>
-                  <button type="button" class="adm-sch-door" onClick=${() => toggle(job)}>${job.enabled ? S('switchOff') : S('switchOn')}</button>
-                </span>
-              </div>`)}
-          </div>`}
-      </section>
+              <${ListRow} key=${job.id}>
+                <${Name} meta=${subOf(job)}>${nameOf(job)}<//>
+                <${Cell} code sub=${`${S('failedAt', { when: clock(job.lastRunAt), ago: since(job.lastRunAt), took: took(job.lastRunDurationMs) })}${
+      job.enabled && job.nextRunAt ? ' ' + S('triesAgain', { when: clock(job.nextRunAt), in: until(job.nextRunAt) }) : ''}`}>
+                  ${job.lastRunError || S('noMessage')}
+                <//>
+                <${Doors}>
+                  <${Action} small row onClick=${() => runNow(job.id)}>${S('runNow')}<//>
+                  <${Action} small row onClick=${() => toggle(job)}>${job.enabled ? S('switchOff') : S('switchOn')}<//>
+                <//>
+              <//>`)}
+          <//>
+        <//>`}
+    <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('nextTitle')}<small>02</small></h2></div>
-        ${m.agenda.length === 0
-    ? html`<p class="adm-sch-note">${S('nextNone')}</p>`
+    <${Section} num="02" title=${S('nextTitle')}>
+      ${m.agenda.length === 0
+    ? html`<${Note} kind="quiet">${S('nextNone')}<//>`
     : html`
-          <div class="adm-sch-agenda">
-            <div class="adm-sch-ahrow">
-              <span>${S('colWhen')}</span><span>${S('colJob')}</span><span>${S('colKind')}</span><span>${S('colWhose')}</span>
-            </div>
-            ${m.agenda.slice(0, 6).map(job => html`
-              <div class="adm-sch-arow" key=${job.id}>
-                <span class="adm-sch-at">${clock(job.nextRunAt)}<i>${until(job.nextRunAt)}</i></span>
-                <span class="adm-sch-aname">${nameOf(job)}<em>${cronWords(job.cron)}</em></span>
-                <span class="adm-sch-akind">${job.type}</span>
-                <span class="adm-sch-awho">${job.ownerScope ? html`<b>${ownerOf(job)}</b>` : whoseWords(job)}</span>
-              </div>`)}
-          </div>
-          <div class="adm-sch-foot">
-            <span>${S('agendaShown', { n: num(Math.min(6, m.agenda.length)), total: num(m.agenda.length) })}</span>
-            <span>${S('agendaRest', { activate: num(m.onActivate), off: num(m.off) })}</span>
-          </div>`}
-      </section>
+        <${List} cols="when-name-kind-who" labels head=${[S('colWhen'), S('colJob'), S('colKind'), S('colWhose')]}>
+          ${m.agenda.slice(0, 6).map(job => html`
+            <${ListRow} key=${job.id}>
+              <${When} at=${until(job.nextRunAt)}>${clock(job.nextRunAt)}<//>
+              <${Name} meta=${cronWords(job.cron)}>${nameOf(job)}<//>
+              <${Cell} meta>${job.type}<//>
+              ${job.ownerScope ? html`<${Who}>${ownerOf(job)}<//>` : html`<${Desc}>${whoseWords(job)}<//>`}
+            <//>`)}
+        <//>
+        <${Foot} left=${S('agendaShown', { n: num(Math.min(6, m.agenda.length)), total: num(m.agenda.length) })}
+          right=${S('agendaRest', { activate: num(m.onActivate), off: num(m.off) })} />`}
+    <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('registerTitle')}<small>03</small></h2></div>
-        <p class="adm-sch-lead">${S('registerLead')}</p>
-
-        <div class="adm-sch-tools">
-          <div class="adm-sch-find">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M16 16 L21 21"></path></svg>
-            <input type="text" value=${find} onInput=${e => setFind(e.target.value)} placeholder=${S('findPlaceholder')} />
-          </div>
-          <div class="adm-sch-chips">
-            ${chip('all', S('chipAll', { n: num(m.total) }))}
-            ${chip('failing', S('chipFailing', { n: num(m.failing.length) }), 'bad')}
-            ${chip('mine', S('chipMine', { n: num(m.mine) }))}
-            ${chip('owned', S('chipOwned', { n: num(m.owned) }))}
-            ${chip('extensions', S('chipExtensions', { n: num(m.extensions) }))}
-            ${chip('off', S('chipOff', { n: num(m.off) }))}
-          </div>
-        </div>
-
-        <div class="adm-sch-rows">
-          <div class="adm-sch-hrow">
-            <span>${S('colJob')}</span><span>${S('colRuns')}</span><span>${S('colWhose')}</span>
-            <span>${S('colLastRun')}</span><span>${S('colNext')}</span><span></span>
-          </div>
-          ${shown.map(job => {
+    <${Section} num="03" title=${S('registerTitle')}>
+      <${Note} kind="lead">${S('registerLead')}<//>
+      <${Stack} gap="small">
+        <${SearchLine} find text value=${find} onInput=${e => setFind(e.target.value)} placeholder=${S('findPlaceholder')} />
+        <${Tabs} tone="filter" value=${filter} onSelect=${setFilter} label=${S('registerTitle')} items=${chips} />
+      <//>
+      <${List} cols="name-when-who-state-when-doors" labels apart
+        head=${[S('colJob'), S('colRuns'), S('colWhose'), S('colLastRun'), S('colNext'), '']}>
+        ${shown.map(job => {
     const next = nextWords(job);
+    const failed = job.lastRunResult === 'error';
     return html`
-            <div class="adm-sch-row ${job.enabled ? '' : 'is-off'}" key=${job.id}>
-              <span class="adm-sch-name">${nameOf(job)}<em>${subOf(job)}</em></span>
-              <span class="adm-sch-when">${cronWords(job.cron)}<em>${job.cron}${job.timezone ? ' · ' + job.timezone : ''}</em></span>
-              <span class="adm-sch-who">${job.ownerScope
-    ? html`<b>${ownerOf(job)}</b>${S('ownerOwn')}`
-    : whoseWords(job)}</span>
-              <span class="adm-sch-ran ${job.lastRunResult === 'error' ? 'err' : ''}">
-                ${job.lastRunAt ? (job.lastRunResult === 'error' ? S('ranFailed') : S('ranSucceeded')) : S('ranNever')}
-                ${job.lastRunAt && html`<em>${since(job.lastRunAt)} · ${took(job.lastRunDurationMs)}</em>`}
-              </span>
-              <span class="adm-sch-next ${next.none ? 'none' : ''}">${next.text}</span>
-              <span class="adm-sch-acts">
-                <button type="button" class="adm-sch-state ${job.enabled ? '' : 'off'}"
-                  onClick=${() => toggle(job)}>${job.enabled ? S('stateOn') : S('stateOff')}</button>
-                <button type="button" class="adm-sch-run" onClick=${() => runNow(job.id)}>${S('runNow')}</button>
-                ${job.type !== 'core' && html`
-                  <button type="button" class="adm-sch-kill" onClick=${() => remove(job)}>${S('delete')}</button>`}
-              </span>
-            </div>`;
+          <${ListRow} key=${job.id} faded=${!job.enabled} hover>
+            <${Name} meta=${subOf(job)}>${nameOf(job)}<//>
+            <${Desc} sub=${`${job.cron}${job.timezone ? ' · ' + job.timezone : ''}`}>${cronWords(job.cron)}<//>
+            ${job.ownerScope ? html`<${Who} sub=${S('ownerOwn')}>${ownerOf(job)}<//>` : html`<${Desc}>${whoseWords(job)}<//>`}
+            <${Desc} sub=${job.lastRunAt ? `${since(job.lastRunAt)} · ${took(job.lastRunDurationMs)}` : undefined}>
+              ${job.lastRunAt
+      ? (failed ? html`<${Tinted} strong tone="notice">${S('ranFailed')}<//>` : S('ranSucceeded'))
+      : S('ranNever')}
+            <//>
+            ${next.none ? html`<${Cell} meta>${next.text}<//>` : html`<${When}>${next.text}<//>`}
+            <${Doors}>
+              <${Mark} tone=${job.enabled ? 'sun' : 'dim'} onClick=${() => toggle(job)}>${job.enabled ? S('stateOn') : S('stateOff')}<//>
+              <${Action} small row onClick=${() => runNow(job.id)}>${S('runNow')}<//>
+              ${job.type !== 'core' && html`<${Action} small row tone="danger" onClick=${() => remove(job)}>${S('delete')}<//>`}
+            <//>
+          <//>`;
   })}
-        </div>
-        <div class="adm-sch-foot">
-          <span>${S('registerShown', { n: num(shown.length), total: num(m.total) })}</span>
-          <span>${S('registerCoreNote')}</span>
-        </div>
-      </section>
+      <//>
+      <${Foot} left=${S('registerShown', { n: num(shown.length), total: num(m.total) })} right=${S('registerCoreNote')} />
+    <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${S('logTitle')}<small>04</small></h2>
-          <button type="button" class="og-door" onClick=${prune}>${S('prune')}</button>
-        </div>
-        <p class="adm-sch-lead">${S('logLead')}</p>
-        ${log.length === 0
-    ? html`<p class="adm-sch-note">${S('logNone')}</p>`
+    <${Section} num="04" title=${S('logTitle')}
+      doors=${html`<${Action} small onClick=${prune}>${S('prune')}<//>`}>
+      <${Note} kind="lead">${S('logLead')}<//>
+      ${log.length === 0
+    ? html`<${Note} kind="quiet">${S('logNone')}<//>`
     : html`
-          <div class="adm-sch-chips adm-sch-chips--log">
-            ${logChip('all', S('chipAllRuns'))}
-            ${logChip('errors', S('chipErrors', { n: num(log.filter(e => e.result === 'error').length) }), 'bad')}
-            ${logChip('skipped', S('chipSkipped', { n: num(log.filter(e => e.result === 'skipped').length) }))}
-            ${logChip('manual', S('chipByHand', { n: num(log.filter(e => e.trigger === 'manual').length) }))}
-            ${logChip('activate', S('chipOnRestart', { n: num(log.filter(e => e.trigger === 'activate').length) }))}
-          </div>
-          <div class="adm-sch-lrows">
-            <div class="adm-sch-lhrow">
-              <span>${S('colWhen')}</span><span>${S('colJob')}</span><span>${S('colTrigger')}</span>
-              <span>${S('colResult')}</span><span class="r">${S('colTook')}</span><span>${S('colDid')}</span>
-            </div>
-            ${shownLog.map(e => html`
-              <div class="adm-sch-lrow" key=${e.id}>
-                <span class="adm-sch-t">${clock(e.createdAt)}<i>${since(e.createdAt)}</i></span>
-                <span class="adm-sch-ljob">${e.jobName || e.jobId}<em>${e.type}${e.extensionName ? ' · ' + e.extensionName : ''}</em></span>
-                <span class="adm-sch-trig">${S('trigger.' + e.trigger)}</span>
-                <span class="adm-sch-res ${e.result === 'error' ? 'err' : e.result === 'skipped' ? 'skip' : ''}">${S('result.' + e.result)}</span>
-                <span class="adm-sch-ms r">${took(e.durationMs)}</span>
-                <span class="adm-sch-did">${didWhat(e)}</span>
-              </div>`)}
-          </div>
-          <div class="adm-sch-foot">
-            <span>${S('logShown', { n: num(shownLog.length), loaded: num(log.length) })}</span>
-            <span>${S('logKeptNote', { total: num(logTotal) })}</span>
-          </div>`}
-      </section>
+        <${Tabs} tone="filter" value=${logFilter} onSelect=${setLogFilter} label=${S('logTitle')} items=${logChips} />
+        <${List} cols="when-name-kind-state-n-desc" labels apart
+          head=${[S('colWhen'), S('colJob'), S('colTrigger'), S('colResult'), { label: S('colTook'), num: true }, S('colDid')]}>
+          ${shownLog.map(e => {
+      const did = didWhat(e);
+      return html`
+            <${ListRow} key=${e.id}>
+              <${When} at=${since(e.createdAt)}>${clock(e.createdAt)}<//>
+              <${Name} meta=${`${e.type}${e.extensionName ? ' · ' + e.extensionName : ''}`}>${e.jobName || e.jobId}<//>
+              <${Cell} meta>${S('trigger.' + e.trigger)}<//>
+              <${Desc}>${e.result === 'error'
+        ? html`<${Tinted} strong tone="notice">${S('result.' + e.result)}<//>`
+        : e.result === 'skipped' ? S('result.' + e.result) : html`<${Tinted} strong>${S('result.' + e.result)}<//>`}<//>
+              <${Num}>${took(e.durationMs)}<//>
+              <${Desc} sub=${did.keys}>${did.head ? html`<${Tinted} strong>${did.head}<//>` : did.text}<//>
+            <//>`;
+    })}
+        <//>
+        <${Foot} left=${S('logShown', { n: num(shownLog.length), loaded: num(log.length) })}
+          right=${S('logKeptNote', { total: num(logTotal) })} />`}
+    <//>
 
-      <${ConfirmUI} />
-    </div>`;
+    <${ConfirmUI} />`;
 }
 
 /**
@@ -358,12 +350,13 @@ export default function SchedulerTab({ data, reload }) {
  * A skipped run never touched anything and carries the reason it was stopped, which is the only
  * thing worth reading on that row. A run that did happen names the keys it read and wrote — the
  * record keeps the KEYS, not counts, and they were never on a screen before.
+ * @returns {{ text?: string, head?: string, keys?: string }}
  */
 function didWhat(entry) {
-  if (entry.result === 'skipped') return entry.errorMessage || S('skippedNoReason');
+  if (entry.result === 'skipped') return { text: entry.errorMessage || S('skippedNoReason') };
   const reads = entry.memoryReads || [];
   const writes = entry.memoryWrites || [];
-  if (reads.length === 0 && writes.length === 0) return S('touchedNothing');
+  if (reads.length === 0 && writes.length === 0) return { text: S('touchedNothing') };
   const keys = [...reads, ...writes].slice(0, 3).join(', ');
-  return html`<b>${S('touched', { r: reads.length, w: writes.length })}</b><em>${keys}${reads.length + writes.length > 3 ? ' …' : ''}</em>`;
+  return { head: S('touched', { r: reads.length, w: writes.length }), keys: `${keys}${reads.length + writes.length > 3 ? ' …' : ''}` };
 }

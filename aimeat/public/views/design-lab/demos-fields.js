@@ -7,6 +7,10 @@
  * @structure FIELD_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { FIELD_DEMOS } from './demos-fields.js';
  * @version-history
+ *   v1.3.0 — 2026-09-27 — The options appcat added: Fields plain, beside, chapter, ruled, spaced, column
+ *     and narrow; TextField size glyph and mark; TextArea prompt, page, source and script; Select line;
+ *     FileDrop ink, mark, browseLabel and chosen; Check pill, ruled and strong (the catalogue pass).
+ *   v1.2.0 — 2026-09-27 — The script editor (TextArea indent and onSave), in the operator's frame.
  *   v1.1.0 — 2026-09-27 — The demos of field, text-field and choice; select-field, check-line, tag-input,
  *     model-picker, file-drop, form-fields and field-row moved in from demos-settings.js, drawn by calling
  *     Select, Check, TagInput, ModelList and ModelPicker, FileDrop, Fields and TextField (the catalogue pass).
@@ -23,8 +27,10 @@ import { Check } from '/components/Check.js';
 import { TagInput } from '/components/TagInput.js';
 import { ModelList, ModelPicker } from '/components/ModelPicker.js';
 import { FileDrop } from '/components/FileDrop.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Tabs } from '/components/Tabs.js';
 import { Note } from '/components/Note.js';
+import { OperatorFrame } from '/components/OperatorFrame.js';
 
 const html = htm.bind(h);
 const noop = () => {};
@@ -91,6 +97,44 @@ export const FIELD_DEMOS = {
     { name: 'actions apart and at the right', render: () => root(html`<${FormActions} apart><${Note}>Nothing is sent until you press Send.<//><${Loud} control onClick=${noop}>Send<//><//>
       <${FormActions} end><${Action} small onClick=${noop}>Cancel<//><${Loud} control onClick=${noop}>Save<//><//>`) },
     { name: 'long', render: () => root(html`<${TextField} label="The name your studio goes by with clients and partners" hint=${LONG_HINT} value="Harbour Studio for ferry timetables, seat maps and seasonal menus" onInput=${noop} />`) },
+    { name: 'plain labels (an app catalogue dialog)', render: () => root(html`<${Fields} plain>
+      <${TextField} label="App name" placeholder="Seat map viewer" value="" onInput=${noop} />
+      <${Field} id="dl-field-plain-tags" label="Tags" labelNote="comma separated">
+        <${TextField} id="dl-field-plain-tags" value="ferries, maps" onInput=${noop} />
+      <//>
+      <${Select} label="Visible to" value="public" options=${[['public', 'Everyone'], ['private', 'Only me']]} onChange=${noop} />
+    <//>`) },
+    { name: 'labels beside', render: () => root(html`<${Fields} plain beside>
+      <${Select} label="Language" value="en" options=${[['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']]} onChange=${noop} />
+      <${TextField} label="Owner" value="sandbox" readOnly />
+    <//>`) },
+    { name: 'in a chapter, two columns', render: () => root(html`<${Fields} plain chapter>
+      <${TextArea} label="What people search for" rows=${2} value="ferry seat map, cabin plan, Helsinki Tallinn" onInput=${noop} />
+      <${Fields} plain chapter cols=${2}>
+        <${TextField} label="Licence" value="CC BY 4.0" onInput=${noop} />
+        <${TextField} label="Contact" value="studio@harbour.example" onInput=${noop} />
+      <//>
+    <//>`) },
+    { name: 'opened under a rule', render: () => root(html`<${Fields} plain chapter ruled>
+      <${TextField} label="Tool name" value="Seat map lookup" hint="The name an agent sees when it looks for a tool." onInput=${noop} />
+      <${Fields} plain chapter cols=${3}>
+        <${TextField} label="Morsels" type="number" value="5" onInput=${noop} />
+        <${TextField} label="Money" type="number" value="0.50" onInput=${noop} />
+        <${Select} label="Currency" value="eur" options=${[['eur', 'EUR'], ['usd', 'USD']]} onChange=${noop} />
+      <//>
+      <${Check} strong checked onChange=${noop}>List in EXCHANGE<//>
+    <//>`) },
+    { name: 'spaced', render: () => root(html`<${Fields} plain chapter spaced>
+      <${TextField} label="Title" value="Nordic Ferries seat map" onInput=${noop} />
+      <${TextField} label="Short description" value="Pick a seat on the Helsinki to Tallinn crossing." onInput=${noop} />
+    <//>`) },
+    { name: 'one column', render: () => root(html`<${Fields} plain column>
+      <${Select} label="Page" value="privacy" options=${[['privacy', 'Privacy'], ['terms', 'Terms of use']]} onChange=${noop} />
+      <${TextArea} label="Text" rows=${4} hint="Saved as the app's privacy page." value="Lumo Bakery keeps no personal data in this app." onInput=${noop} />
+    <//>`) },
+    { name: 'narrow', render: () => root(html`<${Fields} plain column narrow>
+      <${TextField} label="Reviewer's name" value="Harbour Studio" onInput=${noop} />
+    <//>`) },
   ] },
   'text-field': { variants: [
     { name: 'empty', render: () => root(html`<${TextField} label="Name" placeholder="Harbour Studio" value="" onInput=${noop} />`) },
@@ -112,7 +156,23 @@ export const FIELD_DEMOS = {
     { name: 'many lines', render: () => root(html`<${TextArea} label="What it sends" rows=${4} value="Read every workspace I belong to and list the open questions first." onInput=${noop} />`) },
     { name: 'many lines of code, refused', render: () => root(html`<${TextArea} label="Config" code rows=${4} value=${'{ "role": "worker",\n  "tools": [ }'} message="The JSON does not parse: line 2." error onInput=${noop} />`) },
     { name: 'growing', render: () => root(html`<${TextArea} ariaLabel="Message" grow=${132} placeholder="Write to invoice-drafter…" value="" onInput=${noop} onSend=${noop} />`) },
+    { name: 'a script editor: Tab indents, Ctrl+S saves (an operator page)', render: () => html`<${OperatorFrame} title="Extensions"><${TextArea} label="Action: fetch the timetable" code indent rows=${6}
+      value=${'export default async function (ctx) {\n  const res = await ctx.fetch("https://timetables.nordic-ferries.example/v2/routes");\n  return res.json();\n}'} onInput=${noop} onSave=${noop} /><//>` },
     { name: 'long', render: () => root(html`<${TextField} label="The address the Nordic Ferries booking agent reads its timetables from" hint=${LONG_HINT} value="https://timetables.nordic-ferries.example/v2/routes/helsinki-tallinn/winter-season" onInput=${noop} />`) },
+    { name: 'glyph, with ready marks', render: () => root(html`<${Fields} plain><${Field} label="Icon" hint="Or type any other mark." group>
+      <${TextField} size="glyph" maxLength=${4} ariaLabel="Icon" value="⛴" onInput=${noop}
+        actions=${html`<${Tabs} tone="glyph" value="⛴" onSelect=${noop} label="Icon" items=${['⛴', '🗺', '🥐', '📝'].map((g) => ({ value: g, label: g }))} />`} />
+    <//><//>`) },
+    { name: 'mark', render: () => root(html`<${Fields} plain chapter spaced><${TextField} label="Icon" size="mark" maxLength=${4} value="🥐" onInput=${noop} /><//>`) },
+    { name: 'prompt, with its send button', render: () => root(html`<${TextArea} prompt ariaLabel="Change with AI" placeholder="Say what to change…" value="Make the seat numbers larger on a phone." onInput=${noop}
+      actions=${html`<${Actions} chapter><${Loud} control onClick=${noop}>Run<//><//>`} />`) },
+    { name: 'page', render: () => root(html`<${TextArea} page label="Privacy" rows=${8} value=${'# Privacy\n\nLumo Bakery keeps no personal data in this app.\nOrders are sent to the bakery by mail and deleted after a week.'} onInput=${noop} />`) },
+    { name: 'source', render: () => root(html`<${TextArea} source ariaLabel="seat-map.html" spellCheck=${false}
+      value=${'<!doctype html>\n<html lang="en">\n<head><title>Nordic Ferries seat map</title></head>\n<body>\n  <main id="map"></main>\n  <script src="map.js"></script>\n</body>\n</html>'} onInput=${noop} />`) },
+    { name: 'script and long script', render: () => root(html`<${Fields} plain>
+      <${TextArea} label="manifest.json" script="long" spellCheck=${false} value=${'{\n  "name": "timetables",\n  "version": "1.0.0",\n  "libs": ["fetch.js"]\n}'} onInput=${noop} />
+      <${TextArea} script ariaLabel="fetch.js" spellCheck=${false} value=${'export async function routes(ctx) {\n  return ctx.fetch("/v2/routes");\n}'} onInput=${noop} />
+    <//>`) },
   ] },
   choice: { variants: [
     { name: 'tabs, one chosen', render: () => root(html`<${Choice} label="Lifetime" value="168" options=${LIFETIMES} onChange=${noop} />`) },
@@ -146,6 +206,9 @@ export const FIELD_DEMOS = {
     { name: 'groups', render: () => root(html`<${Select} label="Provider" value="openrouter" options=${[{ group: 'Hosted', options: [['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic']] }, { group: 'On your machine', options: [['lmstudio', 'LM Studio']] }]} onChange=${noop} />`) },
     { name: 'long', render: () => root(html`<${Select} label="Which workspace the Nordic Ferries agent reads its timetables from" hint=${LONG_HINT} value="w1"
       options=${[['w1', 'Harbour Studio / Client briefs / Nordic Ferries winter season timetables'], ['w2', 'Lumo Bakery / Seasonal menu']]} onChange=${noop} />`) },
+    { name: 'line', render: () => root(html`<${Select} line ariaLabel="Attach a skill" value="" placeholder="Choose a skill…"
+      options=${[['seat-maps', 'Seat maps'], ['timetables', 'Reading ferry timetables'], ['menus', 'Seasonal menus']]} onChange=${noop} />`) },
+    { name: 'line, fit', render: () => root(html`<${Select} line fit ariaLabel="Where visitors come from" value="country" options=${[['country', 'By country'], ['city', 'By city']]} onChange=${noop} />`) },
   ] },
   'check-line': { variants: [
     { name: 'on and off', render: () => root(html`<${Check} checked onChange=${noop}>Detect on capture<//><${Check} checked=${false} onChange=${noop}>Retry a failed run once<//>`) },
@@ -155,6 +218,10 @@ export const FIELD_DEMOS = {
     { name: 'with a hint', render: () => root(html`<${Check} radio name="dl-check-hint" checked hint="The app's records are read on a schedule and sorted into your memory." onChange=${noop}>Run on a schedule<//>`) },
     { name: 'disabled', render: () => root(html`<${Check} checked disabled title="Your plan decides this">Keep a copy of every mail<//>`) },
     { name: 'long', render: () => root(html`<${Check} checked=${false} onChange=${noop}>Let invoice-drafter send the invoices it drafts to the clients of Harbour Studio without asking me first<//>`) },
+    { name: 'pill', render: () => root(html`<${Check} pill checked onChange=${noop}>Memory<//> <${Check} pill checked=${false} onChange=${noop}>Payments<//> <${Check} pill checked onChange=${noop}>AI<//>`) },
+    { name: 'ruled', render: () => root(html`<${Check} ruled checked onChange=${noop}><span><strong>No right click.</strong> The menu that saves the page does not open.</span><//>
+      <${Check} ruled checked=${false} onChange=${noop}><span><strong>No copying text.</strong> Selected words cannot be copied out of the app.</span><//>`) },
+    { name: 'strong', render: () => root(html`<${Check} strong checked onChange=${noop}>List in EXCHANGE<//>`) },
   ] },
   'tag-input': { variants: [
     { name: 'two tags', render: () => root(html`<${TagInput} label="Interests" tags=${['design', 'ferries']} onChange=${noop} />`) },
@@ -186,6 +253,10 @@ export const FIELD_DEMOS = {
     { name: 'button', render: () => root(html`<${FileDrop} button="+ Upload a skill" soft accept=".md,.json" onFiles=${noop} />`) },
     { name: 'long', render: () => root(html`<${FileDrop} label="Documents" hint=${LONG_HINT} multiple onFiles=${noop} onRemove=${noop}
       items=${[{ file: file('nordic-ferries-winter-season-timetables-helsinki-tallinn-2026.csv', 24, 'text/csv'), key: 'studio/clients/nordic-ferries/timetables/winter-season-helsinki-tallinn-2026.csv' }]} />`) },
+    { name: 'ink, nothing chosen', render: () => root(html`<${Fields} plain><${FileDrop} ink label="HTML file" accept=".html,.htm,.zip" onFiles=${noop}
+      mark="📄" dropLabel="Drop an HTML file here" orLabel="or" browseLabel="Browse files" chosen="" /><//>`) },
+    { name: 'ink, a file chosen', render: () => root(html`<${Fields} plain><${FileDrop} ink label="HTML file" accept=".html,.htm,.zip" onFiles=${noop}
+      mark="📄" dropLabel="Drop an HTML file here" orLabel="or" browseLabel="Browse files" chosen="nordic-ferries-seat-map.html" /><//>`) },
   ] },
   'form-fields': { variants: [
     { name: 'two columns and actions', render: () => root(html`<${Fields} cols=${2}>
@@ -196,6 +267,26 @@ export const FIELD_DEMOS = {
     <${FormActions}><${Loud} control onClick=${noop}>Save<//><${Note}>Saved changes show at once.<//><//>`) },
     { name: 'code', render: () => root(html`<${TextField} label="Runs when" code value="0 7 * * 1-5" onInput=${noop} />`) },
     { name: 'refused', render: () => root(html`<${TextField} label="Name" value="" invalid message="The name is taken." error onInput=${noop} />`) },
+    { name: 'plain labels', render: () => root(html`<${Fields} plain>
+      <${TextField} label="Subdomain" placeholder="seat-map" value="" onInput=${noop} hint="Letters, digits and dashes." />
+      <${TextArea} label="What changed" rows=${2} value="Larger seat numbers on a phone." onInput=${noop} />
+    <//>`) },
+    { name: 'labels beside', render: () => root(html`<${Fields} plain beside>
+      <${Select} label="Theme" value="dark" options=${[['light', 'Light'], ['dark', 'Dark']]} onChange=${noop} />
+    <//>`) },
+    { name: 'in a chapter, opened under a rule', render: () => root(html`<${Fields} plain chapter ruled>
+      <${TextField} label="Question" value="Which crossing?" hint="An agent asks this before it runs the tool." onInput=${noop} />
+    <//>`) },
+    { name: 'spaced', render: () => root(html`<${Fields} plain chapter spaced>
+      <${TextField} label="Headline" value="Pick your seat before you board" onInput=${noop} />
+      <${TextArea} label="Text" rows=${3} value="The Nordic Ferries seat map shows every free seat on the next crossing." onInput=${noop} />
+    <//>`) },
+    { name: 'one column, narrow', render: () => root(html`<${Fields} plain column narrow>
+      <${TextField} label="Reviewer's name" value="Lumo Bakery" onInput=${noop} />
+    <//>`) },
+    { name: 'a page\'s text', render: () => root(html`<${Fields} plain column>
+      <${TextArea} page label="Terms of use" rows=${8} value=${'# Terms of use\n\nThe seat map shows what Nordic Ferries publishes.\nA seat is yours only when the booking says so.'} onInput=${noop} />
+    <//>`) },
   ] },
   'field-row': { variants: [
     { name: 'empty', render: () => root(html`<${TextField} box unmanaged ariaLabel="Key" placeholder="sk-or-…" value="" onInput=${noop}

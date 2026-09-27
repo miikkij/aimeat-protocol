@@ -8,10 +8,35 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.1 — 2026-09-27 — The inline word's literal corner 0 goes (nothing under it draws a corner, so
+ *     AIMEAT is unchanged). check:shape-tokens.
+ *   v1.3.0 — 2026-09-27 — .og-crumb-link--file (Action tone 'file'): the old app catalogue's
+ *     odps.yaml link (.od-link), appcat parity (sections-d); additive.
+ *   v1.2.0 — 2026-09-27 — .og-crumb-link--inline and --small (Action tone 'inline'): the old app
+ *     catalogue's ink words in running text (.mk-legal-link, .lg-open), appcat parity (sections-c);
+ *     additive.
+ *   v1.1.0 — 2026-09-27 — .og-crumb-link--dashed (Action tone 'dashed'): the dashed door word of the
+ *     old app catalogue (.cat-dashed), appcat parity; additive.
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
  */
 
 .og-crumb { display: flex; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
 .og-crumb-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
 .og-crumb-link:hover { color: var(--text); }
+/* The dashed word (Action tone 'dashed', appcat): a door inside running text, a dashed coral line
+   under it that turns solid under the pointer; the word stays coral (the old catalogue's .cat-dashed). */
+.og-crumb-link.og-crumb-link--dashed { border-bottom: var(--shape-frame) dashed var(--accent); margin: 0; }
+.og-crumb-link.og-crumb-link--dashed:hover { color: var(--accent); border-bottom-style: solid; }
 .og-crumb-here { color: var(--text); }
+/* The inline word (Action tone 'inline', appcat sections-c): an ink word inside running text, bold,
+   the ink line under it; coral with its line under the pointer; `small` a step smaller (the old
+   catalogue's .mk-legal-link "Read Article 50 →" and a legal page's .lg-open "Open →"). */
+.og-crumb-link.og-crumb-link--inline { font-weight: 700; color: var(--text); text-decoration: none; border-bottom: var(--shape-frame) solid var(--text); }
+.og-crumb-link.og-crumb-link--inline:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.og-crumb-link.og-crumb-link--small { font-size: .85rem; }
+/* The file link (Action tone 'file', appcat sections-d): a link to a file in the typewriter face, a
+   step smaller, coral, underlined only under the pointer (the old app catalogue's .od-link). */
+.og-crumb-link.og-crumb-link--file { font-family: var(--font-mono); font-size: .8rem; text-decoration: none; }
+.og-crumb-link.og-crumb-link--file:hover { color: var(--accent); text-decoration: underline; }
+/* A row of doors with a file link keeps its words 18px apart (the old .od-tool-head). */
+.og-doors.og-doors:has(> .og-crumb-link--file) { gap: 18px; }

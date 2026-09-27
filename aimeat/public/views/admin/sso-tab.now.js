@@ -18,11 +18,16 @@
  *   is not on this page: a connection can be complete and reach nobody because sso.enabled is off
  *   and both public doors answer 503. The old page could not say that anywhere except one row of
  *   its troubleshooting table.
+ *
+ *   Every part is a library component; the page passes data and writes no class.
  * @structure
  *   - Nothing — the empty state: what it buys, and the four things to gather
  *   - RightNow — the word, the five rows, the strip
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only: Section, Verdict with the readings, the three
+ *     things it buys as Cards (the icons drawn by their own attributes, in coral), FigureStrip, the
+ *     frozen note in the edge Box.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
  */
@@ -32,15 +37,30 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
 import { num, Badge, Row } from './shared.js';
+import { Section } from '/components/Section.js';
+import { Verdict } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tinted } from '/components/Figure.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Box } from '/components/Box.js';
 
 const S = (key, params) => t('admin.sso.' + key, params);
 
-/** Stroke icons on a 24px grid, one style. Never an emoji: these scale and recolour. */
+/** Stroke icons on a 24px grid, one style, in coral. Never an emoji: these scale and recolour. */
+const icon = (paths) => html`<${Tinted} tone="notice"><svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg><//>`;
 const ICONS = {
-  key: html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>`,
-  people: html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" /></svg>`,
-  shield: html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>`,
+  key: icon(html`<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" />`),
+  people: icon(html`<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" />`),
+  shield: icon(html`<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" />`),
 };
+
+/** The page is frozen by a setting elsewhere: what is in the way, at the edge of the column. */
+export function Frozen({ setting }) {
+  return html`<${Box} tone="edge">${S('now.lockedWhy', { setting })}<//>`;
+}
 
 /**
  * Section 01 with nothing connected.
@@ -51,49 +71,31 @@ const ICONS = {
  */
 export function Nothing({ node, onConnect }) {
   const gets = [
-    { icon: ICONS.key, title: S('gets.workAccount'), body: S('gets.workAccountWhy') },
-    { icon: ICONS.people, title: S('gets.theirIt'), body: S('gets.theirItWhy') },
-    { icon: ICONS.shield, title: S('gets.youDecide'), body: S('gets.youDecideWhy') },
+    { key: 'work', icon: ICONS.key, title: S('gets.workAccount'), body: S('gets.workAccountWhy') },
+    { key: 'it', icon: ICONS.people, title: S('gets.theirIt'), body: S('gets.theirItWhy') },
+    { key: 'you', icon: ICONS.shield, title: S('gets.youDecide'), body: S('gets.youDecideWhy') },
   ];
   const gather = ['shortName', 'domains', 'someone', 'visibility'];
 
   return html`
-    <section class="og-sec og-sec--first" id="adm-sso-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--danger" disabled=${node.locked} onClick=${onConnect}>
-            ${S('now.connect')}
-          </button>
-        </div>
-      </div>
+    <${Section} first id="adm-sso-01" num="01" title=${S('now.title')}
+      doors=${html`<${Action} small tone="danger" disabled=${node.locked} onClick=${onConnect}>${S('now.connect')}<//>`}>
+      <${Verdict}
+        word=${S('empty.word')}
+        line=${node.accounts ? S('empty.line', { n: num(node.accounts) }) : S('empty.lineNoCount')}
+        doors=${node.locked ? html`<${Frozen} setting=${node.locked_setting} />` : null}>
+        <${CardGrid}>
+          ${gets.map(g => html`<${Card} key=${g.key} mark=${g.icon} name=${g.title} text=${g.body} />`)}
+        <//>
+      <//>
 
-      <div class="adm-sso-offer">
-        <div>
-          <div class="adm-ov-status">${S('empty.word')}</div>
-          <p class="adm-alert-line">${node.accounts
-    ? S('empty.line', { n: num(node.accounts) })
-    : S('empty.lineNoCount')}</p>
-          ${node.locked ? html`
-            <p class="adm-sso-locked">${S('now.lockedWhy', { setting: node.locked_setting })}</p>` : null}
-        </div>
-        <div class="adm-sso-gets">
-          ${gets.map(g => html`
-            <div class="adm-sso-get">
-              ${g.icon}
-              <b>${g.title}</b>
-              <p>${g.body}</p>
-            </div>`)}
-        </div>
-      </div>
-
-      <div class="og-strip">
-        <div><b class="adm-sso-dim">0</b><span>${S('strip.organisations')}</span><small>${S('strip.organisationsNone')}</small></div>
-        <div><b>${num(node.accounts || 0)}</b><span>${S('strip.accounts')}</span><small>${S('strip.accountsSub')}</small></div>
-        <div><b class="adm-sso-dim">${S('strip.off')}</b><span>${S('strip.switch')}</span><small>${S('strip.switchLater')}</small></div>
-        <div><b>${gather.length}</b><span>${S('strip.gather')}</span><small>${S('strip.gatherSub')}</small></div>
-      </div>
-    </section>`;
+      <${FigureStrip} wrap items=${[
+    { key: 'orgs', n: '0', tone: 'dim', label: S('strip.organisations'), sub: S('strip.organisationsNone') },
+    { key: 'accounts', n: num(node.accounts || 0), label: S('strip.accounts'), sub: S('strip.accountsSub') },
+    { key: 'switch', n: S('strip.off'), tone: 'word dim', label: S('strip.switch'), sub: S('strip.switchLater') },
+    { key: 'gather', n: gather.length, label: S('strip.gather'), sub: S('strip.gatherSub') },
+  ]} />
+    <//>`;
 }
 
 /**
@@ -128,49 +130,31 @@ export function RightNow({ data, onConnect, toSection }) {
   ].join(' · ');
 
   return html`
-    <section class="og-sec og-sec--first" id="adm-sso-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" disabled=${node.locked} onClick=${onConnect}>
-            ${S('now.connect')}
-          </button>
-        </div>
-      </div>
-
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${blocked || node.locked ? 'danger' : ''}">${word}</div>
-          <p class="adm-alert-line">${line}</p>
-          <div class="adm-ov-up">${stamp}</div>
-          ${blocked ? html`
-            <div class="adm-sso-acts">
-              <a class="og-door og-door--danger" href="/v1/admin?tab=config">${S('now.openConfig')}</a>
-            </div>` : null}
-        </div>
-
-        <div>
-          ${Row({
+    <${Section} first id="adm-sso-01" num="01" title=${S('now.title')}
+      doors=${html`<${Action} small soft disabled=${node.locked} onClick=${onConnect}>${S('now.connect')}<//>`}>
+      <${Verdict} word=${word} tone=${blocked || node.locked ? 'danger' : undefined} line=${line} stamp=${stamp}
+        doors=${blocked ? html`<${Action} small tone="danger" href="/v1/admin?tab=config">${S('now.openConfig')}<//>` : null}>
+        ${Row({
     title: S('now.masterSwitch'),
     why: S('now.masterSwitchWhy'),
     chip: html`<${Badge} type=${node.enabled ? 'success' : 'danger'}
       label=${node.enabled ? S('now.on') : S('now.off')} />`,
     value: node.enabled_setting,
   })}
-          ${Row({
+        ${Row({
     title: S('now.changing'),
     why: S('now.changingWhy'),
     chip: html`<${Badge} type=${node.locked ? 'warning' : 'success'}
       label=${node.locked ? S('now.frozen') : S('now.open')} />`,
     value: node.locked_setting,
   })}
-          ${Row({
+        ${Row({
     title: S('now.connected'),
     why: S('now.connectedWhy'),
     chip: html`<${Badge} type="info" label=${String(s.total)} />`,
     value: data.connections.map(c => c.id).slice(0, 3).join(' · '),
   })}
-          ${Row({
+        ${Row({
     title: S('now.buttons'),
     why: S('now.buttonsWhy'),
     chip: s.buttons_showing > 0
@@ -180,7 +164,7 @@ export function RightNow({ data, onConnect, toSection }) {
       ? S('now.buttonsValue', { n: s.buttons_showing })
       : S('now.buttonsWould', { n: s.blocked_by_switch }),
   })}
-          ${Row({
+        ${Row({
     title: S('now.arriving'),
     why: S('now.arrivingWhy'),
     chip: s.directories_calling > 0
@@ -189,37 +173,22 @@ export function RightNow({ data, onConnect, toSection }) {
     value: S('now.arrivingValue', { logins: num(s.logins_seen), dirs: num(s.directories_calling) }),
     last: true,
   })}
-        </div>
-      </div>
+      <//>
 
-      <div class="og-strip">
-        <div>
-          <b class=${node.enabled ? '' : 'adm-sso-coral'}>${node.enabled ? S('now.on') : S('now.off')}</b>
-          <span>${S('strip.switch')}</span>
-          <small>${node.enabled ? S('strip.switchOnSub') : S('strip.switchOffSub')}</small>
-        </div>
-        <div>
-          <b>${s.total}</b><span>${S('strip.organisations')}</span>
-          <small>${data.connections.map(c => c.name).slice(0, 2).join(' · ')}</small>
-        </div>
-        <div>
-          <b class=${s.logins_seen ? '' : 'adm-sso-dim'}>${num(s.logins_seen)}</b>
-          <span>${S('strip.arrived')}</span>
-          <small>${s.logins_seen ? S('strip.arrivedSub') : S('strip.arrivedNone')}</small>
-        </div>
-        <div>
-          <b>${S('strip.stepsValue', { done: first?.steps_done ?? 0, total: s.steps_total })}</b>
-          <span>${S('strip.steps')}</span>
-          <small>${node.enabled ? S('strip.stepsSub') : S('strip.stepsSixth')}</small>
-        </div>
-      </div>
+      <${FigureStrip} wrap items=${[
+    { key: 'switch', n: node.enabled ? S('now.on') : S('now.off'), tone: node.enabled ? 'word' : 'coral',
+      label: S('strip.switch'), sub: node.enabled ? S('strip.switchOnSub') : S('strip.switchOffSub') },
+    { key: 'orgs', n: s.total, label: S('strip.organisations'), sub: data.connections.map(c => c.name).slice(0, 2).join(' · ') },
+    { key: 'arrived', n: num(s.logins_seen), tone: s.logins_seen ? undefined : 'dim', label: S('strip.arrived'),
+      sub: s.logins_seen ? S('strip.arrivedSub') : S('strip.arrivedNone') },
+    { key: 'steps', n: S('strip.stepsValue', { done: first?.steps_done ?? 0, total: s.steps_total }), label: S('strip.steps'),
+      sub: node.enabled ? S('strip.stepsSub') : S('strip.stepsSixth') },
+  ]} />
 
       ${blocked ? html`
-        <p class="adm-sso-note">
+        <${Note} kind="hint">
           ${S('now.blockedNote')}${' '}
-          <button type="button" class="og-door og-door--quiet" onClick=${() => toSection('02')}>
-            ${S('now.seeSteps')}
-          </button>
-        </p>` : null}
-    </section>`;
+          <${Action} small soft onClick=${() => toSection('02')}>${S('now.seeSteps')}<//>
+        <//>` : null}
+    <//>`;
 }

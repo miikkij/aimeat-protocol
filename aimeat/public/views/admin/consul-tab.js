@@ -3,13 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for the Consul KV config integration — shows connection
- *   status and key count, and lets operators export config to / import config from Consul.
+ *   status and key count, and lets operators export config to / import config from Consul. The tab
+ *   draws library components and passes them data; it writes no class and no style.
  *
  * @structure
  *   - ConsulTab({ data, reload }): renders status, disabled/setup help, and export/import actions
  *   - handleExport/handleImport: call consulExport/consulImport and reload dashboard data
  *
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components, no class or inline style: the explanation is a hint,
+ *     the card is the Object box with the address in its head and the health mark at its end, the
+ *     two actions are the loud action and the action link, the result is the form's message (fine or
+ *     refused). The health figure keeps its colour as the strip's fine or danger tone.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -20,6 +25,11 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Badge, StatsGrid, ExpandableHelp, Empty, DataTable } from './shared.js';
 import { consulExport, consulImport } from '/js/services/admin.js';
+import { Box } from '/components/Box.js';
+import { Loud, Action } from '/components/Action.js';
+import { FormActions } from '/components/Field.js';
+import { Space } from '/components/Layout.js';
+import { Note } from '/components/Note.js';
 
 export default function ConsulTab({ data, reload }) {
   const consul = data.consul;
@@ -30,13 +40,13 @@ export default function ConsulTab({ data, reload }) {
 
   if (!consul.enabled) {
     return html`
-      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.consulExplain')}</p>
-      <div class="adm-card">
+      <${Note}>${t('dashboard.consulExplain')}<//>
+      <${Box}>
         <p>${t('dashboard.consulDisabled')}</p>
         <${ExpandableHelp} title=${t('dashboard.consulSetupGuide')}>
           <p>${t('dashboard.consulSetupDetail')}</p>
-        </${ExpandableHelp}>
-      </div>
+        <//>
+      <//>
     `;
   }
 
@@ -61,31 +71,30 @@ export default function ConsulTab({ data, reload }) {
   };
 
   return html`
-    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.consulExplain')}</p>
+    <${Note}>${t('dashboard.consulExplain')}<//>
     <${ExpandableHelp} title=${t('dashboard.consulSetupGuide')}>
       <p>${t('dashboard.consulSetupDetail')}</p>
-    </${ExpandableHelp}>
+    <//>
 
     <${StatsGrid} items=${[
-      { label: t('dashboard.consulStatus'), value: consul.healthy ? '\u2713' : '\u2717', color: consul.healthy ? '#22c55e' : '#ef4444' },
+      // The health figure keeps its colour by meaning: fine when Consul answers, danger when not.
+      { label: t('dashboard.consulStatus'), value: consul.healthy ? '✓' : '✗', tone: consul.healthy ? 'green' : 'red' },
       { label: t('dashboard.consulKeysLoaded'), value: consul.key_count },
     ]} />
 
-    ${result && html`<div style="margin:12px 0;padding:8px 12px;border-radius:6px;background:${result.ok ? '#16a34a22' : '#dc262622'};color:${result.ok ? '#22c55e' : '#ef4444'};font-size:.85rem">${escHtml(result.msg)}</div>`}
+    ${result && html`<${Space} above="medium" below="medium"><${Note} kind="message" error=${!result.ok}>${escHtml(result.msg)}<//><//>`}
 
-    <div class="adm-card" style="margin-top:12px">
-      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-        <span style="color:var(--text-dim);font-size:.85rem">${escHtml(consul.url)} \u2014 ${escHtml(consul.prefix)}</span>
-        <span style="margin-left:auto"><${Badge} type=${consul.healthy ? 'healthy' : 'critical'} /></span>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="adm-btn" onClick=${handleExport} disabled=${loading}>${t('dashboard.consulExport')}</button>
-        <button class="adm-btn-action" onClick=${handleImport} disabled=${loading}>${t('dashboard.consulImport')}</button>
-      </div>
-      ${consul.keys?.length > 0
-        ? html`<${DataTable} headers=${['Key']} rows=${consul.keys.map(k => [escHtml(k)])} />`
-        : html`<${Empty} text=${t('dashboard.consulNoKeys')} />`
-      }
-    </div>
+    <${Space} above="medium">
+      <${Box} marks=${html`<${Note} kind="meta" inline>${escHtml(consul.url)} — ${escHtml(consul.prefix)}<//>`}
+        end=${html`<${Badge} type=${consul.healthy ? 'healthy' : 'critical'} />`}>
+        <${FormActions}>
+          <${Loud} control onClick=${handleExport} disabled=${loading}>${t('dashboard.consulExport')}<//>
+          <${Action} small onClick=${handleImport} disabled=${loading}>${t('dashboard.consulImport')}<//>
+        <//>
+        ${consul.keys?.length > 0
+    ? html`<${DataTable} headers=${['Key']} rows=${consul.keys.map(k => [escHtml(k)])} />`
+    : html`<${Empty} text=${t('dashboard.consulNoKeys')} />`}
+      <//>
+    <//>
   `;
 }

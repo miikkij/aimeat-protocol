@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.62.0 -- 2026-09-26 -- federation-messages.ts joins GUARD_SUITES (138 → 139), measured alone on
+ *            a fresh database, three identical green runs on both backends.
  *   v1.61.0 -- 2026-09-26 -- 41 suites that carry the September 2026 security fixes join
  *            GUARD_SUITES (97 → 138), each measured alone on a fresh database, three identical green
  *            runs on both backends.
@@ -739,6 +741,8 @@ const ALL_SUITES = [
     'test/e2e-mcp-groups-shares.ts',
     'test/e2e-mcp-onboarding.ts',
     'test/e2e-mcp-packages-tools.ts',
+    // A tool published over MCP lands under the app filename, so both catalogues show it.
+    'test/e2e-app-tools-key.ts',
     // The same sweep, three files further: the core doors nobody had called (the work lifecycle,
     // the memory owner-scope branches, both resource templates), the DM and data-package tools,
     // and the extension and app tools with their refusal arms.
@@ -1102,6 +1106,12 @@ const GUARD_SUITES = [
     'test/e2e-workflows.ts',                // a run's spending limit, and the local session the workflow doors take
     'test/e2e-workspace-member-changes.ts', // a plain member changes a workspace only under its rule
     'test/e2e-workspace-rows.ts',           // row spaces: the manifest gate, and who may append and read
+    // Promoted the way the rule says: alone, on a freshly deleted database, three consecutive 16-of-16
+    // runs on BOTH backends. The identity work keeps touching the paths it drives (a message to a person
+    // on another node, the first-contact gate there, a block, a message to an agent there), and nothing
+    // ran it on a push, only the nightly sweep. It boots its own nodes on 40270, 40271 and 40405, in
+    // one process, so it sits in lane 0.
+    'test/federation-messages.ts',          // a message crosses to the right mailbox on the other node; a stranger is held
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

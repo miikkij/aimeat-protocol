@@ -136,6 +136,8 @@ google*.html
 *.dump
 # …but the Kysely provider's schema migrations ARE source (checked in), not a data export.
 !aimeat/src/storage/providers/*/migrations/*.sql
+# …and so are the read-only checks an operator runs before a deploy (SELECTs only, no data).
+!aimeat/scripts/precheck-*.sql
 
 # Binary docs (use .md instead)
 *.docx

@@ -5,6 +5,28 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.15.0 — 2026-09-26 — The at-rules are a list: @font-palette-values, @position-try, @function and
+ *     @font-feature-values pass under a name that starts with the prefix and are refused under another,
+ *     an at-rule off the list (@document, @charset, one nobody has named yet, a feature block outside
+ *     @font-feature-values) is refused with the list, and the reader is timed on at-rules that define a name.
+ *   v1.14.0 — 2026-09-26 — @layer, @page and @view-transition are refused, each by name; a @keyframes,
+ *     @property or @counter-style whose name does not start with the prefix is refused with the
+ *     prefixed form, and one whose name does passes, as does a use of the page's own names.
+ *   v1.13.0 — 2026-09-26 — A stylesheet carrying @scope is refused wherever it stands, its name escaped
+ *     or in capitals included, and the refusal shows the rule on the component's own classes; a string
+ *     or a comment naming @scope passes.
+ *   v1.12.0 — 2026-09-26 — The preview and the snippet say why a stored component no longer passes,
+ *     the preview's words escaped.
+ *   v1.11.0 — 2026-09-26 — A repeated attribute, a missing space between attributes and a "/" on a
+ *     <div> each get their own sentence.
+ *   v1.10.0 — 2026-09-26 — Markup that leaves an element open where it ends is refused, with the
+ *     outermost open element named; implied end tags and self-closing SVG pass.
+ *   v1.9.0 — 2026-09-26 — A pseudo whose argument is words and numbers passes (::part(label),
+ *     :state(on), :nth-col(2n+1)); one whose argument is a selector the parser cannot read, and every
+ *     pseudo that names the page, is refused.
+ *   v1.8.0 — 2026-09-26 — A rule nested behind "&" reads "&" as the parent rule's own elements, and
+ *     "&" at the top of the stylesheet as the page; a rule nested without "&" is refused with the
+ *     forms that pass.
  *   v1.7.0 — 2026-09-26 — A stylesheet holding "</" is refused, in a comment or in a string, and the
  *     preview and the snippet bench a stored one again; "<\/" inside a string passes.
  *   v1.6.0 — 2026-09-26 — The stylesheet is read by the CSS parser (e82c9f26d729): a string passes
@@ -141,7 +163,7 @@ describe('the component bench', () => {
     expect(bad({ html: '<div class="wkgrid"><body onload="x()"></body></div>' })).toThrow(/starts no tag a browser reads in that place/);
     expect(bad({ html: '<svg class="wkgrid-i"><![CDATA[><script>alert(1)</script>]]></svg>' })).toThrow(/starts no tag a browser reads in that place/);
     expect(bad({ html: '<div class="wkgrid">x</p></div>' })).toThrow(/starts no tag a browser reads in that place/);
-    expect(bad({ html: '<div class="wkgrid"/>' })).toThrow(/does not read cleanly/);
+    expect(bad({ html: '<div class="wkgrid"/>' })).toThrow(/ignores the "\/"/);
     // Markup a browser and the parser agree on passes: a table with its rows, a list closed by its end
     // tag, text with its references, a textarea whose text holds no "<".
     for (const html of [
@@ -291,6 +313,7 @@ describe('the component bench', () => {
       ['comments', '/* '], ['strings', '"a\\'], ['escapes', '\\75 '], ['declarations', 'animation ', '.a{'], ['strings in rules', '"{\'', '.a{'],
       ['flat at-rules', '@media '], ['selector lists', '.a, '], ['conditions', '(', '@supports '], ['blocks', '@media{'], ['nested rules', '& {', '.a{'],
       ['pseudo-classes', ':is(', '.a'], ['var fallbacks', 'var(--a,(', '.a{b:'], ['closed declarations', 'a:b; ', '.a{'],
+      ['at-rules that define a name', '@keyframes '], ['custom functions', '@function --a('],
     ]) timed(`stylesheet, ${shape}`, () => readStylesheet(ceiling(unit, head)));
     // Nesting at the most the bench reads is parsed, and parsed quickly.
     timed('stylesheet, nested as deep as the bench reads', () => {
@@ -333,7 +356,8 @@ describe('the component bench', () => {
     expect(bad(rule('*.wkgrid'))).toThrow(/names the page itself/);
     // The column combinator is not one the CSS parser reads, so the bench cannot follow it.
     expect(bad(rule('.wkgrid || td'))).toThrow(/does not read as a selector/);
-    expect(bad(rule('.wkgrid-x { & ~ p'))).toThrow(/starts at one of its own classes/);
+    // Nested, "&" is .wkgrid-x, so this is `.wkgrid-x ~ p`: it reaches beside the component.
+    expect(bad(rule('.wkgrid-x { & ~ p'))).toThrow(/beside it/);
     // …and what a component legitimately writes still passes: inside it, and between its own parts.
     for (const ok of [
       '.wkgrid > *', '.wkgrid li', '.wkgrid-row + .wkgrid-row', '.wkgrid-cell ~ .wkgrid-cell-today',
@@ -343,6 +367,198 @@ describe('the component bench', () => {
     ]) {
       expect(() => validateComponentBody({ ...WEEK_GRID, ...rule(ok) }), ok).not.toThrow();
     }
+  });
+
+  // CSS nesting: inside a style rule, "&" is that rule's own elements, and every selector of that
+  // rule is checked on its own. At the top of the stylesheet "&" is the page.
+  it('reads "&" in a nested rule as the parent rule\'s own elements, and at the top as the page', () => {
+    const nest = (inner: string) => ({ css: `${WEEK_GRID.css}\n.wkgrid-row { color: var(--ak-ink); ${inner} }` });
+    for (const ok of [
+      '& .wkgrid-cell { color: var(--ak-accent); }', '&:hover { color: var(--ak-accent); }', '& > span { color: var(--ak-accent); }',
+      '&.wkgrid-on { color: var(--ak-accent); }', '& + & { margin-top: 4px; }', '& + .wkgrid-row { margin-top: 4px; }',
+      '&::after { content: ""; }', '@media (max-width: 480px) { & .wkgrid-cell { min-height: 32px; } }',
+      '& .wkgrid-cell { &:hover { color: var(--ak-accent); } }',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, ...nest(ok) }), ok).not.toThrow();
+    }
+    // A nested rule reaches what the rule it stands for reaches: inside .wkgrid-row, `& ~ p` is `.wkgrid-row ~ p`.
+    expect(bad(nest('& ~ p { color: var(--ak-accent); }'))).toThrow(/beside it/);
+    expect(bad(nest('& + p { color: var(--ak-accent); }'))).toThrow(/beside it/);
+    expect(bad(nest('&:has(~ p) { color: var(--ak-accent); }'))).toThrow(/looks only down/);
+    expect(bad(nest('& :root { color: var(--ak-accent); }'))).toThrow(/names the page itself/);
+    // The parent rule is checked too: under `p`, "&" is every paragraph on the page.
+    expect(bad({ css: `${WEEK_GRID.css}\np { & .wkgrid-cell { color: var(--ak-accent); } }` })).toThrow(/starts at one of its own classes/);
+    // At the top of the stylesheet "&" is the page, wherever it stands in the selector.
+    expect(bad({ css: `${WEEK_GRID.css}\n& .wkgrid-cell { color: var(--ak-accent); }` })).toThrow(/starts at one of its own classes/);
+    expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid & { color: var(--ak-accent); }` })).toThrow(/names the page itself/);
+    expect(bad({ css: `${WEEK_GRID.css}\n@media (min-width: 1px) { & p { color: var(--ak-accent); } }` })).toThrow(/starts at one of its own classes/);
+    // Nesting without "&" stays refused, and the refusal shows the forms that pass.
+    expect(bad(nest('.wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}", "&:hover \{ … \}"/);
+    expect(bad(nest('> .wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}"/);
+    expect(readStylesheet('.a { & .b { c: d } }').selectors.map(s => [s.text, s.nested])).toEqual([['.a', false], ['& .b', true]]);
+  });
+
+  // Inside @scope, "&" stands for the elements its prelude chooses, which can be outside the
+  // component. A component's own classes already keep every rule inside it, so it carries no @scope.
+  it('refuses @scope wherever it stands, and says how to write the rule on the component\'s own classes', () => {
+    // Nested in a rule of the component, the prelude makes "&" the page's <body>.
+    expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid { @scope (body) { & p { color: var(--ak-accent); } } }` }))
+      .toThrow(/carries no @scope, and a component does not need it.*"@scope \(\.wkgrid\) \{ \.wkgrid-cell \{ … \} \}" is "\.wkgrid \.wkgrid-cell \{ … \}", or "& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/);
+    for (const css of [
+      `@scope (.wkgrid) { .wkgrid-cell { color: var(--ak-accent); } }\n${WEEK_GRID.css}`,
+      `${WEEK_GRID.css}\n.wkgrid-row { @scope (.wkgrid-row) to (.wkgrid-cell) { & { color: var(--ak-accent); } } }`,
+      `${WEEK_GRID.css}\n@media (min-width: 1px) { .wkgrid { @scope (html) { & .wkgrid-cell { color: var(--ak-accent); } } } }`,
+      `${WEEK_GRID.css}\n.wkgrid { @SCOPE (body) { & p { color: var(--ak-accent); } } }`,
+      `${WEEK_GRID.css}\n.wkgrid { @\\73 cope (body) { & p { color: var(--ak-accent); } } }`,
+    ]) {
+      expect(bad({ css }), css).toThrow(/carries no @scope/);
+    }
+    // What a string or a comment holds is text.
+    for (const css of [`${WEEK_GRID.css}\n.wkgrid-cell::after { content: "@scope (body)"; }`, `${WEEK_GRID.css}\n/* no @scope here */`]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css }), css).not.toThrow();
+    }
+  });
+
+  // A component's stylesheet reaches only the component. These three act on the whole page by nature.
+  it.each([
+    ['layer', '@layer wkgrid-base { .wkgrid-cell { color: var(--ak-accent); } }', /carries no @layer: the order of cascade layers belongs to the whole page.*":where\(\.wkgrid-cell\) \{ … \}"/],
+    ['layer', '@layer wkgrid-base, wkgrid-top;', /carries no @layer: /],
+    ['layer', '.wkgrid { @LAYER wkgrid-base { & .wkgrid-cell { color: var(--ak-accent); } } }', /carries no @layer: /],
+    ['page', '@page { margin: 0; }', /carries no @page: it sets how the whole page prints.*How a page prints is the page's to say/],
+    ['page', '@\\70 age :first { margin: 0; }', /carries no @page: /],
+    ['view-transition', '@view-transition { navigation: auto; }', /carries no @view-transition: it sets how the whole page changes to the next one/],
+  ])('refuses @%s, which acts on the whole page: %s', (_name, rule, message) => {
+    expect(bad({ css: `${WEEK_GRID.css}\n${rule}` })).toThrow(message);
+  });
+
+  // A name one of these at-rules defines is shared by the whole page, so a component defines names
+  // of its own only, and says which form passes.
+  it.each([
+    ['@keyframes fade { from { opacity: 0; } to { opacity: 1; } }',
+      /defines the animation "fade" with @keyframes, a name the whole page shares.*"@keyframes wkgrid-fade", and use it as "animation-name: wkgrid-fade"/],
+    ['@-webkit-keyframes fade { from { opacity: 0; } }', /defines the animation "fade" with @-webkit-keyframes.*"@-webkit-keyframes wkgrid-fade"/],
+    ['@keyframes "ak-fade" { from { opacity: 0; } }', /defines the animation "ak-fade" with @keyframes.*"@keyframes wkgrid-ak-fade"/],
+    ['@keyframes \\61 k-fade { from { opacity: 0; } }', /defines the animation "ak-fade" with @keyframes/],
+    ['@keyframes wkgridx { from { opacity: 0; } }', /defines the animation "wkgridx" with @keyframes/],
+    ['@keyframes wkgrid-a, fade { from { opacity: 0; } }', /"@keyframes wkgrid-a, fade" does not name one animation.*"@keyframes wkgrid-spin"/],
+    ['@property --ak-ink { syntax: "*"; inherits: false; }',
+      /defines the custom property "--ak-ink" with @property, a name the whole page shares.*"@property --wkgrid-ak-ink", and use it as "var\(--wkgrid-ak-ink\)"/],
+    ['@property wkgrid-x { syntax: "*"; inherits: false; }', /defines the custom property "wkgrid-x" with @property.*"@property --wkgrid-wkgrid-x"/],
+    ['@counter-style decimal { system: numeric; symbols: "0" "1"; }',
+      /defines the counter style "decimal" with @counter-style, a name the whole page shares.*"@counter-style wkgrid-decimal", and use it as "list-style-type: wkgrid-decimal"/],
+    ['@counter-style DISC { system: cyclic; symbols: "*"; }', /defines the counter style "disc" with @counter-style/],
+    ['@font-palette-values --ak-pal { font-family: Inter; override-colors: 0 var(--ak-ink); }',
+      /defines the font palette "--ak-pal" with @font-palette-values, a name the whole page shares.*"@font-palette-values --wkgrid-ak-pal", and use it as "font-palette: --wkgrid-ak-pal"/],
+    ['@position-try --ak-top { top: 0; }',
+      /defines the position fallback "--ak-top" with @position-try, a name the whole page shares.*"@position-try --wkgrid-ak-top", and use it as "position-try-fallbacks: --wkgrid-ak-top"/],
+    ['@function --ak-gap() { result: 4px; }',
+      /defines the custom function "--ak-gap" with @function, a name the whole page shares.*"@function --wkgrid-ak-gap\(\)", and use it as "--wkgrid-ak-gap\(\)"/],
+    ['@font-feature-values Inter { @styleset { nice: 1; } }',
+      /defines feature values for the font family "inter" with @font-feature-values, a family the whole page shares.*"@font-feature-values wkgrid-inter", and use it as "font-family: wkgrid-inter"/],
+  ])('refuses %s: the name it defines does not start with the prefix', (rule, message) => {
+    expect(bad({ css: `${WEEK_GRID.css}\n${rule}` })).toThrow(message);
+  });
+
+  // The at-rules a component's stylesheet may carry are a list, so an at-rule nobody has thought of
+  // yet is refused too, and the refusal says what the list is.
+  it.each([
+    ['document', '@document url-prefix() { .wkgrid-cell { color: var(--ak-accent); } }'],
+    ['charset', '@charset "utf-8";'],
+    ['charset', '@\\63 harset "utf-8";'],
+    ['tomorrow', '@tomorrow (x) { .wkgrid-cell { color: var(--ak-accent); } }'],
+    ['styleset', '@styleset { nice: 1; }'],
+  ])('refuses @%s, which is not on the list, and says what a component may use: %s', (name, rule) => {
+    expect(bad({ css: `${rule}\n${WEEK_GRID.css}` })).toThrow(new RegExp(`@${name}.*uses only @media, @supports, @container and @starting-style, which condition its own rules, `
+      + 'and @keyframes, @property, @counter-style, @font-palette-values, @position-try, @function and @font-feature-values under a name that starts with its prefix'));
+  });
+
+  it('passes @keyframes, @property and @counter-style under names of its own, and the page\'s own names where it uses them', () => {
+    for (const css of [
+      '@keyframes wkgrid-spin { from { opacity: 0; } to { opacity: 1; } }\n.wkgrid-cell { animation: wkgrid-spin 1s; }',
+      '@keyframes wkgrid { from { opacity: 0; } }', '@keyframes "wkgrid-in" { from { opacity: 0; } }', '@-webkit-keyframes WKGRID-spin { from { opacity: 0; } }',
+      '@keyframes \\77 kgrid-out { to { opacity: 0; } }',
+      '@property --wkgrid-x { syntax: "<length>"; inherits: false; initial-value: 0px; }',
+      '@counter-style wkgrid-count { system: cyclic; symbols: "*"; }\n.wkgrid-row { list-style-type: wkgrid-count; }',
+      '.wkgrid-cell { animation: ak-fade 1s; }', '.wkgrid-row { counter-increment: ak-step; list-style-type: decimal; }',
+      '@container (min-width: 30em) { .wkgrid-cell { min-height: 32px; } }', '@starting-style { .wkgrid-cell { opacity: 0; } }',
+      '@font-palette-values --wkgrid-pal { font-family: Inter; override-colors: 0 var(--ak-ink); }', '@position-try --wkgrid-top { top: 0; }',
+      '@function --wkgrid-gap() { result: 4px; }', '@font-feature-values wkgrid-font { @styleset { nice: 1; } @swash { fancy: 1; } }',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css: `${WEEK_GRID.css}\n${css}` }), css).not.toThrow();
+    }
+  });
+
+  // A pseudo-class only narrows the element its compound names, and a pseudo-element hangs off it,
+  // so an argument of words and numbers changes nothing a rule reaches. A pseudo whose argument is
+  // a selector the parser cannot read, and every pseudo that names the page, stay refused.
+  it('reads a pseudo whose argument is only words and numbers, and refuses one it cannot follow', () => {
+    const rule = (selector: string) => ({ css: `${WEEK_GRID.css}\n${selector} { color: var(--ak-accent); }` });
+    for (const ok of [
+      '.wkgrid-cell::part(label)', '.wkgrid-cell::part(label icon)', '.wkgrid-cell:state(on)', '.wkgrid-cell:nth-col(2n+1)',
+      '.wkgrid-cell::highlight(wkgrid-hit)', '.wkgrid::view-transition-old(wkgrid-a)', '.wkgrid-cell:state(on)::part(label)',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, ...rule(ok) }), ok).not.toThrow();
+    }
+    expect(readStylesheet('.a::part(b) { c: d }').unreadable).toBeNull();
+    expect(bad(rule('.wkgrid-cell:foo(.a > p)'))).toThrow(/does not read as a selector/);
+    expect(bad(rule('.wkgrid-cell:foo("x")'))).toThrow(/does not read as a selector/);
+    expect(bad(rule('.wkgrid-cell:current(p)'))).toThrow(/does not read as a selector/);
+    expect(bad(rule('.wkgrid-cell:foo(url(x))'))).toThrow(/no url\(\)/);
+    expect(bad(rule('.wkgrid-cell:host(.x)'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid-cell::slotted(p)'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid-cell:host-context(body)'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid-cell:root'))).toThrow(/names the page itself/);
+    expect(bad(rule('p::part(label)'))).toThrow(/starts at one of its own classes/);
+    expect(bad(rule('.wkgrid ~ p::part(label)'))).toThrow(/beside it/);
+  });
+
+  // An element still open where the markup ends takes in whatever the page writes after the
+  // component, so a rule of the component styles the page's own content.
+  it('refuses markup that leaves an element open where it ends, and says which', () => {
+    for (const [html, element] of [
+      ['<div class="wkgrid" role="grid"><span class="wkgrid-b">x</span>', 'div'],
+      ['<div class="wkgrid"></div><p class="wkgrid-p">a', 'p'],
+      ['<div class="wkgrid"><select class="wkgrid-s"><option>a', 'div'],
+      ['<select class="wkgrid-s"><option>a</option>', 'select'],
+      ['<svg class="wkgrid-i" viewBox="0 0 8 8"><path class="wkgrid-p" d="M0 0L8 8"/>', 'svg'],
+      ['<table class="wkgrid"><tr><td>1</td></tr>', 'table'],
+      ['<ul class="wkgrid"><li>a', 'ul'],
+    ]) {
+      expect(bad({ html }), html).toThrow(new RegExp(`<${element}> is still open where the markup ends.*Close every element inside the markup`));
+      expect(readMarkup(html).problem, html).toEqual({ kind: 'open', element });
+    }
+    // Implied end tags, and foreign content that closes itself, close inside the markup.
+    for (const html of [
+      '<ul class="wkgrid"><li>a<li>b</ul>', '<svg class="wkgrid-i" viewBox="0 0 8 8"><path class="wkgrid-p" d="M0 0L8 8"/></svg>',
+      '<div class="wkgrid"><p>a</div>', '<p class="wkgrid">a<div class="wkgrid-b">b</div>', '<div class="wkgrid"></div>text after',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, html }), html).not.toThrow();
+    }
+  });
+
+  it('says in words of its own what a repeated attribute, a missing space and a "/" on a <div> are', () => {
+    expect(bad({ html: '<div class="wkgrid" class="wkgrid-x"></div>' })).toThrow(/On <div>, the attribute "class" is written twice/);
+    expect(bad({ html: '<div class="wkgrid" hidden data-x="1" hidden></div>' })).toThrow(/the attribute "hidden" is written twice/);
+    expect(bad({ html: '<div class="wkgrid"role="grid"></div>' })).toThrow(/On <div>, the attribute "role" follows the value before it with no space/);
+    expect(bad({ html: '<div class="wkgrid"/>' })).toThrow(/A browser ignores the "\/" at the end of <div …\/>, so the <div> stays open.*Close every element inside the markup/);
+    expect(bad({ html: '<div class="wkgrid"><span class="wkgrid-b"/></div>' })).toThrow(/the <span> stays open/);
+    expect(readMarkup('<div hidden hidden></div>').problem).toEqual({ kind: 'duplicate', element: 'div', attribute: 'hidden' });
+    expect(readMarkup('<div class="a"id="b"></div>').problem).toEqual({ kind: 'no-space', element: 'div', attribute: 'id' });
+    expect(readMarkup('<div class="a"/>').problem).toEqual({ kind: 'slash', element: 'div' });
+  });
+
+  // A stored component that no longer passes is not shown and not handed out, and both say why in
+  // the bench's own words. The preview is a page of this node, so what the bench quotes from the
+  // stored body is text on it, never markup.
+  it('says why a stored component no longer passes, in the preview and in the refusal to hand it out', () => {
+    const stored = { ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid ~ p { color: var(--ak-ink); }' } as unknown as ComponentBody;
+    expect(() => componentSnippet(stored)).toThrow(/no longer passes.*"\.wkgrid ~ p" reaches from the component to an element beside it/s);
+    const page = componentPreviewHtml(stored);
+    expect(page).toMatch(/no longer passes/);
+    expect(page).toContain('&quot;.wkgrid ~ p&quot; reaches from the component to an element beside it');
+    const quoted = componentPreviewHtml({ ...WEEK_GRID, html: '<div class="wkgrid"><td class="wkgrid-c"><img src=x onerror=alert(1)></td></div>' } as unknown as ComponentBody);
+    expect(quoted).toContain('&lt;td class=&quot;wkgrid-c&quot;&gt;&lt;img');
+    expect(quoted).not.toMatch(/<img|<td/i);
   });
 
   it('wears the page it lands in: a literal colour is refused with the tokens named, a fallback is fine', () => {

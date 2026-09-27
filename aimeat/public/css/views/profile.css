@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.162.3 -- 2026-09-27 -- Page group G9: .cmdk* (the command palette: QuickFind, quick-find.css), .pj-doc-solo and .pj-doc-solo-empty (the document window: SoloWindow, solo-window.css) and .input-field.input-sm (its last user, the invitation page, draws TextField) go with their last users.
  *   v3.162.2 -- 2026-09-27 -- Components draw only their own class names: .pf .sub-tabs (Tabs bar: tab-row.css .tab-row--bar), .pf-edit-label (DisplayPrefsFields: display-prefs-fields.css), .pf .agent-cta and its h3 and p, .pf .pf-device-code, .agc-preset-desc, .agc-boundary and the utilities only AgentConsent still wrote (.pf .flex-row, .pf .text-caption, .pf .mb-1, .pf .mb-half, .pf .p-1, .pf .mt-1; agent-consent.css) go. .pf .text-meta and .input-field.input-sm stay: other pages write them (the invitation page writes .input-sm). The list in v3.162.0 no longer closes this comment early (its star and slash after .pf-edit- did).
  *   v3.162.1 -- 2026-09-27 -- .mmd and .mmd-fallback leave with the Mermaid component under its own names (css/components/mermaid.css, .mermaid-diagram and .mermaid-fallback, a move).
  *   v3.162.0 -- 2026-09-26 -- Page group G8 (Settings overview, P&L, Nodes, Node stats, the AI tab's cards, shared.js): the rules of their classes go with their last user: .pf .vis-pill (Mark onClick, mark.css), the kebab menu (.pj-menu*, CardMenu), the nodes' .pn-* and radio rules, node stats' .pf-figures and .stat-*, the AI cards' .pf-aitr-*, .pf-dr-*, .pf-cmp-* (BoxList, BoxLine, Touch), P&L's .pf-pnl-* and .pf-acc-*, the overview's .pf-lp-* (moved unchanged to number-band.css), .pf-fed-dot, .pf-presence-pill-* (moved unchanged to presence-dot.css), .pf-next, .pf-cortex-*, .pf-landing-section, .pf-menu-title, the dialogs' .pf-edit-*, .pf-pw-*, .pf-presence-*, .pf-waiting*, .pf-home-*, .pf-usage-*, .pf-ai-*, .pf-promo-dismiss, .pf-avatar-* (moved to masthead.css), .pf-start-page (start-page.css footer) and the overview's font rule. .pf-edit-label stays (DisplayPrefsFields writes it).
@@ -537,8 +538,7 @@
 .pf .mt-section       { margin-top: 1.5rem; }
 .pf .mt-xs            { margin-top: 4px; }
 
-/* ── Input size modifier ── */
-.input-field.input-sm { padding: .4rem .6rem; font-size: .85rem; }
+/* The input size modifier (.input-field.input-sm) went with its last user, the invitation page. */
 
 /* The visibility pill is the Tag with onClick (components/Mark.js; its pointer: css/components/mark.css). */
 
@@ -659,19 +659,8 @@
 .pj-search-group-head { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.35rem; padding-bottom: 0.25rem; }
 /* One hit (.pj-search-hit, its title and snippet) is a library part: css/components/search-hits.css. */
 
-/* ── Global command palette (Cmd-K, Kerros 2) ── */
-.cmdk { display: flex; flex-direction: column; gap: 0.4rem; min-width: min(92vw, 40rem); }
-.cmdk-hint { font-size: 0.72rem; text-align: right; }
-.cmdk-list { max-height: 50vh; overflow: auto; margin-top: 0.2rem; }
-.cmdk-group { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0.6rem 0 0.2rem; }
-.cmdk-item { display: flex; flex-direction: column; gap: 0.1rem; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 0.45rem 0.6rem; cursor: pointer; color: var(--text); }
-.cmdk-item.is-sel, .cmdk-item:hover { background: var(--bg-dim); border-color: var(--border); }
-.cmdk-item-label { font-size: 0.9rem; font-weight: 600; }
-.cmdk-item-sub { font-size: 0.75rem; color: var(--muted); }
-.cmdk-item-snippet { font-size: 0.76rem; color: var(--text-dim); overflow-wrap: anywhere; max-height: 2.6em; overflow: hidden; }
-/* Popped-out single-document window (doc-solo.js); the document itself is DocView (css/components/doc-view.css). */
-.pj-doc-solo { max-width: 920px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
-.pj-doc-solo-empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
+/* The global command palette's list is the QuickFind component: css/components/quick-find.css. */
+/* The popped-out document window is the SoloWindow component: css/components/solo-window.css. */
 
 /* Deterministic Mermaid charts are the Mermaid component's: css/components/mermaid.css. */
 /* Participants panel — node → owner → agents listing */

@@ -1,0 +1,35 @@
+/**
+ * @file search-preview.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A search result and a shared link's card, drawn from what a site serves
+ *   (components/SearchPreview.js): the ink frame on the card ground, the coral label over it. The
+ *   values are main's Discovery previews (views/admin-discovery.css, .adm-disc-frame, .adm-disc-serp-*,
+ *   .adm-disc-card-*, .adm-disc-lbl).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — .search-card (SearchCard): the old app catalogue's .dtl-seo-preview, appcat
+ *     parity (sections-c); additive.
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G2).
+ */
+
+/* The label is the row label of poster.css (.poster-label); only its place is here. */
+.search-preview-label { margin-bottom: 6px; }
+.search-preview { border: var(--shape-frame) solid var(--shape-frame-colour); background: var(--card-bg); padding: 12px 14px; margin-bottom: 18px; }
+.search-preview--card { padding: 0; }
+.search-preview-url { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.search-preview-title { font-weight: 700; font-size: 1.05rem; color: var(--accent); margin: 2px 0; }
+.search-preview-desc { font-size: .85rem; color: var(--text-dim); line-height: 1.45; }
+.search-preview-img { display: block; width: 100%; max-width: 100%; height: 200px; object-fit: cover; background: var(--text); }
+.search-preview-img--none { display: flex; align-items: center; justify-content: center; color: var(--bg); font-size: .8rem; }
+.search-preview-body { padding: 12px 14px; }
+.search-preview-card-title { font-weight: 700; font-size: .95rem; color: var(--text); }
+.search-preview-host { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: 6px; }
+/* The app catalogue's search preview (SearchCard, appcat sections-c): one thin rounded frame, the name
+   as the coral line, the sentence in the grey, the picture or the dashed "none yet" under them (the
+   old .dtl-seo-preview; its --border-subtle is the site's --border, its --text-muted the --text-dim). */
+.search-card { padding: 12px; border: 1px solid var(--border); border-radius: var(--shape-corner-card); line-height: normal; }
+.search-card-title { font-weight: 600; color: var(--accent); }
+.search-card-desc { margin: 2px 0 8px; font-size: .85rem; color: var(--text-dim); }
+.search-card-img { display: block; width: 100%; max-width: 100%; border-radius: var(--shape-corner-soft); }
+.search-card-none { padding: 14px; border: 1px dashed var(--border); border-radius: var(--shape-corner-soft); text-align: center; font-size: .8rem; color: var(--text-dim); }

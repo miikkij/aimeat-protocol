@@ -1,0 +1,52 @@
+/**
+ * @file data-map.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description An app's data map read in full (components/DataMap.js): the paragraph that says what
+ *   the app is, the facts as named rows, the parts under coral headings over the ink rule, one row per
+ *   thing held (the key in the typewriter face, what it holds, where at the right; the facts and the
+ *   why under them), the coral bar on a row nobody explained, and the contradiction in a coral frame.
+ *   The values are the old app catalogue's (app-catalog-poster.css .dtl-dm-*), on the theme's tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — appcat parity (sections-a), measured on a map: the greys read the site's
+ *     names for the old page's colours (places, where, facts, why, lists: --text-muted; the exact
+ *     place: --text-dim), the part headings in the body letters, the key's 6px and the facts' and
+ *     why's 4px, the contradiction on the grey ground at .95rem, "cannot be taken back" in --danger.
+ *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder B).
+ */
+.data-map-what { margin: 0 0 14px; max-width: 66ch; font-family: var(--font-body); font-size: 1.05rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.55; color: var(--text); }
+.data-map-fact { display: flex; gap: 12px; align-items: baseline; margin: 0; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .95rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.5; color: var(--text); }
+.data-map-fact b, .data-map-part {
+  font-size: var(--text-xs, .72rem); color: var(--accent); font-weight: var(--weight-heavy, 800);
+  text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label, .1em);
+}
+.data-map-fact b { flex: 0 0 176px; }
+/* The part headings are in the page's body letters, not the site's heading face (the old h4). */
+.data-map-part { margin: 32px 0 8px; padding-bottom: 6px; border-bottom: var(--shape-frame) solid var(--shape-rule-colour, var(--text)); font-family: var(--font-body); line-height: normal; }
+.data-map-text { margin: 0; max-width: 66ch; font-size: .95rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.55; color: var(--text); }
+/* The old page's --text-dim is the site's --text-muted and its --text-muted the site's --text-dim: the
+   greys below read the site's names for the old page's colours. */
+.data-map-places { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 10px 0 0; padding: 0; font-family: var(--font-mono); font-size: .78rem; color: var(--text-muted); }
+.data-map-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.data-map-row--unexplained { border-left: var(--shape-frame-heavy, 3px) solid var(--accent); padding-left: 12px; }
+.data-map-head { display: grid; grid-template-columns: 260px minmax(0, 1fr) 200px; gap: 16px; align-items: baseline; }
+/* The key keeps the 6px under it, the facts and the why the 4px over them, that the old base sheet gave. */
+.data-map-key { margin: 0 0 6px; font-family: var(--font-mono); font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+.data-map-holds { font-size: .95rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.5; color: var(--text); }
+.data-map-where { font-family: var(--font-mono); font-size: .75rem; color: var(--text-muted); text-align: right; }
+/* The exact place in the system's own typewriter face, as the old base sheet named it. */
+.data-map-exact { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.data-map-facts { margin-top: 4px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); }
+.data-map-personal { color: var(--accent); }
+.data-map-why { margin-top: 4px; max-width: 72ch; font-size: .88rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.5; color: var(--text-muted); }
+.data-map-why--missing { color: var(--accent); }
+.data-map-bullets { margin: 0; padding-left: 18px; font-size: .9rem; font-weight: var(--font-poster-text-weight, 500); line-height: 1.6; color: var(--text-muted); }
+.data-map-norecall { color: var(--danger, var(--accent)); }
+.data-map-contradiction { margin: 0 0 14px; padding: 10px 14px; border: var(--shape-frame-heavy, 3px) solid var(--accent); background: var(--bg-surface); font-size: .95rem; font-weight: 700; color: var(--text); }
+@media (max-width: 900px) {
+  .data-map-head { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .data-map-where { text-align: left; }
+  .data-map-fact { flex-direction: column; gap: 2px; }
+  .data-map-fact b { flex: none; }
+}

@@ -2,7 +2,8 @@
  * @file hooks-overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Hooks page in one read, and the two writes behind it.
+ * @description The Hooks page in one read, the two writes behind it, and the settling of the stored
+ *   bindings at start.
  *
  *   The question an operator has is "does anything here call out to my own code, and is any of it
  *   broken". Answering it needs four things at once: the eleven moments and which of them decide
@@ -21,10 +22,29 @@
  * @structure
  *   - buildHooksOverview(config, storage) — the page's one read
  *   - setHookActions(config, storage, hookName, actions) — bind, or clear with []
+ *   - settleStoredHookBindings(config, storage) — at start, once per node, every stored reference to
+ *     the form a binding is stored in now
+ *   - moveAccountNameHookBindings(config, storage) — at start, once per node, each `id#name` to the
+ *     `id#<GHII>` its action is published under after the deploy migration
  *   - HOOK_GUARDS — which part of the node each moment belongs to
  * @usage
  *   const overview = await buildHooksOverview(config, storage);
  * @version-history
+ *   v1.5.0 — 2026-09-26 — moveAccountNameHookBindings(): at start, after the deploy migration has
+ *     moved a person's actions to their GHII, a binding stored as `id#<account name>` is stored as
+ *     `id#<GHII>` when the action is published there, once per node under its own record
+ *     (HOOK_BINDINGS_FULL_IDENTITY_KEY; secaudit 2026-09: R3 row 5).
+ *   v1.4.0 — 2026-09-26 — SECURITY (audit A8-3): the page reads a stored reference through resolveHookRef()
+ *     in hooks.ts, as the executor does, so a bare id reads as naming nothing, with `ambiguous`
+ *     listing the id#provider of each provider that publishes it now. settleStoredHookBindings()
+ *     runs once per node and records that it ran (HOOK_BINDINGS_SETTLED_KEY), so a later start does
+ *     not resolve a bare id that was left naming nothing.
+ *   v1.3.0 — 2026-09-26 — SECURITY (audit A8-3): a hook binds only an action that is already
+ *     published. setHookActions refuses a reference that no published action answers to, with a
+ *     sentence that says to publish the action first, and refuses a binding when the actions cannot
+ *     be read; an empty list clears without reading them. settleStoredHookBindings() runs at start:
+ *     a stored bare id that one provider publishes is stored as its id#provider, and one that no
+ *     provider publishes is taken off its moment, with a line on the Hooks page that says so.
  *   v1.2.0 — 2026-09-26 — SECURITY (audit A8-3): a bare id one provider publishes is stored as its
  *     id#provider when it is bound. Left bare, another owner publishing the same id later made the
  *     binding name nothing, and a gate bound to it refused everything it guards.
@@ -37,8 +57,9 @@
  */
 import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { HOOK_NAMES, hookKind, HOOK_TIMEOUT_MS, indexActionRefs, type HookKind } from './hooks.js';
-import { readHookRuns, HOOK_RUNS_KEPT, type HookRun } from './hook-log.js';
+import type { ActionRecord } from '../storage/types/commerce.js';
+import { HOOK_NAMES, hookKind, HOOK_TIMEOUT_MS, indexActionRefs, resolveHookRef, qualifiedRef, isBareRef, type HookKind } from './hooks.js';
+import { readHookRuns, recordHookRun, HOOK_RUNS_KEPT, type HookRun } from './hook-log.js';
 import { logger } from '../utils/logger.js';
 
 /** Which part of the node a moment belongs to. The page groups its rows by this. */
@@ -68,8 +89,9 @@ export interface BoundAction {
   has_address: boolean;
   /** The address's host, never the whole address: enough to recognise it, nothing to copy out of a screen. */
   host: string | null;
-  /** When the reference is a bare id two or more providers publish: the `id#provider` of each. It
-   *  names none of them, and the executor calls none of them. */
+  /** When the reference is a bare id: the `id#provider` of each provider that publishes the id now,
+   *  possibly none. A bare id names no action when a hook runs, so the executor calls none of them
+   *  and a gate bound to it refuses; bind the one meant as `id#provider`. */
   ambiguous?: string[];
 }
 
@@ -119,9 +141,9 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
     readHookRuns(storage),
   ]);
 
-  // The executor's own index, so the page cannot show a binding as naming something the executor
-  // would not call.
-  const { byRef, ambiguous } = indexActionRefs(published);
+  // The executor's own reading of a stored reference (resolveHookRef), so the page cannot show a binding
+  // as naming something the executor would not call.
+  const index = indexActionRefs(published);
   const newestFor = new Map<string, HookRun>();
   for (const run of runs) {
     if (!newestFor.has(run.hook)) newestFor.set(run.hook, run);
@@ -131,15 +153,15 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
     const kind = hookKind(name);
     const refs = config.extensionHooks[name] ?? [];
     const actions: BoundAction[] = refs.map((ref) => {
-      const found = byRef.get(ref);
-      const claimants = ambiguous.get(ref);
+      const bound = resolveHookRef(ref, index);
+      const found = bound.kind === 'action' ? bound.action : undefined;
       return {
         ref,
         name: found?.displayName ?? null,
         published: !!found,
         has_address: !!found?.webhookUrl,
         host: hostOf(found?.webhookUrl),
-        ...(claimants ? { ambiguous: claimants } : {}),
+        ...(bound.kind === 'bare' ? { ambiguous: bound.claimants } : {}),
       };
     });
     const last = newestFor.get(name) ?? null;
@@ -188,20 +210,28 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
 
 export type SetHookOutcome =
   | { ok: true; hook: HookName; actions: string[]; cleared: boolean; unknown: string[]; note: string }
-  | { ok: false; code: 'INVALID_INPUT'; message: string };
+  | { ok: false; code: 'INVALID_INPUT' | 'INTERNAL_ERROR'; message: string };
 
 /**
  * Bind a list of actions to one moment, or clear it with an empty list. THE one implementation:
  * PUT and DELETE on /v1/admin/hooks and the aimeat_admin_hook_set tool all land here.
  *
- * An action that is not published here is accepted and NAMED back, rather than refused: binding
- * before publishing is a legitimate order of work, and a silent acceptance is how a binding that
- * calls nothing ends up looking exactly like one that works.
+ * A HOOK BINDS ONLY AN ACTION THAT IS ALREADY PUBLISHED: publish it, then bind it. Every reference
+ * must name one action published here at the moment of binding, and each is stored as that action's
+ * `id#provider`, so the binding keeps naming the action the operator chose whoever publishes the
+ * same id afterwards (security audit A8-3). Everything below is checked before anything is written:
+ *   - A reference no published action answers to is REFUSED, with a sentence that says to publish
+ *     the action first. This covers a stored reference whose action was deleted since, when the list
+ *     is sent again: take it off the list, or publish it again.
+ *   - A bare id that two or more providers publish is REFUSED, and the answer names the
+ *     `id#provider` of each: it names no one action.
+ *   - An actions table that cannot be read REFUSES the binding, because nothing above can be
+ *     checked without it.
+ * An empty list clears the moment and reads nothing, so a moment can be cleared whatever state the
+ * actions table is in.
  *
- * A bare id that two or more providers publish is REFUSED, before anything is written, and the
- * answer names the `id#provider` of each: it names no one action, and binding it would leave the
- * choice to whichever row a scan returns last (security audit A8-3). A bare id that one provider
- * publishes is stored as that `id#provider`, so a later publication cannot change what it names.
+ * `unknown` stays in the answer for the clients that read it. It is always empty, because a
+ * reference that names no published action is refused.
  */
 export async function setHookActions(
   config: AimeatConfig,
@@ -218,47 +248,291 @@ export async function setHookActions(
   const name = hookName as HookName;
   const typed = (actions as string[]).map((a) => a.trim());
 
-  // Read what is published BEFORE writing, so an ambiguous reference is refused rather than stored.
-  // An unreadable actions table means we cannot say whether a reference is ambiguous, so nothing is
-  // refused on that ground; the executor still refuses to guess at call time.
-  const published = await storage.listActions().catch((err: unknown) => {
-    logger.warn('hooks-overview: the actions could not be read for a binding, so it is not checked', { error: String(err) });
-    return [];
-  });
-  const { byRef, ambiguous } = indexActionRefs(published);
-  const clashes = typed.filter((ref) => ambiguous.has(ref));
-  if (clashes.length > 0) {
-    const named = clashes.map((ref) => `"${ref}" is published by ${ambiguous.get(ref)!.length} providers (${ambiguous.get(ref)!.join(', ')})`);
+  if (typed.length === 0) {
+    config.extensionHooks[name] = [];
+    await storage.deleteConfigValue(`hooks.${name}`);
     return {
-      ok: false, code: 'INVALID_INPUT',
-      message: `${named.join('; ')}. Bind the one you mean with its provider, as id#provider. Nothing was changed.`,
+      ok: true, hook: name, actions: [], cleared: true, unknown: [],
+      note: 'Nothing is bound to this moment any more. It no longer calls out.',
     };
   }
 
-  // A bare id that names one action now is stored as that action's id#provider. The operator
-  // chooses what the binding names, here, and another owner who publishes the same id later cannot
-  // change it: left bare, that publication made the id name nothing, and a gate bound to it refused
-  // everything it guards. A reference nothing publishes yet stays as typed and is named back below.
-  const list = typed.map((ref) => {
-    const found = byRef.get(ref);
-    return found && ref === found.id ? `${found.id}#${found.providerGaii}` : ref;
-  });
-
-  config.extensionHooks[name] = list;
-  if (list.length === 0) {
-    await storage.deleteConfigValue(`hooks.${name}`);
-  } else {
-    await storage.setConfigValue(`hooks.${name}`, JSON.stringify(list));
+  // Read what is published BEFORE writing, so a reference that names no one action is refused
+  // rather than stored.
+  let published: ActionRecord[];
+  try {
+    published = await storage.listActions();
+  } catch (err) {
+    logger.error('hooks-overview: the actions could not be read, so a binding was refused', { error: String(err) });
+    return {
+      ok: false, code: 'INTERNAL_ERROR',
+      message: 'The actions published on this node could not be read, so the binding could not be checked. Nothing was changed. Try again in a moment.',
+    };
+  }
+  const { byRef, ambiguous } = indexActionRefs(published);
+  const clashes = typed.filter((ref) => ambiguous.has(ref));
+  const unpublished = typed.filter((ref) => !ambiguous.has(ref) && !byRef.has(ref));
+  if (clashes.length > 0 || unpublished.length > 0) {
+    const parts: string[] = [];
+    if (clashes.length > 0) {
+      const named = clashes.map((ref) => `"${ref}" is published by ${ambiguous.get(ref)!.length} providers (${ambiguous.get(ref)!.join(', ')})`);
+      parts.push(`${named.join('; ')}. Bind the one you mean with its provider, as id#provider.`);
+    }
+    if (unpublished.length > 0) {
+      parts.push(`No action published on this node answers to ${unpublished.map((ref) => `"${ref}"`).join(', ')}. `
+        + 'A hook binds only an action that is already published: publish it first, then bind it, or take it off the list.');
+    }
+    return { ok: false, code: 'INVALID_INPUT', message: `${parts.join(' ')} Nothing was changed.` };
   }
 
-  const unknown = list.filter((ref) => !byRef.has(ref));
+  // Every reference names one published action now, and is stored as that action's id#provider.
+  const list = typed.map((ref) => qualifiedRef(byRef.get(ref)!));
 
-  const kind = hookKind(name);
-  const note = list.length === 0
-    ? 'Nothing is bound to this moment any more. It no longer calls out.'
-    : kind === 'gate'
-      ? `Bound. This moment now waits for ${list.length === 1 ? 'this address' : 'these addresses'} before it lets anything through, and refuses when one does not answer within ${HOOK_TIMEOUT_MS / 1000} seconds.`
-      : 'Bound. This moment is told after the fact; whatever the address answers, nothing is stopped.';
+  config.extensionHooks[name] = list;
+  await storage.setConfigValue(`hooks.${name}`, JSON.stringify(list));
 
-  return { ok: true, hook: name, actions: list, cleared: list.length === 0, unknown, note };
+  const note = hookKind(name) === 'gate'
+    ? `Bound. This moment now waits for ${list.length === 1 ? 'this address' : 'these addresses'} before it lets anything through, and refuses when one does not answer within ${HOOK_TIMEOUT_MS / 1000} seconds.`
+    : 'Bound. This moment is told after the fact; whatever the address answers, nothing is stopped.';
+
+  return { ok: true, hook: name, actions: list, cleared: false, unknown: [], note };
+}
+
+/** What settling the stored bindings changed at start. */
+export interface SettledHookBindings {
+  /** False when there was nothing to settle, or this node has settled its bindings before. */
+  ran: boolean;
+  /** Each bare id one provider publishes, stored now as that action's id#provider. */
+  pinned: Array<{ hook: HookName; from: string; to: string }>;
+  /** Each bare id no provider publishes, taken off its moment. */
+  removed: Array<{ hook: HookName; ref: string }>;
+}
+
+/** The record that says this node has settled its stored bindings, under `system@<nodeId>`. */
+export const HOOK_BINDINGS_SETTLED_KEY = 'migrations.hook-bindings-settled';
+
+/** Said on the Hooks page, in section 04, for each reference taken off at start. */
+const REMOVED_AT_START = 'No action published on this node answered to this reference when the node started, so it was '
+  + 'taken off this moment: a hook binds only an action that is already published. Publish the action, then bind it again.';
+
+/**
+ * Bring the stored bindings to the form setHookActions stores: every reference names the one
+ * published action it was bound to. Called at start, after the stored bindings are loaded
+ * (server-bootstrap/config-init.ts). The executor resolves only id#provider references (resolveHookRef in
+ * hooks.ts), so this and a new binding are the only places a bare id is resolved.
+ *   - A bare id that one provider publishes is stored as that action's id#provider, and from then on
+ *     the executor calls that action.
+ *   - A bare id that no provider publishes is taken off its moment, and section 04 of the Hooks
+ *     page says so with what to do: publish the action, then bind it again. It names no action.
+ *   - A bare id that two or more providers publish stays. It names none of them, the executor calls
+ *     none, a gate bound to it refuses, and the page names each `id#provider` to choose from.
+ *   - A reference with its provider stays, published or not. Only that provider publishes under it.
+ *
+ * ONCE PER NODE, AND THE RECORD THAT SAYS SO. When the settling is done and saved, the node writes
+ * HOOK_BINDINGS_SETTLED_KEY under its own system identity, never to expire, and every later start
+ * reads it and changes nothing. A bare id left after that is one two or more providers published,
+ * and it stays naming nothing whatever they publish or delete later, until the operator binds it
+ * again: settling it again at a later start would let a deletion decide what it names. A start with
+ * no bare id reads nothing and writes nothing.
+ *
+ * Never in the way of a start: when the record or the actions cannot be read, or a change cannot be
+ * saved, no record is written, and the next start settles again. A change applies to the running
+ * node even when it cannot be saved.
+ */
+export async function settleStoredHookBindings(config: AimeatConfig, storage: Storage): Promise<SettledHookBindings> {
+  const settled: SettledHookBindings = { ran: false, pinned: [], removed: [] };
+  if (!HOOK_NAMES.some((name) => (config.extensionHooks[name] ?? []).some(isBareRef))) return settled;
+
+  const system = `system@${config.nodeId}`;
+  let published: ActionRecord[];
+  try {
+    if (await storage.getMemory(system, HOOK_BINDINGS_SETTLED_KEY)) return settled;
+    published = await storage.listActions();
+  } catch (err) {
+    logger.error('hooks-overview: the stored hook bindings were not checked at start, because the store could not be read. The next start tries again.', { error: String(err) });
+    return settled;
+  }
+  settled.ran = true;
+  const { byRef, ambiguous } = indexActionRefs(published);
+
+  let saved = true;
+  for (const name of HOOK_NAMES) {
+    const refs = config.extensionHooks[name] ?? [];
+    if (!refs.some(isBareRef)) continue;
+    const next: string[] = [];
+    for (const ref of refs) {
+      if (!isBareRef(ref) || ambiguous.has(ref)) { next.push(ref); continue; }
+      const found = byRef.get(ref);
+      if (found) {
+        next.push(qualifiedRef(found));
+        settled.pinned.push({ hook: name, from: ref, to: qualifiedRef(found) });
+      } else {
+        settled.removed.push({ hook: name, ref });
+      }
+    }
+    if (next.length === refs.length && next.every((ref, i) => ref === refs[i])) continue;
+    config.extensionHooks[name] = next;
+    try {
+      if (next.length === 0) await storage.deleteConfigValue(`hooks.${name}`);
+      else await storage.setConfigValue(`hooks.${name}`, JSON.stringify(next));
+    } catch (err) {
+      saved = false;
+      logger.error(`hooks-overview: the settled binding of ${name} could not be saved. It applies until the node stops, and the next start settles it again.`, { error: String(err) });
+    }
+  }
+
+  for (const { hook, from, to } of settled.pinned) {
+    logger.info(`hooks-overview: "${from}" on ${hook} is stored as ${to}, the one action it names`);
+  }
+  for (const { hook, ref } of settled.removed) {
+    logger.warn(`hooks-overview: "${ref}" on ${hook} names no published action, so it was taken off. Publish the action, then bind it again.`);
+    await recordHookRun(storage, {
+      at: new Date().toISOString(), hook, actionRef: ref, answer: 'missing', status: null, ms: 0, allowed: true,
+      reason: REMOVED_AT_START,
+    });
+  }
+
+  if (saved) {
+    const now = new Date().toISOString();
+    try {
+      await storage.setMemory({
+        key: HOOK_BINDINGS_SETTLED_KEY,
+        ownerGaii: system,
+        value: { at: now, pinned: settled.pinned.length, removed: settled.removed.length },
+        visibility: 'private',
+        tags: ['migration'],
+        // Never swept: a record that expired would settle the bindings again at the next start.
+        ttlHours: null,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (err) {
+      logger.error('hooks-overview: the record that the hook bindings are settled could not be saved. The next start settles them again.', { error: String(err) });
+    }
+  }
+  return settled;
+}
+
+/** What moving the bindings that name an account by its bare name changed at start. */
+export interface MovedHookBindings {
+  /** False when no binding names an account by its bare name, or this node has moved them before. */
+  ran: boolean;
+  /** Each `id#name` whose action is published under that account's GHII, stored now as `id#<GHII>`. */
+  moved: Array<{ hook: HookName; from: string; to: string }>;
+  /** Each `id#name` whose action is not published under that account's GHII: left as it was. */
+  left: Array<{ hook: HookName; ref: string }>;
+}
+
+/** The record that says this node has moved those bindings, under `system@<nodeId>`. */
+export const HOOK_BINDINGS_FULL_IDENTITY_KEY = 'migrations.hook-bindings-full-identity';
+
+/** The id and the account of a reference `id#name` whose provider is a bare account name; else null. */
+function accountNameRef(ref: unknown): { id: string; name: string } | null {
+  if (typeof ref !== 'string') return null;
+  const cut = ref.indexOf('#');
+  if (cut <= 0) return null;
+  const name = ref.slice(cut + 1);
+  return name && !name.includes('@') && !name.includes('#') ? { id: ref.slice(0, cut), name } : null;
+}
+
+/**
+ * Move each stored binding that names an action by the bare account name of the person who published
+ * it (`id#name`) to the form that action is stored in now, `id#<GHII>`.
+ *
+ * WHY. An action a person published in person was stored under their bare account name, so a binding
+ * to it was stored as `id#name`: setHookActions and the settle above both store the action's own
+ * `id#provider`. The deploy migration moves those actions to the person's GHII (Postgres 0085, and
+ * sqlite/schema-identity-backfill.ts), and runs when the store opens, before this. So at start:
+ *   - `id#name` becomes `id#<GHII of that account>` when the action `id` is published under that
+ *     GHII. That is the action the binding was made for: the migration moved it there because that
+ *     account held the name when the action was written.
+ *   - Any other `id#name` stays as it was. It names no published action, and the Hooks page says so.
+ *
+ * ONCE PER NODE, under its own record (HOOK_BINDINGS_FULL_IDENTITY_KEY), for the reason the settle
+ * above gives: a later start must not let what is published by then decide what a binding names. The
+ * settle's record cannot serve, because a node that ran the settle has it already. A start with no
+ * such binding reads nothing and writes nothing. When the store cannot be read, or a change cannot be
+ * saved, no record is written and the next start tries again; a change applies to the running node
+ * even when it cannot be saved.
+ */
+export async function moveAccountNameHookBindings(config: AimeatConfig, storage: Storage): Promise<MovedHookBindings> {
+  const out: MovedHookBindings = { ran: false, moved: [], left: [] };
+  const names = new Set<string>();
+  for (const hook of HOOK_NAMES) {
+    for (const ref of config.extensionHooks[hook] ?? []) {
+      const parsed = accountNameRef(ref);
+      if (parsed) names.add(parsed.name);
+    }
+  }
+  if (names.size === 0) return out;
+
+  const system = `system@${config.nodeId}`;
+  let byRef: Map<string, ActionRecord>;
+  const ghiiOf = new Map<string, string | null>();
+  try {
+    if (await storage.getMemory(system, HOOK_BINDINGS_FULL_IDENTITY_KEY)) return out;
+    byRef = indexActionRefs(await storage.listActions()).byRef;
+    for (const name of names) ghiiOf.set(name, (await storage.getGHIIByOwner(name))?.ghii ?? null);
+  } catch (err) {
+    logger.error('hooks-overview: the hook bindings that name an account by its bare name were not checked at start, because the store could not be read. The next start tries again.', { error: String(err) });
+    return out;
+  }
+  out.ran = true;
+
+  let saved = true;
+  for (const hook of HOOK_NAMES) {
+    const refs = config.extensionHooks[hook] ?? [];
+    let changed = false;
+    const next = refs.map((ref) => {
+      const parsed = accountNameRef(ref);
+      if (!parsed) return ref;
+      const ghii = ghiiOf.get(parsed.name);
+      const to = ghii ? `${parsed.id}#${ghii}` : null;
+      const found = to ? byRef.get(to) : undefined;
+      if (to && found && qualifiedRef(found) === to) {
+        out.moved.push({ hook, from: ref, to });
+        changed = true;
+        return to;
+      }
+      out.left.push({ hook, ref });
+      return ref;
+    });
+    if (!changed) continue;
+    config.extensionHooks[hook] = next;
+    try {
+      await storage.setConfigValue(`hooks.${hook}`, JSON.stringify(next));
+    } catch (err) {
+      saved = false;
+      logger.error(`hooks-overview: the moved binding of ${hook} could not be saved. It applies until the node stops, and the next start moves it again.`, { error: String(err) });
+    }
+  }
+
+  for (const { hook, from, to } of out.moved) {
+    logger.info(`hooks-overview: "${from}" on ${hook} is stored as ${to}, where its action is published now`);
+  }
+  for (const { hook, ref } of out.left) {
+    logger.warn(`hooks-overview: "${ref}" on ${hook} names no action published under that account's full identity, so it names nothing. Publish the action, then bind it again.`);
+  }
+
+  if (saved) {
+    const now = new Date().toISOString();
+    try {
+      await storage.setMemory({
+        key: HOOK_BINDINGS_FULL_IDENTITY_KEY,
+        ownerGaii: system,
+        value: { at: now, moved: out.moved.length, left: out.left.length },
+        visibility: 'private',
+        tags: ['migration'],
+        // Never swept: a record that expired would move the bindings again at the next start.
+        ttlHours: null,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (err) {
+      logger.error('hooks-overview: the record that the account-name hook bindings are moved could not be saved. The next start moves them again.', { error: String(err) });
+    }
+  }
+  return out;
 }

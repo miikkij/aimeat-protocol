@@ -1,0 +1,19 @@
+/**
+ * @file save-bar.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The row that keeps unsaved work and its save in sight (components/SaveBar.js): pinned
+ *   62px from the top, the top bar's own height (the offset the Config tab's pinned row uses too), on
+ *   the surface ground with the coral edge at its left. The values are main's .adm-pt-pin
+ *   (views/admin-portal.css).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G2).
+ */
+
+.save-bar {
+  position: sticky; top: 62px; z-index: 39;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin: 0 0 16px; padding: 8px 12px;
+  background: var(--bg-surface); border-left: var(--shape-frame-heavy) solid var(--accent);
+}

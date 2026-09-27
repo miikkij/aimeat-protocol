@@ -3,9 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Erasing an owner, as ONE operation. This is the whole of `DELETE /v1/owners/:name`
- *   below the HTTP layer: cancel in-flight work and return escrow, clear the GHII-level data the
- *   storage cascade does not reach, then hand off to `storage.deleteOwner()` for the per-identity
- *   cascade and the owner record.
+ *   below the HTTP layer: clear the GHII-level data the storage cascade does not reach, then hand off
+ *   to `storage.deleteOwner()` for the work, the per-identity cascade and the owner record.
  *
  *   WHY IT LEFT THE ROUTE. It ran as ~90 lines inside the handler, which meant two things. It could
  *   not be reached from any other door — an agent asking to close its owner's account over MCP would
@@ -24,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.3.0 — 2026-09-26 — Work is settled inside storage.deleteOwner() on both backends, for every
+ *     door that deletes an account: open work cancelled, the held morsels back with a ledger line,
+ *     finished work kept for the other side under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
  *   v1.2.0 — 2026-09-16 — Remote MCP servers are erased. Added by hand rather than caught by a
  *     gate: check-storage-parity keys on `ownerGaii` and this table's owner column is `ownerGhii`,
  *     which that gate deliberately does not look at yet.
@@ -69,20 +71,11 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
   const deletionLog: string[] = [];
 
   await storage.transaction(async () => {
-    // 1. Cancel in-flight work and return escrow for every agent.
-    for (const agent of agents) {
-      evictAgentTelemetry(agent.gaii);
-      const providerWork = await storage.listWorkByProvider(agent.gaii);
-      const requesterWork = await storage.listWorkByRequester(agent.gaii);
-      for (const w of [...providerWork, ...requesterWork]) {
-        if (['pending', 'accepted', 'in_progress'].includes(w.status)) {
-          await storage.updateWork(w.trackingCode, { status: 'cancelled', updatedAt: new Date().toISOString() });
-          if (w.cost.inEscrow > 0) {
-            await storage.creditBalance(w.requesterGaii, w.cost.total);
-          }
-        }
-      }
-    }
+    // 1. The agents' cached telemetry. Their work is settled inside storage.deleteOwner(), on every
+    // door that deletes an account: open work is cancelled and the requester's held morsels go back
+    // with a ledger line, for the person's own identity as well as their agents', and finished work
+    // stays for the other side under the erasure's pseudonym.
+    for (const agent of agents) evictAgentTelemetry(agent.gaii);
 
     // 2. GHII-level data the per-identity cascade does not reach.
     await step('ghii_memory', async () => { await storage.deleteAllMemory(ghii); return 'ghii_memory'; }, deletionLog);

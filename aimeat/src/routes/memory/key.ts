@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-26 — GET /v1/memory/:gaii/:key answers a Design Book part with 403
+ *     DESIGN_BOOK_PART, naming GET /v1/designbook/:id, the one door that reads a part
+ *     (utils/own-door-keys.ts). Soft or not, signed in or not.
  *   v1.6.2 — 2026-09-26 — PUT stores the provenance record it stamps only once the version-checked
  *     write lands (secaudit 2026-09, N2). It was stored before the write, so a write that lost the
  *     swap answered 409 and left a record about bytes that were never stored.
@@ -50,6 +53,7 @@ import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
+import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { stampAgentWrite, resolveAttachableProvenanceId, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
@@ -616,6 +620,14 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the existence of non-public records (mirrors the 404 parity of the hard path).
     const soft = !!req.query.soft;
     const softMiss = () => { res.json(success(config.nodeId, { key, value: null, exists: false })); };
+
+    // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which benches a
+    // component again before it hands one out. This door names that one (utils/own-door-keys.ts).
+    const ownDoor = ownDoorRefusal(gaii, key, config.nodeId);
+    if (ownDoor) {
+      res.status(403).json(error(config.nodeId, ownDoor.code, ownDoor.message, 403, { door: ownDoor.door }));
+      return;
+    }
 
     const record = await storage.getMemory(gaii, key);
     if (!record) {

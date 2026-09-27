@@ -9,6 +9,8 @@
  * @structure PAGE_DEMOS — { [id]: { variants: [{ name, render(ex) }] } }
  * @usage import { PAGE_DEMOS } from './demos-page.js';
  * @version-history
+ *   v1.3.0 — 2026-09-27 — SettingsStack's sections are SettingsSection (no hand-written section), and
+ *     SwatchPicker's pattern.
  *   v1.2.0 — 2026-09-26 — The numbered list's first tone with a line and its steps (Jouni's decision "Numbered list").
  *   v1.1.0 — 2026-09-23 — The diagonal band's demo goes with ChatDoor (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
@@ -38,7 +40,7 @@ import { Timeline, TimelineRow } from '/components/Timeline.js';
 import { BackLink } from '/components/BackLink.js';
 import { DayGroup, DayList, DayEmpty } from '/components/DayGroup.js';
 import { ArchiveSection, ArchiveMore, ArchiveError } from '/components/ArchiveSection.js';
-import { SettingsStack } from '/components/SettingsStack.js';
+import { SettingsStack, SettingsSection } from '/components/SettingsStack.js';
 import { SettingsSwitch } from '/components/SettingsSwitch.js';
 import { SwatchPicker } from '/components/SwatchPicker.js';
 import { SettingsDoor } from '/components/SettingsDoor.js';
@@ -115,6 +117,8 @@ export const PAGE_DEMOS = {
   'star-toggle': { variants: [
     { name: 'on', render: (ex) => html`<${StarToggle} on=${true} title=${ex.title} onClick=${noop} />` },
     { name: 'off', render: (ex) => html`<${StarToggle} on=${false} title=${ex.title} onClick=${noop} />` },
+    { name: 'bright, on and off', render: () => html`<p><${StarToggle} bright on=${true} title="Remove from favourites" onClick=${noop} /> Lumo Bakery orders
+      <br /><${StarToggle} bright on=${false} title="Add to favourites" onClick=${noop} /> Nordic Ferries timetables</p>` },
   ] },
   'fold-button': { variants: [
     { name: 'default', render: (ex) => html`<${FoldButton} onClick=${noop}>${ex.children}<//>` },
@@ -141,6 +145,7 @@ export const PAGE_DEMOS = {
   ] },
   'ink-foot': { flush: true, variants: [
     { name: 'default', render: () => html`<${InkFoot}><p>AI-made content carries its label.</p><p>Your data is yours: export it, delete it.</p><//>` },
+    { name: 'brand', render: () => html`<${InkFoot} brand="AIMEAT"><p>Apps made on this node, by its people and their agents.</p><p>Back up your apps as a zip, and restore them the same way.</p><//>` },
   ] },
   'check-item': { variants: [
     { name: 'done', render: (ex) => html`<${CheckItem} done=${true} href=${ex.href}>${ex.children}<//>` },
@@ -169,7 +174,9 @@ export const PAGE_DEMOS = {
   ] },
   'settings-stack': { variants: [
     { name: 'with its sections', render: () => html`<${SettingsStack}>
-        <section class="poster-section"><${SettingsSwitch} checked=${true} onChange=${noop}>Show what I have tried<//></section>
+        <${SettingsSection} title="The home"><${SettingsSwitch} checked=${true} onChange=${noop}>Show achievements on the home<//><//>
+        <${SettingsSection} title="Appearance"><${SwatchPicker} title="Margin pattern" hint="A figure on the empty margins, fading toward the middle." emptyLabel="Off" pattern="c"
+          choices=${[{ value: '', label: 'Off', active: false }, { value: 'c', label: 'Registration marks', active: true }]} onChoose=${noop} /><//>
         <${SettingsDoor} href="#" title="All settings →" hint="Your account, your agents and your keys." /><//>` },
   ] },
   'settings-switch': { variants: [
@@ -180,6 +187,8 @@ export const PAGE_DEMOS = {
     { name: 'first chosen', render: (ex) => html`<${SwatchPicker} title=${ex.title} hint="The pattern in the page margin." emptyLabel="None" choices=${ex.choices} onChoose=${noop} />` },
     { name: 'second chosen', render: (ex) => html`<${SwatchPicker} title=${ex.title} hint="The pattern in the page margin." emptyLabel="None"
         choices=${ex.choices.map((c, i) => ({ ...c, active: i === 1 }))} onChoose=${noop} />` },
+    { name: 'pattern: the picker draws the swatch', render: (ex) => html`<${SwatchPicker} title=${ex.title} hint="The pattern in the page margin." emptyLabel="None" pattern="b"
+        choices=${[{ value: '', label: 'None', active: false }, { value: 'b', label: 'Diagonal hatch', active: true }]} onChoose=${noop} />` },
   ] },
   'settings-door': { variants: [{ name: 'default', render: (ex) => html`<${SettingsDoor} href=${ex.href} title=${ex.title} hint=${ex.hint} />` }] },
   'open-items': { variants: [

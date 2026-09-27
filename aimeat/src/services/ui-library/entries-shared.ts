@@ -9,6 +9,8 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.5.2 — 2026-09-27 — OwnAimeat names its module (components/OwnAimeat.js) and the words it takes
+ *     (the catalogue pass, operator family).
  *   v1.5.1 — 2026-09-27 — InstructionBlock draws its own names from instruction-block.css (formerly
  *     .ib-* in hello-mcp.css; a move); its entry id follows its sheet (hello-mcp → instruction-block).
  *   v1.5.0 — 2026-09-26 — Markdown's small cut (.md-body--small, `small`), Jouni's decision "Small reader".
@@ -23,12 +25,30 @@ import type { UiEntryWritten } from './types.js';
 export const SHARED_ENTRIES: UiEntryWritten[] = [
     {
         id: 'card-menu', name: 'CardMenu', kind: 'component', status: 'active',
-        summary: 'The dots in the top right corner of a card, and the menu they open.',
+        summary: 'The dots in the top right corner of a card, and the menu they open. The same menu can open from a line of words drawn as the action link, and its list can stand in the poster frame (the ink frame with the sun shadow).',
         module: '/components/CardMenu.js', sheet: '/css/components/card-menu.css',
-        data: { shape: 'CardMenu({ state, actions, label, onOpened, inline })', fields: { state: "'off', 'open' or 'working': the colour of the dots", actions: '[{ label, run, done, danger }]', label: 'what the dots are, for a screen reader', onOpened: 'called the first time it opens', inline: "'start' or 'end': the dots in a line of words, the menu opening from that edge" } },
-        useFor: ['Acting on one card: always the same corner, on every card.', 'The actions of one message that do not fit its line (Messages).'],
-        variants: [{ name: 'inline', class: 'card-menu--inline', prop: 'inline', when: 'the dots in a line of words, not in a card\'s corner' }],
+        data: {
+            shape: 'CardMenu({ state, actions, label, onOpened, inline, word, framed, disabled })',
+            fields: {
+                state: "'off', 'open' or 'working': the colour of the dots",
+                actions: '[{ label, run, done, doneLabel, danger } | { divider: true }]: the rows; done shows doneLabel (else "Done") for a moment, danger is the menu row\'s danger tone, a divider draws a line between two groups',
+                label: 'what the dots are, for a screen reader and the tooltip; with word, the tooltip of the words', onOpened: 'called the first time it opens',
+                inline: "'start' or 'end': the dots in a line of words, the menu opening from that edge",
+                word: 'the words the menu opens from, drawn as the action link in their own line instead of the dots; the menu opens from their right edge unless inline says \'start\'',
+                framed: 'the list in the poster frame: the ink frame with the sun shadow, 6px off what opened it',
+                disabled: 'the dots or the words cannot be pressed now (an export the menu started is running)',
+            },
+        },
+        useFor: ['Acting on one card: always the same corner, on every card.', 'The actions of one message that do not fit its line (Messages).',
+            'A page\'s small menu of acts that opens from a line of words ("Backups and imports").'],
+        variants: [
+            { name: 'inline', class: 'card-menu--inline', prop: 'inline', when: 'the dots in a line of words, not in a card\'s corner' },
+            { name: 'word', prop: 'word', when: 'the menu opens from words drawn as the action link, not from the dots' },
+            { name: 'framed', class: 'card-menu-list--framed', prop: 'framed', when: 'the opened list in the ink frame with the sun shadow' },
+            { name: 'disabled', prop: 'disabled', when: 'the dots or the words cannot be pressed while what the menu started runs' },
+        ],
         example: { state: 'open', label: 'Your welcome mat', actions: [{ label: 'Take it off your open items' }] },
+        note: 'word, framed and disabled came with appcat on 2026-09-27: together they replaced the old app catalogue\'s "Backups and imports" (.cat-word #backup-btn) and the menu it opened (.backup-menu).',
     },
     {
         id: 'markdown', name: 'Markdown', kind: 'component', status: 'active',
@@ -141,12 +161,21 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'own-aimeat', name: 'OwnAimeat', kind: 'component', status: 'active',
-        summary: 'The home\'s "get your own AIMEAT" card on a demo site, stacked from the poster box, label, headline and slab.',
-        module: null, sheet: '/css/components/own-aimeat.css', classes: ['poster-own-aimeat'],
-        data: { shape: 'markup: .poster-own-aimeat (OwnAimeatBlock in views/surface/blocks-home.js)', fields: { headline: 'the card headline', href: 'where to get one' } },
-        useFor: ['The home of a demo node, as a layout block.'],
+        summary: 'A demo site\'s one prompt to buy: a record-face card with its small row label, the headline, one paragraph, and the loud slab to the store, which opens in a new tab. With no store address it draws nothing.',
+        module: '/components/OwnAimeat.js', sheet: '/css/components/own-aimeat.css',
+        data: {
+            shape: 'OwnAimeat({ label, title, text, cta, href })',
+            fields: {
+                label: 'the small row label at the top ("Demo")',
+                title: 'the headline',
+                text: 'the one paragraph under it',
+                cta: 'the slab\'s words',
+                href: 'the store\'s address; without it the card is not drawn (a stored layout can outlive its store)',
+            },
+        },
+        useFor: ['The home of a demo node, as a layout block the operator adds; no built-in home has it.'],
         variants: [],
-        example: { headline: 'Get your own', href: '/v1/store' },
-        note: 'Its markup sits in OwnAimeatBlock (views/surface/blocks-home.js), which a node draws only when it has a store address and its operator added the block.',
+        example: { label: 'Demo', title: 'This is a demo. Get your own AIMEAT.', text: 'Many people share this site to try things out.', cta: 'Go to the store →', href: 'https://store.example.com' },
+        note: 'The markup OwnAimeatBlock (views/surface/blocks-home.js) wrote, moved unchanged into components/OwnAimeat.js on 2026-09-27, so the block passes the words and the store\'s address. Its look is own-aimeat.css with the record and slab shapes of poster.css.',
     },
 ];

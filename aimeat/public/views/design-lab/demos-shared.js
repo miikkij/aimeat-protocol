@@ -9,6 +9,8 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.14.0 — 2026-09-27 — The own-aimeat demo moves to demos-operator.js, drawn by calling OwnAimeat;
+ *     OwnAimeatDemo and its OwnAimeatBlock import go.
  *   v1.13.0 — 2026-09-27 — The box and choice tile shapes' demos are box-shape and choice-shape, as their entries.
  *   v1.12.0 — 2026-09-26 — The Markdown reader's small cut beside the full one (Jouni's decision "Small reader").
  *   v1.11.0 — 2026-09-26 — The box's raised tone.
@@ -39,7 +41,6 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { TagList } from '/components/TagList.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
-import { OwnAimeatBlock } from '/views/surface/blocks-home.js';
 
 const html = htm.bind(h);
 const noop = () => {};
@@ -53,19 +54,18 @@ function SandboxOpen() {
   return html`<p>The overlay covers this frame.</p>`;
 }
 
-/** A store address exists in this frame only, so the demo card draws. */
-function OwnAimeatDemo() {
-  const w = /** @type {any} */ (window);
-  w.__SITE = { ...(w.__SITE || {}), store: w.__SITE?.store || 'https://store.example.com' };
-  return html`<${OwnAimeatBlock} />`;
-}
-
 export const SHARED_DEMOS = {
   'card-menu': { height: 260, variants: [
     { name: 'off', render: (ex) => html`<${CardMenu} state="off" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'open', render: (ex) => html`<${CardMenu} state="open" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'working', render: (ex) => html`<${CardMenu} state="working" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'inline, in a line of words', render: () => html`<div class="poster-time poster-turn-meta">10:42 <${CardMenu} inline="start" label="More" actions=${[{ label: 'Mark important', run: noop }, { label: 'Delete this message', run: noop, danger: true }]} /></div>` },
+    { name: 'word: opens from words', render: () => html`<${CardMenu} word="Backups and imports" label="Back up your apps, or bring them back"
+        actions=${[{ label: 'Export all apps as a zip', run: noop }, { label: 'Export the ones I pick', run: noop }, { divider: true }, { label: 'Import a zip', run: noop }]} />` },
+    { name: 'word, framed', render: () => html`<${CardMenu} word="Backups and imports" framed
+        actions=${[{ label: 'Export all apps as a zip', run: noop }, { label: 'Export the ones I pick', run: noop }, { divider: true }, { label: 'Import a zip', run: noop }]} />` },
+    { name: 'word, disabled while it runs', render: () => html`<${CardMenu} word="Exporting Harbour Studio's twelve apps…" framed disabled
+        actions=${[{ label: 'Export all apps as a zip', run: noop }]} />` },
   ] },
   'markdown': { variants: [{ name: 'every element', render: () => html`<${Markdown} text=${MARKDOWN} />` },
     { name: 'small', render: () => html`<${Markdown} text=${MARKDOWN} small />` }] },
@@ -98,7 +98,6 @@ export const SHARED_DEMOS = {
   ] },
   'tags': { variants: [{ name: 'default', render: (ex) => html`<${TagList} tags=${ex.tags} max=${ex.max} onTag=${noop} />` }] },
   'app-sandbox': { height: 420, variants: [{ name: 'open', render: () => html`<${SandboxOpen} />` }] },
-  'own-aimeat': { variants: [{ name: 'on a demo node', render: () => html`<${OwnAimeatDemo} />` }] },
 };
 
 /** One element with the shape's classes; `cls` is the base, `extra` the cut. */

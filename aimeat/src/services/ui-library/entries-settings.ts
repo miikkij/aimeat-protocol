@@ -8,6 +8,13 @@
  * @structure SETTINGS_ENTRIES
  * @usage import { SETTINGS_ENTRIES } from './entries-settings.js';
  * @version-history
+ *   v1.89.0 — 2026-09-27 — What appcat added: the Rail's ink tone; the crumb sheet's dashed, inline and file
+ *     Action tones; PageHead line, low, thing and picture; PageSection list, chapter and part, and its sheet's
+ *     Actions chapter, apart and tight and Note lead chapter and record.
+ *   v1.88.0 — 2026-09-27 — The Rail's light tone and PageSection group (the admin Config page as main drew it).
+ *   v1.87.0 — 2026-09-27 — What the admin pages added: PageSection band; the Listing's operator cuts; the Search
+ *     line's find; a Board notice's title without onOpen. The Listing and the Search line no longer speak of admin
+ *     markup (the admin pages draw the List now).
  *   v1.86.1 — 2026-09-27 — SignedOutDoor draws its own names (.signed-out-door-*, formerly .pf-door-*).
  *   v1.86.0 — 2026-09-27 — The Score chart, Offer map, Offer request, Rating stars, Week rhythm, Job chips, Workflow
  *     steps, Morsel flow, Schedule calendar and Ecosystem automation move to entries-views-work.ts (this file had
@@ -136,22 +143,37 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'side-menu', name: 'SideMenu', kind: 'component', status: 'active',
-        summary: 'The side menu of Settings & Controls, read as a table of contents: the way home, items as hairline rows with the open one on the sun, a coral count when something waits, a pin, groups under a coral capital word that fold, and "show all tools".',
+        summary: 'The side menu of Settings & Controls, read as a table of contents: the way home, items as hairline rows with the open one on the sun, a coral count when something waits, a pin, groups under a coral capital word that fold, and "show all tools". As a page\'s own index it has the way home under a heavy rule, the menu\'s name beside its mark in a framed square, bold rows with every count in small grey typewriter letters (on a coral chip for the open row), and on a phone each group as a sideways strip of words.',
         module: '/components/SideMenu.js', sheet: '/css/components/side-menu.css',
         data: {
-            shape: 'SideMenuHome({ href, children }) · SideMenuItem({ active, onClick, count, pin, children }) · SideMenuGroup({ title, collapsed, onToggle, children }) · SideMenuMore({ onClick, children })',
+            shape: 'SideMenu({ label, index, children }) · SideMenuTitle({ mark, children }) · SideMenuHome({ href, children }) · SideMenuItem({ active, onClick, count, tally, small, tab, pin, children }) · SideMenuGroup({ title, collapsed, onToggle, role, label, children }) · SideMenuLabel({ children }) · SideMenuMore({ onClick, children })',
             fields: {
+                SideMenu: 'the nav that holds the parts; the Settings frame draws its own and needs none', index: 'SideMenu: the page\'s own index (the look in the summary); under 900px the title and the group words hide and each group is a sideways strip',
+                label: 'SideMenu: names the menu for a screen reader; SideMenuGroup: names the group (with role)',
+                mark: 'SideMenuTitle: the sign in the framed square before the menu\'s name', 'SideMenuTitle children': 'the menu\'s name, hidden on a phone',
                 active: 'the item of the open view', count: 'how many wait there; shown when above 0',
-                pin: '{ on, title, onToggle }: the pin that keeps the item under Pinned', title: 'the group\'s word',
+                tally: 'the count only says how many, shown whatever it is (0 too; \'\' says nothing yet) in small grey typewriter letters, on a coral chip while the item is open',
+                small: 'a row of a long list (a tag): smaller and grey', tab: 'the item switches the page\'s view: role tab, selected while active',
+                pin: '{ on, title, onToggle }: the pin that keeps the item under Pinned', title: 'the group\'s word; a group without one draws none',
                 collapsed: 'the group is folded', onToggle: 'folds the group; without it the title is a plain word',
+                role: 'SideMenuGroup: what the group is to a screen reader (tablist for a view switch)',
+                SideMenuLabel: 'a second word inside a group: the rows after it stay in the same group and, on a phone, in the same strip',
             },
         },
-        useFor: ['The index beside a set of views that belong together. Items are views, not actions.'],
+        useFor: ['The index beside a set of views that belong together. Items are views, not actions.',
+            'A page\'s own index of views and filters (the app catalogue\'s rail): SideMenu index, with a count on every row.'],
         variants: [
             { name: 'open item', class: 'side-menu-item--active', prop: 'active', when: 'the view shown now' },
             { name: 'pinned', class: 'side-menu-pin--on', prop: 'pin.on', when: 'the person keeps this item under Pinned' },
+            { name: 'index', class: 'side-menu--index', prop: 'SideMenu index', when: 'a page\'s own index: the way home under a heavy rule, bold rows, sideways strips on a phone' },
+            { name: 'title', class: 'side-menu-title', prop: 'SideMenuTitle mark', when: 'the menu\'s name beside its mark in a framed square, at the top of an index' },
+            { name: 'tally', class: 'side-menu-tally', prop: 'tally', when: 'a count that only says how many, grey, on a coral chip for the open row' },
+            { name: 'small row', class: 'side-menu-item--small', prop: 'small', when: 'a row of a long list (a tag), smaller and grey' },
+            { name: 'view switch', prop: 'SideMenuGroup role="tablist" (no title) · SideMenuItem tab', when: 'a group with no title whose items switch the page\'s view' },
+            { name: 'second word', prop: 'SideMenuLabel', when: 'a second word inside a group, its rows in the same strip on a phone' },
         ],
         example: { groups: [{ title: 'Information', items: ['Discover', 'Organisms', 'Memory'] }], active: 'Memory', count: 3 },
+        note: 'SideMenu, SideMenuTitle, SideMenuLabel and an item\'s tally, small and tab came with appcat on 2026-09-27 (side-menu.css .side-menu--index and its parts). They replaced the old app catalogue\'s rail: .cat-rail and its .cat-rail-home, .cat-rail-group, .cat-rail-label, .cat-rail-item and --tag, .cat-rail-count and .cat-rail-more, and #state-bar with its "Something missing" word. The Settings menu draws what it drew.',
     },
     // The og- page kit, moved out of views/organism.css. Its class names stay (every tab, the organism
     // pages and the admin write them); each part is one entry.
@@ -160,9 +182,10 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'The dark contents rail beside a Settings page, with its sun shadow: coral group labels, the page\'s sections as numbered links that bring a section to the top, the way back, the page\'s modes and acts, and the sibling pages marked →; a rule between groups, the current item at full strength. On a phone it stands under the page. Its sheet also holds the page\'s root and columns (.og, .og-grid, .og-main), which SettingsPage draws.',
         module: '/components/Rail.js', sheet: '/css/components/tab-page.css',
         data: {
-            shape: 'Rail({ title, groups }) · scrollToSection(id) · openTab(tabId) · railSection({ id, num, label, count, open, href })',
+            shape: 'Rail({ title, groups, tone }) · scrollToSection(id) · openTab(tabId) · railSection({ id, num, label, count, open, href })',
             fields: {
                 title: 'the rail\'s name for a screen reader',
+                tone: '\'light\': the index on the page\'s own ground under a heavy ink rule (the admin Config page\'s index) | \'ink\': the box in the text\'s own colour, dark with light words in the light theme and light with dark words in the dark theme (the app catalogue\'s detail rail)',
                 groups: '[{ label, rule, items }]: a coral label, then its items; a rule stands between two groups unless the later one says rule: false',
                 'item.section': 'the id of a section to scroll to; open() first opens a folded one; with href (\'#id\') the item is an anchor',
                 'item.tab': 'a Settings tab to open (mark and count default to →)', 'item.href, item.newTab': 'a link (mark and count default to →)',
@@ -178,6 +201,8 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         useFor: ['Beside a Settings page, to move between its sections and to its sibling pages. A page usually gives SettingsPage the short form (sections, pages, back) and lets it build the rail.'],
         variants: [
             { name: 'current', class: 'on', prop: 'item.on', when: 'the item of what is shown now, at full strength' },
+            { name: 'light', class: 'og-rail--light', prop: 'tone="light"', when: 'an index on the page\'s own ground: ink group words, grey items, grey counts (the admin Config page, as main drew it; the dark look is the operator menu\'s alone)' },
+            { name: 'ink', class: 'og-rail--ink', prop: 'tone="ink"', when: 'a rail that follows the text\'s colour, so it turns light with dark words in the dark theme (the app catalogue\'s "On this page" beside an app\'s detail)' },
             { name: 'still', prop: 'item.still', when: 'a line that only says something, at full strength (a static count)' },
             { name: 'plain', class: 'og-rail-plain', prop: 'item.plain', when: 'a line that only says something at the rail\'s own strength (a workflow\'s agents, "5 more")' },
             { name: 'code', class: 'og-rail-code', prop: 'item.code', when: 'the label is an identifier (a memory key), as written' },
@@ -186,7 +211,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'page', class: 'og-page', prop: 'SettingsPage page', when: 'a page inside a page: the page column sits a little lower' },
         ],
         example: { title: 'On this page', groups: [{ label: 'On this page', items: [{ section: 'og-files', mark: '01', label: 'Files', count: 12, on: true }, { section: 'og-people', mark: '02', label: 'People', count: 4 }] }, { label: 'Pages', items: [{ tab: 'agents', label: 'Agents' }] }] },
-        note: 'It replaced the og-rail markup every Settings page wrote, the pageLinks() helper of each frame.js, the local openTab of each frame.js, and scrollTo in views/profile/organisms/poster-parts.js (which re-exports scrollToSection under the old name until nothing imports it). The tree that can take the rail\'s place is the contents-tree entry, on the same sheet.',
+        note: 'It replaced the og-rail markup every Settings page wrote, the pageLinks() helper of each frame.js, the local openTab of each frame.js, and scrollTo in views/profile/organisms/poster-parts.js (which re-exports scrollToSection under the old name until nothing imports it). The tree that can take the rail\'s place is the contents-tree entry, on the same sheet. On 2026-09-27 appcat, the app catalogue rebuilt on components, added tone="ink" for the old catalogue\'s detail rail (.dtl-rail).',
     },
     {
         id: 'crumb-trail', name: 'Crumb', kind: 'component', status: 'active',
@@ -203,16 +228,19 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         variants: [
             { name: 'link', class: 'og-crumb-link', prop: '{ label, onClick } | { label, href }', when: 'a step you can go back to' },
             { name: 'here', class: 'og-crumb-here', prop: 'the last string | { label, here: true }', when: 'the page you are on' },
+            { name: 'dashed word', class: 'og-crumb-link--dashed', prop: 'Action tone="dashed" (Action.js)', when: 'a door inside running text: the coral word over a dashed coral line that turns solid under the pointer (the app catalogue\'s "generated" in its Add dialog)' },
+            { name: 'inline word', class: 'og-crumb-link--inline', prop: 'Action tone="inline" (Action.js; small for .og-crumb-link--small)', when: 'an ink word inside running text, bold, over an ink line that turns coral under the pointer (the app catalogue\'s "Read Article 50 →" and a legal page\'s "Open →")' },
+            { name: 'file link', class: 'og-crumb-link--file', prop: 'Action tone="file" (Action.js)', when: 'a link to a file: the coral word in the typewriter face, a step smaller, underlined only under the pointer; a row of doors holding one keeps its words 18px apart (the app catalogue\'s "View odps.yaml")' },
         ],
         example: { steps: ['Settings', { label: 'Organisms', onClick: '…' }, 'Harbour Studio'] },
-        note: 'It replaced the crumb() helper in each views/profile/<page>/frame.js and the og-crumb markup the pages wrote by hand.',
+        note: 'It replaced the crumb() helper in each views/profile/<page>/frame.js and the og-crumb markup the pages wrote by hand. Its link word is also the look of Action tone="link", and on 2026-09-27 appcat, the app catalogue rebuilt on components, added three more Action tones here: dashed (the old catalogue\'s .cat-dashed), inline (.mk-legal-link, .lg-open) and file (.od-link). Action.js draws them; the action entry describes the component.',
     },
     {
         id: 'page-head', name: 'PageHead', kind: 'component', status: 'active',
-        summary: 'The head of a Settings page under its crumb: the big poster title with a small mono line beside it, a small label over it on a page inside a page, the tags under it, the grey sentence that says what the page is for, and at the right the column of what the page offers first (the loud action, a hint, a row of action links). On a phone the column stands under the words.',
+        summary: 'The head of a page under its crumb: the big poster title with a small mono line beside it, a small label over it on a page inside a page, the tags under it, the grey sentence that says what the page is for, and at the right the column of what the page offers first (the loud action, a hint, a row of action links). On a phone the column stands under the words. A low head stands on its foot with a narrow title, and the head of one thing\'s own page puts its picture in a framed box before the words.',
         module: '/components/PageHead.js', sheet: '/css/components/page-head.css',
         data: {
-            shape: 'PageHead({ label, title, sub, marks, desc, actions, page, asKey, edit })',
+            shape: 'PageHead({ label, title, sub, marks, desc, actions, page, asKey, edit, line, low, thing, picture })',
             fields: {
                 label: 'a small label over the title (a page inside a page names its kind: Person, Board)', title: 'the page\'s name, always an h1',
                 sub: 'the small mono line beside the title (a count, a subtitle)',
@@ -220,6 +248,10 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
                 desc: 'one or two sentences on what the page is for', actions: 'the right column: a Loud, a Note kind="hint" slab, an Actions row',
                 page: 'the head of a page inside a page', asKey: 'the title is a memory key, in the typewriter face as written',
                 edit: 'what stands in the title\'s place while the title is renamed (the field with its save and cancel)',
+                line: 'the page\'s own small grey typewriter line under the title (who you are and how many things are yours); it keeps its height while empty, so the head does not move when the line comes',
+                low: 'the head stands on its foot: the title held to about 12 letters\' width and the column at the right line up at their foot and stay side by side on a phone, where the column keeps only its loud action and the title is smaller',
+                thing: 'the head of one thing\'s own page (an app\'s detail): the picture at the start, then the title, the line, the description in ink a step larger and the tags, all on their foot, the column at the right; stacked on a phone. It leaves out label, sub, asKey, edit and page',
+                picture: 'with thing: { glyph, src, alt }; a 96px framed box holding the glyph, or the picture from src (a screenshot, wider) when it loads; a picture that fails to load gives way to the glyph',
             },
         },
         useFor: ['The first thing on a Settings page. SettingsPage draws it from its head props.'],
@@ -228,31 +260,57 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'key title', class: 'og-title--key', prop: 'asKey', when: 'the title is a memory key (a record\'s page)' },
             { name: 'actions', class: 'og-mast-actions', prop: 'actions', when: 'the page offers something first: the column at the right' },
             { name: 'renaming', prop: 'edit', when: 'while the title is renamed' },
+            { name: 'line', class: 'og-mast-line', prop: 'line', when: 'a page that says in one small line whose it is and how much it holds (the app catalogue\'s "sandbox · 30 apps published")' },
+            { name: 'low', class: 'og-mast--low', prop: 'low', when: 'a masthead with a short title and one loud action that stays beside it on a phone (the app catalogue\'s "My Apps")' },
+            { name: 'thing', class: 'og-mast--thing', prop: 'thing', when: 'the head of one thing\'s own page, its picture before its words (an app\'s detail)' },
+            { name: 'picture, a screenshot', class: 'og-mast-picture--shot', prop: 'thing picture={ src }', when: 'the thing has a picture of itself: a wider framed box, cut to its top' },
         ],
         example: { title: 'Skills', sub: '12 own', marks: [{ label: '3 bound to an app', tone: 'sun' }], desc: 'What your agents know how to do.' },
-        note: 'It replaced the og-mast markup every Settings page wrote by hand. The tags row is poster.css\'s .poster-chips; the old .og-chips rule stays for the public knowledge viewer, which still writes it.',
+        note: 'It replaced the og-mast markup every Settings page wrote by hand. The tags row is poster.css\'s .poster-chips; the old .og-chips rule stays for the public knowledge viewer, which still writes it. On 2026-09-27 appcat, the app catalogue rebuilt on components, added line and low (the old catalogue\'s masthead: .cat-masthead, .cat-title, .cat-mastline, with its .cat-slab and .cat-word) and thing with picture (its app detail masthead: .dtl-mast and .dtl-mast-icon).',
     },
     {
         id: 'page-section', name: 'PageSection', kind: 'component', status: 'active',
-        summary: 'An open section of a Settings page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body.',
+        summary: 'An open section of a page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body. A list\'s headline is the dark slab across the column with the count in the slab\'s letters and can fold the list; a chapter of a long page of one thing has its coral "03 / 19" over the slab, its doors on the slab and much air above; a part of a dialog\'s body has a smaller slab title.',
         module: '/components/PageSection.js', sheet: '/css/components/page-section.css',
         data: {
-            shape: 'PageSection({ id, num, title, count, doors, first, plain, children })',
+            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, group, chapter, list, onFold, folded, foldLabel, foot, spaced, part, children })',
             fields: {
                 id: 'the section\'s anchor, which the rail scrolls to', num: 'the small number beside the title', title: 'the section\'s name',
-                count: 'a count instead of the number', doors: 'the section\'s actions at the right of its head (Action links)',
-                first: 'the first section under the page head: no rule on top', plain: 'no head at all: the rule on top (none with first) and the body', children: 'the body',
+                count: 'a count instead of the number; on a list, the count on the slab', doors: 'the section\'s actions at the right of its head (Action links); on a chapter, on the slab in the slab\'s own colour',
+                first: 'the first section under the page head: no rule on top; on a chapter or a list, less air above', plain: 'no head at all: the rule on top (none with first) and the body; with list, the list\'s air and no rule (the place of a list before its headline shows)',
+                band: 'the title\'s dark band spans the whole column, as the classic pages drew it (P&L, Nodes, Organisms, Notebook, Federation, Chat sessions)',
+                group: 'a section that holds a group of sections: a smaller band across the column',
+                chapter: 'a chapter of a long page of one thing: the words over its slab in coral typewriter ("03 / 19"), the slab across the column, 112px of air above it',
+                list: 'the headline over a list of things: the slab across the column with the count in the slab\'s own letters, 48px of air above it',
+                'onFold, folded, foldLabel': 'with list: a press on the headline or its arrow folds the list; folded hides it (the arrow turns and says aria-expanded); foldLabel names the arrow',
+                foot: 'with list: a small grey line under the list', spaced: 'with list: 6px between the headline and the list',
+                part: 'a part of a dialog\'s body: a section with its slab title, which the dialog\'s sheet sizes and spaces (the slab a size smaller)',
+                children: 'the body',
             },
         },
         useFor: ['Each open part of a Settings page. Section without fold is the same component; a lead inside it is Note kind="lead".'],
         variants: [
             { name: 'first', class: 'og-sec--first', prop: 'first', when: 'the first section under the page head' },
             { name: 'plain', prop: 'plain', when: 'a box that stands as a section of its own without a title (a member\'s "Leave" on an organism\'s settings)' },
+            { name: 'band', class: 'og-sec-h--band', prop: 'band', when: 'the title\'s band across the whole column (the classic pages)' },
+            { name: 'group', class: 'og-sec--group', prop: 'group', when: 'a section that holds a group of sections, its band smaller and across the column (the admin Config domains)' },
             { name: 'split', class: 'og-split', prop: 'Split (Layout.js)', when: 'a part of a section set off by a hairline: its last actions, a group inside it' },
             { name: 'side split', class: 'og-split--side', prop: 'Split side (Layout.js)', when: 'the line at the part\'s start and the part indented: a quieter side door' },
+            { name: 'list', class: 'og-sec--list', prop: 'list', when: 'the headline over a list of things with its count on the slab (the app catalogue\'s "Your apps · 12")' },
+            { name: 'list that folds', class: 'og-sec-fold', prop: 'list onFold folded foldLabel', when: 'a list a person may put away: its headline folds it, the arrow at its end says open or shut (the app catalogue\'s community list)' },
+            { name: 'list, its place', prop: 'list plain', when: 'the place of a list whose headline is not shown yet: its waiting and empty blocks, the list\'s air, no rule' },
+            { name: 'list foot', class: 'og-sec-foot', prop: 'list foot', when: 'a small grey line under a list that says what it holds or where the rest is' },
+            { name: 'list spaced', class: 'og-sec-h--spaced', prop: 'list spaced', when: 'a little air between a list\'s headline and its first row' },
+            { name: 'chapter', class: 'og-sec--chapter', prop: 'chapter="03 / 19"', when: 'a chapter of a long page of one thing (an app\'s detail): the big air above says the previous one ended' },
+            { name: 'dialog part', prop: 'part', when: 'a part of a dialog\'s body under its own slab title (the app catalogue\'s Settings and Help dialogs)' },
+            { name: 'chapter doors', class: 'og-doors--chapter', prop: 'Actions chapter (Action.js)', when: 'the door row of a chapter: its words and slabs a step smaller and 24px apart, a door that cannot be pressed at half strength' },
+            { name: 'doors apart', class: 'og-doors--apart', prop: 'Actions apart (Action.js)', when: 'a row of one door with 10px of air above and below it' },
+            { name: 'doors tight', class: 'og-doors--tight', prop: 'Actions tight (Action.js)', when: 'a picker\'s row of a door, a choice and a door, 8px apart' },
+            { name: 'chapter lead', class: 'og-lead--chapter', prop: 'Note kind="lead" chapter (Note.js)', when: 'a chapter\'s opening words: ink at the reading size, 14px over what follows' },
+            { name: 'record lead', class: 'og-lead--record', prop: 'Note kind="lead" size="record" (Note.js)', when: 'a statement on the record in semibold ink ("Reviewed by …, declared …")' },
         ],
         example: { id: 'og-people', num: '02', title: 'People', doors: 'Invite', children: '…' },
-        note: 'The sheet also holds the lead (.og-lead, drawn by Note kind="lead"), the hint (.og-hint) and its label cut (.og-hint--label), which no page writes now, and the split\'s lines that Layout\'s Split draws.',
+        note: 'The sheet also holds the lead (.og-lead, drawn by Note kind="lead"), the hint (.og-hint) and its label cut (.og-hint--label), which no page writes now, and the split\'s lines that Layout\'s Split draws. On 2026-09-27 appcat, the app catalogue rebuilt on components, added list with its fold, foot and spaced (the old catalogue\'s .cat-list-title, .published-header, .cat-list-foot and #local-apps-header), chapter (its detail sections, .dtl-section), part (its dialogs\' section.poster-section), and in this sheet the door rows Actions chapter, apart and tight (.dtl-btn-row, .dtl-seo-switch, the skill picker row) and the leads Note chapter and size record (.dtl-desc, .mk-author-is); Action.js and Note.js draw those.',
     },
     {
         id: 'fold-row', name: 'FoldSection', kind: 'component', status: 'active',
@@ -291,22 +349,33 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
     // first, unused until the tabs move onto them.
     {
         id: 'listing', name: 'Listing', kind: 'component', status: 'active',
-        summary: 'Things in rows of columns under a heading row: the name in bold with a small typewriter line, a grey description, who or where, the doors on the right; a row can open a framed panel under it. On a phone one column, or the narrow columns of its cut (listing--cols). In Settings & Controls the List component (components/List.js) draws it: List with its cut and head, Row, and the Name, Desc, Who, Num, When, Cell, Doors and Panel cells; a page writes none of these classes.',
+        summary: 'Things in rows of columns under a heading row: the name in bold with a small typewriter line, a grey description, who or where, the doors on the right; a row can open a framed panel under it. On a phone one column, or the narrow columns of its cut (listing--cols). The List component (components/List.js) draws it in Settings & Controls and on the operator pages: List with its cut and head, Row, and the Name, Desc, Who, Num, When, Cell, Doors and Panel cells; a page writes none of these classes.',
         module: null, sheet: '/css/components/listing.css', classes: ['listing', 'listing-row', 'listing-name', 'listing-desc', 'listing-who', 'listing-doors', 'listing-open', 'listing-meta'],
-        data: { shape: 'List({ cols, keepCols, head }) › Row({ open }) › Name · Desc · Who · Doors · Panel (components/List.js) · as markup in the admin: <div class="listing listing--<cut>"><div class="listing-row listing-row--head">…</div><div class="listing-row"><div class="listing-name">…</div><div class="listing-desc">…</div><div class="listing-doors">…</div></div></div>', fields: { name: 'the thing (Name)', desc: 'what it is (Desc)', who: 'whose it is or where (Who)', doors: 'what a person can do with it (Doors)', open: 'the panel one row opens (Panel, Row open)' } },
-        useFor: ['A list of things a person owns or can install, when each needs a few columns: in Settings through the List, in the admin pages as markup.'],
-        variants: [{ name: 'head', class: 'listing-row--head', prop: 'List head', when: 'the heading row' }, { name: 'open', class: 'is-open', prop: 'Row open', when: 'the row whose panel is open' }, { name: 'cols', class: 'listing--cols', prop: 'List keepCols', when: 'the list keeps the columns of its cut on a narrow screen instead of stacking' }, { name: 'meta', class: 'listing-meta', when: 'the grey typewriter line under a name outside a Listing row (Jouni\'s decision "Meta line"; the Box\'s BoxLine meta draws it)' }],
+        data: { shape: 'List({ cols, keepCols, head, index, tone }) › Row({ open, below }) › Name · Desc · Who · Num · When · Cell · Doors · Panel (components/List.js)', fields: { cols: 'the cut, named by its columns (List cols)', index: 'with the cut n-mark-name-desc-state-n-arrow: the app catalogue\'s index (List index, list.css)', tone: 'a detail list of the app catalogue drawn over its cut (List tone, list-tones.css)', name: 'the thing (Name)', desc: 'what it is (Desc)', who: 'whose it is or where (Who)', doors: 'what a person can do with it (Doors)', open: 'the panel one row opens (Panel, Row open)' } },
+        useFor: ['A list of things a person owns or can install, when each needs a few columns: in Settings and on the operator pages, through the List.'],
+        variants: [{ name: 'head', class: 'listing-row--head', prop: 'List head', when: 'the heading row' }, { name: 'open', class: 'is-open', prop: 'Row open', when: 'the row whose panel is open' }, { name: 'cols', class: 'listing--cols', prop: 'List keepCols', when: 'the list keeps the columns of its cut on a narrow screen instead of stacking' }, { name: 'meta', class: 'listing-meta', when: 'the grey typewriter line under a name outside a Listing row (Jouni\'s decision "Meta line"; the Box\'s BoxLine meta draws it)' },
+            { name: 'operator cuts', class: 'listing--n-name-n-when-doors', prop: 'List cols="<cut>"', when: 'the operator pages\' tables, each with main\'s column widths and narrow rules (2026-09-27): id-name-in-out-state-mark-n-n, id-name-state-n-when-when, id-name-who-state-n-tags, n-id-state-name-who-n-when, n-name-n-when-doors, n-name-state, n-name-tags-n-when-doors, n-name-who-count-when-doors, name-code-state-when-doors, name-code-when-when, name-desc-code-n, name-desc-n-n-n-n, name-desc-state-mark-when-when-doors, name-id-score-n-mark-doors, name-id-when, name-id-who-ver-n-when, name-id-who-when-mark, name-kind-id-when-state-doors, name-kind-state-when, name-kind-words, name-n-bar-desc, name-n-code-code-bar, name-n-desc, name-n-n-bar, name-n-n-bar-doors, name-n-n-n-bar, name-n-n-n-n-n-state, name-n-where-state-doors, name-state-kind-code-when-desc-edit-doors, name-state-meta-meta-doors, name-state-n-trend, name-state-words-when, name-tags-when-doors, name-ver-kind-n-state, name-ver-who-n-kinds-doors, name-when-who-state-when-doors, name-where-what-who-when-doors, name-who-code-desc-desc, name-who-doors, name-who-kind-n-seen-review-when-doors, name-who-n-n-n-when-doors, name-who-state-count-when-doors, name-who-tags-n-when-doors, name-words, name-words-when, state-name-code-desc, state-name-who-when-doors, tag-n-name-doors, tag-name-desc, tag-when-who-n, when-name-kind-state-n-desc, when-name-kind-who, when-state-path-where-kind-desc' },
+            { name: 'app index', class: 'listing--n-mark-name-desc-state-n-arrow', prop: 'List index cols="n-mark-name-desc-state-n-arrow"', when: 'the app catalogue\'s rows: the number, the icon, the name with its line, what it does, its state, how often it was opened, the arrow (the old .cat-row columns); List index draws the rest of its look' },
+            { name: 'switch rows', class: 'listing--name-meaning-doors', prop: 'List tone="switches" cols="name-meaning-doors"', when: 'a switch, what its state means and its action, the name 13.75rem wide (the old .mk-row)' },
+            { name: 'data map keys', class: 'listing--key-desc-who', prop: 'List cols="key-desc-who"', when: 'a data map\'s key, what it holds and where, the where in grey typewriter at the right (the old .dtl-dm-head); in the sheet, no page draws it today' },
+            { name: 'count per place', class: 'listing--name-n', prop: 'List cols="name-n"', when: 'a name and one count at the right (the old .vis-table); in the sheet, no page draws it today' },
+            { name: 'audit log', class: 'listing--when-name-who', prop: 'List tone="log" cols="when-name-who"', when: 'when, what was done, by whom in grey typewriter (the old .mk-log)' },
+            { name: 'declarations log', class: 'listing--when-kind-name-who', prop: 'List tone="log" cols="when-kind-name-who"', when: 'the log with the act\'s word after the date (Cell sign), the declarations of who made an app' },
+            { name: 'tool for sale', class: 'listing--name-price-delivery-doors', prop: 'List cols="name-price-delivery-doors"', when: 'a tool an app sells: its name and what it does, its price with a coral label over it, how a bought call is delivered, the doors; one rule under the whole row, the reason it cannot be listed under the row in the warning colour (Row below); one column under 900px (the old .mz-tool)' },
+            { name: 'contract', class: 'listing--name-price-rake-budget-state', prop: 'List cols="name-price-rake-budget-state"', when: 'a contract an app sources: each one a wrapping line of facts without rules, the capability first with its provider in coral small capitals under it, each other fact a coral label over its bold value (the old cost rows, .dtl-status-row)' }],
         example: { rows: [['aimeat-writing', 'How prose is written', 'sandbox']] },
-        note: 'Built on 2026-09-25 with the look six Settings tabs draw as identical copies; the Settings listings moved onto it the same day, each with a cut named by its columns. No module of its own: the class names are shared with the admin pages, and in Settings the List (entry list) draws them.',
+        note: 'Built on 2026-09-25 with the look six Settings tabs draw as identical copies; the Settings listings moved onto it the same day, each with a cut named by its columns. On 2026-09-27 the operator pages\' tables moved onto the List too, each with its own cut here (the operator cuts variant). Also on 2026-09-27 appcat (the app catalogue rebuilt at /v1/appcat) added its cuts: n-mark-name-desc-state-n-arrow for its index (the old .cat-row grid), name-meaning-doors, key-desc-who, name-n, when-name-who and when-kind-name-who for the detail\'s rows (the old .mk-row, .dtl-dm-head, .vis-table, .mk-log), name-price-delivery-doors (the old .mz-tool, drawn whole here) and name-price-rake-budget-state (the old cost rows). Where a List tone (list-tones.css) or List index (list.css) draws the row, the cut gives only its columns. No module of its own: the List (entry list) draws these classes everywhere.',
     },
     {
         id: 'search-line', name: 'Search line', kind: 'component', status: 'active',
-        summary: 'The field that searches a list, across the row, and how many it found in small grey typewriter letters at its end. In Settings & Controls the List\'s SearchLine (components/List.js) draws it, with the clear mark, a button or a hint after the field.',
+        summary: 'The field that searches a list, across the row, and how many it found in small grey typewriter letters at its end. The List\'s SearchLine (components/List.js) draws it, with the clear mark, a button or a hint after the field, and on the operator pages the magnifier before it.',
         module: null, sheet: '/css/components/search-line.css', classes: ['search-line'],
-        data: { shape: 'SearchLine({ value, onInput, onEnter, onClear, placeholder, note, text, beside, children }) (components/List.js) · as markup in the admin: <div class="search-line"><input class="og-input"><small>12 of 40</small></div>', fields: { input: 'what to look for (value, onInput)', small: 'how many it found (note)' } },
-        useFor: ['Above a list a person can search.'],
-        variants: [{ name: 'beside', class: 'search-line--beside', prop: 'SearchLine beside', when: 'one of several lines side by side in a row, under each other on a phone' }], example: { found: '12 of 40' },
-        note: 'Built on 2026-09-25 with the look six Settings tabs drew as identical copies; since then the Settings tabs\' search fields over a list sit in it, with a button or a count beside the field where the place has one. No module of its own: the class is shared with the admin pages, and in Settings the List\'s SearchLine draws it.',
+        data: { shape: 'SearchLine({ value, onInput, onEnter, onClear, clearLabel, placeholder, label, note, text, autofocus, beside, find, big, id, children }) (components/List.js)', fields: { input: 'what to look for (value, onInput)', small: 'how many it found (note)', find: 'the magnifier before the field', big: 'the page\'s one search: bold words on a heavy underline, coral in focus, what follows the field (an order row) at its foot', id: 'the field\'s own id, for a key that brings the focus to it', children: 'a button, a hint or an order row after the field' } },
+        useFor: ['Above a list a person can search.', 'The one search of a page that is mostly a list (the app catalogue), with the list\'s order beside it: SearchLine big.'],
+        variants: [{ name: 'beside', class: 'search-line--beside', prop: 'SearchLine beside', when: 'one of several lines side by side in a row, under each other on a phone' },
+            { name: 'find', class: 'search-line-glass', prop: 'SearchLine find', when: 'an operator page\'s search: the ink magnifier before the field (main\'s admin Cortex and Knowledge searches)' },
+            { name: 'big', class: 'search-line--big', prop: 'SearchLine big', when: 'the page\'s one search: bold words on a heavy underline that turns coral in focus, its order row at its foot; on a narrow phone the order row first and the field under it across the width' }], example: { found: '12 of 40' },
+        note: 'Built on 2026-09-25 with the look six Settings tabs drew as identical copies; since then the Settings tabs\' search fields over a list sit in it, with a button or a count beside the field where the place has one, and since 2026-09-27 the operator pages\' searches too. SearchLine big and id came with appcat on 2026-09-27 (the old app catalogue\'s .cat-tools and .cat-search). No module of its own: the List\'s SearchLine draws it.',
     },
     {
         id: 'switch', name: 'Switch', kind: 'component', status: 'active',
@@ -476,16 +545,17 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         data: {
             shape: 'BoardNotice({ kind, title, onOpen, words, who, whoNote, board, time, left, counts }) · BoardNoticeText({ children })',
             fields: {
-                kind: 'the notice\'s category, as a Tag; none draws the grey dot', title: 'the notice\'s title, a button', onOpen: 'opens the notice',
+                kind: 'the notice\'s category, as a Tag; none draws the grey dot', title: 'the notice\'s title: a button with onOpen, bold words without it', onOpen: 'opens the notice; without it the title opens nothing and is not a button',
                 words: 'the first words of the notice', who: 'who posted it', whoNote: 'their standing, after the name',
                 board: '{ name, onOpen }: the board it is on, a coral word that opens it', time: 'when it was posted', left: 'how long it has left',
                 counts: 'its replies and thanks, on a line of their own', children: 'BoardNoticeText: the notice\'s own text on its page',
             },
         },
-        useFor: ['The notices of a board, and of an organism\'s board preview; BoardNoticeText for one notice\'s text on its page, with its replies as Message tone="board" under it.'],
+        useFor: ['The notices of a board, of an organism\'s board preview and of the operator\'s Boards page; BoardNoticeText for one notice\'s text on its page, with its replies as Message tone="board" under it.'],
         variants: [
             { name: 'no category', class: 'board-notice-kind--none', prop: 'kind omitted', when: 'a notice with no category: a grey dot' },
             { name: 'text', class: 'board-notice-text', prop: 'BoardNoticeText', when: 'a notice\'s own text on its page, at a reading size' },
+            { name: 'title only', class: 'board-notice-title--still', prop: 'title without onOpen', when: 'a place with no notice page to open (the operator\'s Boards page): the title in bold, not a button' },
         ],
         example: { kind: 'News', title: 'The ferry timetable changes on Monday', words: 'The morning boat leaves at 07:10 from now on.', who: 'second', board: { name: 'Harbour' }, time: 'today 09:12', counts: '2 replies' },
         note: 'Moved on 2026-09-25 from boards-poster.css with its class names; on 2026-09-26 the Boards page\'s notice row and the organism\'s board preview became the BoardNotice component and the bp- names its own (board-notice*).',

@@ -7,6 +7,11 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — appcat parity: .empty--start at the browser's line height with the icon's
+ *     glow and .empty-aside; .empty--line and .empty-hint (EmptyState line, hint): the old
+ *     .view-empty; additive.
+ *   v1.1.0 — 2026-09-27 — .empty--start, .empty-ring, .empty--ruled (EmptyState start, loading,
+ *     ruled): the old app catalogue's empty and loading blocks, for appcat; additive.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1584-1601), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
@@ -28,4 +33,40 @@
 .empty-title { font-style: normal; font-weight: var(--weight-semibold); font-size: var(--text-base); color: var(--text); margin-bottom: 0.25rem; }
 .empty-text { margin: 0 auto; max-width: 32rem; }
 .empty-action { margin-top: 0.85rem; font-style: normal; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+
+/* The empty state of a poster list (EmptyState start, loading, ruled; appcat): the old app
+   catalogue's .empty-state, .cat-spinner and .view-empty, values unchanged. */
+.empty.empty--start {
+  display: flex; flex-direction: column; align-items: flex-start; padding: 40px 0; text-align: left;
+  font-style: normal; font-size: .9rem; line-height: 1.6; color: var(--text-dim);
+}
+.empty--start .empty-icon { font-size: 4rem; opacity: .6; margin-bottom: 20px; }
+.empty--start .empty-title {
+  margin-bottom: 8px; font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: 1.4rem;
+  text-transform: var(--shape-case-heading); color: var(--text);
+}
+.empty--start .empty-text { margin: 0 0 6px; max-width: 340px; }
+.empty--start .empty-action { justify-content: flex-start; }
+.empty.empty--ruled { border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); padding: 22px 0; }
+/* The old page kept the browser's line height in these blocks; only the words under the title read
+   1.6. The icon carried a faint coral glow; the faint formats line sat under the words (EmptyState
+   aside). */
+.empty.empty--start { line-height: normal; }
+.empty--start .empty-text { line-height: 1.6; }
+.empty--start .empty-icon { filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--accent) 10%, transparent)); }
+.empty--start .empty-aside { margin-top: 4px; font-size: .78rem; color: var(--text-dim); opacity: .7; }
+/* The empty line that stands in for a list under its headline (EmptyState line, appcat parity): the
+   old .view-empty. Its words in ink and semibold, the hint grey under them, held to 460px and
+   centred as the old block was; the ring, while it waits, centred over the words. */
+.empty.empty--line { display: block; padding: 22px 0; text-align: left; font-style: normal; font-family: var(--font-body); font-size: 1rem; line-height: normal; color: var(--text); }
+.empty--line .empty-text { margin: 0 0 6px; max-width: none; font-weight: 600; }
+.empty--line .empty-hint { max-width: 460px; margin: 0 auto; font-size: .85rem; font-weight: 400; line-height: 1.5; color: var(--muted); }
+.empty--line .empty-ring { margin: 0 auto 16px; }
+.empty-ring {
+  display: block; width: 40px; height: 40px; box-sizing: border-box; margin-bottom: 20px;
+  border: var(--shape-ring) solid var(--border-subtle, var(--border)); border-top-color: var(--accent); border-radius: 50%;
+  animation: empty-ring-spin .9s linear infinite;
+}
+@keyframes empty-ring-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .empty-ring { animation: none; } }
 

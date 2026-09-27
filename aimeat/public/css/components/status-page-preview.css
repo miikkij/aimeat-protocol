@@ -1,0 +1,28 @@
+/**
+ * @file status-page-preview.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The page a node serves in its own place, drawn small (components/StatusPagePreview.js):
+ *   the ink frame on the surface ground, the typewriter status line on top, the page on the card
+ *   ground, centred; the coral label or the live mark over it and the grey hint under it. The values
+ *   are main's Maintenance preview (views/admin-maintenance.css, .adm-maint-prev*, .adm-maint-live,
+ *   .adm-maint-lbl, .adm-maint-hint).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G2).
+ */
+
+/* The label is the row label of poster.css (.poster-label); only its place is here. */
+.status-page-preview-label { margin-bottom: 7px; }
+/* A live preview says so: what is on the screen of everyone at the node right now. */
+.status-page-preview-live { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 9px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: var(--shape-case-label); color: var(--accent); }
+.status-page-preview-live i { width: 9px; height: 9px; background: var(--accent); }
+.status-page-preview-page { border: var(--shape-frame) solid var(--shape-frame-colour); background: var(--bg-surface); }
+.status-page-preview-top { display: flex; justify-content: space-between; gap: 10px; border-bottom: var(--shape-frame) solid var(--shape-frame-colour); padding: 6px 12px; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.status-page-preview-body { padding: 22px 20px 24px; text-align: center; background: var(--card-bg); }
+.status-page-preview-node { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+/* The headline is the record title of poster.css (.poster-record-title); only its place is here. */
+.status-page-preview-head { margin: 10px 0 12px; }
+.status-page-preview-msg { margin: 0 auto; max-width: 30ch; font-size: .95rem; font-weight: 600; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.status-page-preview-sub { margin: 10px 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.status-page-preview-hint { margin: .55rem 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }

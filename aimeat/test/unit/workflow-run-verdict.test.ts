@@ -7,6 +7,8 @@
  *   limit when the run had spent it, and the step's estimate beside them when the estimate is what
  *   did not fit in what was left.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The spend is said as what had been spent on AI, which includes the judging
+ *     of the run's worded signals (secaudit 2026-09, A6-11).
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, A6-11).
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -48,12 +50,12 @@ describe('a run stopped at its spending limit, in words', () => {
     it('names the spend and the limit when the run had spent it', () => {
         const v = verdictOf(stoppedRun({ capUsd: 0.01, spentUsd: 0.02, stoppedBefore: 'right' }));
         expect(v.tone).toBe('bad');
-        expect(v.head).toBe(`Stopped before Right: its AI steps had spent ${money(0.02)}, and the limit is ${money(0.01)} per run`);
+        expect(v.head).toBe(`Stopped before Right: ${money(0.02)} had been spent on AI, and the limit is ${money(0.01)} per run`);
     });
 
     it('names the step\'s estimate beside them when the estimate did not fit in what was left', () => {
         const v = verdictOf(stoppedRun({ capUsd: 0.03, spentUsd: 0.02, stoppedBefore: 'right', neededUsd: 0.025 }));
         expect(v.tone).toBe('bad');
-        expect(v.head).toBe(`Stopped before Right: it was expected to cost ${money(0.025)}, ${money(0.02)} was already spent, and the limit is ${money(0.03)} per run`);
+        expect(v.head).toBe(`Stopped before Right: it was expected to cost ${money(0.025)}, ${money(0.02)} had already been spent on AI, and the limit is ${money(0.03)} per run`);
     });
 });

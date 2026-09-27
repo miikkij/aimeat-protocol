@@ -15,6 +15,9 @@
  *          who=${label} whoNote=${standing} board=${{ name, onOpen }} time=${rel(p.created_at)}
  *          left=${leftWords(p.ttl_expires_at)} counts=${'2 replies · 1 thanks'} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — A title with no `onOpen` is words, not a button that does nothing (the
+ *     admin Boards page, which has no notice page to open); every caller that gave a title gave
+ *     onOpen too, so nothing drawn before changes. Additive, page group G5.
  *   v1.0.0 — 2026-09-26 — Initial: the Boards page's notice row (views/profile/boards/frame.js
  *     noticeRow) and the organism's board preview (views/profile/organisms/panels.js) as one
  *     component, with their markup and their look unchanged; the bp- class names became the
@@ -31,7 +34,8 @@ export function BoardNotice({ kind, title, onOpen, words, who, whoNote, board, t
     <div class="board-notice">
       <div class=${`board-notice-kind${kind ? '' : ' board-notice-kind--none'}`}>${kind ? html`<${Mark}>${kind}<//>` : '·'}</div>
       <div class="board-notice-body">
-        ${title ? html`<button type="button" class="board-notice-title" onClick=${onOpen}>${title}</button>` : null}
+        ${title && onOpen ? html`<button type="button" class="board-notice-title" onClick=${onOpen}>${title}</button>`
+          : title ? html`<b class="board-notice-title board-notice-title--still">${title}</b>` : null}
         ${words ? html`<p>${words}</p>` : null}
         <div class="board-notice-by"><b>${who || '?'}</b>${whoNote ? ` · ${whoNote}` : ''}${board ? html` · <button type="button" class="board-notice-board" onClick=${board.onOpen}>${board.name}</button>` : null}</div>
       </div>

@@ -7,6 +7,7 @@
  * @structure KNOWLEDGE_VIEW_ENTRIES
  * @usage import { KNOWLEDGE_VIEW_ENTRIES } from './entries-views-knowledge.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — PagePreview's email and live (SitePreview folded in), from the admin pages.
  *   v1.1.1 — 2026-09-27 — SetupGuide draws its own names from setup-guide.css (formerly .ast-* in
  *     hello-mcp.css; a move).
  *   v1.1.0 — 2026-09-27 — The special views of the organism pages, the Memory and Access pages, the
@@ -168,28 +169,57 @@ export const KNOWLEDGE_VIEW_ENTRIES: UiEntryWritten[] = [
     // The overview, Portfolio and the Agents page (page groups G8 and G1a).
     {
         id: 'page-preview', name: 'PagePreview', kind: 'component', status: 'active',
-        summary: 'A web page shown as it will look, in the raised Object box with no inner air: a sandboxed frame (scripts run, nothing else is allowed) 34rem high, 24rem on a phone; the loading line until the page\'s text is there.',
+        summary: 'A web page shown as it will look, in the raised Object box with no inner air: a sandboxed frame (scripts run, nothing else is allowed) 34rem high, 24rem on a phone; the loading line until the page\'s text is there. An email shows where nothing in it runs, 600px wide on white. A live page of this site shows by its address, with its title as a row label, three ways over it (wide, phone, fold it away), a grey note under it, the link that opens it, and each of its parts numbered in an ink square as the list beside it numbers them.',
         module: '/components/PagePreview.js', sheet: '/css/components/page-preview.css',
-        data: { shape: 'PagePreview({ title, srcdoc, loading, loadingLabel })', fields: { title: 'the frame\'s name, for a screen reader', srcdoc: 'the page\'s whole HTML', loading: 'the page is on its way', loadingLabel: 'the words of the loading line' } },
-        useFor: ['Seeing a published page before it goes out, such as a portfolio.'],
-        variants: [{ name: 'loading', prop: 'loading, or no srcdoc', when: 'the page\'s text is not there yet' }],
+        data: {
+            shape: 'PagePreview({ title, srcdoc, loading, loadingLabel, email, live, src, href, openLabel, wideLabel, phoneLabel, foldLabel, unfoldLabel, note, markedNote, marks, refresh, empty })',
+            fields: {
+                title: 'the frame\'s name, for a screen reader; live: also the row label over it', srcdoc: 'the page\'s whole HTML', loading: 'the page is on its way', loadingLabel: 'the words of the loading line',
+                email: 'an email as it reaches its reader: nothing in it runs (a sandbox with no permission), 600px wide and 420px high on the white ground, centred',
+                live: 'a live page of this site by its address, beside the thing that arranges it', src: 'live: the frame\'s address', refresh: 'live: a new value loads the page again',
+                href: 'live: the link that opens the page on its own', openLabel: 'live: that link\'s words',
+                'wideLabel, phoneLabel, foldLabel, unfoldLabel': 'live: the words of the three ways (wide, phone width, fold it away and back)',
+                note: 'live: the grey line under the frame', markedNote: 'live: added to the note while the parts are numbered',
+                marks: 'live: { root, count }: the element whose children are the parts, and how many are shown; each part gets its number only when the count matches, since a wrong number is worse than none',
+                empty: 'live: a line in the frame\'s place and nothing else (a page behind a sign-in)',
+            },
+        },
+        useFor: ['Seeing a published page before it goes out, such as a portfolio.', 'An operator\'s email template before it is sent (email), and the front page beside the list that arranges its parts (live).'],
+        variants: [
+            { name: 'loading', prop: 'loading, or no srcdoc', when: 'the page\'s text is not there yet' },
+            { name: 'email', class: 'page-preview-frame--mail', prop: 'email', when: 'an email template: nothing runs, 600px on white (the operator\'s Email page)' },
+            { name: 'live', class: 'page-preview-live', prop: 'live src', when: 'the front page by its address, with its three ways, its note and its link (the operator\'s Portal page)' },
+            { name: 'live, phone', class: 'page-preview-live-frame--phone', prop: 'live (the phone way pressed)', when: 'the same page at a phone\'s width' },
+            { name: 'live, nothing to show', class: 'page-preview-live-empty', prop: 'live empty', when: 'a page behind a sign-in: a line in the frame\'s place' },
+        ],
         example: { title: 'Lumo Bakery portfolio', srcdoc: '<h1>Lumo Bakery</h1><p>Seasonal bread, baked at five.</p>' },
-        note: 'Was .pf-prev and .pf-prev-frame of the Portfolio page (views/profile/portfolio/page.js).',
+        note: 'Was .pf-prev and .pf-prev-frame of the Portfolio page (views/profile/portfolio/page.js). On 2026-09-27 it took the admin Email page\'s template preview (email, main\'s .adm-em-stage) and folded in SitePreview, the admin Portal page\'s live preview (live, main\'s .adm-pt-pv* and .adm-pt-frame); SitePreview.js and site-preview.css are gone, their look is page-preview.css\'s .page-preview-live*. The numbers inside the framed page carry their own look, since no sheet of this page reaches into the frame.',
     },
     {
         id: 'number-band', name: 'NumberBand', kind: 'component', status: 'active',
-        summary: 'The numbers of an account on a diagonal coral band with a sun stripe under it: each number big in the poster face with its word in small capitals under it, a door to the page it counts that turns sun under the pointer. No numbers, no band.',
+        summary: 'The numbers of an account on a diagonal coral band with a sun stripe under it: each number big in the poster face with its word in small capitals under it, a door to the page it counts that turns sun under the pointer. No numbers, no band. The fitted band is as tall as its numbers, so a second row still stands on the coral; on a phone it is a solid coral block in two columns with the sun flat along its foot.',
         module: '/components/NumberBand.js', sheet: '/css/components/number-band.css',
-        data: { shape: 'NumberBand({ items })', fields: { items: '[{ key, icon, n, label, onOpen, fine }]: the number, its word, where it leads; `fine` marks something earned (morsels); `icon` is said to nobody' } },
-        useFor: ['The overview of Settings & Controls: how much the person has, each number a way to where it is.'],
-        variants: [{ name: 'earned', class: 'number-band-value--fine', prop: 'items[].fine', when: 'a number that counts something earned, such as morsels' }],
+        data: {
+            shape: 'NumberBand({ items, fitted })',
+            fields: {
+                items: '[{ key, icon, n, label, onOpen, fine }]: the number, its word, where it leads; `fine` marks something earned (morsels); `icon` is said to nobody',
+                fitted: 'the band as tall as its numbers, the sun stripe near its foot, the words in the body face; in it a number without onOpen is a figure, not a door',
+            },
+        },
+        useFor: ['The overview of Settings & Controls: how much the person has, each number a way to where it is.',
+            'The app catalogue\'s counts over its lists and over an opened app (fitted): numbers to read, not doors.'],
+        variants: [
+            { name: 'earned', class: 'number-band-value--fine', prop: 'items[].fine', when: 'a number that counts something earned, such as morsels' },
+            { name: 'fitted', class: 'number-band--fitted', prop: 'fitted', when: 'numbers to read, one row or two, on a band that fits them' },
+            { name: 'figure', class: 'number-band-item--figure', prop: 'fitted, an item without onOpen', when: 'a number that only says its figure: no pointer, no sun under it' },
+        ],
         themeHooks: { selector: '.number-band', hooks: [
             { name: '--number-band-ground', kind: 'colour', default: 'var(--accent)', what: 'the band' },
             { name: '--number-band-stripe', kind: 'colour', default: 'var(--sun)', what: 'the stripe under the band, and a number under the pointer' },
             { name: '--number-band-ink', kind: 'colour', default: 'var(--bg)', what: 'the numbers and their words on the band' },
         ] },
         example: { items: [{ key: 'memory', n: 128, label: 'Memories' }, { key: 'agents', n: 3, label: 'Agents' }, { key: 'morsels', n: 420, label: 'Morsels', fine: true }] },
-        note: 'Was the ProfileCard\'s stats of views/profile/landing-page.cards.js (.pf-lp-stat*); its own names since 2026-09-27. The numbers keep the band\'s ink whatever colour a style gives big numbers, so Pebble no longer draws them in its accent on its accent band.',
+        note: 'Was the ProfileCard\'s stats of views/profile/landing-page.cards.js (.pf-lp-stat*); its own names since 2026-09-27. The numbers keep the band\'s ink whatever colour a style gives big numbers, so Pebble no longer draws them in its accent on its accent band. fitted came with appcat (2026-09-27): it draws the old app catalogue\'s band (.cat-band) over the lists and in an opened app\'s head.',
     },
     {
         id: 'open-card', name: 'OpenCard', kind: 'component', status: 'active',

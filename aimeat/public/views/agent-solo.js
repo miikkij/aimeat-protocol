@@ -10,6 +10,9 @@
  *   connection so the card live-updates independently.
  * @structure AgentSolo (default export)
  * @version-history
+ *   2026-09-27 -- The window is the SoloWindow component inside the Settings root, its sentences the
+ *     quiet line, its toast the ToastBox; it writes no class (page group G9). The column is the
+ *     document window's 920px (was 860px).
  *   2026-09-14 -- The window's toast is the site's shared one (theme.css .toast).
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent pop-out window
  */
@@ -24,6 +27,9 @@ import { listAgents } from '/js/services/agents.js';
 import { getOnboarding } from '/js/services/agent-integration.js';
 import { listTasks } from '/js/services/agent-tasks.js';
 import AgentCard from './profile/agents/agent-card.js';
+import { SettingsRoot } from '/components/SettingsFrame.js';
+import { SoloWindow } from '/components/SoloWindow.js';
+import { ToastBox } from '/components/Toast.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -103,29 +109,32 @@ export default function AgentSolo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.owner]);
 
+  // The card's rules key on the Settings root (.pf), so the window stands inside it.
   if (!session) {
-    return html`<div class="pf pf-agd-solo"><div class="pf-agd-empty">${t('profile.agents.solo.loginRequired')}</div></div>`;
+    return html`<${SettingsRoot}><${SoloWindow} message=${t('profile.agents.solo.loginRequired')} /><//>`;
   }
   if (loading && !agent) {
-    return html`<div class="pf pf-agd-solo"><div class="pf-agd-empty">${t('profile.loading')}</div></div>`;
+    return html`<${SettingsRoot}><${SoloWindow} message=${t('profile.loading')} /><//>`;
   }
   if (error) {
-    return html`<div class="pf pf-agd-solo"><div class="pf-agd-empty">${error}</div></div>`;
+    return html`<${SettingsRoot}><${SoloWindow} message=${error} /><//>`;
   }
 
   return html`
-    <div class="pf pf-agd-solo">
-      <${AgentCard}
-        agent=${agent}
-        onboarding=${onboarding}
-        expanded=${true}
-        soloMode=${true}
-        onToggle=${() => {}}
-        session=${session}
-        showToast=${showToast}
-        allAgents=${allAgents}
-      />
-      ${toast && html`<div class=${`toast ${toast.isErr ? 'toast-error' : 'toast-success'}`}>${toast.msg}</div>`}
-    </div>
+    <${SettingsRoot}>
+      <${SoloWindow}>
+        <${AgentCard}
+          agent=${agent}
+          onboarding=${onboarding}
+          expanded=${true}
+          soloMode=${true}
+          onToggle=${() => {}}
+          session=${session}
+          showToast=${showToast}
+          allAgents=${allAgents}
+        />
+        <${ToastBox} toast=${toast ? { msg: toast.msg, type: toast.isErr ? 'error' : 'success' } : null} />
+      <//>
+    <//>
   `;
 }

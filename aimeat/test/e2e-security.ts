@@ -5,6 +5,8 @@
  *   Security tab composite (owner-only) with GHII CORS input validation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-security
  * @version-history
+ *   v1.2.0 — 2026-09-26 — 7b-7d: work between a person and their own agent is refused both ways
+ *            (SAME_OWNER_WORK), and another owner still asks the same agent (secaudit 2026-09, R3 7d).
  *   v1.1.0 — 2026-07-29 — Add 11b (GET /v1/security/overview is owner-only — an agent gets 403 and
  *            no session list) and 11c (PUT /v1/ghii/cors refuses a non-URL origin, and the refusals
  *            do not partially land) for batch 01 holes 6 and 11; drop 500 from test 5b's accepted
@@ -478,6 +480,65 @@ await test('7. Same-owner work: Agent A cannot request work from Agent C (same o
     });
     assert(status === 400, `expected 400 for same-owner work, got ${status}`);
     assert(body.error?.code === 'SAME_OWNER_WORK', `expected SAME_OWNER_WORK, got ${body.error?.code}`);
+});
+
+// A person is a provider too: an action they publish in person is stored under their GHII. So the rule
+// holds between a person and their own agents, in both directions, as it holds between two agents.
+await test('7b. Same-owner work: Owner A in person cannot request work from their own Agent C', async () => {
+    const { status, body } = await json('/v1/work/request', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerAToken}` },
+        body: JSON.stringify({
+            action_id: 'same-owner-test-action',
+            provider_gaii: agentCGaii,
+            input: { text: 'asked in person' },
+        }),
+    });
+    assert(status === 400, `expected 400 for work between a person and their own agent, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'SAME_OWNER_WORK', `expected SAME_OWNER_WORK, got ${body.error?.code}`);
+});
+
+await test('7c. Same-owner work: Agent A cannot request work on an action Owner A published in person', async () => {
+    const ownerAGhii = `${ownerAName}@${NODE_ID}`;
+    const pub = await json('/v1/actions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerAToken}` },
+        body: JSON.stringify({
+            id: 'same-owner-person-action',
+            display_name: 'Same Owner Person',
+            description: 'Action a person published in person',
+            input_schema: { type: 'object', properties: { text: { type: 'string' } } },
+            output_schema: { type: 'object', properties: { result: { type: 'string' } } },
+            pricing: { base_morsels: 0 },
+        }),
+    });
+    assert(pub.status === 201, `publish in person: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+    assert(pub.body.data?.provider_gaii === ownerAGhii, `the action is the person's: ${pub.body.data?.provider_gaii}`);
+
+    const { status, body } = await json('/v1/work/request', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({
+            action_id: 'same-owner-person-action',
+            provider_gaii: ownerAGhii,
+            input: { text: 'for my own owner' },
+        }),
+    });
+    assert(status === 400, `expected 400 for work between an agent and its own owner, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'SAME_OWNER_WORK', `expected SAME_OWNER_WORK, got ${body.error?.code}`);
+});
+
+await test('7d. Another owner in person may still request work from Agent C', async () => {
+    const { status, body } = await json('/v1/work/request', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerBToken}` },
+        body: JSON.stringify({
+            action_id: 'same-owner-test-action',
+            provider_gaii: agentCGaii,
+            input: { text: 'asked by another owner' },
+        }),
+    });
+    assert(status === 201, `a different owner must still be able to ask: ${status} ${JSON.stringify(body)}`);
 });
 
 // ─── Test 8: Path Traversal ───

@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- deleteOwner writes the erasure's pseudonym in place of the person on the
+ *     ledger lines of other people that name them, as counterparty or as the one who acted
+ *     (repos/ledger-erasure.ts). The lines stay for those people's books.
+ *   v1.13.0 -- 2026-09-26 -- The work settlement names the owner's agents as well, so their work is
+ *     found for an account with no GHII row.
+ *   v1.12.0 -- 2026-09-26 -- deleteOwner settles the person's work first (repos/work-erasure.ts): open
+ *     work is cancelled and the requester's held morsels go back, finished work stays for the other
+ *     side under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
  *   v1.11.0 -- 2026-09-26 -- deleteOwner deletes the actions the owner published in person, stored
  *     under the bare account name, and rewrites the owner and principal of the kept AI provenance
  *     records to the erasure's pseudonym (repos/ai-provenance-erasure.ts). A freed name inherits
@@ -48,7 +56,9 @@ import { resolveGroupId } from '../../../memory-sharing.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
 import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
-import { erasedPartyPseudonym } from '../../../erased-party.js';
+import { settleErasedPartyWork } from '../repos/work-erasure.js';
+import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
+import { erasedPartyPseudonym, erasedAccountParty } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
@@ -108,11 +118,18 @@ export const ownerMethods = {
 
   async deleteOwner(this: SqliteStorage, name: string): Promise<boolean> {
     const txn = this.db.transaction(() => {
-      // 1. Get all agents belonging to this owner
+      // 0. The work this person is a party to, settled before the per-identity passes below delete
+      // what they find: open work is cancelled and the requester's held morsels go back, finished
+      // work stays for the other side under the erasure's pseudonym (repos/work-erasure.ts). One
+      // pseudonym for the whole erasure, so the other side's books still see one party. The agents
+      // are named too, for an account whose agents no GHII pattern would find.
+      const ghiiRows = this.db.prepare('SELECT ghii FROM ghiis WHERE ownerName = ?').all(name) as { ghii: string }[];
       const agentRows = this.db.prepare('SELECT gaii FROM agents WHERE owner = ?').all(name) as { gaii: string }[];
       const agentGaiis = agentRows.map(r => r.gaii);
+      const pseudonym = erasedPartyPseudonym();
+      settleErasedPartyWork(this.db, name, ghiiRows.map(r => r.ghii), pseudonym, id => this.resolveGhii(id), {}, agentGaiis);
 
-      // 2. Cascade delete all agent-related data for each agent
+      // 1-2. Cascade delete all agent-related data for each agent
       for (const gaii of agentGaiis) {
         this.cascadeDeleteAgentData(gaii);
       }
@@ -125,7 +142,6 @@ export const ownerMethods = {
       // person has, because owner sessions and app grants both resolve to the GHII — survived the
       // delete. Found by test/unit/storage-conformance.test.ts on the day it was written: Postgres
       // clears these and SQLite did not, the mirror image of the audit's H-30 in the other provider.
-      const ghiiRows = this.db.prepare('SELECT ghii FROM ghiis WHERE ownerName = ?').all(name) as { ghii: string }[];
       for (const row of ghiiRows) {
         this.cascadeDeleteAgentData(row.ghii);
       }
@@ -144,12 +160,14 @@ export const ownerMethods = {
 
       // The purchase receipts this person is a party to stay, because each one is also the other
       // side's book entry. The name leaves them: it is released for reuse, and every purchase read
-      // keys on it. One pseudonym for the whole erasure, so the books still see one party.
-      const pseudonym = erasedPartyPseudonym();
+      // keys on it. The pseudonym is the one the work above took.
       pseudonymisePurchaseParties(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
       // The AI provenance records stay too, for the content that outlives the account. The name
       // leaves the two columns every owner read keys on, under the same pseudonym.
       pseudonymiseProvenanceOwner(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
+      // So do the other side's ledger lines: the person's own went with the passes above, and the
+      // lines in other people's ledgers name them by the same pseudonym (repos/ledger-erasure.ts).
+      pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiiRows.map(r => r.ghii), pseudonym, agentGaiis));
 
       // 4. Delete GHII records for this owner
       this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);

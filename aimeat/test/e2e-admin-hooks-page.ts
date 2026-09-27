@@ -3,13 +3,16 @@
  * @description E2E for the Hooks page's one read and the binding behind it. The read says which of
  *   the eleven moments decide rather than notify, what is bound to each and whether that action is
  *   still published and still carries an address, what could be bound, and every call made. The
- *   write binds a moment, names back a reference nothing is published under, and clears one. Every
+ *   write binds a moment, refuses a reference nothing is published under, and clears one. Every
  *   door refuses a stranger and a non-operator.
  *
  *   The binding is proven against a REAL published action, because the interesting failures are the
  *   ones where the binding looks right: an action with no address is bound and does nothing, and a
- *   reference to something that was never published is accepted and has to be named.
+ *   reference nothing is published under is refused until the action is published.
  * @version-history
+ *   v1.3.0 -- 2026-09-26 -- A hook binds only an action that is already published: a reference
+ *            nothing is published under is refused with a sentence that says to publish it first, and
+ *            the same id binds, with its provider, once it is published (security audit A8-3).
  *   v1.2.0 -- 2026-09-26 -- A bare id only one owner publishes is bound as id#provider, so a second
  *            owner publishing the same id later changes nothing the binding names (security audit A8-3).
  *   v1.1.0 -- 2026-09-24 -- A bare id a second owner also publishes (security audit A8-3): binding it
@@ -81,6 +84,7 @@ const nonOpName = `hooknon${Date.now()}`;
 const agentName = `hookagent${Date.now()}`;
 const withAddr = `hook-addr-${Date.now()}`;
 const noAddr = `hook-noaddr-${Date.now()}`;
+const later = `hook-later-${Date.now()}`;
 let opToken = '';
 let nonOpToken = '';
 let agentToken = '';
@@ -163,13 +167,32 @@ await test('Binding a moment names what it means, and the read shows it', async 
     assert(d.extension_hooks.pre_board_post.length === 2, 'the old shape carries it too');
 });
 
-await test('A reference nothing is published under is accepted and named back', async () => {
-    const r = await json('/v1/admin/hooks/post_settlement', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ actions: ['nobody-published-this'] }) });
-    assert(r.status === 200, `bind ${r.status}: ${JSON.stringify(r.body.error)}`);
-    assert(JSON.stringify(r.body.data.unknown) === '["nobody-published-this"]', `the unknown reference is named, got ${JSON.stringify(r.body.data.unknown)}`);
+// A hook binds only an action that is already published: publish it, then bind it. The same id is
+// refused before it is published and binds, with its provider, after.
+await test('A reference nothing is published under is refused, says to publish it first, and nothing is written', async () => {
+    const r = await json('/v1/admin/hooks/post_settlement', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ actions: [later] }) });
+    assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT',
+        `a reference nothing is published under was accepted: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+    assert(r.body.error.message.includes(`"${later}"`), `the refusal does not name the reference: "${r.body.error.message}"`);
+    assert(/publish it first, then bind it/i.test(r.body.error.message), `the refusal does not say to publish first: "${r.body.error.message}"`);
     const row = rowOf(await hooks(opToken), 'post_settlement');
-    assert(row.actions[0].published === false && row.actions[0].name === null, `the read says it is not published here, got ${JSON.stringify(row.actions[0])}`);
-    assert(/told after|stopped/i.test(r.body.data.note) || !/refuses/.test(r.body.data.note), `a notify hook's note does not claim it refuses, got "${r.body.data.note}"`);
+    assert(row.actions.length === 0, `the refused binding was written anyway: ${JSON.stringify(row.actions)}`);
+});
+
+await test('Published first, the same id binds with its provider, and a notify moment does not claim to refuse', async () => {
+    const pub = await json('/v1/actions', { method: 'POST', headers: auth(agentToken), body: JSON.stringify({
+        id: later, display_name: `Test ${later}`, description: 'An action published before it is bound.',
+        input_schema: { type: 'object' }, output_schema: { type: 'object' },
+        pricing: { base_morsels: 0 }, tags: ['test'], webhook_url: 'https://hooks.invalid/later',
+    }) });
+    assert(pub.status === 201, `publish ${later}: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+    const r = await json('/v1/admin/hooks/post_settlement', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ actions: [later] }) });
+    assert(r.status === 200, `bind ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(JSON.stringify(r.body.data.actions) === JSON.stringify([`${later}#${pub.body.data.provider_gaii}`]),
+        `the binding names the action with its provider, got ${JSON.stringify(r.body.data.actions)}`);
+    const row = rowOf(await hooks(opToken), 'post_settlement');
+    assert(row.actions[0]?.published === true && row.actions[0]?.host === 'hooks.invalid', `the read says it is bound and published, got ${JSON.stringify(row.actions[0])}`);
+    assert(/told after the fact/.test(r.body.data.note) && !/refuses/.test(r.body.data.note), `a notify hook's note does not claim it refuses, got "${r.body.data.note}"`);
 });
 
 await test('An unknown moment and a bad list are refused', async () => {
@@ -252,16 +275,16 @@ await test('A bare id only one owner publishes is bound with its provider, and a
         `a later publication changed what the binding names: ${JSON.stringify(bound)}`);
 });
 
-await test('Cleanup: the two actions are deleted', async () => {
-    for (const id of [withAddr, noAddr]) {
+await test('Cleanup: the three actions are deleted', async () => {
+    for (const id of [withAddr, noAddr, later]) {
         const r = await json(`/v1/actions/${encodeURIComponent(id)}`, { method: 'DELETE', headers: auth(agentToken) });
-        assert(r.status === 200 || r.status === 204, `delete ${id}: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(r.status === 200, `delete ${id}: ${r.status} ${JSON.stringify(r.body.error)}`);
     }
     const squatGone = await json(`/v1/actions/${encodeURIComponent(withAddr)}`, { method: 'DELETE', headers: auth(squatterToken) });
     assert(squatGone.status === 200,
         `delete the second owner's ${withAddr}: ${squatGone.status} ${JSON.stringify(squatGone.body.error)}`);
     const d = await hooks(opToken);
-    assert(!d.bindable_actions.some((a: any) => a.id === withAddr || a.id === noAddr), 'both are gone from what could be bound');
+    assert(!d.bindable_actions.some((a: any) => [withAddr, noAddr, later].includes(a.id)), 'all three are gone from what could be bound');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

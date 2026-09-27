@@ -1,0 +1,105 @@
+/**
+ * @file ask-page.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A page that asks the person one thing (components/AskPage.js): a narrow column in the
+ *   middle of the window, the question in the Object box (box.css, poster.css), who asks at its top,
+ *   the ways to answer at its foot. Colours from the style; no corner, frame or shadow of its own.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial: the column and the parts of the app-grant consent page
+ *     (css/views/app-grant.css .agr-*) and of the invitation page (css/views/invite-accept.css
+ *     .inv-*), one look for both (page group G9).
+ */
+
+.ask-page {
+  max-width: 470px;
+  margin: 1.5rem auto;
+  padding: 0 1rem 1.5rem;
+}
+
+.ask-page-message {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+/* Who asks: what this is, before what it asks for. */
+.ask-page-who {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.ask-page-who-words {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ask-page-who-name {
+  display: block;
+  font-weight: 800;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.ask-page-who-meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.ask-page-who-mark {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+.ask-page-tag {
+  margin-bottom: 0.6rem;
+}
+
+.ask-page-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0 0 0.6rem;
+  color: var(--text);
+}
+
+/* The ways to answer: at the right of the foot; on a phone under each other, the first lowest. */
+.ask-page-doors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem 1.2rem;
+  margin-top: 1.1rem;
+}
+
+.ask-page-or {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 1rem 0 0.7rem;
+}
+
+.ask-page-ways {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+/* It often opens in a small popup: keep the answer reachable on a short window. */
+@media (max-height: 620px) {
+  .ask-page { margin: 0.75rem auto; }
+  .ask-page-title { font-size: 1.1rem; }
+}
+
+@media (max-width: 420px) {
+  .ask-page-doors { flex-direction: column-reverse; align-items: stretch; }
+  .ask-page-doors > * { text-align: center; }
+}

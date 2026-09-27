@@ -24,6 +24,9 @@
  *   - CompliancePromptSection — section 07, the paste in the dashed box with a door that copies it
  * @usage imported by compliance-tab.js, rendered beside the kept reports
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only: Section, the copy an Action, the paste a Code
+ *     block in the SettingBox. The paste itself is unchanged; the file writes no class. Kept off
+ *     paper by the page's ScreenOnly part (components/PrintPage.js).
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.2.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.1.0 — 2026-09-05 — The section in the poster face: the whole paste sits in the dashed coral
@@ -36,7 +39,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getNodeUrl } from '/js/services/auth.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section } from '/components/Section.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Code } from '/components/Mark.js';
+import { SettingBox } from '/components/Box.js';
 
 /**
  * The paste.
@@ -100,14 +107,12 @@ A write replaces the whole register, so send every entry you want kept. Afterwar
 export function CompliancePromptSection({ nodeId, days }) {
   const prompt = buildCompliancePrompt({ nodeId, days });
   return html`
-    <section class="og-sec adm-cmp-no-print" id="adm-cmp-07">
-      <div class="og-sec-h"><h2 class="poster-section-title">${t('admin.compliance.promptTitle')}<small>07</small></h2>
-        <div class="og-doors"><${CopyButton} text=${prompt} label=${t('admin.compliance.promptCopy')} className="og-door og-door--quiet" /></div></div>
-      <p class="adm-cmp-lead">${t('admin.compliance.promptNote')}</p>
-      <div class="og-box poster-aside poster-aside--small">
-        <span class="og-box-label">${t('admin.compliance.promptLabel')}</span>
-        <div class="adm-cmp-paste">${prompt}</div>
-      </div>
-    </section>
+    <${Section} id="adm-cmp-07" num="07" title=${t('admin.compliance.promptTitle')}
+      doors=${html`<${Action} small soft copy=${prompt}>${t('admin.compliance.promptCopy')}<//>`}>
+      <${Note} kind="lead">${t('admin.compliance.promptNote')}<//>
+      <${SettingBox} label=${t('admin.compliance.promptLabel')}>
+        <${Code} block>${prompt}<//>
+      <//>
+    <//>
   `;
 }

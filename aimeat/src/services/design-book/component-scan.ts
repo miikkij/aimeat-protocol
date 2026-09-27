@@ -23,10 +23,35 @@
  *   reading is the one a browser follows. Both parsers cost more the deeper the text nests, so the
  *   bench hands them no more than its ceiling (COMPONENT_LIMITS in component.ts), and css-tree is not
  *   run at all on a stylesheet nesting deeper than MAX_NESTING.
+ *
+ *   THE MARKUP CLOSES EVERY ELEMENT IT OPENS. A page writes its own content after the component, and
+ *   an element still open where the markup ends takes that content in, so a rule of the component
+ *   styles it. The markup is read once more with an element after it, the way a page follows it.
  * @structure readMarkup · readStylesheet · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
- *   DeclarationRead · ComplexSelector · Compound · Pseudo
+ *   NameKind · NameDefinition · nameKindOf · DeclarationRead · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.6.0 — 2026-09-26 — readStylesheet notes for every at-rule the at-rule whose block it stands in
+ *     (`atRules[].within`), and reads the name @font-palette-values, @position-try, @function (its
+ *     function token) and @font-feature-values (the family) define beside the other three
+ *     (nameKindOf, exported). A prelude is read up to the next at-rule at most.
+ *   v2.5.0 — 2026-09-26 — readStylesheet reads the name each @keyframes, @property and @counter-style
+ *     defines (`definitions`), from the tokens of its prelude: one identifier or string, escapes
+ *     resolved and lower-cased, or null when the prelude holds anything else.
+ *   v2.4.0 — 2026-09-26 — A repeated attribute (`duplicate`, named from the text before the error,
+ *     since parse5 drops it), a missing space between two attributes (`no-space`) and a "/" ending the
+ *     start tag of an element that is not empty (`slash`) are each reported as itself.
+ *   v2.3.0 — 2026-09-26 — readMarkup reports an element still open where the markup ends (`open`,
+ *     with the outermost one's name), read by parsing the markup with an element after it: that
+ *     element stands last at the top only when every element of the markup closed. Its name is one
+ *     no rule of the parser treats apart, so an open <svg> holds it as it holds the page's own
+ *     elements, where a <br> would break out.
+ *   v2.2.0 — 2026-09-26 — A pseudo whose argument is not a selector, and which the parser keeps as raw
+ *     text holding only words and numbers (::part(label), :state(on), :nth-col(2n+1)), reads as
+ *     `plain`, and the walk does not report that text as unreadable.
+ *   v2.1.0 — 2026-09-26 — readStylesheet says of every selector whether it stands in a rule nested
+ *     inside a style rule (`nested`), at-rules between them or not: there "&" is that rule's own
+ *     elements, and at the top of the stylesheet it is the page.
  *   v2.0.0 — 2026-09-26 — The stylesheet is read by css-tree (readStylesheet, in place of cssAsRead,
  *     declarationsOf, selectorsOf, selectorListOf, complexSelectorOf and withoutVarFallbacks): its
  *     tokenizer for the at-rules, functions and addresses, with every name's escapes resolved, and
@@ -61,7 +86,7 @@
  */
 import { defaultTreeAdapter, html as HTML, parseFragment, type DefaultTreeAdapterTypes, type ParserError } from 'parse5';
 import {
-  ident, parse as parseCss, tokenize, tokenTypes, walk,
+  ident, parse as parseCss, string as cssString, tokenize, tokenTypes, walk,
   type CssNode, type Declaration, type PseudoClassSelector, type PseudoElementSelector, type Rule, type Selector, type SelectorList,
 } from 'css-tree';
 
@@ -90,12 +115,20 @@ export type MarkupProblem =
   | { kind: 'closing'; element: string; rest: string }
   /** A "<" with no tag name straight after it, or after "</". */
   | { kind: 'tag-start' }
-  /** A quote or an angle bracket in a name or a bare value, a missing value, a repeated name. */
+  /** A quote or an angle bracket in a name or a bare value, a missing value, a stray "/" in a tag. */
   | { kind: 'attribute'; element: string; attribute: string }
+  /** The same attribute written twice on one element: a browser keeps the first. */
+  | { kind: 'duplicate'; element: string; attribute: string }
+  /** An attribute written straight after the value before it, with no space between them. */
+  | { kind: 'no-space'; element: string; attribute: string }
+  /** A "/" ending the start tag of an element that is not empty: a browser ignores it and leaves the element open. */
+  | { kind: 'slash'; element: string }
   /** Any other place the parser reports the markup as not well formed, by its WHATWG error code. */
   | { kind: 'unclean'; code: string; at: number }
   /** A "<" the parser read as no tag: text inside <textarea> or <title>, or a tag HTML drops there. */
-  | { kind: 'stray'; at: number };
+  | { kind: 'stray'; at: number }
+  /** An element still open where the markup ends, by the name of the outermost one. */
+  | { kind: 'open'; element: string };
 
 /** The parse error codes that say where a tag ends, what starts one and what an attribute holds. */
 const UNCLOSED_CODES = new Set(['eof-in-tag', 'eof-before-tag-name']);
@@ -105,8 +138,17 @@ const TAG_START_CODES = new Set([
 ]);
 const ATTRIBUTE_CODES = new Set([
   'unexpected-character-in-attribute-name', 'unexpected-character-in-unquoted-attribute-value', 'missing-attribute-value',
-  'missing-whitespace-between-attributes', 'unexpected-solidus-in-tag', 'duplicate-attribute',
+  'unexpected-solidus-in-tag',
 ]);
+
+/**
+ * What the markup is read again with, after it: an element a page might write next. Its name is a
+ * custom element's, which no rule of the parser treats apart and no allowlist carries: an open <p>
+ * does not close for it, an open <svg> holds it (a <br> would break out of the <svg> to the top), and
+ * <select> drops it and a <table> puts it before itself, so in neither is it last.
+ */
+const END_NAME = 'aimeat-bench-end';
+const END_MARK = `<${END_NAME}></${END_NAME}>`;
 
 /**
  * The context the markup is parsed in: the inside of a <div>, where the preview puts it. A fragment
@@ -129,6 +171,10 @@ interface TagSpan { start: number; end: number; name: string; closing: boolean; 
  *     text in another place, so every "<" has to be one of the tags the checks see.
  * Elements come in document order, the contents of a <template> included. The walk is a loop, not
  * a recursion, since a nesting depth is whatever the text says.
+ *
+ * A markup that reads cleanly is read once more with END_MARK after it, as a page follows the
+ * component with its own content: when END_MARK is not the last thing at the top, standing empty, an
+ * element of the markup is still open and would take that content in.
  */
 export function readMarkup(html: string): { elements: MarkupElement[]; problem: MarkupProblem | null } {
   const errors: ParserError[] = [];
@@ -163,14 +209,25 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
     if (first.code === 'unexpected-equals-sign-before-attribute-name') return { elements, problem: { kind: 'equals', element: span?.name ?? '' } };
     if (UNCLOSED_CODES.has(first.code)) return { elements, problem: { kind: 'unclosed' } };
     if (TAG_START_CODES.has(first.code)) return { elements, problem: { kind: 'tag-start' } };
-    if (ATTRIBUTE_CODES.has(first.code) && span) {
+    if (first.code === 'non-void-html-element-start-tag-with-trailing-solidus' && span) return { elements, problem: { kind: 'slash', element: span.name } };
+    // parse5 reports a repeated attribute right after its name, and drops it from the element, so
+    // the name is read from the text just before the error, one character at a time backwards.
+    if (first.code === 'duplicate-attribute' && span) {
+      let end = first.startOffset;
+      while (end > span.start && /\s/.test(html[end - 1])) end--;
+      let start = end;
+      while (start > span.start && !/[\s"'<>/=]/.test(html[start - 1])) start--;
+      return { elements, problem: { kind: 'duplicate', element: span.name, attribute: html.slice(start, end) } };
+    }
+    if ((ATTRIBUTE_CODES.has(first.code) || first.code === 'missing-whitespace-between-attributes') && span) {
       // The attribute the error sits in, or nearest before it: parse5 gives each one's place.
       let attribute = '';
       let from = -1;
       for (const [attrName, where] of Object.entries(span.attrs)) {
         if (where.startOffset <= first.startOffset && where.startOffset > from) { attribute = attrName; from = where.startOffset; }
       }
-      return { elements, problem: { kind: 'attribute', element: span.name, attribute } };
+      const kind = first.code === 'missing-whitespace-between-attributes' ? 'no-space' : 'attribute';
+      return { elements, problem: { kind, element: span.name, attribute } };
     }
     return { elements, problem: { kind: 'unclean', code: first.code, at: first.startOffset } };
   }
@@ -183,6 +240,15 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
     while (s < spans.length && spans[s].start <= at) { reach = Math.max(reach, spans[s].end); s++; }
     if (at >= reach) return { elements, problem: { kind: 'stray', at } };
   }
+  // NOTHING IS LEFT OPEN: what a page writes next stands at the top, after the component.
+  const followed = parseFragment(CONTEXT, html + END_MARK, {}).childNodes;
+  const last = followed[followed.length - 1];
+  if (!last || last.nodeName !== END_NAME || !('childNodes' in last) || last.childNodes.length > 0) {
+    // The outermost element still open is the last one at the top: END_MARK is inside it, or it
+    // dropped END_MARK (<select>) or put it before itself (<table>).
+    const open = [...followed].reverse().find(n => 'tagName' in n);
+    return { elements, problem: { kind: 'open', element: open && 'tagName' in open ? open.tagName.toLowerCase() : '' } };
+  }
   return { elements, problem: null };
 }
 
@@ -192,8 +258,10 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
  *   - `list`: a selector list (:is, :where, :not, :has, ::slotted, …), each entry a complex selector,
  *     or null where one does not read as a selector;
  *   - `nth`: :nth-child() and its kin, with the list after "of" when there is one;
- *   - `plain`: words, strings and commas, which name no element (:lang(fi), :dir(rtl));
- *   - `unreadable`: anything the parser kept as raw text, a pseudo it does not know included.
+ *   - `plain`: words, strings and commas, which name no element (:lang(fi), :dir(rtl)), and the
+ *     argument of a pseudo whose argument is not a selector, when the parser kept it as raw text and
+ *     it holds only words, numbers, commas and spaces (::part(label), :state(on), :nth-col(2n+1));
+ *   - `unreadable`: anything else the parser kept as raw text.
  */
 export interface Pseudo {
   name: string;
@@ -243,10 +311,32 @@ export interface DeclarationRead {
   text: string;
 }
 
+/**
+ * The at-rules that define a name the whole page shares: an animation, a custom property, a counter
+ * style, a font palette, a position fallback, a custom function, and the feature values of a font family.
+ */
+export type NameKind = 'keyframes' | 'property' | 'counter-style' | 'font-palette-values' | 'position-try' | 'function' | 'font-feature-values';
+
+/** One at-rule that defines a name the whole page shares, as readStylesheet read its prelude. */
+export interface NameDefinition {
+  kind: NameKind;
+  /** The at-rule's name as the tokenizer saw it, escapes resolved, lower-cased: "keyframes", "-webkit-keyframes". */
+  atRule: string;
+  /** The one name its prelude holds, an identifier or a string, escapes resolved and lower-cased; null when it holds anything else. */
+  name: string | null;
+  /** The at-rule and its prelude as written, for a message. */
+  text: string;
+}
+
 /** A stylesheet as the CSS parser reads it (readStylesheet). */
 export interface StylesheetReading {
-  /** Every at-rule's name the tokenizer saw, escapes resolved, lower-cased. */
-  atRules: string[];
+  /**
+   * Every at-rule the tokenizer saw: its name, escapes resolved, lower-cased, and `within`, the name
+   * of the at-rule whose block it stands in, or null at the top or in a style rule's block.
+   */
+  atRules: Array<{ name: string; within: string | null }>;
+  /** Every at-rule that defines a name the whole page shares, wherever it stands, with the name it defines. */
+  definitions: NameDefinition[];
   /** Every function's name the tokenizer saw, escapes resolved, lower-cased, and "url" for an address token. */
   functions: string[];
   /** Whether a var() reads one of the page's tokens, `--ak-…`. */
@@ -254,8 +344,12 @@ export interface StylesheetReading {
   /** How deep brackets and blocks nest. */
   depth: number;
   declarations: DeclarationRead[];
-  /** Every selector of every style rule outside @keyframes, as written, and read, or null where it does not read. */
-  selectors: Array<{ text: string; selector: ComplexSelector | null }>;
+  /**
+   * Every selector of every style rule outside @keyframes, as written, and read, or null where it
+   * does not read. `nested` when the rule stands inside another style rule, at-rules between them
+   * or not: there "&" is that rule's own elements, and at the top it is the page.
+   */
+  selectors: Array<{ text: string; selector: ComplexSelector | null; nested: boolean }>;
   /** The first part the parser could not read (a parse error, or text it kept raw), or null. */
   unreadable: string | null;
 }
@@ -272,6 +366,38 @@ const T = tokenTypes;
 /** A name as the text spells it, escapes resolved and lower-cased: `U\72 L` is `url`, as a browser matches it. */
 const nameOf = (raw: string): string => ident.decode(raw).toLowerCase();
 
+const NAME_KINDS = new Set<string>(['property', 'counter-style', 'font-palette-values', 'position-try', 'function', 'font-feature-values']);
+
+/** What kind of page-wide name an at-rule defines, or null when it defines none. */
+export function nameKindOf(atRule: string): NameKind | null {
+  if (KEYFRAMES.test(atRule)) return 'keyframes';
+  return NAME_KINDS.has(atRule) ? atRule as NameKind : null;
+}
+
+/**
+ * The name the at-rule whose at-keyword is token `at` defines, read from the tokens of its prelude
+ * up to its block, its ";", the end of the block it stands in, or the next at-rule. The prelude is
+ * one name, an identifier or a string, or the name is null. A custom function is named by its
+ * function token (`@function --name(<parameters>) returns <type>`), and what follows names nothing.
+ */
+function definitionAt(tokens: ReadonlyArray<{ type: number; start: number; end: number }>, at: number, css: string, atRule: string, kind: NameKind): NameDefinition {
+  const parts: Array<{ type: number; start: number; end: number }> = [];
+  let t = at + 1;
+  for (; t < tokens.length; t++) {
+    const { type } = tokens[t];
+    if (type === T.LeftCurlyBracket || type === T.Semicolon || type === T.RightCurlyBracket || type === T.AtKeyword) break;
+    if (type !== T.WhiteSpace && type !== T.Comment) parts.push(tokens[t]);
+  }
+  const text = css.slice(tokens[at].start, t < tokens.length ? tokens[t].start : css.length).replace(/\s+/g, ' ').trim().slice(0, 60);
+  const [first] = parts;
+  let name: string | null = null;
+  if (kind === 'function') {
+    if (first?.type === T.Function) name = nameOf(css.slice(first.start, first.end - 1));
+  } else if (parts.length === 1 && first.type === T.Ident) name = nameOf(css.slice(first.start, first.end));
+  else if (parts.length === 1 && first.type === T.String) name = cssString.decode(css.slice(first.start, first.end)).toLowerCase();
+  return { kind, atRule, name, text };
+}
+
 /** The text a node stands on, trimmed. */
 const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(node.loc.start.offset, node.loc.end.offset).trim() : '');
 
@@ -284,7 +410,9 @@ const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(nod
  * structure. A name is read with its escapes resolved: css-tree matches `url(` as written, and a
  * browser matches it after resolving `u\72 l(`, so every function name is resolved here and the
  * checks read that. The same pass measures how deep the brackets and blocks nest, pairing each
- * closer with its own opener as CSS does (a "]" inside "(" closes nothing).
+ * closer with its own opener as CSS does (a "]" inside "(" closes nothing), notes for every at-rule
+ * the at-rule whose block it stands in, and reads the name that each at-rule defining a page-wide
+ * name defines, from the tokens of its prelude (nameKindOf, definitionAt).
  *
  * THE STRUCTURE, from css-tree's parser, only when the nesting is within MAX_NESTING: every
  * declaration outside an at-rule's conditions, and every selector of every style rule outside
@@ -292,14 +420,24 @@ const textOf = (css: string, node: CssNode): string => (node.loc ? css.slice(nod
  * the parser keeps as raw text, is reported as unreadable.
  */
 export function readStylesheet(css: string): StylesheetReading {
-  const reading: StylesheetReading = { atRules: [], functions: [], readsPageTokens: false, depth: 0, declarations: [], selectors: [], unreadable: null };
+  const reading: StylesheetReading = { atRules: [], definitions: [], functions: [], readsPageTokens: false, depth: 0, declarations: [], selectors: [], unreadable: null };
   const tokens: Array<{ type: number; start: number; end: number }> = [];
   tokenize(css, (type, start, end) => { tokens.push({ type, start, end }); });
   const closers: number[] = [];
   const open = (closer: number) => { closers.push(closer); reading.depth = Math.max(reading.depth, closers.length); };
+  // The at-rule each open block belongs to, the innermost last (null for a style rule's block), and
+  // the at-rule whose prelude is being read, whose block the next "{" opens.
+  const owners: Array<string | null> = [];
+  let prelude: string | null = null;
   for (let t = 0; t < tokens.length; t++) {
     const { type, start, end } = tokens[t];
-    if (type === T.AtKeyword) reading.atRules.push(nameOf(css.slice(start + 1, end)));
+    if (type === T.AtKeyword) {
+      const atRule = nameOf(css.slice(start + 1, end));
+      reading.atRules.push({ name: atRule, within: owners.length ? owners[owners.length - 1] : null });
+      prelude = atRule;
+      const kind = nameKindOf(atRule);
+      if (kind) reading.definitions.push(definitionAt(tokens, t, css, atRule, kind));
+    } else if (type === T.Semicolon) prelude = null;
     else if (type === T.Url || type === T.BadUrl) reading.functions.push('url');
     else if (type === T.Function) {
       const name = nameOf(css.slice(start, end - 1));
@@ -314,8 +452,14 @@ export function readStylesheet(css: string): StylesheetReading {
       open(T.RightParenthesis);
     } else if (type === T.LeftParenthesis) open(T.RightParenthesis);
     else if (type === T.LeftSquareBracket) open(T.RightSquareBracket);
-    else if (type === T.LeftCurlyBracket) open(T.RightCurlyBracket);
-    else if (closers.length && type === closers[closers.length - 1]) closers.pop();
+    else if (type === T.LeftCurlyBracket) {
+      open(T.RightCurlyBracket);
+      owners.push(prelude);
+      prelude = null;
+    } else if (closers.length && type === closers[closers.length - 1]) {
+      closers.pop();
+      if (type === T.RightCurlyBracket) { owners.pop(); prelude = null; }
+    }
   }
   if (reading.depth > MAX_NESTING) return reading;
 
@@ -326,15 +470,22 @@ export function readStylesheet(css: string): StylesheetReading {
       onParseError: (error, fallback) => { reading.unreadable ??= (fallback.type === 'Raw' ? fallback.value : css.slice(error.offset)).trim().slice(0, 60); },
     });
     let keyframes = 0;
+    // How many style rules the walk stands inside: a rule inside one is a nested rule.
+    let styleRules = 0;
     walk(ast, {
       enter(node) {
         if (node.type === 'Raw') reading.unreadable ??= node.value.trim().slice(0, 60);
+        // Raw text a pseudo holds that is only words and numbers is read, not refused (pseudoOf).
+        else if ((node.type === 'PseudoClassSelector' || node.type === 'PseudoElementSelector') && wordsOnly(node)) return this.skip;
         else if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes++;
-        else if (node.type === 'Rule' && keyframes === 0) reading.selectors.push(...selectorsOfRule(node, css));
+        else if (node.type === 'Rule' && keyframes === 0) reading.selectors.push(...selectorsOfRule(node, css, styleRules > 0));
         else if (node.type === 'Declaration' && !this.atrulePrelude) reading.declarations.push(declarationOf(node, css));
+        if (node.type === 'Rule') styleRules++;
+        return undefined;
       },
       leave(node) {
         if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes--;
+        if (node.type === 'Rule') styleRules--;
       },
     });
   } catch (err) {
@@ -370,9 +521,11 @@ function declarationOf(node: Declaration, css: string): DeclarationRead {
 }
 
 /** Every selector of one style rule, as written and as read. A prelude the parser kept raw is one unreadable entry. */
-function selectorsOfRule(rule: Rule, css: string): StylesheetReading['selectors'] {
-  if (rule.prelude.type === 'Raw') return [{ text: rule.prelude.value.trim(), selector: null }];
-  return rule.prelude.children.toArray().map(s => ({ text: s.type === 'Raw' ? s.value.trim() : textOf(css, s), selector: s.type === 'Selector' ? complexOf(s) : null }));
+function selectorsOfRule(rule: Rule, css: string, nested: boolean): StylesheetReading['selectors'] {
+  if (rule.prelude.type === 'Raw') return [{ text: rule.prelude.value.trim(), selector: null, nested }];
+  return rule.prelude.children.toArray().map(s => ({
+    text: s.type === 'Raw' ? s.value.trim() : textOf(css, s), selector: s.type === 'Selector' ? complexOf(s) : null, nested,
+  }));
 }
 
 const listOf = (list: SelectorList): Array<ComplexSelector | null> => list.children.toArray().map(s => (s.type === 'Selector' ? complexOf(s) : null));
@@ -412,10 +565,36 @@ function complexOf(selector: Selector): ComplexSelector | null {
   return out;
 }
 
+/** Pseudos whose argument is a selector: the checks follow that argument, so a raw one stays unreadable. */
+const SELECTOR_ARGUMENT = new Set([
+  'is', 'where', 'not', 'matches', '-webkit-any', '-moz-any', 'has', 'nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type',
+  'host', 'host-context', 'slotted', 'cue', 'cue-region', 'current', 'past', 'future',
+]);
+/** The tokens an argument of words and numbers is made of. */
+const WORD_TOKENS = new Set([T.Ident, T.Number, T.Dimension, T.Percentage, T.Comma, T.WhiteSpace]);
+
+/**
+ * Whether a pseudo holds, as raw text, an argument of words and numbers only: ::part(label),
+ * :state(on), :nth-col(2n+1). A pseudo-class only narrows the element its compound names and a
+ * pseudo-element hangs off it, so such an argument changes nothing a rule reaches. A pseudo whose
+ * argument is a selector is never read this way: its argument is what the checks follow.
+ */
+function wordsOnly(node: PseudoClassSelector | PseudoElementSelector): boolean {
+  if (node.children === null || SELECTOR_ARGUMENT.has(nameOf(node.name))) return false;
+  const kids = node.children.toArray();
+  return kids.length > 0 && kids.every(kid => {
+    if (kid.type !== 'Raw') return false;
+    let words = true;
+    tokenize(kid.value, type => { if (!WORD_TOKENS.has(type)) words = false; });
+    return words;
+  });
+}
+
 /** A pseudo-class or pseudo-element with what its parentheses hold, as css-tree read it. */
 function pseudoOf(node: PseudoClassSelector | PseudoElementSelector): Pseudo {
   const pseudo: Pseudo = { name: nameOf(node.name), element: node.type === 'PseudoElementSelector', arg: null };
   if (node.children === null) return pseudo;
+  if (wordsOnly(node)) { pseudo.arg = { kind: 'plain' }; return pseudo; }
   const kids = node.children.toArray();
   const [only] = kids;
   if (kids.length === 1 && only.type === 'SelectorList') pseudo.arg = { kind: 'list', list: listOf(only) };

@@ -11,6 +11,13 @@
  *   shape. The row under a page head is .tab-row--bar with .poster-row--thing.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-09-27 — .tab-row--fill (Tabs fill): the tabs share the row's width, each word
+ *     centred, 22px apart (the old app catalogue's Add dialog tabs, .modal-tabs); the line and glyph
+ *     tones keep their own padding in a row. appcat parity; additive.
+ *   v1.3.0 — 2026-09-27 — The caption's word at the old order row's size and spacing (.66rem, .12em),
+ *     appcat parity; additive.
+ *   v1.2.0 — 2026-09-27 — .tab-row--caption (Tabs caption): a row with its own coral word before the
+ *     tabs, one line, sideways on a phone (the old app catalogue's order row), for appcat; additive.
  *   v1.1.0 — 2026-09-27 — Every tab of a row is one box, chosen or not (no jump when one is chosen); the
  *     ground and words change over 150ms; .tab-panel fades the chosen view in (about 180ms); no motion
  *     under prefers-reduced-motion.
@@ -30,7 +37,7 @@
    buttons did. */
 /* :where() keeps the weight of this rule at a style's own tab rule, so a style that gives its tabs
    one padding of its own (Pebble) still wins, chosen or not. */
-:where(.tab-row, .tab-row--bar) > .poster-tab:not(.poster-tab--filter):not(.poster-tab--tile) { padding: .2rem .5rem; }
+:where(.tab-row, .tab-row--bar) > .poster-tab:not(.poster-tab--filter):not(.poster-tab--tile):not(.poster-tab--line):not(.poster-tab--glyph) { padding: .2rem .5rem; }
 :is(.tab-row, .tab-row--bar) > .poster-tab { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
 /* The part a view tab shows (components/Tabs.js TabPanel) fades in when the chosen tab changes. */
 .tab-panel { animation: tab-panel-in .18s ease-out; }
@@ -38,4 +45,21 @@
 @media (prefers-reduced-motion: reduce) {
   :is(.tab-row, .tab-row--bar) > .poster-tab { transition: none; }
   .tab-panel { animation: none; }
+}
+/* A row with its own word before the tabs (Tabs caption, appcat): the old catalogue's order row
+   (.cat-sort, .cat-sort-label): one line on the baseline, 20px apart; on a phone it scrolls sideways. */
+.tab-row.tab-row--caption { flex-wrap: nowrap; align-items: baseline; gap: 20px; padding-bottom: 10px; }
+.tab-row-caption { flex: none; }
+/* The caption's word is the old order row's, a step smaller and wider set than a label (.cat-sort-label). */
+.tab-row--caption > .tab-row-caption { font-size: .66rem; letter-spacing: calc(var(--shape-tracking-label) * 1.2); line-height: normal; }
+.tab-row.tab-row--caption > .poster-tab.poster-tab--line { padding: 0 0 1px; }
+/* A row whose tabs share its width (Tabs fill, appcat): the old catalogue's Add dialog tabs
+   (.modal-tabs): one line, 22px apart, each word centred in its half, 14px over what the tabs govern.
+   The chosen line tab there was semibold (its .modal-tab.active), kept as it looked. */
+.tab-row.tab-row--fill { display: flex; flex-wrap: nowrap; gap: 22px; margin: 0 0 14px; }
+.tab-row--fill > .poster-tab { flex: 1 1 0; min-width: 0; justify-content: center; }
+.tab-row--fill > .poster-tab.poster-tab--line.is-on { font-weight: var(--weight-semibold); }
+@media (max-width: 900px) {
+  .tab-row.tab-row--caption { gap: 14px; padding-bottom: 0; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .tab-row.tab-row--caption::-webkit-scrollbar { display: none; }
 }

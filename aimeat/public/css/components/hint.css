@@ -10,6 +10,26 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.9.0 — 2026-09-27 — The paragraph to be read (.poster-hint--text, Note hint size 'text'): the old
+ *     detail's .mk-legal; additive, appcat parity (sections-c).
+ *   v1.8.0 — 2026-09-27 — The short state (.state-line--small, Note state size 'small'): the old
+ *     EXCHANGE status (.od-status) with its grey line and door row after it; additive, appcat parity
+ *     (sections-d).
+ *   v1.7.0 — 2026-09-27 — .poster-hint--intro and --note (Note hint size 'intro', 'note'): the old
+ *     visitors' .vis-intro and .vis-note; additive, appcat parity (sections-b).
+ *   v1.6.0 — 2026-09-27 — The chapter's grey line (.poster-hint--chapter, Note hint `chapter`): the old
+ *     detail's .dtl-ai-status; and the state line on the old page's own ground and corner (its
+ *     --bg-subtle is the site's --bg-surface, 8px): the old page defined none of the tinted grounds, so
+ *     every state stood on the grey. appcat parity (sections-c); the state line is appcat's alone.
+ *   v1.5.0 — 2026-09-27 — The small hint (.poster-hint--small, Note hint size 'small'): the old app
+ *     catalogue's .wc-verbs-hint; additive, appcat parity (sections-a).
+ *   v1.4.0 — 2026-09-27 — The chapter's status line (.note-report--chapter, Note report `chapter`): the
+ *     old app catalogue's detail .dtl-ai-status; additive, appcat parity (sections-d).
+ *   v1.3.0 — 2026-09-27 — The caption (.note-caption, Note kind="caption"): a dialog's small grey line on
+ *     what it is about or does, and the report (.note-report, Note kind="report"): the line a dialog
+ *     reports what it is doing in (the old app catalogue's); additive, appcat parity.
+ *   v1.2.0 — 2026-09-27 — The state line (.state-line, Note kind="state"): where a thing stands on a
+ *     ground tinted by its state, the old app catalogue's search state; additive, appcat.
  *   v1.1.0 — 2026-09-25 — The look 21 Settings & Controls tabs draw as identical copies: body face, .82rem,
  *     line-height 1.5, the gap above rather than below; and the slab tone, with the values of the four
  *     identical copies beside a loud action (UI consolidation phase 5, a unification). The home's
@@ -19,6 +39,75 @@
 
 .poster-hint { margin: .7rem 0 0; font-family: var(--font-body); font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
 .poster-hint--slab { display: block; margin: 0; max-width: 18rem; font-family: var(--font-mono); font-size: .7rem; text-align: right; }
+/* The small hint (Note hint size 'small', appcat): the line under a row of verbs that says what they
+   do (the old app catalogue's .wc-verbs-hint). */
+.poster-hint.poster-hint--small { margin-top: 10px; font-size: .78rem; line-height: 1.45; }
+/* A readout's grey opening sentence and the grey note under a figure or a table (Note hint size
+   'intro', 'note'; appcat sections-b): the old visitors' .vis-intro and .vis-note, in the lighter grey
+   (the old page's --text-dim is the site's --text-muted). */
+.poster-hint.poster-hint--intro { max-width: 70ch; margin: 0 0 18px; font-size: .95rem; line-height: 1.55; color: var(--text-muted); }
+.poster-hint.poster-hint--note { max-width: 78ch; margin: 10px 0 0; font-size: .85rem; line-height: 1.55; color: var(--text-muted); }
+/* The caption (Note kind="caption", appcat): a dialog's small grey line on what it is about or what it
+   does, no margin of its own (the old app catalogue's .consents-target, the versions and protection
+   help lines: .78rem to .8rem in its --text-muted, which is the site's --text-dim); a summary a step
+   larger (.82rem); the typewriter face for a name as it is written. */
+.note-caption { margin: 0; font-size: .78rem; line-height: normal; color: var(--text-dim); overflow-wrap: anywhere; }
+.note-caption--medium { font-size: .82rem; }
+.note-caption--large { font-size: .9rem; }
+.note-caption--mono { font-family: var(--font-mono); }
+/* body: a description at the running text's size, 18px over what follows (the old .cx-desc); faint:
+   the lighter grey (the old page's --text-dim: .cx-sub, .cx-status, .cx-desc). */
+.note-caption--body { margin-bottom: 18px; font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; }
+.note-caption--faint { color: var(--text-muted); }
+/* lead (appcat sections-d): a chapter's grey opening line, 6px over what follows (the old detail's
+   Bundled agents explanation, .85rem in its --text-muted, the site's --text-dim). */
+.note-caption--lead { margin-bottom: 6px; font-size: .85rem; overflow-wrap: normal; }
+/* The report (Note kind="report", appcat): the line a dialog reports what it is doing in, 8px under what
+   is above it (the old page's #…-status lines, .85rem); grey while it works, green when done, red when
+   it failed, coral when the form said no; `keep` holds one line's room while it says nothing. */
+.note-report { margin: 8px 0 0; font-size: .85rem; line-height: normal; color: var(--text); overflow-wrap: anywhere; }
+.note-report--keep { min-height: 1.1em; }
+.note-report--busy { color: var(--text-dim); }
+.note-report--ok { color: var(--success); }
+.note-report--err { color: var(--danger); }
+.note-report--refused { color: var(--accent); }
+/* A report that names a list (the old backup result): its name semibold, the items a bullet list
+   .82rem, 4px under the name and 10px over what follows, 18px in. */
+.note-report > strong { font-weight: var(--weight-semibold); }
+.note-report > ul { margin: 4px 0 10px; padding-left: 18px; font-size: .82rem; }
+/* A lead right after a status line stands 10px under it (the old source editor's verbs hint). */
+.note-report + .og-lead { margin-top: 10px; }
+/* A chapter's status line (Note report `chapter`, appcat sections-d): the old app catalogue's detail
+   .dtl-ai-status, 10px under what is above it, .82rem; its room kept with `keep`. */
+.note-report.note-report--chapter { margin-top: 10px; font-size: .82rem; }
+/* The state line (Note kind="state"): the one sentence that says where a thing stands, on a ground
+   tinted by its state (the old app catalogue's search state, .dtl-seo-state). */
+.state-line { margin: 0 0 12px; padding: 8px 10px; border-radius: var(--shape-corner-soft); background: var(--bg-surface); font-size: .88rem; line-height: 1.45; color: var(--text); }
+/* A chapter's grey line (Note hint `chapter`, appcat sections-c): the old detail's .dtl-ai-status, at
+   the reading of the words around it, 10px under what is above it, its one line's room kept. */
+.poster-hint.poster-hint--chapter { margin-top: 10px; min-height: 1.1em; line-height: normal; }
+/* A paragraph to be read (Note hint size 'text', appcat sections-c): what the law says, in words, at
+   the reading size in the grey, 8px under it (the old detail's .mk-legal; its --text-muted is the
+   site's --text-dim). */
+.poster-hint.poster-hint--text { margin: 0 0 8px; font-size: .92rem; line-height: 1.6; color: var(--text-dim); }
+.state-line--fine { background: var(--success-bg, var(--bg-subtle)); }
+.state-line--attention { background: var(--warn-bg, var(--bg-subtle)); }
+.state-line--danger { background: var(--danger-bg, var(--bg-subtle)); }
+/* A short state (Note state size="small", appcat sections-d): only as wide as its words, bold and a
+   step smaller, grey on the grey ground, or green on a pale green one when fine (the old app
+   catalogue's EXCHANGE status, .od-status: its --text-muted is the site's --text-dim, its green the
+   success colour). A chapter's grey line under it stands 6px away, and the door row after them 18px
+   (.od-note, .od-actions). */
+.state-line.state-line--small { display: inline-block; margin: 0; padding: 6px 10px; font-size: .86rem; font-weight: 600; line-height: normal; color: var(--text-dim); }
+.state-line.state-line--small.state-line--fine { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success); }
+.state-line--small + .poster-quiet.poster-quiet--chapter { margin: 6px 0; }
+/* …in the typewriter face (Note state size="small" mono): the old cost summary, a .dtl-sync chip; the
+   list of contracts under it stands 10px away. */
+.state-line.state-line--small.state-line--mono { border-radius: var(--shape-corner); font-family: var(--font-mono); font-size: .82rem; font-weight: 400; }
+/* …waiting (tone attention): amber on a pale amber ground (the old .dtl-sync.diff: a paused contract). */
+.state-line.state-line--small.state-line--attention { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.state-line--small + .listing { margin-top: 10px; }
+.state-line--small ~ .og-doors--chapter { margin-top: 18px; }
 @media (max-width: 860px) {
   .poster-hint--slab { text-align: left; }
 }

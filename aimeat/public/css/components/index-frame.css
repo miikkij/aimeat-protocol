@@ -1,0 +1,33 @@
+/**
+ * @file index-frame.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A page with its own index beside it (components/IndexFrame.js): the index column at
+ *   the start and the main column at a reading width, one column under 900px with the index on top.
+ *   A foot on ink (InkFoot, .poster-foot) as the main column's last part bleeds to its edges. The
+ *   values are the old app catalogue's (.cat-body, .cat-rail, .cat-main, its footer).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — .index-frame--dense: the old catalogue's reading (line height normal, the
+ *     dim words in --text-muted, the theme's lightest grey, which is what the old page's own
+ *     --text-dim was), appcat parity.
+ *   v1.0.0 — 2026-09-27 — Initial, for appcat (the old catalogue's frame, values unchanged).
+ */
+
+/* The catalogue's reading: the old page kept the browser's line height, and its dim words were the
+   theme's lightest grey. Everything in the frame inherits both. */
+.index-frame--dense { line-height: normal; --text-dim: var(--text-muted); }
+
+.index-frame { display: flex; align-items: flex-start; position: relative; z-index: 1; }
+.index-frame-index { width: 250px; flex: 0 0 250px; padding: 24px 20px 32px 24px; box-sizing: border-box; display: flex; flex-direction: column; }
+.index-frame-main { flex: 1 1 auto; min-width: 0; max-width: 1180px; padding: 40px 44px 0 24px; display: flex; flex-direction: column; }
+/* The foot on ink bleeds to the main column's edges (the catalogue's footer). */
+.index-frame-main > .poster-foot { margin: 64px -44px 0 -24px; padding: 40px 44px; gap: 44px; font-size: .95rem; font-weight: var(--font-poster-text-weight); }
+
+@media (max-width: 900px) {
+  .index-frame { flex-direction: column; align-items: stretch; }
+  .index-frame > * { min-width: 0; width: auto; }
+  .index-frame-index { flex: 0 0 auto; padding: 22px 18px 0; gap: 12px; }
+  .index-frame-main { padding: 16px 18px 0; }
+  .index-frame-main > .poster-foot { margin: 40px -18px 0; padding: 28px 18px; grid-template-columns: 1fr; gap: 14px; }
+}

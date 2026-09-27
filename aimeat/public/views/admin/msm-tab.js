@@ -5,7 +5,7 @@
  * @description Admin MSM page in the poster face (design canvas "MSM Management Page",
  *   direction A): what a machine service manifest is, what is registered and where each one points,
  *   which of them describe the same thing, the ready-made ones nobody has used, and what it takes
- *   to use one.
+ *   to use one. Drawn only from library components: the page passes data and writes no class.
  *
  *   THE PAGE SHOWED NOTHING WHILE TEN WERE REGISTERED. The shell fetched the listing into
  *   `data.msmIntegrations` and this tab read `data.msm`, so an operator with ten manifests met
@@ -20,9 +20,15 @@
  *
  *   FIVE OF THE TEN ON AIMEAT.IO DESCRIBE ONE RSS FEED. Section 03 says so, from the addresses the
  *   listing now carries, and names the fact that joined each set.
- * @structure MsmTab (default) · RightNow · ReadyMade · WhatItTakes
+ * @structure MsmTab (default) · RightNow · ReadyMade · WhatItTakes · ManifestList
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only (Jouni, 2026-09-22: "all admin pages onto the
+ *     shared set"): Section, FigureStrip (the coral figure kept as its notice tone), SearchLine, the
+ *     manifests a List with main's columns (each cell says its column on a phone), the sets a List
+ *     whose rows open their manifests in the Panel, the ready-made ones two Lists in Columns, what it
+ *     takes Facts, the boxes SettingBox, the delete dialog's field a TextField, the doors Action and
+ *     Loud. admin-msm.css goes.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings and stylesheet-owned layout.
  *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
@@ -34,20 +40,29 @@
  *   v1.2.0 — 2026-06-02 — Delete-confirm uses the canonical <Modal>.
  *   v1.1.0 — 2026-06-02 — Delete-confirm overlay uses .modal-overlay from theme.css.
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, dt, Badge, Spinner, ErrorBox, useToast, Toast } from './shared.js';
 import { Modal } from '/components/Modal.js';
+import { Section } from '/components/Section.js';
+import { Note } from '/components/Note.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name, Cell, Doors, SearchLine } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Facts } from '/components/Facts.js';
+import { SettingBox } from '/components/Box.js';
+import { TextField } from '/components/TextField.js';
+import { Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import {
     listMsms, getMsmDetail, createMsm, updateMsm, deleteMsm, getMsmTemplates, getMsmTemplate,
 } from '/js/services/admin.js';
 import { relatedSets, loneOnes, hostsOf, actionsOf } from './msm-tab.groups.js';
 import MsmDetail from './msm-tab.detail.js';
-import MsmWrite from './msm-tab.write.js';
+import MsmWrite, { TemplateList } from './msm-tab.write.js';
 
 const html = htm.bind(h);
 const M = (key, params) => t('admin.msm.' + key, params);
@@ -63,62 +78,59 @@ function daysSince(iso) {
 /** Section 01: four numbers, and the sentence that says what registering one does not do. */
 function RightNow({ facts, number, onWrite }) {
     return html`
-    <section class="og-sec og-sec--first" id="adm-msm-now">
-      <div class="og-sec-h"><h2 class="poster-section-title">${M('now.title')}<small>${number}</small></h2>
-        <div class="og-doors"><button type="button" class="og-slab" onClick=${onWrite}>${M('writeNew')}</button></div></div>
-      <div class="og-strip">
-        <div><b>${num(facts.all)}</b><span>${M('strip.registered')}</span><small>${M('strip.registeredSub')}</small></div>
-        <div><b>${num(facts.needKey)}</b><span>${M('strip.needKey')}</span><small>${M('strip.needKeySub')}</small></div>
-        <div><b class="og-coral-num">${num(facts.biggestSet)}</b><span>${M('strip.repeated')}</span>
-          <small>${facts.biggestSetWhat || M('strip.repeatedNone')}</small></div>
-        <div><b>${num(facts.daysQuiet)}</b><span>${M('strip.quiet')}</span><small>${M('strip.quietSub')}</small></div>
-      </div>
-      <p class="adm-alert-line">${M('now.line')}</p>
-    </section>`;
+    <${Section} first id="adm-msm-now" num=${number} title=${M('now.title')}
+      doors=${html`<${Loud} control onClick=${onWrite}>${M('writeNew')}<//>`}>
+      <${FigureStrip} wrap items=${[
+        { n: num(facts.all), label: M('strip.registered'), sub: M('strip.registeredSub') },
+        { n: num(facts.needKey), label: M('strip.needKey'), sub: M('strip.needKeySub') },
+        { n: num(facts.biggestSet), tone: 'notice', label: M('strip.repeated'), sub: facts.biggestSetWhat || M('strip.repeatedNone') },
+        { n: num(facts.daysQuiet), label: M('strip.quiet'), sub: M('strip.quietSub') },
+      ]} />
+      <${Note} kind="lead">${M('now.line')}<//>
+    <//>`;
 }
 
 /** Section 04: the ten that ship with the software, and the fact that none of them is in use. */
 function ReadyMade({ templates, number, onPick }) {
     const list = Array.isArray(templates) ? templates : [];
-    const half = Math.ceil(list.length / 2);
-    const row = (ft, last) => html`
-      <div class=${'adm-msm-tpl' + (last ? ' adm-msm-tpl--last' : '')} key=${ft.type}>
-        <span><b>${ft.name}</b><span class="adm-why">${ft.description}</span></span>
-        <span><button type="button" class="og-door og-door--quiet" onClick=${() => onPick(ft.type)}>${M('write.start')}</button></span>
-      </div>`;
     return html`
-    <section class="og-sec" id="adm-msm-ready">
-      <div class="og-sec-h"><h2 class="poster-section-title">${M('ready.title')}<small>${number}</small></h2>
-        <div class="og-doors"><span class="adm-msm-note">${M('ready.count', { n: num(list.length) })}</span></div></div>
-      <p class="adm-msm-lead">${M('ready.lead')}</p>
+    <${Section} id="adm-msm-ready" num=${number} title=${M('ready.title')}
+      doors=${html`<${Note} kind="meta" inline>${M('ready.count', { n: num(list.length) })}<//>`}>
+      <${Note} kind="lead">${M('ready.lead')}<//>
       ${list.length === 0
-        ? html`<p class="adm-msm-note">${M('write.noTemplates')}</p>`
-        : html`<div class="adm-msm-tpls">
-            <div>${list.slice(0, half).map((ft, i) => row(ft, i === half - 1))}</div>
-            <div>${list.slice(half).map((ft, i) => row(ft, i === list.length - half - 1))}</div>
-          </div>`}
-    </section>`;
+        ? html`<${Note} kind="quiet">${M('write.noTemplates')}<//>`
+        : html`<${TemplateList} list=${list} onPick=${onPick} />`}
+    <//>`;
 }
 
 /** Section 05: the key, who may read them, who may write one, and what travels. */
 function WhatItTakes({ facts, number }) {
-    const row = (key, last) => html`
-    <div class=${'adm-msm-krow adm-msm-krow--wide' + (last ? ' adm-msm-krow--last' : '')}>
-      <span><b>${M('takes.' + key)}</b></span>
-      <span>${M('takes.' + key + 'Why')}</span>
-    </div>`;
     return html`
-    <section class="og-sec" id="adm-msm-takes">
-      <div class="og-sec-h"><h2 class="poster-section-title">${M('takes.title')}<small>${number}</small></h2></div>
-      ${row('key')}
-      ${row('public')}
-      ${row('write')}
-      ${row('travel', true)}
-      <div class="og-box adm-msm-takes-note poster-aside poster-aside--small">
-        <span class="og-box-label">${M('takes.boxLabel')}</span>
-        ${M('takes.box', { days: num(facts.daysQuiet) })}
-      </div>
-    </section>`;
+    <${Section} id="adm-msm-takes" num=${number} title=${M('takes.title')}>
+      <${Facts} wide rows=${['key', 'public', 'write', 'travel'].map((key) => ({ k: M('takes.' + key), v: M('takes.' + key + 'Why') }))} />
+      <${Space} above="large">
+        <${SettingBox} label=${M('takes.boxLabel')}>${M('takes.box', { days: num(facts.daysQuiet) })}<//>
+      <//>
+    <//>`;
+}
+
+/** The manifests as rows: where each points, what it offers, who wrote it and when. */
+function ManifestList({ rows, onOpen }) {
+    return html`
+    <${List} cols="name-where-what-who-when-doors" labels stackWide
+      head=${[M('col.name'), M('col.calls'), M('col.actions'), M('col.by'), M('col.registered'), '']}>
+      ${rows.map((m) => html`
+        <${Row} key=${m.name}>
+          <${Name} onOpen=${() => onOpen(m)} meta=${m.description || null} after=${html`
+            ${m.auth_type && m.auth_type !== 'none' ? html` <${Badge} type="watch" label=${M('auth.' + m.auth_type)} />` : null}
+            ${m.federate ? html` <${Badge} type="info" label=${M('detail.federatedBadge')} />` : null}`}>${m.name}<//>
+          <${Cell} meta>${hostsOf(m).join(', ') || M('detail.noHost')}<//>
+          <${Cell} meta>${actionsOf(m).join(', ') || '—'}<//>
+          <${Cell} meta>${m.registered_by || '?'}<//>
+          <${Cell} meta>${dt(m.registered_at)}<//>
+          <${Doors}><${Action} small soft onClick=${() => onOpen(m)}>${M('open')}<//><//>
+        <//>`)}
+    <//>`;
 }
 
 export default function MsmTab() {
@@ -288,19 +300,12 @@ export default function MsmTab() {
       <${Modal} open=${!!removing} onClose=${() => setRemoving(null)}
         title=${removing ? M('dialog.deleteTitle', { name: removing.name }) : ''}
         footer=${removing && html`
-          <button type="button" class="poster-action" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
-          <button type="button" class="poster-slab poster-slab--control poster-slab--danger"
-            disabled=${busy || removing.typed !== removing.name} onClick=${doDelete}>${M('deleteIt')}</button>`}>
+          <${Action} onClick=${() => setRemoving(null)}>${t('common.cancel')}<//>
+          <${Loud} control danger disabled=${busy || removing.typed !== removing.name} onClick=${doDelete}>${M('deleteIt')}<//>`}>
         ${removing && html`
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${M('dialog.deleteWarnLabel')}</span>
-            ${M('dialog.deleteWarn')}
-          </div>
-          <label class="adm-msm-field">
-            <span>${M('dialog.deleteTypeLabel', { name: removing.name })}</span>
-            <input class="adm-input mono" type="text" value=${removing.typed} placeholder=${removing.name}
-              onInput=${ev => setRemoving({ ...removing, typed: ev.target.value })} />
-          </label>`}
+          <${SettingBox} label=${M('dialog.deleteWarnLabel')}>${M('dialog.deleteWarn')}<//>
+          <${TextField} code label=${M('dialog.deleteTypeLabel', { name: removing.name })} value=${removing.typed}
+            placeholder=${removing.name} onInput=${(v) => setRemoving({ ...removing, typed: v })} />`}
       <//>`;
 
     if (list === null) {
@@ -335,45 +340,8 @@ export default function MsmTab() {
     let counter = 0;
     const n = () => String(++counter).padStart(2, '0');
 
-    const row = (m) => html`
-      <tr key=${m.name}>
-        <td data-label=${M('col.name')}>
-          <span class="adm-msm-name">
-            <button type="button" onClick=${() => openDetail(m)}>${m.name}</button>
-            <span class="adm-msm-chips">
-              ${m.auth_type && m.auth_type !== 'none' && html`<${Badge} type="watch" label=${M('auth.' + m.auth_type)} />`}
-              ${m.federate && html`<${Badge} type="info" label=${M('detail.federatedBadge')} />`}
-            </span>
-          </span>
-          ${m.description && html`<span class="adm-msm-sub">${m.description}</span>`}
-        </td>
-        <td class="r" data-label=${M('col.calls')}>${hostsOf(m).join(', ') || M('detail.noHost')}</td>
-        <td class="r" data-label=${M('col.actions')}>${actionsOf(m).join(', ') || '—'}</td>
-        <td class="r" data-label=${M('col.by')}>${m.registered_by || '?'}</td>
-        <td class="r" data-label=${M('col.registered')}>${dt(m.registered_at)}</td>
-        <td>
-          <div class="adm-msm-acts">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => openDetail(m)}>${M('open')}</button>
-          </div>
-        </td>
-      </tr>`;
-
-    const table = (rows) => html`
-    <div class="adm-msm-scroll">
-      <table class="adm-msm-tbl">
-        <thead><tr>
-          <th class="adm-msm-name-column">${M('col.name')}</th>
-          <th class="r">${M('col.calls')}</th>
-          <th class="r">${M('col.actions')}</th>
-          <th class="r">${M('col.by')}</th>
-          <th class="r">${M('col.registered')}</th>
-          <th></th>
-        </tr></thead>
-        <tbody>${rows.map(row)}</tbody>
-      </table>
-    </div>`;
-
-    const setBlock = (s, last) => {
+    /** One set that describes the same thing: what joined it, its names, and its manifests opened. */
+    const setRow = (s) => {
         const open = openSet === s.key;
         const title = s.sharedHosts.length > 0
             ? M('sets.byHost', { n: num(s.items.length), host: s.sharedHosts[0] })
@@ -384,71 +352,55 @@ export default function MsmTab() {
             : s.sharedActions.length > 0 ? M('sets.byActionWhy')
                 : M('sets.byBothWhy');
         return html`
-      <div class=${'adm-msm-set' + (last ? ' adm-msm-set--last' : '')} key=${s.key}>
-        <div class="adm-msm-seth">
-          <b>${title}</b>
-          <span class="adm-msm-setacts">
-            <button type="button" class="og-door og-door--quiet"
-              onClick=${() => setOpenSet(open ? '' : s.key)}>${open ? M('sets.hide') : M('sets.compare')}</button>
-          </span>
-        </div>
-        <span class="adm-msm-setnames">${s.items.map((m, i) => html`${i > 0 ? ' · ' : ''}${m.name}`)}</span>
-        <span class="adm-msm-setwhy">${why}</span>
-        ${open && html`<div class="adm-msm-open">${table(s.items)}</div>`}
-      </div>`;
+      <${Row} key=${s.key} open=${open} panel=${html`<${ManifestList} rows=${s.items} onOpen=${openDetail} />`}>
+        <${Name} meta=${s.items.map((m) => m.name).join(' · ')} desc=${why}>${title}<//>
+        <${Doors}><${Action} small soft expanded=${open}
+          onClick=${() => setOpenSet(open ? '' : s.key)}>${open ? M('sets.hide') : M('sets.compare')}<//><//>
+      <//>`;
     };
 
     const alone = loneOnes(shown, shownSets);
+    const copies = shownSets.reduce((s, x) => s + x.items.length - 1, 0);
 
     return html`
-    <div class="adm-msm">
+    <${Fragment}>
       ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
-      <p class="adm-msm-intro">${M('intro')}</p>
+      <${Note} kind="lead">${M('intro')}<//>
       ${error && html`<${ErrorBox} message=${error} />`}
 
       <${RightNow} facts=${facts} number=${n()} onWrite=${openWrite} />
 
-      <section class="og-sec" id="adm-msm-list">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('list.title')}<small>${n()}</small></h2>
-          <div class="og-doors"><span class="adm-msm-note">${M('list.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
-
-        <div class="adm-msm-tools">
-          <span class="adm-msm-find">
-            <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
-            <input type="text" value=${query} placeholder=${M('list.find')}
-              onInput=${ev => setQuery(ev.target.value)} />
-          </span>
-        </div>
-
+      <${Section} id="adm-msm-list" num=${n()} title=${M('list.title')}
+        doors=${html`<${Note} kind="meta" inline>${M('list.count', { n: num(shown.length), total: num(facts.all) })}<//>`}>
+        <${SearchLine} text value=${query} placeholder=${M('list.find')} onInput=${(ev) => setQuery(ev.target.value)} />
         ${shown.length === 0
-          ? html`<p class="adm-msm-note">${query ? M('list.noMatch') : M('list.none')}</p>`
-          : table(shown)}
-      </section>
+          ? html`<${Note} kind="quiet">${query ? M('list.noMatch') : M('list.none')}<//>`
+          : html`<${ManifestList} rows=${shown} onOpen=${openDetail} />`}
+      <//>
 
-      <section class="og-sec" id="adm-msm-sets">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('sets.title')}<small>${n()}</small></h2>
-          <div class="og-doors"><span class="adm-msm-note">${(() => {
-            const copies = shownSets.reduce((s, x) => s + x.items.length - 1, 0);
-            return copies === 0 ? M('sets.countNone')
-              : copies === 1 ? M('sets.countOne')
-                : M('sets.count', { n: num(copies) });
-          })()}</span></div></div>
+      <${Section} id="adm-msm-sets" num=${n()} title=${M('sets.title')}
+        doors=${html`<${Note} kind="meta" inline>${copies === 0 ? M('sets.countNone')
+          : copies === 1 ? M('sets.countOne')
+            : M('sets.count', { n: num(copies) })}<//>`}>
         ${shownSets.length === 0
-          ? html`<p class="adm-msm-note">${M('sets.none')}</p>`
+          ? html`<${Note} kind="quiet">${M('sets.none')}<//>`
           : html`
-            <p class="adm-msm-lead">${M('sets.lead', { n: num(shownSets.reduce((s, x) => s + x.items.length, 0)), total: num(shown.length) })}</p>
-            ${shownSets.map((s, i) => setBlock(s, i === shownSets.length - 1 && alone.length === 0))}
-            ${alone.length > 0 && html`
-              <div class="adm-msm-set adm-msm-set--last">
-                <div class="adm-msm-seth"><b>${alone.length === 1 ? M('sets.aloneOne') : M('sets.alone', { n: num(alone.length) })}</b></div>
-                <span class="adm-msm-setnames">${alone.map((m, i) => html`${i > 0 ? ' · ' : ''}${m.name}`)}</span>
-                <span class="adm-msm-setwhy">${alone.length === 1 ? M('sets.aloneOneWhy') : M('sets.aloneWhy')}</span>
-              </div>`}`}
-      </section>
+            <${Note} kind="lead">${M('sets.lead', { n: num(shownSets.reduce((s, x) => s + x.items.length, 0)), total: num(shown.length) })}<//>
+            <${List} cols="name-doors">
+              ${shownSets.map(setRow)}
+              ${alone.length > 0 && html`
+                <${Row} key="alone">
+                  <${Name} meta=${alone.map((m) => m.name).join(' · ')}
+                    desc=${alone.length === 1 ? M('sets.aloneOneWhy') : M('sets.aloneWhy')}>
+                    ${alone.length === 1 ? M('sets.aloneOne') : M('sets.alone', { n: num(alone.length) })}<//>
+                  <${Doors} />
+                <//>`}
+            <//>`}
+      <//>
 
       <${ReadyMade} templates=${templates} number=${n()} onPick=${pickTemplate} />
       <${WhatItTakes} facts=${facts} number=${n()} />
 
       ${removeDialog()}
-    </div>`;
+    <//>`;
 }

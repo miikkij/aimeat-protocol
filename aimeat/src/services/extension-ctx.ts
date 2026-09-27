@@ -24,10 +24,17 @@
  *   - buildExtensionCtx() — the core with guards applied, merged with the optional parts
  *   - decodeBody() — the shared charset detection the three copies each had their own version of,
  *     on an answer read up to the outbound ceiling
+ *   - hostOfUrl() — the one part of a called address a message about that call names
  * @usage
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.7 — 2026-09-26 — ctx.memory.getPublic refuses a Design Book part with `DESIGN_BOOK_PART: …`,
+ *     naming GET /v1/designbook/:id, the one door that reads a part (utils/own-door-keys.ts).
+ *   v1.6.6 — 2026-09-26 — RESPONSE_TOO_LARGE names the host the script called, with its port, so an
+ *     owner whose script calls several services can tell which one answered too much. The userinfo,
+ *     the path, the query and the fragment stay out of it, since each can carry a key (secaudit
+ *     2026-09, N3).
  *   v1.6.5 — 2026-09-26 — ctx.fetch reads the answer through readBodyCapped up to OUTBOUND_READ_MAX_BYTES
  *     (utils/read-capped.ts, 4 MB). Past it the rest is cancelled, nothing is decoded, and the call
  *     throws `RESPONSE_TOO_LARGE: …`, the shape of every other refusal ctx.fetch makes (secaudit 2026-09, N3).
@@ -74,6 +81,7 @@ import type { ExtensionCtx } from './extension-runtime.js';
 import type { EmailService } from './email.js';
 import { enforceExtensionMemoryLimits } from './quota.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
@@ -129,6 +137,21 @@ function looksLikeUtf8(bytes: Uint8Array): boolean {
 }
 
 /**
+ * The host of an address a script called, with its port when it has one, for a message about that
+ * call. Never more of the address: the userinfo, the path, the query and the fragment can each carry
+ * a key, and the message reaches logs, run records and a person's screen. Null when the string is not
+ * an address, which safeFetch would already have refused.
+ */
+function hostOfUrl(url: string): string | null {
+    try {
+        return new URL(url).host || null;
+    } catch {
+        // eslint-disable-next-line aimeat/no-silent-catch -- safeFetch refused an address that does not parse before any answer was read; here it only leaves the host out of one message
+        return null;
+    }
+}
+
+/**
  * Read a response body as text, honouring the charset from the header or the document prolog.
  * Extracted because each hand-built context carried its own copy and they had drifted: three had
  * the mislabelled-encoding guard below and the MCP one did not, so the same feed that reads
@@ -149,13 +172,16 @@ function looksLikeUtf8(bytes: Uint8Array): boolean {
  * share. Past it the rest of the stream is cancelled, nothing is decoded, and the call throws
  * `RESPONSE_TOO_LARGE: …`. The code leads the message as it does in SECRET_UNKNOWN, because the
  * message is all a script receives, and every road into the sandbox then carries the same code.
+ * The message names the host the script called, so an owner whose script calls several services
+ * can tell which one answered too much (hostOfUrl below).
  */
-async function decodeBody(resp: Response, strictCharset = false): Promise<string> {
+async function decodeBody(resp: Response, url: string, strictCharset = false): Promise<string> {
     const buf = await readBodyCapped(resp, OUTBOUND_READ_MAX_BYTES);
     if (buf === null) {
-        throw new Error(`RESPONSE_TOO_LARGE: The answer is larger than ${OUTBOUND_READ_MAX_BYTES / (1024 * 1024)} MB, `
-            + 'the most ctx.fetch reads of one answer. Ask the source for less: fewer items, one page at a time, '
-            + 'or a shorter date range.');
+        const host = hostOfUrl(url);
+        throw new Error(`RESPONSE_TOO_LARGE: The answer ${host ? `from ${host} ` : ''}is larger than `
+            + `${OUTBOUND_READ_MAX_BYTES / (1024 * 1024)} MB, the most ctx.fetch reads of one answer. Ask the `
+            + 'source for less: fewer items, one page at a time, or a shorter date range.');
     }
     const ct = resp.headers.get('content-type') || '';
     let charset = (/charset=([^\s;]+)/i.exec(ct)?.[1] ?? '').toLowerCase();
@@ -523,6 +549,10 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             },
 
             getPublic: async (namespace, key) => {
+                // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which
+                // benches a component again before it hands one out (utils/own-door-keys.ts).
+                const ownDoor = ownDoorRefusal(namespace, key, config.nodeId);
+                if (ownDoor) throw new Error(`${ownDoor.code}: ${ownDoor.message}`);
                 let record = await storage.getMemory(namespace, key);
                 // A bare owner name resolves through that owner's agents. One IN query rather than
                 // one lookup per agent: the per-agent loop was the older shape and it is still in
@@ -569,7 +599,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             // default and a package producer gets a failed run instead of a mojibake version.
             // GUARD (2026-09-26): the answer is read up to the outbound ceiling and no further, and
             // one past it throws RESPONSE_TOO_LARGE (decodeBody above).
-            const text = await decodeBody(resp, deps.extConfig?.strictCharset === true);
+            const text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true);
             const headers: Record<string, string> = {};
             resp.headers.forEach((v, k) => { headers[k] = v; });
             return { status: resp.status, ok: resp.ok, text, headers };

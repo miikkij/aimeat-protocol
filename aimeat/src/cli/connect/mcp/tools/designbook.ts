@@ -11,6 +11,16 @@
  * @structure registerDesignbookTools(mcp, registry)
  * @usage import { registerDesignbookTools } from './designbook.js';
  * @version-history
+ *   v1.6.3 — 2026-09-26 — The propose contract states the list of at-rules a component's stylesheet may
+ *     carry (parity with the server MCP).
+ *   v1.6.2 — 2026-09-26 — The propose contract says a component's stylesheet carries no @layer, @page or
+ *     @view-transition, and that a name it defines with @keyframes, @property or @counter-style starts
+ *     with its prefix (parity with the server MCP).
+ *   v1.6.1 — 2026-09-26 — The propose contract says a component's stylesheet carries no @scope (parity
+ *     with the server MCP).
+ *   v1.6.0 — 2026-09-26 — The propose contract says the markup closes every element it opens and a
+ *     nested rule starts with "&" (parity with the server MCP). get carries a component's `bench`, and
+ *     the proposer alone gets the markup of one that no longer passes, because the route does.
  *   v1.5.0 — 2026-09-20 — aimeat_designbook_keep and the search's view "reasons" (parity with the
  *     server MCP); get carries the reasons because the route does.
  *   v1.4.0 — 2026-09-19 — A search with no word and no kind asks the route for its map view and
@@ -75,7 +85,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
   });
 
   mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), {
-    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration"|"genre"|"ambient"|"effect"|"component", title, summary, body, tags? }. A COMPONENT (what an app made by hand, offered to the next one) has body { prefix, html, css, use, judgement: { reach: "general"|"special", why }, from_app? }: markup and a stylesheet under one class prefix, every colour a var(--ak-…) token, NO script; a general one from an app its owner was satisfied with is published by itself. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), { style, palette_words? } (illustration), { template } naming a served genre template (genre), { ambient: waves|aurora|dust|grid|static|ink|plasma|lava|tunnel, alpha?, speed?, look?, tokens? } (ambient — "none" is an arrangement\'s choice, never a part), or { effect: scanlines|vignette|duotone|recolour|distort|glitch|vhs|ripple|kaleidoscope, params?, on?: hero|figure|layer, look?, tokens? } (effect — a post-process filter proven where it lands: a moment on the hero band, a picture effect on a figure, or a living pass over the ambient layer).'),
+    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration"|"genre"|"ambient"|"effect"|"component", title, summary, body, tags? }. A COMPONENT (what an app made by hand, offered to the next one) has body { prefix, html, css, use, judgement: { reach: "general"|"special", why }, from_app? }: markup that closes every element it opens and a stylesheet under one class prefix (a nested rule starts with "&"; the only at-rules are @media, @supports, @container and @starting-style, and @keyframes, @property, @counter-style, @font-palette-values, @position-try, @function and @font-feature-values under a name that starts with the prefix), every colour a var(--ak-…) token, NO script; a general one from an app its owner was satisfied with is published by itself. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), { style, palette_words? } (illustration), { template } naming a served genre template (genre), { ambient: waves|aurora|dust|grid|static|ink|plasma|lava|tunnel, alpha?, speed?, look?, tokens? } (ambient — "none" is an arrangement\'s choice, never a part), or { effect: scanlines|vignette|duotone|recolour|distort|glitch|vhs|ripple|kaleidoscope, params?, on?: hero|figure|layer, look?, tokens? } (effect — a post-process filter proven where it lands: a moment on the hero band, a picture effect on a figure, or a living pass over the ambient layer).'),
     ...aiProvenanceInputs,
   }, annotationsFor('aimeat_designbook_propose'), async ({ part, ai_provenance, ai_provenance_id }) => {
     return out(await client.post('/v1/designbook', {

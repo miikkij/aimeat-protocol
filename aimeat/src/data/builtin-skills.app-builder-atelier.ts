@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.20.0 — 2026-09-26 — Components: step 10 says every element closes inside the markup and a
+ *     nested rule starts with "&", and that a proposer is told once, with the reason, when the bench
+ *     stops passing a component they proposed.
  *   v1.19.0 — 2026-09-20 — Components: step 10 says how a hand-made piece is offered when the
  *     owner is satisfied (kind component, the builder's own judgement of its reach, published by
  *     itself when general), and to look at the Book's COMPONENTS before making one.
@@ -299,7 +302,10 @@ moved under you says so.
    arrangement you composed as a \`fill\`. A general component from an app its owner was
    satisfied with is published by itself, with no person in between; a special one stays listed
    and yours. So make hand-made pieces in that shape from the start: one prefix, tokens for
-   colours, behaviour in your script. And before you make one, look at the COMPONENTS group of
+   colours, behaviour in your script, every element closed inside the markup, and a nested rule
+   starting with \`&\`. When the bench this node runs stops passing a component you proposed, you
+   are told once, with the reason: fix it as the reason says and propose it again under the
+   same id. And before you make one, look at the COMPONENTS group of
    the Book's list: \`aimeat_designbook_adopt\` on a component answers its two texts to build in.
    \`aimeat_designbook_propose\` with what it is for, when to choose it and its body, NOW, while you
    know how it works; the publish answer's \`design_book\` line names the styles this app made for

@@ -18,6 +18,8 @@
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   2026-09-27: The door to settings and controls is the Action component, the same link (page
+ *     group G9, a move).
  *   2026-09-23: Composed from components/Masthead.js (Masthead, MastheadButton, MastheadCog), which
  *     emits the markup this file wrote (UI consolidation phase 1, a move).
  *   2026-09-23: The masthead is the shared part in css/parts.css (.poster-masthead*), moved from
@@ -42,6 +44,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import { Masthead, MastheadButton, MastheadCog } from '/components/Masthead.js';
+import { Action } from '/components/Action.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -53,9 +56,9 @@ export function HomeHeader({ name, owner, identity, onOpenSettings }) {
       ${/* The door to everything behind the home. The header carries the same link, but a person
             reading the nameplate is not reading the header, and the relationship (home in front,
             controls behind) has to be visible on the page itself. */''}
-      <a class="poster-action" href="/v1/profile">
+      <${Action} href="/v1/profile">
         ${tr('home.settings.allControls', 'All settings and controls')} →
-      </a>
+      <//>
       <${MastheadButton} onClick=${onOpenSettings}>
         ${MastheadCog}
         <span>${tr('home.settings.open', 'Home settings')}</span>

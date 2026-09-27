@@ -22,7 +22,12 @@
  *     `named` instead, when the set inside names itself by the label), `message` (words, or { text, error })
  *     and `error` (the message is a refusal).
  *   - Fields: `cols` = 2 for two columns, 3 for three short fields side by side (one column on a
- *     narrow screen).
+ *     narrow screen); `plain`: the labels are plain bold words in ink, in the words' own case (a
+ *     dialog form in the app catalogue's face); `beside`: each label at the left of its field, a thin
+ *     rule under each row (the app catalogue's Settings rows); `chapter` (with `plain`): a form inside
+ *     a chapter of the app catalogue's detail, its fields spaced as the old detail spaced them
+ *     (`ruled`: opened in place under the heavy ink rule, the tool editor);
+ *     `spaced` (with `plain chapter`): its one-line fields carry their own air (the About editor).
  *   - FormActions: `end` (the row at the right), `apart` (the first thing at the left, the rest at
  *     the right: a hint beside the send action).
  * @structure Field({ label, hint, message, error, wide, invalid, group, named, id, labelId, hintId, children }) ·
@@ -32,6 +37,20 @@
  *        html`<${Field} label=${t('x.who')} hint=${t('x.whoHint')} group>…<//>`
  *        html`<${FormActions}><${Loud} control onClick=${save}>${t('x.save')}<//><//>`
  * @version-history
+ *   v1.8.0 — 2026-09-27 — Fields `spaced` (with `plain chapter`: the old detail's About editor, its
+ *     one-line fields and the rows under it spaced one by one); additive, form-fields.css
+ *     .og-fields--spaced, appcat parity (sections-a).
+ *   v1.7.0 — 2026-09-27 — Fields `column` (with `plain`: a detail's form in one column, 10px apart, the
+ *     old .mk-author-form and .lg-editor) and `narrow` (520px at most, the reviewer's name); additive,
+ *     form-fields.css .og-fields--column, .og-fields--narrow, appcat parity (sections-c).
+ *   v1.6.0 — 2026-09-27 — Fields `chapter`: with `plain`, a form inside a chapter of the app
+ *     catalogue's detail, its fields spaced as the old detail's (the Promote texts, the ODPS defaults,
+ *     the tool editor), `ruled` for one opened in place under the heavy rule; additive,
+ *     form-fields.css .og-fields--chapter and --ruled, appcat parity (sections-d).
+ *   v1.5.0 — 2026-09-27 — Fields `beside`: each label at the left of its field, a rule under each row
+ *     (the old app catalogue's Settings rows), for appcat; additive, form-fields.css .og-fields--beside.
+ *   v1.4.0 — 2026-09-27 — Fields `plain`: the labels as plain bold words in ink (the app catalogue's
+ *     dialog forms, the old page's .modal-label), for appcat; additive, form-fields.css .og-fields--plain.
  *   v1.3.0 — 2026-09-26 — Fields `cols` 4: four short fields in a row, two under 1100px (an offer's
  *     price on the Offers page, main's .op-sell), additive (page group G6).
  *   v1.1.0 — 2026-09-26 — Fields `cols` 3: three short fields in a row (an agent's crew: the
@@ -92,10 +111,28 @@ export function Field({ label, labelNote, hint, message, error, wide, invalid, g
 }
 
 /** Fields in a column, or in two columns (`cols` 2) that fold to one on a narrow screen. */
-export function Fields({ cols, children }) {
+export function Fields({ cols, plain, beside, chapter, ruled, column, narrow, spaced, children }) {
+  // spaced (added by appcat sections-a, parity): with `plain chapter`, a form whose one-line fields
+  // carry their own air, 4px under the label and 10px over what follows (the last 8px); a row of
+  // doors right under it keeps 4px, its status line 8px, a grey line 10px (the old detail's About
+  // editor, whose fields and rows were spaced one by one).
+  // column (added by appcat sections-c, parity): with `plain`, a form whose parts stand in one column
+  // 10px apart, each label 2px over its field, a hint in the chapter's grey line 10px under it, a
+  // choice 260px at most (the old detail's .mk-author-form and .lg-editor). narrow: a short form of
+  // one name, 520px at most, 14px of air above it and 8px under it (.mk-author-form).
+  // chapter (added by appcat sections-d, parity): with `plain`, a form inside a chapter of the app
+  // catalogue's detail (the old detail's label.dtl-stat-label and its inline fields): the form and
+  // its fields are blocks whose margins meet as there, a field stands in the line under its label and
+  // a many-line one 4px under it and 6px over what follows; `cols` 2 keeps two columns down to 900px,
+  // 24px apart, `cols` 3 is two wide and a short third (a currency). `ruled` (sections-d): the form
+  // opens in place under the heavy ink rule, 24px under what is above it (the old tool editor).
+  // beside (added by appcat's dialogs, parity): each label at the left of its field, a thin rule
+  // under each row (the old app catalogue's Settings rows, .settings-row).
   // cols 4 (added by page group G6): four short fields in a row, two on a narrower screen (an
   // offer's price: visibility, morsels, money, currency; main's .op-sell).
-  return html`<div class=${cx('og-fields', cols === 2 && 'og-fields--2', cols === 3 && 'og-fields--3', cols === 4 && 'og-fields--4')}>${children}</div>`;
+  // plain (added by appcat's dialogs): the labels are plain bold words in ink (the app catalogue's
+  // dialog forms, the old page's .modal-label).
+  return html`<div class=${cx('og-fields', cols === 2 && 'og-fields--2', cols === 3 && 'og-fields--3', cols === 4 && 'og-fields--4', plain && 'og-fields--plain', beside && 'og-fields--beside', chapter && 'og-fields--chapter', ruled && 'og-fields--ruled', column &&'og-fields--column', narrow && 'og-fields--narrow', spaced && 'og-fields--spaced')}>${children}</div>`;
 }
 
 /** The row of actions at the foot of a form: the send action first, then the quieter ones, a message last. */

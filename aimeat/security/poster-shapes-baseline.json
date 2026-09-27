@@ -1,209 +1,23 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-26T17:52:33.435Z",
-    "files": 79,
-    "declarations": 343,
+    "date": "2026-09-27T02:30:07.786Z",
+    "files": 38,
+    "declarations": 150,
     "patterns": {
-      "sun": 90,
-      "action": 53,
-      "box2": 94,
-      "frame3": 35,
-      "record": 8,
-      "headline": 51,
-      "slab": 5,
-      "rule": 5,
+      "sun": 46,
+      "box2": 28,
+      "frame3": 30,
+      "record": 4,
+      "slab": 4,
       "dialog": 1,
+      "rule": 4,
+      "action": 10,
+      "headline": 22,
       "label": 1
     }
   },
   "files": {
-    "public/css/views/admin-agent-integration.css": {
-      "sun": 2
-    },
-    "public/css/views/admin-agents.css": {
-      "action": 1,
-      "sun": 1,
-      "box2": 3,
-      "frame3": 1,
-      "record": 1
-    },
-    "public/css/views/admin-apps.css": {
-      "headline": 1,
-      "action": 1,
-      "box2": 2,
-      "slab": 1
-    },
-    "public/css/views/admin-boards.css": {
-      "action": 3,
-      "sun": 2,
-      "box2": 2
-    },
-    "public/css/views/admin-compliance.css": {
-      "headline": 1,
-      "action": 2,
-      "sun": 1,
-      "box2": 2
-    },
-    "public/css/views/admin-cors.css": {
-      "action": 1,
-      "box2": 1
-    },
-    "public/css/views/admin-cortex.css": {
-      "headline": 3,
-      "action": 1
-    },
-    "public/css/views/admin-csm.css": {
-      "box2": 4
-    },
-    "public/css/views/admin-database.css": {
-      "headline": 1,
-      "action": 1,
-      "sun": 1,
-      "box2": 2
-    },
-    "public/css/views/admin-discovery.css": {
-      "action": 1,
-      "sun": 1,
-      "box2": 3
-    },
-    "public/css/views/admin-email.css": {
-      "action": 3,
-      "sun": 3,
-      "box2": 6,
-      "frame3": 1,
-      "record": 1
-    },
-    "public/css/views/admin-extensions.css": {
-      "action": 1,
-      "sun": 1,
-      "box2": 3,
-      "frame3": 1,
-      "record": 1
-    },
-    "public/css/views/admin-federation.css": {
-      "action": 1,
-      "sun": 2
-    },
-    "public/css/views/admin-ghii.css": {
-      "action": 1,
-      "sun": 2
-    },
-    "public/css/views/admin-hooks.css": {
-      "headline": 1,
-      "action": 1,
-      "sun": 1,
-      "box2": 2
-    },
-    "public/css/views/admin-knowledge.css": {
-      "headline": 1,
-      "action": 2,
-      "sun": 2,
-      "box2": 1
-    },
-    "public/css/views/admin-maintenance.css": {
-      "headline": 1,
-      "action": 1,
-      "box2": 2
-    },
-    "public/css/views/admin-memory.css": {
-      "headline": 4,
-      "action": 3,
-      "sun": 2,
-      "box2": 1
-    },
-    "public/css/views/admin-metrics-poster.css": {
-      "headline": 1,
-      "action": 1,
-      "sun": 2,
-      "box2": 2
-    },
-    "public/css/views/admin-msm.css": {
-      "headline": 3,
-      "action": 1,
-      "box2": 1
-    },
-    "public/css/views/admin-organism-ownership.css": {
-      "headline": 1,
-      "action": 1,
-      "sun": 2,
-      "box2": 2
-    },
-    "public/css/views/admin-owners.css": {
-      "action": 1,
-      "sun": 2,
-      "box2": 1
-    },
-    "public/css/views/admin-packages.css": {
-      "action": 1,
-      "box2": 1
-    },
-    "public/css/views/admin-portal.css": {
-      "headline": 1,
-      "action": 1,
-      "sun": 1,
-      "box2": 4
-    },
-    "public/css/views/admin-prompts.css": {
-      "headline": 2,
-      "action": 2,
-      "sun": 1,
-      "box2": 2
-    },
-    "public/css/views/admin-push.css": {
-      "action": 1,
-      "sun": 1,
-      "box2": 3
-    },
-    "public/css/views/admin-realtime.css": {
-      "headline": 3,
-      "box2": 2,
-      "frame3": 2,
-      "record": 1
-    },
-    "public/css/views/admin-scheduler.css": {
-      "action": 1,
-      "sun": 2,
-      "box2": 1
-    },
-    "public/css/views/admin-security.css": {
-      "action": 1,
-      "sun": 1
-    },
-    "public/css/views/admin-skills.css": {
-      "headline": 1,
-      "action": 1,
-      "sun": 2,
-      "box2": 4
-    },
-    "public/css/views/admin-sso.css": {
-      "headline": 1,
-      "action": 1
-    },
-    "public/css/views/admin-stats.css": {
-      "sun": 1,
-      "box2": 1
-    },
-    "public/css/views/admin-subdomains.css": {
-      "headline": 1,
-      "action": 3,
-      "sun": 2,
-      "box2": 3
-    },
-    "public/css/views/admin-usage.css": {
-      "sun": 1,
-      "box2": 1
-    },
-    "public/css/views/admin-work.css": {
-      "action": 1,
-      "sun": 1
-    },
-    "public/css/views/admin.css": {
-      "headline": 2,
-      "rule": 1,
-      "action": 1,
-      "sun": 1
-    },
     "public/css/views/build-story.css": {
       "sun": 2,
       "box2": 3,
@@ -219,20 +33,9 @@
       "box2": 2,
       "frame3": 2
     },
-    "public/css/views/contacts-poster.css": {
-      "box2": 1
-    },
-    "public/css/views/discover-poster.css": {
-      "sun": 1
-    },
     "public/css/views/help.css": {
       "sun": 2,
       "frame3": 2
-    },
-    "public/css/views/inbox-poster.css": {
-      "action": 1,
-      "sun": 2,
-      "box2": 1
     },
     "public/css/views/knowledge-poster.css": {
       "action": 2
@@ -270,16 +73,10 @@
       "headline": 2,
       "action": 2,
       "sun": 7,
-      "box2": 6,
+      "box2": 5,
       "frame3": 2,
       "slab": 1,
       "label": 1
-    },
-    "public/css/views/profile.css": {
-      "sun": 1
-    },
-    "public/css/views/workflows-poster.css": {
-      "box2": 1
     },
     "public/css/components/archive.css": {
       "headline": 1
@@ -320,17 +117,17 @@
       "headline": 1,
       "sun": 2
     },
-    "public/css/components/offer-lines.css": {
-      "headline": 1
-    },
     "public/css/components/open-items.css": {
       "headline": 1
+    },
+    "public/css/components/operator-menu.css": {
+      "sun": 2
     },
     "public/css/components/page-intro.css": {
       "headline": 1
     },
-    "public/css/components/page-row.css": {
-      "sun": 1
+    "public/css/components/readings.css": {
+      "headline": 1
     },
     "public/css/components/setting-box.css": {
       "headline": 1

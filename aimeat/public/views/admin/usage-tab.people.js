@@ -20,6 +20,8 @@
  *   - WhatWasCalled (05) — the surfaces, and what was refused
  * @usage Imported by views/admin/usage-tab.js.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only: the people are a List with their column names on
+ *     a phone, the call stream Columns of Label and Readings; no class written.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Usage page in the poster face).
  */
@@ -28,8 +30,16 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, Badge, Row } from './shared.js';
+import { num, Badge } from './shared.js';
 import { usd, compact } from './usage-tab.models.js';
+import { Section } from '/components/Section.js';
+import { Readings } from '/components/Readings.js';
+import { List, Row, Name, Num, Cell } from '/components/List.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
+import { EmptyState } from '/components/EmptyState.js';
+import { Columns, Stack } from '/components/Layout.js';
 
 const S = (key, params) => t('admin.usage.' + key, params);
 
@@ -54,10 +64,9 @@ export function WhoSpent({ people, houseSpenders }) {
   const list = people || [];
   if (!list.length) {
     return html`
-      <section class="og-sec" id="adm-us-04">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('who.title')}<small>04</small></h2></div>
-        <div class="adm-us-empty">${S('who.empty')}</div>
-      </section>`;
+      <${Section} id="adm-us-04" num="04" title=${S('who.title')}>
+        <${EmptyState} text=${S('who.empty')} />
+      <//>`;
   }
 
   const shown = all ? list : list.slice(0, TOP_PEOPLE);
@@ -78,55 +87,43 @@ export function WhoSpent({ people, houseSpenders }) {
   const onHouse = new Set((houseSpenders || []).map(u => u.owner_ghii));
 
   return html`
-    <section class="og-sec" id="adm-us-04">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('who.title')}<small>04</small></h2>
-        ${rest.length ? html`<div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setAll(true)}>
-            ${S('who.showAll', { n: list.length })}
-          </button>
-        </div>` : null}
-      </div>
-      <p class="adm-us-lead">${S('who.lead')}</p>
-      <div class="adm-us-scroll">
-        <table class="adm-us-tbl">
-          <thead><tr>
-            <th>${S('who.person')}</th>
-            <th class="num">${S('who.agents')}</th>
-            <th class="num">${S('went.cost')}</th>
-            <th class="num">${S('who.tokens')}</th>
-            <th class="num">${S('went.calls')}</th>
-            <th class="num">${S('went.noPrice')}</th>
-            <th>${S('who.whoseKey')}</th>
-          </tr></thead>
-          <tbody>
-            ${shown.map(u => html`<tr>
-              <td><b>${u.owner_ghii}</b></td>
-              <td class="num">${num(u.agents || 0)}</td>
-              <td class="num">${usd(u.cost_usd)}</td>
-              <td class="num">${compact(u.total_tokens)}</td>
-              <td class="num">${num(u.calls || 0)}</td>
-              <td class="num">${u.unpriced_calls ? num(u.unpriced_calls) : '—'}</td>
-              <td>${onHouse.has(u.owner_ghii)
+    <${Section} id="adm-us-04" num="04" title=${S('who.title')}
+      doors=${rest.length ? html`<${Action} small soft onClick=${() => setAll(true)}>${S('who.showAll', { n: list.length })}<//>` : null}>
+      <${Note} kind="lead">${S('who.lead')}<//>
+      <${List} cols="name-n-n-n-n-n-state" labels head=${[
+    S('who.person'),
+    { label: S('who.agents'), num: true },
+    { label: S('went.cost'), num: true },
+    { label: S('who.tokens'), num: true },
+    { label: S('went.calls'), num: true },
+    { label: S('went.noPrice'), num: true },
+    S('who.whoseKey'),
+  ]}>
+        ${shown.map(u => html`<${Row} key=${u.owner_ghii}>
+          <${Name}>${u.owner_ghii}<//>
+          <${Num}>${num(u.agents || 0)}<//>
+          <${Num}>${usd(u.cost_usd)}<//>
+          <${Num}>${compact(u.total_tokens)}<//>
+          <${Num}>${num(u.calls || 0)}<//>
+          <${Num}>${u.unpriced_calls ? num(u.unpriced_calls) : '—'}<//>
+          <${Cell}>${onHouse.has(u.owner_ghii)
     ? html`<${Badge} type="warning" label=${S('who.house')} />`
-    : html`<${Badge} type="info" label=${S('who.own')} />`}</td>
-            </tr>`)}
-            ${tail ? html`<tr>
-              <td><b>${S('who.othersTitle', { n: tail.people })}</b></td>
-              <td class="num">${num(tail.agents)}</td>
-              <td class="num">${usd(tail.cost_usd)}</td>
-              <td class="num">${compact(tail.total_tokens)}</td>
-              <td class="num">${num(tail.calls)}</td>
-              <td class="num">${tail.unpriced_calls ? num(tail.unpriced_calls) : '—'}</td>
-              <td></td>
-            </tr>` : null}
-          </tbody>
-        </table>
-      </div>
-      <p class="adm-us-note">${onHouse.size
+    : html`<${Badge} type="info" label=${S('who.own')} />`}<//>
+        <//>`)}
+        ${tail ? html`<${Row} key="others">
+          <${Name}>${S('who.othersTitle', { n: tail.people })}<//>
+          <${Num}>${num(tail.agents)}<//>
+          <${Num}>${usd(tail.cost_usd)}<//>
+          <${Num}>${compact(tail.total_tokens)}<//>
+          <${Num}>${num(tail.calls)}<//>
+          <${Num}>${tail.unpriced_calls ? num(tail.unpriced_calls) : '—'}<//>
+          <${Cell} />
+        <//>` : null}
+      <//>
+      <${Note}>${onHouse.size
     ? S('who.noteHouse', { n: onHouse.size })
-    : S('who.noteAllOwn')}</p>
-    </section>`;
+    : S('who.noteAllOwn')}<//>
+    <//>`;
 }
 
 /** Section 05: what was called, and what was turned away. */
@@ -137,10 +134,9 @@ export function WhatWasCalled({ calls }) {
 
   if (!totals || (totals.calls || 0) === 0) {
     return html`
-      <section class="og-sec" id="adm-us-05">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('called.title')}<small>05</small></h2></div>
-        <div class="adm-us-empty">${S('called.empty')}</div>
-      </section>`;
+      <${Section} id="adm-us-05" num="05" title=${S('called.title')}>
+        <${EmptyState} text=${S('called.empty')} />
+      <//>`;
   }
 
   const surfaces = (surface.groups || []).slice(0, 6);
@@ -154,46 +150,49 @@ export function WhatWasCalled({ calls }) {
     .reduce((m, g) => ((g.duration_ms_max || 0) > (m?.duration_ms_max || 0) ? g : m), null);
 
   return html`
-    <section class="og-sec" id="adm-us-05">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('called.title')}<small>05</small></h2>
-      </div>
-      <p class="adm-us-lead">${S('called.lead')}</p>
+    <${Section} id="adm-us-05" num="05" title=${S('called.title')}>
+      <${Note} kind="lead">${S('called.lead')}<//>
 
-      <div class="adm-us-two">
-        <div>
-          <div class="adm-us-lbl">${S('called.byWayIn')}</div>
-          ${surfaces.map((g, i) => Row({
-    title: g.key,
+      <${Columns}>
+        <${Stack} gap="none">
+          <${Label} block>${S('called.byWayIn')}<//>
+          <${Readings} rows=${surfaces.map((g, i) => ({
+    key: g.key,
+    name: g.key,
     why: S('called.surfaceWhy', { errors: num(g.errors || 0) }),
-    chip: (g.refusals || 0) > 0
+    mark: (g.refusals || 0) > 0
       ? html`<${Badge} type="warning" label=${S('called.refusedN', { n: num(g.refusals) })} />`
       : html`<${Badge} type="success" label=${S('called.refusedNone')} />`,
     value: S('called.callsAndRate', { n: num(g.calls || 0), rate: rate(g.refusals, g.calls) }),
     last: i === surfaces.length - 1,
-  }))}
-        </div>
-        <div>
-          <div class="adm-us-lbl">${S('called.mostRefused')}</div>
-          ${refused.length ? refused.map(g => Row({
-    title: g.key,
-    why: S('called.refusedWhy'),
-    chip: html`<${Badge} type="warning" label=${num(g.refusals)} />`,
-    value: g.dims?.surface || '',
-  })) : Row({
-    title: S('called.nothingRefused'),
-    why: S('called.nothingRefusedWhy'),
-    chip: html`<${Badge} type="success" label=${S('called.refusedNone')} />`,
-    value: '',
-  })}
-          ${slowest ? Row({
-    title: S('called.slowest'),
-    why: S('called.slowestWhy'),
-    chip: html`<${Badge} type="muted" label=${ms(slowest.duration_ms_max)} />`,
-    value: slowest.key,
-    last: true,
-  }) : null}
-        </div>
-      </div>
-    </section>`;
+  }))} />
+        <//>
+        <${Stack} gap="none">
+          <${Label} block>${S('called.mostRefused')}<//>
+          <${Readings} rows=${[
+    ...(refused.length ? refused.map(g => ({
+      key: g.key,
+      name: g.key,
+      why: S('called.refusedWhy'),
+      mark: html`<${Badge} type="warning" label=${num(g.refusals)} />`,
+      value: g.dims?.surface || '',
+    })) : [{
+      key: 'none',
+      name: S('called.nothingRefused'),
+      why: S('called.nothingRefusedWhy'),
+      mark: html`<${Badge} type="success" label=${S('called.refusedNone')} />`,
+      value: '',
+    }]),
+    slowest ? {
+      key: 'slowest',
+      name: S('called.slowest'),
+      why: S('called.slowestWhy'),
+      mark: html`<${Badge} type="muted" label=${ms(slowest.duration_ms_max)} />`,
+      value: slowest.key,
+      last: true,
+    } : null,
+  ]} />
+        <//>
+      <//>
+    <//>`;
 }

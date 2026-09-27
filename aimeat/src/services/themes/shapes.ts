@@ -19,6 +19,8 @@
  * @structure ShapeKind · SHAPE_TOKENS · isShapeToken · builtinShapes · checkShape · shapeSheet
  * @usage import { SHAPE_TOKENS, checkShape, shapeSheet } from './shapes.js';
  * @version-history
+ *   v1.1.0 — 2026-09-27 — Four more: --shape-corner-soft, --shape-corner-card, --shape-ring and
+ *     --shape-chosen-ground, the app catalogue's own drawing made a theme's to set (appcat).
  *   v1.0.0 — 2026-09-24 — Initial (07 "New components follow the theme").
  */
 import { readFileSync } from 'node:fs';
@@ -42,11 +44,15 @@ export const SHAPE_TOKENS: readonly ShapeToken[] = [
     { name: '--shape-corner-control', kind: 'corner', group: 'corners', what: 'the corner of a field, a small control or a row you press' },
     { name: '--shape-corner-pill', kind: 'corner', group: 'corners', what: 'the corner of the loud action, a tab and a count' },
     { name: '--shape-corner-dialog', kind: 'corner', group: 'corners', what: 'the corner of a dialog and a menu that opens' },
+    { name: '--shape-corner-soft', kind: 'corner', group: 'corners', what: 'the soft corner of a note, a statement box and a picture in a preview' },
+    { name: '--shape-corner-card', kind: 'corner', group: 'corners', what: 'the corner of a search result card in a preview' },
     { name: '--shape-frame', kind: 'width', group: 'frames', what: 'the frame of a box or a control' },
     { name: '--shape-frame-heavy', kind: 'width', group: 'frames', what: 'the heavy frame and rule: a page frame, a record, a dialog, an underline' },
     { name: '--shape-frame-colour', kind: 'colour', group: 'frames', what: 'the colour of a box\'s frame' },
     { name: '--shape-rule-colour', kind: 'colour', group: 'frames', what: 'the colour of a rule between parts and of a control\'s frame' },
     { name: '--shape-field-colour', kind: 'colour', group: 'frames', what: 'the colour of a field\'s frame' },
+    { name: '--shape-ring', kind: 'width', group: 'frames', what: 'the width of a spinner\'s ring' },
+    { name: '--shape-chosen-ground', kind: 'colour', group: 'frames', what: 'the ground of a chosen row or item: a pressed menu row, a ticked choice, an opened row' },
     { name: '--shape-shadow', kind: 'shadow', group: 'shadows', what: 'the shadow of a box at rest' },
     { name: '--shape-shadow-raised', kind: 'shadow', group: 'shadows', what: 'the shadow of a record and a menu that opens' },
     { name: '--shape-shadow-dialog', kind: 'shadow', group: 'shadows', what: 'the shadow of a dialog' },

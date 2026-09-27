@@ -15,6 +15,8 @@
  *   - doors: the actions at the right of an open section's head (give it Action links).
  *   - first: the first section on the page, with no rule on top.
  *   - plain: a section with no head at all, only the rule on top and the body (added by page group G2a).
+ *   - part: a part of a dialog's body, its slab title a size smaller and 2rem between parts (dialog.css;
+ *     added by appcat's dialogs).
  *   - fold: the section is one row until it is opened; then `open`, `onToggle`, `sub` (the mono
  *     word at the right of the row) and `lead` (a line under the row, shown open or shut); `clip`
  *     cuts a long `sub` with … on its line (added by page group G6).
@@ -22,6 +24,9 @@
  * @usage html`<${Section} id="sk-own" num="01" title=${x('secOwn')} count=${sub} first>…<//>`
  *        html`<${Section} fold id="og-map" num="07" title=${x('map')} open=${o} onToggle=${() => setO(!o)}>…<//>`
  * @version-history
+ *   2026-09-27 — `part` passed on to PageSection (a part of a dialog's body, appcat parity).
+ *   2026-09-27 — `chapter` passed on to PageSection (a chapter of a long page of one thing, appcat).
+ *   2026-09-27 — `group` passed on to PageSection (a section holding a group of sections).
  *   2026-09-27 — `band` passed on to PageSection.
  *   v1.4.0 — 2026-09-26 — `inner` passes to FoldSection: a fold inside a part, without its number
  *     (page group G1a; additive).
@@ -40,12 +45,12 @@ const html = htm.bind(h);
 
 /**
  * @param {{ fold?: boolean, id?: string, num?: any, title: any, count?: any, doors?: any, first?: boolean,
- *   plain?: boolean, band?: boolean, sub?: any, lead?: any, clip?: boolean, wrap?: boolean, inner?: boolean,
+ *   plain?: boolean, band?: boolean, group?: boolean, chapter?: any, part?: boolean, sub?: any, lead?: any, clip?: boolean, wrap?: boolean, inner?: boolean,
  *   open?: boolean, onToggle?: () => void, children?: any }} props
  */
-export function Section({ fold, id, num, title, count, doors, first, plain, band, sub, lead, clip, wrap, inner, open, onToggle, children }) {
+export function Section({ fold, id, num, title, count, doors, first, plain, band, group, chapter, part, sub, lead, clip, wrap, inner, open, onToggle, children }) {
   if (fold) return html`<${FoldSection} id=${id} num=${num} title=${title} sub=${sub} lead=${lead} clip=${clip} wrap=${wrap} inner=${inner} open=${open} onToggle=${onToggle}>${children}<//>`;
-  return html`<${PageSection} id=${id} num=${num} title=${title} count=${count} doors=${doors} first=${first} plain=${plain} band=${band}>${children}<//>`;
+  return html`<${PageSection} id=${id} num=${num} title=${title} count=${count} doors=${doors} first=${first} plain=${plain} band=${band} group=${group} chapter=${chapter} part=${part}>${children}<//>`;
 }
 
 export { PageSection, FoldSection };

@@ -12,11 +12,16 @@
  *   `placeholder`: a first option with the value '' ("–", "Choose…"); `placeholderDisabled` makes it
  *   unpickable once something is chosen. `onChange(value, event)`. Named options: `fit` (as wide as
  *   its words, not its column), `invalid`, `disabled`, `ariaLabel`, `title`, `attention` (coral while
- *   something is chosen: a choice that widens what an act reaches, such as a broadcast's audience).
+ *   something is chosen: a choice that widens what an act reaches, such as a broadcast's audience),
+ *   `line` (no frame, the ink line under it, bold, the grey arrow: the old app catalogue's detail
+ *   choice, at most 340px wide; with `fit` at least 150px).
  * @structure Select(props) · normalise(option)
  * @usage html`<${Select} label=${t('x.vis')} value=${vis} onChange=${setVis}
  *          options=${[['private', t('x.private')], ['public', t('x.public')]]} />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — `line`: the old app catalogue's detail choice (select.modal-input: the ink
+ *     line under it, 10px 32px 10px 14px, .88rem bold, the grey arrow); additive, appcat parity
+ *     (sections-b), select-field.css .select-field--line.
  *   v1.1.0 — 2026-09-26 — `attention`: coral while a value is chosen (main's broadcast audience,
  *     .inbox-bc-audience--on); additive, fix pass.
  *   v1.0.0 — 2026-09-26 — Initial: the Settings selects as one component with options as data
@@ -43,14 +48,16 @@ function optionOf(o) {
 
 export function Select(props) {
   const { id, value, options = [], placeholder, placeholderDisabled, fit, invalid, error, disabled, required, name,
-    ariaLabel, title, onChange, onFocus, onBlur, attention } = props;
+    ariaLabel, title, onChange, onFocus, onBlur, attention, line } = props;
   const ids = useFieldIds(id);
   const bad = !!invalid || !!messageOf(props.message, error)?.error;
   const current = value === null || value === undefined ? '' : String(value);
   // attention (added by the fix pass): a choice that widens what an act reaches turns coral while it
   // is set (the operator's broadcast audience: every user of the node; main's .inbox-bc-audience--on).
+  // line (added by appcat sections-b, parity): the underlined choice of the old app catalogue's
+  // detail (select.modal-input), at most 340px; with `fit` as wide as its words, at least 150px.
   const control = html`<select id=${ids.id} name=${name}
-    class=${cx('select-field', fit && 'select-field--fit', bad && 'select-field--invalid', attention && current !== '' && 'select-field--attention')}
+    class=${cx('select-field', fit && 'select-field--fit', bad && 'select-field--invalid', attention && current !== '' && 'select-field--attention', line && 'select-field--line')}
     value=${current} disabled=${disabled} required=${required} title=${title}
     aria-label=${ariaLabel} aria-invalid=${bad ? 'true' : undefined}
     aria-describedby=${props.hint ? ids.hintId : undefined}

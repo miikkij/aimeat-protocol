@@ -17,6 +17,8 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-27: The playbook's two ways are the Loud and Action components, the same buttons (page
+ *     group G9, a move).
  *   2026-09-24: The playbook's copy button is the underlined action link (Jouni's decision "Panel
  *     action").
  *   2026-09-23: ChatDoor deleted (Jouni's decision): no page had drawn it since 07f7040c5
@@ -76,6 +78,7 @@ import { QuietNote } from '/components/QuietNote.js';
 import { NumberedIndex, IndexItem, IndexPanel } from '/components/NumberedIndex.js';
 import { InkFoot } from '/components/InkFoot.js';
 import { CheckItem } from '/components/CheckItem.js';
+import { Action, Loud } from '/components/Action.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -324,14 +327,14 @@ export function Playbooks({ playbooks, tour }) {
                 drains it INTO THE COMPOSER and the person presses send themselves. A ?ask= query
                 param would have been a second contract, and the chat reads no such thing — a
                 button that navigates somewhere unprepared is the defect this avoids. */''}
-          <button type="button" class="poster-slab" onClick=${() => askAgent(pb)}>
+          <${Loud} onClick=${() => askAgent(pb)}>
             ${tr('home.playbooks.ask', 'Ask my agent')}
-          </button>
-          <button type="button" class="poster-action" onClick=${() => copyPrompt(pb)}>
+          <//>
+          <${Action} onClick=${() => copyPrompt(pb)}>
             ${copied === pb.id
               ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
               : tr('home.playbooks.copy', 'Copy for my own AI')}
-          </button>
+          <//>
         <//>`)}>
       ${playbooks.map((pb) => html`
         <${IndexItem} key=${pb.id}

@@ -5,6 +5,10 @@
  * @description Admin dashboard tab for browsing all agent tasks across all owners.
  *   Provides status filtering, pagination, and TODO progress display.
  * @version-history
+ *   v1.2.0 -- 2026-09-27 -- On the library components (page group G5): the status filter is the
+ *     Select, the refresh the loud action, the table the List with its heading row, the status the
+ *     Status mark in its tone (done fine, failed danger, active and stalled attention, queued and
+ *     draft off), the pager a Row of action links. The file writes no class and no style.
  *   v1.1.0 -- 2026-06-02 -- Component unification (#16): replace inline hex status
  *     colors with tokenized .tag--status-* classes (admin.css) so status tags flip
  *     correctly in dark mode.
@@ -19,10 +23,20 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Empty, StatsGrid } from './shared.js';
 import { apiGet } from '/js/api.js';
+import { List, Row, Name, Cell, Num, When } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
+import { Select } from '/components/Select.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Tinted } from '/components/Figure.js';
+import { Row as Line } from '/components/Layout.js';
 
 const PAGE_SIZE = 20;
 
 const STATUSES = ['', 'draft', 'queued', 'active', 'stalled', 'done', 'failed'];
+
+/** A task status's tone as the Status mark says it; an unknown status is drawn as a draft. */
+const STATUS_TONE = { active: 'attention', done: 'fine', failed: 'danger', stalled: 'attention', queued: 'off', draft: 'off' };
 
 export default function AgentTasksTab() {
   const [tasks, setTasks] = useState([]);
@@ -59,90 +73,64 @@ export default function AgentTasksTab() {
     setStatusFilter(e.target.value);
   }
 
-  // Map a task status to a tokenized status-tag class (colors live in admin.css,
-  // tag--status-* — replaces the former inline hex colors so chips flip in dark mode).
-  function statusTagClass(status) {
-    const known = ['active', 'done', 'failed', 'stalled', 'queued', 'draft'];
-    return known.includes(status) ? `tag tag--status-${status}` : 'tag tag--status-draft';
+  // A task status's tone for the Status mark (the colours live in the mark's own tones, so they flip
+  // with the theme).
+  function statusTone(status) {
+    return STATUS_TONE[status] || STATUS_TONE.draft;
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const options = [['', `${t('dashboard.agentTasksStatus')} (${t('dashboard.all') || 'All'})`], ...STATUSES.filter(s => s).map(s => [s, s])];
+  const head = [t('dashboard.agentTasksAgent'), t('dashboard.agentTasksTitle'), t('dashboard.agentTasksStatus'),
+    t('dashboard.agentTasksTodoProgress'), t('dashboard.agentTasksCreated'), t('dashboard.agentTasksLastEvent')];
 
   return html`
-    <div>
-      <!-- Filter bar -->
-      <div class="adm-mem-filters">
-        <select class="adm-input" value=${statusFilter} onChange=${handleFilterChange}>
-          <option value="">${t('dashboard.agentTasksStatus')} (${t('dashboard.all') || 'All'})</option>
-          ${STATUSES.filter(s => s).map(s => html`
-            <option value=${s}>${s}</option>
-          `)}
-        </select>
-        <button class="adm-btn" onClick=${() => loadTasks(1)} disabled=${loading}>
-          ${loading ? t('dashboard.loading') : t('dashboard.refresh')}
-        </button>
-      </div>
+    <!-- Filter bar -->
+    <${Line} wrap below="medium">
+      <${Select} fit value=${statusFilter} options=${options} ariaLabel=${t('dashboard.agentTasksStatus')}
+        onChange=${(v, e) => handleFilterChange(e)} />
+      <${Loud} control onClick=${() => loadTasks(1)} disabled=${loading}>
+        ${loading ? t('dashboard.loading') : t('dashboard.refresh')}
+      <//>
+    <//>
 
-      <!-- Stats summary -->
-      <${StatsGrid} items=${[{ label: t('dashboard.agentTasksTotal'), value: total }]} />
+    <!-- Stats summary -->
+    <${StatsGrid} items=${[{ label: t('dashboard.agentTasksTotal'), value: total }]} />
 
-      <!-- Table -->
-      ${tasks.length === 0 && !loading && html`<${Empty} text=${t('dashboard.agentTasksEmpty')} />`}
+    <!-- Table -->
+    ${tasks.length === 0 && !loading && html`<${Empty} text=${t('dashboard.agentTasksEmpty')} />`}
 
-      ${tasks.length > 0 && html`
-        <div class="adm-card">
-          <div class="scrollable">
-            <table>
-              <thead><tr>
-                <th>${t('dashboard.agentTasksAgent')}</th>
-                <th>${t('dashboard.agentTasksTitle')}</th>
-                <th>${t('dashboard.agentTasksStatus')}</th>
-                <th>${t('dashboard.agentTasksTodoProgress')}</th>
-                <th>${t('dashboard.agentTasksCreated')}</th>
-                <th>${t('dashboard.agentTasksLastEvent')}</th>
-              </tr></thead>
-              <tbody>
-                ${tasks.map(task => html`
-                  <tr>
-                    <td class="mono" style="font-size:.8rem">${escHtml(task.agent_gaii)}</td>
-                    <td>${escHtml(task.title)}</td>
-                    <td>
-                      <span class=${statusTagClass(task.status)}>
-                        ${task.status}
-                      </span>
-                    </td>
-                    <td>
-                      ${task.todo_progress.total > 0
-                        ? html`${task.todo_progress.done}/${task.todo_progress.total}`
-                        : html`<span style="color:var(--text-dim)">--</span>`
-                      }
-                    </td>
-                    <td style="color:var(--text-dim)">${dt(task.created_at)}</td>
-                    <td style="color:var(--text-dim)">${dt(task.last_event_at)}</td>
-                  </tr>
-                `)}
-              </tbody>
-            </table>
-          </div>
+    ${tasks.length > 0 && html`
+      <${List} cols="id-name-state-n-when-when" head=${head} labels>
+        ${tasks.map(task => html`
+          <${Row} key=${task.id || task.title + task.created_at}>
+            <${Cell} meta>${escHtml(task.agent_gaii)}<//>
+            <${Name}>${escHtml(task.title)}<//>
+            <${Cell}><${Mark} kind="status" tone=${statusTone(task.status)}>${task.status}<//><//>
+            <${Num}>
+              ${task.todo_progress.total > 0
+                ? html`${task.todo_progress.done}/${task.todo_progress.total}`
+                : html`<${Tinted} tone="dim">--<//>`
+              }
+            <//>
+            <${When}><${Tinted} tone="dim">${dt(task.created_at)}<//><//>
+            <${When}><${Tinted} tone="dim">${dt(task.last_event_at)}<//><//>
+          <//>
+        `)}
+      <//>
 
-          <!-- Pagination -->
-          ${totalPages > 1 && html`
-            <div class="adm-mem-pagination">
-              <button class="adm-btn-sm"
-                disabled=${page <= 1}
-                onClick=${() => loadTasks(page - 1)}>
-                ← ${t('dashboard.prev') || 'Prev'}
-              </button>
-              <span class="adm-mem-page-info">${page} / ${totalPages}</span>
-              <button class="adm-btn-sm"
-                disabled=${page >= totalPages}
-                onClick=${() => loadTasks(page + 1)}>
-                ${t('dashboard.next') || 'Next'} →
-              </button>
-            </div>
-          `}
-        </div>
+      <!-- Pagination -->
+      ${totalPages > 1 && html`
+        <${Line} gap="large" above="medium">
+          <${Action} small disabled=${page <= 1} onClick=${() => loadTasks(page - 1)}>
+            ← ${t('dashboard.prev') || 'Prev'}
+          <//>
+          <${Note} kind="meta" inline mono>${page} / ${totalPages}<//>
+          <${Action} small disabled=${page >= totalPages} onClick=${() => loadTasks(page + 1)}>
+            ${t('dashboard.next') || 'Next'} →
+          <//>
+        <//>
       `}
-    </div>
+    `}
   `;
 }

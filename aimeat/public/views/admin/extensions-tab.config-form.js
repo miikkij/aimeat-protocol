@@ -2,18 +2,23 @@
  * @file public/views/admin/extensions-tab.config-form.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Shared input-style constants, JSON-schema default builder, and schema-driven ConfigForm for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
+ * @description JSON-schema default builder and the schema-driven ConfigForm for the admin Extensions
+ *   tab: one field per property of an extension's config schema. Extracted from the tab file to
+ *   satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — The fields are the library's Field family (admin page group G7): an enum is a
+ *     Select, a list a TextField whose label carries "comma-separated" as its note, a number a short
+ *     number field, the rest a TextField, in Fields. The class and style constants the editors shared
+ *     (inputStyle, labelStyle, fieldWrap) are gone: nothing draws them any more.
  *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-
-const inputStyle = 'adm-input';
-const labelStyle = 'adm-text-sm adm-text-dim';
-const fieldWrap = 'display:flex;flex-direction:column;gap:2px';
+import { Field, Fields } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
 
 // ── Build default config values from JSON Schema properties ──
 function buildDefaults(schema) {
@@ -37,64 +42,41 @@ function ConfigForm({ schema, config, onChange }) {
   }
 
   return html`
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">
+    <${Fields} cols=${3}>
       ${keys.map(key => {
         const prop = props[key];
         const val = config[key] ?? prop.default ?? '';
 
         // Enum → select dropdown
         if (prop.enum) {
-          return html`
-            <div style=${fieldWrap}>
-              <label class="${labelStyle}">${key}</label>
-              <select class="${inputStyle}" value=${val}
-                onChange=${e => set(key, e.target.value)}>
-                ${prop.enum.map(opt => html`<option value=${opt}>${opt}</option>`)}
-              </select>
-            </div>
-          `;
+          return html`<${Select} key=${key} label=${key} value=${val} options=${prop.enum}
+            onChange=${v => set(key, v)} />`;
         }
 
         // Array of strings → comma-separated input
         if (prop.type === 'array') {
           const arrVal = Array.isArray(val) ? val.join(', ') : (val || '');
           return html`
-            <div style=${fieldWrap + ';flex:1;min-width:160px'}>
-              <label class="${labelStyle}">${key} <span style="opacity:.6">(${t('dashboard.servicesCommaSep')})</span></label>
-              <input type="text" class="${inputStyle}" value=${arrVal}
+            <${Field} key=${key} id=${'cfg-' + key} label=${key} labelNote=${`(${t('dashboard.servicesCommaSep')})`}>
+              <${TextField} id=${'cfg-' + key} value=${arrVal}
                 placeholder=${(prop.default || []).join(', ') || 'a, b, c'}
-                onInput=${e => {
-                  const items = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-                  set(key, items);
-                }} />
-            </div>
-          `;
+                onInput=${v => set(key, v.split(',').map(s => s.trim()).filter(Boolean))} />
+            <//>`;
         }
 
         // Number / integer
         if (prop.type === 'number' || prop.type === 'integer') {
-          return html`
-            <div style=${fieldWrap}>
-              <label class="${labelStyle}">${key}</label>
-              <input type="number" class="${inputStyle}" style="width:100px" value=${val}
-                step=${prop.type === 'integer' ? 1 : 'any'}
-                onInput=${e => set(key, e.target.value === '' ? '' : Number(e.target.value))} />
-            </div>
-          `;
+          return html`<${TextField} key=${key} type="number" size="short" label=${key} value=${val}
+            step=${prop.type === 'integer' ? 1 : 'any'}
+            onInput=${v => set(key, v === '' ? '' : Number(v))} />`;
         }
 
         // String (default)
-        return html`
-          <div style=${fieldWrap + ';min-width:140px'}>
-            <label class="${labelStyle}">${key}</label>
-            <input type="text" class="${inputStyle}" value=${val}
-              placeholder=${prop.default || ''}
-              onInput=${e => set(key, e.target.value)} />
-          </div>
-        `;
+        return html`<${TextField} key=${key} label=${key} value=${val} placeholder=${prop.default || ''}
+          onInput=${v => set(key, v)} />`;
       })}
-    </div>
+    <//>
   `;
 }
 
-export { inputStyle, labelStyle, fieldWrap, buildDefaults, ConfigForm };
+export { buildDefaults, ConfigForm };

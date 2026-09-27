@@ -16,6 +16,7 @@
  *   - HomeStats / HomeDashboard payload types
  * @usage const home = createHomeDashboardService(config, storage).load(owner);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The pending work count reads the person's own GHII beside their agents'.
  *   v1.0.0 — 2026-07-15 — Phase 3: compose AgentDbService + usage summary + work into one home payload.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -37,7 +38,7 @@ export interface HomeStats {
   files: number;
   services: number;
   apps: number;
-  /** Pending work items across the owner's agents. */
+  /** Pending work items for the person and across their agents. */
   work: number;
 }
 
@@ -87,14 +88,15 @@ export class HomeDashboardService {
     });
   }
 
-  /** Pending work across the owner's agents — the agents list comes from the IdentityMap (0 extra reads),
-   *  then ONE batched count (providerGaii IN (…) AND status IN (…)) instead of a listWorkByProvider per
-   *  agent. This is the fan-out→IN rule (doc-id925fp §6.5): at 100 agents the Home chain drops from ~100
-   *  work queries to 1. */
+  /** Pending work for the person and across their agents — the agents list comes from the IdentityMap
+   *  (0 extra reads), then ONE batched count (providerGaii IN (…) AND status IN (…)) instead of a
+   *  listWorkByProvider per agent. This is the fan-out→IN rule (doc-id925fp §6.5): at 100 agents the
+   *  Home chain drops from ~100 work queries to 1. The person's own GHII is in the list because an
+   *  action they publish in person, and the work on it, is filed under it. */
   private async pendingWorkCount(owner: string): Promise<number> {
     const agents = await this.agents.listOwnerAgents(owner);
-    if (agents.length === 0) return 0;
-    return this.storage.countPendingWorkByProviders(agents.map(a => a.gaii), [...PENDING_WORK]);
+    const ghii = `${owner}@${this.config.nodeId}`;
+    return this.storage.countPendingWorkByProviders([ghii, ...agents.map(a => a.gaii)], [...PENDING_WORK]);
   }
 }
 

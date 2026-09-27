@@ -16,6 +16,9 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-09-27: The page writes no class: the copy of the conversation is ConversationCopy (the
+ *     rail's link, the head's icon), the phone's notice is AiNotice `main`, the ceiling's two ways
+ *     are ConversationCap `ways`; the markup and the look are unchanged (page group G9, a move).
  *   2026-09-24: The welcome's starters read as sentences (Jouni's decision "Suggestion").
  *   2026-09-23: Composed from library components in /components/ (ConversationFrame and its
  *     parts, ThreadList, Turn, Composer, StatusBar, Suggestion, AiNotice, Nudge, Credit), which emit
@@ -79,8 +82,8 @@ import { MobileNudge } from '/components/Nudge.js';
 import {
     ConversationFrame, ConversationAbout, ConversationFoot, ConversationMain, ConversationHead,
     ConversationIcon, ConversationScroll, ConversationWelcome, ConversationJump, ConversationCap,
+    ConversationCopy,
 } from '/components/ConversationFrame.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { storeHref } from '/js/site.js';
 
@@ -601,9 +604,8 @@ export default function ChatView() {
                 <${ConversationAbout} label=${tr('chat.thisConversation', 'This conversation')}
                     name=${thread?.title ?? tr('chat.title', 'Chat')}>
                     <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
-                    ${turns.length > 0 && html`<${CopyButton}
+                    ${turns.length > 0 && html`<${ConversationCopy}
                         text=${conversationAsText(thread?.title, turns)}
-                        className="poster-action poster-action--quiet poster-rail-action"
                         label=${tr('chat.copyAll', 'Copy conversation')}
                         copiedLabel=${'✓ ' + t('common.copied')}
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
@@ -621,9 +623,8 @@ export default function ChatView() {
                     <!-- The whole conversation as plain text: what you paste into a document, an
                          issue or another AI. Both sides, in order, with the work log left out —
                          it is a record of the conversation, not of the machinery. -->
-                    ${turns.length > 0 && html`<${CopyButton}
+                    ${turns.length > 0 && html`<${ConversationCopy} head
                         text=${conversationAsText(thread?.title, turns)}
-                        className="poster-conversation-icon poster-conversation-copy"
                         label="⧉"
                         copiedLabel="✓"
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
@@ -636,7 +637,7 @@ export default function ChatView() {
                 ${/* The phone keeps the notice where the person is looking: full on the first
                       conversation, one line from the first answer onwards. The desktop reads it in
                       the rail, so this copy is phone-only via CSS. */''}
-                <${AiNotice} compact=${turns.length > 0 || threads.length > 1} className="poster-ai-notice--main" />
+                <${AiNotice} main compact=${turns.length > 0 || threads.length > 1} />
                 ${showMobileNudge && html`<${MobileNudge} onDismiss=${dismissNudge} />`}
                 ${!showMobileNudge && html`<${InstallCta} compact=${true} />`}
 
@@ -678,11 +679,12 @@ export default function ChatView() {
                 ${capped ? html`
                     <${ConversationCap}
                         title=${tr('chat.capTitle', 'This conversation has used up its free ride.')}
-                        body=${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}>
-                            <a class="poster-slab" href="/v1/profile?tab=ai">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
-                            ${/* The store is the one price door; a node without one offers only the key. */''}
-                            ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('chat.capOwnPlace', 'Get your own place →')}</a>` : ''}
-                    <//>` : html`
+                        body=${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}
+                        ways=${[
+                            { loud: true, href: '/v1/profile?tab=ai', label: tr('chat.capOwnKey', 'Bring your own key →') },
+                            // The store is the one price door; a node without one offers only the key.
+                            storeHref() ? { href: storeHref(), newTab: true, label: tr('chat.capOwnPlace', 'Get your own place →') } : null,
+                        ]} />` : html`
                 <${Composer}
                     value=${draft}
                     onInput=${setDraft}

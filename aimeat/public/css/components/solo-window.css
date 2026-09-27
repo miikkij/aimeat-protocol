@@ -1,0 +1,22 @@
+/**
+ * @file solo-window.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One thing popped out into a window of its own (components/SoloWindow.js): a centred
+ *   column and, while there is nothing to show, the quiet sentence in the middle of the window.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial: the values of the pop-out document window (profile.css
+ *     .pj-doc-solo, .pj-doc-solo-empty), which the pop-out agent window (agents-detail.css
+ *     .pf-agd-solo, 860px) takes too (page group G9, a unification).
+ */
+
+.solo-window {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 1rem 1.2rem 3rem;
+}
+
+.solo-window-message {
+  text-align: center;
+  padding: 3rem 1rem;
+}

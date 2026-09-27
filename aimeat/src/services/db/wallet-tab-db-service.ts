@@ -14,6 +14,8 @@
  * @structure WalletTabService.overview(ownerName, ownerGhii) → { wallet, transactions, checkoutSessions, orders }
  * @usage const w = await createWalletTabService(config, storage).overview(owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The escrow sum reads the person's own GHII beside their agents': a request
+ *     made in person is filed under it.
  *   v1.1.0 — 2026-09-04 — `lifetime` through services/wallet-stats.ts, the same function GET /v1/wallet
  *     uses: every row kind counted, plus in/out, ledger_sum, unrecorded and by_type.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Wallet tab's 4 core reads into one composite.
@@ -52,12 +54,12 @@ export class WalletTabService {
 
       const [allTx, inEscrow, sessions, orders] = await Promise.all([
         this.storage.getTransactions(identity, 100_000),
-        // Escrow is per-agent (work items reference GAIIs); cached 60s per owner (same key + domain tags
-        // as GET /v1/wallet so the shared cache entry serves both).
+        // Escrow is per identity (work items name the person's GHII or an agent's GAII); cached 60s per
+        // owner (same key + domain tags as GET /v1/wallet so the shared cache entry serves both).
         cached(`escrow:${ownerName}`, TTL.dashboard, async () => {
           const agents = await this.storage.getAgentsByOwner(ownerName);
           let total = 0;
-          for (const a of agents) total += await calculateEscrow(this.storage, a.gaii);
+          for (const id of [identity, ...agents.map(a => a.gaii)]) total += await calculateEscrow(this.storage, id);
           return total;
         }, ['domain:work', 'domain:wallet']),
         listSessions(this.storage, ownerGhii, 100),   // buyer's checkout sessions (purchases)

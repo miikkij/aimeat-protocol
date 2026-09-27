@@ -6,14 +6,20 @@
  *   A template has an HTML part and a plain-text part, and both travel in the same message. The
  *   section says out loud what an operator cannot see otherwise: a saved template is stored on the
  *   node and every send still uses the built-in one, because nothing on the send path reads these
- *   records yet (routes/admin-features.ts writes _email_tpl/… and is the only reader).
+ *   records yet (routes/admin-features.ts writes _email_tpl/… and is the only reader). The section
+ *   draws library components and passes them data; it writes no class.
  *
  * @structure
- *   - Templates({ locale }) — the language picker, the seed and reset-all doors, the three folds
+ *   - Templates({ locale }) — the language chooser, the seed and reset-all doors, the three rows
  *   - Editor({ tpl, locale }) — placeholders, the three views, save, AI prompt, back to built-in
  *   - buildAiPrompt(tpl, locale) — the paste for the operator's own AI, tags kept intact
  *
  * @version-history
+ *   v3.0.0 — 2026-09-27 — The section draws library components and writes no class: the language
+ *     chooser and the three views are tabs (the chosen one on the sun, as before), a template is a
+ *     row of a List that opens its editor in the raised box under it (its id in typewriter under
+ *     the name, built-in or edited at the right, the arrow at the end), the preview is PagePreview's
+ *     email tone (600px on white, nothing in it runs), the edits are code areas.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v2.1.0 — 2026-09-13 — Compose the shared template heading and external spacing.
@@ -29,7 +35,17 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { LOCALES } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section } from '/components/Section.js';
+import { SettingBox } from '/components/Box.js';
+import { List, Row as ListRow, Name, Cell } from '/components/List.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
+import { TextArea } from '/components/TextField.js';
+import { PagePreview } from '/components/PagePreview.js';
+import { Loud, Action } from '/components/Action.js';
+import { FormActions } from '/components/Field.js';
+import { Split, Row } from '/components/Layout.js';
+import { Note } from '/components/Note.js';
+import { Label, Code } from '/components/Mark.js';
 import {
   getEmailTemplates, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates,
 } from '/js/services/admin.js';
@@ -126,38 +142,39 @@ function Editor({ tpl, locale, onSave, onReset }) {
   }
 
   return html`
-    <div class="adm-em-open">
-      ${tpl.params?.length > 0 && html`
-        <div class="adm-em-lbl">${E('tpl.placeholders')}</div>
-        <div class="adm-em-params">
-          ${tpl.params.map(p => html`<code>${p}</code>`)}
-          <span>${E('tpl.placeholdersWhy')}</span>
-        </div>`}
+    ${tpl.params?.length > 0 && html`
+      <${Label} block>${E('tpl.placeholders')}<//>
+      <${Row} wrap align="baseline">
+        ${tpl.params.map(p => html`<${Code} key=${p}>${p}<//>`)}
+        <${Note} kind="meta" inline>${E('tpl.placeholdersWhy')}<//>
+      <//>`}
 
-      <div class="adm-em-views">
-        <button type="button" class=${view === 'preview' ? 'on' : ''} onClick=${() => setView('preview')}>${E('tpl.preview')}</button>
-        <button type="button" class=${view === 'html' ? 'on' : ''} onClick=${() => setView('html')}>${E('tpl.html')}</button>
-        <button type="button" class=${view === 'text' ? 'on' : ''} onClick=${() => setView('text')}>${E('tpl.text')}</button>
-        <span class="adm-em-views-r">${E('tpl.width')}</span>
-      </div>
-      <div class="adm-em-stage">
-        ${view === 'preview' && html`<iframe srcdoc=${editHtml} sandbox="" title=${E('tpl.preview')}></iframe>`}
-        ${view === 'html' && html`<textarea spellcheck="false" value=${editHtml} onInput=${e => setEditHtml(e.target.value)}></textarea>`}
-        ${view === 'text' && html`<textarea spellcheck="false" value=${editText} onInput=${e => setEditText(e.target.value)}></textarea>`}
-      </div>
+    <${Tabs} kind="view" value=${view} onSelect=${setView} label=${E('tpl.preview')}
+      items=${[
+        { value: 'preview', label: E('tpl.preview') },
+        { value: 'html', label: E('tpl.html') },
+        { value: 'text', label: E('tpl.text') },
+      ]}>
+      <${Note} kind="meta" inline mono>${E('tpl.width')}<//>
+    <//>
+    <${TabPanel} value=${view} label=${E('tpl.' + view)}>
+      ${view === 'preview' && html`<${PagePreview} email title=${E('tpl.preview')} srcdoc=${editHtml} />`}
+      ${view === 'html' && html`<${TextArea} code rows=${18} spellCheck=${false} ariaLabel=${E('tpl.html')} value=${editHtml} onInput=${setEditHtml} />`}
+      ${view === 'text' && html`<${TextArea} code rows=${18} spellCheck=${false} ariaLabel=${E('tpl.text')} value=${editText} onInput=${setEditText} />`}
+    <//>
 
-      <div class="adm-em-tacts poster-row--thing">
-        <button class="adm-btn" onClick=${save} disabled=${saving || !changed}>${E('tpl.save')}</button>
-        <${CopyButton} text=${buildAiPrompt(tpl, locale)} className="og-door og-door--quiet"
-          label=${E('tpl.aiPrompt')} copiedLabel=${E('tpl.aiPromptCopied')} />
+    <${Split} heavy>
+      <${FormActions}>
+        <${Loud} control onClick=${save} disabled=${saving || !changed}>${E('tpl.save')}<//>
+        <${Action} small soft copy=${buildAiPrompt(tpl, locale)} copiedLabel=${E('tpl.aiPromptCopied')}>${E('tpl.aiPrompt')}<//>
         ${tpl.isCustom && html`
-          <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${reset}>${E('tpl.backToBuiltIn')}</button>`}
-        ${said && html`<span class="adm-em-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.text}</span>`}
-        ${!said && !changed && html`<span class="adm-em-hint adm-em-hint--flush">${E('tpl.noChanges')}</span>`}
-      </div>
-      <p class="adm-em-hint">${E('tpl.aiHint')}</p>
-      <${ConfirmUI} />
-    </div>`;
+          <${Action} small soft tone="danger" onClick=${reset}>${E('tpl.backToBuiltIn')}<//>`}
+        ${said && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+        ${!said && !changed && html`<${Note} inline>${E('tpl.noChanges')}<//>`}
+      <//>
+    <//>
+    <${Note}>${E('tpl.aiHint')}<//>
+    <${ConfirmUI} />`;
 }
 
 export default function Templates({ locale }) {
@@ -209,40 +226,35 @@ export default function Templates({ locale }) {
     }, { danger: true });
   }
 
+  const languages = html`<${Tabs} tone="fold" value=${lang} onSelect=${setLang} label=${E('tpl.title')}
+    items=${LOCALES.map((l) => ({ value: l, label: l }))} />`;
+
   return html`
-    <section class="og-sec">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${E('tpl.title')}<small>05</small></h2>
-        <div class="og-doors">
-          ${LOCALES.map(l => html`
-            <button type="button" class="og-door og-door--quiet ${l === lang ? 'og-door--on' : ''}"
-              onClick=${() => setLang(l)}>${l}</button>`)}
-        </div>
-      </div>
+    <${Section} num="05" title=${E('tpl.title')} doors=${languages}>
+      <${SettingBox}><b>${E('tpl.warnLead')}</b> ${E('tpl.warn')}<//>
 
-      <div class="og-box poster-aside poster-aside--small">
-        <b>${E('tpl.warnLead')}</b> ${E('tpl.warn')}
-      </div>
+      <${List} cols="name-tags-doors" keepCols apart>
+        ${(list || []).map(tpl => {
+    const isOpen = open === tpl.id;
+    return html`
+          <${ListRow} key=${tpl.id} open=${isOpen} onToggle=${() => setOpen(isOpen ? null : tpl.id)}
+            panel=${isOpen ? html`<${Editor} key=${tpl.id + '-' + lang} tpl=${tpl} locale=${lang} onSave=${onSave} onReset=${onReset} />` : null}>
+            <${Name} meta=${tpl.id}>${E('kind.' + tpl.id)}<//>
+            <${Cell} meta>${tpl.isCustom ? E('tpl.edited', { lang }) : E('tpl.builtIn')}<//>
+            <${Cell} sign>${isOpen ? '▴' : '▾'}<//>
+          <//>`;
+  })}
+      <//>
 
-      <div class="adm-em-templates">
-        ${(list || []).map(tpl => html`
-          <button type="button" class="adm-em-fold ${open === tpl.id ? 'is-open' : ''}" onClick=${() => setOpen(open === tpl.id ? null : tpl.id)}>
-            <i>${tpl.id}</i><b>${E('kind.' + tpl.id)}</b>
-            <em>${tpl.isCustom ? E('tpl.edited', { lang }) : E('tpl.builtIn')}</em>
-            <span class="adm-em-fold-arrow">${open === tpl.id ? '▴' : '▾'}</span>
-          </button>
-          ${open === tpl.id && html`<${Editor} key=${tpl.id + '-' + lang} tpl=${tpl} locale=${lang} onSave=${onSave} onReset=${onReset} />`}`)}
-      </div>
-
-      <div class="adm-em-act">
+      <${FormActions}>
         ${seeded
-    ? html`<button type="button" class="og-door og-door--quiet" onClick=${seedAll}>${E('tpl.reseed')}</button>
-           <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${resetAll}>${E('tpl.resetAll')}</button>`
-    : html`<button type="button" class="og-door og-door--quiet" onClick=${seedAll}>${E('tpl.seedDefaults')}</button>`}
-        <p>${seeded ? E('tpl.seededNote') : E('tpl.seedNote')}</p>
-        ${said && html`<span class="adm-em-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.text}</span>`}
-      </div>
-      <p class="adm-em-note">${E('tpl.bothParts')}</p>
+    ? html`<${Action} small soft onClick=${seedAll}>${E('tpl.reseed')}<//>
+           <${Action} small soft tone="danger" onClick=${resetAll}>${E('tpl.resetAll')}<//>`
+    : html`<${Action} small soft onClick=${seedAll}>${E('tpl.seedDefaults')}<//>`}
+        <${Note} slab>${seeded ? E('tpl.seededNote') : E('tpl.seedNote')}<//>
+        ${said && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+      <//>
+      <${Note}>${E('tpl.bothParts')}<//>
       <${ConfirmUI} />
-    </section>`;
+    <//>`;
 }

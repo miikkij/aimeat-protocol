@@ -13,6 +13,9 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.7.0 — 2026-09-26 — `work_provided` and `work_requested` beside `memories`: the person's own
+ *     work under their GHII, what they published and asked for in person, with the disputes on it.
+ *     One view per side (workProvidedView, workRequestedView) for these and the per-agent sections.
  *   v1.6.0 — 2026-09-20 — A credential record is redacted here too (shownMemoryValue), for the owner's
  *     memories and their agents' alike. Every other door has answered `{ configured: true }` since
  *     2026-09-16; this one handed out the ciphertext of the OpenRouter and TypeSafe keys and the PSP
@@ -44,12 +47,28 @@
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, WorkRecord } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
 import { shownMemoryValue } from '../../services/secret-records.js';
+
+/** One work item this identity was to do, as the export shows it: the other side is the requester. */
+function workProvidedView(w: WorkRecord) {
+  return {
+    tracking_code: w.trackingCode, action_id: w.actionId, status: w.status, requester_gaii: w.requesterGaii,
+    cost: w.cost, rating: w.rating, created_at: w.createdAt, updated_at: w.updatedAt,
+  };
+}
+
+/** One work item this identity asked for, as the export shows it: the other side is the provider. */
+function workRequestedView(w: WorkRecord) {
+  return {
+    tracking_code: w.trackingCode, action_id: w.actionId, status: w.status, provider_gaii: w.providerGaii,
+    cost: w.cost, rating: w.rating, created_at: w.createdAt, updated_at: w.updatedAt,
+  };
+}
 
 /** Mount GET /v1/owners/:name/export on an existing router. */
 export function registerOwnerExportRoute(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -214,26 +233,8 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
           created_at: m.createdAt,
           updated_at: m.updatedAt,
         })),
-        work_provided: providerWork.map(w => ({
-          tracking_code: w.trackingCode,
-          action_id: w.actionId,
-          status: w.status,
-          requester_gaii: w.requesterGaii,
-          cost: w.cost,
-          rating: w.rating,
-          created_at: w.createdAt,
-          updated_at: w.updatedAt,
-        })),
-        work_requested: requesterWork.map(w => ({
-          tracking_code: w.trackingCode,
-          action_id: w.actionId,
-          status: w.status,
-          provider_gaii: w.providerGaii,
-          cost: w.cost,
-          rating: w.rating,
-          created_at: w.createdAt,
-          updated_at: w.updatedAt,
-        })),
+        work_provided: providerWork.map(workProvidedView),
+        work_requested: requesterWork.map(workRequestedView),
         transactions: transactions.map(t => ({
           id: t.id,
           type: t.type,
@@ -274,11 +275,18 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       });
     }
 
+    // ── The person's own work, under their GHII ─────────────────────
+    // An action published in person and a request made in person are filed under the GHII, not
+    // under an agent, so the per-agent sections above do not hold them.
+    const ownWorkProvided = ghii ? await storage.listWorkByProvider(ghii) : [];
+    const ownWorkRequested = ghii ? await storage.listWorkByRequester(ghii) : [];
+    for (const w of [...ownWorkProvided, ...ownWorkRequested]) allWorkTrackingCodes.add(w.trackingCode);
+
     // ── Disputes (via work tracking codes) ──────────────────────────
     const allDisputes = await storage.listAllDisputes();
     const ownerDisputes = allDisputes.filter(d =>
       agentGaiis.includes(d.openedBy) ||
-      // Also include disputes on work records involving owner's agents
+      // Also include disputes on work records involving the owner or the owner's agents
       allWorkTrackingCodes.has(d.trackingCode)
     );
     const disputeExport = [];
@@ -453,6 +461,8 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       ghii: ghiiData,
       memories: ownerMemories,
       storage_files: ownerFiles,
+      work_provided: ownWorkProvided.map(workProvidedView),
+      work_requested: ownWorkRequested.map(workRequestedView),
       agents: agentData,
       disputes: disputeExport,
       personal_node: personalNodeData,

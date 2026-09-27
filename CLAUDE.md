@@ -107,7 +107,10 @@ error: `git commit -m @'…'@` is a PowerShell here-string, and in Bash it prepe
 the subject. Seven commits in this history carry that damage and three of them show `@ feat(…)` in
 `git log --oneline`; a pushed subject can only be fixed by rewriting history. Write the message to a
 file and run `bash scripts/git-commit.sh <file>`. `-m` is fine for a single line. The `commit-msg`
-hook refuses the wreckage whichever way the commit was made. → `docs/coding-guidelines/shell-and-git.md`
+hook refuses the wreckage whichever way the commit was made. The message uses industry terms
+(endpoint, route, MCP tool, code path), never metaphors such as door, road or hand; body paragraphs
+are not hard-wrapped. →
+`docs/coding-guidelines/shell-and-git.md`
 
 ## Ask the developer first
 
