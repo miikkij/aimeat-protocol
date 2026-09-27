@@ -3,16 +3,22 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Owner app-catalog backup endpoints:
- *   GET  /v1/apps/backup          — streamed ZIP of every app (every version) + own cortex extensions
+ *   GET  /v1/apps/backup          — streamed ZIP of every app (every version) + own cortex extensions;
+ *                                   ?to=storage keeps it as a private storage file and answers JSON
  *   POST /v1/apps/backup/inspect  — parse an uploaded backup, report contents/conflicts, write NOTHING
  *   POST /v1/apps/backup/restore  — selectively restore (per-app versions + conflict mode)
  *   Inspect caches the parsed backup under a short-lived token so restore does
  *   not need a second upload; restore also accepts { zip_base64 } directly.
  *   Mirrors the organism import hardening: safeUnzip + ZIP_REJECTED (422) +
- *   security-incident quarantine. Owner role required; restore always writes to
- *   the caller's own account regardless of the backup's source owner.
+ *   security-incident quarantine. Export: the owner, or a principal holding app:write.
+ *   Inspect and restore: owner role required; restore always writes to the caller's own
+ *   account regardless of the backup's source owner.
  * @structure appsBackupRouter(config, storage) — mount BEFORE appsRouter.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — GET /v1/apps/backup takes requireScope('app:write') instead of the owner
+ *     role, so an agent the owner trusts with apps may export (developer decision 2026-09-27), and
+ *     ?to=storage writes the ZIP as backups/apps-<owner>-<date>.zip (exportAppsBackupToStorage).
+ *     Inspect and restore stay owner-only.
  *   v1.0.3 — 2026-09-24 — The caller's owner claim is shortened with localAccountName, which keeps a
  *     visitor's home GHII whole (secaudit 2026-09, F-1).
  *   v1.0.2 — 2026-09-16 — The three doors refuse a federated session: the owner bucket came from the
@@ -26,13 +32,13 @@ import { Router, raw } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireLocalSession } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
-import { exportAppsBackup } from '../services/apps-backup-export.js';
+import { exportAppsBackup, exportAppsBackupToStorage } from '../services/apps-backup-export.js';
 import {
   parseAppsBackup, inspectAppsBackup, restoreAppsBackup,
   type ParsedAppsBackup, type AppSelection, type ExtSelection,
@@ -87,8 +93,36 @@ export function appsBackupRouter(config: AimeatConfig, storage: Storage): Router
   };
 
   // ── GET /v1/apps/backup — streamed ZIP of the caller's whole catalog ──
-  router.get('/v1/apps/backup', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
+  // The owner, or an agent the owner gave app:write (decided 2026-09-27). The bucket is the OWNER's
+  // (canonicalOwner), never the agent's GAII. `?to=storage` keeps the ZIP as the owner's private
+  // storage file and answers JSON, for a caller that cannot take a download.
+  router.get('/v1/apps/backup', requireAuth(), requireLocalSession(), requireScope('app:write'), async (req, res) => {
+    const to = req.query.to;
+    if (to !== undefined && to !== 'storage') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'to must be "storage", or left out to download the ZIP'));
+      return;
+    }
     const { owner, ownerGhii } = await canonicalOwner(req);
+    if (to === 'storage') {
+      try {
+        const stored = await exportAppsBackupToStorage(storage, config, ownerGhii, owner);
+        if (!stored.ok) {
+          res.status(stored.status).json(error(config.nodeId, stored.code, stored.message));
+          return;
+        }
+        const body = {
+          storage_key: stored.storage_key, size_bytes: stored.size_bytes,
+          apps: stored.apps, versions: stored.versions, extensions: stored.extensions,
+        };
+        res.json(success(config.nodeId, body, [
+          { description: 'Download the backup', method: 'GET', url: `/v1/storage/${body.storage_key}` },
+        ]));
+      } catch (e) {
+        logger.error('Apps backup export to storage failed', { error: (e as Error).message, owner });
+        res.status(500).json(error(config.nodeId, 'EXPORT_FAILED', 'Could not build the backup archive'));
+      }
+      return;
+    }
     const exportedAt = new Date().toISOString();
     const date = exportedAt.slice(0, 10);
     const safeOwner = owner.replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'owner';

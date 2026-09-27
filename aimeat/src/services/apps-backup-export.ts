@@ -8,15 +8,21 @@
  *   the organism/workspace export-bundle conventions (archiver, versioned
  *   manifest, folder-per-item layout). The backup contains content + metadata
  *   only — never access codes, tokens or keys.
- * @structure APPS_BACKUP_VERSION; exportAppsBackup(storage, config, opts)
- * @usage import { exportAppsBackup } from '../services/apps-backup-export.js';
+ * @structure APPS_BACKUP_VERSION; exportAppsBackup(storage, config, opts);
+ *   exportAppsBackupToStorage(storage, config, ownerGhii, ownerName) — the same ZIP kept as a
+ *   private storage file, for a caller that cannot take a download (an agent).
+ * @usage import { exportAppsBackup, exportAppsBackupToStorage } from '../services/apps-backup-export.js';
  * @version-history
  *   v1.0.0 — 2026-06-12 — Initial: owner app-catalog backup (apps + versions + extensions)
  *   v1.0.1 — 2026-06-13 — archiver v8: archiver('zip') -> new ZipArchive()
+ *   v1.1.0 — 2026-09-27 — exportAppsBackupToStorage(): writes the ZIP as the private file
+ *     backups/apps-<owner>-<date>.zip through writeStorageFile (key fence, size limit, quota,
+ *     overage, change events) and answers the key, size and counts. An agent may export now.
  */
 import { ZipArchive } from 'archiver';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
+import { writeStorageFile, type StorageWriteRefusal } from './storage-file-write.js';
 
 export const APPS_BACKUP_VERSION = '1.0';
 
@@ -156,5 +162,50 @@ export async function exportAppsBackup(
     apps: appCount,
     versions: versionCount,
     extensions: extCount,
+  };
+}
+
+/** What exportAppsBackupToStorage answers when the file is stored. */
+export interface AppsBackupStored {
+  ok: true;
+  /** The storage key, readable by the owner through GET /v1/storage/{key}. */
+  storage_key: string;
+  size_bytes: number;
+  apps: number;
+  versions: number;
+  extensions: number;
+}
+
+/**
+ * Builds the backup ZIP and keeps it as a PRIVATE storage file under the owner's GHII, key
+ * `backups/apps-<owner>-<YYYY-MM-DD>.zip`. A second export on the same day replaces the first.
+ * The write goes through writeStorageFile, so the per-file limit, the account quota and its overage
+ * charge apply exactly as on POST /v1/storage; a refusal from there is returned unchanged and nothing
+ * is stored.
+ *
+ * `ownerGhii` is the caller's resolved owner bucket (resolveGhii), never a raw token subject: an
+ * agent's `sub` is its GAII, and the file must land where the owner lists their own files.
+ */
+export async function exportAppsBackupToStorage(
+  storage: Storage,
+  config: AimeatConfig,
+  ownerGhii: string,
+  ownerName: string,
+): Promise<AppsBackupStored | StorageWriteRefusal> {
+  const exportedAt = new Date().toISOString();
+  const result = await exportAppsBackup(storage, config, { owner: ownerName, ownerGhii, exportedAt });
+  const safeOwner = ownerName.replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'owner';
+  const key = `backups/apps-${safeOwner}-${exportedAt.slice(0, 10)}.zip`;
+  const written = await writeStorageFile({ storage, config }, ownerGhii, {
+    key, data: result.buffer, mimeType: 'application/zip', visibility: 'private',
+  });
+  if (!written.ok) return written;
+  return {
+    ok: true,
+    storage_key: key,
+    size_bytes: result.buffer.length,
+    apps: result.apps,
+    versions: result.versions,
+    extensions: result.extensions,
   };
 }

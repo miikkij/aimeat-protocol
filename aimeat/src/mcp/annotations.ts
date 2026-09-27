@@ -39,6 +39,7 @@
  *     destructive — what it replaces is a value nobody could read) and _delete (destructive:
  *     whatever named that secret stops working).
  *   2026-09-05 — aimeat_admin_security_overview (read-only) and aimeat_admin_incident_resolve.
+ *   2026-09-27 — aimeat_app_manage (destructive, not idempotent) replaces ten app tools' entries.
  *   2026-09-18 — aimeat_app_visitors (read-only) and aimeat_app_visitors_measure.
  *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set, aimeat_app_audit.
  *   2026-08-28 — The five crew-definition tools.
@@ -384,7 +385,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_package_install_requests: { title: 'Package Install Requests', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_list: { title: 'List Apps', readOnlyHint: true },
     aimeat_app_get: { title: 'Get App', readOnlyHint: true },
-    aimeat_app_versions: { title: 'List App Versions', readOnlyHint: true },
+    // Destructive because some actions are: ui_set replaces a layout, subdomain_delete and
+    // screenshot_clear remove, an empty access_code clears one. Not idempotent: agent_deploy starts
+    // a new task on every call. A client that confirms each call is the safe reading of a mixed tool.
+    aimeat_app_manage: { title: 'Manage an App', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     aimeat_app_publish: { title: 'Publish App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_draft_save: { title: 'Save App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // append is not idempotent: calling it twice writes the chunk twice, which is the whole point of
@@ -393,13 +397,6 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_app_draft_replace: { title: 'Replace In App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_app_draft_read: { title: 'Read App Draft', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_draft_seed: { title: 'Seed App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_screenshot: { title: 'Screenshot App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_seo_set: { title: 'App Search Visibility', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_marks_set: { title: 'App Badge and Install Chip', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_legal_set: { title: 'App Legal Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_visitors: { title: 'App Visitors', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_visitors_measure: { title: 'App Visitor Measurement', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_audit: { title: 'App Audit Log', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_seo_status: { title: 'Search Visibility Status', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Open world: it posts to api.indexnow.org. Idempotent: the same notice twice is the same notice.
     aimeat_seo_announce: { title: 'Instant Update to Search Engines', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -556,8 +553,6 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
     aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
     aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
-    aimeat_app_ui_get: { title: 'App layout: read + catalogue', readOnlyHint: true },
-    aimeat_app_ui_set: { title: 'App layout: replace (versioned)', destructiveHint: true, idempotentHint: true },
     aimeat_designbook_search: { title: 'Design Book: browse the parts', readOnlyHint: true },
     aimeat_designbook_get: { title: 'Design Book: one part, whole', readOnlyHint: true },
     aimeat_designbook_propose: { title: 'Design Book: propose (benched first)', idempotentHint: true },

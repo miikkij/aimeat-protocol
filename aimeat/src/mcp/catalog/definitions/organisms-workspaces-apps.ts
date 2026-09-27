@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.9.0 — 2026-09-27 — aimeat_app_versions, _screenshot, _seo_set, _marks_set, _legal_set and _audit
+ *     moved into aimeat_app_manage (definitions/app-manage.ts) as actions with the same fields.
  *   v1.8.1 — 2026-09-26 — aimeat_memory_read_public says a Design Book part is read through the Design
  *     Book, and that it answers DESIGN_BOOK_PART naming that door.
  *   v1.8.0 — 2026-09-25 — aimeat_workspace_update takes `member_changes`; the three member change
@@ -542,7 +544,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_list',
-        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Paged: the answer carries `total`, `limit`, `offset` and `has_more`, so read the whole catalogue by calling again with offset += limit while has_more is true. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_versions. Publish with aimeat_app_publish.',
+        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Paged: the answer carries `total`, `limit`, `offset` and `has_more`, so read the whole catalogue by calling again with offset += limit while has_more is true. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_manage { action: "versions" }. Publish with aimeat_app_publish.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -557,7 +559,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_get',
-        description: 'Get one app\'s detail (manifest, current version number, size, mime type, whether access-protected, download count, `url` — the app\'s public web address to give a person — and the download/inline URLs) identified by its owner and filename. Find owner/filename via aimeat_app_list; for the list of prior versions use aimeat_app_versions.',
+        description: 'Get one app\'s detail (manifest, current version number, size, mime type, whether access-protected, download count, `url` — the app\'s public web address to give a person — and the download/inline URLs) identified by its owner and filename. Find owner/filename via aimeat_app_list; for the list of prior versions use aimeat_app_manage { action: "versions" }.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -573,16 +575,6 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         input: {
             filename: { type: 'string', required: true, description: "App filename to archive (your own owner's)." },
             version: { type: 'number', description: 'A specific version number. Omit to archive all versions.' },
-        },
-    },
-    {
-        name: 'aimeat_app_versions',
-        description: 'List the version history of one app (each entry: version number, semver display version, size, created-at) identified by its owner and filename. Use to see how an app has evolved before fetching detail with aimeat_app_get or archiving a specific version with aimeat_app_delete.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            owner: { type: 'string', required: true, description: 'Owner name of the app.' },
-            filename: { type: 'string', required: true, description: 'App filename.' },
         },
     },
     {
@@ -684,66 +676,6 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             filename: { type: 'string', required: true, description: 'The draft slot to write into.' },
             from_filename: { type: 'string', description: 'The published app to copy from. Defaults to filename.' },
             version: { type: 'number', description: 'Which published version. Defaults to the newest.' },
-        },
-    },
-    {
-        name: 'aimeat_app_screenshot',
-        description: 'Render a published app in a real browser and store the picture, then return its URL so you can LOOK at what you built. Use it right after publishing: the publish response tells you the bytes arrived, not that the page works, and a blank screen, a broken layout or a script that never ran all return 200. The URL needs no authentication, so you can hand it straight to a vision model. It also replaces the thumbnail the catalogue shows. Only published apps can be photographed; a draft has no public page, so publish first. Throttled per owner, because rendering is expensive.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
-            filename: { type: 'string', required: true, description: 'The published app to photograph (e.g. "pong.html").' },
-        },
-    },
-    {
-        name: 'aimeat_app_seo_set',
-        description: 'Decide whether one of your apps can be found in a search engine, and what it says about itself when it is. OFF for every app until you ask: publishing makes an app public and shareable by link straight away, and being findable is a separate choice. Switching it on adds the app to this node\'s sitemap, invites crawlers on the app\'s own address, and notifies the engines that accept instant updates; switching it off takes all of that back. The wording fields are optional and normally left empty — the title, the summary, the keywords and the picture are taken from the name, description, tags and screenshot already written for the app. Some nodes have their operator approve the request instead of granting it outright, and an operator can block one app from search without touching the app itself; the answer says which of those happened.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            filename: { type: 'string', required: true, description: 'The app to change, with its extension (e.g. "notes.html").' },
-            index: { type: 'boolean', description: 'true makes it findable, false takes it back out. Off until you ask.' },
-            title: { type: 'string', description: 'Title for search results and social cards. Empty derives it from the app name.' },
-            description: { type: 'string', description: 'Description for search results. Empty derives it from the app description.' },
-            keywords: { type: 'array', description: 'Keywords. Empty uses the app tags.' },
-            image: { type: 'string', description: 'Absolute https URL for the social card. Empty uses the app screenshot.' },
-            lang: { type: 'string', description: 'Language tag such as "fi". Empty reads what the app declares about itself.' },
-        },
-    },
-    {
-        name: 'aimeat_app_marks_set',
-        description: 'Switch the two pieces of chrome this node adds to one of your served apps: the "publish your own app" badge in the corner, and the offer to install the app in the visitor\'s browser. Both are on until you ask, and each is switched on its own, so taking the badge off a shop app leaves the install offer where it was. Naming nothing reports where the app stands. What this tool does NOT do: name the person who reviewed the app and answers for it, which is what lifts the visible AI-generated label. That is a legal act by a natural person and is reserved to the account holder signed in as themselves, on the app catalog\'s Details page; an agent cannot make it.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            filename: { type: 'string', required: true, description: 'The app to change, with its extension (e.g. "notes.html").' },
-            badge: { type: 'boolean', description: 'false takes the "publish your own app" badge off this app; true puts it back.' },
-            install: { type: 'boolean', description: 'false stops offering visitors to install this app in their browser; true offers it again.' },
-        },
-    },
-    {
-        name: 'aimeat_app_legal_set',
-        description: 'Publish, replace or remove one of an app\'s own legal pages: terms of use, privacy notice, imprint (who is behind the app), refunds and withdrawal, accessibility statement, cookies, or support. The app answers for what it does — a shop for its sales, an app that handles personal data for that data — and not the node it runs on, so these pages are the app\'s: written in markdown (rendered by the node with every character escaped), as an HTML document (served as written, on the app\'s own origin), or as a link to where the page already lives. Each page is served at /terms, /privacy and so on under the app\'s address, linked from the app\'s head, and named in its llms.txt. Every change lands in the app\'s audit log with who made it, when, the format, the size and a hash of the text. Naming no kind reports where the app stands and which pages it still ought to have: every published app its terms and privacy notice, and one that takes money in a currency (priced tools, a shop) also who is selling, how to withdraw, the accessibility statement and a support contact. Morsels are not money and create none of those duties. A page written here is text a person reads, so declare ai_provenance when a model drafted it: the served page carries the record and its label. The app\'s named reviewer lifts the label on a node that labels only what the law requires; on a strict node the label stays and names the reviewer.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            filename: { type: 'string', required: true, description: 'The app, with its extension (e.g. "shop.html").' },
-            kind: { type: 'string', description: 'terms, privacy, imprint, refunds, accessibility, cookies or support. Omit to only read where the app stands.' },
-            format: { type: 'string', description: 'markdown, html or url.' },
-            content: { type: 'string', description: 'The page text, the HTML document, or the absolute https URL.' },
-            remove: { type: 'boolean', description: 'true removes the named page.' },
-        },
-    },
-    {
-        name: 'aimeat_app_audit',
-        description: 'Read one of your apps\' audit log: every change to how the app is offered, newest first, with who made it (you, or which agent in your name), when, and what — a legal page set or removed (with the format, size and a hash of the text), the badge or install offer switched, a reviewer declared or withdrawn, search visibility, parked or unparked, forking, an access code set or cleared (never the code), copy-protection flags, the name or description. The log is the owner\'s and nobody else\'s; it is what lets an app that sells something or handles personal data show what was in force on a given day. With playtest: true the node also OPENS the app the way a stranger does, in a real browser with nobody signed in, and answers with what it saw — whether anything was on screen within eight seconds, whether the canvas is one flat colour three seconds in (the black screen a player calls broken), errors in the browser console and files the node refused to serve, whether the page survives a phone and a desktop without scrolling sideways, whether sound waits for a tap the way every browser demands, whether the controls are big enough for a thumb, whether progress can be saved, and whether it still starts for someone who asked for less motion. Run it after publishing a game: it is the only way to see the app without a screen. It takes about a minute, changes nothing, and on a node with no browser it says so instead of pretending to pass.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            filename: { type: 'string', required: true, description: 'The app, with its extension.' },
-            limit: { type: 'number', description: 'How many of the newest entries to return. Default 50, at most 500.' },
-            playtest: { type: 'boolean', description: 'Also open the app in a headless browser and report what it did. Slow (about a minute).' },
         },
     },
     {

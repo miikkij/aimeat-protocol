@@ -46,6 +46,7 @@
  *   2026-09-01 — A sixth surface, `primitives` (Agent v2 V2): twelve tools, and everything else
  *     reached through aimeat_discover + aimeat_invoke. The other five are unchanged, and so is
  *     /v1/mcp — this is one more door, not a replacement for any of them.
+ *   2026-09-27 — aimeat_app_manage on appdev and agent, in place of the ten app tools it replaces.
  *   2026-09-18 — aimeat_app_visitors and aimeat_app_visitors_measure beside the other app settings.
  *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set and aimeat_app_audit beside aimeat_app_seo_set.
  *   2026-08-28 — The five aimeat_crew_* tools on `appdev`, `agent` and `admin`: the chat path to
@@ -136,7 +137,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
         'aimeat_discover',
-        'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
+        'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_manage', 'aimeat_app_delete',
         // Component packages — a different backend from the apps above, named so since 2026-08-16.
         // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
         // must list exactly what is registered. Authoring by hand (publish) and pruning history
@@ -145,9 +146,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_pull', 'aimeat_package_install_requests',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
-        'aimeat_app_screenshot',
-        'aimeat_app_seo_set', 'aimeat_app_marks_set', 'aimeat_app_legal_set', 'aimeat_app_audit', 'aimeat_seo_status',
-        'aimeat_app_visitors', 'aimeat_app_visitors_measure',
+        'aimeat_seo_status',
         'aimeat_seo_announce',
         'aimeat_image_generate',
         'aimeat_voice_reply', 'aimeat_voice_speak',
@@ -176,7 +175,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_decide_rules', 'aimeat_decide_rule_propose',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         'aimeat_datamap_get', 'aimeat_datamap_set', 'aimeat_memory_hands',
-        'aimeat_app_ui_get', 'aimeat_app_ui_set',
+        'aimeat_app_manage',
         'aimeat_designbook_search', 'aimeat_designbook_get', 'aimeat_designbook_propose', 'aimeat_designbook_adopt',
         'aimeat_designbook_keep',
         // The parts this node's own interface is built from, read before a page is changed.

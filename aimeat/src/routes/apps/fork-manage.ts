@@ -6,6 +6,11 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-27 — PATCH writes name, description, descriptions, access_code, parked,
+ *     forkable and protection through services/app-settings.ts (applyOwnerSettingsUpdate), and
+ *     patchRefusal validates them with its parseOwnerSettingsInput, so the MCP tool
+ *     aimeat_app_manage (action "settings") runs the same code. Pure extraction: same refusals,
+ *     writes, audit entries, notes and response.
  *   v1.6.3 — 2026-09-26 — The fork's source owner comes from localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -38,14 +43,17 @@
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AppProtection } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { validateCortexAgents } from '../../models/crew-def-schemas.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
-import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
+import {
+    applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput,
+    SETTINGS_PRESENTATION_FIELDS, SETTINGS_OFFERING_FIELDS, type AppSettingsField, type AppSettingsInput,
+} from '../../services/app-settings.js';
 import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput } from '../../services/app-seo.js';
 import {
     applyOwnerMarksUpdate, appMarksState, parseMarksInput, parseAuthorInput, AUTHOR_NEEDS_OWNER_PRINCIPAL,
@@ -72,26 +80,10 @@ const bad = (message: string): PatchRefusal => ({ status: 400, code: 'INVALID_IN
  * disappears mid-request is a 404 no ordering can prevent.
  */
 function patchRefusal(body: Record<string, unknown>, roles: string[], delegated: unknown): PatchRefusal | null {
-    if ('name' in body) {
-        if (typeof body.name !== 'string') return bad('name must be a string');
-        const trimmed = body.name.trim();
-        if (trimmed.length < 1 || trimmed.length > 120) return bad('name must be 1-120 characters');
-    }
-    if ('description' in body) {
-        if (typeof body.description !== 'string') return bad('description must be a string');
-        const trimmed = body.description.trim();
-        if (trimmed.length > 10_000) return bad('description must be at most 10000 characters');
-        if (trimmed.length === 0) return bad('description cannot be empty — apps require a description');
-    }
-    if ('descriptions' in body) {
-        if (typeof body.descriptions !== 'object' || body.descriptions === null || Array.isArray(body.descriptions)) {
-            return bad('descriptions must be an object mapping locale → text');
-        }
-        for (const [loc, val] of Object.entries(body.descriptions as Record<string, unknown>)) {
-            if (typeof val !== 'string') return bad(`descriptions.${loc} must be a string`);
-            if (val.trim().length > 10_000) return bad(`descriptions.${loc} must be at most 10000 characters`);
-        }
-    }
+    // The settings fields are asked in two parts around `cortex`, so that a body with two bad
+    // fields is refused on the same one it always was.
+    const presentation = parseOwnerSettingsInput(settingsPart(body, SETTINGS_PRESENTATION_FIELDS));
+    if ('refusal' in presentation) return presentation.refusal;
     if ('cortex' in body && !isCortexClear(body.cortex)) {
         if (typeof body.cortex !== 'object' || body.cortex === null || Array.isArray(body.cortex)) {
             return bad('cortex must be an object (e.g. { "agents": [ ... ] }) or null to clear');
@@ -99,17 +91,8 @@ function patchRefusal(body: Record<string, unknown>, roles: string[], delegated:
         const check = validateCortexAgents((body.cortex as Record<string, unknown>).agents);
         if (!check.ok) return { status: 400, code: 'INVALID_CREW_DEF', message: check.errors.join('; ') };
     }
-    if ('access_code' in body) {
-        const code = body.access_code;
-        if (typeof code === 'string' && code.length > 0 && (code.length < 4 || code.length > 64)) {
-            return bad('access_code must be 4-64 characters');
-        }
-    }
-    if ('parked' in body && typeof body.parked !== 'boolean') return bad('parked must be a boolean');
-    if ('forkable' in body && typeof body.forkable !== 'boolean') return bad('forkable must be a boolean');
-    if ('protection' in body && sanitizeProtection(body.protection) === undefined) {
-        return bad('protection must be an object of booleans (obfuscate, domainLock, watermark, noRawDownload)');
-    }
+    const offering = parseOwnerSettingsInput(settingsPart(body, SETTINGS_OFFERING_FIELDS));
+    if ('refusal' in offering) return offering.refusal;
     if ('seo' in body) {
         const parsed = parseOwnerSeoInput(body.seo);
         if ('error' in parsed) return bad(parsed.error);
@@ -138,6 +121,13 @@ function patchRefusal(body: Record<string, unknown>, roles: string[], delegated:
         if (!Object.keys(parsed.legal).length) return bad('legal names no page to set or remove');
     }
     return null;
+}
+
+/** The settings fields of `body` that `fields` names; the object is empty when it carries none. */
+function settingsPart(body: Record<string, unknown>, fields: readonly AppSettingsField[]): AppSettingsInput {
+    const part: AppSettingsInput = {};
+    for (const f of fields) if (f in body) part[f] = body[f];
+    return part;
 }
 
 /** `cortex: null` and `{ agents: [] }` both mean "take the bundled crew-defs off". */
@@ -329,72 +319,22 @@ export function registerForkManageRoutes(
         const audit = (action: AppAuditAction, detail?: Record<string, string | number | boolean | null>) =>
             recordAppAudit(storage, { ownerGhii: effectiveGaii, filename, by: callerGaii, action, detail });
 
-        // Rename / re-describe in place: the display name is metadata, the URL is
-        // keyed off owner/filename, so this never changes the link. Only the latest
-        // version's manifest is updated (the version the catalogue surfaces).
-        const metaUpdate: { name?: string; description?: string; descriptions?: Record<string, string> } = {};
-        if ('name' in body) {
-            if (typeof body.name !== 'string') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name must be a string'));
-                return;
+        // The app's own settings (name, descriptions, access code, parked, forkable, protection)
+        // are services/app-settings.ts, which the MCP tool calls too. Called once per part, before
+        // and after `cortex`, so the writes and the notes keep the order they always had.
+        const settingsTarget = { ownerGaii: effectiveGaii, ownerName: owner, filename, callerGaii };
+        const applySettings = async (fields: readonly AppSettingsField[]): Promise<boolean> => {
+            const part = settingsPart(body, fields);
+            if (Object.keys(part).length === 0) return true;
+            const out = await applyOwnerSettingsUpdate(storage, config, settingsTarget, part);
+            if ('refusal' in out) {
+                res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
+                return false;
             }
-            const trimmedName = body.name.trim();
-            if (trimmedName.length < 1 || trimmedName.length > 120) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name must be 1-120 characters'));
-                return;
-            }
-            metaUpdate.name = trimmedName;
-        }
-        if ('description' in body) {
-            if (typeof body.description !== 'string') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description must be a string'));
-                return;
-            }
-            const trimmedDesc = body.description.trim();
-            if (trimmedDesc.length > 10_000) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description must be at most 10000 characters'));
-                return;
-            }
-            if (trimmedDesc.length === 0) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description cannot be empty — apps require a description'));
-                return;
-            }
-            metaUpdate.description = trimmedDesc;
-        }
-        // Per-locale descriptions (EN/FI, extensible): a `{ locale: text }` map. Each value is a
-        // string ≤2000 chars; blank values are dropped. Additive — the canonical `description` stays.
-        if ('descriptions' in body) {
-            if (typeof body.descriptions !== 'object' || body.descriptions === null || Array.isArray(body.descriptions)) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'descriptions must be an object mapping locale → text'));
-                return;
-            }
-            const cleaned: Record<string, string> = {};
-            for (const [loc, val] of Object.entries(body.descriptions as Record<string, unknown>)) {
-                if (typeof val !== 'string') {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `descriptions.${loc} must be a string`));
-                    return;
-                }
-                const trimmed = val.trim();
-                if (trimmed.length > 10_000) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `descriptions.${loc} must be at most 10000 characters`));
-                    return;
-                }
-                if (trimmed.length > 0) cleaned[loc] = trimmed;
-            }
-            metaUpdate.descriptions = cleaned;
-        }
-        if (metaUpdate.name !== undefined || metaUpdate.description !== undefined || metaUpdate.descriptions !== undefined) {
-            await storage.updateAppMeta(effectiveGaii, filename, metaUpdate);
-            if (metaUpdate.name !== undefined) await audit('name', { name: metaUpdate.name });
-            if (metaUpdate.description !== undefined || metaUpdate.descriptions !== undefined) await audit('description');
-            if (metaUpdate.name !== undefined && metaUpdate.description !== undefined) {
-                notes.push('Name and description updated. The app link is unchanged.');
-            } else if (metaUpdate.name !== undefined) {
-                notes.push('Name updated. The app link is unchanged.');
-            } else {
-                notes.push('Description updated.');
-            }
-        }
+            notes.push(...out.notes);
+            return true;
+        };
+        if (!await applySettings(SETTINGS_PRESENTATION_FIELDS)) return;
 
         // Agent-Bundled Apps: edit the bundled crew-defs in place, without re-publishing the
         // HTML. Same fail-loud gate as publish (a malformed agents[] never lands in a manifest);
@@ -421,60 +361,7 @@ export function registerForkManageRoutes(
             }
         }
 
-        if ('access_code' in body) {
-            const access_code = body.access_code;
-            const newCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;
-            if (newCode && (newCode.length < 4 || newCode.length > 64)) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'access_code must be 4-64 characters'));
-                return;
-            }
-            await storage.updateAppAccessCode(effectiveGaii, filename, newCode);
-            // The fact, never the code.
-            await audit(newCode ? 'access_code.set' : 'access_code.cleared');
-            notes.push(newCode
-                ? 'Access code updated. Share the new code with recipients.'
-                : 'Access code removed. The app is now publicly downloadable.');
-        }
-
-        if ('parked' in body) {
-            if (typeof body.parked !== 'boolean') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'parked must be a boolean'));
-                return;
-            }
-            await storage.setAppParked(effectiveGaii, filename, body.parked);
-            await audit(body.parked ? 'parked' : 'unparked');
-            notes.push(body.parked
-                ? 'App parked. It is now hidden from the public catalogue but stays usable by you.'
-                : 'App unparked. It is published in the public catalogue again.');
-        }
-
-        if ('forkable' in body) {
-            if (typeof body.forkable !== 'boolean') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'forkable must be a boolean'));
-                return;
-            }
-            await storage.setAppForkable(effectiveGaii, filename, body.forkable);
-            await audit('forkable', { on: body.forkable });
-            notes.push(body.forkable
-                ? 'Forking enabled. Anyone can now fork this app into their own catalogue.'
-                : 'Forking disabled. Only you and your agents can fork this app.');
-        }
-
-        if ('protection' in body) {
-            const sanitized = sanitizeProtection(body.protection);
-            if (sanitized === undefined) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'protection must be an object of booleans (obfuscate, domainLock, watermark, noRawDownload)'));
-                return;
-            }
-            const toStore: AppProtection = Object.values(sanitized).some(Boolean) ? sanitized : {};
-            await storage.updateAppMeta(effectiveGaii, filename, { protection: toStore });
-            invalidateProtectionCache(owner, filename);
-            const on = Object.entries(toStore).filter(([, v]) => v).map(([k]) => k);
-            await audit('protection', { flags: on.join(',') });
-            notes.push(on.length
-                ? `Copy-protection updated (${on.join(', ')}). Note: these raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic/data, move it into an extension.`
-                : 'Copy-protection cleared.');
-        }
+        if (!await applySettings(SETTINGS_OFFERING_FIELDS)) return;
 
         // Search visibility, and the wording that goes with it. Off by default on every app:
         // publishing makes an app public and shareable by link, and being findable in a search
@@ -554,13 +441,8 @@ export function registerForkManageRoutes(
         const updated = await storage.getApp(effectiveGaii, filename);
 
         res.json(success(config.nodeId, {
-            filename,
-            name: updated?.manifest?.name,
-            description: updated?.manifest?.description,
-            protected: !!updated?.accessCode,
-            parked: !!updated?.parked,
-            forkable: !!updated?.forkable,
-            protection: updated?.manifest?.protection ?? null,
+            // filename, name, description, protected, parked, forkable, protection: in this order.
+            ...appSettingsState(updated, filename),
             // The STATE, not the switch. An owner who turned the switch on in review mode, or on a
             // blocked app, has to be able to see that the answer is still not "findable".
             seo: updated ? { state: appSeoState(updated, config), ...(updated.manifest?.seo ?? {}) } : null,
@@ -571,7 +453,7 @@ export function registerForkManageRoutes(
                 legal: appLegalState(updated),
                 legal_readiness: legalReadiness(updated, { sellsForMoney: await appSellsForMoney(storage, updated) }),
             } : {}),
-            download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
+            download_url: appDownloadUrl(owner, filename),
             note: notes.join(' '),
         }));
         emitChange('apps');

@@ -47,6 +47,8 @@
  *     outside the '*' bundle.
  *   v1.20.0 -- 2026-09-08 -- aimeat_admin_cors_overview and aimeat_admin_cors_set join the
  *     operator-gated list, beside the Security pair.
+ *   2026-09-27 -- aimeat_app_manage replaces ten app tools; it is in SCOPE_EXEMPT_TOOLS and its
+ *     handler checks each action's word (catalog/action-scopes.ts). The ten entries are gone.
  *   v1.19.0 -- 2026-09-06 -- The three secrets-vault tools → secrets:manage, the same word the three
  *     REST doors use. A new word rather than a memory one: memory:write is already held by live
  *     agents and grants, and putting a credential store behind it would have handed every one of
@@ -133,6 +135,10 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // one, and it would have to guess which scope the target wants. `aimeat_invoke` can do exactly
     // what its caller can already do and nothing more; see services/node-invoke.ts.
     'aimeat_invoke',
+    // One tool, many actions, each with its own word (catalog/action-scopes.ts): the handler checks
+    // the action's word on every call. Its reads need none, so one word for the tool would take
+    // versions and lineage away from agents that hold only a read word.
+    'aimeat_app_manage',
     // The node administration block (mint, SSO, account lifecycle, the second-factor reset, the
     // Security, CORS, Hooks, Statistics, Usage, Knowledge and Federation pages, the MCP registry, and
     // the layout read) stood here until 2026-09-24 with the reason "gated in the handler on the
@@ -220,17 +226,6 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_draft_replace:                 'app:write',
     aimeat_app_draft_read:                    'app:write',
     aimeat_app_draft_seed:                    'app:write',
-    aimeat_app_screenshot:                    'app:write',
-    aimeat_app_seo_set:                       'app:write',
-    aimeat_app_marks_set:                     'app:write',
-    aimeat_app_legal_set:                     'app:write',
-    // The signals words, not app:*: the numbers live in the owner's signal stream, the REST doors
-    // are gated on these two, and reading is kept apart from switching on purpose.
-    aimeat_app_visitors:                      'signals:read',
-    aimeat_app_visitors_measure:              'signals:write',
-    // app:write, not app:read: the route behind every door is gated on the one app scope the
-    // owner's checkboxes carry, and an agent that may manage an app may read its log.
-    aimeat_app_audit:                         'app:write',
     // The node's discovery status and the announcement to search engines. Both refuse everyone but
     // the operator in their handler, so the word is the operator's (security audit A8-1): on app:write,
     // which every Full-access agent holds, any agent of the operator could tell the search engines
@@ -479,10 +474,6 @@ export const TOOL_SCOPES: Record<string, string> = {
     // would be a permission that has to be enforced on every door or does not exist (invariant 15).
     aimeat_datamap_get: 'memory:read',
     aimeat_datamap_set: 'memory:write',
-    // The mosaic layout is a memory record in the owner's namespace (TARGET-074): the existing
-    // memory words gate it, no new scope word.
-    aimeat_app_ui_get: 'memory:read',
-    aimeat_app_ui_set: 'memory:write',
     aimeat_designbook_search: 'memory:read',
     aimeat_designbook_get: 'memory:read',
     aimeat_designbook_propose: 'memory:write',

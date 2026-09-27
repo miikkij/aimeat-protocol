@@ -74,7 +74,7 @@ export const ATELIER_MOSAIC_IN_GENRE = '## The Design Book in a genre fork: the 
   + 'THE FILL COMES FROM THE BOOK: pick one from the list at the end of this part, read it with `aimeat_designbook_get { id }`, '
   + 'replace every <angle-bracketed> value with this app\'s words and source names, take its `look` line out (in a genre the genre is the look, and the bridge makes every block wear it), and put it in the `#aimeat-layout` block. '
   + 'THE PUBLISH DOES THE REST, so there is nothing to call afterwards: it counts each part the meta names as used (once per app), and on the app\'s FIRST publish it stores the `#aimeat-layout` block as the app\'s arrangement, '
-  + 'so from then on the owner\'s AI rearranges the screen with `aimeat_app_ui_set` and no republish; a later publish never writes over what they arranged. The answer\'s `next_steps.design_book_parts` says what was counted, what it does not hold, and whether the layout was stored. '
+  + 'so from then on the owner\'s AI rearranges the screen with `aimeat_app_manage` action `ui_set` and no republish; a later publish never writes over what they arranged. The answer\'s `next_steps.design_book_parts` says what was counted, what it does not hold, and whether the layout was stored. '
   + 'Compose blocks of your own only where no fill is near.\n\n'
   + 'What stays hand-made in a genre fork is what the genre itself is made of: a figure only this page has, the masthead, a game board. Everything a mosaic block can show is a block.\n\n'
   + 'COMPONENTS: WHAT ANOTHER APP MADE BY HAND. The list at the end of this part has a COMPONENTS group: pieces of page an earlier builder made because the Book had nothing, from apps whose owner was satisfied. '

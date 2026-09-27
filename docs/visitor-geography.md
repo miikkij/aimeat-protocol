@@ -1,7 +1,7 @@
 # Visitor geography: telling a node where its visitors come from
 
 An app's owner can see where the people who open the app come from: on a world map in the App
-Catalog, or by asking their own AI (`aimeat_app_visitors`). This page is for the person who runs the
+Catalog, or by asking their own AI (`aimeat_app_manage`, action `visitors`). This page is for the person who runs the
 node. It says what the node needs from the reverse proxy for that map to fill in, and what is and is
 not kept.
 

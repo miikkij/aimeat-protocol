@@ -7545,11 +7545,17 @@ paths:
         `owner_added_scopes` names the words the owner added to a grant by hand
         (POST /v1/app-grants/{grantId}/read-through); a refresh or a sign-in that follows the app's
         own declaration keeps them until the owner takes them away.
+        Who may call: the owner, or an agent (or other principal) holding the `consent:manage`
+        scope. The list is always the grants of the account the session acts for. A federated
+        session is refused. Narrowing, the spend cap, read-through and revoking a grant stay
+        owner-only.
       tags: [Auth]
       security:
         - BearerAuth: []
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /v1/app-grants/{grantId}:
     patch:
@@ -25588,11 +25594,14 @@ paths:
   /v1/admin/subdomains:
     get:
       operationId: listSubdomainSites
-      summary: List subdomain mappings (operator only)
+      summary: List subdomain mappings (node operator)
       description: >
         Lists all operator-managed subdomain → site mappings. A mapping serves a
         published app at the root of `<subdomain>.<apex>` (kind `app`) or
         301-redirects to an external URL (kind `redirect`).
+        Who may call (all four subdomain doors): the node operator in person, or
+        an agent of the operator holding the `operator:admin` scope. No wildcard
+        carries that scope; an app grant and a federated session are refused.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -25621,12 +25630,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
     post:
       operationId: createSubdomainSite
-      summary: Create a subdomain mapping (operator only)
+      summary: Create a subdomain mapping (node operator)
       description: >
         Maps a subdomain to a published app (`target` = `owner/filename`) or an
         external redirect URL. Reserved subdomains (www, mail, api, admin, static,
         cdn, portal, app, apps, docs, status, mcp) are rejected. Access-code
-        protected and paid apps cannot be mapped.
+        protected and paid apps cannot be mapped. The node operator, or an agent
+        of the operator holding `operator:admin`.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -25679,7 +25689,11 @@ paths:
   /v1/admin/subdomains/{subdomain}:
     patch:
       operationId: updateSubdomainSite
-      summary: Update a subdomain mapping (operator only)
+      summary: Update a subdomain mapping (node operator)
+      description: >
+        Changes kind, target or enabled; the resulting kind and target are checked
+        again as on create. 404 NOT_FOUND when the subdomain is not mapped. The node
+        operator, or an agent of the operator holding `operator:admin`.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -25728,7 +25742,10 @@ paths:
           $ref: '#/components/responses/NotFound'
     delete:
       operationId: deleteSubdomainSite
-      summary: Delete a subdomain mapping (operator only)
+      summary: Delete a subdomain mapping (node operator)
+      description: >
+        Removes the mapping. 404 NOT_FOUND when the subdomain is not mapped. The
+        node operator, or an agent of the operator holding `operator:admin`.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -29192,22 +29209,70 @@ paths:
         plus the owner's installed cortex extensions
         (extensions/{name}/ext.json + manifest.yaml + libs/), described by a
         top-level backup-manifest.json. Access codes, tokens and keys are never
-        included. Owner role required.
+        included.
+        Who may call: the owner, or an agent (or other principal) holding the
+        `app:write` scope. The backup is always the catalogue of the account the
+        session acts for, never one named in the request. A federated session is
+        refused. With `to=storage` the ZIP is not streamed: it is kept as the
+        owner's PRIVATE storage file `backups/apps-{owner}-{YYYY-MM-DD}.zip`
+        (a second export on the same day replaces it), under the same per-file
+        limit and account quota as POST /v1/storage, and the answer is JSON.
+        Inspect and restore stay owner-only.
       tags: [App Store]
       security:
         - BearerAuth: []
+      parameters:
+        - name: to
+          in: query
+          required: false
+          description: >
+            `storage` keeps the ZIP as a private storage file and answers JSON.
+            Leave out to download the ZIP. Any other value is refused (400).
+          schema:
+            type: string
+            enum: [storage]
       responses:
         '200':
-          description: ZIP archive (Content-Disposition attachment)
+          description: >
+            Without `to`: the ZIP archive (Content-Disposition attachment).
+            With `to=storage`: JSON naming the stored file and what it holds.
           content:
             application/zip:
               schema:
                 type: string
                 format: binary
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          storage_key:
+                            type: string
+                            description: Key of the stored ZIP; read it with GET /v1/storage/{key}
+                          size_bytes:
+                            type: integer
+                          apps:
+                            type: integer
+                          versions:
+                            type: integer
+                          extensions:
+                            type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          description: The ZIP is over the per-file limit or the account storage quota (to=storage only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/apps/backup/inspect:
     post:

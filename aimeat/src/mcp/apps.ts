@@ -11,6 +11,10 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.18.0 — 2026-09-27 — aimeat_app_versions moved into aimeat_app_manage (action "versions"), which
+ *     calls services/app-versions.ts like the REST endpoint; this file read storage for it.
+ *   v1.17.4 — 2026-09-27 — aimeat_app_draft_save builds its preview link with mintDraftPreview
+ *     (services/app-draft-preview.ts), so it returns the app-origin URL as the REST endpoint does.
  *   v1.17.3 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.17.2 — 2026-09-26 — aimeat_app_get shows another owner's app through publicAppManifest
@@ -96,7 +100,7 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
-import { generateDraftToken } from '../services/draft-token.js';
+import { mintDraftPreview } from '../services/app-draft-preview.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { requirementsOf, appRef as depAppRef } from '../services/dependency-map.js';
@@ -372,11 +376,13 @@ export function registerAppsTools(
                 if ('refusal' in staged) {
                     return { content: [{ type: 'text' as const, text: refusalText(staged.refusal) }], isError: true };
                 }
-                // Mint a preview token + apex preview URL. On a node with the app origin ON the
-                // apex GET handler 301-redirects this to the isolated origin (preserving the
-                // token), so the SAME URL works in both postures.
-                const token = await generateDraftToken({ sub: scope.ownerGhii, filename }, 600);
-                const previewUrl = `${config.baseUrl}/v1/apps/${encodeURIComponent(scope.ownerName)}/${encodeURIComponent(filename)}?mode=inline&preview=${encodeURIComponent(token)}`;
+                // The preview link is services/app-draft-preview.ts, the same function
+                // POST .../draft/preview-token calls, so both return the app-origin URL when it is on.
+                const preview = await mintDraftPreview(storage, config,
+                    { owner: scope.ownerName, ownerGhii: scope.ownerGhii, filename });
+                if ('refusal' in preview) {
+                    return { content: [{ type: 'text' as const, text: refusalText(preview.refusal) }], isError: true };
+                }
                 logger.info(`App draft saved via MCP: ${filename}`, { by: agentGaii });
                 return {
                     content: [{
@@ -386,8 +392,8 @@ export function registerAppsTools(
                             saved: true,
                             has_live_version: staged.hasLiveVersion,
                             live_version_number: staged.liveVersionNumber,
-                            preview_url: previewUrl,
-                            preview_expires_in_seconds: 600,
+                            preview_url: preview.preview_url,
+                            preview_expires_in_seconds: preview.expires_in_seconds,
                             note: 'Draft saved — the LIVE app is unchanged. Open preview_url in a browser to test this next version on a real origin (mic/camera prompts work). When it is good, call aimeat_app_draft_publish to make it live; to throw it away call aimeat_app_draft_discard. To ship straight to live without staging, use aimeat_app_publish instead.',
                             ...servedMarksResponse(staged),
                         }, null, 2),
@@ -728,43 +734,6 @@ export function registerAppsTools(
             } catch (err) {
                 return { content: [{ type: 'text' as const, text: `Failed to delete app: ${(err as Error).message}` }], isError: true };
             }
-        },
-    );
-
-    // ── Tool 5: aimeat_app_versions ──
-    mcp.tool(
-        'aimeat_app_versions',
-        descriptionFor('aimeat_app_versions'),
-        {
-            owner: z.string().describe('Owner name of the app'),
-            filename: z.string().describe('App filename'),
-        },
-        annotationsFor('aimeat_app_versions'),
-        async ({ owner, filename }) => {
-            // First find the app to get the ownerGaii
-            const app = await storage.getAppByOwnerName(owner, filename);
-            if (!app) {
-                return { content: [{ type: 'text' as const, text: `App "${filename}" not found for owner "${owner}"` }], isError: true };
-            }
-
-            const versions = await storage.listAppVersions(app.ownerGaii, filename);
-
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        owner,
-                        filename,
-                        versions: versions.map(v => ({
-                            version_number: v.versionNumber,
-                            version: v.manifest.version,
-                            size: v.size,
-                            created_at: v.createdAt,
-                        })),
-                        total: versions.length,
-                    }, null, 2),
-                }],
-            };
         },
     );
 

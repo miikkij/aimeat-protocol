@@ -102,7 +102,10 @@ export type ProvenanceCarrier =
     /** Where the record binds, derived from the tool's own input. Both surfaces call this. */
     attachFrom: (input: Record<string, unknown>) => { memoryKey: string; content: string } | undefined;
   }
-  | { kind: 'not-carried'; route: string };
+  | { kind: 'not-carried'; route: string }
+  /** The node route records the declaration from the request body and names the record in its own
+   *  answer, so the connector sends the block with the write and adds no echo of its own. */
+  | { kind: 'recorded-by-route'; route: string };
 
 export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = {
   aimeat_memory_write: {
@@ -122,7 +125,9 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // Same shape as aimeat_surface_layout_set below: the node route ACCEPTS the declaration (the
   // app-ui service mints it against the layout's own bytes) and this side does send the block; what
   // is not proved yet is the `recorded: true` echo, and promoting means proving that.
-  aimeat_app_ui_set: { kind: 'not-carried', route: 'PUT /v1/apps/:owner/:filename/ui' },
+  // The two actions that take a declaration, legal and ui_set, send it in the body of
+  // PATCH /v1/apps/:filename and PUT /v1/apps/:owner/:filename/ui, and both routes record it.
+  aimeat_app_manage: { kind: 'recorded-by-route', route: 'PATCH /v1/apps/:filename (legal), PUT /v1/apps/:owner/:filename/ui (ui_set)' },
   aimeat_designbook_propose: { kind: 'not-carried', route: 'POST /v1/designbook' },
   aimeat_designbook_adopt: { kind: 'not-carried', route: 'POST /v1/designbook/:id/adopt' },
   aimeat_board_post: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts' },
@@ -285,6 +290,8 @@ export async function carryDeclaration(
   if (!declared) return undefined;
 
   const carrier = CONNECTOR_PROVENANCE_CARRIERS[tool];
+  // The route recorded it and says so in its own answer; a second echo here could only disagree.
+  if (carrier?.kind === 'recorded-by-route') return undefined;
   if (!carrier || carrier.kind === 'not-carried') {
     const route = carrier?.route ?? 'this tool\'s node route';
     return {

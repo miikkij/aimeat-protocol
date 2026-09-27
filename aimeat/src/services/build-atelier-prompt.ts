@@ -354,7 +354,7 @@ function composeBody(config: AimeatConfig): string {
   body += 'Render the screen through `AIMEAT.atelier.mosaic(...)` instead of appending components '
     + 'by hand. You declare WHAT the app has — one resolver per data source name, an `onPick`, a '
     + '`fallback` layout of blocks — and the ARRANGEMENT (order, look, navigation mode) is a '
-    + 'stored record the owner\'s AI can change later with one `aimeat_app_ui_set` call, no '
+    + 'stored record the owner\'s AI can change later with one `aimeat_app_manage` call (action `ui_set`), no '
     + 'republish. Source names are the binding contract: keep them stable across edits.\n\n'
     + '```js\n'
     + 'var m = AIMEAT.atelier.mosaic({\n'

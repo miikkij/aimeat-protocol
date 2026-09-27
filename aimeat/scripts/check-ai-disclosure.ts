@@ -234,11 +234,11 @@ const AI_PROVENANCE_REQUIRED = [
   // is exactly who drafts it. DECIDED 2026-08-29: services/app-legal.ts mints through
   // provenanceForWrite() on every door, the served page carries the marks and the visible label,
   // and the app's named reviewer lifts the label the way it is lifted on the app itself.
-  'aimeat_app_legal_set',
   // A mosaic layout's titles, notes and empty-state wording are text a person reads on the app's
   // screen, and an agent is exactly who arranges it. The service mints the record, so the REST
-  // door carries the same decision.
-  'aimeat_app_ui_set',
+  // door carries the same decision. Both are actions of aimeat_app_manage since 2026-09-27
+  // ("legal" and "ui_set"), which takes the declaration for those two actions.
+  'aimeat_app_manage',
   // A Design Book part's title and summary are gallery text people read, and its adopted body is
   // an app screen's wording. The service mints on both writes, so every door carries it.
   'aimeat_designbook_propose',
@@ -323,7 +323,8 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // What this tool actually decides is VISIBILITY — whether an existing app is listed — and
   // visibility is not authorship. The bytes a reader eventually gets are the app's, and
   // aimeat_app_publish stamps those.
-  'aimeat_app_seo_set',
+  // (aimeat_app_seo_set, the tool this was written for, is action "seo" of aimeat_app_manage
+  // since 2026-09-27; the reasoning holds for that action, and the tool is in the list above.)
   // DECIDED, 2026-09-03, on the precedent directly above. An agent's `description` is catalogue
   // metadata about the agent — the same class of text as an app's own `name` and `description`,
   // which this project decided long ago need no provenance. It is one sentence saying what a thing

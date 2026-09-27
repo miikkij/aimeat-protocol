@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-09-27 — aimeat_app_manage gets a PROBE_SETUP entry (action versions).
  *   v1.0.0 -- 2026-09-07 -- Written with the sweep it guards.
  */
 import { describe, it, expect } from 'vitest';
@@ -68,6 +69,8 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_datamap_get: { app: 'someone/thing.html' },
   aimeat_datamap_set: { app: 'someone/thing.html', data_map: { spec: 'aimeat.datamap/1' } },
   aimeat_skill_get: { name: 'probe' },
+  // One tool, an action per job: the first action in its enum needs fields the probe does not send.
+  aimeat_app_manage: { action: 'versions', filename: 'probe.html' },
   aimeat_skill_publish: { skill_md: '---\nname: probe\ndescription: probe\n---\nbody\n' },
   aimeat_crew_try: { doc: { name: 'probe' }, prompt: 'probe' },
   aimeat_crew_publish: { doc: { name: 'probe' } },
