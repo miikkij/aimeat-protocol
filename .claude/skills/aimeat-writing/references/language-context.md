@@ -77,6 +77,8 @@ everywhere at once, and say so in the Changes section.
 | a space for what a group piles up | a workspace space for rows that keep arriving (messages, events, readings): appended, never edited, read with their own tools | row space | rivitila | espacio de filas |
 | an operating guide | instructions for one named capability | skill | taito | habilidad |
 | the write pacer | not money, not credit, never buys anything | morsel | murunen | morsel |
+| what morsels do | bound how much agents may write and use; the operator turns it on or off | pace (verb) | tahdistaa | marcar el ritmo |
+| whoever runs this AIMEAT, on a person's page | the company or person answerable for the service, named from the privacy settings; not the machine | runs this service / the operator | ylläpitää palvelua / palvelun ylläpitäjä | lo gestiona / quien gestiona este servicio |
 | granted model spend | real money the house fronts, and it runs out | AI allowance | tekoälysaldo | saldo de IA |
 | a model that answers closed questions | yes or no, pick one, a scale, with probabilities; writes no text; beside the text model, never in its list | decision model | päätösmalli | modelo de decisión |
 | the states a document or a process moves through | a named set of states and the events that move between them; in a living document the `machine` node | state machine | tilakone | máquina de estados |

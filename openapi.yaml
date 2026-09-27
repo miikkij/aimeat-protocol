@@ -2070,6 +2070,20 @@ components:
             accumulation_cap:
               type: integer
               example: 500
+        pacing:
+          type: object
+          description: |
+            Whether this node burns morsels per metered call to bound how fast agents consume
+            capabilities. `enabled` is true when the operator's default toll is above 0 (0 is off and is
+            the shipped default). A capability may declare its own toll, which this does not describe.
+          properties:
+            enabled:
+              type: boolean
+              example: false
+            toll_default:
+              type: integer
+              minimum: 0
+              example: 0
         lifetime:
           type: object
           description: |
