@@ -5,16 +5,44 @@
  * @description How a step whose work runs on the node reports its outcome to the engine. The ai,
  *   extension and datapackage steps, and the reply of an ecosystem step, call the engine's
  *   onPushTerminal through reportOutcome, the one function that tells a failure of the step's own
- *   work from an error inside the engine.
- * @structure reportOutcome(work, done, failed, label)
+ *   work from an error inside the engine. The write an answer makes (a result key, a package
+ *   version) is passed with the answer as a ResultWrite, and the engine makes it through writeResult
+ *   only while the step still waits for an answer.
+ * @structure reportOutcome(work, done, failed, label) · ResultWrite · writeResult(write, label)
  * @usage  engine-steps.ts and engine-ai-step.ts:
- *   reportOutcome(fire(), () => onPushTerminal(…, true), err => onPushTerminal(…, false), label);
+ *   reportOutcome(fire(), write => onPushTerminal(…, true, …, write), err => onPushTerminal(…, false), label);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — ResultWrite and writeResult: the write an answer makes, which the engine
+ *     makes only while the step still waits for an answer (secaudit 2026-09, R4).
  *   v1.0.0 — 2026-09-26 — reportOutcome: only a failure of the step's own work fails the attempt, and
  *     an error inside the engine while it takes an answer in is logged as the engine's (secaudit
  *     2026-09, R4).
  */
 import { logger } from '../../utils/logger.js';
+
+/**
+ * The write an answer makes: an ai or extension step's result key, or a datapackage step's new
+ * version. The engine runs it under the run's lock, and only while the step still waits for an
+ * answer (engine.ts onPushTerminal). Once the step has ended, an answer settles its cost and hold
+ * and writes nothing.
+ */
+export type ResultWrite = () => Promise<void>;
+
+/**
+ * Make an answer's write, for a step that still waits for an answer. True when it was written, or
+ * when there is nothing to write. False when the write failed: that fails the answer, and the reason
+ * is logged here, as the step's.
+ */
+export async function writeResult(write: ResultWrite | undefined, label: string): Promise<boolean> {
+  if (!write) return true;
+  try {
+    await write();
+    return true;
+  } catch (err) {
+    logger.warn(`${label}: writing the step's answer failed`, { error: String(err) });
+    return false;
+  }
+}
 
 /**
  * Report what a step's dispatched work did to the engine. `work` is the step's own work. When it

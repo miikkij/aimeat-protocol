@@ -8,11 +8,16 @@
  *   call, a cancel, a restart, a cost that arrives after the run finished, and a watchdog pass that
  *   comes between a run's first save and its first step. Then a late answer of an earlier attempt,
  *   while the step runs again after a retry, for an ai step and an extension step; a finished agent
- *   task, which decides only the agent step whose current attempt it was dispatched for; and an error
- *   inside the engine while it takes an answer in, which is not a failure of the attempt. The model
- *   and the extension's action are stand-ins whose calls stay open until the case answers them. The
- *   same road with a real provider is test/e2e-workflows.ts.
+ *   task, which decides only the agent step whose current attempt it was dispatched for; an answer
+ *   that comes after its step ended, which writes nothing; and an error inside the engine while it
+ *   takes an answer in, which is not a failure of the attempt. The model, the extension's action and
+ *   a datapackage step's read of its source are stand-ins that stay open until the case lets them
+ *   answer; the publish is a stand-in that answers at once. The same code path with a real provider
+ *   is test/e2e-workflows.ts.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — An answer that comes after its step ended writes nothing: an ai and an
+ *     extension step's result and a datapackage step's version, after an earlier attempt turned the
+ *     step green, and an ai step's result after a cancel (secaudit 2026-09, R4).
  *   v1.5.0 — 2026-09-26 — An error inside the engine while it takes a model call's answer in leaves
  *     the attempt as it was, and the watchdog decides the step by its output (secaudit 2026-09, R4).
  *   v1.4.0 — 2026-09-26 — A finished agent task decides only the agent step whose current attempt it
@@ -41,6 +46,8 @@ import type {
 const model = vi.hoisted(() => ({ calls: [] as Array<{ prompt: string; resolve: (v: unknown) => void }> }));
 /** The runs of an extension step's action, each open until the case settles it. */
 const sandbox = vi.hoisted(() => ({ runs: [] as Array<{ resolve: (v: unknown) => void; reject: (e: unknown) => void }> }));
+/** The versions the publish stand-in made, by package name. Each one writes `out.pkg`. */
+const packages = vi.hoisted(() => ({ published: [] as string[] }));
 
 vi.mock('../../src/services/ai-completion.js', async importOriginal => ({
     ...await importOriginal<typeof import('../../src/services/ai-completion.js')>(),
@@ -53,6 +60,19 @@ vi.mock('../../src/services/extension-system-run.js', async importOriginal => ({
     runExtensionActionAsSystem: () => new Promise((resolve, reject) => { sandbox.runs.push({ resolve, reject }); }),
 }));
 
+vi.mock('../../src/services/datapackage/store.js', async importOriginal => ({
+    ...await importOriginal<typeof import('../../src/services/datapackage/store.js')>(),
+    publishPackage: async (deps: { storage: Storage }, owner: string, input: { name: string }) => {
+        packages.published.push(input.name);
+        const at = new Date().toISOString();
+        await deps.storage.setMemory({
+            key: 'out.pkg', ownerGaii: owner, value: packages.published.length, visibility: 'private', tags: [],
+            ttlHours: null, version: packages.published.length, createdAt: at, updatedAt: at,
+        } as MemoryRecord);
+        return { ok: true, descriptor: { aimeat: { packageId: input.name } }, contentHash: 'h', unchanged: false, resources: [{ rowCount: 1 }] };
+    },
+}));
+
 const NODE = 'test-node';
 const OWNER = `alice@${NODE}`;
 const WF = 'held';
@@ -61,6 +81,8 @@ const RUN_KEY = `workflows.run.${WF}.${RUN}`;
 
 /** The agent tasks the node holds, by id. */
 const tasks = new Map<string, AgentTaskRecord>();
+/** Reads of `key` wait until the case lets each one through: the source a datapackage step reads. */
+const held = { key: '', reads: [] as Array<() => void> };
 /** The next this many writes of the run record fail: an error inside the engine, not in the step. */
 const faults = { runWritesToFail: 0 };
 
@@ -75,6 +97,7 @@ function memStorage(onSet?: (rec: MemoryRecord) => Promise<void>): Storage {
         [...map.values()].filter(r => match(r) && r.key.startsWith(prefix)).map(r => structuredClone(r));
     return {
         getMemory: async (owner: string, key: string) => {
+            if (key === held.key) await new Promise<void>(resolve => { held.reads.push(resolve); });
             const rec = map.get(k(owner, key));
             return rec ? structuredClone(rec) : null;
         },
@@ -112,6 +135,12 @@ const ai = (id: string, extra: Partial<WorkflowStep> = {}): WorkflowStep => ({
 const extension = (id: string, extra: Partial<WorkflowStep> = {}): WorkflowStep => ({
     id, description: id, required_to_function: 'none', timeout_min: 1,
     action: { kind: 'extension', extension: 'demo', action: 'run', result_to_key: `out.${id}` }, ...extra,
+} as unknown as WorkflowStep);
+
+/** A datapackage step publishing the rows at `in.rows`, timing out after a minute. Its output is `out.pkg`. */
+const datapackage = (id: string, extra: Partial<WorkflowStep> = {}): WorkflowStep => ({
+    id, description: id, required_to_function: 'none', timeout_min: 1,
+    action: { kind: 'datapackage', name: 'rows', from_key: 'in.rows', changes: 'Each run.' }, ...extra,
 } as unknown as WorkflowStep);
 
 /** A step the owner's agent `writer` does: it gets a task, writes `out.<id>` and finishes the task. */
@@ -184,7 +213,13 @@ async function answer(i: number, costUsd: number, content = 'an answer'): Promis
 const callAnswers = (engine: WorkflowEngine, stepId: string, ok: boolean, costUsd: number, attempt = 0) =>
     engine.onPushTerminal(OWNER, WF, RUN, stepId, ok, costUsd, attempt);
 
-beforeEach(() => { model.calls.length = 0; sandbox.runs.length = 0; tasks.clear(); faults.runWritesToFail = 0; });
+/** The value at `key` in the owner's namespace, or undefined. */
+const valueAt = async (storage: Storage, key: string) => (await storage.getMemory(OWNER, key))?.value;
+
+beforeEach(() => {
+    model.calls.length = 0; sandbox.runs.length = 0; packages.published.length = 0;
+    tasks.clear(); held.key = ''; held.reads.length = 0; faults.runWritesToFail = 0;
+});
 
 describe('an ai step\'s call holds its share of the limit until it answers', () => {
     it('the watchdog finds the output while the call runs: the call keeps its hold, and the waiting step starts when it answers', async () => {
@@ -581,6 +616,101 @@ describe('a finished agent task decides only the agent step whose current attemp
         const run = await readRun(storage);
         expect(run.steps.left.state).toBe('green');
         expect(run.status).toBe('done');
+    });
+});
+
+/**
+ * Attempt 0 of `stepId` starts at a watchdog pass and stalls past its minute. The next pass gives the
+ * step its retry, and attempt 1 starts while the work of attempt 0 is still open.
+ */
+async function retryBesideFirst(storage: Storage, engine: WorkflowEngine, stepId: string): Promise<WorkflowRun> {
+    await engine.sweep();
+    const run = await readRun(storage);
+    expect(run.steps[stepId].state).toBe('dispatched');
+    run.steps[stepId].startedAt = new Date(Date.now() - 120_000).toISOString();
+    await put(storage, OWNER, RUN_KEY, run);
+    await engine.sweep();
+    return readRun(storage);
+}
+
+describe('an answer that comes after its step ended writes nothing', () => {
+    it('an ai step: the answer of attempt 0 turns the step green, and the answer of attempt 1 only settles its cost and hold', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left', { retry: { max: 1, backoff_min: 0 } })], 0.05), { left: stepAt('pending', { estimate: 0.02 }) });
+        const engine = engineFor(storage);
+        let run = await retryBesideFirst(storage, engine, 'left');
+        expect(run.steps.left.attempt).toBe(1);
+        expect(model.calls).toHaveLength(2);
+
+        await answer(0, 0.01, 'the answer of attempt 0');
+        run = await readRun(storage);
+        expect(run.steps.left.state).toBe('green');
+        expect(await valueAt(storage, 'out.left')).toBe('the answer of attempt 0');
+
+        await answer(1, 0.02, 'the answer of attempt 1');
+        run = await readRun(storage);
+        expect(run.steps.left.state).toBe('green');
+        expect(await valueAt(storage, 'out.left')).toBe('the answer of attempt 0');
+        expect(reservedUsd(run)).toBe(0);
+        expect(spentUsd(run)).toBeCloseTo(0.03, 10);
+    });
+
+    it('an extension step: the result of attempt 1, after attempt 0 turned the step green, is not written', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([extension('left', { retry: { max: 1, backoff_min: 0 } })], 0.05), { left: stepAt('pending') });
+        const engine = engineFor(storage);
+        const run = await retryBesideFirst(storage, engine, 'left');
+        expect(run.steps.left.attempt).toBe(1);
+        expect(sandbox.runs).toHaveLength(2);
+
+        sandbox.runs[0].resolve({ result: 'the result of attempt 0', reads: [], writes: [] });
+        await settle();
+        expect((await readRun(storage)).steps.left.state).toBe('green');
+        expect(await valueAt(storage, 'out.left')).toBe('the result of attempt 0');
+
+        sandbox.runs[1].resolve({ result: 'the result of attempt 1', reads: [], writes: [] });
+        await settle();
+        expect((await readRun(storage)).steps.left.state).toBe('green');
+        expect(await valueAt(storage, 'out.left')).toBe('the result of attempt 0');
+    });
+
+    it('a datapackage step: attempt 0 publishes and the step is green, and attempt 1 publishes no second version', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([datapackage('pkg', { retry: { max: 1, backoff_min: 0 } })], 0.05), { pkg: stepAt('pending') });
+        await put(storage, OWNER, 'in.rows', [{ n: 1 }]);
+        // Each attempt reads its source, and waits there until the case lets the read through.
+        held.key = 'in.rows';
+        const engine = engineFor(storage);
+        let run = await retryBesideFirst(storage, engine, 'pkg');
+        expect(run.steps.pkg.attempt).toBe(1);
+        expect(held.reads).toHaveLength(2);
+
+        held.reads[0]();
+        await settle();
+        run = await readRun(storage);
+        expect(run.steps.pkg.state).toBe('green');
+        expect(packages.published).toEqual(['rows']);
+
+        held.reads[1]();
+        await settle();
+        expect((await readRun(storage)).steps.pkg.state).toBe('green');
+        expect(packages.published).toEqual(['rows']);
+    });
+
+    it('a cancelled run: the answer of the model call open at the cancel is not written, and its cost is kept', async () => {
+        const storage = memStorage();
+        await seed(storage, defOf([ai('left')], 0.05), { left: stepAt('pending', { estimate: 0.02 }) });
+        const engine = engineFor(storage);
+        await engine.sweep();
+        expect(model.calls).toHaveLength(1);
+
+        expect(await engine.cancelRun(OWNER, WF, RUN)).toBe(true);
+        await answer(0, 0.01, 'an answer after the cancel');
+        const run = await readRun(storage);
+        expect(run.status).toBe('cancelled');
+        expect(await valueAt(storage, 'out.left')).toBeUndefined();
+        expect(run.steps.left.costUsd).toBeCloseTo(0.01, 10);
+        expect(reservedUsd(run)).toBe(0);
     });
 });
 

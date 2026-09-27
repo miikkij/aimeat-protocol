@@ -34,13 +34,16 @@
  *   v1.6.0 — 2026-09-26 — The step reports its outcome to the engine through reportOutcome
  *     (engine-answer.ts): only a failure of the step's own work fails the attempt, and an error inside
  *     the engine while it takes the answer in is logged as the engine's (secaudit 2026-09, R4).
+ *   v1.7.0 — 2026-09-26 — The write of the answer to result_to_key is passed to the engine with the
+ *     answer (ResultWrite, engine-answer.ts), and the engine makes it only while the step still waits
+ *     for an answer (secaudit 2026-09, R4).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
 import { completeForOwner } from '../ai-completion.js';
 import { getOwnerScopeMemory } from '../owner-memory.js';
 import { template } from './engine-util.js';
-import { reportOutcome } from './engine-answer.js';
+import { reportOutcome, type ResultWrite } from './engine-answer.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 
@@ -72,7 +75,7 @@ export function dispatchAiStep(
   // JSON retry is a second call, and a step that fails after the provider answered has still spent.
   let spentUsd = 0;
 
-  const fire = async (): Promise<void> => {
+  const fire = async (): Promise<ResultWrite | undefined> => {
     // The prompt comes from a record when one is named, so changing it is a memory write. The
     // record's own text is templated too: a prompt that names {ref} means the same thing here as a
     // key that does.
@@ -143,19 +146,24 @@ export function dispatchAiStep(
         if (!m) throw new Error(`ai step asked for json and the answer contained none, ${JSON_RETRIES + 1} attempts`);
         value = JSON.parse(m[0]);
       }
-      const existing = await deps.storage.getMemory(ownerGhii, key);
-      const now = new Date().toISOString();
-      await deps.storage.setMemory({
-        key, ownerGaii: ownerGhii, value,
-        visibility: 'owner', tags: ['workflow-ai-result'], ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now, updatedAt: now,
-      });
+      // The engine makes this write, and only while the step still waits for the answer: once the
+      // step has ended, a later answer writes nothing (engine.ts onPushTerminal).
+      return async () => {
+        const existing = await deps.storage.getMemory(ownerGhii, key);
+        const now = new Date().toISOString();
+        await deps.storage.setMemory({
+          key, ownerGaii: ownerGhii, value,
+          visibility: 'owner', tags: ['workflow-ai-result'], ttlHours: null,
+          version: existing ? existing.version + 1 : 1,
+          createdAt: existing?.createdAt ?? now, updatedAt: now,
+        });
+      };
     }
+    return undefined;
   };
 
   reportOutcome(fire(),
-    () => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, spentUsd, attempt),
+    write => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, spentUsd, attempt, write),
     err => {
       logger.warn(`workflow ${workflowId} run ${runId}: ai step "${stepId}" failed`, { error: String(err) });
       return onPushTerminal(ownerGhii, workflowId, runId, stepId, false, spentUsd, attempt);
