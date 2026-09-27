@@ -24,10 +24,16 @@
  *   - setHookActions(config, storage, hookName, actions) — bind, or clear with []
  *   - settleStoredHookBindings(config, storage) — at start, once per node, every stored reference to
  *     the form a binding is stored in now
+ *   - moveAccountNameHookBindings(config, storage) — at start, once per node, each `id#name` to the
+ *     `id#<GHII>` its action is published under after the deploy migration
  *   - HOOK_GUARDS — which part of the node each moment belongs to
  * @usage
  *   const overview = await buildHooksOverview(config, storage);
  * @version-history
+ *   v1.5.0 — 2026-09-26 — moveAccountNameHookBindings(): at start, after the deploy migration has
+ *     moved a person's actions to their GHII, a binding stored as `id#<account name>` is stored as
+ *     `id#<GHII>` when the action is published there, once per node under its own record
+ *     (HOOK_BINDINGS_FULL_IDENTITY_KEY; secaudit 2026-09: R3 row 5).
  *   v1.4.0 — 2026-09-26 — SECURITY (audit A8-3): the page reads a stored reference through resolveHookRef()
  *     in hooks.ts, as the executor does, so a bare id reads as naming nothing, with `ambiguous`
  *     listing the id#provider of each provider that publishes it now. settleStoredHookBindings()
@@ -406,4 +412,127 @@ export async function settleStoredHookBindings(config: AimeatConfig, storage: St
     }
   }
   return settled;
+}
+
+/** What moving the bindings that name an account by its bare name changed at start. */
+export interface MovedHookBindings {
+  /** False when no binding names an account by its bare name, or this node has moved them before. */
+  ran: boolean;
+  /** Each `id#name` whose action is published under that account's GHII, stored now as `id#<GHII>`. */
+  moved: Array<{ hook: HookName; from: string; to: string }>;
+  /** Each `id#name` whose action is not published under that account's GHII: left as it was. */
+  left: Array<{ hook: HookName; ref: string }>;
+}
+
+/** The record that says this node has moved those bindings, under `system@<nodeId>`. */
+export const HOOK_BINDINGS_FULL_IDENTITY_KEY = 'migrations.hook-bindings-full-identity';
+
+/** The id and the account of a reference `id#name` whose provider is a bare account name; else null. */
+function accountNameRef(ref: unknown): { id: string; name: string } | null {
+  if (typeof ref !== 'string') return null;
+  const cut = ref.indexOf('#');
+  if (cut <= 0) return null;
+  const name = ref.slice(cut + 1);
+  return name && !name.includes('@') && !name.includes('#') ? { id: ref.slice(0, cut), name } : null;
+}
+
+/**
+ * Move each stored binding that names an action by the bare account name of the person who published
+ * it (`id#name`) to the form that action is stored in now, `id#<GHII>`.
+ *
+ * WHY. An action a person published in person was stored under their bare account name, so a binding
+ * to it was stored as `id#name`: setHookActions and the settle above both store the action's own
+ * `id#provider`. The deploy migration moves those actions to the person's GHII (Postgres 0085, and
+ * sqlite/schema-identity-backfill.ts), and runs when the store opens, before this. So at start:
+ *   - `id#name` becomes `id#<GHII of that account>` when the action `id` is published under that
+ *     GHII. That is the action the binding was made for: the migration moved it there because that
+ *     account held the name when the action was written.
+ *   - Any other `id#name` stays as it was. It names no published action, and the Hooks page says so.
+ *
+ * ONCE PER NODE, under its own record (HOOK_BINDINGS_FULL_IDENTITY_KEY), for the reason the settle
+ * above gives: a later start must not let what is published by then decide what a binding names. The
+ * settle's record cannot serve, because a node that ran the settle has it already. A start with no
+ * such binding reads nothing and writes nothing. When the store cannot be read, or a change cannot be
+ * saved, no record is written and the next start tries again; a change applies to the running node
+ * even when it cannot be saved.
+ */
+export async function moveAccountNameHookBindings(config: AimeatConfig, storage: Storage): Promise<MovedHookBindings> {
+  const out: MovedHookBindings = { ran: false, moved: [], left: [] };
+  const names = new Set<string>();
+  for (const hook of HOOK_NAMES) {
+    for (const ref of config.extensionHooks[hook] ?? []) {
+      const parsed = accountNameRef(ref);
+      if (parsed) names.add(parsed.name);
+    }
+  }
+  if (names.size === 0) return out;
+
+  const system = `system@${config.nodeId}`;
+  let byRef: Map<string, ActionRecord>;
+  const ghiiOf = new Map<string, string | null>();
+  try {
+    if (await storage.getMemory(system, HOOK_BINDINGS_FULL_IDENTITY_KEY)) return out;
+    byRef = indexActionRefs(await storage.listActions()).byRef;
+    for (const name of names) ghiiOf.set(name, (await storage.getGHIIByOwner(name))?.ghii ?? null);
+  } catch (err) {
+    logger.error('hooks-overview: the hook bindings that name an account by its bare name were not checked at start, because the store could not be read. The next start tries again.', { error: String(err) });
+    return out;
+  }
+  out.ran = true;
+
+  let saved = true;
+  for (const hook of HOOK_NAMES) {
+    const refs = config.extensionHooks[hook] ?? [];
+    let changed = false;
+    const next = refs.map((ref) => {
+      const parsed = accountNameRef(ref);
+      if (!parsed) return ref;
+      const ghii = ghiiOf.get(parsed.name);
+      const to = ghii ? `${parsed.id}#${ghii}` : null;
+      const found = to ? byRef.get(to) : undefined;
+      if (to && found && qualifiedRef(found) === to) {
+        out.moved.push({ hook, from: ref, to });
+        changed = true;
+        return to;
+      }
+      out.left.push({ hook, ref });
+      return ref;
+    });
+    if (!changed) continue;
+    config.extensionHooks[hook] = next;
+    try {
+      await storage.setConfigValue(`hooks.${hook}`, JSON.stringify(next));
+    } catch (err) {
+      saved = false;
+      logger.error(`hooks-overview: the moved binding of ${hook} could not be saved. It applies until the node stops, and the next start moves it again.`, { error: String(err) });
+    }
+  }
+
+  for (const { hook, from, to } of out.moved) {
+    logger.info(`hooks-overview: "${from}" on ${hook} is stored as ${to}, where its action is published now`);
+  }
+  for (const { hook, ref } of out.left) {
+    logger.warn(`hooks-overview: "${ref}" on ${hook} names no action published under that account's full identity, so it names nothing. Publish the action, then bind it again.`);
+  }
+
+  if (saved) {
+    const now = new Date().toISOString();
+    try {
+      await storage.setMemory({
+        key: HOOK_BINDINGS_FULL_IDENTITY_KEY,
+        ownerGaii: system,
+        value: { at: now, moved: out.moved.length, left: out.left.length },
+        visibility: 'private',
+        tags: ['migration'],
+        // Never swept: a record that expired would move the bindings again at the next start.
+        ttlHours: null,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (err) {
+      logger.error('hooks-overview: the record that the account-name hook bindings are moved could not be saved. The next start moves them again.', { error: String(err) });
+    }
+  }
+  return out;
 }
