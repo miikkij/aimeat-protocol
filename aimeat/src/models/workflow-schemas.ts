@@ -58,6 +58,8 @@
  *   v1.14.0 — 2026-09-26 — Under maxCostUsd an ai step holds what it is expected to cost while it
  *     runs: WorkflowRunStep.estimateUsd and reservedUsd, and costCap.neededUsd on a run stopped by
  *     an estimate (secaudit 2026-09, A6-11).
+ *   v1.15.0 — 2026-09-26 — The hold belongs to the model call: WorkflowRunStep.openCalls, one per
+ *     attempt with what it holds, in place of the step's reservedUsd (secaudit 2026-09, A6-11).
  */
 import { z } from 'zod';
 import { SignalSchema, type Signal } from './workflow-signals.js';
@@ -492,7 +494,8 @@ export interface WorkflowRunStep {
   };
   /**
    * What this step's own model calls cost, in US dollars, as the node recorded them: an ai step's
-   * completions, a retry's added on. The run's cost cap (WorkflowDef.maxCostUsd) adds these up.
+   * completions, a retry's added on, and a call that answered after the step was moved on. The run's
+   * cost cap (WorkflowDef.maxCostUsd) adds these up.
    */
   costUsd?: number;
   /**
@@ -502,11 +505,15 @@ export interface WorkflowRunStep {
    */
   estimateUsd?: number;
   /**
-   * Under a cost cap, while this ai step runs: what the engine set aside for it from the cap before
-   * it started, in US dollars (its `estimateUsd`, else its share of the cap nobody held). Removed when
-   * the step ends, and `costUsd` then says what it cost.
+   * Under a cost cap: the model calls of this ai step that have started and not yet answered, one per
+   * attempt. `reservedUsd` is what the engine set aside for the call from the cap before it started
+   * (the step's `estimateUsd`, else its share of the cap nobody held). A call keeps its mark and its
+   * hold until it answers, whatever became of the step meanwhile (a timeout, a retry, the watchdog
+   * finding its output, a cancel), because it runs on and is paid for; `costUsd` then says what it
+   * cost. A restart clears the marks of a run still in flight, because the calls ended with the
+   * process.
    */
-  reservedUsd?: number;
+  openCalls?: Array<{ attempt: number; reservedUsd: number }>;
 }
 
 /**

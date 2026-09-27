@@ -6,6 +6,8 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.3 — 2026-09-26 — OnPushTerminal carries the attempt an ai step's model call was started for,
+ *     so the engine drops that call's hold on the cost cap when it answers (secaudit 2026-09, A6-11).
  *   v1.5.2 — 2026-09-26 — A run stopped because its next ai step's estimate did not fit under the
  *     cost cap is finished with its own words: the step, its estimate, the spend and the cap
  *     (workflow_stopped_estimate; secaudit 2026-09, A6-11).
@@ -71,8 +73,9 @@ export interface StepDeps {
 }
 
 /** Callback into the engine's non-task terminal path for ecosystem action steps. `costUsd` is what the
- *  step's own model calls cost (an ai step), for the run's cost cap. */
-export type OnPushTerminal = (ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number) => void | Promise<void>;
+ *  step's own model calls cost (an ai step), for the run's cost cap, and `call` is the attempt that
+ *  model call was started for, whose hold on the cap goes with its answer. */
+export type OnPushTerminal = (ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number) => void | Promise<void>;
 
 const TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled', 'stopped']);
 const FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red', 'timed-out', 'agent-offline']);
