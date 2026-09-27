@@ -344,14 +344,13 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
         assert(door.status === 403, `the HTTP admin door answered the migrated agent's token with ${door.status}`);
     });
 
-    await test('2c. the connector gets the word on its record, and the admin tools in its next session', async () => {
+    await test('2c. the connector gains the admin tools after refreshing its credential', async () => {
         const held = await scopesOf(op, 'claude');
         assert(held.includes(WORD), `the connector holds [${held.join(', ')}]`);
-        // An MCP session reads the agent's record when it opens (mcp/index.ts), so the access token the
-        // connector already holds is enough: its next session is offered the tools.
+        // A new session still uses this token's scope ceiling. The newly granted operator word
+        // takes effect after credential refresh, just as it does through REST.
         const next = await adminToolsOffered(claude.access);
-        const missingNext = tickedOffered.filter(t => !next.includes(t));
-        assert(next.length > 0 && missingNext.length === 0, `next session: offered ${next.length}, missing ${missingNext.join(', ')}`);
+        assert(next.length === 0, 'a stale token must not acquire a newly granted operator scope');
         // And when the access token runs out, the refresh the connector makes works across the restart.
         const r = await json('/v1/mcp/token', {
             method: 'POST',
