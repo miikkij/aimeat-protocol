@@ -12,6 +12,9 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.5.1 — 2026-09-26 — A person's inbox and sent list read their ecosystem apps' identities beside
+ *     their agents' (services/db/owner-identity.ts identitiesActingFor), so work on an action an app of
+ *     theirs published, a cortex's action among them, reaches the person (secaudit 2026-09, R4 3).
  *   v1.5.0 — 2026-09-26 — Work for a provider on another node checks the node's address first, then
  *     takes the 1-morsel routing fee as the call goes out (routingFee, services/morsel.ts). The fee
  *     goes back when the node cannot be reached or answers with an error (secaudit 2026-09, R4 6).
@@ -64,6 +67,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
+import { identitiesActingFor } from '../services/db/owner-identity.js';
 
 // The webhook log kept its address here when fireWebhook moved to the shared service.
 export { getWebhookLog } from '../services/work-lifecycle.js';
@@ -364,9 +368,9 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     const me = resolveIdentity(req.auth!, config.nodeId);
     let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
     if (isOwnerSession) {
-      // The person's own work (their GHII) and all their agents' — ONE providerGaii IN (…) query.
-      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-      items = await storage.listWorkByProviders([me, ...agents.map(a => a.gaii)]);
+      // The person's own work (their GHII), their agents' and their ecosystem apps' — ONE
+      // providerGaii IN (…) query over services/db/owner-identity.ts identitiesActingFor.
+      items = await storage.listWorkByProviders(await identitiesActingFor(storage, req.auth!.owner as string, me));
     } else {
       items = await storage.listWorkByProvider(me);
     }
@@ -399,9 +403,9 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     const me = resolveIdentity(req.auth!, config.nodeId);
     let items: Awaited<ReturnType<typeof storage.listWorkByRequester>>;
     if (isOwnerSession) {
-      // ONE requesterGaii IN (…) query across the person's own GHII and their agents.
-      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-      items = await storage.listWorkByRequesters([me, ...agents.map(a => a.gaii)]);
+      // ONE requesterGaii IN (…) query across the person's own GHII, their agents and their
+      // ecosystem apps (identitiesActingFor).
+      items = await storage.listWorkByRequesters(await identitiesActingFor(storage, req.auth!.owner as string, me));
     } else {
       items = await storage.listWorkByRequester(me);
     }
