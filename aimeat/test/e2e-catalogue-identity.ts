@@ -13,6 +13,8 @@
  *   person activates over REST publishes its actions under the same GHII.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=catalogue-identity
  * @version-history
+ *   v1.3.0 — 2026-09-26 — Deactivation removes a cortex's actions whoever deactivates it: the person
+ *     after their agent activated it, and an operator after the owner did (secaudit 2026-09, R3 7c).
  *   v1.2.0 — 2026-09-26 — A cortex a person activates publishes its action under their GHII: another
  *     owner's work on it reaches the person, and deactivation takes the action away (secaudit 2026-09,
  *     R3 7c).
@@ -26,6 +28,7 @@ ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -223,6 +226,100 @@ await test('A person activates a cortex: its action is under their GHII, work on
     assert(del.status === 200, `uninstall: ${del.status} ${JSON.stringify(del.body)}`);
 });
 
+// Whoever deactivates a cortex, its actions go: the ones an activation published are deleted under
+// the identity that activation published them under, not under the identity of whoever deactivates.
+/** A cortex with one action component, installed by owner A in their own namespace. */
+function oneActionCortex(name: string): string {
+    return [
+        'apiVersion: cortex.aimeat.org/v1',
+        'kind: Extension',
+        'metadata:',
+        `  name: ${name}`,
+        `  namespace: ${aName}`,
+        'spec:',
+        '  version: 1.0.0',
+        '  components:',
+        '    - type: action',
+        '      name: proofread',
+        '      description: Proofreads a text',
+        '      input_schema:',
+        '        type: object',
+    ].join('\n');
+}
+/**
+ * Every provider that still publishes an action with this id, from the public catalogue. A cortex
+ * action is tagged with its cortex's name, so `q` narrows the list to that cortex's actions.
+ */
+async function publishedUnder(cortex: string, actionId: string): Promise<string[]> {
+    const found = await json(`/v1/actions?q=${encodeURIComponent(cortex)}&per_page=200`);
+    assert(found.status === 200, `the catalogue: ${found.status}`);
+    return ((found.body.data?.actions ?? []) as any[]).filter(a => a.id === actionId).map(a => a.provider_gaii);
+}
+let opName = '', opTok = '';
+
+await test("An agent activates its person's cortex and the person deactivates it: none of the cortex's actions stays published", async () => {
+    const reg = await json('/v1/agents', {
+        ...auth(aTok), method: 'POST',
+        body: JSON.stringify({ name: 'cortexhand', owner: aName, capabilities: ['memory'], scopes: ['cortex:write'] }),
+    });
+    assert(reg.status === 201, `agent: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+    const agentGaii = reg.body.data.agent.gaii as string;
+    const at = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ gaii: agentGaii, timestamp: at, signature: await signMsg(reg.body.data.private_key, agentGaii + at) }),
+    });
+    assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body?.error)}`);
+    const agentTok = tok.body.data.token as string;
+
+    const name = `catcortexagent${ts}`;
+    const actionId = `cortex-${name}-proofread`;
+    const inst = await json('/v1/cortex', { ...auth(aTok), method: 'POST', body: JSON.stringify({ manifest: oneActionCortex(name) }) });
+    assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
+    const on = await json(`/v1/cortex/${name}/activate`, { ...auth(agentTok), method: 'POST' });
+    assert(on.status === 200, `the agent activates: ${on.status} ${JSON.stringify(on.body)}`);
+    const published = await publishedUnder(name, actionId);
+    assert(JSON.stringify(published) === JSON.stringify([agentGaii]),
+        `the agent's activation publishes under its own GAII: ${JSON.stringify(published)}`);
+
+    const off = await json(`/v1/cortex/${name}/deactivate`, { ...auth(aTok), method: 'POST' });
+    assert(off.status === 200, `the person deactivates: ${off.status} ${JSON.stringify(off.body)}`);
+    const left = await publishedUnder(name, actionId);
+    assert(left.length === 0, `an action of the deactivated cortex is still published under ${JSON.stringify(left)}`);
+    const del = await json(`/v1/cortex/${name}`, { ...auth(aTok), method: 'DELETE' });
+    assert(del.status === 200, `uninstall: ${del.status} ${JSON.stringify(del.body)}`);
+});
+
+await test("An operator deactivates another owner's cortex: none of its actions stays published", async () => {
+    opName = `catop${ts}`;
+    const reg = await json('/v1/admin/setup/register', {
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: opName }),
+    });
+    assert(reg.status === 200 && reg.body.ok === true, `setup/register: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const at = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ owner: opName, timestamp: at, signature: await signMsg(reg.body.private_key, opName + NODE_ID + at) }),
+    });
+    assert(tok.body.ok === true, `operator token: ${JSON.stringify(tok.body?.error)}`);
+    opTok = tok.body.data.token as string;
+
+    const name = `catcortexop${ts}`;
+    const actionId = `cortex-${name}-proofread`;
+    const inst = await json('/v1/cortex', { ...auth(aTok), method: 'POST', body: JSON.stringify({ manifest: oneActionCortex(name) }) });
+    assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
+    const on = await json(`/v1/cortex/${name}/activate`, { ...auth(aTok), method: 'POST' });
+    assert(on.status === 200, `the owner activates: ${on.status} ${JSON.stringify(on.body)}`);
+    const published = await publishedUnder(name, actionId);
+    assert(JSON.stringify(published) === JSON.stringify([aGhii]),
+        `the owner's activation publishes under their GHII: ${JSON.stringify(published)}`);
+
+    const off = await json(`/v1/cortex/${name}/deactivate`, { ...auth(opTok), method: 'POST' });
+    assert(off.status === 200, `the operator deactivates: ${off.status} ${JSON.stringify(off.body)}`);
+    const left = await publishedUnder(name, actionId);
+    assert(left.length === 0, `an action of the deactivated cortex is still published under ${JSON.stringify(left)}`);
+    const del = await json(`/v1/cortex/${name}`, { ...auth(aTok), method: 'DELETE' });
+    assert(del.status === 200, `uninstall: ${del.status} ${JSON.stringify(del.body)}`);
+});
+
 await test('Publishing a service without a credential is refused (401)', async () => {
     const pub = await json('/v1/catalogue', { method: 'POST', body: JSON.stringify({ display_name: 'Anon', description: 'no auth', category: 'text', price_morsels: 0 }) });
     assert(pub.status === 401, `an unauthenticated publish must be refused, got ${pub.status}`);
@@ -289,6 +386,7 @@ await test('Cleanup', async () => {
     await json(`/v1/owners/${aName}`, { ...auth(aTok), method: 'DELETE' });
     await json(`/v1/owners/${bName}`, { ...auth(bTok), method: 'DELETE' });
     await json(`/v1/owners/${cName}`, { ...auth(cTok), method: 'DELETE' });
+    if (opTok) await json(`/v1/owners/${opName}`, { ...auth(opTok), method: 'DELETE' });
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
