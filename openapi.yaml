@@ -27238,7 +27238,10 @@ paths:
         `@keyframes`, `@property`, `@counter-style`, `@font-palette-values`, `@position-try`,
         `@function` and `@font-feature-values` under a name that starts with its prefix
         (`@keyframes wkgrid-spin`, `@property --wkgrid-x`), because the whole page shares that name.
-        Every other at-rule is refused, known or unknown, `@scope`, `@layer`, `@page`,
+        The blocks of `@font-feature-values` (`@styleset`, `@swash` and the others) pass inside it.
+        A `@function` names its parameters without types or default values and leaves out
+        `returns` (`@function --wkgrid-gap(--a, --b)`), because the CSS parser the bench reads with
+        cannot read those, and the refusal says so. Every other at-rule is refused, known or unknown, `@scope`, `@layer`, `@page`,
         `@view-transition`, `@import` and `@font-face` among them, and the refusal says what the
         list is. A declaration that names a counter, an anchor, a view transition or a timeline
         (`counter-reset`, `counter-set`, `counter-increment`, `anchor-name`, `view-transition-name`,

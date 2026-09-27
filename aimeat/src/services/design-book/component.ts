@@ -36,6 +36,10 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.16.0 — 2026-09-26 — A @function whose parameter carries a type or a default, or that says what it
+ *     returns, is refused in a sentence of its own: the CSS parser the bench reads with cannot read
+ *     those, and the refusal shows the form it reads. Every refusal of an at-rule names the blocks of
+ *     @font-feature-values among what passes.
  *   v1.15.0 — 2026-09-26 — A declaration that names a counter, an anchor, a view transition or a
  *     timeline (counter-reset, counter-set, counter-increment, anchor-name, view-transition-name,
  *     view-timeline-name, scroll-timeline-name, timeline-scope and the two timeline shorthands) names
@@ -279,7 +283,19 @@ const CONDITIONS = new Set(['media', 'supports', 'container', 'starting-style'])
 const FEATURE_BLOCKS = new Set(['styleset', 'stylistic', 'character-variant', 'swash', 'ornaments', 'annotation', 'historical-forms']);
 /** The list, as every refusal of an at-rule says it. */
 const USES_ONLY = 'uses only @media, @supports, @container and @starting-style, which condition its own rules, '
-  + 'and @keyframes, @property, @counter-style, @font-palette-values, @position-try, @function and @font-feature-values under a name that starts with its prefix';
+  + 'and @keyframes, @property, @counter-style, @font-palette-values, @position-try, @function and @font-feature-values under a name that starts with its prefix, '
+  + 'and inside @font-feature-values its own blocks, such as @styleset and @swash';
+
+/**
+ * css-tree reads a custom function's parameters by name only (`@function --x(--a, --b)`), and keeps a
+ * type, a default value or `returns` as raw text. The bench vouches only for what it reads, so such a
+ * @function is refused, saying why and what it reads.
+ */
+function rawFunctionRefusal(text: string, prefix: string): string {
+  const name = /^@function\s+(--[^\s(]+)/.exec(text)?.[1] ?? `--${prefix}-fn`;
+  return `"${text}" gives a parameter a type or a default, or names the type it returns. The CSS parser the bench reads with cannot read those, and the bench vouches only for a stylesheet it reads whole. `
+    + `Name the parameters without types or defaults, and leave out "returns": "@function ${name}(--a, --b) { result: … }".`;
+}
 
 /** May a component's stylesheet carry this at-rule where it stands? The name it defines is checked apart (ownDefinition). */
 const listed = (a: { name: string; within: string | null }): boolean => CONDITIONS.has(a.name) || nameKindOf(a.name) !== null
@@ -482,7 +498,9 @@ function checkStyles(css: string, prefix: string): void {
   }
   // WHAT THE PARSER CANNOT READ IS REFUSED. A browser drops what it cannot read and reads on from a
   // place of its own choosing, so the bench vouches only for a stylesheet it reads whole. A rule
-  // nested without "&" is such a part: the parser keeps it, and what follows it, as raw text.
+  // nested without "&" is such a part: the parser keeps it, and what follows it, as raw text. So is a
+  // @function whose parameters carry a type or a default, which gets a sentence of its own.
+  if (sheet.rawFunction !== null) refuse(rawFunctionRefusal(sheet.rawFunction, prefix));
   if (sheet.unreadable !== null) {
     refuse(`A component's stylesheet reads as CSS from its first character to its last, and "${sheet.unreadable}" does not. A browser drops such a part and reads on from a place of its own choosing, so the bench vouches only for a stylesheet it reads whole. `
       + `Write each rule as its selector and its declarations in braces. A rule nested inside another starts with "&": "& .${prefix}-cell { … }", "&:hover { … }".`);
