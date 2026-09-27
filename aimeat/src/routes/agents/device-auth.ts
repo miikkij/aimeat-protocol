@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.2 — 2026-09-26 — POST /v1/agents/verify asks credentialRevoked of the owner token in its
+ *     body, as every authenticated route asks of a bearer token: revoked, signed out, or of an account
+ *     that no longer holds the name, it answers 401 AUTH_REQUIRED.
  *   v1.10.1 — 2026-09-24 — The same-owner shortcut names the caller's account with localAccountName,
  *     so a visitor's home GHII is never the requested owner, and a visitor holds no owner role to
  *     approve with in the first place (secaudit 2026-09, A4-1).
@@ -78,7 +81,7 @@ import { executeHooks } from '../../services/hooks.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { verifyJWT, issueJWT, generateSessionId } from '../../auth/jwt.js';
-import { optionalAuth } from '../../auth/middleware.js';
+import { credentialRevoked, optionalAuth } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
@@ -690,9 +693,12 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
-    // Verify owner JWT
+    // Verify owner JWT. It arrives in the body, where the global auth middleware does not look, so it
+    // takes here the credential check every authenticated route takes (credentialRevoked): a revoked
+    // token, a signed-out session, and a token of an account that no longer holds the owner name are
+    // refused.
     const ownerPayload = await verifyJWT(owner_token);
-    if (!ownerPayload || !ownerPayload.roles?.includes('owner')) {
+    if (!ownerPayload || !ownerPayload.roles?.includes('owner') || await credentialRevoked(owner_token, ownerPayload)) {
       res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid or expired owner token'));
       return;
     }

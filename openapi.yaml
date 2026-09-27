@@ -10523,7 +10523,10 @@ paths:
     post:
       operationId: verifyDeviceAuth
       summary: Approve or deny device authorization
-      description: Owner submits consent decision for a pending device authorization request.
+      description: >
+        Owner submits consent decision for a pending device authorization request. The owner token
+        in the body takes the same check as a bearer token on any route: a revoked or signed-out
+        token, and a token of an account that no longer holds the owner name, answer 401.
       tags: [Identity]
       requestBody:
         required: true

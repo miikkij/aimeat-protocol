@@ -26,6 +26,9 @@
  *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.10.0 — 2026-09-26 — 62 (b): the deleted account's owner token approves no device authorization
+ *     request for the new holder's account. 63: POST /v1/agents/verify refuses a signed-out owner
+ *     token and accepts a current one.
  *   v1.9.0 — 2026-09-26 — 62: when an account is deleted, its owner token, its agent's token, the
  *     agent's MCP access token, an app grant's access token and a personal access token are refused
  *     before the name is registered again, after it is, and after the new holder connects an agent of
@@ -1440,6 +1443,14 @@ await test('62. When an account is deleted, every credential it issued is refuse
     });
     assert(kept.status === 201, `the new holder writes: ${kept.status} ${JSON.stringify(kept.body?.error)}`);
     await tryAll('(b) after the name is registered again', secret);
+    // A device authorization request for the new holder's account, approved with the deleted account's
+    // owner token, which POST /v1/agents/verify takes in its body.
+    const asked = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: 'intruder', owner: first.name }) });
+    assert(asked.status === 200, `device-authorize ${asked.status}: ${JSON.stringify(asked.body?.error)}`);
+    const approved = await json('/v1/agents/verify', {
+        method: 'POST', body: JSON.stringify({ user_code: asked.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: first.token }),
+    });
+    if (approved.status !== 401) found.push(`(b) after the name is registered again: the owner token approved a device authorization for the new holder's account (${approved.status}${approved.body.data?.gaii ? `, ${approved.body.data.gaii}` : ''})`);
 
     const sameName = await setupAgent(again, 'worker', scopes);
     assert(sameName.gaii === agent.gaii, `an agent of the same name gets the same identity: ${sameName.gaii}`);
@@ -1449,6 +1460,36 @@ await test('62. When an account is deleted, every credential it issued is refuse
 
     assert(found.length === 0, found.join('; '));
     assert(control.status === 200, `the new holder's own agent is refused: ${control.status} ${JSON.stringify(control.body?.error)}`);
+});
+
+// POST /v1/agents/verify takes the owner token in its body, and that token takes the credential check
+// every authenticated route takes: an owner token signed out with POST /v1/auth/revoke approves no
+// device authorization request, and a current one of the same account does.
+await test('63. The device approval endpoint refuses a signed-out owner token and accepts a current one', async () => {
+    const owner = await setupOwner('devsignout');
+    const ask = async (agentName: string) => {
+        const r = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: owner.name }) });
+        assert(r.status === 200, `device-authorize ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        return r.body.data.user_code as string;
+    };
+    const approve = async (userCode: string, token: string) => json('/v1/agents/verify', {
+        method: 'POST', body: JSON.stringify({ user_code: userCode, action: 'approve', scopes: ['memory:read'], owner_token: token }),
+    });
+
+    const out = await json('/v1/auth/revoke', { method: 'POST', headers: auth(owner.token) });
+    assert(out.status === 200, `sign out ${out.status}: ${JSON.stringify(out.body?.error)}`);
+    const signedOut = await approve(await ask('aftersignout'), owner.token);
+
+    const ts = new Date().toISOString();
+    const signedIn = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ owner: owner.name, timestamp: ts, signature: await signMsg(owner.privateKey, owner.name + NODE_ID + ts) }),
+    });
+    assert(signedIn.body.ok === true, `sign in again: ${JSON.stringify(signedIn.body?.error)}`);
+    const current = await approve(await ask('current'), signedIn.body.data.token as string);
+    await json(`/v1/owners/${owner.name}`, { method: 'DELETE', headers: auth(signedIn.body.data.token as string) });
+
+    assert(signedOut.status === 401, `the signed-out owner token approved a device authorization request: ${signedOut.status} ${JSON.stringify(signedOut.body?.data ?? signedOut.body?.error)}`);
+    assert(current.status === 200 && current.body.data?.status === 'approved', `the current owner token is refused: ${current.status} ${JSON.stringify(current.body?.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
