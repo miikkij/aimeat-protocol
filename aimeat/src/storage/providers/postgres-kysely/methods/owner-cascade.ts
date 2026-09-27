@@ -38,6 +38,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.10.0 — 2026-09-26 — deleteOwnerCascade deletes the person's own ledger lines filed under the
+ *     bare account name (the ones written before 2026-08-16).
  *   v1.9.0 — 2026-09-26 — deleteInstalledCortexesDb: deleteOwnerCascade takes the cortexes the person
  *     installed, after the actions under their own identities: each record, the actions under the
  *     identity it names, the schema locks, boards and prompt, ontology and seed records one of the
@@ -488,6 +490,9 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // session's raw `sub`), which neither pass above walks, and the name is released for reuse, so the
   // next holder of the name could change or delete it.
   await db.deleteFrom('Action').where('providerGaii', '=', name).execute();
+  // The person's own ledger lines from before 2026-08-16, which were filed under the bare account
+  // name. They are theirs, so they go with the account, like the lines under the GHII.
+  await db.deleteFrom('Transaction').where('gaii', '=', name).execute();
 
   // The cortexes this person installed, now that the actions under their own identities are gone:
   // each record, with what its activation made and what is keyed by its name (../../../erased-cortex.ts).
