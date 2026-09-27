@@ -6,6 +6,10 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — Activation and deactivation take a CortexActor: the acting principal
+ *     (`gaii`) and its resolved identity (`identity`). An action is published under the resolved
+ *     identity, as POST /v1/actions publishes one, so the work doors find it. Deactivation deletes
+ *     each action under the resolved identity and under the acting principal (secaudit 2026-09, R3 7c).
  *   v1.3.0 — 2026-09-24 — The ceiling pre-pass is activationRefusal(), exported, so a cortex redeploy
  *     asks it before it swaps libs, stores the manifest and tears the old activation down
  *     (db8a5635a633). It takes the activation a redeploy replaces, whose boards go first.
@@ -27,6 +31,22 @@ import { publicBoardCeiling, type BoardWriteRefusal } from '../../services/board
 import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
 
 // ── Activation Logic ──
+
+/**
+ * Who an activation acts as, in the two forms it records.
+ *
+ * `gaii` is the acting principal as the token names it: a person's bare account name, an agent's
+ * GAII. The schema locks, the prompt, ontology and seed-data memory and the boards are recorded
+ * under it and torn down under it.
+ *
+ * `identity` is the resolved identity (utils/gaii.ts resolveIdentity): a person's GHII, an agent's
+ * GAII. A published action is keyed on it, as POST /v1/actions keys one, because every work door
+ * finds a provider's actions and work under that identity.
+ */
+export interface CortexActor {
+  gaii: string;
+  identity: string;
+}
 
 /**
  * What activating `ext` would refuse, asked without writing anything: the public-board ceiling,
@@ -61,11 +81,12 @@ export async function activateExtension(
   ext: CortexExtensionRecord,
   config: AimeatConfig,
   storage: Storage,
-  gaii: string,
+  actor: CortexActor,
   // Whether the person activating counts as an operator, for the one component type that has a
   // ceiling. Defaults to false, which is the stricter answer: a caller that cannot say is bounded.
   isOperator = false,
 ): Promise<CortexActivationArtifacts> {
+  const { gaii } = actor;
   const artifacts: CortexActivationArtifacts = {
     schemaKeys: [],
     promptKeys: [],
@@ -158,13 +179,13 @@ export async function activateExtension(
         break;
       }
 
-      // 4. action
+      // 4. action, under the resolved identity (CortexActor says why)
       case 'action': {
         const actionId = `cortex-${ext.name}-${comp.name}`;
         try {
           await storage.createAction({
             id: actionId,
-            providerGaii: gaii,
+            providerGaii: actor.identity,
             displayName: comp.name,
             description: comp.description,
             inputSchema: comp.input_schema,
@@ -280,8 +301,9 @@ export async function activateExtension(
 export async function deactivateExtension(
   ext: CortexExtensionRecord,
   storage: Storage,
-  gaii: string,
+  actor: CortexActor,
 ): Promise<void> {
+  const { gaii } = actor;
   const { activationArtifacts: artifacts } = ext;
 
   // Remove schemas
@@ -302,9 +324,13 @@ export async function deactivateExtension(
     logger.info(`Cortex deactivated ontology: ${key}`, { extension: ext.name });
   }
 
-  // Remove actions
+  // Remove actions. An action is stored under the resolved identity. A person's action can also be
+  // under their bare account name: the identity migration (Postgres 0085, sqlite/schema-identity-
+  // backfill.ts) leaves such a row when the GHII already holds the same id. So each id is deleted
+  // under both, and for an agent the two are one.
+  const providers = [...new Set([actor.identity, gaii])];
   for (const actionId of artifacts.actionIds) {
-    await storage.deleteAction(actionId, gaii);
+    for (const provider of providers) await storage.deleteAction(actionId, provider);
     logger.info(`Cortex deactivated action: ${actionId}`, { extension: ext.name });
   }
 

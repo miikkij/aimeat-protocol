@@ -10,6 +10,8 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.8.2 -- 2026-09-26 -- The caller carries its resolved identity, which for an MCP session is the
+ *     agent's own GAII; an activation publishes the cortex's actions under it (secaudit 2026-09, R3 7c).
  *   v1.8.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.8.0 -- 2026-09-24 -- SECURITY (audit A8-1): the namespace claim on install and redeploy is
@@ -90,9 +92,12 @@ export function registerCortexTools(
      * lifecycle three, which is a live question for the developer rather than something to settle
      * by extraction.
      */
+    // An MCP session is always an agent (mcp/index.ts refuses a token that names no agent), and an
+    // agent's resolved identity is its own GAII: the same string is the actor and the identity.
     const agentCaller = (isOperator = false): CortexCaller => ({
         ownerName: callerOwner,
         gaii: getAgentGaii(),
+        identity: getAgentGaii(),
         isOperator,
     });
 

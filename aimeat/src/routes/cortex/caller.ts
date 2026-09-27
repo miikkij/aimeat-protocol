@@ -5,11 +5,13 @@
  * @description Who is asking, as services/cortex-lifecycle.ts wants the question put. Extracted
  *   from routes/cortex.ts (max-file-lines) when the federated-session answer below was written;
  *   the body moved unchanged and the route imports it.
- * @structure cortexCallerOf(req) → CortexCaller
+ * @structure cortexCallerOf(req, nodeId) → CortexCaller
  * @usage
  *   import { cortexCallerOf } from './cortex/caller.js';
- *   const out = await installCortex({ storage, config }, cortexCallerOf(req), { manifest, libs });
+ *   const out = await installCortex({ storage, config }, cortexCallerOf(req, config.nodeId), { manifest, libs });
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The caller carries `identity`, resolveIdentity's answer (a person's GHII),
+ *     and an activation publishes the cortex's actions under it (secaudit 2026-09, R3 7c).
  *   v1.1.0 — 2026-09-24 — The visitor's name is homeIdentityOf's: verifyJWT hands a visitor its home
  *     GHII as `owner` since this day, so appending the home node again would have named it twice.
  *   v1.0.0 — 2026-09-14 — Extraction, with the federated session no longer answering to the local
@@ -17,12 +19,14 @@
  */
 import type { Request } from 'express';
 import type { CortexCaller } from '../../services/cortex-lifecycle.js';
-import { homeIdentityOf, isForeignPrincipal } from '../../utils/gaii.js';
+import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
 
 /**
  * `req.auth!.owner` is the bare owner name for an owner session and for that owner's agents alike,
- * which is what `installedBy` holds; `req.auth!.sub` is the acting principal, recorded on whatever
- * an activation materialises.
+ * which is what `installedBy` holds; `req.auth!.sub` is the acting principal, recorded on the schema
+ * locks, memory and boards an activation materialises. A published action is keyed on the resolved
+ * identity instead (`identity`, a person's GHII), as POST /v1/actions keys one: every work door
+ * finds a provider's actions and work under it.
  *
  * A SESSION FROM ANOTHER NODE IS NOT THE LOCAL ACCOUNT OF THE SAME NAME. A federated login mints
  * `owner` as the local part of the visitor's HOME name (routes/ghii/register-login.ts), and every
@@ -40,10 +44,11 @@ import { homeIdentityOf, isForeignPrincipal } from '../../utils/gaii.js';
  * requireLocalSession() was considered and not taken here: it would also shut the public catalogue
  * read, which a visitor is entitled to.
  */
-export function cortexCallerOf(req: Request): CortexCaller {
+export function cortexCallerOf(req: Request, nodeId: string): CortexCaller {
   return {
     ownerName: isForeignPrincipal(req.auth) ? homeIdentityOf(req.auth!) : req.auth!.owner,
     gaii: req.auth!.sub,
+    identity: resolveIdentity(req.auth!, nodeId),
     isOperator: req.auth!.roles.includes('operator'),
   };
 }
