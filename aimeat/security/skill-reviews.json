@@ -270,7 +270,7 @@
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts"
       ],
-      "digest": "sha256:ecebd8bad960e1e891b745ea"
+      "digest": "sha256:f9409d367289717b7ade9f2e"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -481,7 +481,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "4e0c2165819c25dd",
       "aimeat/src/mcp/agent-schedules.ts": "491ce215a8732f44",
-      "aimeat/src/services/scheduler.ts": "347f524fd059e4c8"
+      "aimeat/src/services/scheduler.ts": "b11960580fbf96e6"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "d4c59f171eb2fb20",

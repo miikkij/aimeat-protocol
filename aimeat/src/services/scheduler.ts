@@ -7,6 +7,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.15.2 — 2026-09-26 — A job's croner name is its id and this node's id. croner refuses a name
+ *     the process already holds, so two nodes in one process (the multi-node E2E suites) each schedule
+ *     their own copy of a seeded job. The scheduler still finds every job by its id.
  *   v2.15.1 — 2026-09-26 — notifyOwner takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v2.15.0 — 2026-09-08 — Both places that materialise an agent task emit task_assigned on the
  *     connector tunnel. The comment above one of them already said "same channels a normally-created
@@ -306,7 +309,12 @@ export class Scheduler {
     try {
       // Pass IANA timezone through to croner so "every morning" stays correct
       // across DST. Omitted when unset → server-local interpretation (unchanged).
-      const cronOpts: { name: string; timezone?: string } = { name: job.id };
+      // The croner name is the job id and this node's id. croner keeps one list of names for the
+      // whole process and refuses a name it already holds, and every node seeds its core jobs under
+      // the same ids, so in a process that serves more than one node each node schedules its own
+      // copy. cronJobs is keyed by the job id, and stop, removeJob, reschedule and the next-run read
+      // use that key. A production process serves one node: the name gains a suffix, nothing else.
+      const cronOpts: { name: string; timezone?: string } = { name: `${job.id}@${this.config.nodeId}` };
       if (job.timezone) cronOpts.timezone = job.timezone;
       const cron = new Cron(job.cron, cronOpts, async () => {
         await this.executeJob(job, 'cron');
