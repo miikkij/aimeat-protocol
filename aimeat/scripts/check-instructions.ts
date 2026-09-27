@@ -28,6 +28,7 @@
  *   v1.1.0 — 2026-09-19 — Three more checks, from finding H16 of the instruction review: every rule
  *     file is named in CLAUDE.md's table, CLAUDE.md carries no em-dash, and every `pnpm <script>`
  *     the root file, the rules, the skills and the agents name is defined in a package.json.
+ *   v1.1.1 — 2026-09-27 — Ceiling 39,500 → 40,500 for the docs/internal plans rule.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -47,8 +48,10 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * Raised to 39,500 on 2026-09-23, at Jouni's request, for the rule under "Accepting a result" that a
  * look-keeping change passes only with no visible difference and his words are never paraphrased
  * (docs/pitfalls.md §94), which holds in every session.
+ * Raised to 40,500 on 2026-09-27, at Jouni's request, for the rule that plans live in the main
+ * checkout's docs/internal/ and never in a worktree's, which holds in every session.
  */
-const CEILING_BYTES = 39_500;
+const CEILING_BYTES = 40_500;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
