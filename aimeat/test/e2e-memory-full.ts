@@ -20,6 +20,8 @@
  *     organism-prefixed and reserved-key refusal into failed[], and 400/401 guards.
  *   v1.7.1 — 2026-07-15 — Bulk write storage_ref integrity (dangling ref → failed) — guard-parity with
  *     the single POST /v1/memory.
+ *   v1.7.2 — 2026-09-27 — The second owner is deleted after the bundle test that writes with its
+ *     token, since a deleted account's credentials no longer authenticate.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -953,14 +955,6 @@ await test('members read stays 404 for anonymous after an authenticated read', a
     assert(status === 404, `expected 404, got ${status}`);
 });
 
-await test('cleanup second owner', async () => {
-    const { status } = await json(`/v1/owners/${encodeURIComponent(owner2Name)}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${owner2Token}` },
-    });
-    assert(status === 200, `delete owner2 status ${status}`);
-});
-
 // ═══════════════════════════════════════════════════════
 // Collection bundle — ZIP export of selected memory entries + storage files
 // ═══════════════════════════════════════════════════════
@@ -1029,6 +1023,16 @@ await test('Bundle refuses a key that EXISTS under another owner — not merely 
         body: JSON.stringify({ items: [{ kind: 'memory', key: secretKey }] }),
     });
     assert(mine.status === 200, `the owner cannot bundle their own record: ${mine.status} ${JSON.stringify(mine.body?.error)}`);
+});
+
+// The second owner's account goes after the last test that uses its token: a deleted account's
+// credentials stop working with the account.
+await test('cleanup second owner', async () => {
+    const { status } = await json(`/v1/owners/${encodeURIComponent(owner2Name)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${owner2Token}` },
+    });
+    assert(status === 200, `delete owner2 status ${status}`);
 });
 
 await test('Bundle without auth returns 401', async () => {
