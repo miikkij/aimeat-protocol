@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-09-27 — Phase 11: a schedule's prompt is read with aimeat_schedule_list detail: true and changed with
+ *     aimeat_schedule_update prompt (and over REST), and refused for another owner and for an empty prompt.
  *   v1.2.0 — 2026-09-26 — 4g/4h: an ai schedule naming a record the node keeps for itself, as input
  *     or as output, is refused 403 RESERVED_KEY on create and on edit (secaudit 2026-09: A6-1).
  *   v1.1.0 — 2026-08-11 — 4e/4f: the length cut on description/purpose and cron validation on EDIT.
@@ -563,6 +565,103 @@ await test('26. High-frequency crons are summarized in `frequent`, not enumerate
     assert(dailyStillEnumerated, 'daily "0 7 * * *" schedule stays in occurrences');
     const dailyNotFrequent = !body.data.frequent.some((f: any) => f.scheduleId === agentTaskScheduleId);
     assert(dailyNotFrequent, 'daily schedule must not be classified frequent');
+});
+
+console.log('\nPhase 11 -- A schedule\'s prompt: read it with aimeat_schedule_list, change it with aimeat_schedule_update');
+
+/** One call on the node's own MCP server, as an agent: initialize once, then tools/call. */
+async function mcpSession(token: string) {
+    let sid: string | undefined;
+    let id = 0;
+    const rpc = async (method: string, params: Record<string, unknown> = {}) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`,
+                ...(sid ? { 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }),
+        });
+        sid = res.headers.get('mcp-session-id') ?? sid;
+        const text = await res.text();
+        const line = text.split('\n').find(l => l.startsWith('data: '));
+        return JSON.parse(line ? line.slice(6) : text);
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'e2e-schedules', version: '1' } });
+    return async (name: string, args: Record<string, unknown>) => {
+        const body = await rpc('tools/call', { name, arguments: args });
+        const t = body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body);
+        let data: any; try { data = JSON.parse(t); } catch { data = null; }
+        return { isError: body?.result?.isError === true || !!body?.error, text: t as string, data };
+    };
+}
+
+async function scopedAgent(ownerName: string, ownerToken: string, agentName: string, scopes: string[]) {
+    const ar = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: agentName, owner: ownerName, scopes }),
+    });
+    assert(ar.status === 201, `agent reg: ${JSON.stringify(ar.body)}`);
+    return getToken(ar.body.data.agent.gaii, ar.body.data.private_key, true);
+}
+
+const promptAgent = await scopedAgent(o1.ownerName, o1.ownerToken, 'promptbot', ['task:write', 'workflow:read', 'workflow:write', 'ai:use']);
+const otherPromptAgent = await scopedAgent(o2.ownerName, o2.ownerToken, 'otherprompt', ['task:write', 'workflow:read', 'workflow:write', 'ai:use']);
+const call = await mcpSession(promptAgent);
+const callOther = await mcpSession(otherPromptAgent);
+let promptAiId = '';
+let promptTaskId = '';
+
+await test('30. aimeat_schedule_list with detail: true returns each schedule\'s prompt; without it, none', async () => {
+    const ai = await call('aimeat_schedule_create', { kind: 'ai', cron: '0 6 * * *', display_name: 'Prompt AI', prompt: 'Summarise the input in three lines.', input_keys: ['notes.today'] });
+    assert(!ai.isError, `create ai: ${ai.text}`);
+    promptAiId = ai.data.schedule_id;
+    const task = await call('aimeat_schedule_create', { kind: 'agent_task', cron: '0 5 * * *', display_name: 'Prompt task', task_title: 'Morning', task_description: 'Read the inbox and list what waits.' });
+    assert(!task.isError, `create agent_task: ${task.text}`);
+    promptTaskId = task.data.schedule_id;
+    const plain = await call('aimeat_schedule_list', {});
+    const p = (plain.data?.schedules ?? []).find((s: any) => s.id === promptAiId);
+    assert(p && p.prompt === undefined, `no prompt without detail: ${JSON.stringify(p)}`);
+    const full = await call('aimeat_schedule_list', { detail: true });
+    const a = (full.data?.schedules ?? []).find((s: any) => s.id === promptAiId);
+    const t = (full.data?.schedules ?? []).find((s: any) => s.id === promptTaskId);
+    assert(a?.prompt === 'Summarise the input in three lines.', `ai prompt: ${JSON.stringify(a)}`);
+    assert(t?.prompt === 'Read the inbox and list what waits.' && t?.task_title === 'Morning', `agent_task prompt: ${JSON.stringify(t)}`);
+});
+
+await test('31. aimeat_schedule_update sets a new prompt, and the stored schedule carries it', async () => {
+    const up = await call('aimeat_schedule_update', { schedule_id: promptAiId, prompt: 'Summarise the input in one line.' });
+    assert(!up.isError, `update ai: ${up.text}`);
+    const ai = await json(`/v1/schedules/${promptAiId}`, { headers: auth1 });
+    assert(ai.body.data.schedule.input.prompt === 'Summarise the input in one line.', `stored: ${JSON.stringify(ai.body.data.schedule.input)}`);
+    assert(JSON.stringify(ai.body.data.schedule.input.inputKeys) === '["notes.today"]', 'the rest of the input is kept');
+    const up2 = await call('aimeat_schedule_update', { schedule_id: promptTaskId, prompt: 'List what waits, oldest first.' });
+    assert(!up2.isError, `update agent_task: ${up2.text}`);
+    const task = await json(`/v1/schedules/${promptTaskId}`, { headers: auth1 });
+    const tmpl = task.body.data.schedule.input.taskTemplate;
+    assert(tmpl.description === 'List what waits, oldest first.' && tmpl.title === 'Morning', `stored template: ${JSON.stringify(tmpl)}`);
+});
+
+await test('32. The REST twin: GET /v1/schedules?detail=true names the prompt, PATCH takes it', async () => {
+    const list = await json('/v1/schedules?detail=true', { headers: auth1 });
+    const row = (list.body.data.managed ?? []).find((s: any) => s.id === promptAiId);
+    assert(row?.prompt === 'Summarise the input in one line.', `detail list: ${JSON.stringify(row).slice(0, 300)}`);
+    const patch = await json(`/v1/schedules/${promptAiId}`, { method: 'PATCH', headers: auth1, body: JSON.stringify({ prompt: 'Back to three lines.' }) });
+    assert(patch.status === 200 && patch.body.data.schedule.input.prompt === 'Back to three lines.', `PATCH: ${patch.status} ${JSON.stringify(patch.body).slice(0, 300)}`);
+});
+
+await test('33. A prompt change is refused for another owner\'s schedule, for an empty prompt, and for a kind that has none', async () => {
+    const other = await callOther('aimeat_schedule_update', { schedule_id: promptAiId, prompt: 'hijack' });
+    assert(other.isError && /FORBIDDEN|NOT_FOUND/.test(other.text), `cross-owner: ${other.text}`);
+    const stored = await json(`/v1/schedules/${promptAiId}`, { headers: auth1 });
+    assert(stored.body.data.schedule.input.prompt === 'Back to three lines.', 'the prompt is untouched');
+    const empty = await call('aimeat_schedule_update', { schedule_id: promptAiId, prompt: '   ' });
+    assert(empty.isError && empty.text.startsWith('INVALID_INPUT'), `empty: ${empty.text}`);
+    const wf = await json('/v1/schedules', { method: 'POST', headers: auth1, body: JSON.stringify({ kind: 'workflow', cron: '0 2 * * *', display_name: 'wf', workflow_id: 'nope' }) });
+    if (wf.status === 201) {
+        const r = await json(`/v1/schedules/${wf.body.data.schedule.id}`, { method: 'PATCH', headers: auth1, body: JSON.stringify({ prompt: 'x' }) });
+        assert(r.status === 400 && r.body?.error?.code === 'NO_PROMPT', `workflow kind: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
 });
 
 console.log('\nCleanup');

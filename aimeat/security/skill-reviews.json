@@ -20,13 +20,13 @@
       "digest": "sha256:b37756797be3a65edcdfec3a"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-09-26",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts"
       ],
-      "digest": "sha256:53c95273e024b7c245b91fbb"
+      "digest": "sha256:a52d1731ef8105c5bd6fd0b4"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-09-19",
@@ -270,7 +270,7 @@
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts"
       ],
-      "digest": "sha256:399f4d740c07727874fa9940"
+      "digest": "sha256:8a7dd66cb4b5683ddbd86e0a"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -480,7 +480,7 @@
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "689c8903dfca6de9",
-      "aimeat/src/mcp/agent-schedules.ts": "491ce215a8732f44",
+      "aimeat/src/mcp/agent-schedules.ts": "79f308cca66be79f",
       "aimeat/src/services/scheduler.ts": "347f524fd059e4c8"
     },
     "node:aimeat-game-apps": {
@@ -518,7 +518,7 @@
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "5d6d832ec8021f6f",
-      "aimeat/src/mcp/agent-schedules.ts": "491ce215a8732f44",
+      "aimeat/src/mcp/agent-schedules.ts": "79f308cca66be79f",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc"
     },
     "node:aimeat-decide": {
