@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- deleteOwner takes the cortexes the person installed, after the actions
+ *     under their own identities (repos/cortex-erasure.ts): each record, with what its activation made
+ *     and the lib files, kept versions and dependency edges keyed by its name (secaudit 2026-09, R4
+ *     "found": the cortex record).
  *   v1.14.0 -- 2026-09-26 -- deleteOwner writes the erasure's pseudonym in place of the person on the
  *     ledger lines of other people that name them, as counterparty or as the one who acted
  *     (repos/ledger-erasure.ts). The lines stay for those people's books.
@@ -58,6 +62,7 @@ import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
 import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
 import { settleErasedPartyWork } from '../repos/work-erasure.js';
 import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
+import { deleteInstalledCortexes } from '../repos/cortex-erasure.js';
 import { erasedPartyPseudonym, erasedAccountParty } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
@@ -150,6 +155,11 @@ export const ownerMethods = {
       // owner session's raw `sub`), which neither pass above walks, and the name is released for
       // reuse, so the next holder of the name could change or delete it.
       this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(name);
+
+      // 3d. The cortexes this person installed, now that the actions under their own identities are
+      // gone: each record, with what its activation made and what is keyed by its name
+      // (repos/cortex-erasure.ts, the rule in ../../../erased-cortex.ts).
+      deleteInstalledCortexes(this.db, name, ghiiRows.map(r => r.ghii));
 
       // What this person WROTE into somebody else's namespace is that other owner's record of who
       // touched their data, so it is pseudonymised rather than deleted — removing it would silently
