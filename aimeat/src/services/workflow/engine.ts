@@ -193,10 +193,11 @@ export class WorkflowEngine {
     const prev = this.locks.get(runId) ?? Promise.resolve();
     let release!: () => void;
     const gate = new Promise<void>(r => { release = r; });
-    this.locks.set(runId, prev.then(() => gate));
+    const queued = prev.then(() => gate);
+    this.locks.set(runId, queued);
     await prev;
     try { return await fn(); }
-    finally { release(); if (this.locks.get(runId) === prev.then(() => gate)) this.locks.delete(runId); }
+    finally { release(); if (this.locks.get(runId) === queued) this.locks.delete(runId); }
   }
 
   // ── start a run ──────────────────────────────────────────────────────────────
