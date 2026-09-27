@@ -27251,7 +27251,12 @@ paths:
         never through `var()` or another function; `inherit` is refused there, and `all` takes only
         `unset`, `initial`, `revert` or `revert-layer`. An animation, a counter style, a font palette,
         a counter, an anchor or a timeline the page defines is still used by its name
-        (`content: counter(x)`, `position-anchor`, `animation-timeline`). A component whose builder judged it `general`
+        (`content: counter(x)`, `position-anchor`, `animation-timeline`). A list item stays inside a
+        list of the component, because a browser numbers any other as an item of the page's own
+        list around the component: an `<li>` stands inside a `<ul>` or `<ol>` of the markup, no
+        `display` holds `list-item` or is written through `var()`, another function or `inherit`,
+        and where the markup carries a `<summary>` (which a browser makes a list item that counts 0)
+        every `counter-increment` also writes `list-item 0`. A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide

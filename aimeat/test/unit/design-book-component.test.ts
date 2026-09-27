@@ -5,6 +5,11 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.20.0 — 2026-09-26 — A list item stays in a list of the component: an <li> outside a <ul> or <ol>, a
+ *     display that holds list-item, reads through var() or inherits, and a counter-increment without
+ *     "list-item 0" beside a <summary> are refused, each saying why; a list of the component, and
+ *     "list-item 0", pass. The reader's elements carry their parent and a number its text; the bench
+ *     is timed on a list of many items.
  *   v1.19.0 — 2026-09-26 — A @function whose parameter carries a type or a default, or that says what it
  *     returns, is refused in a sentence saying the parser cannot read those, one with plain parameters
  *     passes, and the refusal of an at-rule names the blocks of @font-feature-values among what passes.
@@ -164,8 +169,8 @@ describe('the component bench', () => {
     ]);
     // An SVG name comes back lower-cased, as the allowlist spells it, and a prefixed one keeps its prefix.
     expect(readMarkup('<svg viewBox="0 0 8 8"><linearGradient xlink:href="#g"></linearGradient></svg>').elements).toEqual([
-      { name: 'svg', attrs: [{ name: 'viewbox', value: '0 0 8 8' }] },
-      { name: 'lineargradient', attrs: [{ name: 'xlink:href', value: '#g' }] },
+      { name: 'svg', attrs: [{ name: 'viewbox', value: '0 0 8 8' }], parent: null },
+      { name: 'lineargradient', attrs: [{ name: 'xlink:href', value: '#g' }], parent: 'svg' },
     ]);
     expect(() => validateComponentBody({ ...WEEK_GRID, html: WEEK_GRID.html.replace('aria-label="This week"', 'aria-label="Read &amp; write"') })).not.toThrow();
   });
@@ -384,6 +389,9 @@ describe('the component bench', () => {
     });
     timed('the bench, styles', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }' + 'animation '.repeat(1100) }); } catch { /* refused is the right answer */ } });
     timed('the bench, selectors', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid' + ':is(.wkgrid'.repeat(900) + ')'.repeat(900) + ' { color: var(--ak-ink); }' }); } catch { /* refused is the right answer */ } });
+    timed('the bench, list items', () => {
+      expect(() => validateComponentBody({ ...WEEK_GRID, html: '<ul class="wkgrid">' + '<li>a</li>'.repeat(1100) + '</ul>' })).not.toThrow();
+    });
     timed('the bench, names in a declaration', () => {
       expect(() => validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); counter-reset:' + ' wkgrid-a 1,'.repeat(950) + ' wkgrid-b; }' })).not.toThrow();
     });
@@ -553,6 +561,8 @@ describe('the component bench', () => {
   it.each([
     ['counter-increment: sec 100000', /The declaration "counter-increment: sec 100000" names the counter "sec", a name the whole page shares, so the page's own counter of that name would change\. A component defines and changes names of its own only: start the name with its prefix, "counter-increment: wkgrid-sec", and use it as "content: counter\(wkgrid-sec\)"\. The page's own counters are still used by their names\./],
     ['counter-reset: sec', /names the counter "sec".*"counter-reset: wkgrid-sec"/],
+    ['counter-increment: list-item 1', /names the counter "list-item"/],
+    ['counter-reset: list-item 0', /names the counter "list-item"/],
     ['counter-reset: wkgrid-a reversed(sec) 3', /names the counter "sec"/],
     ['counter-set: wkgrid-a 1, --sec 2', /names the counter "--sec".*"counter-set: wkgrid-sec"/],
     ['anchor-name: --menu', /names the anchor "--menu".*"anchor-name: --wkgrid-menu", and use it as "position-anchor: --wkgrid-menu"\. The page's own anchors are still used by their names\./],
@@ -580,7 +590,7 @@ describe('the component bench', () => {
       'counter-increment: wkgrid-step', 'counter-reset: wkgrid-step 0 --wkgrid-sub', 'counter-reset: reversed(wkgrid-step) 3', 'counter-set: wkgrid-step 2, wkgrid-sub',
       'counter-increment: none', 'counter-reset: unset', 'anchor-name: --wkgrid-menu, --wkgrid-tip', 'view-transition-name: wkgrid-hero', 'view-transition-name: none',
       'view-transition-name: match-element', 'view-timeline: --wkgrid-reveal block 10% 20px', 'scroll-timeline: --wkgrid-scroll inline', 'timeline-scope: --wkgrid-scroll, --wkgrid-reveal',
-      'timeline-scope: all', 'all: unset', 'all: revert',
+      'timeline-scope: all', 'all: unset', 'all: revert', 'counter-increment: wkgrid-step list-item 0',
       // Using a name the page defines stays allowed, as using a page animation does.
       'content: counter(sec) ". "', 'position-anchor: --menu', 'animation-timeline: --page', 'list-style-type: decimal',
     ]) {
@@ -588,9 +598,50 @@ describe('the component bench', () => {
     }
     // The reader gives each part of a value at its top level, for the checks to read the names in it.
     expect(readStylesheet('.a { counter-reset: reversed(b) 2, --c; d: var(--e) "f" }').declarations.map(d => d.parts)).toEqual([
-      [{ type: 'function', name: 'reversed', words: ['b'] }, { type: 'number' }, { type: 'comma' }, { type: 'word', name: '--c' }],
+      [{ type: 'function', name: 'reversed', words: ['b'] }, { type: 'number', text: '2' }, { type: 'comma' }, { type: 'word', name: '--c' }],
       [{ type: 'function', name: 'var', words: ['--e'] }, { type: 'other', text: '"f"' }],
     ]);
+  });
+
+  // A browser numbers a list item in the list around it, and a component lands inside a page: a list
+  // item that no list of the component holds is numbered in the page's own list, whose items after
+  // it count on from it. The <summary> of a <details> is a list item that counts 0.
+  it('keeps every list item inside a list of the component, so none is numbered in the page\'s own list', () => {
+    expect(bad({ html: '<div class="wkgrid"><li class="wkgrid-i">a</li></div>' })).toThrow(new RegExp('An <li> stands inside <div>, outside a list of the component: a browser numbers it as an item of the page\'s own list '
+      + 'around the component, and the page\'s items after it count on from it\\. Put every <li> inside a <ul> or <ol> of the markup\\.'));
+    expect(bad({ html: '<li class="wkgrid">a</li>' })).toThrow(/An <li> stands at the top of the markup, outside a list of the component/);
+    expect(bad({ html: '<ol class="wkgrid"><li>a<section class="wkgrid-s"><li>b</li></section></li></ol>' })).toThrow(/An <li> stands inside <section>/);
+    for (const [decl, message] of [
+      ['display: list-item', new RegExp('The declaration "display: list-item" makes an element a list item, and outside a list of the component a browser numbers it as an item of the page\'s own list '
+        + 'around the component, so the page\'s items after it count on from it\\. A component\'s list items are the <li> elements of its <ul> or <ol>, which need no display of their own\\.')],
+      ['display: block list-item', /The declaration "display: block list-item" makes an element a list item/],
+      ['display: inline flow-root list-item', /makes an element a list item/],
+      ['display: LIST-ITEM', /makes an element a list item/],
+      ['display: var(--wkgrid-d)', new RegExp('The declaration "display: var\\(--wkgrid-d\\)" writes display through var\\(\\), and the bench cannot read whether it makes a list item, which a browser '
+        + 'numbers as an item of the page\'s own list around the component\\. Write display as the word itself, as in "display: grid"\\.')],
+      ['display: inherit', /The declaration "display: inherit" gives an element the display of its parent, and the parent of the component can be an item of the page's own list/],
+    ] as Array<[string, RegExp]>) {
+      expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid-row { ${decl}; }` }), decl).toThrow(message);
+    }
+    expect(bad({ css: `${WEEK_GRID.css}\n@keyframes wkgrid-a { to { display: list-item; } }` })).toThrow(/makes an element a list item/);
+    const disclosure = '<details class="wkgrid"><summary class="wkgrid-s">More</summary><p class="wkgrid-p">x</p></details>';
+    for (const decl of ['counter-increment: wkgrid-step', 'counter-increment: none']) {
+      expect(bad({ html: disclosure, css: `${WEEK_GRID.css}\n.wkgrid-s { ${decl}; }` }), decl).toThrow(new RegExp(`The markup carries a <summary>, which a browser makes a list item that counts 0, and the declaration "${decl}" can reach it: `
+        + 'a counter-increment replaces that 0, so the <summary> is numbered as an item of the page\'s own list around the component, and the page\'s items after it count on from it\\. '
+        + 'Where the markup carries a <summary>, every counter-increment also writes "list-item 0": "counter-increment: wkgrid-step list-item 0"\\.'));
+    }
+    // A list of the component holds its own items, and "list-item 0" keeps a <summary> counting 0.
+    for (const [html, css] of [
+      ['<ul class="wkgrid"><li class="wkgrid-i">a</li><li>b</li></ul>', ''],
+      ['<ol class="wkgrid"><li>a<ol class="wkgrid-sub"><li>b</li></ol></li></ol>', '.wkgrid { counter-reset: wkgrid-step; }'],
+      [disclosure, '.wkgrid-s { counter-increment: wkgrid-step list-item 0; }'],
+      [disclosure, '.wkgrid-s { display: block; } .wkgrid-p { counter-reset: wkgrid-step; }'],
+      [WEEK_GRID.html, '.wkgrid-row { counter-increment: wkgrid-step; display: grid; } .wkgrid-cell { display: revert; }'],
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, html, css: `${WEEK_GRID.css}\n${css}` }), `${html} ${css}`).not.toThrow();
+    }
+    // The reader gives every element the name of the element it stands in.
+    expect(readMarkup('<ul><li>a</li></ul><li>b</li>').elements.map(e => [e.name, e.parent])).toEqual([['ul', null], ['li', 'ul'], ['li', null]]);
   });
 
   // css-tree reads a custom function's parameters by name only, and keeps a type, a default or a
@@ -625,7 +676,7 @@ describe('the component bench', () => {
     // A name in ASCII capitals reads as its lower case.
     expect(readStylesheet('@MEDIA print { .A { COLOR: RED } }')).toMatchObject({ atRules: [{ name: 'media', within: null }], declarations: [{ property: 'color', keyword: 'red' }] });
     expect(readMarkup('<DIV CLASS="x"><SVG VIEWBOX="0 0 1 1"></SVG></DIV>').elements).toEqual([
-      { name: 'div', attrs: [{ name: 'class', value: 'x' }] }, { name: 'svg', attrs: [{ name: 'viewbox', value: '0 0 1 1' }] },
+      { name: 'div', attrs: [{ name: 'class', value: 'x' }], parent: null }, { name: 'svg', attrs: [{ name: 'viewbox', value: '0 0 1 1' }], parent: 'div' },
     ]);
   });
 

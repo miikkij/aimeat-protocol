@@ -36,6 +36,9 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.17.0 — 2026-09-26 — A list item stays in a list of the component (component-lists.ts): an <li> outside a
+ *     <ul>, <ol> or <menu>, a display that holds list-item or is not written as words, and a counter-increment
+ *     without "list-item 0" where the markup carries a <summary> are refused; "list-item 0" passes.
  *   v1.16.0 — 2026-09-26 — A @function whose parameter carries a type or a default, or that says what it
  *     returns, is refused in a sentence of its own: the CSS parser the bench reads with cannot read
  *     those, and the refusal shows the form it reads. Every refusal of an at-rule names the blocks of
@@ -126,9 +129,10 @@
 import { createHash } from 'node:crypto';
 import { DesignBookError } from './errors.js';
 import {
-  MAX_NESTING, nameKindOf, readMarkup, readStylesheet, type ComplexSelector, type Compound, type DeclarationRead, type MarkupProblem, type NameDefinition,
-  type NameKind, type StylesheetOpen, type ValuePart,
+  MAX_NESTING, nameKindOf, readMarkup, readStylesheet, type ComplexSelector, type Compound, type DeclarationRead, type MarkupElement, type MarkupProblem,
+  type NameDefinition, type NameKind, type StylesheetOpen, type ValuePart,
 } from './component-scan.js';
+import { countsListItemZero, displayRefusal, listItemMarkupRefusal, summaryCounterRefusal } from './component-lists.js';
 import { escapeHtml } from '../site-tags.js';
 
 export const COMPONENT_LIMITS = { html: 12_000, css: 12_000, use: 600, why: 400, whyMin: 20 } as const;
@@ -209,7 +213,8 @@ function markupRefusal(problem: MarkupProblem, html: string): string {
   }
 }
 
-function checkMarkup(html: string, prefix: string): void {
+/** The markup's checks. It answers the elements it read, which the stylesheet's checks need too. */
+function checkMarkup(html: string, prefix: string): MarkupElement[] {
   // The parser's cost grows with how deep the markup nests, so it reads no more than the ceiling.
   if (html.length > COMPONENT_LIMITS.html) refuse(`A component carries its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
   // READ BY THE HTML PARSER (component-scan.ts readMarkup): the elements a browser builds, and every
@@ -250,6 +255,10 @@ function checkMarkup(html: string, prefix: string): void {
       }
     }
   }
+  // A LIST ITEM STAYS IN A LIST OF THE COMPONENT, or a browser numbers it in the page's own list (component-lists.ts).
+  const strayItem = listItemMarkupRefusal(elements);
+  if (strayItem) refuse(strayItem);
+  return elements;
 }
 
 /** At-rules that load something from an address. */
@@ -385,8 +394,11 @@ function pageNameRefusal(d: DeclarationRead, prefix: string): string | null {
     + `A component defines and changes names of its own only: start the name with its prefix, "${d.property}: ${ownFor(name)}", and use it as "${p.use(ownFor(name))}". The page's own ${p.noun}s are still used by their names.`;
   // A value the parser kept raw is one part the bench cannot read.
   const parts: ValuePart[] = d.parts ?? [{ type: 'other', text: d.text }];
-  for (const part of parts) {
+  for (let at = 0; at < parts.length; at++) {
+    const part = parts[at];
     if (part.type === 'number' || part.type === 'comma') continue;
+    // "list-item 0" steps the page's list by nothing, and keeps a <summary> counting 0 (component-lists.ts).
+    if (d.property === 'counter-increment' && countsListItemZero(parts, at)) { at++; continue; }
     if (part.type === 'word') {
       if (part.name === 'none' || RESETS.has(part.name) || p.keywords?.has(part.name) || own(part.name)) continue;
       if (part.name !== 'inherit') return pageName(part.name);
@@ -432,7 +444,7 @@ const loads = (fn: string) => fn === 'url' || fn === 'src' || fn === 'image' || 
 /** Properties that bind a behaviour, in the browsers that had them. */
 const BINDINGS = new Set(['behavior', '-ms-behavior', '-moz-binding']);
 
-function checkStyles(css: string, prefix: string): void {
+function checkStyles(css: string, prefix: string, elements: ReadonlyArray<MarkupElement>): void {
   // The parser's cost grows with how deep the stylesheet nests, so it reads no more than the ceiling.
   if (css.length > COMPONENT_LIMITS.css) refuse(`A component carries its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
   // A PAGE READS THE STYLESHEET INSIDE A <style> ELEMENT, the preview's and the one an app pastes it
@@ -461,6 +473,14 @@ function checkStyles(css: string, prefix: string): void {
     const pageName = pageNameRefusal(d, prefix);
     if (pageName) refuse(pageName);
   }
+  // A LIST ITEM STAYS IN A LIST OF THE COMPONENT, or a browser numbers it in the page's own list: no
+  // display makes one, and a <summary> of the markup keeps counting 0 (component-lists.ts).
+  for (const d of sheet.declarations) {
+    const listItem = displayRefusal(d);
+    if (listItem) refuse(listItem);
+  }
+  const summary = summaryCounterRefusal(elements, sheet.declarations, prefix);
+  if (summary) refuse(summary);
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
   if (sheet.functions.some(loads)) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
   if (sheet.depth > MAX_NESTING) {
@@ -633,8 +653,7 @@ function benchTexts(prefix: string, html: string, css: string): void {
   if (prefix === 'ak' || prefix === 'aimeat') refuse(`"${prefix}" is the kit's prefix. Choose one of the component's own.`);
   if (!html || html.length > COMPONENT_LIMITS.html) refuse(`A component carries its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
   if (!css || css.length > COMPONENT_LIMITS.css) refuse(`A component carries its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
-  checkMarkup(html, prefix);
-  checkStyles(css, prefix);
+  checkStyles(css, prefix, checkMarkup(html, prefix));
 }
 
 export function validateComponentBody(raw: unknown): ComponentBody {

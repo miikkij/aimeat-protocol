@@ -35,6 +35,9 @@
  *   StylesheetOpen · NameKind · NameDefinition · nameKindOf · DeclarationRead · ValuePart · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.11.0 — 2026-09-26 — readMarkup gives every element the name of the element it stands in
+ *     (`parent`), and a number in a declaration's value carries its text, for the checks that keep a
+ *     list item inside a list of the component.
  *   v2.10.0 — 2026-09-26 — readStylesheet notes the first @function whose prelude css-tree keeps as raw
  *     text (`rawFunction`): a parameter with a type or a default value, or a `returns`.
  *   v2.9.0 — 2026-09-26 — Every name, in the markup and in the stylesheet, is read in ASCII lower case
@@ -125,6 +128,8 @@ export interface MarkupElement {
    * DECODED, as a browser uses it: `u&#114;l(` comes out as `url(`, `A &ndash; B` as `A – B`.
    */
   attrs: Array<{ name: string; value: string }>;
+  /** The name of the element it stands in, as `name` spells it, or null at the top of the markup. */
+  parent: string | null;
 }
 
 /** Why the markup cannot be vouched for, with what a message needs to say where. */
@@ -205,21 +210,24 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
   const elements: MarkupElement[] = [];
   const spans: TagSpan[] = [];
   let comment = false;
-  const stack: ChildNode[] = [...fragment.childNodes].reverse();
+  // Every node still to read, with the name of the element it stands in (null at the top).
+  const stack: Array<{ node: ChildNode; parent: string | null }> = [...fragment.childNodes].reverse().map(node => ({ node, parent: null }));
   while (stack.length) {
-    const node = stack.pop() as ChildNode;
+    const { node, parent } = stack.pop() as { node: ChildNode; parent: string | null };
     if (node.nodeName === '#comment') comment = true;
     if (!('tagName' in node)) continue;
     const loc = node.sourceCodeLocation;
     const attrLocs = loc?.attrs ?? {};
     if (loc?.startTag) spans.push({ start: loc.startTag.startOffset, end: loc.startTag.endOffset, name: node.tagName, closing: false, attrs: attrLocs });
     if (loc?.endTag) spans.push({ start: loc.endTag.startOffset, end: loc.endTag.endOffset, name: node.tagName, closing: true, attrs: {} });
+    const name = asciiLower(node.tagName);
     elements.push({
-      name: asciiLower(node.tagName),
+      name,
       attrs: node.attrs.map(a => ({ name: asciiLower(a.prefix ? `${a.prefix}:${a.name}` : a.name), value: a.value })),
+      parent,
     });
     const children = node.tagName === 'template' ? (node as Template).content.childNodes : node.childNodes;
-    for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+    for (let i = children.length - 1; i >= 0; i--) stack.push({ node: children[i], parent: name });
   }
   spans.sort((a, b) => a.start - b.start);
   const spanAt = (at: number): TagSpan | undefined => spans.find(s => s.start <= at && at < s.end);
@@ -323,8 +331,8 @@ export interface ComplexSelector { lead: string | null; compounds: Compound[]; c
 export type ValuePart =
   /** An identifier, escapes resolved and lower-cased. */
   | { type: 'word'; name: string }
-  /** A number, a percentage or a dimension. */
-  | { type: 'number' }
+  /** A number, a percentage or a dimension, as written. */
+  | { type: 'number'; text: string }
   | { type: 'comma' }
   /** A function by its name, with what it holds when that is words only (`reversed(x)`), and null otherwise. */
   | { type: 'function'; name: string; words: string[] | null }
@@ -606,7 +614,7 @@ export function readStylesheet(css: string): StylesheetReading {
 /** One part of a value at its top level (ValuePart). */
 function partOf(node: CssNode, css: string): ValuePart {
   if (node.type === 'Identifier') return { type: 'word', name: nameOf(node.name) };
-  if (node.type === 'Number' || node.type === 'Percentage' || node.type === 'Dimension') return { type: 'number' };
+  if (node.type === 'Number' || node.type === 'Percentage' || node.type === 'Dimension') return { type: 'number', text: textOf(css, node) };
   if (node.type === 'Operator' && node.value === ',') return { type: 'comma' };
   if (node.type === 'Function') {
     const held = node.children.toArray().filter(n => n.type !== 'WhiteSpace');
