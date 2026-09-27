@@ -7,6 +7,10 @@
  *   an in-memory storage double: the function needs no server.
  * @usage pnpm exec vitest run test/unit/cortex-lifecycle.test.ts
  * @version-history
+ *   v1.3.0 — 2026-09-26 — A record stored without the identity has each action deleted under every
+ *     principal of the account that installed the cortex: its bare name, its GHII, its agents and its
+ *     ecosystem apps, and the deactivator's own two. The prompts and ontologies an activation wrote are
+ *     deleted under the same principals.
  *   v1.2.0 — 2026-09-26 — Activation records the identity it published the actions under, and
  *     deactivation and uninstall delete them under it, whoever does them: the person after their
  *     agent, an operator after the owner. A record without it keeps the deactivator's identity and
@@ -104,19 +108,24 @@ describe('activateCortex and deactivateCortex: a cortex action is keyed on the r
     const operator = { ownerName: 'root', gaii: 'root', identity: 'root@test-node', isOperator: true };
     const ACTION_ID = 'cortex-laake-lookup';
 
+    /** Every principal alice's account holds: her bare name, her GHII, her agent and her ecosystem app. */
+    const ALICE_PRINCIPALS = ['alice', 'alice@test-node', 'bot#alice@test-node', 'eco:drum#alice@test-node'];
+
     /**
-     * One cortex with one action component, recording every action written and deleted. `actionProvider`
-     * is the identity a stored activation says its actions were published under; left out, the record
-     * is one written before activation stored it.
+     * One cortex with one action component, recording every action written and deleted and every
+     * memory record deleted. `actionProvider` is the identity a stored activation says its actions
+     * were published under; left out, the record is one written before activation stored it.
+     * `promptKeys` are the prompt records the stored activation lists.
      */
-    function activationStorage(status: 'active' | 'inactive', actionIds: string[], actionProvider?: string) {
+    function activationStorage(status: 'active' | 'inactive', actionIds: string[], actionProvider?: string, promptKeys: string[] = []) {
         const created: { id: string; providerGaii: string }[] = [];
         const deleted: { id: string; providerGaii: string }[] = [];
+        const memoryDeleted: { owner: string; key: string }[] = [];
         let record = {
             name: 'laake', installedBy: 'alice', status,
             components: [{ type: 'action', name: 'lookup', description: 'Looks one up', input_schema: { type: 'object' } }],
             activationArtifacts: {
-                schemaKeys: [], promptKeys: [], actionIds, boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: [],
+                schemaKeys: [], promptKeys, actionIds, boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: [],
                 ...(actionProvider ? { actionProvider } : {}),
             },
         } as unknown as CortexExtensionRecord;
@@ -124,12 +133,17 @@ describe('activateCortex and deactivateCortex: a cortex action is keyed on the r
             getCortexExtension: async () => record,
             updateCortexExtension: async (_name: string, patch: Partial<CortexExtensionRecord>) => { record = { ...record, ...patch }; },
             deleteCortexExtension: async () => true,
+            deleteCortexLibFile: async () => true,
             deleteDependencyEdges: async () => {},
             deleteComponentVersions: async () => {},
             createAction: async (a: { id: string; providerGaii: string }) => { created.push({ id: a.id, providerGaii: a.providerGaii }); return a; },
             deleteAction: async (id: string, providerGaii: string) => { deleted.push({ id, providerGaii }); return true; },
+            deleteMemory: async (owner: string, key: string) => { memoryDeleted.push({ owner, key }); return true; },
+            getGHIIByOwner: async (name: string) => (name === 'alice' ? { ghii: 'alice@test-node', ownerName: 'alice' } : null),
+            getAgentsByOwner: async (name: string) => (name === 'alice' ? [{ gaii: 'bot#alice@test-node', owner: 'alice' }] : []),
+            getEcosystemAppsByOwner: async (name: string) => (name === 'alice' ? [{ geai: 'eco:drum#alice@test-node', owner: 'alice' }] : []),
         } as unknown as Storage;
-        return { storage, created, deleted, stored: () => record };
+        return { storage, created, deleted, memoryDeleted, stored: () => record };
     }
 
     it("publishes a person's cortex action under their GHII, not under the bare account name", async () => {
@@ -158,22 +172,37 @@ describe('activateCortex and deactivateCortex: a cortex action is keyed on the r
         expect(deleted).toEqual([{ id: ACTION_ID, providerGaii: 'alice@test-node' }]);
     });
 
-    it("a record stored without the identity: each action is deleted under the deactivator's GHII and bare account name", async () => {
+    // A record stored before activation named its provider does not say who published the actions:
+    // the person, one of their agents or apps, whoever activated it. Each action id is deleted under
+    // every principal of the account that installed the cortex, and under the deactivator's own two.
+    it('a record stored without the identity: the person deactivates what their agent activated, and the action goes under every principal of the account', async () => {
         const { storage, deleted } = activationStorage('active', [ACTION_ID]);
-        const out = await deactivateCortex({ storage, config }, person, 'laake');
-        expect(out.ok).toBe(true);
-        expect(deleted).toHaveLength(2);
-        expect(deleted).toEqual(expect.arrayContaining([
-            { id: ACTION_ID, providerGaii: 'alice@test-node' },
-            { id: ACTION_ID, providerGaii: 'alice' },
-        ]));
+        expect((await deactivateCortex({ storage, config }, person, 'laake')).ok).toBe(true);
+        expect(deleted).toEqual(expect.arrayContaining(ALICE_PRINCIPALS.map(providerGaii => ({ id: ACTION_ID, providerGaii }))));
+        expect(deleted).toHaveLength(ALICE_PRINCIPALS.length);
+    });
+
+    it("a record stored without the identity: an operator deactivates it, and the action goes under the owner's principals as well as the operator's", async () => {
+        const { storage, deleted } = activationStorage('active', [ACTION_ID]);
+        expect((await deactivateCortex({ storage, config }, operator, 'laake')).ok).toBe(true);
+        expect(deleted).toEqual(expect.arrayContaining(
+            [...ALICE_PRINCIPALS, 'root', 'root@test-node'].map(providerGaii => ({ id: ACTION_ID, providerGaii }))));
+        expect(deleted).toHaveLength(ALICE_PRINCIPALS.length + 2);
+    });
+
+    it('the person deactivates what their agent activated: the prompt the activation wrote goes too, under every principal of the account', async () => {
+        const PROMPT = '__cortex__/laake/prompts/ask';
+        const { storage, memoryDeleted } = activationStorage('active', [ACTION_ID], 'bot#alice@test-node', [PROMPT]);
+        expect((await deactivateCortex({ storage, config }, person, 'laake')).ok).toBe(true);
+        expect(memoryDeleted).toEqual(expect.arrayContaining(ALICE_PRINCIPALS.map(owner => ({ owner, key: PROMPT }))));
+        expect(memoryDeleted).toHaveLength(ALICE_PRINCIPALS.length);
     });
 
     it('an agent publishes and deletes under its own GAII, once', async () => {
         const on = activationStorage('inactive', []);
         expect((await activateCortex({ storage: on.storage, config }, agent, 'laake')).ok).toBe(true);
         expect(on.created).toEqual([{ id: ACTION_ID, providerGaii: 'bot#alice@test-node' }]);
-        const off = activationStorage('active', [ACTION_ID]);
+        const off = activationStorage('active', [ACTION_ID], 'bot#alice@test-node');
         expect((await deactivateCortex({ storage: off.storage, config }, agent, 'laake')).ok).toBe(true);
         expect(off.deleted).toEqual([{ id: ACTION_ID, providerGaii: 'bot#alice@test-node' }]);
     });

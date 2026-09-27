@@ -15,8 +15,12 @@
  *   - loadOwnerEcoApps(storage, owner) — the owner's ecosystem apps, read-once per operation
  *   - resolveOwnerIdentities(storage, nodeId, owner) — GHII first, then agent GAIIs, then eco GEAIs
  *     (the priority order the owner-scope GHII-first dedup relies on)
+ *   - accountPrincipals(storage, owner) — every principal one account holds, its bare name included
  * @usage const agents = await loadOwnerAgents(storage, owner);   // 0 extra reads inside a read scope
  * @version-history
+ *   v1.1.0 — 2026-09-26 — accountPrincipals: the bare account name, the GHII, the agents' GAIIs and the
+ *     ecosystem apps' GEAIs of one account. A cortex teardown deletes what an activation wrote under
+ *     each of them (routes/cortex/activation.ts).
  *   v1.0.0 — 2026-07-15 — Phase 3: canonical IdentityMap-aware owner-identity loaders (dedup).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -51,4 +55,21 @@ export function loadOwnerEcoApps(storage: Storage, owner: string): Promise<EcoAp
 export async function resolveOwnerIdentities(storage: Storage, nodeId: string, owner: string): Promise<string[]> {
   const [agents, ecoApps] = await Promise.all([loadOwnerAgents(storage, owner), loadOwnerEcoApps(storage, owner)]);
   return [`${owner}@${nodeId}`, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+}
+
+/**
+ * Every principal one account holds on this node, as storage names them: the bare account name, which
+ * a person's cortex activation writes its prompt, ontology and seed records under, then the GHII,
+ * each agent's GAII and each ecosystem app's GEAI.
+ *
+ * `owner` is an account name as a record keeps it (a cortex's `installedBy`). A name that is not a
+ * local account's, such as a visitor's home identity or the node's own `system@<node>`, carries an
+ * `@`, and it is its own only principal.
+ */
+export async function accountPrincipals(storage: Storage, owner: string): Promise<string[]> {
+  if (owner.includes('@')) return [owner];
+  const [ghii, agents, ecoApps] = await Promise.all([
+    storage.getGHIIByOwner(owner), loadOwnerAgents(storage, owner), loadOwnerEcoApps(storage, owner),
+  ]);
+  return [owner, ...(ghii ? [ghii.ghii] : []), ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
 }
