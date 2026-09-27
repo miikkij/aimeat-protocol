@@ -12,6 +12,10 @@
  * @structure SecurityTab({ switchPage }) — load · alertLine · RightNow · Strip · the sections from
  *   security-tab.refusals.js and security-tab.sections.js · the actions (resolve, delete, payload)
  * @version-history
+ *   v3.2.0 — 2026-09-26 — The records the update at start left have a section of their own while
+ *     such an incident exists, before "Refused and kept", and the open figure of the strip leads there
+ *     while one is open; the sections after 02 are numbered as they come. The question before a
+ *     decision says what it does to the cortexes and ecosystem apps the name holds.
  *   v3.1.0 — 2026-09-26 — The decision on one name of the incident the update at start opens: asked
  *     first, then POST .../incidents/:id/resolve with { name, resolution }.
  *   v3.0.0 — 2026-09-27 — Library components only: the status is the Verdict with the Readings beside
@@ -38,7 +42,7 @@ import { useConfirm } from '/components/Modal.js';
 import { getSecurityOverview, resolveSecurityIncident, deleteSecurityIncident, resolveHeldName } from '/js/services/admin.js';
 import { authHeaders } from '/js/services/auth.js';
 import { RefusalsSection, ipText } from './security-tab.refusals.js';
-import { IncidentsSection, AccountsSection, SettingsSection, AskAiSection } from './security-tab.sections.js';
+import { HeldSection, IncidentsSection, AccountsSection, SettingsSection, AskAiSection, isHeldIncident } from './security-tab.sections.js';
 import { Section } from '/components/Section.js';
 import { Verdict, Readings } from '/components/Readings.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -106,11 +110,13 @@ function Strip({ ov, switchPage }) {
   const n = ov.now, r = ov.refusals, a = ov.accounts, i = ov.incidents;
   const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const cell = (key, onClick, value, label, sub, hot) => ({ key, onClick, n: value, label, sub: sub || undefined, tone: hot ? 'notice' : undefined });
+  // The open figure leads to the records to decide while one of those incidents is open.
+  const openHeld = i.items.some(x => isHeldIncident(x) && x.status === 'open');
   return html`<${FigureStrip} wrap items=${[
     cell('refusals', () => go('adm-sec-02'), num(n.refusals.value), S('strip.refusals'),
       n.refusals.mean_per_day != null ? S('strip.refusalsSub', { mean: num(n.refusals.mean_per_day) }) : S('strip.refusalsSubNoMean')),
     cell('sources', () => go('adm-sec-02'), num(n.sources.value), S('strip.sources'), r.by_source[0] ? S('strip.sourcesSub', { n: num(r.by_source[0].count) }) : ''),
-    cell('open', () => go('adm-sec-03'), num(i.open), S('strip.open'), S('strip.openSub', { total: num(i.total), resolved: num(i.total - i.open) }), i.open > 0),
+    cell('open', () => go(openHeld ? 'adm-sec-names' : 'adm-sec-03'), num(i.open), S('strip.open'), S('strip.openSub', { total: num(i.total), resolved: num(i.total - i.open) }), i.open > 0),
     cell('operators', () => switchPage('owners'), num(a.operators.length), S('strip.operators'),
       S('strip.operatorsSub', { total: num(a.owners_total), deactivated: num(a.deactivated.length) })),
     cell('twostep', () => switchPage('ghii'), num(a.two_step_on), S('strip.twoStep'),
@@ -145,12 +151,10 @@ export default function SecurityTab(props) {
     async () => { try { await deleteSecurityIncident(id); showOk(S('deleted')); load(); } catch (e) { showErr((e && e.message) || t('common.error')); } },
     { danger: true, title: S('title') },
   );
-  // One name of the incident the update at start opened: whose its records are. Both decisions move
-  // or settle rows for good, so each asks first and says what it will do.
+  // One name of the incident the update at start opened: whose its records are. Both decisions move,
+  // keep or settle rows for good, so each asks first and says what it will do to what the name holds.
   const decide = (id, n, resolution) => confirm(
-    resolution === 'holder'
-      ? S('incidents.held.confirmHolder', { name: n.name, ghii: n.holder_ghii || n.name })
-      : S('incidents.held.confirmPrevious', { name: n.name }),
+    confirmText(n, resolution),
     async () => { try { await resolveHeldName(id, n.name, resolution); showOk(S('incidents.held.decided')); load(); } catch (e) { showErr((e && e.message) || t('common.error')); } },
     { danger: resolution === 'previous', title: S('title') },
   );
@@ -171,16 +175,41 @@ export default function SecurityTab(props) {
       ${failed ? html`<${Note} kind="quiet">${S('loadFailed')}<//>` : html`<${Spinner} />`}`;
   }
 
+  // Sections 01 and 02 always stand first; the rest are numbered as they come, since the records the
+  // update at start left have a section only while such an incident exists.
+  let counter = 2;
+  const n = () => String(++counter).padStart(2, '0');
+  const held = ov.incidents.items.filter(isHeldIncident);
+  const refused = ov.incidents.items.filter(i => !isHeldIncident(i));
   return html`
     <${ConfirmUI} />${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${Note} kind="lead">${S('intro')}<//>
     <${RightNow} ov=${ov} switchPage=${switchPage} />
     <${Strip} ov=${ov} switchPage=${switchPage} />
     <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
-    <${IncidentsSection} ov=${ov} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} onDecide=${decide} switchPage=${switchPage} />
+    ${held.length ? html`<${HeldSection} items=${held} number=${n()} onResolve=${resolve} onDelete=${remove} onDecide=${decide} switchPage=${switchPage} />` : null}
+    <${IncidentsSection} items=${refused} number=${n()} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} />
     <${Columns}>
-      <${AccountsSection} ov=${ov} switchPage=${switchPage} />
-      <${SettingsSection} ov=${ov} switchPage=${switchPage} />
+      <${AccountsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
+      <${SettingsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
     <//>
-    <${AskAiSection} />`;
+    <${AskAiSection} number=${n()} />`;
+}
+
+/**
+ * The question before a decision on one held name, from the kinds of row it holds: what moves to the
+ * holder or stays with them, or what is settled as a deleted account's and deleted.
+ */
+function confirmText(n, resolution) {
+  const rows = (n.actions || 0) + (n.work || 0) + (n.own_lines || 0) + (n.naming_lines || 0) > 0;
+  const installs = (n.cortexes || 0) + (n.ecosystem_apps || 0) > 0;
+  const ghii = n.holder_ghii || n.name;
+  if (resolution === 'holder') {
+    if (!rows) return S('incidents.held.confirmHolderOnlyInstalls', { name: n.name, ghii });
+    return [S('incidents.held.confirmHolder', { name: n.name, ghii }), installs ? S('incidents.held.confirmHolderInstalls') : ''].filter(Boolean).join(' ');
+  }
+  const first = rows
+    ? [S('incidents.held.confirmPrevious', { name: n.name }), installs ? S('incidents.held.confirmPreviousInstalls') : '']
+    : [S('incidents.held.confirmPreviousOnlyInstalls', { name: n.name })];
+  return [...first, S('incidents.held.cannotUndo')].filter(Boolean).join(' ');
 }
