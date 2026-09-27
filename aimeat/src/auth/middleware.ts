@@ -14,6 +14,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-26 — requireAuth asks credentialRevoked of a token it verifies itself, the same questions
+ *     optionalAuth asks, so every route gated by requireAuth refuses what optionalAuth refuses, with
+ *     or without anonymous mode and however the router is mounted.
  *   2026-09-26 — credentialRevoked asks the account question (accountRefuses): a credential counts
  *     only while an account holds its owner name, the account is not deactivated, and the account is
  *     not newer than the credential (auth/credential-age.ts), in one read per token; an app grant's
@@ -416,20 +419,18 @@ export function requireAuth() {
       return;
     }
 
-    // P3-7: Check if the session has been revoked. Reached only when this middleware ran without the
-    // global optionalAuth() ahead of it (unit tests, a router mounted standalone) — in the server
-    // the check above has already happened and this is a second, harmless look.
-    if (verified.sessionId && _sessionStorage) {
-      const revokedSession = await _sessionStorage.isSessionRevoked(verified.sessionId);
-      if (revokedSession) {
-        deny401(req, res, 'Session has been revoked');
-        return;
-      }
+    // This code path verifies the token itself, so it asks every question optionalAuth() asks
+    // (credentialRevoked): the exact token, its session row, its app grant, its ecosystem app and
+    // the account it acts for. It runs whenever no identity was set before it: when optionalAuth()
+    // ran and set none, with anonymous mode off, and when this middleware is mounted without
+    // optionalAuth() ahead of it (a unit test, a router mounted on its own).
+    if (await credentialRevoked(token, verified)) {
+      deny401(req, res, 'The credential is no longer valid');
+      return;
     }
 
-    // The same narrowing optionalAuth does. This branch is reached only when this middleware runs
-    // WITHOUT the global optionalAuth ahead of it (a unit test, a standalone router) — and a path
-    // that skips it is exactly the kind that goes on honouring a permission an owner removed.
+    // The same narrowing optionalAuth does, on the same code path and for the same reason: a
+    // permission the owner removed is not honoured here either.
     req.auth = await withCurrentScopes(_sessionStorage, verified);
     touchAgentLastSeen(verified);
     next();

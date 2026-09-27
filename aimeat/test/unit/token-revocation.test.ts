@@ -25,6 +25,8 @@
  *   asked no account.
  * @usage cd aimeat && pnpm exec vitest run test/unit/token-revocation.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-26 — requireAuth on a router mounted without optionalAuth refuses a token made
+ *     before its account, a signed-out session's and a revoked app grant's, and passes a live one.
  *   v1.1.0 — 2026-09-26 — The account a credential acts for: no account, a deactivated one, and one
  *     made after the credential refuse it, per credential family, and `iat_ms` is written and read.
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, N4).
@@ -169,16 +171,17 @@ describe('a credential counts only while the account it acts for holds its name'
     type Pats = typeof import('../../src/services/access-token.js');
     type OwnerSessions = typeof import('../../src/services/owner-session.js');
 
-    /** The owners, app grants and ecosystem apps tables in miniature. */
+    /** The owners, app grants, ecosystem apps and revoked sessions in miniature. */
     const owners = new Map<string, { name: string; roles: string[]; createdAt: string; disabledAt: string | null }>();
     const grants = new Map<string, { grantId: string; owner: string; createdAt: string; revoked: boolean }>();
     const ecosystemApps = new Map<string, { geai: string; status: string; createdAt: string }>();
+    const revokedSessions = new Set<string>();
     const accounts = {
         ...store,
         getOwner: async (name: string) => owners.get(name) ?? null,
         getAppGrant: async (id: string) => grants.get(id) ?? null,
         getEcosystemApp: async (geai: string) => ecosystemApps.get(geai) ?? null,
-        isSessionRevoked: async () => false,
+        isSessionRevoked: async (sessionId: string) => revokedSessions.has(sessionId),
     } as unknown as Storage;
 
     let j: Jwt;
@@ -332,5 +335,38 @@ describe('a credential counts only while the account it acts for holds its name'
             .toMatchObject({ ok: false, status: 401, code: 'SESSION_REVOKED' });
         expect(ended).toEqual([`sess-${s * 1000 + 200}`]);
         expect(await sessions.refreshOwnerSession(holding(row(s * 1000 + 800)), config, req, res)).toMatchObject({ ok: true });
+    });
+
+    // requireAuth verifies a token itself whenever no identity was set before it: optionalAuth ran and
+    // set none with anonymous mode off, or the router is mounted without optionalAuth, as here. It
+    // asks what credentialRevoked asks: a token made before the account that holds its owner name
+    // now, a token of a signed-out session and a token of a revoked app grant answer 401, and the
+    // account's own token of a live session passes.
+    it('requireAuth refuses what credentialRevoked refuses, on a router mounted without optionalAuth', async () => {
+        const s = second();
+        account('lena', s * 1000 + 500);
+        revokedSessions.add('sid-lena-out');
+        grants.set('g-lena-revoked', { grantId: 'g-lena-revoked', owner: 'lena', createdAt: at(s * 1000 + 600), revoked: true });
+        const gate = mw.requireAuth();
+        const answer = async (token: string): Promise<number> => {
+            let code = 0;
+            let passed = false;
+            const req = {
+                headers: { authorization: `Bearer ${token}` }, method: 'GET', path: '/v1/probe', protocol: 'http',
+                get: (name: string) => (name.toLowerCase() === 'host' ? 'localhost' : undefined),
+            } as unknown as Request;
+            const res = {
+                headersSent: false,
+                status(c: number) { code = c; return res; },
+                json() { return res; },
+                setHeader() { return res; },
+            } as unknown as Response;
+            await gate(req, res, () => { passed = true; });
+            return passed ? 200 : code;
+        };
+        expect(await answer(await signed({ sub: 'lena', owner: 'lena', roles: ['owner'] }, s, s * 1000 + 200)), 'made before the account').toBe(401);
+        expect(await answer(await signed({ sub: 'lena', owner: 'lena', roles: ['owner'], jti: 'sid-lena-out' }, s + 1, (s + 1) * 1000)), 'a signed-out session').toBe(401);
+        expect(await answer(await signed({ sub: `lena@${NODE}`, owner: 'lena', roles: ['app'], app_grant: 'g-lena-revoked' }, s + 1, (s + 1) * 1000)), 'a revoked app grant').toBe(401);
+        expect(await answer(await signed({ sub: 'lena', owner: 'lena', roles: ['owner'], jti: 'sid-lena-in' }, s + 1, (s + 1) * 1000)), 'the account\'s own token').toBe(200);
     });
 });
