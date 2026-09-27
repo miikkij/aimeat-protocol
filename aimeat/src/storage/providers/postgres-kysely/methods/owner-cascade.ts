@@ -36,6 +36,10 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.12.0 — 2026-09-26 — deleteOwnerCascade takes the ecosystem apps the person connected, as it
+ *     takes the agents: each app's identity data, its record with the pinned key, and the automation
+ *     recipes set for it. The apps' identities are named to the work settlement and the ledger rule
+ *     beside the agents'.
  *   v1.11.0 — 2026-09-26 — The work and ledger functions move to work-ledger-erasure.ts, and are
  *     exported again from here, so the operator's decision on a held name (methods/held-names.ts)
  *     reaches them without importing this cascade. settleLeavingPartyWorkDb takes
@@ -353,12 +357,22 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // no GHII pattern would find.
   const ghiis = await db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).execute();
   const agents = await db.selectFrom('Agent').select('gaii').where('owner', '=', name).execute();
+  // The ecosystem apps the person connected act for them under `eco:<app>#<name>@<node>`, as agents do.
+  const ecoApps = await db.selectFrom('EcosystemApp').select('geai').where('owner', '=', name).execute();
+  const actors = [...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
   const pseudonym = erasedPartyPseudonym();
-  await settleErasedPartyWorkDb(db, name, ghiis.map(g => g.ghii), pseudonym, agents.map(a => a.gaii));
+  await settleErasedPartyWorkDb(db, name, ghiis.map(g => g.ghii), pseudonym, actors);
 
-  // Per-identity data: agents first, then the person's own GHIIs.
+  // Per-identity data: agents first, then the ecosystem apps, then the person's own GHIIs.
   for (const a of agents) await cascadeDeleteIdentityData(db, a.gaii);
   await db.deleteFrom('Agent').where('owner', '=', name).execute();
+
+  // An ecosystem app goes as an agent does: what it holds, then its record with the key pinned at its
+  // first connection, and the automation recipes the person set for it. Every credential of the app
+  // stops with its record (auth/middleware.ts ecosystemAppGone).
+  for (const e of ecoApps) await cascadeDeleteIdentityData(db, e.geai);
+  await db.deleteFrom('EcosystemApp').where('owner', '=', name).execute();
+  await db.deleteFrom('EcoAutomationRecipe').where('owner', '=', name).execute();
 
   for (const g of ghiis) await cascadeDeleteIdentityData(db, g.ghii);
 
@@ -389,7 +403,7 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   await pseudonymiseProvenanceOwnerDb(db, name, ghiis.map(g => g.ghii), pseudonym);
   // So do the other side's ledger lines: the person's own went with the passes above, and the lines
   // in other people's ledgers name them by the same pseudonym.
-  await pseudonymiseLedgerPartyDb(db, erasedAccountParty(name, ghiis.map(g => g.ghii), pseudonym, agents.map(a => a.gaii)));
+  await pseudonymiseLedgerPartyDb(db, erasedAccountParty(name, ghiis.map(g => g.ghii), pseudonym, actors));
 
   await db.deleteFrom('Ghii').where('ownerName', '=', name).execute();
 

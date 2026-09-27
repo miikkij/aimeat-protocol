@@ -14,6 +14,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-26 — credentialRevoked asks a fifth question: an ecosystem app's token counts only while
+ *     the app record it names is there, active, and not newer than the token (ecosystemAppGone), so
+ *     every credential of an app goes with its record, also when its account is deleted.
  *   2026-09-24 — requireOperatorPrincipal asks services/operator-principal.ts askOperator(), the operator
  *     question the tool surface and the services ask too (security audit A8-1). Its refusals and
  *     their codes are the same.
@@ -262,12 +265,27 @@ async function ownerDisabled(verified: VerifiedToken): Promise<boolean> {
 }
 
 /**
- * Is this credential dead? Four ways a JWT stops being one, and a door that asks fewer than four
- * questions is a door the revoked keep opening:
+ * Is the ecosystem app this token names gone? An app acts under `eco:<app>#<owner>@<node>`, built
+ * from the account name, and the name is released for reuse. So a token counts only while its app
+ * record is there and active, and only when the record is not newer than the token: a record made
+ * later is a later connection that reuses the identity, and the older token is not its credential.
+ * One keyed read per ecosystem request, uncached for the same reason as the checks above.
+ */
+async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
+  if (!verified.roles.includes('ecosystem') || !_sessionStorage) return false;
+  const app = await _sessionStorage.getEcosystemApp(verified.sub);
+  if (!app || app.status !== 'active') return true;
+  return verified.iat !== undefined && Math.floor(Date.parse(app.createdAt) / 1000) > verified.iat;
+}
+
+/**
+ * Is this credential dead? Five ways a JWT stops being one, and an endpoint that asks fewer than
+ * five questions is one the revoked keep opening:
  *   - the exact token was revoked          (POST /v1/auth/revoke)
  *   - its session row was revoked          (sign out, sign out everywhere, deleting the agent)
  *   - its app grant was revoked            (the owner pressed Revoke on the app)
- *   - the owner it acts for is deactivated (BR-04 — SCIM active:false, the admin disable door)
+ *   - the owner it acts for is deactivated (BR-04 — SCIM active:false, the admin disable endpoint)
+ *   - its ecosystem app is gone            (disconnected, or its account deleted)
  *
  * Exported because verifying a JWT is not only Express's job. The WebSocket upgrade for the connect
  * tunnel (src/index-start.ts) cannot run middleware on a raw socket, so it verified the token by
@@ -279,6 +297,7 @@ export async function credentialRevoked(token: string, verified: VerifiedToken):
   if (await isRevoked(token)) return true;
   if (await sessionRevoked(verified)) return true;
   if (await appGrantRevoked(verified)) return true;
+  if (await ecosystemAppGone(verified)) return true;
   // Fourth question (BR-04): a deactivated owner's credentials are dead even when the token
   // itself was never individually revoked — MCP OAuth tokens carry no session row at all, and
   // this is the only door that catches them.

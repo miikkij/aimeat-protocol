@@ -7827,7 +7827,10 @@ paths:
         x-signature header. The cortexes the account installed go with it: each record, what its
         activation made (its actions, schema locks, boards, and prompt, ontology and seed records),
         and its lib files, kept versions and dependency edges, so the account name and the cortex
-        name are both free again.
+        name are both free again. So do the ecosystem apps the account connected: each app's record
+        with its pinned key, what the app wrote and published, and the automation recipes set for
+        it. Every token such an app holds is refused from then on, also after the name is
+        registered again and an app of the same name is connected.
       tags: [Identity]
       security:
         - BearerAuth: []

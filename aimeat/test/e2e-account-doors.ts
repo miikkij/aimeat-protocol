@@ -23,9 +23,12 @@
  *   Phase 10 POST /v1/agents/connect (connectivity key)
  *   Phase 11 401 and 403 on every door
  *   Phase 12 erasure: a name registered again inherits no action published in person, no work, no
- *            line in the other side's ledger and no cortex
+ *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.8.0 — 2026-09-26 — 61: when an account is deleted, its ecosystem apps go with it: the name
+ *     registered again lists none and reads nothing they wrote, and the old app's token is refused,
+ *     also after the new holder connects an app of the same name; the new holder's own app works.
  *   v1.7.0 — 2026-09-26 — 60: when an account is deleted, its cortex goes with it: no lib of it is
  *     served, the name registered again can neither read nor switch it off, and the cortex name
  *     installs anew, its pinned version serving the new bytes.
@@ -1288,6 +1291,61 @@ spec:
     assert(off.status === 404, `the freed name acts on the previous person's cortex: ${off.status}`);
     assert(reinstall.status === 201, `the cortex name does not install anew: ${reinstall.status} ${JSON.stringify(reinstall.body?.error)}`);
     assert(onAgain.status === 200 && pinnedText.includes('from the second'), `the pinned address serves another person's bytes: ${pinnedAgain.status} ${pinnedText.slice(0, 80)}`);
+});
+
+// An ecosystem app connected to an account acts under an identity built from the account name,
+// `eco:<app>#<name>@<node>`, and the name is released for reuse. The app's record, its pinned key,
+// what it wrote and every credential it holds go with the account: the name registered again lists
+// no app, sees nothing the old app wrote, and the old app's token is refused, also after the new
+// holder connects an app of the same name, which gets the same identity.
+await test('61. When an account is deleted, its ecosystem apps go with it: the freed name lists none, and the old app\'s token is refused', async () => {
+    const first = await setupOwner('ecogone');
+    const app = `acctdoor-eco-${Date.now().toString(36)}`;
+    const connect = async (o: Owner) => {
+        const hello = await json('/v1/ecosystem-apps/hello', {
+            method: 'POST',
+            body: JSON.stringify({ owner: o.name, app, display_name: 'Account deletion test app', public_key: Buffer.from(`key-of-${o.token.slice(-8)}`).toString('base64'), scopes: ['memory:read', 'memory:write'] }),
+        });
+        assert(hello.status === 200, `hello ${hello.status}: ${JSON.stringify(hello.body?.error)}`);
+        const ok = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+            method: 'POST', headers: auth(o.token), body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+        });
+        assert(ok.status === 200 && ok.body.data?.status === 'approved', `approve ${ok.status}: ${JSON.stringify(ok.body)}`);
+        const tok = await json('/v1/ecosystem-apps/token', {
+            method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+        });
+        assert(tok.status === 200 && typeof tok.body.access_token === 'string', `app token ${tok.status}: ${JSON.stringify(tok.body)}`);
+        return { geai: ok.body.data.geai as string, token: tok.body.access_token as string };
+    };
+    const write = (token: string, key: string, from: string) => json('/v1/memory', {
+        method: 'POST', headers: auth(token), body: JSON.stringify({ key, value: { from }, visibility: 'private' }),
+    });
+    const key = `acctdoor.eco.${Date.now().toString(36)}`;
+
+    const old = await connect(first);
+    const wrote = await write(old.token, key, 'the first account');
+    assert(wrote.status === 201 && wrote.body.data?.owner_gaii === old.geai, `the app writes under its own identity: ${wrote.status} ${JSON.stringify(wrote.body?.data ?? wrote.body?.error)}`);
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    const again = await registerAgain(first.name);
+
+    const found: string[] = [];
+    const listed = ((await json('/v1/ecosystem-apps', { headers: auth(again.token) })).body.data?.ecosystem_apps ?? []) as any[];
+    if (listed.length) found.push(`the freed name lists ${JSON.stringify(listed.map(a => `${a.geai} (${a.status})`))}`);
+    const replay = await write(old.token, `${key}.after`, 'the old app, after the deletion');
+    if (replay.status !== 401) found.push(`the old token wrote after the deletion: ${replay.status}, as ${replay.body.data?.owner_gaii ?? JSON.stringify(replay.body?.error)}`);
+    const seen = ((await json('/v1/memory', { headers: auth(again.token) })).body.data?.items ?? []) as any[];
+    const inherited = seen.filter(i => String(i.key).startsWith(key)).map(i => `${i.key} under ${i.owner_gaii}`);
+    if (inherited.length) found.push(`the freed name reads what the old app wrote: ${JSON.stringify(inherited)}`);
+    const fresh = await connect(again);
+    const replayAfter = await write(old.token, `${key}.fresh`, 'the old app, after the new holder connected the same app');
+    if (replayAfter.status !== 401) found.push(`the old token wrote after the new holder connected an app of the same name (${fresh.geai === old.geai ? 'same identity' : 'another identity'}): ${replayAfter.status}, as ${replayAfter.body.data?.owner_gaii ?? JSON.stringify(replayAfter.body?.error)}`);
+    const control = await write(fresh.token, `${key}.new`, 'the new holder\'s app');
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+
+    assert(found.length === 0, found.join('; '));
+    assert(control.status === 201, `the new holder's own app is refused: ${control.status} ${JSON.stringify(control.body?.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
