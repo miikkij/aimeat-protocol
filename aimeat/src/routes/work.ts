@@ -12,6 +12,8 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.4.3 — 2026-09-26 — createWorkItem refuses INVALID_INPUT (400) when provider_gaii is not a full
+ *     identity (a GHII, a GAII or a GEAI), for every work endpoint and MCP tool (secaudit 2026-09, R4 5).
  *   v1.4.2 — 2026-09-26 — createWorkItem asks refuseWorkBetween (services/work-parties.ts) for SELF_WORK
  *     and SAME_OWNER_WORK, the same function EXCHANGE agent work asks (secaudit 2026-09, R4 5).
  *   v1.4.1 — 2026-09-26 — createWorkItem refuses SAME_OWNER_WORK when the requester and the provider
@@ -47,6 +49,7 @@ import type { MailboxNotificationService } from '../services/mailbox-notificatio
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
 import { isForeignPrincipal, resolveIdentity } from '../utils/gaii.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
+import { isIdentityShaped } from '../services/local-identity.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow } from '../services/morsel.js';
@@ -97,6 +100,18 @@ export async function createWorkItem(
 
   if (!action_id || !provider_gaii || input === undefined) {
     return { error: 'action_id, provider_gaii, and input are required', status: 400, code: 'INVALID_INPUT' };
+  }
+
+  // The provider is named by its full identity: a person's GHII, an agent's GAII or an ecosystem app's
+  // GEAI. A bare account name identifies no principal, so no caller could accept the work, and the
+  // requester's escrow would wait for the TTL. The shape test is the one the address book and direct
+  // messages use (services/local-identity.ts).
+  if (!isIdentityShaped(provider_gaii)) {
+    return {
+      error: 'provider_gaii must be a full identity: a person\'s GHII (name@node), an agent\'s GAII (agent#name@node) or an ecosystem app\'s GEAI (eco:app#name@node)',
+      status: 400,
+      code: 'INVALID_INPUT',
+    };
   }
 
   // SECURITY: no work with yourself (trust score manipulation), and none between two principals of
