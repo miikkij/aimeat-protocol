@@ -18,7 +18,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { deflateRawSync, crc32 } from 'node:zlib';
-import { buildExtensionRecordFromManifest } from '../../src/routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from '../../src/services/extension-manifest.js';
 import { parseExtensionZip } from '../../src/services/upload-zip.js';
 import type { AimeatConfig } from '../../src/config.js';
 

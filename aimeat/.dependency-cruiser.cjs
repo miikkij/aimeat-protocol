@@ -27,6 +27,13 @@
 module.exports = {
     forbidden: [
         {
+            name: 'manifest-is-transport-independent',
+            comment: 'The shared extension builder belongs below routes and CLI adapters.',
+            severity: 'error',
+            from: { path: '^src/services/extension-manifest[.]ts$' },
+            to: { path: '^src/(routes|cli|mcp)/', dependencyTypesNot: ['type-only'] },
+        },
+        {
             name: 'no-circular',
             comment:
                 'A cycle means neither module can be understood, tested or moved without the other. '

@@ -1,6 +1,6 @@
 /**
  * @file extension-manifest.test.ts
- * @description The extension manifest builder (routes/extensions/manifest.ts) and the package ZIP
+ * @description The extension manifest builder (services/extension-manifest.ts) and the package ZIP
  *   manifest parse (services/package-zip.ts), on the two traps appdev builders were told to work
  *   around on 2026-09-13:
  *     - a description with an unquoted `: ` breaks the YAML, and both doors threw the parser's line
@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ZipArchive } from 'archiver';
-import { buildExtensionRecordFromManifest } from '../../src/routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from '../../src/services/extension-manifest.js';
 import { parseZip, ZipValidationError } from '../../src/services/package-zip.js';
 import { SECRET_KEYS_FIELD } from '../../src/services/extension-secrets.js';
 import type { AimeatConfig } from '../../src/config.js';

@@ -49,7 +49,7 @@
 
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from '../routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from './extension-manifest.js';
 import YAML from 'yaml';
 import type { Storage, PackageComponentType, CortexComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';

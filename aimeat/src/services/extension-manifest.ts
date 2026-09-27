@@ -1,10 +1,11 @@
 /**
- * @file src/routes/extensions/manifest.ts
+ * @file src/services/extension-manifest.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.2 -- 2026-09-27 -- Move the shared builder out of the route layer; behavior unchanged.
  *   v1.7.1 — 2026-09-26 — The installer named in the config.app check comes from localAccountName
  *                         (utils/gaii.ts), which keeps an identity of another node whole, so it never
  *                         names the local namesake (secaudit 2026-09, F-1).
@@ -32,13 +33,13 @@
  *     `commercial` {payMorsels, payMoney} for priced raw calls (design notes doc-r6tyr3o, C1/M1)
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  */
-import type { AimeatConfig } from '../../config.js';
-import type { ExtensionRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../config.js';
+import type { ExtensionRecord } from '../storage/interface.js';
 import { parse as parseYaml } from 'yaml';
-import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from '../../services/extension-secrets.js';
-import { MONEY_CURRENCIES } from '../../commerce/money.js';
-import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from '../../services/extension-workspace-declaration.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from './extension-secrets.js';
+import { MONEY_CURRENCIES } from '../commerce/money.js';
+import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
 export type ExtBuildResult =

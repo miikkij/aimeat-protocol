@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { BUILTIN_EXTENSIONS } from '../../src/data/builtin-extensions/index.js';
-import { buildExtensionRecordFromManifest } from '../../src/routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from '../../src/services/extension-manifest.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const config = {

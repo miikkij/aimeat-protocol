@@ -20,7 +20,7 @@
  *     so every extension that gates an app was refused on the presigned path, which is the path
  *     an author is told to use. parseCortexZip below has taken an ownerName from the start.
  *   v1.2.0 — 2026-07-26 — parseExtensionZip delegates validation + record building to the shared
- *     buildExtensionRecordFromManifest (routes/extensions/manifest.ts) instead of keeping a thinner
+ *     buildExtensionRecordFromManifest (services/extension-manifest.ts) instead of keeping a thinner
  *     third copy. The copy had drifted: per-action pricing (tollMorsels / commercial / ODPS), the
  *     pricing validator, instances validation and the `type: secret` config marker were all missing,
  *     so a priced EXCHANGE capability became free just by being installed as a ZIP.
@@ -31,7 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { parseCortexManifest } from './cortex-manifest.js';
 import { isUnsafeName } from './safe-zip.js';
-import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from './extension-manifest.js';
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const MAX_FILES = 50;

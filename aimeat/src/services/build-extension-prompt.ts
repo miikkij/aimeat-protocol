@@ -221,7 +221,7 @@ function sandboxSection(): string {
   ].join('\n');
 }
 
-/** The manifest contract, transcribed from routes/extensions/manifest.ts. */
+/** The manifest contract, transcribed from services/extension-manifest.ts. */
 function manifestSection(owner: string): string {
   return [
     '## The manifest',

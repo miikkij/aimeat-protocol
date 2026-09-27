@@ -35,7 +35,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
-import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from './extension-manifest.js';
 import { writeExtensionRecord, activateExtension } from './extension-lifecycle.js';
 import { BUILTIN_EXTENSIONS, type BuiltinExtension } from '../data/builtin-extensions/index.js';
 import { logger } from '../utils/logger.js';
