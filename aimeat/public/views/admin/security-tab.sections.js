@@ -2,12 +2,21 @@
  * @file security-tab.sections.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Sections 03 to 06 of the admin Security page: what was refused and kept (one row per
- *   incident, the one loud action on the open one), who holds the keys (rows in words with a door to
- *   the page that acts), what the doors are set to (the security settings read as sentences, each
- *   with a door to Settings), and the paste for the operator's own AI.
- * @structure IncidentsSection · AccountsSection · SettingsSection · AskAiSection
+ * @description The sections after 02 of the admin Security page, numbered by the page: the records
+ *   the update at start left as they were (only while such an incident exists), what was refused and
+ *   kept (one row per incident, the one loud action on the open one), who holds the keys (rows in
+ *   words with a button to the page that acts), the security settings (read as sentences, each with a
+ *   button to Settings), and the paste for the operator's own AI.
+ * @structure HeldSection · IncidentsSection · AccountsSection · SettingsSection · AskAiSection · isHeldIncident
  * @version-history
+ *   v2.2.0 — 2026-09-26 — The incident the update at start opens has a section of its own (HeldSection),
+ *     with its own heading and a lead for while a name is to decide and one for when every name is
+ *     decided; its row says how many names are still to decide, or that every name is decided. Under
+ *     it the names keep their columns on a phone (keepCols), each count stands on its own line with
+ *     the kinds a name has none of left out, the cortexes and ecosystem apps are counted, a name with
+ *     ecosystem apps says they can still act for the account until you decide, and the two buttons
+ *     stand under the row, so the name keeps its column at every width. The marks are one short word.
+ *     Section numbers come from the page.
  *   v2.1.0 — 2026-09-26 — The incident the update at start opens lists under its row each name to
  *     decide, with its counts, its holder and its two buttons ("It belongs to the current holder", "It
  *     was a previous holder's"), then the hook bindings that point at actions that no longer exist and
@@ -31,7 +40,7 @@ import { num, dt, fmtBytes } from './shared.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { buildSecurityPrompt } from './security-tab.prompt.js';
 import { Section } from '/components/Section.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Mark, Code } from '/components/Mark.js';
 import { Readings } from '/components/Readings.js';
@@ -81,10 +90,32 @@ function boundNote(n) {
   return S('incidents.held.bound', { list: hookList(n.bindings) });
 }
 
+/** What a held name holds, one count per line, the kinds it has none of left out. */
+function countLines(n) {
+  return [
+    ['countActions', n.actions], ['countWork', n.work], ['countOwn', n.own_lines], ['countNaming', n.naming_lines],
+    ['countCortexes', n.cortexes], ['countApps', n.ecosystem_apps],
+  ].filter(([, v]) => (v || 0) > 0).map(([key, v]) => S('incidents.held.' + key, { n: num(v) }));
+}
+
+/** The coral line under a held name: its ecosystem apps act for the account until you decide, and its hooks. */
+function nameNote(n) {
+  const apps = n.ecosystem_apps || 0;
+  const acting = n.status === 'open' && apps > 0
+    ? (apps === 1 ? S('incidents.held.appsActOne') : S('incidents.held.appsActMany', { n: num(apps) }))
+    : '';
+  return [acting, boundNote(n)].filter(Boolean).join(' ') || undefined;
+}
+
+/** The mark of a held name: still to decide, or whose its records were. */
+const nameMark = (n) => S(n.status === 'open' ? 'incidents.held.toDecide' : n.status === 'holder' ? 'incidents.held.decidedHolder' : 'incidents.held.decidedPrevious');
+
 /**
- * Under the incident the update at start opened: each name to decide, with its two buttons while it
- * is open; then the hook bindings that point at actions that no longer exist, and the values left as
- * they are. The decisions are the page's only new control, in the incident's own row pattern.
+ * Under an incident of section "Records older than the account": each name to decide, its counts one
+ * per line, its holder, and its two buttons under it while it is open; then the hook bindings that
+ * point at actions that no longer exist, and the values left as they are. The names keep the cut's
+ * own columns on a phone. The buttons stand under the row (on a phone under the name), so the name
+ * keeps its column at every width.
  */
 function HeldNames({ i, onDecide }) {
   const names = i.names || [];
@@ -93,65 +124,95 @@ function HeldNames({ i, onDecide }) {
   const untiedItem = (u) => (u.lines === 1 ? S('incidents.held.untiedOne', { value: u.value }) : S('incidents.held.untiedMany', { value: u.value, lines: num(u.lines) }));
   return html`
     ${names.length ? html`
-      <${List} under dense cols="state-name-who-doors" rows=${names} render=${(n) => html`
-        <${Row} key=${n.name}>
-          <${Cell} line><${Mark} kind="status" tone=${n.status === 'open' ? 'danger' : 'fine'}>${S(n.status === 'open' ? 'incidents.held.toDecide' : n.status === 'holder' ? 'incidents.held.decidedHolder' : 'incidents.held.decidedPrevious')}<//><//>
-          <${Name} desc=${S('incidents.held.counts', { actions: num(n.actions), work: num(n.work), own: num(n.own_lines), naming: num(n.naming_lines) })}
-            note=${boundNote(n)}>${n.name}<//>
+      <${List} under dense keepCols cols="state-name-who-doors" rows=${names} render=${(n) => {
+        const open = n.status === 'open';
+        return html`
+        <${Row} key=${n.name} below=${open ? html`
+          <${Actions} tight>
+            <${Action} small onClick=${() => onDecide(i.id, n, 'holder')}>${S('incidents.held.decideHolder')}<//>
+            <${Action} small tone="danger" onClick=${() => onDecide(i.id, n, 'previous')}>${S('incidents.held.decidePrevious')}<//>
+          <//>` : undefined}>
+          <${Cell} line><${Mark} kind="status" tone=${open ? 'danger' : 'fine'}>${nameMark(n)}<//><//>
+          <${Name} desc=${countLines(n)} note=${nameNote(n)}>${n.name}<//>
           <${Who}>${holderLine(n)}<//>
-          <${Doors}>
-            ${n.status === 'open' ? html`
-              <${Action} small onClick=${() => onDecide(i.id, n, 'holder')}>${S('incidents.held.decideHolder')}<//>
-              <${Action} small tone="danger" onClick=${() => onDecide(i.id, n, 'previous')}>${S('incidents.held.decidePrevious')}<//>` : null}
-          <//>
-        <//>`} />` : null}
+          ${open ? null : html`<${Doors} />`}
+        <//>`;
+      }} />` : null}
     ${left.length ? html`<${Note} kind="quiet">${S('incidents.held.bindingsLeft', { list: left.map(b => `${b.hook} → ${b.ref}`).join(', ') })}${left.some(b => b.gate) ? ' ' + S('incidents.held.bindingsLeftGate') : ''}<//>` : null}
     ${untied.length ? html`<${Note} kind="quiet">${S('incidents.held.untied', { list: untied.map(untiedItem).join(', ') })}<//>` : null}`;
 }
 
-export function IncidentsSection({ ov, onResolve, onDelete, onPayload, onDecide, switchPage }) {
-  const { items, open } = ov.incidents;
-  const lastResolved = items.map(i => i.resolvedAt).filter(Boolean).sort().pop();
-  const typeWord = (type) => tOr('admin.security.incidents.type.' + type, type);
-  const sourceWord = (source) => source ? tOr('admin.security.incidents.source.' + source, source) : '';
+/** An incident whose names are decided one by one: the update at start opened it. */
+export const isHeldIncident = (i) => Array.isArray(i.names);
+
+const typeWord = (type) => tOr('admin.security.incidents.type.' + type, type);
+const sourceWord = (source) => source ? tOr('admin.security.incidents.source.' + source, source) : '';
+const whenLine = (i) => `${dt(i.createdAt)}${i.resolvedAt ? ' · ' + S('incidents.resolvedOn', { date: dt(i.resolvedAt) }) : ''}`;
+
+/**
+ * The section of the records the update at start left as they were, while such an incident exists:
+ * its heading and its lead (one for while a name is to decide, one for when every name is decided),
+ * then each incident in the incidents' own row, its names under it. It closes with its last name, so
+ * neither Resolve nor Delete stands beside a name still to decide.
+ */
+export function HeldSection({ items, number, onResolve, onDelete, onDecide, switchPage }) {
+  const anyOpen = items.some(i => i.status === 'open');
   return html`
-    <${Section} id="adm-sec-03" num="03" title=${S('incidents.title')}>
+    <${Section} id="adm-sec-names" num=${number} title=${S('incidents.held.title')}>
+      <${Note} kind="lead">${S(anyOpen ? 'incidents.held.lead' : 'incidents.held.leadResolved')}<//>
+      <${List} cols="state-name-who-when-doors" rows=${items} render=${(i) => {
+        const names = i.names || [];
+        const undecided = names.filter(n => n.status === 'open').length;
+        const line = undecided ? S('incidents.held.rowOpen', { n: num(undecided), total: num(names.length) }) : names.length ? S('incidents.held.rowResolved') : undefined;
+        return html`
+        <${Row} key=${i.id} below=${html`<${HeldNames} i=${i} onDecide=${onDecide} />`}>
+          <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>
+          <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${line}>${typeWord(i.type)}<//>
+          <${Who}>${sourceWord(i.source)}<//>
+          <${When}>${whenLine(i)}<//>
+          <${Doors}>
+            ${(i.bindings_left || []).length ? html`<${Action} small soft onClick=${() => switchPage('hooks')}>${t('dashboard.hooks')}<//>` : null}
+            ${i.status === 'open' && !undecided ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
+            ${!undecided ? html`<${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>` : null}
+          <//>
+        <//>`;
+      }} />
+    <//>`;
+}
+
+/** Section "Refused and kept": the incidents of refused uploads, whose bytes were kept when small enough. */
+export function IncidentsSection({ items, number, onResolve, onDelete, onPayload }) {
+  const open = items.filter(i => i.status === 'open').length;
+  const lastResolved = items.map(i => i.resolvedAt).filter(Boolean).sort().pop();
+  return html`
+    <${Section} id="adm-sec-03" num=${number} title=${S('incidents.title')}>
       <${Note} kind="lead">${S('incidents.lead')}<//>
       ${items.length === 0 ? html`<${Note} kind="quiet">${S('incidents.none')}<//>` : null}
       ${items.length > 0 && open === 0 ? html`<${Note} kind="quiet">${lastResolved ? S('incidents.noneOpen', { date: fmtDate(lastResolved) }) : S('incidents.noneOpenPlain')}<//>` : null}
       ${items.length > 0 ? html`
-        <${List} cols="state-name-who-when-doors" rows=${items} render=${(i) => {
-          // The update at start opens an incident whose names are decided one by one; it closes with
-          // the last, so neither Resolve nor Delete stands beside a name still to decide.
-          const held = Array.isArray(i.names);
-          const undecided = held && i.names.some(n => n.status === 'open');
-          return html`
-          <${Row} key=${i.id} below=${held ? html`<${HeldNames} i=${i} onDecide=${onDecide} />` : undefined}>
+        <${List} cols="state-name-who-when-doors" rows=${items} render=${(i) => html`
+          <${Row} key=${i.id}>
             <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>
-            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${held ? S('incidents.held.lead') : (i.detail || undefined)}>${typeWord(i.type)}<//>
-            ${held
-              ? html`<${Who}>${sourceWord(i.source)}<//>`
-              : html`<${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>`}
-            <${When}>${dt(i.createdAt)}${i.resolvedAt ? ' · ' + S('incidents.resolvedOn', { date: dt(i.resolvedAt) }) : ''}<//>
+            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${i.detail || undefined}>${typeWord(i.type)}<//>
+            <${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>
+            <${When}>${whenLine(i)}<//>
             <${Doors}>
               ${i.quarantine_key ? html`<${Action} small onClick=${() => onPayload(i.id)}>${S('incidents.payload')}<//>` : null}
-              ${held && (i.bindings_left || []).length ? html`<${Action} small soft onClick=${() => switchPage('hooks')}>${t('dashboard.hooks')}<//>` : null}
-              ${i.status === 'open' && !undecided ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
-              ${!undecided ? html`<${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>` : null}
+              ${i.status === 'open' ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
+              <${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>
             <//>
-          <//>`;
-        }} />` : null}
+          <//>`} />` : null}
     <//>`;
 }
 
-export function AccountsSection({ ov, switchPage }) {
+export function AccountsSection({ ov, number, switchPage }) {
   const a = ov.accounts;
   const deactivated = a.deactivated.length;
   const list = a.deactivated
     .map(d => `${d.name} (${d.since ? fmtDate(d.since) : '?'}${d.by ? ', ' + d.by : ''})`)
     .join(', ');
   return html`
-    <${Section} id="adm-sec-04" num="04" title=${S('accounts.title')}
+    <${Section} id="adm-sec-04" num=${number} title=${S('accounts.title')}
       doors=${html`<${Action} small soft onClick=${() => switchPage('owners')}>${t('dashboard.owners')}<//>`}>
       <${Readings} rows=${[
         doorRow('operators', {
@@ -183,14 +244,14 @@ export function AccountsSection({ ov, switchPage }) {
     <//>`;
 }
 
-export function SettingsSection({ ov, switchPage }) {
+export function SettingsSection({ ov, number, switchPage }) {
   const s = ov.settings;
   const log = ov.now.log;
   const windowWord = (ms) => ms === 60000 ? S('settings.aMinute') : S('settings.perSeconds', { s: Math.round(ms / 1000) });
   const toConfig = () => switchPage('config');
   const apps = ov.apps ? appsLine(ov.apps) : null;
   return html`
-    <${Section} id="adm-sec-05" num="05" title=${S('settings.title')}
+    <${Section} id="adm-sec-05" num=${number} title=${S('settings.title')}
       doors=${html`<${Action} small soft onClick=${toConfig}>${t('dashboard.config')}<//>`}>
       <${Note} kind="lead">${S('settings.lead')}<//>
       <${Readings} rows=${[
@@ -245,10 +306,10 @@ export function SettingsSection({ ov, switchPage }) {
     <//>`;
 }
 
-export function AskAiSection() {
+export function AskAiSection({ number }) {
   const paste = buildSecurityPrompt({ url: getNodeUrl() });
   return html`
-    <${Section} id="adm-sec-06" num="06" title=${S('ai.title')}
+    <${Section} id="adm-sec-06" num=${number} title=${S('ai.title')}
       doors=${html`<${Action} small soft copy=${paste}>${S('ai.copy')}<//>`}>
       <${Note} kind="lead">${S('ai.lead')}<//>
       <${SettingBox} label=${S('ai.label')}>
