@@ -29,6 +29,8 @@
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
+ *   v1.3.0 — 2026-09-26 — `modes.work` makes the fake peer answer POST /v1/work/request with a 500, so
+ *     a suite can route a call to a far end that answers with an error.
  *   v1.2.0 — 2026-09-26 — The fake peer records the relay claim it received (`relayClaim`, the claim's
  *     JSON decoded), so a suite can read who the claim names as the caller.
  *   v1.1.0 — 2026-09-16 — The fake peer records the Authorization header it received.
@@ -167,6 +169,7 @@ export const modes = {
     settle: 'ok' as 'ok' | 'fail',
     catalogue: 'ok' as 'ok' | 'resync' | 'fail',
     replicate: 'ok' as 'ok' | 'fail',
+    work: 'ok' as 'ok' | 'fail',
 };
 
 /** Every request the fake peer received, so an outbound body can be held to what was claimed. */
@@ -224,7 +227,11 @@ export function startFakePeer(): Promise<{ server: Server; url: string }> {
                 return;
             }
             if (path === '/v1/federation/templates') { send(res, 404, { ok: false, error: { code: 'NOT_FOUND' } }); return; }
-            if (path === '/v1/work/request') { send(res, 201, { ok: true, data: { tracking_code: 'tc-fake-001' } }); return; }
+            if (path === '/v1/work/request') {
+                if (modes.work === 'fail') { send(res, 500, { ok: false, error: { code: 'PEER_BROKEN' } }); return; }
+                send(res, 201, { ok: true, data: { tracking_code: 'tc-fake-001' } });
+                return;
+            }
             if (path.startsWith('/v1/agents/')) { send(res, 200, { ok: true, data: { agent: { gaii: decodeURIComponent(path.slice(11)) } } }); return; }
             if (path === '/v1/federation/route') { send(res, 200, { ok: true, data: { relayed: true } }); return; }
             send(res, 200, { ok: true, data: { echo: path } });

@@ -44,6 +44,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The routing fee is taken only for a route that is made, on the three endpoints
+ *     that route: nothing for a refused address, back again for an unreachable node or an error
+ *     response, and no route at all for a person whose balance cannot cover it.
  *   v1.5.0 — 2026-09-26 — A route a person starts in person names their full identity in the claim to
  *     the target and in the claim to a relaying peer, and the routing fee is filed under it (secaudit
  *     2026-09, R3 9).
@@ -604,6 +607,109 @@ async function run(): Promise<void> {
             body: JSON.stringify({ target_node: SSRF_ID, action_id: 'a', provider_gaii: 'p@q', input: {} }),
         });
         assert(blocked.status === 400 && blocked.body.error?.code === 'INVALID_URL', `ssrf target: ${blocked.status} ${JSON.stringify(blocked.body)}`);
+    });
+
+    // ─── The routing fee is taken only for a route that is made ───
+    // One morsel paces a call to another node. It is taken when the call goes out, it goes back when
+    // the far end cannot be reached or responds with an error, and a person whose balance cannot cover
+    // it is not routed at all. The same rule on every endpoint that routes: work asked of a provider on
+    // a peer, POST /v1/federation/route and POST /v1/federation/cross-node/work.
+    const walletOf = async (token: string): Promise<number> =>
+        (await A.json('/v1/wallet', { headers: auth(token) })).body.data.balance;
+    const linesOf = async (token: string, type: string): Promise<any[]> =>
+        (await A.json(`/v1/wallet/transactions?type=${type}&per_page=200`, { headers: auth(token) })).body.data?.transactions ?? [];
+
+    await test('work asked of a provider on a peer: a refused address and an unreachable node cost nothing', async () => {
+        const before = await walletOf(A.ownerToken);
+        const blocked = await A.json('/v1/work/request', {
+            method: 'POST', headers: auth(A.ownerToken),
+            body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${SSRF_ID}`, input: { q: 'blocked' } }),
+        });
+        assert(blocked.status === 400 && blocked.body.error?.code === 'INVALID_URL', `blocked: ${blocked.status} ${JSON.stringify(blocked.body)}`);
+        const afterBlocked = await walletOf(A.ownerToken);
+        assert(afterBlocked === before, `a refused address took the routing fee: ${before} → ${afterBlocked}`);
+        const blockedFees = (await linesOf(A.ownerToken, 'routing_fee')).filter((t: any) => t.tracking_code === `route:${SSRF_ID}`);
+        assert(blockedFees.length === 0, `a refused address wrote a routing fee line: ${JSON.stringify(blockedFees)}`);
+
+        const dead = await A.json('/v1/work/request', {
+            method: 'POST', headers: auth(A.ownerToken),
+            body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${DEAD_ID}`, input: { q: 'dead' } }),
+        });
+        assert(dead.status === 502 && dead.body.error?.code === 'REMOTE_UNREACHABLE', `dead: ${dead.status} ${JSON.stringify(dead.body)}`);
+        const afterDead = await walletOf(A.ownerToken);
+        assert(afterDead === before, `an unreachable node kept the routing fee: ${before} → ${afterDead}`);
+        const back = (await linesOf(A.ownerToken, 'routing_fee_return')).filter((t: any) => t.tracking_code === `route:${DEAD_ID}`);
+        assert(back.length === 1 && back[0].amount === 1, `the fee went back with a line of its own: ${JSON.stringify(back)}`);
+    });
+
+    await test('work asked of a provider on a peer: the fee stays when the peer takes the work, and goes back on an error answer', async () => {
+        const before = await walletOf(A.ownerToken);
+        const made = await A.json('/v1/work/request', {
+            method: 'POST', headers: auth(A.ownerToken),
+            body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'made' } }),
+        });
+        assert(made.status === 201, `the peer takes the work: ${made.status} ${JSON.stringify(made.body)}`);
+        const afterMade = await walletOf(A.ownerToken);
+        assert(afterMade === before - 1, `a route that was made takes one morsel: ${before} → ${afterMade}`);
+        const taken = (await linesOf(A.ownerToken, 'routing_fee')).filter((t: any) => t.tracking_code === `route:${FAKE_ID}`);
+        assert(taken.length === 1 && taken[0].amount === -1, `one routing fee line: ${JSON.stringify(taken)}`);
+
+        modes.work = 'fail';
+        try {
+            const refused = await A.json('/v1/work/request', {
+                method: 'POST', headers: auth(A.ownerToken),
+                body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'refused' } }),
+            });
+            assert(refused.status === 500, `the peer's error is passed on: ${refused.status} ${JSON.stringify(refused.body)}`);
+        } finally { modes.work = 'ok'; }
+        const afterRefused = await walletOf(A.ownerToken);
+        assert(afterRefused === afterMade, `an error answer kept the routing fee: ${afterMade} → ${afterRefused}`);
+        const fees = (await linesOf(A.ownerToken, 'routing_fee')).filter((t: any) => t.tracking_code === `route:${FAKE_ID}`);
+        const back = (await linesOf(A.ownerToken, 'routing_fee_return')).filter((t: any) => t.tracking_code === `route:${FAKE_ID}`);
+        assert(fees.length === 2 && back.length === 1 && back[0].amount === 1,
+            `two fees taken and the second given back: ${JSON.stringify({ fees, back })}`);
+    });
+
+    await test('a route and cross-node work whose target answers with an error are not charged', async () => {
+        const before = await walletOf(A.ownerToken);
+        const returnsBefore = await linesOf(A.ownerToken, 'federation_routing_return');
+        modes.work = 'fail';
+        try {
+            const routed = await A.json('/v1/federation/route', {
+                method: 'POST', headers: auth(A.ownerToken),
+                body: JSON.stringify({ target_node: FAKE_ID, method: 'POST', path: '/v1/work/request', body: { q: 'route' } }),
+            });
+            assert(routed.status === 500, `the target's error is passed on: ${routed.status} ${JSON.stringify(routed.body)}`);
+            const submitted = await A.json('/v1/federation/cross-node/work', {
+                method: 'POST', headers: auth(agentToken),
+                body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'cross' } }),
+            });
+            assert(submitted.status === 500, `the peer's error is passed on: ${submitted.status} ${JSON.stringify(submitted.body)}`);
+        } finally { modes.work = 'ok'; }
+        const after = await walletOf(A.ownerToken);
+        assert(after === before, `an error answer was charged: ${before} → ${after}`);
+        const fresh = (await linesOf(A.ownerToken, 'federation_routing_return'))
+            .filter((t: any) => !returnsBefore.some((b: any) => b.id === t.id));
+        assert(fresh.length === 2 && fresh.every((t: any) => t.amount === 1)
+            && fresh.some((t: any) => t.tracking_code === `relay:${A_ID}` && (t.initiator_gaii ?? null) === null)
+            && fresh.some((t: any) => !t.tracking_code && t.initiator_gaii === agentGaii),
+            `one fee back for the route and one for the agent's cross-node work: ${JSON.stringify(fresh)}`);
+    });
+
+    await test('a person whose balance cannot cover the fee is not routed, and nothing reaches the target', async () => {
+        const plainGhii = `plain${stamp}@${A_ID}`;
+        const balance = await walletOf(plainOwnerToken);
+        const emptied = balance === 0 || await A.storage.debitBalance(plainGhii, balance);
+        assert(emptied && await walletOf(plainOwnerToken) === 0, `the plain owner must hold no morsels, held ${balance}`);
+        const sentBefore = seen.length;
+        const r = await A.json('/v1/federation/route', {
+            method: 'POST', headers: auth(plainOwnerToken),
+            body: JSON.stringify({ target_node: FAKE_ID, method: 'GET', path: '/v1/nodeinfo' }),
+        });
+        assert(r.status === 402 && r.body.error?.code === 'INSUFFICIENT_MORSELS', `expected 402 INSUFFICIENT_MORSELS, got ${r.status}: ${JSON.stringify(r.body)}`);
+        assert(seen.length === sentBefore, `the route went out anyway: ${seen.slice(sentBefore).map(s => s.path).join(', ')}`);
+        const lines = await linesOf(plainOwnerToken, 'federation_routing');
+        assert(lines.length === 0, `a refused route wrote a routing fee line: ${JSON.stringify(lines)}`);
     });
 
     // ─── Phase 6: Templates and the peer memory inventory ───

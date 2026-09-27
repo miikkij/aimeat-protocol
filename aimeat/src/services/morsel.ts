@@ -9,12 +9,18 @@
  * @structure
  *   - calculateWorkCost: base price + 10% network fee → escrow total
  *   - holdEscrow/returnEscrow: atomically debit/credit escrow with transaction logs
+ *   - routingFee: the 1-morsel fee of one route to another node, taken when the call goes out and
+ *     given back when no route was made
  *   - settlePayment: burn + fee split + pay provider on successful delivery
  *   - applyDailyAllowance: capped daily allowance credit
  *   - calculateEscrow: sum in-escrow amounts across a requester's open work
  *   - mintMorsels: operator mint against the daily cap, for every door that mints
  *
  * @version-history
+ *   v1.2.0 — 2026-09-26 — routingFee(): the routing fee of one route to another node, for every
+ *     endpoint that routes a call. The endpoint takes it when the call goes out, after its checks; a
+ *     balance that cannot cover it stops the route; it goes back, with a `<type>_return` line, when the
+ *     far end cannot be reached or responds with an error (secaudit 2026-09, R4 6).
  *   v1.1.0 — 2026-08-11 — mintMorsels() added, and POST /v1/admin/mint and aimeat_admin_mint both
  *     call it. They were two implementations of the same mint: the same cap arithmetic, the same
  *     credit and the same ledger row written twice, and they had already drifted — the tool told the
@@ -207,6 +213,67 @@ export async function returnEscrow(
             timestamp: new Date().toISOString(),
         });
     }
+}
+
+/** The fee for routing one call to another node (§15), in morsels. */
+export const ROUTING_FEE_MORSELS = 1;
+
+/** One route's fee: taken when the call goes out, given back when no route was made. */
+export interface RoutingFee {
+    /**
+     * Take the fee, once per route; a second call does nothing. False when the payer's balance
+     * cannot cover it, and then the endpoint refuses the route (402 INSUFFICIENT_MORSELS) and sends
+     * nothing.
+     */
+    take(): Promise<boolean>;
+    /** Give a taken fee back, with a ledger line of its own. Does nothing when no fee was taken. */
+    giveBack(): Promise<void>;
+}
+
+/**
+ * The routing fee of one route, for every endpoint that routes a call to another node: work asked of
+ * a provider there (routes/work.ts createWorkItem), POST /v1/federation/route and
+ * POST /v1/federation/cross-node/work (routes/federation-sync/routing.ts).
+ *
+ * A morsel paces what a person sends to other nodes, so the fee is taken for a route that is made
+ * and for nothing else. The endpoint takes it when the call goes out, after every check that can
+ * refuse the route, and gives it back when the far end cannot be reached or responds with an error.
+ *
+ * `payer` is the identity of whoever starts the route: debitBalance takes an agent's fee from its
+ * owner, and addTransaction files the line under the owner with the agent as the one who called.
+ * `null` means no fee, as on a node that relays a hop of someone else's route. The ledger lines are
+ * `type` (-1) and `${type}_return` (+1), both with the given tracking code.
+ */
+export function routingFee(
+    storage: Storage,
+    payer: string | null,
+    ledger: { type: string; trackingCode?: string },
+): RoutingFee {
+    let taken = false;
+    const line = (type: string, amount: number) => storage.addTransaction({
+        id: `tx-${randomUUID()}`,
+        gaii: payer as string,
+        type,
+        amount,
+        ...(ledger.trackingCode ? { trackingCode: ledger.trackingCode } : {}),
+        timestamp: new Date().toISOString(),
+    });
+    return {
+        async take() {
+            if (!payer || taken) return true;
+            if (!(await storage.debitBalance(payer, ROUTING_FEE_MORSELS))) return false;
+            taken = true;
+            await line(ledger.type, -ROUTING_FEE_MORSELS);
+            return true;
+        },
+        async giveBack() {
+            if (!payer || !taken) return;
+            taken = false;
+            if (await storage.creditBalance(payer, ROUTING_FEE_MORSELS)) {
+                await line(`${ledger.type}_return`, ROUTING_FEE_MORSELS);
+            }
+        },
+    };
 }
 
 /**
