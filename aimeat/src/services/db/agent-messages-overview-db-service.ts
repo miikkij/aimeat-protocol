@@ -15,7 +15,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { logger } from '../../utils/logger.js';
+import { enrichThreadTitles } from '../thread-titles.js';
 
 export interface AgentMessagesOverview {
   commands: unknown;
@@ -42,19 +42,7 @@ export class AgentMessagesOverviewService {
         this.storage.listMessages(agentGaii, { page: 1, perPage }),
       ]);
 
-      // Enrich threads with the linked task title (cache so several threads on the same task hit once).
-      const taskCache = new Map<string, string | null>();
-      const resolveTaskTitle = async (threadId: string): Promise<string | null> => {
-        if (taskCache.has(threadId)) return taskCache.get(threadId) ?? null;
-        const task = await this.storage.getAgentTask(threadId).catch(err => { logger.warn('resolveTaskTitle: continuing after a suppressed failure', { error: String(err) }); return null; });
-        const title = task?.title ?? null;
-        taskCache.set(threadId, title);
-        return title;
-      };
-      const enriched = await Promise.all(threads.map(async (thread) => {
-        const title = await resolveTaskTitle(thread.threadId);
-        return { ...thread, title, linkedTaskId: title !== null ? thread.threadId : null };
-      }));
+      const enriched = await enrichThreadTitles(this.storage, threads);
 
       return {
         commands: commandsRec?.value ?? [],

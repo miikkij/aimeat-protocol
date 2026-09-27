@@ -15,7 +15,7 @@
  */
 import { sql, type Selectable } from 'kysely';
 import type { ConsentAuditEntry, ConsentFacet, ConsentFacetQuery, ConsentRecord } from '../../../interface.js';
-import { matchesRecipient } from '../../../../services/consent.js';
+import { matchesRecipient } from '../../../consent-recipient.js';
 import { parseGaiiLoose } from '../../../../utils/gaii.js';
 import { consentMatchPattern } from '../../../pattern-utils.js';
 import type { Consent } from '../db-types.js';

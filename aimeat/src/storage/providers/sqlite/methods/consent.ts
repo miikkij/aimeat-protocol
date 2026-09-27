@@ -15,7 +15,7 @@
 import type { ConsentRecord, ConsentAuditEntry, ConsentFacet, ConsentFacetQuery } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { consentMatchPattern } from '../../../pattern-utils.js';
-import { matchesRecipient } from '../../../../services/consent.js';
+import { matchesRecipient } from '../../../consent-recipient.js';
 import { parseGaiiLoose } from '../../../../utils/gaii.js';
 
 export const consentMethods = {
