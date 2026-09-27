@@ -6,6 +6,11 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — A record stored without `actionProvider` has each action deleted under
+ *     every principal of the account that installed the cortex (its bare name, GHII, agents and
+ *     ecosystem apps) and under the deactivator's own two. The prompts and ontologies an activation
+ *     wrote are deleted under the deactivating principal and every principal of that account, so a
+ *     teardown finds them whoever activated the cortex (secaudit 2026-09, R4 4a).
  *   v1.5.0 — 2026-09-26 — Activation records the identity it published the actions under
  *     (`actionProvider` in the artifacts), and deactivation deletes them under it, whoever
  *     deactivates: the person after their agent, an operator after the owner. A record stored without
@@ -33,6 +38,7 @@ import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '
 import { logger } from '../../utils/logger.js';
 import { publicBoardCeiling, type BoardWriteRefusal } from '../../services/board-write.js';
 import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
+import { accountPrincipals } from '../../services/db/owner-identity.js';
 
 // ── Activation Logic ──
 
@@ -41,7 +47,8 @@ import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
  *
  * `gaii` is the acting principal as the token names it: a person's bare account name, an agent's
  * GAII. The schema locks, the prompt, ontology and seed-data memory and the boards are recorded
- * under it and torn down under it.
+ * under it. A teardown removes the schema locks and boards by key, and the prompt and ontology
+ * memory under it and under every principal of the installing account.
  *
  * `identity` is the resolved identity (utils/gaii.ts resolveIdentity): a person's GHII, an agent's
  * GAII. A published action is keyed on it, as POST /v1/actions keys one, because every work door
@@ -315,30 +322,41 @@ export async function deactivateExtension(
   const { gaii } = actor;
   const { activationArtifacts: artifacts } = ext;
 
+  // Every principal of the account that installed the cortex (services/db/owner-identity.ts): its
+  // bare name, its GHII, its agents' GAIIs and its ecosystem apps' GEAIs. Any of them can have
+  // activated it, so what the activation wrote under the activating principal is looked for under
+  // each. Read once, and only when the teardown needs it.
+  let installer: Promise<string[]> | undefined;
+  const installerPrincipals = (): Promise<string[]> => (installer ??= accountPrincipals(storage, ext.installedBy));
+
   // Remove schemas
   for (const key of artifacts.schemaKeys) {
     await storage.deleteSchema(key);
     logger.info(`Cortex deactivated schema: ${key}`, { extension: ext.name });
   }
 
-  // Remove prompts (stored as memory)
-  for (const key of artifacts.promptKeys) {
-    await storage.deleteMemory(gaii, key);
-    logger.info(`Cortex deactivated prompt: ${key}`, { extension: ext.name });
-  }
-
-  // Remove ontologies (stored as memory)
-  for (const key of artifacts.ontologyKeys) {
-    await storage.deleteMemory(gaii, key);
-    logger.info(`Cortex deactivated ontology: ${key}`, { extension: ext.name });
+  // Remove prompts and ontologies (stored as memory, under the principal that activated the cortex),
+  // under the deactivating principal and under every principal of the installing account. The keys
+  // are this cortex's own (`__cortex__/<name>/…`), so nothing else is stored under them.
+  if (artifacts.promptKeys.length + artifacts.ontologyKeys.length > 0) {
+    const owners = [...new Set([gaii, ...await installerPrincipals()])];
+    for (const key of artifacts.promptKeys) {
+      for (const owner of owners) await storage.deleteMemory(owner, key);
+      logger.info(`Cortex deactivated prompt: ${key}`, { extension: ext.name });
+    }
+    for (const key of artifacts.ontologyKeys) {
+      for (const owner of owners) await storage.deleteMemory(owner, key);
+      logger.info(`Cortex deactivated ontology: ${key}`, { extension: ext.name });
+    }
   }
 
   // Remove actions, under the identity the activation recorded publishing them under
-  // (`actionProvider`), whoever deactivates. A record stored without it deletes each id under the
-  // deactivating caller's resolved identity and under its acting principal: a person's action can be
-  // under their bare account name, which the identity migration (Postgres 0085, sqlite/schema-
-  // identity-backfill.ts) leaves when the GHII already holds the same id. For an agent the two are one.
-  const providers = artifacts.actionProvider ? [artifacts.actionProvider] : [...new Set([actor.identity, gaii])];
+  // (`actionProvider`), whoever deactivates. A record stored without it does not say which principal
+  // published them, so each id is deleted under every principal of the installing account and under
+  // the deactivator's own two (an operator's included). The pair (provider, id) is unique, so no
+  // action of another cortex or another person is reached.
+  const providers = artifacts.actionProvider ? [artifacts.actionProvider]
+    : artifacts.actionIds.length > 0 ? [...new Set([actor.identity, gaii, ...await installerPrincipals()])] : [];
   for (const actionId of artifacts.actionIds) {
     for (const provider of providers) await storage.deleteAction(actionId, provider);
     logger.info(`Cortex deactivated action: ${actionId}`, { extension: ext.name });

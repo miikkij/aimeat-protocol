@@ -40678,9 +40678,14 @@ paths:
       operationId: deactivateCortexModel
       summary: Deactivate cortex model
       description: >
-        Removes what the activation made. The cortex's actions are deleted under the identity the
+        Removes what the activation made: its schema locks, boards, prompts, ontologies and actions.
+        Its seed data and lib files stay. The cortex's actions are deleted under the identity the
         activation recorded (`actionProvider`), whichever of the owner's principals, or an
-        operator, deactivates. Uninstall and the redeploy of an active cortex do the same.
+        operator, deactivates. A record that names no such identity has each action deleted under
+        every principal of the account that installed the cortex (its bare name, its GHII, its
+        agents and its ecosystem apps) and under the caller's own. The prompts and ontologies are
+        deleted under the same principals, whoever activated the cortex. Uninstall and the redeploy
+        of an active cortex do the same.
       tags: [Cortex]
       security:
         - BearerAuth: []

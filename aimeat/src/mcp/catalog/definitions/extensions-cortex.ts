@@ -12,6 +12,8 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — aimeat_cortex_deactivate says what a deactivation removes, whoever activated
+ *     the cortex, and what stays.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.2.0 — 2026-09-27 — aimeat_cortex_list takes name and include_source: one cortex in full, and its source.
  *   v1.1.0 — 2026-09-13 — aimeat_extension_get takes include_source (each action's script, for the
@@ -127,7 +129,7 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_deactivate',
-        description: 'Deactivate an active cortex extension by name, setting it inactive so its components are no longer served to apps (it stays installed). Idempotent — returns success if already inactive. Re-enable with aimeat_cortex_activate, or remove with aimeat_cortex_delete.',
+        description: 'Deactivate an active cortex extension by name, setting it inactive so its components are no longer served to apps (it stays installed). Its actions leave the catalogue and its schema locks, boards, prompts and ontologies are removed, also when another principal of the person (the person, an agent or an app of theirs) activated it. Its seed data and lib files stay. Idempotent — returns success if already inactive. Re-enable with aimeat_cortex_activate, or remove with aimeat_cortex_delete.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
