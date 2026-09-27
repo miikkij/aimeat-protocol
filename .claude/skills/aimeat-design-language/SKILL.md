@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.11.0
+  version: 1.12.0
   updated: 2026-09-27
   owner: Jouni Miikki
 ---
@@ -22,7 +22,11 @@ each, each with its entry in the component catalogue (`src/services/ui-library/e
 a demo in the design lab; they read the shape values like `poster.css` does. Since 2026-09-27 a
 Settings & Controls page writes no class at all: it calls the components (`components/Action.js`,
 `Mark.js`, `Note.js`, `List.js`, `Facts.js`, `Field.js`, `SettingsPage.js` and the rest) with data,
-and a component draws only its own class names and the `poster.css` shapes below.
+and a component draws only its own class names and the `poster.css` shapes below. The admin pages
+(since 2026-09-27) and appcat, the app catalogue rebuilt on the components at `/v1/appcat`, are
+drawn the same way; where the old app catalogue drew a thing in its own way, that look is a named
+option of the component reading the tokens (and `poster.css` holds its tones outside the
+`@app-catalog` ranges, which the old catalogue's build copies), so a theme reaches it too.
 
 Type and colour tokens live in `aimeat/public/css/theme.css`, and nothing else does:
 `pnpm check:theme-tokens` refuses a rule there that is not a custom property. Font sizes and
@@ -192,8 +196,11 @@ style's, faces stay the style's.
 | `--shape-corner-control` | `0` | a field, an icon button, a choice, a menu row, a chat row |
 | `--shape-corner-pill` | `0` | the loud action, a tab, a count, the morsel badge (not the action link: a line under words has no corner to round) |
 | `--shape-corner-dialog` | `0` | a dialog, the bell's menu |
+| `--shape-corner-soft` / `--shape-corner-card` | `8px` / `10px` | the app catalogue's own softer drawing (appcat): a statement box, a state line, a picture and the empty box of a search preview / the search result card |
 | `--shape-frame` / `--shape-frame-heavy` | `2px` / `3px` | a box's or a control's frame / the heavy frame, the rule under an action, the page's rules |
 | `--shape-frame-colour` / `--shape-rule-colour` / `--shape-field-colour` | `var(--text)` each | a box's frame / a rule and a control's frame / a field's frame |
+| `--shape-ring` | `3px` | a spinner's ring |
+| `--shape-chosen-ground` | `var(--sun)` | the ground of a chosen row or item: a pressed menu row, a ticked choice, an opened row, a chosen value |
 | `--shape-shadow` | `none` | a box at rest |
 | `--shape-shadow-raised` | `8px 8px 0 var(--sun)` | a record, an open step, an open menu |
 | `--shape-shadow-dialog` | `12px 12px 0 var(--sun)` | a dialog |
