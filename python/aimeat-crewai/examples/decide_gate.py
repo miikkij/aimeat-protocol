@@ -38,6 +38,10 @@ from aimeat_crewai import (
 
 AGENT = os.environ.get("AIMEAT_AGENT_NAME", "support-crew")
 
+#: Another agent of the same owner, the one that records a person's verdict. The node refuses a
+#: review by the agent that asked for the decision (OWN_DECISION).
+REVIEWER = os.environ.get("AIMEAT_DECIDE_REVIEWER", "reviewer")
+
 #: The rule bound to the irreversible step. The owner wrote it; this file only names it.
 SEND_RULE = os.environ.get("AIMEAT_DECIDE_SEND_RULE", "send-a-reply")
 
@@ -152,10 +156,11 @@ def main() -> int:
 
     # ── 5. When a person confirms or overrides it, say so ─────────────────────────────────────
     # This is what turns the register into something thresholds can be tuned from: without it,
-    # every decision looks equally good forever. Here the send went ahead unreviewed, so there is
-    # nothing to record; the call is left in place as the shape to copy.
+    # every decision looks equally good forever. The owner records it in person or through another
+    # of their agents, never through the agent that asked. Here the send went ahead unreviewed, so
+    # there is nothing to record; the call is left in place as the shape to copy.
     if os.environ.get("AIMEAT_DECIDE_DEMO_REVIEW"):
-        review(verdict.decision_id, "confirmed", note="Read it before it went out.", agent_name=AGENT)
+        review(verdict.decision_id, "confirmed", note="Read it before it went out.", agent_name=REVIEWER)
 
     return 0
 

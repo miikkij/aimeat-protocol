@@ -779,10 +779,21 @@ def review(
     register into something the owner can tune thresholds from: without it every decision looks
     equally good forever.
 
+    WHO MAY RECORD IT. The node refuses a review by the agent that asked for the decision (403
+    ``OWN_DECISION``). The owner records the verdict in person, or through another of their agents:
+    call this with that other agent's name or token, not with the one that asked. The review's
+    ``by`` names whoever recorded it.
+
     Args:
         outcome: 'confirmed' or 'overridden'.
         note: up to 2000 characters, in the reviewer's words.
         override: what they did instead, when that is worth keeping.
+
+    Raises:
+        DecideError: ``outcome`` is neither of the two; checked before anything is sent.
+        DecideRefused: the node refused, with its own code: ``OWN_DECISION`` when this caller is
+            the agent that asked for the decision.
+        DecideUnreachable: the node could not be reached.
     """
     if outcome not in ("confirmed", "overridden"):
         raise DecideError("outcome must be 'confirmed' or 'overridden'.")
