@@ -39,6 +39,7 @@
  *     component no longer passes the bench this build runs is told once (design-book/component-notice.ts).
  *   v1.10.0 — 2026-09-27 — migrateAppToolsKeysOnce(): once per node, app tool manifests move to the
  *     app's filename key (services/app-tools-key.ts).
+ *   v1.10.1 — 2026-09-26 — Anonymous mode is switched on for this node's id (auth/node-auth.ts).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -588,8 +589,8 @@ async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): P
       logger.info('Anonymous GHII created', { ghii: ANON_GHII });
     }
 
-    // Enable the anonymous auth fallback in middleware
-    enableAnonymousAuth(ANON_GAII, ANON_OWNER);
+    // Enable the anonymous auth fallback in middleware, for this node only
+    enableAnonymousAuth(ANON_GAII, ANON_OWNER, config.nodeId);
     logger.info('Anonymous mode enabled — unauthenticated requests use shared identity', { gaii: ANON_GAII });
   } catch (err) {
     logger.error('Failed to setup anonymous identity', { error: err });

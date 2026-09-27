@@ -16,9 +16,12 @@
  *   - setThisNodeId / runAsNode / localAccountName / localAccountOf: the account an identity names on
  *     THIS node, for a lookup (another node's identity comes back whole) or a decision (it comes back
  *     null); "this node" is the node the code runs as (runAsNode), else the node registered at boot
+ *   - currentNodeId: that node, for other module state held per node (auth/node-auth.ts)
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.9.0 — 2026-09-26 — currentNodeId is exported, so the auth layer reads the storage, config and
+ *     anonymous identity of the node the code runs as (auth/node-auth.ts).
  *   v1.8.1 — 2026-09-26 — The comments name every place a node's code runs as that node: its
  *     requests, everything createServer starts, its event-bus listeners, its WebSocket upgrades and
  *     the handlers of its open sockets.
@@ -294,8 +297,12 @@ export function runAsNode<T>(nodeId: string, fn: () => T): T {
   return servingNode.run(nodeId, fn);
 }
 
-/** The node a cut answers for: the one the code runs as, else the one registered at boot. */
-function currentNodeId(): string | null {
+/**
+ * The node a cut answers for: the one the code runs as, else the one registered at boot, else null.
+ * The auth layer reads its per-node state for this node too (auth/node-auth.ts): the storage and
+ * config the credential checks use, and the anonymous identity.
+ */
+export function currentNodeId(): string | null {
   return servingNode.getStore() ?? thisNodeId;
 }
 

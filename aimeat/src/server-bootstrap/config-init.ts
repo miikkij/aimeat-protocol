@@ -12,6 +12,8 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The revocation storage is filed under this node's id, as the session auth
+ *     storage is, so a process that serves more than one node reads each node's own revoked tokens.
  *   v1.5.0 — 2026-09-26 — The cortexes and ecosystem apps of deleted accounts are settled once per node
  *     after the move (services/held-account-names.ts settleInstallsAtStart), and what they leave joins
  *     the same incident.
@@ -179,10 +181,10 @@ export async function initializeConfig(
   // Once per record; the node starts whatever the store answers.
   await openHeldNamesIncident(config, storage);
 
-  // Wire storage into token revocation system for persistent revocation
-  initRevocationStorage(storage);
-
-  // P3-7: Wire storage into session-aware auth middleware (+ config for PAT browser cookies)
+  // Wire storage into token revocation system for persistent revocation, and into the session-aware
+  // auth middleware (+ config for PAT browser cookies). Both are filed under this node's id and read
+  // for the node the code runs as (auth/node-auth.ts); a production process serves one node.
+  initRevocationStorage(storage, config.nodeId);
   initSessionAuth(storage, config);
 
   return { storage, provenance, consulService };

@@ -11,33 +11,29 @@
  *   of twelve of fourteen calls and two doors refused people without counting them. Extracting the
  *   pair to their own file keeps that property visible instead of buried in an 800-line module.
  *
- *   THE CONFIG ARRIVES BY SETTER. deny401 needs the base URL to build the discovery hint, and that
- *   was a module variable in middleware.ts. setDenyConfig() is called from initSessionAuth(), the
- *   same moment the old variable was assigned, so the behaviour is unchanged: no config wired (unit
- *   tests constructing middleware standalone) means the header is omitted and the body is the same.
+ *   THE CONFIG IS THE NODE'S. deny401 needs the node's config to build the discovery hint. It reads
+ *   the config of the node the code runs as (./node-auth.ts sessionConfig), which initSessionAuth()
+ *   files for each node at boot. No config filed (unit tests constructing middleware standalone)
+ *   means the header is omitted and the body is the same.
  * @structure
- *   - setDenyConfig(config) — called by initSessionAuth()
  *   - auditContext(req) — the request, as the refusal log needs it
  *   - deny401 / deny403 — the two refusals
  * @usage
  *   import { deny401, deny403 } from './deny.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — deny401 reads the config of the node the code runs as (./node-auth.ts), so a
+ *     process that serves more than one node names each node's own origin in the discovery hint.
+ *     initSessionAuth files the config there, and this file holds no copy of its own. One node per
+ *     process in production, so nothing there changes.
  *   v1.1.0 — 2026-09-12 — denyScope403 counts: scope_denials_total had never been written.
  *   v1.0.0 — 2026-08-23 — Pure extraction from middleware.ts (BR-02 pushed it past 800 lines).
  */
 import type { Request, Response } from 'express';
-import type { AimeatConfig } from '../config.js';
 import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
 import { recordAuthFailure, type AuthFailureContext } from '../services/auth-audit.js';
 import { resourceMetadataUrl } from '../services/protected-resource.js';
-
-let _denyConfig: AimeatConfig | null = null;
-
-/** Wired by initSessionAuth(), at the same moment middleware.ts used to assign its own copy. */
-export function setDenyConfig(config: AimeatConfig | null): void {
-  _denyConfig = config;
-}
+import { sessionConfig } from './node-auth.js';
 
 /**
  * What the refusal log needs, lifted off the request.
@@ -86,8 +82,9 @@ export function deny401(req: Request, res: Response, message: string): void {
   const prom = getPromMetrics();
   if (prom) prom.authFailuresTotal.inc();
   recordAuthFailure(auditContext(req), { status: 401, code: 'AUTH_REQUIRED', reason: message });
-  if (_denyConfig && !res.headersSent) {
-    res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, _denyConfig)}"`);
+  const config = sessionConfig();
+  if (config && !res.headersSent) {
+    res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, config)}"`);
   }
   res.status(401).json(errorEnvelope('AUTH_REQUIRED', message));
 }
