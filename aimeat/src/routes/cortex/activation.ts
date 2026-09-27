@@ -6,6 +6,10 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — Activation records the identity it published the actions under
+ *     (`actionProvider` in the artifacts), and deactivation deletes them under it, whoever
+ *     deactivates: the person after their agent, an operator after the owner. A record stored without
+ *     it keeps the v1.4.0 rule (secaudit 2026-09, R3 7c).
  *   v1.4.0 — 2026-09-26 — Activation and deactivation take a CortexActor: the acting principal
  *     (`gaii`) and its resolved identity (`identity`). An action is published under the resolved
  *     identity, as POST /v1/actions publishes one, so the work doors find it. Deactivation deletes
@@ -41,7 +45,8 @@ import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
  *
  * `identity` is the resolved identity (utils/gaii.ts resolveIdentity): a person's GHII, an agent's
  * GAII. A published action is keyed on it, as POST /v1/actions keys one, because every work door
- * finds a provider's actions and work under that identity.
+ * finds a provider's actions and work under that identity. The activation records it as the
+ * artifacts' `actionProvider`, and a teardown deletes the actions there.
  */
 export interface CortexActor {
   gaii: string;
@@ -293,6 +298,10 @@ export async function activateExtension(
     }
   }
 
+  // Whoever tears this activation down (the person after their agent, an agent after its person, an
+  // operator after the owner) deletes the actions where they were published, so that is recorded.
+  if (artifacts.actionIds.length > 0) artifacts.actionProvider = actor.identity;
+
   return artifacts;
 }
 
@@ -324,11 +333,12 @@ export async function deactivateExtension(
     logger.info(`Cortex deactivated ontology: ${key}`, { extension: ext.name });
   }
 
-  // Remove actions. An action is stored under the resolved identity. A person's action can also be
-  // under their bare account name: the identity migration (Postgres 0085, sqlite/schema-identity-
-  // backfill.ts) leaves such a row when the GHII already holds the same id. So each id is deleted
-  // under both, and for an agent the two are one.
-  const providers = [...new Set([actor.identity, gaii])];
+  // Remove actions, under the identity the activation recorded publishing them under
+  // (`actionProvider`), whoever deactivates. A record stored without it deletes each id under the
+  // deactivating caller's resolved identity and under its acting principal: a person's action can be
+  // under their bare account name, which the identity migration (Postgres 0085, sqlite/schema-
+  // identity-backfill.ts) leaves when the GHII already holds the same id. For an agent the two are one.
+  const providers = artifacts.actionProvider ? [artifacts.actionProvider] : [...new Set([actor.identity, gaii])];
   for (const actionId of artifacts.actionIds) {
     for (const provider of providers) await storage.deleteAction(actionId, provider);
     logger.info(`Cortex deactivated action: ${actionId}`, { extension: ext.name });

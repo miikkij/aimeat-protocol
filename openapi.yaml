@@ -40534,6 +40534,11 @@ paths:
     post:
       operationId: activateCortexModel
       summary: Activate cortex model
+      description: >
+        Materialises the cortex's components and answers with what it made (`artifacts`). Its
+        actions are published under the caller's full identity, a person's GHII or an agent's GAII,
+        and `artifacts.actionProvider` names that identity. GET /v1/cortex/{name} shows the same
+        record as `activation_artifacts`.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -40553,6 +40558,10 @@ paths:
     post:
       operationId: deactivateCortexModel
       summary: Deactivate cortex model
+      description: >
+        Removes what the activation made. The cortex's actions are deleted under the identity the
+        activation recorded (`actionProvider`), whichever of the owner's principals, or an
+        operator, deactivates. Uninstall and the redeploy of an active cortex do the same.
       tags: [Cortex]
       security:
         - BearerAuth: []
