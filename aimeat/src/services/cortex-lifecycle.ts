@@ -45,6 +45,10 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   v1.7.0 — 2026-09-26 — removeCortex deletes the seed records under every principal of the installing
+ *     account: under the bare account name as before, and under its GHII, agents and ecosystem apps
+ *     where the record carries this cortex's seed tags, so a record of the person's own under the
+ *     same key stays.
  *   v1.6.0 — 2026-09-26 — removeCortex: the uninstall after its ownership question, shared by
  *     deleteCortex and the package registrar, so a package that goes takes an active cortex down
  *     before its record goes. It removes every lib file the record names, the manifest's and the
@@ -81,6 +85,7 @@ import { emitChange } from './event-bus.js';
 import { activateExtension, deactivateExtension, type CortexActor } from '../routes/cortex/activation.js';
 import { refreshCortexDependencies, forgetDependencies } from './dependency-map.js';
 import { snapshotCortexVersion, forgetVersions } from './component-versions.js';
+import { accountPrincipals } from './db/owner-identity.js';
 import { logger } from '../utils/logger.js';
 
 export interface CortexDeps {
@@ -428,8 +433,8 @@ export async function deactivateCortex(
 }
 
 /**
- * Uninstall a cortex: the ownership question, then removeCortex. Seed-data is removed under
- * `installedBy`, the identity it was created with when the installing owner activated it.
+ * Uninstall a cortex: the ownership question, then removeCortex, which removes the seed data under
+ * whichever principal of the installing account activated the cortex.
  */
 export async function deleteCortex(
     deps: CortexDeps,
@@ -469,9 +474,20 @@ export async function removeCortex(
         await deactivateExtension(ext, storage, actor);
     }
 
-    // Uninstall removes seed-data; deactivation deliberately does not.
-    for (const key of ext.activationArtifacts.seedDataKeys) {
+    // Uninstall removes seed-data; deactivation deliberately does not. An activation wrote each seed
+    // record under the principal that activated the cortex, which is any principal of the installing
+    // account (services/db/owner-identity.ts accountPrincipals). A seed key is an ordinary key
+    // (`recipes.welcome`), so under the principals other than the bare account name only a record
+    // this cortex seeded goes: the activation tags it `seed-data` and the cortex's name.
+    const seedKeys = ext.activationArtifacts.seedDataKeys;
+    const others = seedKeys.length > 0
+        ? (await accountPrincipals(storage, ext.installedBy)).filter(p => p !== ext.installedBy) : [];
+    for (const key of seedKeys) {
         await storage.deleteMemory(ext.installedBy, key);
+        for (const owner of others) {
+            const seeded = await storage.getMemory(owner, key);
+            if (seeded?.tags?.includes('seed-data') && seeded.tags.includes(name)) await storage.deleteMemory(owner, key);
+        }
     }
 
     const libFiles = new Set(ext.activationArtifacts.libFiles);
