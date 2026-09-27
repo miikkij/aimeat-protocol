@@ -7,6 +7,8 @@
  *   an in-memory storage double: the function needs no server.
  * @usage pnpm exec vitest run test/unit/cortex-lifecycle.test.ts
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The uninstall deletes a seed record under the principal that activated the
+ *     cortex, and keeps a record of the person's own under the same key.
  *   v1.4.0 — 2026-09-26 — A package's active cortex is taken down before its record goes
  *     (deleteComponent): the actions its activation published are deleted, then the libs and the record.
  *   v1.3.0 — 2026-09-26 — A record stored without the identity has each action deleted under every
@@ -208,6 +210,48 @@ describe('activateCortex and deactivateCortex: a cortex action is keyed on the r
         const off = activationStorage('active', [ACTION_ID], 'bot#alice@test-node');
         expect((await deactivateCortex({ storage: off.storage, config }, agent, 'laake')).ok).toBe(true);
         expect(off.deleted).toEqual([{ id: ACTION_ID, providerGaii: 'bot#alice@test-node' }]);
+    });
+});
+
+describe('deleteCortex: the seed data an activation wrote goes with the uninstall', () => {
+    const SEED = 'laake.welcome';
+    const person = { ownerName: 'alice', gaii: 'alice', identity: 'alice@test-node', isOperator: false };
+
+    // A seed key is an ordinary key. The activation that wrote it may have been the person's, an agent's
+    // or an app's, so the uninstall looks under every principal of the account; under the bare account
+    // name it deletes the key as before, and under the others only the record this cortex seeded.
+    it("deletes a seed record under the principal that activated the cortex, and keeps the person's own record under the same key", async () => {
+        const memoryDeleted: { owner: string; key: string }[] = [];
+        const stored: Record<string, { tags: string[] }> = {
+            [`bot#alice@test-node|${SEED}`]: { tags: ['cortex', 'seed-data', 'laake'] },
+            [`alice@test-node|${SEED}`]: { tags: ['mine'] },
+        };
+        const record = {
+            name: 'laake', installedBy: 'alice', status: 'inactive', components: [],
+            activationArtifacts: {
+                schemaKeys: [], promptKeys: [], actionIds: [], boardIds: [], seedDataKeys: [SEED], ontologyKeys: [], libFiles: [],
+            },
+        } as unknown as CortexExtensionRecord;
+        const storage = {
+            getCortexExtension: async () => record,
+            deleteCortexExtension: async () => true,
+            deleteCortexLibFile: async () => true,
+            deleteDependencyEdges: async () => 0,
+            deleteComponentVersions: async () => 0,
+            getMemory: async (owner: string, key: string) => stored[`${owner}|${key}`] ?? null,
+            deleteMemory: async (owner: string, key: string) => { memoryDeleted.push({ owner, key }); return true; },
+            getGHIIByOwner: async () => ({ ghii: 'alice@test-node', ownerName: 'alice' }),
+            getAgentsByOwner: async () => [{ gaii: 'bot#alice@test-node', owner: 'alice' }],
+            getEcosystemAppsByOwner: async () => [{ geai: 'eco:drum#alice@test-node', owner: 'alice' }],
+        } as unknown as Storage;
+
+        expect((await deleteCortex({ storage, config }, person, 'laake')).ok).toBe(true);
+        expect(memoryDeleted).toEqual(expect.arrayContaining([
+            { owner: 'alice', key: SEED },
+            { owner: 'bot#alice@test-node', key: SEED },
+        ]));
+        expect(memoryDeleted).not.toContainEqual({ owner: 'alice@test-node', key: SEED });
+        expect(memoryDeleted).not.toContainEqual({ owner: 'eco:drum#alice@test-node', key: SEED });
     });
 });
 
