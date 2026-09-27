@@ -65,4 +65,3 @@ describe('workflow lock lifecycle', () => {
     expect(e.locks.size).toBe(0);
   });
 });
-

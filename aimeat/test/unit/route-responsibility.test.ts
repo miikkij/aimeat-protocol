@@ -88,4 +88,3 @@ it.each([
     if (status === 200) expect(JSON.parse(response.text).data).toHaveProperty('memory_writes');
   } finally { storage.close(); }
 });
-

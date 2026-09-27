@@ -29,6 +29,12 @@ describe('MCP request authority', () => {
     expect(sameMcpPrincipal({ ...principal, roles: ['agent', 'operator'] }, principal)).toBe(true);
   });
 
+  it('compares exact token subjects even when two spellings could resolve to the same owner', () => {
+    const owner = { ...principal, sub: 'alice', roles: ['owner'] };
+    expect(sameMcpPrincipal(owner, { ...owner, exp: 2000 })).toBe(true);
+    expect(sameMcpPrincipal(owner, { ...owner, sub: 'alice@test' })).toBe(false);
+  });
+
   it('keeps each concurrent callback on its own token and scope snapshot after awaiting', async () => {
     const authority = mcpRequestAuthority();
     let release!: () => void;

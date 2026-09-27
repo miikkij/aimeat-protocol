@@ -74,4 +74,3 @@ export function countConsentRecipients(consents: readonly { recipient: string }[
   }
   return byType;
 }
-
