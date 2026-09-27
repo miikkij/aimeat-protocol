@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.5 — 2026-09-26 — At propose, a declaration that names a counter, an anchor or a view
+ *     transition passes under the prefix and is refused under a name the page shares, through var(),
+ *     and as `all: inherit`.
  *   v1.8.4 — 2026-09-26 — At propose, a stylesheet that leaves a block, a comment, a string or a rule
  *     open where it ends is refused, with what is open.
  *   v1.8.3 — 2026-09-26 — At propose, the at-rules are a list: @container, @starting-style and the four
@@ -730,6 +733,27 @@ const GOOD_BODY = {
             if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${JSON.stringify(tail)}: ${said(r)}`);
         }
         assert(wrong.length === 0, `each is refused with what is open: ${wrong.join('; ')}`);
+    });
+
+    await test('a declaration that names a counter, an anchor, a view transition or a timeline passes under the prefix, and is refused under a name the page shares', async () => {
+        const stamp = Date.now() % 100000;
+        const own = await proposeComponent(`comp-counted-${stamp}`, componentBody({
+            css: `${componentBody().css}\n.wkgrid-cell { counter-increment: wkgrid-step; anchor-name: --wkgrid-cell; view-transition-name: none; }\n`
+                + '.wkgrid-cell::after { content: counter(wkgrid-step) " of " counter(sec); }',
+        }));
+        assert(own.status === 201, `names of its own pass, and a page counter it only reads: ${said(own)}`);
+        const wrong: string[] = [];
+        for (const [decl, expected] of [
+            ['counter-increment: sec 100000', 'names the counter "sec", a name the whole page shares'],
+            ['anchor-name: --menu', '"anchor-name: --wkgrid-menu"'],
+            ['view-transition-name: hero', '"view-transition-name: wkgrid-hero"'],
+            ['counter-increment: var(--wkgrid-n)', 'writes its counter name as var()'],
+            ['all: inherit', 'sets every property at once'],
+        ]) {
+            const r = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n.wkgrid-cell { ${decl}; }` }));
+            if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${decl}: ${said(r)}`);
+        }
+        assert(wrong.length === 0, `each is refused in its own words: ${wrong.join('; ')}`);
     });
 
     // A component the second owner proposed, stored when it passed an older bench: `.wkgrid ~ p`

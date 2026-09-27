@@ -27240,8 +27240,15 @@ paths:
         (`@keyframes wkgrid-spin`, `@property --wkgrid-x`), because the whole page shares that name.
         Every other at-rule is refused, known or unknown, `@scope`, `@layer`, `@page`,
         `@view-transition`, `@import` and `@font-face` among them, and the refusal says what the
-        list is. An animation, a counter style or a font palette the page defines is still used by
-        its name. A component whose builder judged it `general`
+        list is. A declaration that names a counter, an anchor, a view transition or a timeline
+        (`counter-reset`, `counter-set`, `counter-increment`, `anchor-name`, `view-transition-name`,
+        `view-timeline-name`, `scroll-timeline-name`, `timeline-scope` and the `scroll-timeline` and
+        `view-timeline` shorthands) names only the component's own, under its prefix after an
+        optional `--` (`counter-increment: wkgrid-step`), or `none`, written as the word itself and
+        never through `var()` or another function; `inherit` is refused there, and `all` takes only
+        `unset`, `initial`, `revert` or `revert-layer`. An animation, a counter style, a font palette,
+        a counter, an anchor or a timeline the page defines is still used by its name
+        (`content: counter(x)`, `position-anchor`, `animation-timeline`). A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide

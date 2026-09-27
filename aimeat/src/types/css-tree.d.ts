@@ -12,6 +12,8 @@
  *   read a rule with it and keeps the text raw.
  * @usage import { parse, walk, tokenize, tokenTypes, ident, string } from 'css-tree';
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The Operator node and its value, which the bench reads to find the commas
+ *     between the names in a declaration's value.
  *   v1.3.0 — 2026-09-26 — The token types of "<!--" and "-->" (CDO, CDC), which start no rule at the top
  *     of a stylesheet, for the reading of what is still open where a stylesheet ends.
  *   v1.2.0 — 2026-09-26 — string.decode(), and the token types of a string and a ";", which the bench
@@ -41,6 +43,8 @@ declare module 'css-tree' {
   export interface Identifier extends NodeBase { type: 'Identifier'; name: string }
   export interface FunctionNode extends NodeBase { type: 'Function'; name: string; children: CssList<CssNode> }
   export interface Hash extends NodeBase { type: 'Hash'; value: string }
+  /** A "," or a "/" in a value, among others. */
+  export interface Operator extends NodeBase { type: 'Operator'; value: string }
   export interface SelectorList extends NodeBase { type: 'SelectorList'; children: CssList<Selector | Raw> }
   export interface Selector extends NodeBase { type: 'Selector'; children: CssList<CssNode> }
   export interface TypeSelector extends NodeBase { type: 'TypeSelector'; name: string }
@@ -54,11 +58,11 @@ declare module 'css-tree' {
   export interface OtherNode extends NodeBase {
     type: 'AnPlusB' | 'AtrulePrelude' | 'AttributeSelector' | 'Brackets' | 'CDC' | 'CDO' | 'Comment' | 'Condition'
       | 'DeclarationList' | 'Dimension' | 'Feature' | 'FeatureFunction' | 'FeatureRange' | 'GeneralEnclosed' | 'IdSelector'
-      | 'Layer' | 'LayerList' | 'MediaQuery' | 'MediaQueryList' | 'NestingSelector' | 'Number' | 'Operator' | 'Parentheses'
+      | 'Layer' | 'LayerList' | 'MediaQuery' | 'MediaQueryList' | 'NestingSelector' | 'Number' | 'Parentheses'
       | 'Percentage' | 'Ratio' | 'Scope' | 'String' | 'SupportsDeclaration' | 'UnicodeRange' | 'Url' | 'WhiteSpace';
   }
 
-  export type CssNode = StyleSheet | Atrule | Rule | Block | Declaration | Value | Raw | Identifier | FunctionNode | Hash
+  export type CssNode = StyleSheet | Atrule | Rule | Block | Declaration | Value | Raw | Identifier | FunctionNode | Hash | Operator
     | SelectorList | Selector | TypeSelector | ClassSelector | PseudoClassSelector | PseudoElementSelector | Combinator | Nth
     | OtherNode;
 
