@@ -95,6 +95,7 @@ import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -217,13 +218,6 @@ export type MemoryWriteResult =
         details?: unknown;
     };
 
-/** Does this session carry the scope, allowing for the wildcard forms the middleware accepts? */
-function hasScope(scopes: string[], needed: string): boolean {
-    if (scopes.includes('*') || scopes.includes(needed)) return true;
-    const domain = needed.split(':')[0];
-    return scopes.includes(`${domain}:*`);
-}
-
 /**
  * Write one memory record. The order matters and is the same order the REST route has always used:
  * refuse before validating, validate before reading, read before deciding the version, and stamp
@@ -252,7 +246,7 @@ export async function writeMemoryRecord(
     const privileged = !scopedPrincipal
         && (caller.roles.includes('owner') || caller.roles.includes('operator'));
     const needed = input.authorisingScope ?? 'memory:write';
-    if (!privileged && !hasScope(caller.scopes, needed)) {
+    if (!privileged && !scopeIsCovered(caller.scopes, needed)) {
         return {
             ok: false, status: 403, code: 'SCOPE_DENIED',
             message: `Writing this needs the "${needed}" permission, which this session does not carry.`,
@@ -417,7 +411,7 @@ export async function writeMemoryRecord(
     //    (a GEAI, which parseGAII refuses) is not checked, or this would tell it which owner keys exist.
     let shadowedBy: string | null = null;
     const targetAgent = input.ownerScoped ? null : parseGAII(caller.targetGaii);
-    if (targetAgent && (privileged || hasScope(caller.scopes, 'memory:read'))) {
+    if (targetAgent && (privileged || scopeIsCovered(caller.scopes, 'memory:read'))) {
         const ownerCopy = await storage.getMemory(`${targetAgent.owner}@${config.nodeId}`, input.key);
         if (ownerCopy) shadowedBy = ownerCopy.ownerGaii;
     }
