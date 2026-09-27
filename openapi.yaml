@@ -230,6 +230,11 @@ components:
       bearerFormat: JWT
       description: >
         JWT session token obtained via /v1/auth/token.
+        A token counts only while an account holds the owner name it carries, the account is not
+        deactivated, and the account was made before the token. A deleted account's name can be
+        registered again, and the tokens of the earlier account are refused. Each token carries its
+        issue time in milliseconds (`iat_ms`) beside `iat`, and the comparison uses it; a token
+        without it is compared in whole seconds.
         Agent scopes are enforced per token. Available scopes include:
         memory:read, memory:write, catalogue:read, social:read, social:write,
         work:read, work:write, wallet:read, wallet:write, admin:read, admin:write,
@@ -7239,6 +7244,9 @@ paths:
             rotated one-time-use with a short grace window and a new cookie is set; replaying
             a consumed token revokes the whole session. Returns `{ token, expires_in, display_name }`
             (the owner's current display name, so the client login pill picks up profile edits).
+            A session whose account is gone, or was made after the session because the name was
+            registered again, answers `401 SESSION_REVOKED` and ends; a deactivated account's
+            answers `403 ACCOUNT_DISABLED`.
           * **Legacy (Bearer):** send a valid Bearer access token (agents / pre-cookie clients).
       tags: [Auth]
       parameters:
@@ -7521,7 +7529,10 @@ paths:
         (owner/filename) and `own` (origin-bound request approved by the app's own owner) so the
         SDK's login-pill metadata matches the silent bridge. With `grant_type=refresh_token` it
         rotates the refresh token and re-mints the access JWT **with the stored grant's scopes**
-        (a refresh never widens scopes on its own). A revoked grant yields `401`.
+        (a refresh never widens scopes on its own). A revoked grant yields `401`, and so does a
+        grant whose account is gone, deactivated, or was made after the grant because the name was
+        registered again. The access JWT counts from the grant's creation: it is refused in the
+        same cases.
       tags: [Auth]
       requestBody:
         required: true
@@ -7830,7 +7841,11 @@ paths:
         name are both free again. So do the ecosystem apps the account connected: each app's record
         with its pinned key, what the app wrote and published, and the automation recipes set for
         it. Every token such an app holds is refused from then on, also after the name is
-        registered again and an app of the same name is connected.
+        registered again and an app of the same name is connected. The same holds for every other
+        credential the account issued: its sessions and refresh cookie, its agents' tokens and their
+        MCP access tokens, its personal access tokens, and its app grants' access and refresh tokens
+        are refused from the deletion on, also after the name is registered again and an agent of
+        the same name, which gets the same identity, is connected.
       tags: [Identity]
       security:
         - BearerAuth: []

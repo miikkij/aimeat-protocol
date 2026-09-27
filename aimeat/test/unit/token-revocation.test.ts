@@ -14,20 +14,36 @@
  *   The first case proves the copies verify before it proves they are refused. The others prove the
  *   refusal holds where a second process reads it from storage, that it reaches the live tunnel,
  *   that it is about THIS token and no wider, and that a revocation filed before the change holds.
+ *
+ *   THE ACCOUNT A CREDENTIAL ACTS FOR (auth/credential-age.ts). An account name is released for reuse
+ *   when the account is deleted, and every credential carries the bare name. So a credential counts
+ *   only while an account holds that name, the account is not deactivated, and the account was made
+ *   before the credential: to the millisecond when the token carries `iat_ms`, in whole seconds when
+ *   it was minted before the claim existed. An app grant's token counts from the grant, a personal
+ *   access token and an owner session's refresh from their own rows, and an ecosystem app's token is
+ *   compared with its app record the same way. A token that names no owner, or an anonymous one, is
+ *   asked no account.
  * @usage cd aimeat && pnpm exec vitest run test/unit/token-revocation.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The account a credential acts for: no account, a deactivated one, and one
+ *     made after the credential refuse it, per credential family, and `iat_ms` is written and read.
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, N4).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createHash } from 'node:crypto';
+import type { Request, Response } from 'express';
 import type { WebSocket } from 'ws';
+import { SignJWT } from 'jose';
 
 vi.mock('../../src/utils/logger.js', () => ({
     logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+vi.mock('../../src/services/stats.js', () => ({ getStats: () => null }));
+vi.mock('../../src/services/prometheus.js', () => ({ getPromMetrics: () => null }));
 
 import { generateKeyPair, type KeyPair } from '../../src/auth/keypair.js';
 import type { Storage } from '../../src/storage/interface.js';
+import type { AimeatConfig } from '../../src/config.js';
 
 type Jwt = typeof import('../../src/auth/jwt.js');
 
@@ -145,5 +161,176 @@ describe('a revoked token is refused by what it is, not by how its bytes are spe
             (_socket, principal) => { detached.push(principal); }, token);
         expect(sent.map(f => f.type)).toEqual(['auth_revoked']);
         expect(detached).toEqual([conn.principal]);
+    });
+});
+
+describe('a credential counts only while the account it acts for holds its name', () => {
+    type Middleware = typeof import('../../src/auth/middleware.js');
+    type Pats = typeof import('../../src/services/access-token.js');
+    type OwnerSessions = typeof import('../../src/services/owner-session.js');
+
+    /** The owners, app grants and ecosystem apps tables in miniature. */
+    const owners = new Map<string, { name: string; roles: string[]; createdAt: string; disabledAt: string | null }>();
+    const grants = new Map<string, { grantId: string; owner: string; createdAt: string; revoked: boolean }>();
+    const ecosystemApps = new Map<string, { geai: string; status: string; createdAt: string }>();
+    const accounts = {
+        ...store,
+        getOwner: async (name: string) => owners.get(name) ?? null,
+        getAppGrant: async (id: string) => grants.get(id) ?? null,
+        getEcosystemApp: async (geai: string) => ecosystemApps.get(geai) ?? null,
+        isSessionRevoked: async () => false,
+    } as unknown as Storage;
+
+    let j: Jwt;
+    let mw: Middleware;
+    let pats: Pats;
+    let sessions: OwnerSessions;
+
+    beforeAll(async () => {
+        vi.resetModules();
+        j = await import('../../src/auth/jwt.js');
+        await j.initNodeKeys(keys.publicKey, keys.privateKey);
+        j.initRevocationStorage(accounts);
+        mw = await import('../../src/auth/middleware.js');
+        mw.initSessionAuth(accounts, { nodeId: NODE } as AimeatConfig);
+        pats = await import('../../src/services/access-token.js');
+        sessions = await import('../../src/services/owner-session.js');
+    });
+
+    const at = (ms: number) => new Date(ms).toISOString();
+    /** A whole second a minute ago, so every token below is live and every time is in the past. */
+    const second = () => Math.floor(Date.now() / 1000) - 60;
+    const account = (name: string, createdMs: number, disabled = false) => {
+        owners.set(name, { name, roles: ['owner'], createdAt: at(createdMs), disabledAt: disabled ? at(createdMs + 1) : null });
+    };
+
+    /** A token signed as issueJWT signs one, with its issue time set by the test: `ms` is its
+     *  `iat_ms`, and a token without it is one minted before the claim existed. */
+    async function signed(claims: { sub: string; owner: string; roles: string[] } & Record<string, unknown>, iat: number, ms?: number): Promise<string> {
+        const { sub, ...rest } = claims;
+        return new SignJWT({ node: NODE, scopes: ['memory:read'], ...rest, ...(ms === undefined ? {} : { iat_ms: ms }) })
+            .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+            .setSubject(sub)
+            .setIssuedAt(iat)
+            .setExpirationTime(iat + 3600)
+            .sign(j.getNodeCryptoKeys().privateKey);
+    }
+    async function refused(token: string): Promise<boolean> {
+        const verified = await j.verifyJWT(token);
+        expect(verified, 'the token verifies').not.toBeNull();
+        return mw.credentialRevoked(token, verified!);
+    }
+
+    it('issueJWT writes the issue time in milliseconds beside iat, and verifyJWT reads it', async () => {
+        account('ada', Date.now() - 60_000);
+        const before = Date.now();
+        const v = await j.verifyJWT(await j.issueJWT({ sub: 'ada', owner: 'ada', node: NODE, roles: ['owner'], scopes: [] }, 3600));
+        const after = Date.now();
+        expect(typeof v!.iatMs).toBe('number');
+        expect(v!.iatMs!).toBeGreaterThanOrEqual(before);
+        expect(v!.iatMs!).toBeLessThanOrEqual(after);
+        expect(v!.iat).toBe(Math.floor(v!.iatMs! / 1000));
+    });
+
+    it('refuses an owner token and an agent token whose owner name no account holds', async () => {
+        const s = second();
+        expect(await refused(await signed({ sub: 'nobody', owner: 'nobody', roles: ['owner'] }, s, s * 1000 + 100))).toBe(true);
+        expect(await refused(await signed({ sub: `bot#nobody@${NODE}`, owner: 'nobody', roles: ['agent'] }, s, s * 1000 + 100))).toBe(true);
+    });
+
+    it('refuses a token made before the account that holds its owner name now, to the millisecond', async () => {
+        const s = second();
+        account('dora', s * 1000 + 500); // the name registered again 300 ms after the tokens were made
+        expect(await refused(await signed({ sub: 'dora', owner: 'dora', roles: ['owner'] }, s, s * 1000 + 200))).toBe(true);
+        expect(await refused(await signed({ sub: `bot#dora@${NODE}`, owner: 'dora', roles: ['agent'], mcp_client: 'Probe' }, s, s * 1000 + 200))).toBe(true);
+    });
+
+    it('keeps the account\'s own tokens, also one made in the same second as the account', async () => {
+        const s = second();
+        account('erin', s * 1000 + 200);
+        expect(await refused(await signed({ sub: 'erin', owner: 'erin', roles: ['owner'] }, s, s * 1000 + 500))).toBe(false);
+        expect(await refused(await signed({ sub: `bot#erin@${NODE}`, owner: 'erin', roles: ['agent'] }, s + 5, (s + 5) * 1000))).toBe(false);
+    });
+
+    it('compares a token minted without iat_ms in whole seconds', async () => {
+        const s = second();
+        account('finn', s * 1000 + 500);
+        // The account's own second: which came first cannot be told, and the token is kept.
+        expect(await refused(await signed({ sub: 'finn', owner: 'finn', roles: ['owner'] }, s))).toBe(false);
+        // A second before the account: refused.
+        expect(await refused(await signed({ sub: 'finn', owner: 'finn', roles: ['owner'] }, s - 1))).toBe(true);
+    });
+
+    it('refuses the tokens of a deactivated account', async () => {
+        const s = second();
+        account('gail', s * 1000 - 10_000, true);
+        expect(await refused(await signed({ sub: 'gail', owner: 'gail', roles: ['owner'] }, s, s * 1000))).toBe(true);
+    });
+
+    it('counts an app grant\'s token from the grant, however late the token was minted', async () => {
+        const s = second();
+        account('hana', s * 1000 + 5_000);
+        grants.set('g-earlier', { grantId: 'g-earlier', owner: 'hana', createdAt: at(s * 1000), revoked: false });
+        grants.set('g-own', { grantId: 'g-own', owner: 'hana', createdAt: at(s * 1000 + 6_000), revoked: false });
+        // Both minted by a refresh ten seconds after the account was made.
+        const late = (grant: string) => signed({ sub: `hana@${NODE}`, owner: 'hana', roles: ['app'], app_grant: grant }, s + 10, (s + 10) * 1000);
+        expect(await refused(await late('g-earlier'))).toBe(true);
+        expect(await refused(await late('g-own'))).toBe(false);
+    });
+
+    it('compares an ecosystem app\'s token with its app record to the millisecond', async () => {
+        const s = second();
+        account('ivan', s * 1000 - 60_000);
+        const geai = `eco:drum#ivan@${NODE}`;
+        ecosystemApps.set(geai, { geai, status: 'active', createdAt: at(s * 1000 + 500) });
+        const eco = (ms?: number) => signed({ sub: geai, owner: 'ivan', roles: ['ecosystem'], eco_app: 'drum' }, s, ms);
+        // Made 300 ms before the record that holds the identity now: the record is a later connection.
+        expect(await refused(await eco(s * 1000 + 200))).toBe(true);
+        expect(await refused(await eco(s * 1000 + 800))).toBe(false);
+        // Minted without iat_ms in the record's own second: the order cannot be told, and it is kept.
+        expect(await refused(await eco())).toBe(false);
+    });
+
+    it('asks no account of an anonymous token or of a token that names no owner', async () => {
+        const s = second();
+        expect(await refused(await signed({ sub: 'anon#shared@x', owner: 'no-such-account', roles: ['agent'], anonymous: true }, s, s * 1000))).toBe(false);
+        expect(await refused(await signed({ sub: 'unnamed', owner: '', roles: ['agent'] }, s, s * 1000))).toBe(false);
+    });
+
+    it('resolves a personal access token only when it was made after the account that holds its name', async () => {
+        const s = second();
+        account('jude', s * 1000 + 500);
+        const pat = (createdMs: number) => ({
+            id: `pat-${createdMs}`, owner: 'jude', gaii: 'jude', label: 'probe', scopes: [], grantOwner: true, grantOperator: false,
+            createdAt: at(createdMs), expiresAt: null, lastUsedAt: null, revoked: false,
+        });
+        const holding = (row: ReturnType<typeof pat>) => ({ ...accounts, getPatByHash: async () => row }) as unknown as Storage;
+        expect(await pats.resolvePat(holding(pat(s * 1000 + 200)), 'aimeat_pat_earlier')).toBeNull();
+        expect(await pats.resolvePat(holding(pat(s * 1000 + 800)), 'aimeat_pat_own')).toMatchObject({ owner: 'jude', roles: ['owner'] });
+    });
+
+    it('ends an owner session made before the account that holds its owner name now, at refresh', async () => {
+        const s = second();
+        account('kira', s * 1000 + 500);
+        const ended: string[] = [];
+        const row = (issuedMs: number) => ({
+            sessionId: `sess-${issuedMs}`, gaii: 'kira', owner: 'kira', issuedAt: at(issuedMs), revoked: false,
+            refreshTokenHash: sessions.hashToken('raw'), idleExpiresAt: at(Date.now() + 3_600_000), absoluteExpiresAt: at(Date.now() + 86_400_000),
+        });
+        const holding = (session: ReturnType<typeof row>) => ({
+            ...accounts,
+            getSessionByRefreshHash: async () => session,
+            revokeSession: async (id: string) => { ended.push(id); },
+            rotateSessionRefresh: async () => undefined,
+            getGHIIByOwner: async () => null,
+        }) as unknown as Storage;
+        const req = { headers: { cookie: 'aimeat_rt=raw', 'x-aimeat-refresh': '1' }, secure: false } as unknown as Request;
+        const res = { cookie: () => res, clearCookie: () => res } as unknown as Response;
+        const config = { nodeId: NODE, accessTtlSeconds: 3600, refreshIdleDays: 14, refreshAbsoluteDays: 90, refreshGraceMs: 30_000 } as AimeatConfig;
+
+        expect(await sessions.refreshOwnerSession(holding(row(s * 1000 + 200)), config, req, res))
+            .toMatchObject({ ok: false, status: 401, code: 'SESSION_REVOKED' });
+        expect(ended).toEqual([`sess-${s * 1000 + 200}`]);
+        expect(await sessions.refreshOwnerSession(holding(row(s * 1000 + 800)), config, req, res)).toMatchObject({ ok: true });
     });
 });
