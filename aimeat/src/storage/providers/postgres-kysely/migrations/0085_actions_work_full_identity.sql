@@ -14,7 +14,10 @@
 --     account existed when the row was written; to an account registered later, nothing goes back;
 --   - their finished work stays for the other side, with their side under a random `erased:`
 --     pseudonym, one per person; their callback address goes, and so does their name in a dispute
---     on it. The dispute log's hashes stay as they were stored.
+--     on it. The dispute log's hashes stay as they were stored;
+--   - the lines in other people's ledgers that name them, by the bare name, the GHII or an agent or
+--     app acting for them, as counterparty or as the one who acted, take the same pseudonym. A
+--     ledger line carries no hash of its own.
 -- A copy of another node's action (id `<node>:<id>`, tag `federated:<node>`) names a person of that
 -- node and is left as it is.
 --
@@ -72,12 +75,17 @@ WHERE w."id" = t."id" AND t.ghii IS NOT NULL;
 -- 4. What is left under a bare name belonged to an account that is gone: every row when nobody holds
 --    the name now, the rows older than the account when somebody does. Settled the way a deletion
 --    settles it.
+-- 5. Then the lines in other people's ledgers that name such an account, with the same pseudonym.
 DO $$
 DECLARE
     person RECORD;
     w RECORD;
+    a RECORD;
     cutoff TIMESTAMP(3);
     pseudonym TEXT;
+    -- One pseudonym for each deleted account, by its account name: its work (4) and its ledger lines
+    -- (5) name it by the same one.
+    pseudonyms JSONB := '{}'::jsonb;
     payer TEXT;
     provider_gone BOOLEAN;
     requester_gone BOOLEAN;
@@ -92,6 +100,7 @@ BEGIN
     LOOP
         cutoff := (SELECT o."createdAt" FROM "Owner" o WHERE o."name" = person.name);
         pseudonym := 'erased:' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 24);
+        pseudonyms := pseudonyms || jsonb_build_object(person.name, pseudonym);
         FOR w IN
             SELECT * FROM "Work"
             WHERE ("providerGaii" = person.name OR "requesterGaii" = person.name)
@@ -149,4 +158,55 @@ BEGIN
               AND "actor" = person.name;
         END LOOP;
     END LOOP;
+
+    -- 5. Every value in "counterpartyGaii" or "initiatorGaii" that names an account of this node: a
+    --    bare name, a GHII `name@node` or an agent or app `…#name@node`, where `node` is one this
+    --    node's accounts are under ("Ghii"."nodeId"). Left out: a pseudonym (`erased:`), a person of
+    --    another node, the two line types that name a node rather than a person (relay_fee in
+    --    services/morsel.ts, federation_settlement in routes/federation-settlements.ts), and a bare
+    --    value that is a node's id. The account counts as deleted for a line by the rule of step 4:
+    --    nobody holds the name now, or the line is older than the account that does.
+    CREATE TEMP TABLE erased_ledger_value ON COMMIT DROP AS
+    SELECT p.val, p.acct, o."createdAt" AS holder_since, NULL::text AS given
+      FROM (
+        SELECT x.val,
+               CASE WHEN strpos(x.val, '#') > 0 THEN split_part(split_part(x.val, '#', 2), '@', 1)
+                    WHEN strpos(x.val, '@') > 0 THEN split_part(x.val, '@', 1)
+                    ELSE x.val END AS acct,
+               NULLIF(split_part(x.val, '@', 2), '') AS node
+          FROM (
+            SELECT "counterpartyGaii" AS val FROM "Transaction"
+             WHERE "counterpartyGaii" IS NOT NULL AND "type" NOT IN ('relay_fee', 'federation_settlement')
+            UNION
+            SELECT "initiatorGaii" FROM "Transaction"
+             WHERE "initiatorGaii" IS NOT NULL AND "type" NOT IN ('relay_fee', 'federation_settlement')
+          ) x
+         WHERE left(x.val, 7) <> 'erased:'
+           AND (strpos(x.val, '#') = 0 OR strpos(x.val, '@') > strpos(x.val, '#'))
+      ) p
+      LEFT JOIN "Owner" o ON o."name" = p.acct
+     WHERE p.acct <> ''
+       AND CASE WHEN p.node IS NULL
+                THEN NOT EXISTS (SELECT 1 FROM "Ghii" g WHERE g."nodeId" = p.val)
+                 AND NOT EXISTS (SELECT 1 FROM "FederationPeer" f WHERE f."nodeId" = p.val)
+                ELSE EXISTS (SELECT 1 FROM "Ghii" g WHERE g."nodeId" = p.node) END;
+
+    -- One pseudonym for each account, whichever form names it: the one step 4 gave its work, or a
+    -- new one when it had no work under its bare name.
+    FOR a IN SELECT DISTINCT acct FROM erased_ledger_value LOOP
+        pseudonym := COALESCE(pseudonyms ->> a.acct, 'erased:' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 24));
+        pseudonyms := pseudonyms || jsonb_build_object(a.acct, pseudonym);
+        UPDATE erased_ledger_value SET given = pseudonym WHERE acct = a.acct;
+    END LOOP;
+
+    UPDATE "Transaction" t SET "counterpartyGaii" = e.given
+      FROM erased_ledger_value e
+     WHERE t."counterpartyGaii" = e.val
+       AND t."type" NOT IN ('relay_fee', 'federation_settlement')
+       AND (e.holder_since IS NULL OR t."timestamp" < e.holder_since);
+    UPDATE "Transaction" t SET "initiatorGaii" = e.given
+      FROM erased_ledger_value e
+     WHERE t."initiatorGaii" = e.val
+       AND t."type" NOT IN ('relay_fee', 'federation_settlement')
+       AND (e.holder_since IS NULL OR t."timestamp" < e.holder_since);
 END $$;

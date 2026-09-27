@@ -13,8 +13,9 @@
 -- person made move from the bare account name to the person's GHII, but only to an account that
 -- existed when the row was written. A row older than the account that holds its name now is taken
 -- as a deleted account's: its actions are deleted, its open work is cancelled, and its finished work
--- is kept under an `erased:` pseudonym. So everything depends on "Owner"."createdAt" being the time
--- each account was really created.
+-- is kept under an `erased:` pseudonym. The lines in other people's ledgers that name a deleted
+-- account take the same pseudonym. So everything depends on "Owner"."createdAt" being the time each
+-- account was really created.
 
 BEGIN TRANSACTION READ ONLY;
 
@@ -47,6 +48,41 @@ SELECT 'Work', x.name, o."createdAt", min(x."createdAt"), max(x."createdAt"), co
    AND x."createdAt" < o."createdAt"
  GROUP BY x.name, o."createdAt"
  ORDER BY 2, 1;
+
+-- 1b. The lines in other people's ledgers that 0085 gives a deleted account's pseudonym, by account
+--    name: the lines whose counterparty, or the one who acted, names the account by its bare name, its
+--    GHII or an agent or app of it, and are older than the account that holds the name now, or have
+--    no account holding it. A line counts once, whichever of its two columns names the account.
+--    RIGHT RESULT: only accounts that were deleted: `no account holds the name` for a name nobody took
+--    again, `registered again` with `account_created` later than `newest_line` for a name somebody
+--    took later. No rows when no account that had ledger lines was ever deleted.
+--    WRONG RESULT: a name that is not a deleted account: a person who still has their account (their
+--    createdAt is then later than lines that name them), a node, or a name this node uses for itself.
+--    0085 would write a pseudonym over it in other people's ledgers. Do not deploy.
+SELECT p.acct AS name,
+       CASE WHEN o."name" IS NULL THEN 'no account holds the name' ELSE 'registered again' END AS state,
+       o."createdAt" AS account_created,
+       count(DISTINCT t."id") AS line_count, min(t."timestamp") AS oldest_line, max(t."timestamp") AS newest_line
+  FROM "Transaction" t
+ CROSS JOIN LATERAL (VALUES (t."counterpartyGaii"), (t."initiatorGaii")) AS c(val)
+ CROSS JOIN LATERAL (
+       SELECT CASE WHEN strpos(c.val, '#') > 0 THEN split_part(split_part(c.val, '#', 2), '@', 1)
+                   WHEN strpos(c.val, '@') > 0 THEN split_part(c.val, '@', 1)
+                   ELSE c.val END AS acct,
+              NULLIF(split_part(c.val, '@', 2), '') AS node) p
+  LEFT JOIN "Owner" o ON o."name" = p.acct
+ WHERE c.val IS NOT NULL
+   AND t."type" NOT IN ('relay_fee', 'federation_settlement')
+   AND left(c.val, 7) <> 'erased:'
+   AND (strpos(c.val, '#') = 0 OR strpos(c.val, '@') > strpos(c.val, '#'))
+   AND p.acct <> ''
+   AND CASE WHEN p.node IS NULL
+            THEN NOT EXISTS (SELECT 1 FROM "Ghii" g WHERE g."nodeId" = c.val)
+             AND NOT EXISTS (SELECT 1 FROM "FederationPeer" f WHERE f."nodeId" = c.val)
+            ELSE EXISTS (SELECT 1 FROM "Ghii" g WHERE g."nodeId" = p.node) END
+   AND (o."name" IS NULL OR t."timestamp" < o."createdAt")
+ GROUP BY p.acct, o."name", o."createdAt"
+ ORDER BY 1;
 
 -- 2. Pseudonyms an erasure has already written into Work.
 --    RIGHT RESULT: 0 is what a node on 3.18.0 shows, because that version writes no pseudonym into
