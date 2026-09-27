@@ -5,7 +5,9 @@
  *   principal type. Supports anonymous-mode fallback and browser PAT-to-cookie session bootstrap.
  *
  * @structure
- *   - initSessionAuth / enableAnonymousAuth / isAnonymousMode / getAnonymousCredentials: startup wiring
+ *   - initSessionAuth: startup wiring, a node's storage and config filed under its node id
+ *     (./node-auth.ts, which also holds enableAnonymousAuth / isAnonymousMode /
+ *     getAnonymousCredentials, re-exported here)
  *   - optionalAuth / requireAuth / requireAuthOrAnonymous: presence-level gates
  *   - requireRole / requireScope / requireExternalPrincipal / requireLocalSession: authorization gates
  *   - the account-security family (isOwnerPrincipal, isThirdPartyPrincipal, requireOwnerPrincipal)
@@ -14,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-26 — Every read of the storage and the config, and the anonymous fallback, is for the node
+ *     the code runs as (./node-auth.ts): initSessionAuth files them under the node id, and a process
+ *     that serves more than one node checks each node's credentials against that node's storage.
  *   2026-09-26 — requireAuth asks credentialRevoked of a token it verifies itself, the same questions
  *     optionalAuth asks, so every route gated by requireAuth refuses what optionalAuth refuses, with
  *     or without anonymous mode and however the router is mounted.
@@ -103,29 +108,32 @@ import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { deny401, deny403, denyScope403, setDenyConfig } from './deny.js';
+import { deny401, deny403, denyScope403 } from './deny.js';
 import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { askOperator } from '../services/operator-principal.js';
+import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 
-// P3-7: Reference to storage for session revocation checks
-let _sessionStorage: Storage | null = null;
-let _config: AimeatConfig | null = null;
+export { enableAnonymousAuth, isAnonymousMode, getAnonymousCredentials } from './node-auth.js';
 
-/** Initialize session-aware auth middleware. Called once during server startup. */
+/**
+ * Initialize session-aware auth middleware. Called once per node during server startup: the storage
+ * the credential checks read and the config a refusal reads are filed under the node id, and every
+ * read below takes those of the node the code runs as (./node-auth.ts). A production process serves
+ * one node, so there it is that node's.
+ */
 export function initSessionAuth(storage: Storage, config?: AimeatConfig): void {
-  _sessionStorage = storage;
-  _config = config ?? null;
-  setDenyConfig(_config);
+  registerSessionAuth(storage, config ?? null);
   // So localAccountName (utils/gaii.ts) can tell this node's identities from a visitor's home GHII.
-  setThisNodeId(_config?.nodeId ?? null);
+  setThisNodeId(config?.nodeId ?? null);
 }
 
 const _lastSeenCache = new Map<string, number>();
 const LAST_SEEN_THROTTLE_MS = 5 * 60_000;
 
 function touchAgentLastSeen(auth: VerifiedToken): void {
-  if (!_sessionStorage) return;
+  const storage = sessionStorage();
+  if (!storage) return;
   const isAgent = auth.roles.includes('agent');
   const isEco = auth.roles.includes('ecosystem');
   if (!isAgent && !isEco) return;
@@ -148,9 +156,9 @@ function touchAgentLastSeen(auth: VerifiedToken): void {
   const lastSeenFailed = (err: unknown) =>
     logger.warn('lastSeen update failed; fleet views will show this principal as stale', { id, error: String(err) });
   if (isEco) {
-    _sessionStorage.updateEcosystemApp(id, { lastSeen: iso }).catch(lastSeenFailed);
+    storage.updateEcosystemApp(id, { lastSeen: iso }).catch(lastSeenFailed);
   } else {
-    _sessionStorage.updateAgent(id, { lastSeen: iso }).catch(lastSeenFailed);
+    storage.updateAgent(id, { lastSeen: iso }).catch(lastSeenFailed);
   }
 }
 
@@ -164,10 +172,11 @@ function touchAgentLastSeen(auth: VerifiedToken): void {
  * Returns null if missing/revoked/expired. Records usage without blocking the request.
  */
 async function resolvePatToken(token: string): Promise<VerifiedToken | null> {
-  if (!_sessionStorage) return null;
-  const r = await resolvePat(_sessionStorage, token);
+  const storage = sessionStorage();
+  if (!storage) return null;
+  const r = await resolvePat(storage, token);
   if (!r) return null;
-  _sessionStorage.touchPat(r.patId, new Date().toISOString())
+  storage.touchPat(r.patId, new Date().toISOString())
     .catch(err => logger.warn('PAT lastUsed update failed; the token will look unused', { patId: r.patId, error: String(err) }));
   return {
     sub: r.sub,
@@ -187,34 +196,13 @@ async function resolvePatToken(token: string): Promise<VerifiedToken | null> {
  * tokens, non-browsers, /v1/auth/* (which manage their own cookies), and when a cookie exists.
  */
 function maybeSetPatBrowserSession(req: Request, res: Response, rawToken: string, patAuth: VerifiedToken): void {
-  if (!_config) return;
+  const config = sessionConfig();
+  if (!config) return;
   if (!patAuth.roles.includes('owner')) return;
   if (req.path.startsWith('/v1/auth/')) return;
   if (!String(req.headers['user-agent'] || '').includes('Mozilla')) return;
   if (readRefreshCookie(req)) return;
-  setRefreshCookie(req, res, _config, rawToken);
-}
-
-// Anonymous mode: when enabled, inject this identity for unauthenticated requests
-let _anonymousMode = false;
-let _anonymousGaii = '';
-let _anonymousOwner = '';
-
-/** Called by server.ts after anonymous setup to enable anonymous fallback in auth middleware */
-export function enableAnonymousAuth(gaii: string, owner: string): void {
-  _anonymousMode = true;
-  _anonymousGaii = gaii;
-  _anonymousOwner = owner;
-}
-
-/** Check if anonymous mode is enabled */
-export function isAnonymousMode(): boolean {
-  return _anonymousMode;
-}
-
-/** Get anonymous credentials (gaii + owner) — only valid when isAnonymousMode() is true */
-export function getAnonymousCredentials(): { gaii: string; owner: string } {
-  return { gaii: _anonymousGaii, owner: _anonymousOwner };
+  setRefreshCookie(req, res, config, rawToken);
 }
 
 // Extend Express Request with auth info
@@ -232,8 +220,9 @@ declare global {
  * has marked revoked; a token with no `jti`, or one naming a session nobody tracked, is unaffected.
  */
 async function sessionRevoked(verified: VerifiedToken): Promise<boolean> {
-  if (!verified.sessionId || !_sessionStorage) return false;
-  return _sessionStorage.isSessionRevoked(verified.sessionId);
+  const storage = sessionStorage();
+  if (!verified.sessionId || !storage) return false;
+  return storage.isSessionRevoked(verified.sessionId);
 }
 
 /**
@@ -252,8 +241,9 @@ async function sessionRevoked(verified: VerifiedToken): Promise<boolean> {
  * grant while it stands, null for a token that names none, and false for a revoked or missing one.
  */
 async function standingAppGrant(verified: VerifiedToken): Promise<AppGrantRecord | null | false> {
-  if (!verified.app_grant || !_sessionStorage) return null;
-  const grant = await _sessionStorage.getAppGrant(verified.app_grant);
+  const storage = sessionStorage();
+  if (!verified.app_grant || !storage) return null;
+  const grant = await storage.getAppGrant(verified.app_grant);
   return !grant || grant.revoked === true ? false : grant;
 }
 
@@ -271,8 +261,9 @@ async function standingAppGrant(verified: VerifiedToken): Promise<AppGrantRecord
  * (federation-auth.ts). So are an anonymous identity and a token that names no owner.
  */
 async function accountRefuses(verified: VerifiedToken, grant: AppGrantRecord | null): Promise<boolean> {
-  if (isForeignPrincipal(verified) || verified.anonymous || !verified.owner || !_sessionStorage) return false;
-  const owner = await _sessionStorage.getOwner(verified.owner);
+  const storage = sessionStorage();
+  if (isForeignPrincipal(verified) || verified.anonymous || !verified.owner || !storage) return false;
+  const owner = await storage.getOwner(verified.owner);
   return ownerRefuses(owner, grant ? recordIssuedAt(grant.createdAt) : tokenIssuedAt(verified));
 }
 
@@ -284,8 +275,9 @@ async function accountRefuses(verified: VerifiedToken, grant: AppGrantRecord | n
  * One keyed read per ecosystem request, uncached for the same reason as the checks above.
  */
 async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
-  if (!verified.roles.includes('ecosystem') || !_sessionStorage) return false;
-  const app = await _sessionStorage.getEcosystemApp(verified.sub);
+  const storage = sessionStorage();
+  if (!verified.roles.includes('ecosystem') || !storage) return false;
+  const app = await storage.getEcosystemApp(verified.sub);
   if (!app || app.status !== 'active') return true;
   return madeAfter(app.createdAt, tokenIssuedAt(verified));
 }
@@ -349,15 +341,16 @@ export function optionalAuth() {
           // The scope list on the token is what the agent held when it was minted; the record is
           // what it holds now. Narrowed here, once, so every door downstream — routes, the MCP
           // surface, the tunnel's forwarded calls — reads the same answer without asking again.
-          req.auth = await withCurrentScopes(_sessionStorage, verified);
+          req.auth = await withCurrentScopes(sessionStorage(), verified);
         }
       }
     }
     // Anonymous mode: inject anonymous identity when no auth present
-    if (!req.auth && _anonymousMode) {
+    if (!req.auth && isAnonymousMode()) {
+      const anonymous = getAnonymousCredentials();
       req.auth = {
-        sub: _anonymousGaii,
-        owner: _anonymousOwner,
+        sub: anonymous.gaii,
+        owner: anonymous.owner,
         node: '',
         roles: ['agent'],
         exp: Math.floor(Date.now() / 1000) + 86400,
@@ -431,7 +424,7 @@ export function requireAuth() {
 
     // The same narrowing optionalAuth does, on the same code path and for the same reason: a
     // permission the owner removed is not honoured here either.
-    req.auth = await withCurrentScopes(_sessionStorage, verified);
+    req.auth = await withCurrentScopes(sessionStorage(), verified);
     touchAgentLastSeen(verified);
     next();
   };

@@ -9,6 +9,10 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.8.0 — 2026-09-26 — The revoked-token table is each node's own: initRevocationStorage files a
+ *     node's storage under its node id, and isRevoked, revokeToken and the mint check in issueJWT read
+ *     the one of the node the code runs as (./node-auth.ts), with its cache entries filed per node and
+ *     one expiry sweep per node. One node per process in production, so nothing there changes.
  *   v1.7.0 — 2026-09-26 — issueJWT writes the issue time in milliseconds (`iat_ms`) beside `iat`, from
  *     one clock reading, and verifyJWT carries it as `iatMs`, so a credential's age is compared with
  *     an account or a record to the millisecond (auth/credential-age.ts).
@@ -37,7 +41,8 @@ import { SignJWT, jwtVerify } from 'jose';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { FEDERATED_ROLE, homeIdentityOf, isForeignPrincipal } from '../utils/gaii.js';
+import { FEDERATED_ROLE, currentNodeId, homeIdentityOf, isForeignPrincipal } from '../utils/gaii.js';
+import { PerNode } from './node-auth.js';
 
 // We use EdDSA JWTs signed with the node's private key
 // jose requires CryptoKey objects, so we convert from raw Ed25519 bytes
@@ -115,8 +120,9 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
   // twenty call sites asked. Same shape as provisionOwner's registration-mode backstop — the human
   // doors refuse with a clean 403 before reaching here, and this makes a forgotten door impossible.
   // Federated mints are excluded: their `owner` is a remote node's name, judged by its home node.
-  if (payload.owner && !isForeignPrincipal(payload) && _storage) {
-    const ownerRecord = await _storage.getOwner(payload.owner);
+  const storage = revocationStore.get();
+  if (payload.owner && !isForeignPrincipal(payload) && storage) {
+    const ownerRecord = await storage.getOwner(payload.owner);
     if (ownerRecord?.disabledAt) throw new AccountDisabledError(payload.owner);
   }
 
@@ -271,25 +277,33 @@ function spellingHashOf(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-// In-memory cache for fast repeated lookups (TTL 60 seconds).
+// In-memory cache for fast repeated lookups (TTL 60 seconds), filed per node (cacheKey), so an answer
+// read from one node's table is never another node's.
 // Entries are { revoked: boolean, cachedAt: number }.
 const revocationCache = new Map<string, { revoked: boolean; cachedAt: number }>();
 const CACHE_TTL_MS = 60_000;
 
-// Reference to the storage layer, set via initRevocationStorage().
-let _storage: Storage | null = null;
-let _cleanupInterval: ReturnType<typeof setInterval> | null = null;
+/** Where a key of the revoked-token table is cached: under the node the code runs as. */
+const cacheKey = (key: string): string => `${currentNodeId() ?? ''}\u0000${key}`;
+
+// The storage layer of each node, filed by initRevocationStorage() under the node id and read for the
+// node the code runs as (./node-auth.ts): its revoked-token table and, for the mint check, its
+// accounts. Code that runs as no node reads the one filed last. One expiry sweep per node.
+const revocationStore = new PerNode<Storage>('last');
+const cleanupSweeps = new Map<string, ReturnType<typeof setInterval>>();
 
 /**
- * Initialize the token revocation system with a persistent storage backend.
- * Must be called once during server startup (after storage is created).
+ * Initialize the token revocation system with a persistent storage backend. Called once per node
+ * during server startup (after storage is created), with that node's id; without one, the storage is
+ * filed for the node the code runs as. A production process serves one node.
  */
-export function initRevocationStorage(storage: Storage): void {
-  _storage = storage;
+export function initRevocationStorage(storage: Storage, nodeId?: string): void {
+  const key = revocationStore.set(storage, nodeId);
 
-  // Periodic cleanup of expired revoked tokens (every 60 seconds)
-  if (_cleanupInterval) clearInterval(_cleanupInterval);
-  _cleanupInterval = setInterval(async () => {
+  // Periodic cleanup of this node's expired revoked tokens (every 60 seconds)
+  const previous = cleanupSweeps.get(key);
+  if (previous) clearInterval(previous);
+  cleanupSweeps.set(key, setInterval(async () => {
     try {
       await storage.cleanExpiredRevocations();
     } catch (err) {
@@ -299,12 +313,12 @@ export function initRevocationStorage(storage: Storage): void {
     }
     // Also evict stale cache entries
     const now = Date.now();
-    for (const [key, entry] of revocationCache) {
+    for (const [cached, entry] of revocationCache) {
       if (now - entry.cachedAt > CACHE_TTL_MS) {
-        revocationCache.delete(key);
+        revocationCache.delete(cached);
       }
     }
-  }, 60_000);
+  }, 60_000));
 }
 
 /**
@@ -314,13 +328,14 @@ export function initRevocationStorage(storage: Storage): void {
 export async function revokeToken(token: string, expiresAt: number): Promise<void> {
   const id = tokenIdOf(token);
 
-  // Persist to storage
-  if (_storage) {
-    await _storage.revokeToken(id, expiresAt);
+  // Persist to the storage of the node the code runs as
+  const storage = revocationStore.get();
+  if (storage) {
+    await storage.revokeToken(id, expiresAt);
   }
 
   // Update cache
-  revocationCache.set(id, { revoked: true, cachedAt: Date.now() });
+  revocationCache.set(cacheKey(id), { revoked: true, cachedAt: Date.now() });
 
   // P2: if this token, in any spelling (the tunnel matches on tokenIdOf), holds a live connector
   // tunnel, push `auth_revoked` + close it now so the agent re-auths immediately instead of probing
@@ -358,15 +373,17 @@ export async function isRevoked(token: string): Promise<boolean> {
  */
 async function revokedUnder(key: string): Promise<boolean> {
   // L1: Check in-memory cache
-  const cached = revocationCache.get(key);
+  const cachedUnder = cacheKey(key);
+  const cached = revocationCache.get(cachedUnder);
   if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
     return cached.revoked;
   }
 
-  // L2: Check storage
-  if (_storage) {
-    const revoked = await _storage.isTokenRevoked(key);
-    revocationCache.set(key, { revoked, cachedAt: Date.now() });
+  // L2: Check the storage of the node the code runs as
+  const storage = revocationStore.get();
+  if (storage) {
+    const revoked = await storage.isTokenRevoked(key);
+    revocationCache.set(cachedUnder, { revoked, cachedAt: Date.now() });
     return revoked;
   }
 
