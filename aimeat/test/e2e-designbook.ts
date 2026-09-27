@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.6 — 2026-09-26 — At propose, an at-rule and a counter spelled with a Kelvin sign are read as a
+ *     browser reads them: the at-rule is off the list, and the counter is not the component's own.
  *   v1.8.5 — 2026-09-26 — At propose, a declaration that names a counter, an anchor or a view
  *     transition passes under the prefix and is refused under a name the page shares, through var(),
  *     and as `all: inherit`.
@@ -754,6 +756,14 @@ const GOOD_BODY = {
             if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${decl}: ${said(r)}`);
         }
         assert(wrong.length === 0, `each is refused in its own words: ${wrong.join('; ')}`);
+    });
+
+    await test('a name is read in ASCII lower case, as a browser matches it: spelled with a Kelvin sign, it is neither @keyframes nor the component\'s own', async () => {
+        const stamp = Date.now() % 100000;
+        const kelvin = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n@\\212a eyframes wkgrid-in { from { opacity: 0; } }` }));
+        assert(refusedWith(kelvin, /carries no @Keyframes: it uses only @media/), `an at-rule spelled with a Kelvin sign is off the list: ${said(kelvin)}`);
+        const counter = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `${componentBody().css}\n.wkgrid-cell { counter-increment: w\\212a grid-step; }` }));
+        assert(refusedWith(counter, /names the counter "wKgrid-step"/), `a counter spelled with a Kelvin sign is not the component's own: ${said(counter)}`);
     });
 
     // A component the second owner proposed, stored when it passed an older bench: `.wkgrid ~ p`
