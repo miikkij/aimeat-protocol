@@ -9,6 +9,9 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The redeploy of an active cortex tears down and re-activates as the caller
+ *     (CortexActor), so its actions are published under the caller's resolved identity, as a plain
+ *     activation publishes them (secaudit 2026-09, R3 7c).
  *   v1.2.0 — 2026-09-24 — upsertCortex refuses other lib bytes under a kept version (409
  *     VERSION_EXISTS) before its first write, and its create branch keeps the version it creates
  *     (secaudit 2026-09, A6-7).
@@ -220,7 +223,7 @@ export async function upsertCortex(
   //    for the next /activate.
   let reinitialized = false;
   if (wasActive) {
-    await deactivateExtension(existing, storage, gaii);
+    await deactivateExtension(existing, storage, caller);
     const reinitBase: CortexExtensionRecord = {
       ...existing,
       version: parsed.version,
@@ -235,7 +238,7 @@ export async function upsertCortex(
         libFiles: [],  // repopulated from the new lib components
       },
     };
-    const artifacts = await activateExtension(reinitBase, config, storage, gaii);
+    const artifacts = await activateExtension(reinitBase, config, storage, caller);
     await storage.updateCortexExtension(name, {
       status: 'active',
       activatedAt: now,

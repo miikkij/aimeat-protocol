@@ -11,6 +11,8 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.6.3 — 2026-09-26 — The caller is built with this node's id, so it carries the resolved
+ *     identity an activation publishes a cortex's actions under (secaudit 2026-09, R3 7c).
  *   v1.6.2 — 2026-09-24 — upsertCortex() and CortexUpsertResult moved to ./cortex/upsert.ts and are
  *     re-exported from here (pure move, max-file-lines).
  *   v1.6.1 — 2026-09-13 — upsertCortex refuses a lib component with no content (INVALID_MANIFEST,
@@ -89,7 +91,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   /** Who is asking. In ./cortex/caller.ts, which says why a federated session is not the namesake. */
-  const callerOf = cortexCallerOf;
+  const callerOf = (req: Parameters<typeof cortexCallerOf>[0]) => cortexCallerOf(req, config.nodeId);
 
   // ── GET /v1/cortex — list installed cortex extensions ──
   router.get('/v1/cortex', requireAuth(), requireScope('catalogue:read'), async (req, res) => {

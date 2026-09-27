@@ -9,9 +9,13 @@
  *   public catalogue as provider_gaii, a half-identity. This proves the stored value is the full
  *   GHII, and that the cross-owner delete boundary holds. The same holds on POST /v1/actions, and the
  *   work on such an action is keyed on the GHII as well, so the person who published it takes the
- *   work themselves: sees it in their inbox, accepts, reports progress and delivers.
+ *   work themselves: sees it in their inbox, accepts, reports progress and delivers. A cortex a
+ *   person activates over REST publishes its actions under the same GHII.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=catalogue-identity
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A cortex a person activates publishes its action under their GHII: another
+ *     owner's work on it reaches the person, and deactivation takes the action away (secaudit 2026-09,
+ *     R3 7c).
  *   v1.1.0 — 2026-09-26 — POST /v1/actions from an owner session stores the GHII; the owner takes work
  *     on it end to end, the requester rates it, and another owner can neither read nor move it.
  *   v1.0.0 — 2026-08-23 — Initial: owner-session provider_gaii is a GHII; cross-owner delete → 404.
@@ -166,6 +170,57 @@ await test('The publisher updates and unpublishes the action under the same name
     assert(other.status === 404, `another owner removed it: ${other.status}`);
     const del = await json(`/v1/actions/${workActionId}`, { ...auth(aTok), method: 'DELETE' });
     assert(del.status === 200, `unpublish: ${del.status} ${JSON.stringify(del.body)}`);
+});
+
+// ── A cortex a person activates over REST ──
+// Activation publishes the cortex's actions under the caller's resolved identity, as POST /v1/actions
+// does: a person's GHII. The work doors find the action there, and deactivation takes it away.
+const cortexName = `catcortex${ts}`;
+const cortexActionId = `cortex-${cortexName}-proofread`;
+
+await test('A person activates a cortex: its action is under their GHII, work on it reaches them, and deactivation removes it', async () => {
+    const manifest = [
+        'apiVersion: cortex.aimeat.org/v1',
+        'kind: Extension',
+        'metadata:',
+        `  name: ${cortexName}`,
+        `  namespace: ${aName}`,
+        'spec:',
+        '  version: 1.0.0',
+        '  components:',
+        '    - type: action',
+        '      name: proofread',
+        '      description: Proofreads a text',
+        '      input_schema:',
+        '        type: object',
+    ].join('\n');
+    const inst = await json('/v1/cortex', { ...auth(aTok), method: 'POST', body: JSON.stringify({ manifest }) });
+    assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
+    const on = await json(`/v1/cortex/${cortexName}/activate`, { ...auth(aTok), method: 'POST' });
+    assert(on.status === 200, `activate: ${on.status} ${JSON.stringify(on.body)}`);
+
+    const detail = await json(`/v1/actions/${encodeURIComponent(aGhii)}/${cortexActionId}`);
+    assert(detail.status === 200, `the cortex action must be found under the GHII "${aGhii}", got ${detail.status}`);
+    const bare = await json(`/v1/actions/${encodeURIComponent(aName)}/${cortexActionId}`);
+    assert(bare.status === 404, `nothing may be published under the bare name "${aName}", got ${bare.status}`);
+
+    const req = await json('/v1/work/request', {
+        ...auth(bTok), method: 'POST',
+        body: JSON.stringify({ action_id: cortexActionId, provider_gaii: aGhii, input: { text: 'teh text' } }),
+    });
+    assert(req.status === 201, `request: ${req.status} ${JSON.stringify(req.body)}`);
+    const tc = req.body.data.tracking_code;
+    const inbox = await json('/v1/work/inbox', auth(aTok));
+    assert((inbox.body.data?.items ?? []).some((w: any) => w.tracking_code === tc), `the person's inbox lacks the work: ${JSON.stringify(inbox.body.data)}`);
+    const rej = await json(`/v1/work/${tc}/reject`, { ...auth(aTok), method: 'POST' });
+    assert(rej.status === 200, `the person rejects it: ${rej.status} ${JSON.stringify(rej.body)}`);
+
+    const off = await json(`/v1/cortex/${cortexName}/deactivate`, { ...auth(aTok), method: 'POST' });
+    assert(off.status === 200, `deactivate: ${off.status} ${JSON.stringify(off.body)}`);
+    const gone = await json(`/v1/actions/${encodeURIComponent(aGhii)}/${cortexActionId}`);
+    assert(gone.status === 404, `deactivation must take the action away, got ${gone.status}`);
+    const del = await json(`/v1/cortex/${cortexName}`, { ...auth(aTok), method: 'DELETE' });
+    assert(del.status === 200, `uninstall: ${del.status} ${JSON.stringify(del.body)}`);
 });
 
 await test('Publishing a service without a credential is refused (401)', async () => {
