@@ -5,6 +5,9 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.9.0 — 2026-09-26 — A pseudo whose argument is words and numbers passes (::part(label),
+ *     :state(on), :nth-col(2n+1)); one whose argument is a selector the parser cannot read, and every
+ *     pseudo that names the page, is refused.
  *   v1.8.0 — 2026-09-26 — A rule nested behind "&" reads "&" as the parent rule's own elements, and
  *     "&" at the top of the stylesheet as the page; a rule nested without "&" is refused with the
  *     forms that pass.
@@ -376,6 +379,30 @@ describe('the component bench', () => {
     expect(bad(nest('.wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}", "&:hover \{ … \}"/);
     expect(bad(nest('> .wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}"/);
     expect(readStylesheet('.a { & .b { c: d } }').selectors.map(s => [s.text, s.nested])).toEqual([['.a', false], ['& .b', true]]);
+  });
+
+  // A pseudo-class only narrows the element its compound names, and a pseudo-element hangs off it,
+  // so an argument of words and numbers changes nothing a rule reaches. A pseudo whose argument is
+  // a selector the parser cannot read, and every pseudo that names the page, stay refused.
+  it('reads a pseudo whose argument is only words and numbers, and refuses one it cannot follow', () => {
+    const rule = (selector: string) => ({ css: `${WEEK_GRID.css}\n${selector} { color: var(--ak-accent); }` });
+    for (const ok of [
+      '.wkgrid-cell::part(label)', '.wkgrid-cell::part(label icon)', '.wkgrid-cell:state(on)', '.wkgrid-cell:nth-col(2n+1)',
+      '.wkgrid-cell::highlight(wkgrid-hit)', '.wkgrid::view-transition-old(wkgrid-a)', '.wkgrid-cell:state(on)::part(label)',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, ...rule(ok) }), ok).not.toThrow();
+    }
+    expect(readStylesheet('.a::part(b) { c: d }').unreadable).toBeNull();
+    expect(bad(rule('.wkgrid-cell:foo(.a > p)'))).toThrow(/does not read as a selector/);
+    expect(bad(rule('.wkgrid-cell:foo("x")'))).toThrow(/does not read as a selector/);
+    expect(bad(rule('.wkgrid-cell:current(p)'))).toThrow(/does not read as a selector/);
+    expect(bad(rule('.wkgrid-cell:foo(url(x))'))).toThrow(/no url\(\)/);
+    expect(bad(rule('.wkgrid-cell:host(.x)'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid-cell::slotted(p)'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid-cell:host-context(body)'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid-cell:root'))).toThrow(/names the page itself/);
+    expect(bad(rule('p::part(label)'))).toThrow(/starts at one of its own classes/);
+    expect(bad(rule('.wkgrid ~ p::part(label)'))).toThrow(/beside it/);
   });
 
   it('wears the page it lands in: a literal colour is refused with the tokens named, a fallback is fine', () => {

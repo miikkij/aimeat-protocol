@@ -27,6 +27,9 @@
  *   DeclarationRead · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.2.0 — 2026-09-26 — A pseudo whose argument is not a selector, and which the parser keeps as raw
+ *     text holding only words and numbers (::part(label), :state(on), :nth-col(2n+1)), reads as
+ *     `plain`, and the walk does not report that text as unreadable.
  *   v2.1.0 — 2026-09-26 — readStylesheet says of every selector whether it stands in a rule nested
  *     inside a style rule (`nested`), at-rules between them or not: there "&" is that rule's own
  *     elements, and at the top of the stylesheet it is the page.
@@ -195,8 +198,10 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
  *   - `list`: a selector list (:is, :where, :not, :has, ::slotted, …), each entry a complex selector,
  *     or null where one does not read as a selector;
  *   - `nth`: :nth-child() and its kin, with the list after "of" when there is one;
- *   - `plain`: words, strings and commas, which name no element (:lang(fi), :dir(rtl));
- *   - `unreadable`: anything the parser kept as raw text, a pseudo it does not know included.
+ *   - `plain`: words, strings and commas, which name no element (:lang(fi), :dir(rtl)), and the
+ *     argument of a pseudo whose argument is not a selector, when the parser kept it as raw text and
+ *     it holds only words, numbers, commas and spaces (::part(label), :state(on), :nth-col(2n+1));
+ *   - `unreadable`: anything else the parser kept as raw text.
  */
 export interface Pseudo {
   name: string;
@@ -338,10 +343,13 @@ export function readStylesheet(css: string): StylesheetReading {
     walk(ast, {
       enter(node) {
         if (node.type === 'Raw') reading.unreadable ??= node.value.trim().slice(0, 60);
+        // Raw text a pseudo holds that is only words and numbers is read, not refused (pseudoOf).
+        else if ((node.type === 'PseudoClassSelector' || node.type === 'PseudoElementSelector') && wordsOnly(node)) return this.skip;
         else if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes++;
         else if (node.type === 'Rule' && keyframes === 0) reading.selectors.push(...selectorsOfRule(node, css, styleRules > 0));
         else if (node.type === 'Declaration' && !this.atrulePrelude) reading.declarations.push(declarationOf(node, css));
         if (node.type === 'Rule') styleRules++;
+        return undefined;
       },
       leave(node) {
         if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes--;
@@ -425,10 +433,36 @@ function complexOf(selector: Selector): ComplexSelector | null {
   return out;
 }
 
+/** Pseudos whose argument is a selector: the checks follow that argument, so a raw one stays unreadable. */
+const SELECTOR_ARGUMENT = new Set([
+  'is', 'where', 'not', 'matches', '-webkit-any', '-moz-any', 'has', 'nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type',
+  'host', 'host-context', 'slotted', 'cue', 'cue-region', 'current', 'past', 'future',
+]);
+/** The tokens an argument of words and numbers is made of. */
+const WORD_TOKENS = new Set([T.Ident, T.Number, T.Dimension, T.Percentage, T.Comma, T.WhiteSpace]);
+
+/**
+ * Whether a pseudo holds, as raw text, an argument of words and numbers only: ::part(label),
+ * :state(on), :nth-col(2n+1). A pseudo-class only narrows the element its compound names and a
+ * pseudo-element hangs off it, so such an argument changes nothing a rule reaches. A pseudo whose
+ * argument is a selector is never read this way: its argument is what the checks follow.
+ */
+function wordsOnly(node: PseudoClassSelector | PseudoElementSelector): boolean {
+  if (node.children === null || SELECTOR_ARGUMENT.has(nameOf(node.name))) return false;
+  const kids = node.children.toArray();
+  return kids.length > 0 && kids.every(kid => {
+    if (kid.type !== 'Raw') return false;
+    let words = true;
+    tokenize(kid.value, type => { if (!WORD_TOKENS.has(type)) words = false; });
+    return words;
+  });
+}
+
 /** A pseudo-class or pseudo-element with what its parentheses hold, as css-tree read it. */
 function pseudoOf(node: PseudoClassSelector | PseudoElementSelector): Pseudo {
   const pseudo: Pseudo = { name: nameOf(node.name), element: node.type === 'PseudoElementSelector', arg: null };
   if (node.children === null) return pseudo;
+  if (wordsOnly(node)) { pseudo.arg = { kind: 'plain' }; return pseudo; }
   const kids = node.children.toArray();
   const [only] = kids;
   if (kids.length === 1 && only.type === 'SelectorList') pseudo.arg = { kind: 'list', list: listOf(only) };

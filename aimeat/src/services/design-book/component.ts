@@ -30,6 +30,9 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.7.0 — 2026-09-26 — A pseudo whose argument is not a selector and is only words and numbers
+ *     (::part(label), :state(on), :nth-col(2n+1)) passes: it narrows the element its compound names
+ *     and changes nothing a rule reaches. A pseudo that names the page stays refused by its name.
  *   v1.6.0 — 2026-09-26 — A rule nested inside a style rule may start at "&", which is that rule's own
  *     elements (and every selector of that rule is checked too); "&" anywhere at the top of the
  *     stylesheet is the page. The refusal of a rule the parser keeps raw shows the nested forms that
@@ -310,8 +313,8 @@ function isOwnCompound(c: Compound, prefix: string, nested: boolean, depth = 0):
 /**
  * Why a compound reaches the page, its functional pseudo-classes followed down, or null. A pseudo's
  * argument is what the CSS parser made of it (component-scan.ts Pseudo), so a pseudo it does not
- * know, whose argument it keeps as raw text, cannot be followed and is refused. "&" outside a
- * nested rule is the page (:scope, the document's root).
+ * know, whose argument it keeps as raw text, cannot be followed and is refused, unless that text is
+ * only words and numbers. "&" outside a nested rule is the page (:scope, the document's root).
  */
 function compoundEscape(c: Compound, prefix: string, first: boolean, nested: boolean, depth = 0): SelectorEscape | null {
   if (c.types.some(t => PAGE_TYPES.has(t)) || (first && c.types.includes('*')) || (c.nesting && !nested)) return 'page';
