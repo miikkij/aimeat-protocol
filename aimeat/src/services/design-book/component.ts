@@ -35,6 +35,9 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.11.0 — 2026-09-26 — A stylesheet carrying @scope is refused in a sentence of its own, which shows
+ *     the same rule written on the component's own classes: inside @scope, "&" stands for the elements
+ *     its prelude chooses, and a component's own classes already keep every rule inside it.
  *   v1.10.0 — 2026-09-26 — componentBench answers why a stored body no longer passes, once per body and
  *     process, through the same checks a proposal passes (benchTexts). The preview sentence and the
  *     snippet's refusal carry that reason, the preview's escaped, and componentAsRead withholds the
@@ -227,6 +230,14 @@ function checkMarkup(html: string, prefix: string): void {
 
 /** At-rules that load something from an address. */
 const LOADING_AT_RULES = new Set(['import', 'font-face', 'namespace']);
+/**
+ * Inside @scope, "&" stands for the elements its prelude chooses, which can be outside the component,
+ * and the component's own classes already keep every rule inside it. So @scope is refused, with the
+ * same rule written on the component's own classes.
+ */
+const SCOPE_REFUSAL = (prefix: string) => 'A component\'s stylesheet carries no @scope, and a component does not need it: its own classes already keep every rule inside it. '
+  + 'Inside @scope, "&" stands for the elements its prelude chooses, and they can be outside the component. '
+  + `Write the same rule on the component's own classes: "@scope (.${prefix}) { .${prefix}-cell { … } }" is ".${prefix} .${prefix}-cell { … }", or "& .${prefix}-cell { … }" inside ".${prefix} { … }".`;
 /** Functions that take an address: url() as a token or a function, and the ones that take it as a plain string. */
 const loads = (fn: string) => fn === 'url' || fn === 'src' || fn === 'image' || fn.endsWith('image-set');
 /** Properties that bind a behaviour, in the browsers that had them. */
@@ -246,6 +257,7 @@ function checkStyles(css: string, prefix: string): void {
   // declarations and selectors from its parser. A string is one token: what it holds is text.
   const sheet = readStylesheet(css);
   if (sheet.atRules.some(name => LOADING_AT_RULES.has(name))) refuse('A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).');
+  if (sheet.atRules.includes('scope')) refuse(SCOPE_REFUSAL(prefix));
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
   if (sheet.functions.some(loads)) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
   if (sheet.depth > MAX_NESTING) {

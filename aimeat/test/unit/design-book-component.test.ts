@@ -5,6 +5,9 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.13.0 — 2026-09-26 — A stylesheet carrying @scope is refused wherever it stands, its name escaped
+ *     or in capitals included, and the refusal shows the rule on the component's own classes; a string
+ *     or a comment naming @scope passes.
  *   v1.12.0 — 2026-09-26 — The preview and the snippet say why a stored component no longer passes,
  *     the preview's words escaped.
  *   v1.11.0 — 2026-09-26 — A repeated attribute, a missing space between attributes and a "/" on a
@@ -385,6 +388,27 @@ describe('the component bench', () => {
     expect(bad(nest('.wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}", "&:hover \{ … \}"/);
     expect(bad(nest('> .wkgrid-cell { color: var(--ak-accent); }'))).toThrow(/"& \.wkgrid-cell \{ … \}"/);
     expect(readStylesheet('.a { & .b { c: d } }').selectors.map(s => [s.text, s.nested])).toEqual([['.a', false], ['& .b', true]]);
+  });
+
+  // Inside @scope, "&" stands for the elements its prelude chooses, which can be outside the
+  // component. A component's own classes already keep every rule inside it, so it carries no @scope.
+  it('refuses @scope wherever it stands, and says how to write the rule on the component\'s own classes', () => {
+    // Nested in a rule of the component, the prelude makes "&" the page's <body>.
+    expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid { @scope (body) { & p { color: var(--ak-accent); } } }` }))
+      .toThrow(/carries no @scope, and a component does not need it.*"@scope \(\.wkgrid\) \{ \.wkgrid-cell \{ … \} \}" is "\.wkgrid \.wkgrid-cell \{ … \}", or "& \.wkgrid-cell \{ … \}" inside "\.wkgrid \{ … \}"/);
+    for (const css of [
+      `@scope (.wkgrid) { .wkgrid-cell { color: var(--ak-accent); } }\n${WEEK_GRID.css}`,
+      `${WEEK_GRID.css}\n.wkgrid-row { @scope (.wkgrid-row) to (.wkgrid-cell) { & { color: var(--ak-accent); } } }`,
+      `${WEEK_GRID.css}\n@media (min-width: 1px) { .wkgrid { @scope (html) { & .wkgrid-cell { color: var(--ak-accent); } } } }`,
+      `${WEEK_GRID.css}\n.wkgrid { @SCOPE (body) { & p { color: var(--ak-accent); } } }`,
+      `${WEEK_GRID.css}\n.wkgrid { @\\73 cope (body) { & p { color: var(--ak-accent); } } }`,
+    ]) {
+      expect(bad({ css }), css).toThrow(/carries no @scope/);
+    }
+    // What a string or a comment holds is text.
+    for (const css of [`${WEEK_GRID.css}\n.wkgrid-cell::after { content: "@scope (body)"; }`, `${WEEK_GRID.css}\n/* no @scope here */`]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css }), css).not.toThrow();
+    }
   });
 
   // A pseudo-class only narrows the element its compound names, and a pseudo-element hangs off it,
