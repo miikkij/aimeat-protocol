@@ -34,6 +34,8 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.10.1 — 2026-09-26 — PART_KEY_PREFIX is defined in utils/own-door-keys.ts, beside the refusal the
+ *     generic memory doors give for a part, and exported from here as before.
  *   v1.10.0 — 2026-09-26 — A COMPONENT is benched again when it is read (component.ts componentBench):
  *     get() answers `bench`, and a component that no longer passes keeps its markup and stylesheet
  *     from every reader but its proposer; list(), and so the search and the map, leave it out, and
@@ -94,8 +96,10 @@ import { buildDesignBookMap } from './map.js';
 import { DesignBookReasons } from './reasons.js';
 import { componentAsRead, componentBench, componentSnippet, type ComponentBenchRead, type ComponentBody } from './component.js';
 import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
+// Where a part is stored lives beside what a generic memory door answers for one (utils/own-door-keys.ts).
+import { DESIGN_BOOK_PART_PREFIX as PART_KEY_PREFIX } from '../../utils/own-door-keys.js';
 
-export const PART_KEY_PREFIX = 'atelier.book.part.';
+export { PART_KEY_PREFIX };
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
 /** Which stored body of a component its proposer was told no longer passes (component-notice.ts). */
 export const NOTICE_KEY_PREFIX = 'atelier.book.notice.';

@@ -18794,7 +18794,8 @@ paths:
           description: >
             `own` (default) searches all of the caller's content; `public` searches public-visibility
             content across the whole node (knowledge packages, public workspace documents, public
-            memory), each hit carrying its producer.
+            memory), each hit carrying its producer. A Design Book part is never a hit: it is found
+            and read through the Design Book (GET /v1/designbook, GET /v1/designbook/{id}).
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -19375,7 +19376,9 @@ paths:
         with the specified visibility (defaults to 'private'). The copy keeps the
         source's key, so an `organism.*` key gets the organism rule POST /v1/memory
         applies, and a caller that may not write it there is refused (403 ACCESS_DENIED
-        or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist).
+        or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist). A
+        Design Book part is not copied: 403 DESIGN_BOOK_PART names GET /v1/designbook/{id},
+        the one door that reads a part.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19819,7 +19822,11 @@ paths:
       summary: Read public memory entry
       description: |
         Read a public memory entry by GAII and key. No auth required for public
-        entries. For shared entries, consent is checked.
+        entries. For shared entries, consent is checked. A Design Book part (a key
+        starting `atelier.book.part.` under the node's own system identity) is read
+        through the Design Book, the one door that reads it: this door answers
+        403 DESIGN_BOOK_PART, with or without `soft`, and its `details.door` names
+        GET /v1/designbook/{id}.
       tags: [Memory]
       parameters:
         - name: gaii

@@ -29,6 +29,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.7 — 2026-09-26 — ctx.memory.getPublic refuses a Design Book part with `DESIGN_BOOK_PART: …`,
+ *     naming GET /v1/designbook/:id, the one door that reads a part (utils/own-door-keys.ts).
  *   v1.6.6 — 2026-09-26 — RESPONSE_TOO_LARGE names the host the script called, with its port, so an
  *     owner whose script calls several services can tell which one answered too much. The userinfo,
  *     the path, the query and the fragment stay out of it, since each can carry a key (secaudit
@@ -79,6 +81,7 @@ import type { ExtensionCtx } from './extension-runtime.js';
 import type { EmailService } from './email.js';
 import { enforceExtensionMemoryLimits } from './quota.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
@@ -546,6 +549,10 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             },
 
             getPublic: async (namespace, key) => {
+                // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which
+                // benches a component again before it hands one out (utils/own-door-keys.ts).
+                const ownDoor = ownDoorRefusal(namespace, key, config.nodeId);
+                if (ownDoor) throw new Error(`${ownDoor.code}: ${ownDoor.message}`);
                 let record = await storage.getMemory(namespace, key);
                 // A bare owner name resolves through that owner's agents. One IN query rather than
                 // one lookup per agent: the per-agent loop was the older shape and it is still in
