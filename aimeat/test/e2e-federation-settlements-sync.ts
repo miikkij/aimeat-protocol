@@ -44,6 +44,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — A route a person starts in person names their full identity in the claim to
+ *     the target and in the claim to a relaying peer, and the routing fee is filed under it (secaudit
+ *     2026-09, R3 9).
  *   v1.4.0 — 2026-09-26 — Cross-node work a person submits in person tells the peer their full
  *     identity, and the routing fee is filed under it.
  *   v1.3.0 — 2026-09-16 — A multi-hop relay carries no Authorization header to the relaying peer.
@@ -495,6 +498,37 @@ async function run(): Promise<void> {
         });
         assert(status === 404 && body.error?.code === 'FEDERATION_ERROR', `expected 404, got ${status}: ${JSON.stringify(body)}`);
         assert(String(body.error?.message).includes('No route'), `message: ${body.error?.message}`);
+    });
+
+    // A person starts a route in person. The next node is told who asked by their full identity: a
+    // bare account name means nobody there, or that node's own namesake. The routing fee is filed under
+    // the same identity, so the ledger names no other principal as having made the call.
+    await test('a person starts a route in person: each claim names their full identity, and the fee is filed under it', async () => {
+        const direct = await A.json('/v1/federation/route', {
+            method: 'POST', headers: auth(A.ownerToken),
+            body: JSON.stringify({ target_node: FAKE_ID, method: 'GET', path: '/v1/nodeinfo' }),
+        });
+        assert(direct.status === 200, `direct: ${direct.status} ${JSON.stringify(direct.body)}`);
+        const straight = seen.filter(s => s.path === '/v1/nodeinfo').pop();
+        assert(straight?.relayClaim?.caller === A.ownerGhii,
+            `the claim to the target names the person's full identity: ${JSON.stringify(straight?.relayClaim)}`);
+
+        const relayed = await A.json('/v1/federation/route', {
+            method: 'POST', headers: auth(A.ownerToken),
+            body: JSON.stringify({ target_node: `aimeat-far-away-${stamp}`, method: 'POST', path: '/v1/ping', body: { hello: 2 } }),
+        });
+        assert(relayed.status === 200, `relayed: ${relayed.status} ${JSON.stringify(relayed.body)}`);
+        const hop = seen.filter(s => s.path === '/v1/federation/route').pop();
+        assert(hop?.relayClaim?.caller === A.ownerGhii,
+            `the claim to the relaying peer names the person's full identity: ${JSON.stringify(hop?.relayClaim)}`);
+
+        const all = (await A.json('/v1/wallet/transactions?type=federation_routing', { headers: auth(A.ownerToken) })).body.data?.transactions ?? [];
+        const fees = all.filter((t: any) => String(t.tracking_code ?? '').startsWith('relay:'));
+        assert(fees.length >= 2, `both routes took their fee: ${JSON.stringify(fees)}`);
+        assert(!fees.some((t: any) => t.initiator_gaii === A.ownerName),
+            `a routing fee names the bare account name as the one who called: ${JSON.stringify(fees)}`);
+        assert(fees.every((t: any) => t.amount === -1 && (t.initiator_gaii ?? null) === null),
+            `every routing fee is the person's own, with nobody else as the one who called: ${JSON.stringify(fees)}`);
     });
 
     await test('resolve finds a local agent, a node-hinted GAII, a peer that answers, and nothing', async () => {

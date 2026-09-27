@@ -29,6 +29,8 @@
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The fake peer records the relay claim it received (`relayClaim`, the claim's
+ *     JSON decoded), so a suite can read who the claim names as the caller.
  *   v1.1.0 — 2026-09-16 — The fake peer records the Authorization header it received.
  *   v1.0.0 — 2026-09-08 — Extracted from test/e2e-federation-settlements-sync.ts.
  */
@@ -168,7 +170,15 @@ export const modes = {
 };
 
 /** Every request the fake peer received, so an outbound body can be held to what was claimed. */
-export const seen: { path: string; method: string; body: any; authorization?: string }[] = [];
+export const seen: { path: string; method: string; body: any; authorization?: string; relayClaim?: any }[] = [];
+
+/** The relay claim a request carried, decoded from its base64url JSON; undefined when there was none. */
+function relayClaimOf(req: http.IncomingMessage): unknown {
+    const raw = req.headers['x-relay-claim'];
+    const encoded = Array.isArray(raw) ? raw[0] : raw;
+    if (!encoded) return undefined;
+    try { return JSON.parse(Buffer.from(encoded, 'base64url').toString('utf-8')); } catch { return { _undecodable: encoded }; }
+}
 
 function readBody(req: http.IncomingMessage): Promise<string> {
     return new Promise(resolve => {
@@ -196,7 +206,7 @@ export function startFakePeer(): Promise<{ server: Server; url: string }> {
             const raw = await readBody(req);
             let parsed: unknown;
             try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = { _unparsed: raw }; }
-            seen.push({ path, method: req.method ?? '', body: parsed, authorization: req.headers.authorization });
+            seen.push({ path, method: req.method ?? '', body: parsed, authorization: req.headers.authorization, relayClaim: relayClaimOf(req) });
 
             if (path === '/v1/federation/settle') {
                 if (modes.settle === 'fail') { send(res, 500, { ok: false, error: { code: 'PEER_BROKEN' } }); return; }

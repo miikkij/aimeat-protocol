@@ -41753,6 +41753,10 @@ paths:
         in a multi-hop relay each node signs for the node it hands to, so a receiver only ever
         decides about a peer whose key it has pinned.
 
+        The node where the route starts names the person who asked by their full identity, their
+        GHII, in the claim's `caller`, and takes the 1-morsel routing fee from that identity. Each
+        later hop carries the same `caller` forward and charges no fee.
+
         WHAT A RECEIVER ANSWERS, on any path a relay reaches, always 403 and never 401. A 401 would
         invite a retry with credentials, and no credential of the original caller's fixes any of
         these. Every message says the refusal is about the link between the two nodes rather than
