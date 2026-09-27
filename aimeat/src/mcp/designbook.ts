@@ -169,7 +169,7 @@ export function registerDesignbookTools(
                 note: out.kind === 'component'
                     ? 'Taken. Build `snippet.html` and `snippet.css` into your page as they are, and wire the behaviour yourself as `snippet.use` says: a component carries no script. It reads the page\'s tokens, so inside a genre it wears the genre. Name it in your page\'s build notes (`took`, with why you chose it): that is what counts it as used.'
                     : out.kind === 'fill'
-                    ? 'Adopted. This part is a starting shape: its <placeholder> texts are yours to replace with aimeat_app_ui_set.'
+                    ? 'Adopted. This part is a starting shape: its <placeholder> texts are yours to replace with aimeat_app_manage (action "ui_set").'
                     : out.kind === 'ambient'
                         ? 'Adopted. The ambient runs behind the app on its next open; its arrangement and look are untouched, and only the part\'s own tokens merged in.'
                         : out.kind === 'effect'

@@ -2,7 +2,7 @@
  * @file visitors.js
  * @description The Visitors section of the App Detail view: who opened this app, when, and from
  *   where. Read from GET /v1/apps/visitors, the same answer the owner's AI gets from
- *   aimeat_app_visitors, so the screen and the chat never disagree.
+ *   aimeat_app_manage (action "visitors"), so the screen and the chat never disagree.
  *
  *   TWO HALVES, AND THE SECOND IS OFF UNTIL ASKED FOR. Opens are always counted, so the first half
  *   is there for every published app: how many opens in the window, by signed-in people and by

@@ -15,6 +15,8 @@
  *     an integration needs instead of the person pasting it into the chat.
  *   v2.2.0 -- 2026-09-23 -- Register the component catalogue tools (aimeat_ui_component_list/get).
  *   v2.3.0 -- 2026-09-24 -- Register the theme tools (aimeat_theme_list/get/save/style_save/component_css_set).
+ *   v2.4.0 -- 2026-09-27 -- aimeat_app_manage (app-manage.ts) replaces the app-ui pair and, in apps.ts,
+ *     the screenshot, versions, seo, marks, visitors, legal and audit tools.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
@@ -62,7 +64,7 @@ import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
-import { registerAppUiTools } from './app-ui.js';
+import { registerAppManageTool } from './app-manage.js';
 import { registerDesignbookTools } from './designbook.js';
 import { registerUiLibraryTools } from './ui-library.js';
 import { registerThemeTools } from './themes.js';
@@ -114,7 +116,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerCompanyTools(mcp, registry);
   registerPortfolioTools(mcp, registry);
   registerSurfaceLayoutTools(mcp, registry);
-  registerAppUiTools(mcp, registry);
+  registerAppManageTool(mcp, registry);
   registerDesignbookTools(mcp, registry);
   registerUiLibraryTools(mcp, registry);
   registerThemeTools(mcp, registry);

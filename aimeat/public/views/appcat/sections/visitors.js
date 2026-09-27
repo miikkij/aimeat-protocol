@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The detail section "Visitors" (features F333–F337, F164–F165, F174, routes F224–F226):
  *   who opened this app, when, and from where, read from GET /v1/apps/visitors, the same answer the
- *   owner's AI gets from aimeat_app_visitors, so the screen and the chat never disagree.
+ *   owner's AI gets from aimeat_app_manage (action "visitors"), so the screen and the chat never disagree.
  *
  *   TWO HALVES, AND THE SECOND IS OFF UNTIL ASKED FOR. Opens are always counted: how many in the
  *   window, by signed-in people and by nobody signed in, as five numbers and a chart. What KIND of

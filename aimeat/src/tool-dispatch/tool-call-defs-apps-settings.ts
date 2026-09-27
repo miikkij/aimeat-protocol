@@ -2,15 +2,16 @@
  * @file src/tool-dispatch/tool-call-defs-apps-settings.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The CLI dispatch definitions for an app's SETTINGS: search visibility
- *   (aimeat_app_seo_set, aimeat_seo_status), the badge and install-chip switches
- *   (aimeat_app_marks_set), the app's own legal pages (aimeat_app_legal_set) and its audit log
- *   (aimeat_app_audit). A pure extraction from tool-call-defs-apps.ts when that file passed the
+ * @description The CLI dispatch definitions for the node's search visibility (aimeat_seo_status,
+ *   aimeat_seo_announce). An app's own settings are aimeat_app_manage since 2026-09-27
+ *   (tool-call-defs-app-manage.ts). A pure extraction from tool-call-defs-apps.ts when that file passed the
  *   800-line ceiling; the entries are spread back into appTools, so the assembled table, the
  *   parity gates and test/unit/cli-tool-param-forwarding.test.ts see the same list as before.
  * @structure appSettingsTools: ConnectCliToolDefinition[]
  * @usage import { appSettingsTools } from './tool-call-defs-apps-settings.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-27 -- The six per-app tools moved into aimeat_app_manage; the two node-wide SEO
+ *     tools stay.
  *   v1.4.0 -- 2026-09-18 -- aimeat_app_visitors and aimeat_app_visitors_measure, on the third surface
  *     in the same change as the other two.
  *   v1.3.0 -- 2026-09-11 -- aimeat_seo_announce: the whole site to IndexNow (or its plan), on the
@@ -21,150 +22,10 @@
  *   v1.1.0 -- 2026-08-29 -- aimeat_app_legal_set forwards ai_provenance / ai_provenance_id in the PATCH body.
  *   v1.0.0 -- 2026-08-29 -- Extracted from tool-call-defs-apps.ts (max-file-lines), no behaviour change.
  */
-import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, optionalString, optionalBoolean, optionalNumber, optionalArray } from './tool-call-helpers.js';
+import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
+import { optionalString, optionalBoolean } from './tool-call-helpers.js';
 
 export const appSettingsTools: ConnectCliToolDefinition[] = [
-    {
-        // → PATCH /v1/apps/:filename — the app owner's own search-visibility switch and wording.
-        //   Only the fields the caller named travel: an absent field means "leave it alone", so
-        //   flipping the switch never wipes a title written on an earlier visit. The dispatch
-        //   refuses an undeclared parameter rather than dropping it (withDeclaredInputOnly), which
-        //   is what stops this door from succeeding while having done less than it was asked.
-        name: 'aimeat_app_seo_set',
-        description: 'Decide whether one of your apps can be found in a search engine, and what it says about itself when it is. Off until you ask.',
-        input: {
-            filename: { type: 'string', required: true, description: 'The app to change, with its extension (e.g. "notes.html").' },
-            index: { type: 'boolean', description: 'true makes the app findable in search engines; false takes it back out.' },
-            title: { type: 'string', description: 'Title for search results and social cards. Empty derives it from the app name.' },
-            description: { type: 'string', description: 'Description for search results. Empty derives it from the app description.' },
-            keywords: { type: 'array', description: 'Keywords. Empty uses the app tags.' },
-            image: { type: 'string', description: 'Absolute https URL for the social card. Empty uses the app screenshot.' },
-            lang: { type: 'string', description: 'Language tag such as "fi". Empty reads what the app declares about itself.' },
-        },
-        handler: ({ client }, input) => {
-            const seo: JsonObject = {};
-            const index = optionalBoolean(input, 'index');
-            if (index !== undefined) seo.index = index;
-            for (const field of ['title', 'description', 'image', 'lang'] as const) {
-                const v = optionalString(input, field);
-                if (v !== undefined) seo[field] = v;
-            }
-            const keywords = optionalArray(input, 'keywords');
-            if (keywords) seo.keywords = keywords;
-            return client.patch(`/v1/apps/${encodeURIComponent(requiredString(input, 'filename'))}`, { seo });
-        },
-    },
-    {
-        // → PATCH /v1/apps/:filename — the app owner's badge and install-chip switches. Only the
-        //   fields the caller named travel. The reviewer's name is not a field on purpose (see the
-        //   connector door): the route refuses it from any agent token.
-        name: 'aimeat_app_marks_set',
-        description: 'Switch the "publish your own app" badge and the browser install offer on one of your served apps. Both on until you ask; naming nothing reports where the app stands.',
-        input: {
-            filename: { type: 'string', required: true, description: 'The app to change, with its extension (e.g. "notes.html").' },
-            badge: { type: 'boolean', description: 'false takes the "publish your own app" badge off this app; true puts it back.' },
-            install: { type: 'boolean', description: 'false stops offering visitors to install this app in their browser; true offers it again.' },
-        },
-        handler: ({ client }, input) => {
-            const marks: JsonObject = {};
-            for (const field of ['badge', 'install'] as const) {
-                const v = optionalBoolean(input, field);
-                if (v !== undefined) marks[field] = v;
-            }
-            return client.patch(`/v1/apps/${encodeURIComponent(requiredString(input, 'filename'))}`, { marks });
-        },
-    },
-    {
-        // → GET /v1/apps/visitors?filename=… — who opened one of the owner's own apps. A bare
-        //   filename is "one of mine" on the route, so this door never spells the account out.
-        name: 'aimeat_app_visitors',
-        description: 'Who opened one of your own apps over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, and, once measurement is on, people against named AIs against other bots, and where the people came from.',
-        input: {
-            filename: { type: 'string', required: true, description: 'One of your own apps, with its extension (e.g. "shop.html").' },
-            days: { type: 'number', description: 'The trailing window in days, 0 to 360. 0 is today only. Default 30.' },
-        },
-        handler: ({ client }, input) => {
-            // The node clamps the window; what this door owes is that the number leaves the process.
-            const window = optionalNumber(input, 'days');
-            const days = window !== undefined ? `&days=${window}` : '';
-            return client.get(`/v1/apps/visitors?filename=${encodeURIComponent(requiredString(input, 'filename'))}${days}`);
-        },
-    },
-    {
-        // → PUT /v1/apps/visitors/measurement — the switch, and the precision a place is kept at.
-        //   `geo` travels only when named: an absent one means "keep what it was".
-        name: 'aimeat_app_visitors_measure',
-        description: 'Switch visitor measurement on or off for one of your own apps, and choose how precisely a person\'s place is kept (off, country, region, city). Off keeps what was counted.',
-        input: {
-            filename: { type: 'string', required: true, description: 'One of your own apps, with its extension (e.g. "shop.html").' },
-            on: { type: 'boolean', required: true, description: 'true starts counting who opens the app; false stops and keeps what was counted.' },
-            geo: { type: 'string', description: 'off, country, region or city. Omit to keep what it was.' },
-        },
-        handler: ({ client }, input) => {
-            // A missing or unreadable `on` is refused here: read as false it would switch a working
-            // measurement off, which is the opposite of doing nothing.
-            const on = optionalBoolean(input, 'on');
-            if (on === undefined) throw new Error('Missing required field: on (true or false)');
-            const body: JsonObject = { filename: requiredString(input, 'filename'), on };
-            const geo = optionalString(input, 'geo');
-            if (geo !== undefined) body.geo = geo;
-            return client.put('/v1/apps/visitors/measurement', body);
-        },
-    },
-    {
-        // → PATCH /v1/apps/:filename { legal } — one of the app's own legal pages set or removed;
-        //   with no kind, GET /v1/apps/me/:filename/legal reports where the app stands.
-        name: 'aimeat_app_legal_set',
-        description: 'Publish, replace or remove one of an app\'s own legal pages (terms, privacy, imprint, refunds, accessibility, cookies, support) as markdown, HTML or a link; with no kind, report where the app stands.',
-        input: {
-            filename: { type: 'string', required: true, description: 'The app, with its extension (e.g. "shop.html").' },
-            kind: { type: 'string', description: 'terms, privacy, imprint, refunds, accessibility, cookies or support. Omit to only read where the app stands.' },
-            format: { type: 'string', description: 'markdown, html or url.' },
-            content: { type: 'string', description: 'The page text, the HTML document, or the absolute https URL.' },
-            remove: { type: 'boolean', description: 'true removes the named page.' },
-        },
-        handler: ({ client }, input) => {
-            const filename = requiredString(input, 'filename');
-            const kind = optionalString(input, 'kind');
-            if (!kind) return client.get(`/v1/apps/me/${encodeURIComponent(filename)}/legal`);
-            // Every declared field travels inside the kind object; the node reads `remove: true`
-            // as the same act as null. Nothing this door was given is decided here.
-            const doc: JsonObject = {};
-            const format = optionalString(input, 'format');
-            if (format !== undefined) doc.format = format;
-            const content = optionalString(input, 'content');
-            if (content !== undefined) doc.content = content;
-            const remove = optionalBoolean(input, 'remove');
-            if (remove !== undefined) doc.remove = remove;
-            // The provenance declaration travels in the body as PATCH takes it: the ROUTE records
-            // it and answers with `legal[kind].aiProvenanceId`. The dispatch wrapper's carrier table
-            // is for tools whose route accepts none, so this one is not listed there.
-            const body: JsonObject = { legal: { [kind]: doc } };
-            if (input.ai_provenance !== undefined) body.ai_provenance = input.ai_provenance;
-            const declaredId = optionalString(input, 'ai_provenance_id');
-            if (declaredId !== undefined) body.ai_provenance_id = declaredId;
-            return client.patch(`/v1/apps/${encodeURIComponent(filename)}`, body);
-        },
-    },
-    {
-        // → GET /v1/apps/me/:filename/audit — the owner's audit log of the app's settings, and on
-        // request the app opened for real in the node's headless browser.
-        name: 'aimeat_app_audit',
-        description: 'Read one of your apps\' audit log: every change to how the app is offered, newest first, with who made it and when. With playtest, also open the app for real and report what it did.',
-        input: {
-            filename: { type: 'string', required: true, description: 'The app, with its extension.' },
-            limit: { type: 'number', description: 'How many of the newest entries to return. Default 50, at most 500.' },
-            playtest: { type: 'boolean', description: 'Also open the app in a headless browser and report what it did. Slow (about a minute).' },
-        },
-        handler: ({ client }, input) => {
-            const limit = Math.min(500, Math.max(1, Number(input.limit ?? 50) || 50));
-            // The flag travels to the node, which owns the browser. A door that read it and did
-            // nothing with it would be the silent drop this dispatch exists to refuse.
-            const playtest = optionalBoolean(input, 'playtest') ? '&playtest=true' : '';
-            return client.get(`/v1/apps/me/${encodeURIComponent(requiredString(input, 'filename'))}/audit?limit=${limit}${playtest}`);
-        },
-    },
     {
         // → GET /v1/admin/seo/status — is this node findable, and what is left to do. Operator-only.
         name: 'aimeat_seo_status',

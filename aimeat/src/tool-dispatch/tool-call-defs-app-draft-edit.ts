@@ -16,6 +16,7 @@
  * @usage
  *   import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
  * @version-history
+ *   2026-09-27 -- aimeat_app_screenshot moved into aimeat_app_manage (action "screenshot").
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -101,19 +102,6 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             const from = optionalString(input, 'from_filename'); if (from) body.from_filename = from;
             const version = optionalNumber(input, 'version'); if (version !== undefined) body.version = version;
             return client.post(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft/seed`, body);
-        },
-    },
-    {
-        // → POST /v1/apps/:owner/:filename/screenshot/capture
-        name: 'aimeat_app_screenshot',
-        description: 'Render a published app in a real browser, store the picture, and return its URL so you can look at what you built.',
-        input: {
-            filename: { type: 'string', required: true, description: 'The published app to photograph (e.g. "pong.html").' },
-            owner: { type: 'string', description: 'Whose catalogue the app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.' },
-        },
-        handler: ({ client, config }, input) => {
-            const filename = requiredString(input, 'filename');
-            return client.post(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/screenshot/capture`, {});
         },
     },
     {

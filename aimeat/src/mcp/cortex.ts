@@ -10,6 +10,8 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.9.0 -- 2026-09-27 -- aimeat_cortex_list takes `name` (one cortex in full) and `include_source`
+ *     (its manifest and libs, cortex:write), through services/cortex-read.ts like the REST reads.
  *   v1.8.2 -- 2026-09-26 -- The caller carries its resolved identity, which for an MCP session is the
  *     agent's own GAII; an activation publishes the cortex's actions under it (secaudit 2026-09, R3 7c).
  *   v1.8.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -58,6 +60,9 @@ import { upsertCortex, cortexLibUrls } from '../routes/cortex.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from './catalog/shape.js';
+import { cortexDetail, cortexSource } from '../services/cortex-read.js';
+import { toolError } from './tool-error.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -116,9 +121,24 @@ export function registerCortexTools(
     mcp.tool(
         'aimeat_cortex_list',
         descriptionFor('aimeat_cortex_list'),
-        {},
+        {
+            name: z.string().optional().describe('One cortex, in full, instead of the list.'),
+            include_source: z.boolean().optional().describe('With name: also its manifest and lib files, for editing. Your own cortex only; needs cortex:write.'),
+        },
         annotationsFor('aimeat_cortex_list'),
-        async () => {
+        async ({ name, include_source }) => {
+            // One cortex: the same reads GET /v1/cortex/:name and its /export make (services/cortex-read.ts).
+            if (name) {
+                const detail = await cortexDetail(storage, config, agentCaller(), name);
+                if (!detail.ok) return { ...toolError(detail.code, detail.message) };
+                if (!include_source) return { content: [{ type: 'text' as const, text: JSON.stringify(detail.data, null, 2) }] };
+                if (!scopeIsCovered(scopes, 'cortex:write')) {
+                    return { ...toolError('SCOPE_DENIED', 'Reading a cortex\x27s source needs the "cortex:write" permission, the same word replacing it needs.') };
+                }
+                const source = await cortexSource(storage, agentCaller(), name);
+                if (!source.ok) return { ...toolError(source.code, source.message) };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ ...detail.data, source: source.data }, null, 2) }] };
+            }
             // The same fence GET /v1/cortex applies: public, the node's own bundled ones, and the
             // caller's own. This tool listed every owner's private cortex until 2026-09-05.
             const extensions = visibleCortexes(agentCaller(), await storage.listCortexExtensions({}), config.nodeId);

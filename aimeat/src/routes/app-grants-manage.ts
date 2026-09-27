@@ -27,6 +27,10 @@
  *   DELETE /v1/app-grants/:grantId
  * @usage app.use(appGrantsManageRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-09-27 — GET /v1/app-grants: the owner, or an agent holding consent:manage
+ *     (requireRoleOrScope), and never a federated visitor. The listing moved to
+ *     services/app-grant-list.ts (listActiveAppGrants), same answer. Narrowing, the spend cap,
+ *     read-through and DELETE stay owner-only.
  *   v1.2.0 — 2026-09-26 — POST and DELETE /v1/app-grants/:grantId/read-through, the owner's own door
  *     for reading mail; GET says which words the owner added by hand, and narrowing drops a word from
  *     that list together with the grant.
@@ -38,10 +42,12 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireOwnerPrincipal } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, requireOwnerPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { READ_THROUGH_SCOPE, heldOwnerAdded } from '../services/app-grant-scopes.js';
+import { listActiveAppGrants } from '../services/app-grant-list.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 
 export function appGrantsManageRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -51,23 +57,15 @@ export function appGrantsManageRouter(config: AimeatConfig, storage: Storage): R
     + 'An app asks for it on its own consent screen.';
 
   // ── GET /v1/app-grants ── the owner lists the apps they've granted access to.
-  router.get('/v1/app-grants', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
-    const owner = req.auth!.owner;
-    const grants = (await storage.listAppGrantsByOwner(owner)).filter(g => !g.revoked);
-    res.json(success(config.nodeId, {
-      grants: grants.map(g => ({
-        grant_id: g.grantId, app: g.app, app_name: g.appName, app_origin: g.appOrigin,
-        scopes: g.scopes, granted_at: g.createdAt, last_used_at: g.lastUsedAt,
-        // Only meaningful for an app that may spend at all; the UI hides the control otherwise.
-        can_spend: (g.scopes ?? []).includes('contract:spend'),
-        spend_cap_morsels: g.spendCapMorsels ?? null,
-        spent_morsels: g.spentMorsels ?? 0,
-        scopes_fixed_at: g.scopesFixedAt ?? null,
-        // The words the owner added by hand, which stay when the app's own declaration shrinks.
-        owner_added_scopes: heldOwnerAdded(g),
-      })),
-      total: grants.length,
-    }));
+  // The owner, or an agent the owner gave consent:manage (decided 2026-09-27): reading the list is
+  // not changing it. A federated visitor takes only the scope path (requireRoleOrScope), and the
+  // list is always the SESSION's own owner's, never a name from the request.
+  router.get('/v1/app-grants', requireAuth(), requireRoleOrScope('owner', 'consent:manage'), async (req: Request, res: Response) => {
+    if (isForeignPrincipal(req.auth)) {
+      return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This action requires a local session'));
+    }
+    const owner = localAccountName(req.auth!.owner);
+    return res.json(success(config.nodeId, await listActiveAppGrants(storage, owner)));
   });
 
   /**

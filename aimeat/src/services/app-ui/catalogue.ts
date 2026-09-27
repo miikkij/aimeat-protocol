@@ -10,7 +10,7 @@
  *   than from nothing. A pure extraction of buildUiCatalogue() from registry.ts on 2026-09-05
  *   (the registry stood at 798 lines against the 800 cap, and the effects round adds a shelf).
  *   The registry stays the single declaration and this file only reads it, so the dependency
- *   runs one way; the two doors (GET /v1/apps/ui/catalogue and the aimeat_app_ui_get tool)
+ *   runs one way; the two doors (GET /v1/apps/ui/catalogue and aimeat_app_manage action "ui_get")
  *   import from here.
  * @structure buildUiCatalogue()
  * @usage

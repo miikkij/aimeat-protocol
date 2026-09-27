@@ -1,11 +1,13 @@
 /**
  * @file app-collaboration-surfaces.test.ts
  * @description Invoke connector handlers and inspect what reaches the REST boundary.
- * @version-history v1.0.0 - 2026-09-08 - Retain the target, roadmap and provenance on draft publication.
+ * @version-history v1.1.0 - 2026-09-27 - The screenshot is action "screenshot" of aimeat_app_manage.
+ *   v1.0.0 - 2026-09-08 - Retain the target, roadmap and provenance on draft publication.
  */
 import { describe, expect, it } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerAppsTools } from '../../src/cli/connect/mcp/tools/apps.js';
+import { registerAppManageTool } from '../../src/cli/connect/mcp/tools/app-manage.js';
 
 describe('shared app connector requests', () => {
   it('forwards a draft publication to the invited owner with its complete note', async () => {
@@ -18,6 +20,7 @@ describe('shared app connector requests', () => {
       } }),
     } as Parameters<typeof registerAppsTools>[1];
     registerAppsTools(mcp, connection);
+    registerAppManageTool(mcp, connection);
     const declared = { level: 'assisted', method: 'generated', human_involvement: 'reviewed' };
     await handlers.get('aimeat_app_draft_publish')!({
       owner: 'app-owner', filename: 'app.html', roadmap: 'A release note.',
@@ -27,7 +30,7 @@ describe('shared app connector requests', () => {
       roadmap: 'A release note.', ai_provenance: declared, ai_provenance_id: 'existing-record',
       spec_token: 'spec-digest', spec_ack: 'skipped-by-owner',
     }]);
-    await handlers.get('aimeat_app_screenshot')!({ owner: 'app-owner', filename: 'app.html' });
+    await handlers.get('aimeat_app_manage')!({ action: 'screenshot', owner: 'app-owner', filename: 'app.html' });
     expect(requests[1]?.[0]).toBe('/v1/apps/app-owner/app.html/screenshot/capture');
   });
 });

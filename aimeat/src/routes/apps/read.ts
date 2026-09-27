@@ -10,6 +10,10 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.13.0 — 2026-09-27 — Pure extraction: the version list moved to services/app-versions.ts and
+ *     the screenshot POST and DELETE work to services/app-screenshot-store.ts, so the MCP tool calls
+ *     the same code. The routes keep the scope check, the `presentation` authorisation (asked after
+ *     the lookup, as before) and the envelope; their answers are unchanged.
  *   v1.12.1 — 2026-09-26 — Every owner segment is read with localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -60,18 +64,17 @@
  *     even the owner's own Open button (UX-remake v3, P6). API callers keep the JSON.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  */
-import type { Router } from 'express';
+import type { Request, Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { captureAppScreenshot } from '../../services/screenshot-capture.js';
-import { emitChange } from '../../services/event-bus.js';
+import { storeAppScreenshot, clearAppScreenshot, type AppScreenshotGate } from '../../services/app-screenshot-store.js';
+import { listAppVersionsView } from '../../services/app-versions.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
 import { generateAppAccessToken } from '../../services/app-access-token.js';
-import { decodeStrictBase64 } from '../../utils/base64.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
-import { imageUploadType } from '../../utils/raster-image.js';
 import { ownerCoordinate, localAccountName } from '../../utils/gaii.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { appBadgeOn, appReviewedBy } from '../../services/app-marks.js';
@@ -167,39 +170,25 @@ export function registerReadRoutes(
     canonicalOwner: CanonicalOwner,
     appTarget: AppTargetFor,
 ): void {
-    // GET /v1/apps/:owner/:filename/versions — List all versions
-    router.get('/v1/apps/:owner/:filename/versions', async (req, res) => {
-        const ownerParam = req.params.owner as string;
-        const filename = req.params.filename as string;
-        // Tolerate the legacy full-GHII owner segment (owner@node) in old links.
-        const owner = localAccountName(ownerParam);
+    // Who may set or clear a screenshot: a node operator (the screenshot worker runs as operator), the
+    // app's own owner, or somebody they gave a rung that carries `presentation`. The resolver reads
+    // the SAME `:owner` segment the service used to find the app. Asked after the lookup, as before.
+    const screenshotGate = (req: Request): AppScreenshotGate => async () => {
+        if (req.auth!.roles?.includes('operator') ?? false) return null;
+        const t = await appTarget(req, 'presentation');
+        return t.ok ? null : t;
+    };
 
-        // Apps live in the owner's canonical bucket (ownerGaii = owner@nodeId),
-        // not under any agent GAII. Resolve the row by owner name, then list that
-        // exact bucket so every published version is returned.
-        const app = await storage.getAppByOwnerName(owner, filename);
-        if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+    // GET /v1/apps/:owner/:filename/versions — List all versions
+    // The owner segment, the lookup and the list are services/app-versions.ts, shared with MCP.
+    router.get('/v1/apps/:owner/:filename/versions', async (req, res) => {
+        const out = await listAppVersionsView(storage, config, req.params.owner as string, req.params.filename as string);
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
         }
-
-        const versions = await storage.listAppVersions(app.ownerGaii, filename);
-        // TARGET-058: per version, because each publish is its own content and carries its own
-        // statement; `meta.provenance` is the LIVE version's, on the one envelope carrier.
-        const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
-        setProvenanceHeaders(res, prov);
-        res.json(success(config.nodeId, {
-            owner,
-            filename,
-            versions: versions.map(v => ({
-                version_number: v.versionNumber,
-                version: v.manifest.version,
-                size: v.size,
-                created_at: v.createdAt,
-                ai_provenance_id: v.aiProvenanceId ?? null,
-            })),
-            total: versions.length,
-        }, undefined, envelopeMeta(prov)));
+        setProvenanceHeaders(res, out.provenance);
+        res.json(success(config.nodeId, out.data, undefined, envelopeMeta(out.provenance)));
     });
 
     // GET /v1/apps/:owner/:filename/forks — the direct forks of this app, each with
@@ -337,74 +326,18 @@ export function registerReadRoutes(
         ]));
     });
 
+    // Validation, storage and the change event are services/app-screenshot-store.ts, shared with MCP.
     router.post('/v1/apps/:owner/:filename/screenshot', requireAuth(), requireScope('app:write'), async (req, res) => {
-        const ownerParam = req.params.owner as string;
-        const filename = req.params.filename as string;
-        const owner = localAccountName(ownerParam);
-
-        const decodedFn = decodeURIComponent(filename);
-        if (decodedFn.includes('..') || decodedFn.includes('/') || decodedFn.includes('\\')
-            || decodedFn.includes('%2f') || decodedFn.includes('%2F')
-            || decodedFn.includes('%5c') || decodedFn.includes('%5C')
-            || decodedFn.includes('\0')) {
-            res.status(400).json(error(config.nodeId, 'INVALID_FILENAME', 'Filename contains invalid characters'));
+        const body = req.body ?? {};
+        const out = await storeAppScreenshot(storage, {
+            owner: req.params.owner as string, filename: req.params.filename as string,
+            screenshot: body.screenshot, screenshot_mime_type: body.screenshot_mime_type,
+        }, screenshotGate(req));
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
         }
-
-        const app = await storage.getAppByOwnerName(owner, filename);
-        if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
-            return;
-        }
-
-        // Ownership: the app's owner, or a node operator (the screenshot worker runs as operator).
-        const isOperator = req.auth!.roles?.includes('operator') ?? false;
-        // The app's own owner, or somebody they gave a rung that carries `presentation`. The
-        // resolver reads the SAME `:owner` segment this handler already used to find the app, so
-        // there is no second spelling of "whose app is this" to keep in step.
-        if (!isOperator && !(await appTargetOr(appTarget, config, req, res, 'presentation'))) return;
-
-        const { screenshot, screenshot_mime_type } = req.body ?? {};
-        if (!screenshot || typeof screenshot !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'screenshot (base64 image) is required'));
-            return;
-        }
-        const screenshotData = decodeStrictBase64(screenshot);
-        if (!screenshotData) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'screenshot must be base64-encoded image data'));
-            return;
-        }
-        const MAX_SCREENSHOT_SIZE = 2 * 1024 * 1024;
-        if (screenshotData.length > MAX_SCREENSHOT_SIZE) {
-            res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));
-            return;
-        }
-        // CHECKED, NOT BELIEVED, like the icon. The bytes must be a PNG, JPEG, WebP, GIF or AVIF image
-        // and are stored as the type they are; a label naming anything else is refused, because the
-        // GET door serves this key to anybody from the node's own origin (A7-2).
-        const screenshotMime = imageUploadType(screenshotData, screenshot_mime_type);
-        if (!screenshotMime) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                'A screenshot must be a PNG, JPEG, WebP, GIF or AVIF image, and screenshot_mime_type, when given, must say which.'));
-            return;
-        }
-
-        await storage.createStorageFile({
-            key: `apps/screenshots/${filename}`,
-            ownerGaii: app.ownerGaii,   // match the app row's bucket so the GET route finds it
-            visibility: 'public',
-            mimeType: screenshotMime,
-            size: screenshotData.length,
-            data: screenshotData,
-            createdAt: new Date().toISOString(),
-        });
-
-        emitChange('apps');
-        res.json(success(config.nodeId, {
-            filename,
-            owner: app.ownerName,
-            screenshot_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(filename)}/screenshot`,
-        }));
+        res.json(success(config.nodeId, out.data));
     });
 
     // DELETE /v1/apps/:owner/:filename/screenshot — clear an app's screenshot WITHOUT rendering a new
@@ -412,41 +345,14 @@ export function registerReadRoutes(
     // "refresh thumbnail" action: clearing is cheap and queues a batch recapture, so there is no
     // on-demand server render to hammer (DoS-safe). The app's owner, or a node operator, may clear.
     router.delete('/v1/apps/:owner/:filename/screenshot', requireAuth(), requireScope('app:write'), async (req, res) => {
-        const ownerParam = req.params.owner as string;
-        const filename = req.params.filename as string;
-        const owner = localAccountName(ownerParam);
-
-        const decodedFn = decodeURIComponent(filename);
-        if (decodedFn.includes('..') || decodedFn.includes('/') || decodedFn.includes('\\')
-            || decodedFn.includes('%2f') || decodedFn.includes('%2F')
-            || decodedFn.includes('%5c') || decodedFn.includes('%5C')
-            || decodedFn.includes('\0')) {
-            res.status(400).json(error(config.nodeId, 'INVALID_FILENAME', 'Filename contains invalid characters'));
+        const out = await clearAppScreenshot(storage, config, {
+            owner: req.params.owner as string, filename: req.params.filename as string,
+        }, screenshotGate(req));
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
         }
-
-        const app = await storage.getAppByOwnerName(owner, filename);
-        if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
-            return;
-        }
-
-        const isOperator = req.auth!.roles?.includes('operator') ?? false;
-        // The app's own owner, or somebody they gave a rung that carries `presentation`. The
-        // resolver reads the SAME `:owner` segment this handler already used to find the app, so
-        // there is no second spelling of "whose app is this" to keep in step.
-        if (!isOperator && !(await appTargetOr(appTarget, config, req, res, 'presentation'))) return;
-
-        await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`);
-        emitChange('apps');
-        res.json(success(config.nodeId, {
-            filename,
-            owner: app.ownerName,
-            cleared: true,
-            note: config.screenshotAutoCapture
-                ? 'Screenshot cleared. The node will capture a fresh one on its next scheduled scan.'
-                : 'Screenshot cleared. Auto-capture is off on this node — set a new one manually, or enable AIMEAT_SCREENSHOT_AUTO.',
-        }));
+        res.json(success(config.nodeId, out.data));
     });
 
     // GET /v1/apps/:owner/:filename — Download app (supports ?version=N)

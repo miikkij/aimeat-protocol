@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.9.0 — 2026-09-27 — registerAppManageTool (aimeat_app_manage, with the session's scopes) replaces
+ *     the screenshot, marks, visitors, legal and ui registrations.
  *   v1.8.0 — 2026-09-25 — registerPackageInstallRequestTools: an agent of the owner lists, approves
  *     or declines package install requests from a chat, with the session's scopes.
  *   v1.7.0 — 2026-09-24 — The boards, skills, cortex, page-layout and theme groups receive the
@@ -76,12 +78,9 @@ import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
 import { registerSeoTools } from './seo.js';
-import { registerAppMarksTools } from './app-marks.js';
-import { registerAppVisitorsTools } from './app-visitors.js';
-import { registerAppLegalTools } from './app-legal.js';
+import { registerAppManageTool } from './app-manage.js';
 import { registerAppsTools } from './apps.js';
 import { registerAppDraftEditTools } from './apps-draft-edit.js';
-import { registerAppScreenshotTool } from './apps-screenshot.js';
 import { registerAiImageTool } from './ai-image.js';
 import { registerSharingGroupTools } from './sharing-groups.js';
 import { registerAgentTaskTools } from './agent-tasks.js';
@@ -103,7 +102,6 @@ import { registerPackageTools } from './packages.js';
 import { registerPackageInstallRequestTools } from './package-install-requests.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
-import { registerAppUiTools } from './app-ui.js';
 import { registerDesignbookTools } from './designbook.js';
 import { registerUiLibraryTools } from './ui-library.js';
 import { registerThemeTools } from './themes.js';
@@ -184,11 +182,9 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
-    registerAppScreenshotTool(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
-    registerAppMarksTools(mcp, storage, config, agentGaii);
-    registerAppVisitorsTools(mcp, storage, config, agentGaii);
-    registerAppLegalTools(mcp, storage, config, agentGaii);
+    // One tool for the settings and reads of an app, each action checked against its own permission word.
+    registerAppManageTool(mcp, storage, config, agentGaii, scopes);
     registerAiImageTool(mcp, storage, config, agentGaii);
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
@@ -216,7 +212,6 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes);
     registerPortfolioTools(mcp, storage, config, agentGaii);
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes);
-    registerAppUiTools(mcp, storage, config, agentGaii);
     registerDesignbookTools(mcp, storage, config, agentGaii);
     registerUiLibraryTools(mcp, storage, config);
     registerThemeTools(mcp, storage, config, agentGaii, scopes);

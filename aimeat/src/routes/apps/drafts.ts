@@ -6,6 +6,8 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.7.2 -- 2026-09-27 -- POST .../draft/preview-token calls mintDraftPreview
+ *     (services/app-draft-preview.ts), shared with aimeat_app_draft_save. The answer is unchanged.
  *   v2.7.1 -- 2026-09-24 -- POST .../frame-token refuses a delegated caller with 403 before any other
  *     check (A6-6). It was authorised on the `draft` act, which every development rung carries, so a
  *     drafter could mint a grant for any Origin. The owner and the owner's own agents still mint.
@@ -55,7 +57,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { generateDraftToken, generateFrameToken } from '../../services/draft-token.js';
+import { generateFrameToken } from '../../services/draft-token.js';
+import { mintDraftPreview } from '../../services/app-draft-preview.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
@@ -340,26 +343,17 @@ export function registerDraftRoutes(
         const t = await appTargetOr(appTarget, config, req, res, 'draft');
         if (!t) return;
         const { owner, ownerGhii } = t;
-        const draft = await storage.getAppDraft(ownerGhii, filename);
-        if (!draft) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}". Save one with PUT .../draft first.`));
+        // The token and the URL are services/app-draft-preview.ts, shared with aimeat_app_draft_save.
+        const out = await mintDraftPreview(storage, config, { owner, ownerGhii, filename });
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
             return;
         }
-        const ttlSeconds = 600;
-        const token = await generateDraftToken({ sub: ownerGhii, filename }, ttlSeconds);
-        let previewUrl: string;
-        if (config.appOriginEnabled && config.appHost) {
-            const originBase = await appOriginUrl(config, storage, owner, filename);
-            const sep = originBase.includes('?') ? '&' : '?';
-            previewUrl = `${originBase}${sep}preview=${encodeURIComponent(token)}`;
-        } else {
-            previewUrl = `${config.baseUrl}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}?mode=inline&preview=${encodeURIComponent(token)}`;
-        }
         res.json(success(config.nodeId, {
-            preview_url: previewUrl,
-            token,
-            expires_in_seconds: ttlSeconds,
-            note: 'Open this URL in a new top-level tab to test the draft on a real origin (mic/camera prompts work). The link is single-app, owner-only, and expires shortly.',
+            preview_url: out.preview_url,
+            token: out.token,
+            expires_in_seconds: out.expires_in_seconds,
+            note: out.note,
         }));
     });
 
