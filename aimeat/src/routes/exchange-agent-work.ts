@@ -11,6 +11,10 @@
  * @usage
  *   registerExchangeAgentWorkRoutes(router, config, storage, notify);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — POST /v1/exchange/work refuses SELF_WORK and SAME_OWNER_WORK (400) when the
+ *     consumer and the agent that does the work belong to the same owner, before it reads the
+ *     contract: the rule for every endpoint that creates work, from services/work-parties.ts
+ *     (secaudit 2026-09, R4 5).
  *   v1.0.0 — 2026-09-26 — Moved out of routes/exchange.ts as it was, to keep that file under the
  *     800-line limit.
  */
@@ -26,6 +30,7 @@ import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
 import {
   type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
 } from '../services/exchange-work.js';
+import { refuseWorkBetween } from '../services/work-parties.js';
 
 /** Deliver a same-node inbox message about a work event: exchangeRouter's own `notify`. */
 export type ExchangeNotify = (senderOwner: string, recipientOwner: string, subject: string, body: string) => Promise<void>;
@@ -45,6 +50,7 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
    * POST /v1/exchange/work — the CONSUMER starts a task under an agent-work contract. Body:
    * `{ offering_id, input, note? }`. Requires an active metered entitlement for the offering's coordinate
    * (contract first). Nothing is charged yet — the per-task price is metered when the provider DELIVERS.
+   * The consumer and the agent that does the work belong to different owners.
    */
   router.post('/v1/exchange/work', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
@@ -56,16 +62,21 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     if (!o || o.state !== 'listed' || o.kind !== 'agent-work' || !o.surface || o.surface.kind !== 'agent-work') {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such listed agent-work offering'));
     }
+    // The provider of agent work is the agent that does it. No work with yourself and none between two
+    // principals of one owner: the rule for every endpoint that creates work (services/work-parties.ts).
+    const s = o.surface;
+    const agentGaii = `${s.agentName}#${o.providerOwner}@${config.nodeId}`;
+    const refused = refuseWorkBetween(consumerGaii, agentGaii);
+    if (refused) return res.status(400).json(error(config.nodeId, refused.code, refused.message));
     const ent = await readEntitlementForCall(storage, consumerGaii, o.ext, o.action);
     if (!ent || ent.state !== 'active') {
       return res.status(402).json(error(config.nodeId, 'NO_CONTRACT', 'Accept a contract for this agent-work offering before starting a task'));
     }
-    const s = o.surface;
     const now = new Date().toISOString();
     const work: AgentWork = {
       workId: newWorkId(), offeringId, consumerGaii, consumerOwner: owner,
       providerGhii: o.providerGhii, providerOwner: o.providerOwner,
-      agentGaii: `${s.agentName}#${o.providerOwner}@${config.nodeId}`, taskType: s.taskType,
+      agentGaii, taskType: s.taskType,
       ext: o.ext, action: o.action, input: b.input ?? {}, output: null,
       note: typeof b.note === 'string' ? b.note.slice(0, 2000) : '',
       state: 'open', unit: ent.unit, currency: ent.currency, chargedUnits: 0, createdAt: now, deliveredAt: null,

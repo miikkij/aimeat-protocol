@@ -22,6 +22,8 @@
  *     is what broke every metered app-tool call an hour into any MCP session.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8b: a declared `ai_provenance` on a delivery reaches the
  *     work item and the CONSUMER's listing. The delivered output is the thing the buyer paid for.
+ *   v1.3.0 — 2026-09-26 — aimeat_exchange_work obeys the work rule: the provider, holding a contract on
+ *     their own agent-work offering, is refused SAME_OWNER_WORK and no work is stored.
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
@@ -127,6 +129,17 @@ await test('aimeat_exchange_work — consumer contracts (REST) then starts a tas
 await test('aimeat_exchange_work — unknown offering → NOT_FOUND (failure mode)', async () => {
     const res = parse(await C()['aimeat_exchange_work']({ offering_id: 'off-nope', input: {} }));
     assert(!!res.error && res.error.includes('NOT_FOUND'), `expected NOT_FOUND, got ${JSON.stringify(res)}`);
+});
+
+await test('aimeat_exchange_work — the provider cannot start work for their own agent, even holding a contract → SAME_OWNER_WORK', async () => {
+    // The same rule as the REST endpoint and the work queue. The contract is there first, so what
+    // refuses is the work rule and not a missing contract.
+    const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ offering_id: awOfferingId, cap_units: 50 }) });
+    assert(acc.status === 201, `the provider's contract on their own offering: ${acc.status} ${JSON.stringify(acc.body?.error)}`);
+    const res = parse(await P()['aimeat_exchange_work']({ offering_id: awOfferingId, input: { text: 'a task for my own agent' } }));
+    assert(!!res.error && res.error.startsWith('SAME_OWNER_WORK'), `expected SAME_OWNER_WORK, got ${JSON.stringify(res)}`);
+    const mine = parse(await P()['aimeat_exchange_work_list']({}));
+    assert(Array.isArray(mine.data?.work) && mine.data.work.length === 0, `no work was stored for the provider as its consumer: ${JSON.stringify(mine.data?.work)}`);
 });
 
 await test('aimeat_exchange_work_deliver — a non-provider cannot deliver → NOT_FOUND', async () => {

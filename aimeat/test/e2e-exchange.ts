@@ -9,6 +9,8 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.6.0 — 2026-09-26 — Agent work obeys the work rule: the provider, holding a contract on their own
+ *     agent-work offering, is refused SAME_OWNER_WORK and no work is stored.
  *   v1.5.0 — 2026-09-13 — The ODPS length case asserted the behaviour the write refusal replaced: a new
  *     flagged app-tool manifest past the cap is now refused with 422 ODPS_FIELD_TOO_LONG naming the room
  *     (156) and the length, stored unflagged it passes, and flagged again with the text unchanged it
@@ -771,6 +773,18 @@ await test('Work lists: consumer sees it (consumer role); provider sees it deliv
   assert(cw.status === 200 && cw.body.data.work.some((w: any) => w.work_id === awWorkId), 'consumer work list');
   const pw = await json('/v1/exchange/work?role=provider', { headers: auth(provider.token) });
   assert(pw.status === 200 && pw.body.data.work.some((w: any) => w.work_id === awWorkId && w.state === 'delivered'), 'provider work list shows delivered');
+});
+
+// No work between a person and their own agents, whichever endpoint would create it: the work queue
+// refuses it (e2e-security 7-7c), and agent work here does too. The provider first holds a contract
+// on their own offering, so what refuses is the work rule and not a missing contract.
+await test('The provider cannot start agent work for their own agent, even holding a contract → 400 SAME_OWNER_WORK', async () => {
+  const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ offering_id: awOfferingId, cap_units: 50 }) });
+  assert(acc.status === 201, `the provider's contract on their own offering: ${acc.status} ${JSON.stringify(acc.body?.error)}`);
+  const st = await json('/v1/exchange/work', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ offering_id: awOfferingId, input: { text: 'a task for my own agent' } }) });
+  assert(st.status === 400 && st.body?.error?.code === 'SAME_OWNER_WORK', `expected 400 SAME_OWNER_WORK, got ${st.status}/${JSON.stringify(st.body?.error ?? st.body?.data)}`);
+  const mine = await json('/v1/exchange/work', { headers: auth(provider.token) });
+  assert(mine.status === 200 && mine.body.data.work.length === 0, `no work was stored for the provider as its consumer: ${JSON.stringify(mine.body.data?.work)}`);
 });
 
 // ── ODPS v4.1 (TARGET-045 §4): the listing as an Open Data Product Specification document ──
