@@ -15,6 +15,10 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.9.0 — 2026-09-26 — A cortex component reads its components from `spec.components`, the
+ *     standard manifest, and from the top level when `spec` has none; each keeps what its author wrote.
+ *     The schema locks and prompt records the registration writes are recorded in the activation
+ *     artifacts, so the uninstall removes them.
  *   v1.8.0 — 2026-09-26 — Deleting a cortex component (a package uninstall, or the rollback of a failed
  *     install or migration) is removeCortex, the cortex uninstall: an active cortex is taken down
  *     first, so its actions, boards, schema locks and prompts go, and its kept versions and dependency
@@ -55,7 +59,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from './extension-manifest.js';
 import YAML from 'yaml';
-import type { Storage, PackageComponentType, CortexComponent } from '../storage/interface.js';
+import type { Storage, PackageComponentType, CortexComponent, CortexActivationArtifacts } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 import { parseBundledCrews } from './app-bundled-crews.js';
@@ -345,21 +349,24 @@ export async function registerComponent(
 
         const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
         originalShortName = (metadata.name as string) || undefined;
-        const componentsRaw = (meta.components ?? []) as Array<Record<string, unknown>>;
+        // The standard manifest lists its components under `spec`; the flat form the bundled packages
+        // use lists them at the top, and is read when `spec` has none.
+        const spec = (meta.spec ?? {}) as Record<string, unknown>;
+        const componentsRaw = (Array.isArray(spec.components) ? spec.components : meta.components ?? []) as Array<Record<string, unknown>>;
 
-        const cortexComponents = componentsRaw.map(c => {
-          const comp: Record<string, unknown> = {
-            type: (c.type as string) ?? 'lib',
-            name: (c.name as string) ?? '',
-            content: typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? ''),
-          };
-          if (c.filename) comp.filename = c.filename as string;
-          if (c.exports) comp.exports = c.exports;
-          if (c.api_surface) comp.api_surface = c.api_surface as string;
-          if (c.key_pattern) comp.key_pattern = c.key_pattern as string;
-          if (c.apply_to) comp.apply_to = c.apply_to as string;
-          return comp;
-        });
+        // Each component keeps what its author wrote (a schema's JSON Schema, a prompt's variables),
+        // with `content` kept as the string it has always been stored as.
+        const cortexComponents: Record<string, unknown>[] = componentsRaw.map(c => ({
+          ...c,
+          type: (c.type as string) ?? 'lib',
+          name: (c.name as string) ?? '',
+          content: typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? ''),
+        }));
+        // What this registration writes, recorded as an activation records it, so the uninstall and
+        // every teardown find it (services/cortex-lifecycle.ts removeCortex).
+        const artifacts: CortexActivationArtifacts = {
+          schemaKeys: [], promptKeys: [], actionIds: [], boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: Object.keys(libs),
+        };
 
         if (input.dryRun) break;
         await storage.createCortexExtension({
@@ -379,15 +386,7 @@ export async function registerComponent(
           installedBy: owner,
           manifest: manifestStr,
           components: cortexComponents as unknown as CortexComponent[],
-          activationArtifacts: {
-            schemaKeys: [],
-            promptKeys: [],
-            actionIds: [],
-            boardIds: [],
-            seedDataKeys: [],
-            ontologyKeys: [],
-            libFiles: Object.keys(libs),
-          },
+          activationArtifacts: { ...artifacts, libFiles: [...artifacts.libFiles] },
         });
 
         // Store lib files — rewrite extension and cortex short-name
@@ -420,6 +419,7 @@ export async function registerComponent(
                 setAt: now,
                 updatedAt: now,
               });
+              artifacts.schemaKeys.push(comp.key_pattern as string);
             // eslint-disable-next-line aimeat/no-silent-catch -- schema may already exist
             } catch { /* schema may already exist */ }
           } else if (compType === 'prompt' && comp.name) {
@@ -435,7 +435,11 @@ export async function registerComponent(
               createdAt: now,
               updatedAt: now,
             });
+            artifacts.promptKeys.push(promptKey);
           }
+        }
+        if (artifacts.schemaKeys.length + artifacts.promptKeys.length > 0) {
+          await storage.updateCortexExtension(registeredAs, { activationArtifacts: artifacts });
         }
         break;
       }
