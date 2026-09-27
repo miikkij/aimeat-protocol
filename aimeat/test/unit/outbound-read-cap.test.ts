@@ -13,14 +13,17 @@
  *   peer-body-size-cap and package-pull-size-cap (secaudit 2026-09, N3).
  * @structure
  *   - the ceiling: one exported number, 4 MB
- *   - ctx.fetch: stops at the ceiling and throws RESPONSE_TOO_LARGE; exactly the ceiling decodes
- *     whole with its charset; what a script sees, caught and uncaught; the scheduled road's error
+ *   - ctx.fetch: stops at the ceiling and throws RESPONSE_TOO_LARGE, naming the host it called and
+ *     nothing else of the address; exactly the ceiling decodes whole with its charset; what a script
+ *     sees, caught and uncaught; the scheduled road's error
  *   - living-hooks: TOO_LARGE for an answer over its own 1 MB and for one past the 4 MB ceiling, on
  *     read and on send, through the scripts the node ships and the real context builder
  *   - callSystemOne: stops at the ceiling with JEV_TOO_LARGE and no retry; exactly the ceiling parses
  *   - readResource: exactly the same ceiling is read, one byte past it is TOO_LARGE
  * @usage cd aimeat && pnpm exec vitest run test/unit/outbound-read-cap.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-26 — ctx.fetch's RESPONSE_TOO_LARGE names the host it called, and never the
+ *     userinfo, the path, the query or the fragment (secaudit 2026-09, N3).
  *   v1.1.0 — 2026-09-26 — living-hooks answers one code, TOO_LARGE, for an answer that is too large
  *     whatever its size, on read and on send (secaudit 2026-09, N3).
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, N3).
@@ -121,6 +124,22 @@ describe("an extension's ctx.fetch", () => {
         expect(far.state.cancelled).toBe(true);
         expect(failure?.message ?? 'ctx.fetch answered').toMatch(/^RESPONSE_TOO_LARGE: /);
         expect(failure?.message).toContain('4 MB');
+    });
+
+    // A script that calls several services has to learn which one answered too much. The host says
+    // that; the userinfo, the path, the query and the fragment can each carry a key, so none of them
+    // may appear in a message that reaches a log, a run record or a person's screen.
+    it('names the host it called, and never the userinfo, the path, the query or the fragment', async () => {
+        const far = farStream(TEN_TIMES);
+        answer = () => new Response(far.stream, { status: 200 });
+        const url = 'https://zz-user:zz-pass@API.Example.com:8443/v2/zz-path/?api_key=zz-key&page=1#zz-frag';
+        const failure = await extensionCtx().fetch(url).then(() => null, (err: Error) => err);
+        expect(failure?.message ?? 'ctx.fetch answered')
+            .toMatch(/^RESPONSE_TOO_LARGE: The answer from api\.example\.com:8443 is larger than 4 MB, /);
+        expect(failure?.message).not.toContain('zz-');
+        expect(failure?.message).not.toContain('/v2');
+        expect(failure?.message).not.toContain('api_key');
+        expect(far.state.cancelled).toBe(true);
     });
 
     it('hands back an answer of exactly 4 MB whole, decoded with the charset it declares', async () => {
