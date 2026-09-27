@@ -2,7 +2,8 @@
  * @file hooks-overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Hooks page in one read, and the two writes behind it.
+ * @description The Hooks page in one read, the two writes behind it, and the settling of the stored
+ *   bindings at start.
  *
  *   The question an operator has is "does anything here call out to my own code, and is any of it
  *   broken". Answering it needs four things at once: the eleven moments and which of them decide
@@ -21,10 +22,18 @@
  * @structure
  *   - buildHooksOverview(config, storage) — the page's one read
  *   - setHookActions(config, storage, hookName, actions) — bind, or clear with []
+ *   - settleStoredHookBindings(config, storage) — at start, every stored reference to the form a
+ *     binding is stored in now
  *   - HOOK_GUARDS — which part of the node each moment belongs to
  * @usage
  *   const overview = await buildHooksOverview(config, storage);
  * @version-history
+ *   v1.3.0 — 2026-09-26 — SECURITY (audit A8-3): a hook binds only an action that is already
+ *     published. setHookActions refuses a reference that no published action answers to, with a
+ *     sentence that says to publish the action first, and refuses a binding when the actions cannot
+ *     be read; an empty list clears without reading them. settleStoredHookBindings() runs at start:
+ *     a stored bare id that one provider publishes is stored as its id#provider, and one that no
+ *     provider publishes is taken off its moment, with a line on the Hooks page that says so.
  *   v1.2.0 — 2026-09-26 — SECURITY (audit A8-3): a bare id one provider publishes is stored as its
  *     id#provider when it is bound. Left bare, another owner publishing the same id later made the
  *     binding name nothing, and a gate bound to it refused everything it guards.
@@ -37,8 +46,9 @@
  */
 import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { ActionRecord } from '../storage/types/commerce.js';
 import { HOOK_NAMES, hookKind, HOOK_TIMEOUT_MS, indexActionRefs, type HookKind } from './hooks.js';
-import { readHookRuns, HOOK_RUNS_KEPT, type HookRun } from './hook-log.js';
+import { readHookRuns, recordHookRun, HOOK_RUNS_KEPT, type HookRun } from './hook-log.js';
 import { logger } from '../utils/logger.js';
 
 /** Which part of the node a moment belongs to. The page groups its rows by this. */
@@ -188,20 +198,31 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
 
 export type SetHookOutcome =
   | { ok: true; hook: HookName; actions: string[]; cleared: boolean; unknown: string[]; note: string }
-  | { ok: false; code: 'INVALID_INPUT'; message: string };
+  | { ok: false; code: 'INVALID_INPUT' | 'INTERNAL_ERROR'; message: string };
+
+/** The one action a reference names, written as the binding stores it. */
+const storedRef = (a: Pick<ActionRecord, 'id' | 'providerGaii'>) => `${a.id}#${a.providerGaii}`;
 
 /**
  * Bind a list of actions to one moment, or clear it with an empty list. THE one implementation:
  * PUT and DELETE on /v1/admin/hooks and the aimeat_admin_hook_set tool all land here.
  *
- * An action that is not published here is accepted and NAMED back, rather than refused: binding
- * before publishing is a legitimate order of work, and a silent acceptance is how a binding that
- * calls nothing ends up looking exactly like one that works.
+ * A HOOK BINDS ONLY AN ACTION THAT IS ALREADY PUBLISHED: publish it, then bind it. Every reference
+ * must name one action published here at the moment of binding, and each is stored as that action's
+ * `id#provider`, so the binding keeps naming the action the operator chose whoever publishes the
+ * same id afterwards (security audit A8-3). Everything below is checked before anything is written:
+ *   - A reference no published action answers to is REFUSED, with a sentence that says to publish
+ *     the action first. This covers a stored reference whose action was deleted since, when the list
+ *     is sent again: take it off the list, or publish it again.
+ *   - A bare id that two or more providers publish is REFUSED, and the answer names the
+ *     `id#provider` of each: it names no one action.
+ *   - An actions table that cannot be read REFUSES the binding, because nothing above can be
+ *     checked without it.
+ * An empty list clears the moment and reads nothing, so a moment can be cleared whatever state the
+ * actions table is in.
  *
- * A bare id that two or more providers publish is REFUSED, before anything is written, and the
- * answer names the `id#provider` of each: it names no one action, and binding it would leave the
- * choice to whichever row a scan returns last (security audit A8-3). A bare id that one provider
- * publishes is stored as that `id#provider`, so a later publication cannot change what it names.
+ * `unknown` stays in the answer for the clients that read it. It is always empty, because a
+ * reference that names no published action is refused.
  */
 export async function setHookActions(
   config: AimeatConfig,
@@ -218,47 +239,133 @@ export async function setHookActions(
   const name = hookName as HookName;
   const typed = (actions as string[]).map((a) => a.trim());
 
-  // Read what is published BEFORE writing, so an ambiguous reference is refused rather than stored.
-  // An unreadable actions table means we cannot say whether a reference is ambiguous, so nothing is
-  // refused on that ground; the executor still refuses to guess at call time.
-  const published = await storage.listActions().catch((err: unknown) => {
-    logger.warn('hooks-overview: the actions could not be read for a binding, so it is not checked', { error: String(err) });
-    return [];
-  });
-  const { byRef, ambiguous } = indexActionRefs(published);
-  const clashes = typed.filter((ref) => ambiguous.has(ref));
-  if (clashes.length > 0) {
-    const named = clashes.map((ref) => `"${ref}" is published by ${ambiguous.get(ref)!.length} providers (${ambiguous.get(ref)!.join(', ')})`);
+  if (typed.length === 0) {
+    config.extensionHooks[name] = [];
+    await storage.deleteConfigValue(`hooks.${name}`);
     return {
-      ok: false, code: 'INVALID_INPUT',
-      message: `${named.join('; ')}. Bind the one you mean with its provider, as id#provider. Nothing was changed.`,
+      ok: true, hook: name, actions: [], cleared: true, unknown: [],
+      note: 'Nothing is bound to this moment any more. It no longer calls out.',
     };
   }
 
-  // A bare id that names one action now is stored as that action's id#provider. The operator
-  // chooses what the binding names, here, and another owner who publishes the same id later cannot
-  // change it: left bare, that publication made the id name nothing, and a gate bound to it refused
-  // everything it guards. A reference nothing publishes yet stays as typed and is named back below.
-  const list = typed.map((ref) => {
-    const found = byRef.get(ref);
-    return found && ref === found.id ? `${found.id}#${found.providerGaii}` : ref;
-  });
-
-  config.extensionHooks[name] = list;
-  if (list.length === 0) {
-    await storage.deleteConfigValue(`hooks.${name}`);
-  } else {
-    await storage.setConfigValue(`hooks.${name}`, JSON.stringify(list));
+  // Read what is published BEFORE writing, so a reference that names no one action is refused
+  // rather than stored.
+  let published: ActionRecord[];
+  try {
+    published = await storage.listActions();
+  } catch (err) {
+    logger.error('hooks-overview: the actions could not be read, so a binding was refused', { error: String(err) });
+    return {
+      ok: false, code: 'INTERNAL_ERROR',
+      message: 'The actions published on this node could not be read, so the binding could not be checked. Nothing was changed. Try again in a moment.',
+    };
+  }
+  const { byRef, ambiguous } = indexActionRefs(published);
+  const clashes = typed.filter((ref) => ambiguous.has(ref));
+  const unpublished = typed.filter((ref) => !ambiguous.has(ref) && !byRef.has(ref));
+  if (clashes.length > 0 || unpublished.length > 0) {
+    const parts: string[] = [];
+    if (clashes.length > 0) {
+      const named = clashes.map((ref) => `"${ref}" is published by ${ambiguous.get(ref)!.length} providers (${ambiguous.get(ref)!.join(', ')})`);
+      parts.push(`${named.join('; ')}. Bind the one you mean with its provider, as id#provider.`);
+    }
+    if (unpublished.length > 0) {
+      parts.push(`No action published on this node answers to ${unpublished.map((ref) => `"${ref}"`).join(', ')}. `
+        + 'A hook binds only an action that is already published: publish it first, then bind it, or take it off the list.');
+    }
+    return { ok: false, code: 'INVALID_INPUT', message: `${parts.join(' ')} Nothing was changed.` };
   }
 
-  const unknown = list.filter((ref) => !byRef.has(ref));
+  // Every reference names one published action now, and is stored as that action's id#provider.
+  const list = typed.map((ref) => storedRef(byRef.get(ref)!));
 
-  const kind = hookKind(name);
-  const note = list.length === 0
-    ? 'Nothing is bound to this moment any more. It no longer calls out.'
-    : kind === 'gate'
-      ? `Bound. This moment now waits for ${list.length === 1 ? 'this address' : 'these addresses'} before it lets anything through, and refuses when one does not answer within ${HOOK_TIMEOUT_MS / 1000} seconds.`
-      : 'Bound. This moment is told after the fact; whatever the address answers, nothing is stopped.';
+  config.extensionHooks[name] = list;
+  await storage.setConfigValue(`hooks.${name}`, JSON.stringify(list));
 
-  return { ok: true, hook: name, actions: list, cleared: list.length === 0, unknown, note };
+  const note = hookKind(name) === 'gate'
+    ? `Bound. This moment now waits for ${list.length === 1 ? 'this address' : 'these addresses'} before it lets anything through, and refuses when one does not answer within ${HOOK_TIMEOUT_MS / 1000} seconds.`
+    : 'Bound. This moment is told after the fact; whatever the address answers, nothing is stopped.';
+
+  return { ok: true, hook: name, actions: list, cleared: false, unknown: [], note };
+}
+
+/** What settling the stored bindings changed at start. */
+export interface SettledHookBindings {
+  /** Each bare id one provider publishes, stored now as that action's id#provider. */
+  pinned: Array<{ hook: HookName; from: string; to: string }>;
+  /** Each bare id no provider publishes, taken off its moment. */
+  removed: Array<{ hook: HookName; ref: string }>;
+}
+
+/** Said on the Hooks page, in section 04, for each reference taken off at start. */
+const REMOVED_AT_START = 'No action published on this node answered to this reference when the node started, so it was '
+  + 'taken off this moment: a hook binds only an action that is already published. Publish the action, then bind it again.';
+
+/**
+ * Bring the stored bindings to the form setHookActions stores: every reference names the one
+ * published action it was bound to. Called once at start, after the stored bindings are loaded
+ * (server-bootstrap/config-init.ts), and a start with nothing to settle reads nothing.
+ *   - A bare id that one provider publishes is stored as that action's id#provider. The executor
+ *     calls the same action as before.
+ *   - A bare id that no provider publishes is taken off its moment, and section 04 of the Hooks
+ *     page says so with what to do: publish the action, then bind it again. It names no action.
+ *   - A bare id that two or more providers publish stays. It names none of them, the executor calls
+ *     none, a gate bound to it refuses, and the page names each `id#provider` to choose from.
+ *   - A reference with its provider stays, published or not. Only that provider publishes under it.
+ * A change applies to the running node even when it cannot be saved; the next start settles it again.
+ * Never in the way of a start: when the actions cannot be read, nothing changes, and the next start
+ * tries again.
+ */
+export async function settleStoredHookBindings(config: AimeatConfig, storage: Storage): Promise<SettledHookBindings> {
+  const settled: SettledHookBindings = { pinned: [], removed: [] };
+  // The load at start checks only that a stored list is an array, so an entry is not assumed to be a
+  // string. An id published through POST /v1/actions has no `#` in it, so a reference without one is
+  // a bare id.
+  const isBare = (ref: unknown) => typeof ref === 'string' && !ref.includes('#');
+  if (!HOOK_NAMES.some((name) => (config.extensionHooks[name] ?? []).some(isBare))) return settled;
+
+  let published: ActionRecord[];
+  try {
+    published = await storage.listActions();
+  } catch (err) {
+    logger.error('hooks-overview: the stored hook bindings were not checked at start, because the actions could not be read. The next start tries again.', { error: String(err) });
+    return settled;
+  }
+  const { byRef, ambiguous } = indexActionRefs(published);
+
+  for (const name of HOOK_NAMES) {
+    const refs = config.extensionHooks[name] ?? [];
+    if (!refs.some(isBare)) continue;
+    const next: string[] = [];
+    for (const ref of refs) {
+      if (!isBare(ref) || ambiguous.has(ref)) { next.push(ref); continue; }
+      const found = byRef.get(ref);
+      if (found) {
+        next.push(storedRef(found));
+        settled.pinned.push({ hook: name, from: ref, to: storedRef(found) });
+      } else {
+        settled.removed.push({ hook: name, ref });
+      }
+    }
+    if (next.length === refs.length && next.every((ref, i) => ref === refs[i])) continue;
+    config.extensionHooks[name] = next;
+    try {
+      if (next.length === 0) await storage.deleteConfigValue(`hooks.${name}`);
+      else await storage.setConfigValue(`hooks.${name}`, JSON.stringify(next));
+    } catch (err) {
+      logger.error(`hooks-overview: the settled binding of ${name} could not be saved. It applies until the node stops, and the next start settles it again.`, { error: String(err) });
+    }
+  }
+
+  for (const { hook, from, to } of settled.pinned) {
+    logger.info(`hooks-overview: "${from}" on ${hook} is stored as ${to}, the one action it names`);
+  }
+  for (const { hook, ref } of settled.removed) {
+    logger.warn(`hooks-overview: "${ref}" on ${hook} names no published action, so it was taken off. Publish the action, then bind it again.`);
+    await recordHookRun(storage, {
+      at: new Date().toISOString(), hook, actionRef: ref, answer: 'missing', status: null, ms: 0, allowed: true,
+      reason: REMOVED_AT_START,
+    });
+  }
+  return settled;
 }

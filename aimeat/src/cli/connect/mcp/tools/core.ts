@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.16.1 -- 2026-09-26 -- aimeat_admin_hook_set's `actions` says each reference names an action
+ *     already published on the node: publish it, then bind it (security audit A8-3).
  *   v1.16.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set (PUT /v1/federation/peers/:nodeId/
  *     relay-claim), node_id and relay_claim both forwarded.
  *   v1.15.1 -- 2026-09-24 -- aimeat_memory_restore sends owner_scope. It declared the flag and dropped
@@ -714,7 +716,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'), {
     agent_name: agentNameSchema,
     hook: z.string().describe('The moment to bind, e.g. "pre_owner_registration".'),
-    actions: z.array(z.string()).describe('The action references to call, in order. An empty list clears the moment.'),
+    actions: z.array(z.string()).describe('The action references to call, in order, each naming an action already published on the node: publish it, then bind it. An empty list clears the moment.'),
   }, annotationsFor('aimeat_admin_hook_set'), async ({ agent_name, hook, actions }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.put(`/v1/admin/hooks/${encodeURIComponent(hook)}`, { actions }));

@@ -25044,20 +25044,24 @@ paths:
         that is not reachable stops everything that moment guards. The other seven are told
         afterwards and stop nothing.
 
-        An action reference is a published action's id, or its id with its provider (`id#provider`).
-        A reference that is not published here is accepted and named back in `unknown` rather than
-        refused: binding before publishing is a legitimate order of work, and a silent acceptance is
-        how a binding that calls nothing ends up looking exactly like one that works.
+        A hook binds only an action that is already published: publish the action first
+        (`POST /v1/actions`, with its `webhook_url`), then bind it. An action reference is a
+        published action's id, or its id with its provider (`id#provider`). A reference that no
+        action published here answers to is refused with 400 before anything is written, and the
+        message names it and says to publish the action first. The same holds for a reference
+        already bound whose action is gone when the list is sent again: take it off the list, or
+        publish it again.
 
         A bare id that more than one provider publishes is refused with 400 before anything is
         written, and the message names the `id#provider` of each. It names no one action, and a
         gate bound to such an id refuses rather than calling either.
 
-        A bare id that one provider publishes is stored as that action's `id#provider`, and the
-        answer's `actions` shows it so. Another owner who publishes the same id later cannot change
-        what the binding names.
+        Every reference is stored as the `id#provider` of the action it names, and the answer's
+        `actions` shows it so. Another owner who publishes the same id later cannot change what the
+        binding names.
 
-        An empty list clears the moment, the same as DELETE.
+        When the published actions cannot be read, nothing is bound and the answer is 500. An empty
+        list clears the moment, the same as DELETE, and reads nothing.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -25097,7 +25101,7 @@ paths:
                           cleared: { type: boolean }
                           unknown:
                             type: array
-                            description: References accepted but not published on this node, so they would do nothing
+                            description: Always empty. Kept for the clients that read it; a reference that no published action answers to is refused with 400.
                             items: { type: string }
                           note: { type: string, description: What this binding now means, in the operator's terms }
                           updated: { type: boolean }
@@ -25107,6 +25111,11 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          description: The published actions could not be read, so the binding was not checked and nothing was bound
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
     delete:
       operationId: clearHook
