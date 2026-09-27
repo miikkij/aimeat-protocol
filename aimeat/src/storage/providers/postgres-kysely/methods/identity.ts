@@ -7,6 +7,9 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-09-26 — deleteAgent settles the agent's work first (settleDeletedAgentWorkDb in
+ *     owner-cascade.ts): open work is cancelled and the held morsels go back, what stays keeps the
+ *     agent's identity.
  *   2026-09-26 — revokeTokenIfAbsent: an insert that does nothing on conflict, true when it filed the
  *     row (the one-time assertion spend, secaudit 2026-09 N5).
  *   2026-09-09 — getAgentByName, getGHIIsByGhiis and getGHIIByGoogleSub deleted: no caller.
@@ -32,7 +35,7 @@ import type { AgentRecord, GHIIRecord, OwnerRecord } from '../../../interface.js
 import type { Agent, Ghii, Owner } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError } from '../helpers.js';
-import { deleteOwnerCascade, cascadeDeleteIdentityData } from './owner-cascade.js';
+import { deleteOwnerCascade, cascadeDeleteIdentityData, settleDeletedAgentWorkDb } from './owner-cascade.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -219,6 +222,10 @@ export const identityMethods = {
   async deleteAgent(this: PostgresKyselyStorage, gaii: string): Promise<boolean> {
     try {
       return await this.transaction(async () => {
+        // The agent's work first, by the rule an erasure follows: open work is cancelled and what was
+        // held for it goes back, to the requester or to this agent's owner, and what stays keeps the
+        // agent's identity, because its owner is still here.
+        await settleDeletedAgentWorkDb(this.db, gaii);
         await cascadeDeleteIdentityData(this.db, gaii);
         const r = await this.db.deleteFrom('Agent').where('gaii', '=', gaii).executeTakeFirst();
         return Number(r.numDeletedRows ?? 0) > 0;

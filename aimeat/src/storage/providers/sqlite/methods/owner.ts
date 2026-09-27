@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.13.0 -- 2026-09-26 -- The work settlement names the owner's agents as well, so their work is
+ *     found for an account with no GHII row.
  *   v1.12.0 -- 2026-09-26 -- deleteOwner settles the person's work first (repos/work-erasure.ts): open
  *     work is cancelled and the requester's held morsels go back, finished work stays for the other
  *     side under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
@@ -115,16 +117,15 @@ export const ownerMethods = {
       // 0. The work this person is a party to, settled before the per-identity passes below delete
       // what they find: open work is cancelled and the requester's held morsels go back, finished
       // work stays for the other side under the erasure's pseudonym (repos/work-erasure.ts). One
-      // pseudonym for the whole erasure, so the other side's books still see one party.
+      // pseudonym for the whole erasure, so the other side's books still see one party. The agents
+      // are named too, for an account whose agents no GHII pattern would find.
       const ghiiRows = this.db.prepare('SELECT ghii FROM ghiis WHERE ownerName = ?').all(name) as { ghii: string }[];
-      const pseudonym = erasedPartyPseudonym();
-      settleErasedPartyWork(this.db, name, ghiiRows.map(r => r.ghii), pseudonym, id => this.resolveGhii(id));
-
-      // 1. Get all agents belonging to this owner
       const agentRows = this.db.prepare('SELECT gaii FROM agents WHERE owner = ?').all(name) as { gaii: string }[];
       const agentGaiis = agentRows.map(r => r.gaii);
+      const pseudonym = erasedPartyPseudonym();
+      settleErasedPartyWork(this.db, name, ghiiRows.map(r => r.ghii), pseudonym, id => this.resolveGhii(id), {}, agentGaiis);
 
-      // 2. Cascade delete all agent-related data for each agent
+      // 1-2. Cascade delete all agent-related data for each agent
       for (const gaii of agentGaiis) {
         this.cascadeDeleteAgentData(gaii);
       }

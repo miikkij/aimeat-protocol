@@ -29,11 +29,16 @@
  *   - cascadeDeleteIdentityData(db, gaii) — every owner-scoped table for ONE identity (GHII or GAII)
  *   - pseudonymisePurchasePartiesDb(db, name, ghiis, pseudonym) — the kept receipts, without the name
  *   - pseudonymiseProvenanceOwnerDb(db, name, ghiis, pseudonym) — the kept AI provenance, without it
- *   - settleErasedPartyWorkDb(db, name, ghiis, pseudonym) — open work cancelled, held morsels back,
- *     finished work kept without the name
+ *   - settleLeavingPartyWorkDb(db, party) — open work cancelled, held morsels back, finished work kept
+ *   - settleErasedPartyWorkDb(db, name, ghiis, pseudonym, agents) — that rule for an erased account
+ *   - settleDeletedAgentWorkDb(db, gaii) — that rule for one agent its owner deletes
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.7.0 — 2026-09-26 — One work rule for any party that leaves (LeavingParty in erased-party.ts):
+ *     identityMethods.deleteAgent settles the agent's work with it, keeping the agent's identity on
+ *     what stays, and the erasure finds its agents' work by their GAII too. Work leaves the
+ *     per-identity cascade, since both callers settle it first.
  *   v1.6.0 — 2026-09-26 — settleErasedPartyWorkDb runs first in deleteOwnerCascade: open work is
  *     cancelled and the requester's held morsels go back with a ledger line, finished work and its
  *     dispute stay for the other side under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
@@ -62,7 +67,9 @@ import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
 import { pseudonymiseTallyWriterDb } from './memory-tally.js';
 import { resolveGhii } from '../ghii-resolve.js';
-import { erasedPartyPseudonym, partyIdentities, isPartyIdentity, OPEN_WORK_STATUSES } from '../../../erased-party.js';
+import {
+  erasedPartyPseudonym, partyIdentities, OPEN_WORK_STATUSES, erasedAccountParty, deletedAgentParty, type LeavingParty,
+} from '../../../erased-party.js';
 
 /** A Kysely handle: the root connection or an open transaction. */
 type Db = Kysely<DB>;
@@ -94,19 +101,11 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // Actions offered by this identity
   await db.deleteFrom('Action').where('providerGaii', '=', gaii).execute();
 
-  // Work, and the disputes hanging off each work item. DisputeAudit keys on Dispute.disputeId.
-  const workRows = await db.selectFrom('Work').select('trackingCode')
-    .where(eb => eb.or([eb('providerGaii', '=', gaii), eb('requesterGaii', '=', gaii)])).execute();
-  const trackingCodes = workRows.map(w => w.trackingCode);
-  if (trackingCodes.length) {
-    const disputes = await db.selectFrom('Dispute').select('disputeId')
-      .where('trackingCode', 'in', trackingCodes).execute();
-    const disputeIds = disputes.map(d => d.disputeId);
-    if (disputeIds.length) await db.deleteFrom('DisputeAudit').where('disputeId', 'in', disputeIds).execute();
-    await db.deleteFrom('Dispute').where('trackingCode', 'in', trackingCodes).execute();
-  }
-  await db.deleteFrom('Work')
-    .where(eb => eb.or([eb('providerGaii', '=', gaii), eb('requesterGaii', '=', gaii)])).execute();
+  // Work is not deleted here. Both callers settle it first, by one rule (settleLeavingPartyWorkDb
+  // below): open work is cancelled and what was held for it goes back, finished work stays for the
+  // other side. After deleteOwnerCascade no row names this identity any more; after deleteAgent the
+  // rows that stay keep the agent's identity, and deleting them here would take the other side's
+  // records.
 
   // Wallet ledger
   await db.deleteFrom('Transaction').where('gaii', '=', gaii).execute();
@@ -262,21 +261,21 @@ export async function pseudonymiseProvenanceOwnerDb(
 }
 
 /**
- * Settle every work row an erased person is a party to, and take their name out of what stays.
+ * Settle every work row a leaving party is on: an erased account, or one agent its owner deletes.
  *
- * The rule and its reasons are written on the SQLite twin, settleErasedPartyWork in
- * ../../sqlite/repos/work-erasure.ts, and both keep to it: open work is cancelled, and when the erased
- * person was the one to do it, the requester's held morsels go back with an `escrow_return` line in
- * the requester's ledger. Finished work stays under the pseudonym, with its status, its times and the
- * delivery, and so does a dispute on it; its log keeps its hashes. A row between two identities of
- * the erased person goes with its dispute.
+ * The rule and its reasons are written on the SQLite twin, settleLeavingPartyWork in
+ * ../../sqlite/repos/work-erasure.ts, and both keep to it: open work is cancelled, and what was held
+ * for it goes back to whoever asked, with an `escrow_return` line in their ledger, except to a
+ * requester whose account is being erased. Finished work stays with its status, its times and the
+ * delivery, and so does a dispute on it; with a pseudonym the leaving side takes it, and its log
+ * keeps its hashes. A row with the leaving party on both sides goes with its dispute.
  *
  * Postgres LIKE escapes with a backslash by default, which is how partyIdentities escapes.
  */
-export async function settleErasedPartyWorkDb(
-  db: Db, name: string, ghiis: string[], pseudonym: string,
+export async function settleLeavingPartyWorkDb(
+  db: Db, party: LeavingParty,
 ): Promise<{ cancelled: number; returned: number; kept: number; deleted: number }> {
-  const { exact, suffixPatterns } = partyIdentities(name, ghiis);
+  const { exact, suffixPatterns, pseudonym } = party;
   const rows = await db.selectFrom('Work')
     .select(['trackingCode', 'status', 'providerGaii', 'requesterGaii', 'costTotal'])
     .where(eb => eb.or([
@@ -288,8 +287,8 @@ export async function settleErasedPartyWorkDb(
   const out = { cancelled: 0, returned: 0, kept: 0, deleted: 0 };
   const now = new Date();
   for (const w of rows) {
-    const providerGone = isPartyIdentity(w.providerGaii, name, ghiis);
-    const requesterGone = isPartyIdentity(w.requesterGaii, name, ghiis);
+    const providerGone = party.is(w.providerGaii);
+    const requesterGone = party.is(w.requesterGaii);
     // DisputeAudit keys on Dispute.disputeId, the business key, not on the surrogate id.
     const disputeIds = db.selectFrom('Dispute').select('disputeId').where('trackingCode', '=', w.trackingCode);
     if (providerGone && requesterGone) {
@@ -301,7 +300,9 @@ export async function settleErasedPartyWorkDb(
     }
 
     const open = OPEN_WORK_STATUSES.includes(w.status);
-    if (open && providerGone && w.costTotal > 0) {
+    const provider = providerGone && pseudonym ? pseudonym : w.providerGaii;
+    const requester = requesterGone && pseudonym ? pseudonym : w.requesterGaii;
+    if (open && (!requesterGone || party.refundsItself) && w.costTotal > 0) {
       const payer = await resolveGhii(db, w.requesterGaii);
       const credited = payer
         ? await db.updateTable('Ghii').set({ morselBalance: sql`COALESCE("morselBalance", 0) + ${w.costTotal}` })
@@ -310,7 +311,7 @@ export async function settleErasedPartyWorkDb(
       if (payer && Number(credited?.numUpdatedRows ?? 0) > 0) {
         await db.insertInto('Transaction').values({
           txId: `tx-${randomUUID()}`, gaii: payer, type: 'escrow_return', amount: w.costTotal,
-          counterpartyGaii: pseudonym, trackingCode: w.trackingCode,
+          counterpartyGaii: provider, trackingCode: w.trackingCode,
           initiatorGaii: payer !== w.requesterGaii ? w.requesterGaii : null, timestamp: now,
         }).execute();
         out.returned++;
@@ -319,22 +320,41 @@ export async function settleErasedPartyWorkDb(
 
     await db.updateTable('Work').set({
       status: open ? 'cancelled' : w.status,
-      providerGaii: providerGone ? pseudonym : w.providerGaii,
-      requesterGaii: requesterGone ? pseudonym : w.requesterGaii,
-      ...(requesterGone ? { callbackUrl: null } : {}),
+      providerGaii: provider,
+      requesterGaii: requester,
+      ...(requesterGone && pseudonym ? { callbackUrl: null } : {}),
       ...(open ? { updatedAt: now } : {}),
     }).where('trackingCode', '=', w.trackingCode).execute();
-    await db.updateTable('Dispute').set({ openedBy: pseudonym })
-      .where('trackingCode', '=', w.trackingCode)
-      .where(eb => eb.or([eb('openedBy', 'in', exact), ...suffixPatterns.map(p => eb('openedBy', 'like', p))]))
-      .execute();
-    await db.updateTable('DisputeAudit').set({ actor: pseudonym })
-      .where('disputeId', 'in', disputeIds)
-      .where(eb => eb.or([eb('actor', 'in', exact), ...suffixPatterns.map(p => eb('actor', 'like', p))]))
-      .execute();
+    if (pseudonym) {
+      await db.updateTable('Dispute').set({ openedBy: pseudonym })
+        .where('trackingCode', '=', w.trackingCode)
+        .where(eb => eb.or([eb('openedBy', 'in', exact), ...suffixPatterns.map(p => eb('openedBy', 'like', p))]))
+        .execute();
+      await db.updateTable('DisputeAudit').set({ actor: pseudonym })
+        .where('disputeId', 'in', disputeIds)
+        .where(eb => eb.or([eb('actor', 'in', exact), ...suffixPatterns.map(p => eb('actor', 'like', p))]))
+        .execute();
+    }
     if (open) out.cancelled++; else out.kept++;
   }
   return out;
+}
+
+/**
+ * The work of an erased account, found by every identity partyIdentities lists and by its agents'
+ * GAIIs, and kept under the erasure's pseudonym.
+ */
+export async function settleErasedPartyWorkDb(
+  db: Db, name: string, ghiis: string[], pseudonym: string, agents: string[] = [],
+): Promise<{ cancelled: number; returned: number; kept: number; deleted: number }> {
+  return settleLeavingPartyWorkDb(db, erasedAccountParty(name, ghiis, pseudonym, agents));
+}
+
+/** The work of one agent its owner deletes: settled by the same rule, the agent's identity kept. */
+export async function settleDeletedAgentWorkDb(
+  db: Db, gaii: string,
+): Promise<{ cancelled: number; returned: number; kept: number; deleted: number }> {
+  return settleLeavingPartyWorkDb(db, deletedAgentParty(gaii));
 }
 
 /**
@@ -346,13 +366,14 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // The work this person is a party to, settled before the per-identity passes below delete what
   // they find: open work is cancelled and the requester's held morsels go back, finished work stays
   // for the other side under the erasure's pseudonym. One pseudonym for the whole erasure, so the
-  // other side's books still see one party.
+  // other side's books still see one party. The agents are named too, for an account whose agents
+  // no GHII pattern would find.
   const ghiis = await db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).execute();
+  const agents = await db.selectFrom('Agent').select('gaii').where('owner', '=', name).execute();
   const pseudonym = erasedPartyPseudonym();
-  await settleErasedPartyWorkDb(db, name, ghiis.map(g => g.ghii), pseudonym);
+  await settleErasedPartyWorkDb(db, name, ghiis.map(g => g.ghii), pseudonym, agents.map(a => a.gaii));
 
   // Per-identity data: agents first, then the person's own GHIIs.
-  const agents = await db.selectFrom('Agent').select('gaii').where('owner', '=', name).execute();
   for (const a of agents) await cascadeDeleteIdentityData(db, a.gaii);
   await db.deleteFrom('Agent').where('owner', '=', name).execute();
 
