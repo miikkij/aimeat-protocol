@@ -248,9 +248,9 @@ export const memoryMethods = {
       const values = chunk.map(r => sql`(${r.ownerGaii}, ${r.key}, ${JSON.stringify(r.value ?? null)}::jsonb, ${r.visibility},
         ${sql.val(r.tags ?? [])}, ${r.ttlHours ?? null}, ${r.version}, ${r.flagCount ?? 0}, ${r.allowedOrigins ?? null},
         ${r.groupId ?? null}, ${r.workspaceRef ?? null}, ${byteSize(r.value)}, ${buildSearchBlob(r)}, ${r.trackable ?? false},
-        ${new Date(r.createdAt)}, ${new Date(r.updatedAt)})`);
+        ${new Date(r.createdAt)}, ${new Date(r.updatedAt)}, ${r.aiProvenanceId ?? null})`);
       await sql`
-        INSERT INTO "Memory" ("ownerGaii","key","value","visibility","tags","ttlHours","version","flagCount","allowedOrigins","groupId","workspaceRef","byteSize","searchBlob","trackable","createdAt","updatedAt")
+        INSERT INTO "Memory" ("ownerGaii","key","value","visibility","tags","ttlHours","version","flagCount","allowedOrigins","groupId","workspaceRef","byteSize","searchBlob","trackable","createdAt","updatedAt","aiProvenanceId")
         VALUES ${sql.join(values)}
         ON CONFLICT ("ownerGaii","key") DO NOTHING
       `.execute(this.db);
