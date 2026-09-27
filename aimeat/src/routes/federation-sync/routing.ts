@@ -5,6 +5,9 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-09-26 — POST /v1/federation/route names the person who starts a route by the
+ *     resolved identity (resolveIdentity): in the relay claim to the target, in the claim to a
+ *     relaying peer and on the routing fee (secaudit 2026-09, R3 9).
  *   v1.4.0 — 2026-09-26 — POST /v1/federation/cross-node/work names the requester by the resolved
  *     identity (resolveIdentity): in the signed payload, in the relay claim and on the routing fee.
  *   v1.3.0 — 2026-09-17 — A multi-hop hop authenticates with its verified relay claim, since v1.2.0
@@ -117,7 +120,10 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
         // On a hop, the principal is the one the previous node signed into the claim: the person who
         // started the route, on their own node. Nothing here can re-check that name, and nothing
         // here needs to; it is carried forward into the next claim so the far end sees who asked.
-        const requesterGaii = req.relay ? req.relay.caller : req.auth!.sub;
+        // Where the route starts, the person is named by their full identity (resolveIdentity, their
+        // GHII): a bare account name means nobody on the next node, or that node's own namesake. The
+        // routing fee below is taken from the same identity.
+        const requesterGaii = req.relay ? req.relay.caller : resolveIdentity(req.auth!, config.nodeId);
 
         // Helper: charge 1 morsel routing fee (atomic debit), ONLY on the node where the route began.
         //
