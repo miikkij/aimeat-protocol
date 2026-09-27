@@ -2,17 +2,21 @@
  * @file src/services/held-account-names.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What the move to the full identity left for the operator, and the operator's decision
- *   on each name. No deploy step is done by hand: the move runs when the store opens (Postgres 0086,
- *   sqlite/schema-identity-backfill.ts), acts only on positive evidence, and records what it could
- *   not place. This turns the record into ONE incident on the Security page at start, and settles a
- *   name the way the operator decides it.
+ * @description What the move to the full identity and the start step for the cortexes and ecosystem
+ *   apps of deleted accounts left for the operator, and the operator's decision on each name. No
+ *   deploy step is done by hand: the move runs when the store opens (Postgres 0086,
+ *   sqlite/schema-identity-backfill.ts), the start step runs right after it (settleInstallsAtStart),
+ *   both act only on positive evidence, and both record what they could not place. This turns the
+ *   records into ONE incident on the Security page at start, and settles a name the way the operator
+ *   decides it.
  *
  *   WHAT IS HELD. Rows stored under a bare account name that are older than the account that holds
- *   the name now. They may be that person's, or a previous holder's of the name, and nothing in the
- *   data says which. They stay exactly as they were until the operator decides:
+ *   the name now: actions, work and ledger lines (the move), and cortexes installed and ecosystem apps
+ *   connected under the name (the start step). They may be that person's, or a previous holder's of
+ *   the name, and nothing in the data says which. They stay exactly as they were until the operator
+ *   decides, and a held ecosystem app acts for the account that holds the name until then:
  *   - 'holder': they are the holder's. The rows, the holder's own ledger lines and the hook bindings
- *     that name the actions move to the holder's full identity (GHII).
+ *     that name the actions move to the holder's full identity (GHII); the cortexes and apps stay.
  *   - 'previous': they were a previous holder's, and are settled as deleting that account would have
  *     settled them (HeldAccountNameRepository.resolveHeldAccountName).
  *   A hook binding whose action the move did not put under a full identity is listed: with its name
@@ -26,16 +30,24 @@
  *   read or written is logged, and the next start tries again.
  * @structure
  *   - HELD_NAMES_INCIDENT_TYPE, HELD_NAMES_INCIDENT_CODE, HELD_NAMES_SOURCE
- *   - openHeldNamesIncident(config, storage) — at start: the record, once, to one incident
+ *   - settleInstallsAtStart(config, storage) — at start: the cortexes and ecosystem apps of deleted
+ *     accounts, once per node
+ *   - openHeldNamesIncident(config, storage) — at start: the records, once each, to one incident
  *   - resolveHeldName(config, storage, { incidentId, name, resolution }) — one decision
  * @usage
- *   await openHeldNamesIncident(config, storage);   // server-bootstrap/config-init.ts
+ *   await settleInstallsAtStart(config, storage);   // server-bootstrap/config-init.ts
+ *   await openHeldNamesIncident(config, storage);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — settleInstallsAtStart, the start step for the cortexes and ecosystem apps of
+ *     deleted accounts. The incident is made from both records, a name counted once with every kind
+ *     of row it holds; a record whose run an open incident has not taken joins it. A decision covers
+ *     the kinds of row its entry holds.
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { HeldNameOutcome, HeldNameResolution, HeldNamesRecord } from '../storage/types/held-names.js';
+import type { HeldAccountName, HeldNameOutcome, HeldNameResolution, HeldNamesRecord, UntiedLedgerValue } from '../storage/types/held-names.js';
+import { HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY } from '../storage/repositories/held-names.repository.js';
 import { HOOK_NAMES, hookKind, indexActionRefs } from './hooks.js';
 import { accountNameRef, followActionsToFullIdentity } from './hooks-overview.js';
 import {
@@ -50,13 +62,42 @@ export const HELD_NAMES_INCIDENT_TYPE = 'held_account_names';
 export const HELD_NAMES_INCIDENT_CODE = 'NAMES_TO_DECIDE';
 export const HELD_NAMES_SOURCE = 'full_identity_move';
 
+/** The records an incident of this kind is made from, the move's first. */
+const RECORD_KEYS = [HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY];
+
+/** One run of one record, as an incident names what it took: `<key>@<at>`. */
+const sourceOf = (key: string, record: HeldNamesRecord): string => `${key}@${record.at}`;
+
+/** The runs an incident took. An incident written before it listed them names the move's run by `move_at`. */
+const sourcesOf = (i: SecurityIncidentValue): string[] =>
+  i.sources ?? (i.move_at ? [`${HELD_NAMES_RECORD_KEY}@${i.move_at}`] : []);
+
+/** Rows the move recorded for a name: actions, work, lines. */
+const holdsRows = (n: HeldAccountName): boolean => n.actions + n.work + n.own_lines + n.naming_lines > 0;
+/** Cortexes and ecosystem apps the start step recorded for a name. */
+const holdsInstalls = (n: HeldAccountName): boolean => (n.cortexes ?? 0) + (n.ecosystem_apps ?? 0) > 0;
+
+/** Add what another record holds for the same name. */
+function addCounts(into: HeldAccountName, from: HeldAccountName): void {
+  into.actions += from.actions;
+  into.work += from.work;
+  into.own_lines += from.own_lines;
+  into.naming_lines += from.naming_lines;
+  into.cortexes = (into.cortexes ?? 0) + (from.cortexes ?? 0);
+  into.ecosystem_apps = (into.ecosystem_apps ?? 0) + (from.ecosystem_apps ?? 0);
+}
+
 /** The sentence an incident carries for a reader of the REST or MCP answer. The page words its own. */
-function detailOf(names: number, bindings: number, untied: number): string {
+function detailOf(names: HeldAccountName[], bindings: number, untied: number): string {
   const parts: string[] = [];
-  if (names > 0) {
-    parts.push(`The move to the full identity at start left the rows of ${names} account name${names === 1 ? '' : 's'} as they were: `
+  const n = names.length;
+  if (n > 0) {
+    parts.push(`At start, the move to the full identity and the settling of deleted accounts' cortexes and ecosystem apps left the rows of ${n} account name${n === 1 ? '' : 's'} as they were: `
       + 'they are older than the account that holds the name now, so they may be that account\'s or a previous holder\'s. '
-      + 'Decide each name: "holder" moves its rows to the account that holds it, "previous" settles them as a deleted account\'s.');
+      + 'Decide each name: "holder" moves its actions, work and own ledger lines to the account that holds it and keeps its cortexes and ecosystem apps, "previous" settles them all as a deleted account\'s.');
+    if (names.some(h => (h.ecosystem_apps ?? 0) > 0)) {
+      parts.push('An ecosystem app among them can still act for the account that holds its name until you decide.');
+    }
   }
   if (bindings > 0) {
     parts.push(`${bindings} hook binding${bindings === 1 ? '' : 's'} name${bindings === 1 ? 's' : ''} no published action now. `
@@ -69,69 +110,143 @@ function detailOf(names: number, bindings: number, untied: number): string {
 }
 
 /**
- * At start: turn what the move recorded into ONE incident, once. Returns the incident's id when this
- * start opened it. A record already turned into an incident, or no record, opens nothing. So does a
- * record with nothing to show, which is then marked as seen.
+ * At start, right after the move: the cortexes and ecosystem apps of deleted accounts, once per node
+ * (HeldAccountNameRepository.settleInstallsOfDeletedAccounts). What no account holds goes as an account
+ * deletion takes it; what is older than the account holding its name now is recorded for the
+ * operator. The node starts whatever the store answers; the next start tries again.
+ */
+export async function settleInstallsAtStart(config: AimeatConfig, storage: Storage): Promise<void> {
+  try {
+    const record = await storage.settleInstallsOfDeletedAccounts({ nodeId: config.nodeId });
+    const d = record?.deleted;
+    if (d && d.names > 0) {
+      logger.info(`held-account-names: the cortexes and ecosystem apps of ${d.names} deleted account${d.names === 1 ? '' : 's'} went as an account deletion takes them (${d.cortexes} cortexes, ${d.ecosystem_apps} ecosystem apps).`);
+    }
+  } catch (err) {
+    logger.error('held-account-names: the cortexes and ecosystem apps of deleted accounts were not settled at start. The next start tries again.', { error: String(err) });
+  }
+}
+
+/** Say in the log what the incident holds, one line per name and per binding. */
+function logHeld(names: HeldAccountName[], bindingsLeft: IncidentBinding[]): void {
+  for (const n of names) {
+    const apps = n.ecosystem_apps ?? 0;
+    logger.warn(`held-account-names: the rows under the name "${n.name}" are older than the account that holds it now, and stay as they are until an operator decides on the Security page (${n.actions} actions, ${n.work} work, ${n.own_lines} own lines, ${n.naming_lines} lines naming it, ${n.cortexes ?? 0} cortexes, ${apps} ecosystem apps${apps ? ', which act for that account until then' : ''}).`);
+  }
+  for (const b of bindingsLeft) {
+    logger.warn(`held-account-names: "${b.ref}" on ${b.hook} names no published action${b.gate ? ', so this gate lets everything pass until it is bound again' : ''}.`);
+  }
+}
+
+/**
+ * At start: turn what the move and the start step recorded into ONE incident, once per record. A
+ * name both recorded is one entry with every count. Returns the incident's id when this start opened
+ * it. A record already turned into an incident, or no record, opens nothing. So does a record with
+ * nothing to show, which is then marked as seen. A record that comes after its incident was opened
+ * joins it while it is open and none of its names is decided there; else it opens its own.
  */
 export async function openHeldNamesIncident(config: AimeatConfig, storage: Storage): Promise<{ id?: string }> {
-  let record: HeldNamesRecord | null;
+  const pending: Array<{ key: string; record: HeldNamesRecord }> = [];
   let byRef: Map<string, unknown>;
-  let existing: SecurityIncidentValue | undefined;
+  let incidents: SecurityIncidentValue[];
   try {
-    record = await storage.getHeldNamesRecord();
-    if (!record || record.delivered_at) return {};
+    for (const key of RECORD_KEYS) {
+      const record = await storage.getHeldNamesRecord(key);
+      if (record && !record.delivered_at) pending.push({ key, record });
+    }
+    if (!pending.length) return {};
     byRef = indexActionRefs(await storage.listActions()).byRef;
-    // An incident this record already opened, at a start that could not mark the record as seen.
-    existing = (await listSecurityIncidents(storage, config)).items
-      .find(i => i.type === HELD_NAMES_INCIDENT_TYPE && i.move_at === record?.at);
+    incidents = (await listSecurityIncidents(storage, config)).items.filter(i => i.type === HELD_NAMES_INCIDENT_TYPE);
   } catch (err) {
-    logger.error('held-account-names: what the move to the full identity left was not read at start. The next start tries again.', { error: String(err) });
+    logger.error('held-account-names: what the move to the full identity and the start step left was not read at start. The next start tries again.', { error: String(err) });
     return {};
   }
 
-  const names: IncidentHeldName[] = record.held.map(h => ({ ...h, bindings: [], status: 'open' }));
-  const byName = new Map(names.map(n => [n.name, n]));
+  // A record an incident took already, at a start that could not mark it as seen.
+  const tookBy = new Map<string, string>();
+  for (const i of incidents) for (const s of sourcesOf(i)) tookBy.set(s, i.id);
+  const fresh = pending.filter(p => !tookBy.has(sourceOf(p.key, p.record)));
+
+  const byName = new Map<string, IncidentHeldName>();
+  for (const p of fresh) {
+    for (const h of p.record.held) {
+      const entry = byName.get(h.name);
+      if (entry) addCounts(entry, h);
+      else byName.set(h.name, { ...h, cortexes: h.cortexes ?? 0, ecosystem_apps: h.ecosystem_apps ?? 0, bindings: [], status: 'open' });
+    }
+  }
+  const names = [...byName.values()];
+  const untied: UntiedLedgerValue[] = fresh.flatMap(p => p.record.untied ?? []);
   const bindingsLeft: IncidentBinding[] = [];
-  for (const hook of HOOK_NAMES) {
-    for (const ref of config.extensionHooks[hook] ?? []) {
-      const parsed = accountNameRef(ref);
-      if (!parsed) continue;
-      const binding: IncidentBinding = { hook, ref: ref as string, gate: hookKind(hook) === 'gate' };
-      const entry = byName.get(parsed.name);
-      if (entry) entry.bindings.push(binding);
-      else if (!byRef.has(ref as string)) bindingsLeft.push(binding);
+  // The hook bindings name actions by the bare name, which only the move's record speaks of.
+  const moveRecord = fresh.find(p => p.key === HELD_NAMES_RECORD_KEY)?.record;
+  if (moveRecord) {
+    for (const hook of HOOK_NAMES) {
+      for (const ref of config.extensionHooks[hook] ?? []) {
+        const parsed = accountNameRef(ref);
+        if (!parsed) continue;
+        const binding: IncidentBinding = { hook, ref: ref as string, gate: hookKind(hook) === 'gate' };
+        const entry = byName.get(parsed.name);
+        if (entry) entry.bindings.push(binding);
+        else if (!byRef.has(ref as string)) bindingsLeft.push(binding);
+      }
     }
   }
 
   const now = new Date().toISOString();
-  let id: string | null = existing?.id ?? null;
-  if (!id && (names.length || bindingsLeft.length || record.untied.length)) {
-    const opened = await recordSecurityIncident(storage, config, {
-      type: HELD_NAMES_INCIDENT_TYPE, code: HELD_NAMES_INCIDENT_CODE,
-      actorGhii: `system@${config.nodeId}`, actorName: '',
-      detail: detailOf(names.length, bindingsLeft.length, record.untied.length),
-      source: HELD_NAMES_SOURCE, moveAt: record.at,
-      names, bindingsLeft, untied: record.untied,
-    });
-    if (!opened.recorded) {
-      logger.error('held-account-names: the incident for what the move to the full identity left could not be saved. The next start tries again.');
-      return {};
+  let id: string | null = null;
+  let opened = false;
+  if (names.length || bindingsLeft.length || untied.length) {
+    const sources = fresh.map(p => sourceOf(p.key, p.record));
+    const open = incidents.find(i => i.status === 'open');
+    const decidedThere = !!open && names.some(n => (open.names ?? []).some(e => e.name === n.name && e.status !== 'open'));
+    const rec = open && !decidedThere ? await findSecurityIncident(storage, config, open.id) : null;
+    if (rec) {
+      // The open incident takes them: a name it lists already gets the new counts.
+      const value = rec.value as SecurityIncidentValue;
+      const all = (value.names ?? []).map(e => ({ ...e }));
+      for (const n of names) {
+        const entry = all.find(e => e.name === n.name);
+        if (entry) { addCounts(entry, n); entry.bindings = [...entry.bindings, ...n.bindings]; } else all.push(n);
+      }
+      const left = [...(value.bindings_left ?? []), ...bindingsLeft];
+      const allUntied = [...(value.untied ?? []), ...untied];
+      try {
+        await saveSecurityIncident(storage, rec, {
+          ...value, names: all, bindings_left: left, untied: allUntied, sources: [...sourcesOf(value), ...sources],
+          detail: detailOf(all, left.length, allUntied.length),
+        });
+      } catch (err) {
+        logger.error('held-account-names: the incident could not take what the start step left. The next start tries again.', { error: String(err) });
+        return {};
+      }
+      id = value.id;
+    } else {
+      const made = await recordSecurityIncident(storage, config, {
+        type: HELD_NAMES_INCIDENT_TYPE, code: HELD_NAMES_INCIDENT_CODE,
+        actorGhii: `system@${config.nodeId}`, actorName: '',
+        detail: detailOf(names, bindingsLeft.length, untied.length),
+        source: HELD_NAMES_SOURCE, moveAt: moveRecord?.at, sources,
+        names, bindingsLeft, untied,
+      });
+      if (!made.recorded) {
+        logger.error('held-account-names: the incident for what the move to the full identity and the start step left could not be saved. The next start tries again.');
+        return {};
+      }
+      id = made.id;
+      opened = true;
+      emitChange('security');
     }
-    id = opened.id;
-    emitChange('security');
-    for (const n of names) {
-      logger.warn(`held-account-names: the rows under the bare name "${n.name}" are older than the account that holds it now, and stay as they are until an operator decides on the Security page (${n.actions} actions, ${n.work} work, ${n.own_lines} own lines, ${n.naming_lines} lines naming it).`);
-    }
-    for (const b of bindingsLeft) {
-      logger.warn(`held-account-names: "${b.ref}" on ${b.hook} names no published action${b.gate ? ', so this gate lets everything pass until it is bound again' : ''}.`);
+    logHeld(names, bindingsLeft);
+  }
+  for (const p of pending) {
+    try {
+      await storage.saveHeldNamesRecord({ ...p.record, delivered_at: now, incident: tookBy.get(sourceOf(p.key, p.record)) ?? id }, p.key);
+    } catch (err) {
+      logger.error('held-account-names: a record could not be marked as seen. The next start finds its incident and marks it again.', { error: String(err) });
     }
   }
-  try {
-    await storage.saveHeldNamesRecord({ ...record, delivered_at: now, incident: id });
-  } catch (err) {
-    logger.error('held-account-names: the record could not be marked as seen. The next start finds its incident and marks it again.', { error: String(err) });
-  }
-  return id && !existing ? { id } : {};
+  return opened && id ? { id } : {};
 }
 
 export type ResolveHeldNameResult =
@@ -146,7 +261,7 @@ export type ResolveHeldNameResult =
 /**
  * The operator's decision on one name of the incident. Deciding a name the way it was decided
  * already answers what that decision did; deciding it the other way is a CONFLICT. The incident closes
- * when the last name is decided.
+ * when the last name is decided. A decision covers the kinds of row the name's entry holds.
  */
 export async function resolveHeldName(
   config: AimeatConfig,
@@ -170,6 +285,8 @@ export async function resolveHeldName(
     return { ok: false, code: 'CONFLICT', message: `"${name}" was decided as "${entry.status}" on ${entry.resolvedAt ?? 'an earlier day'}.` };
   }
 
+  const rows = holdsRows(entry);
+  const installs = holdsInstalls(entry);
   let holderGhii: string | null = null;
   if (resolution === 'holder') {
     const owner = await storage.getOwner(name);
@@ -177,17 +294,19 @@ export async function resolveHeldName(
       return { ok: false, code: 'CONFLICT', message: `No account holds "${name}" now, so its rows can only be settled as a previous holder's.` };
     }
     if (Date.parse(owner.createdAt) !== Date.parse(entry.holder_since)) {
-      return { ok: false, code: 'CONFLICT', message: `The account that holds "${name}" now is not the one this incident recorded; the rows cannot be moved to it.` };
+      return { ok: false, code: 'CONFLICT', message: `The account that holds "${name}" now is not the one this incident recorded; the rows cannot be given to it.` };
     }
     holderGhii = (await storage.getGHIIByOwner(name))?.ghii ?? null;
-    if (!holderGhii) {
+    if (!holderGhii && rows) {
       return { ok: false, code: 'CONFLICT', message: `The account that holds "${name}" has no full identity to move the rows to.` };
     }
   }
 
-  const done = await storage.resolveHeldAccountName({ name, resolution, holderGhii, namingBefore: entry.holder_since });
+  const done = await storage.resolveHeldAccountName({
+    name, resolution, holderGhii, namingBefore: entry.holder_since, nodeId: config.nodeId, rows, installs,
+  });
   let bindingsMoved: Array<{ hook: string; from: string; to: string }> = [];
-  if (resolution === 'holder' && holderGhii) {
+  if (resolution === 'holder' && holderGhii && rows) {
     const byRef = indexActionRefs(await storage.listActions()).byRef;
     bindingsMoved = (await followActionsToFullIdentity(config, storage, new Map([[name, holderGhii]]), byRef)).moved;
     if (bindingsMoved.length) emitChange('config');

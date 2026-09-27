@@ -21,6 +21,11 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.18.0 -- 2026-09-26 -- The start step for the cortexes and ecosystem apps of deleted accounts, on
+ *     every provider: a name no account holds loses them as an account deletion takes them (the app's
+ *     open work cancelled with what was held going back, the lines naming it under the work's
+ *     pseudonym), older ones of a held name stay and open the incident on their own, the holder's own
+ *     stay, the step runs once; "holder" keeps them and "previous" deletes them the same way.
  *   v1.17.0 -- 2026-09-26 -- deleteOwner takes the ecosystem apps the person connected on every
  *     provider: the record with its pinned key, what the app wrote, the actions it published and the
  *     automation recipe set for it. Another person's app stays as it was.
@@ -368,6 +373,56 @@ async function ecoLeft(s: Storage, a: ReturnType<Awaited<ReturnType<typeof seedE
     };
 }
 
+/**
+ * What an account name installed at `at`, stored under the name whoever holds it now: an ecosystem app
+ * (its record, a record it wrote, an action it published, the recipe set for it) and a cortex (its
+ * record, a lib file, and the schema lock and seed record its activation made under the name's GHII).
+ */
+async function seedInstalls(s: Storage, who: string, node: string, at: string) {
+    const cortex = `cx-${who}`;
+    const x = {
+        who, app: 'helper', geai: `eco:helper#${who}@${node}`, ghii: `${who}@${node}`, key: 'conf.inst.note', action: `conf-inst-${who}`,
+        cortex, lib: 'cx.js', schema: `conf.${cortex}.item`, seed: `conf.${cortex}.seed`,
+    };
+    await s.createEcosystemApp({
+        app: x.app, owner: who, geai: x.geai, publicKey: `pinned-key-of-${who}`, scopes: ['memory:write'],
+        status: 'active', morselBalance: 0, createdAt: at, lastSeen: at,
+    });
+    await s.setMemory({ key: x.key, ownerGaii: x.geai, value: { from: 'the app' }, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: at, updatedAt: at });
+    await s.createAction({
+        id: x.action, providerGaii: x.geai, displayName: x.action, description: 'conformance', inputSchema: {},
+        outputSchema: {}, pricing: { baseMorsels: 0 }, tags: [], createdAt: at, updatedAt: at,
+    });
+    await s.upsertAutomationRecipe({
+        id: randomUUID(), owner: who, app: x.app, trigger: { kind: 'data-published', keyGlob: 'conf.inst.*' },
+        agents: [], enabled: true, createdAt: at, updatedAt: at,
+    });
+    await s.createCortexExtension({
+        name: cortex, namespace: who, shortName: cortex, apiVersion: 'v1', version: '1.0.0', description: 'conformance',
+        author: who, tags: [], labels: {}, status: 'active', visibility: 'private', installedAt: at, activatedAt: at,
+        installedBy: who, manifest: 'conformance', components: [],
+        activationArtifacts: { schemaKeys: [x.schema], promptKeys: [], actionIds: [], boardIds: [], seedDataKeys: [x.seed], ontologyKeys: [], libFiles: [x.lib] },
+    });
+    await s.setCortexLibFile(cortex, x.lib, '(function(){})();');
+    await s.setSchema({ keyPattern: x.schema, applyTo: 'exact', schemaJson: { type: 'object' }, schemaMode: 'strict', lockedBy: x.ghii, setAt: at, updatedAt: at });
+    await s.setMemory({ key: x.seed, ownerGaii: x.ghii, value: { v: 1 }, visibility: 'public', tags: ['cortex'], ttlHours: null, version: 1, createdAt: at, updatedAt: at });
+    return x;
+}
+
+/** What is left of what seedInstalls wrote, read back through the Storage interface. */
+async function installsLeft(s: Storage, x: Awaited<ReturnType<typeof seedInstalls>>) {
+    return {
+        app: !!(await s.getEcosystemApp(x.geai)),
+        wrote: !!(await s.getMemory(x.geai, x.key)),
+        actions: (await s.listActionsByProvider(x.geai)).length,
+        recipe: !!(await s.getAutomationRecipe(x.who, x.app)),
+        cortex: !!(await s.getCortexExtension(x.cortex)),
+        lib: (await s.getCortexLibFile(x.cortex, x.lib)) !== null,
+        schema: !!(await s.getSchema(x.schema, 'exact')),
+        seed: !!(await s.getMemory(x.ghii, x.seed)),
+    };
+}
+
 /** What is left of one seeded cortex, read back through the Storage interface. */
 async function cortexLeft(s: Storage, c: ReturnType<Awaited<ReturnType<typeof seedCortexErasure>>['cortexOf']>) {
     return {
@@ -520,9 +575,19 @@ async function heldRecord(provider: string, storage: Storage): Promise<any> {
 }
 
 /** Forget the record, so the next start of an E2E node on this database opens no incident for it. */
-async function forgetHeldRecord(provider: string, storage: Storage): Promise<void> {
-    if (provider === 'sqlite') sqliteDb(storage).prepare('DELETE FROM system_settings WHERE key = ?').run(HELD_RECORD);
-    else await pgPool(storage).query('DELETE FROM "SystemSetting" WHERE "key" = $1', [HELD_RECORD]);
+async function forgetHeldRecord(provider: string, storage: Storage, key: string = HELD_RECORD): Promise<void> {
+    if (provider === 'sqlite') sqliteDb(storage).prepare('DELETE FROM system_settings WHERE key = ?').run(key);
+    else await pgPool(storage).query('DELETE FROM "SystemSetting" WHERE "key" = $1', [key]);
+}
+
+/** The start step's record for the cortexes and ecosystem apps of deleted accounts. */
+const INSTALLS_RECORD = 'migration:installs:held';
+
+/** Every incident this suite's node recorded, gone, so a start meets no open incident to join. */
+async function forgetIncidents(storage: Storage, nodeId: string): Promise<void> {
+    const owner = `security-system@${nodeId}`;
+    const { items } = await storage.listAllMemory({ prefix: 'security.incident.', limit: 1000 });
+    for (const r of items) if (r.ownerGaii === owner) await storage.deleteMemory(owner, r.key);
 }
 
 /** When the move to the full identity ran on this database, as its own record says; null when it has not. */
@@ -1385,6 +1450,105 @@ describe('storage providers agree on what they do, not just on their signatures'
             for (const hook of ['pre_work_request', 'post_work_delivery']) await storage.deleteConfigValue(`hooks.${hook}`);
             for (const n of [A, B, keeper]) await storage.deleteOwner(n);
             await forgetHeldRecord(name, storage);
+        }
+    }, 60_000);
+
+    // The start step after the move, once per node. The cortexes and ecosystem apps of a name no account
+    // holds go as an account deletion takes them: the app with what it wrote, its action and its recipe,
+    // its open work cancelled with what was held going back, the lines naming it under the work's
+    // pseudonym; the cortex with its lib file, its schema lock and its seed record. Those older than
+    // the account that holds the name now stay as they are, and the incident opens on them alone.
+    // Newer ones are the holder's. "It belongs to the current holder" keeps them; "it was a previous
+    // holder's" deletes them as the start step deletes a deleted account's.
+    it('the start step settles what deleted accounts installed, holds what is older than a name\'s account, and each decision acts on it', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        const { settleInstallsAtStart, openHeldNamesIncident, resolveHeldName } = await import('../../src/services/held-account-names.js');
+        const { findSecurityIncident } = await import('../../src/services/security-incident.js');
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const config = { nodeId: node, extensionHooks: {} } as unknown as AimeatConfig;
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const hour = 3_600_000;
+            const earlier = new Date(Date.now() - hour).toISOString();
+            const longAgo = new Date(Date.now() - 48 * hour).toISOString();
+            const ages = new Date(Date.now() - 72 * hour).toISOString();
+            const gone = `confsg${tag}`, keep = `confsk${tag}`, prev = `confsp${tag}`, own = `confso${tag}`, payer = `confsq${tag}`;
+            const payerGhii = await seedAccount(storage, payer, node, ages);
+            await seedAccount(storage, keep, node, earlier);
+            await seedAccount(storage, prev, node, earlier);
+            await seedAccount(storage, own, node, ages);
+            const g = await seedInstalls(storage, gone, node, longAgo);
+            const k = await seedInstalls(storage, keep, node, longAgo);
+            const p = await seedInstalls(storage, prev, node, longAgo);
+            const o = await seedInstalls(storage, own, node, earlier);
+            // The node's own install and one under a reserved word: nobody's account, so they stay.
+            const nodeOwn = `cx-node-${tag}`, reserved = `cx-reserved-${tag}`;
+            for (const [cx, by] of [[nodeOwn, `system@${node}`], [reserved, 'system']] as const) {
+                await storage.createCortexExtension({
+                    name: cx, namespace: 'system', shortName: cx, apiVersion: 'v1', version: '1.0.0', description: 'conformance',
+                    author: 'system', tags: [], labels: {}, status: 'active', visibility: 'public', installedAt: longAgo, activatedAt: longAgo,
+                    installedBy: by, manifest: 'conformance', components: [],
+                    activationArtifacts: { schemaKeys: [], promptKeys: [], actionIds: [], boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: [] },
+                });
+            }
+            const tc = (x: string) => `tc-inst-${x}-${tag}`;
+            for (const [x, app] of [['g', g], ['p', p]] as const) {
+                await storage.createWork(workRow(tc(x), app.geai, payerGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
+                await storage.debitBalance(payerGhii, 11);
+                await insertLineAsStored(name, storage, {
+                    txId: `tx-inst-${tag}-${x}`, gaii: payerGhii, type: 'escrow_hold', amount: 11, timestamp: longAgo,
+                    counterpartyGaii: app.geai, trackingCode: tc(x),
+                });
+            }
+            // A start that meets no record of this step and no open incident: the move's record is seen.
+            await forgetHeldRecord(name, storage);
+            await forgetHeldRecord(name, storage, INSTALLS_RECORD);
+            await forgetIncidents(storage, node);
+
+            await settleInstallsAtStart(config, storage);
+            const all = { app: true, wrote: true, actions: 1, recipe: true, cortex: true, lib: true, schema: true, seed: true };
+            const none = { app: false, wrote: false, actions: 0, recipe: false, cortex: false, lib: false, schema: false, seed: false };
+            expect.soft(await installsLeft(storage, g), `${name}: what a deleted account installed survived the start`).toEqual(none);
+            expect.soft(await installsLeft(storage, k), `${name}: what is older than an account changed at start`).toEqual(all);
+            expect.soft(await installsLeft(storage, o), `${name}: what the holder installed changed at start`).toEqual(all);
+            expect.soft([!!(await storage.getCortexExtension(nodeOwn)), !!(await storage.getCortexExtension(reserved))],
+                `${name}: the node's own install, or one under a reserved word, was taken for a deleted account's`).toEqual([true, true]);
+            const gw = await storage.getWork(tc('g'));
+            expect.soft([gw?.status, gw?.providerGaii], `${name}: the deleted account's app's open work was not settled`).toEqual(['cancelled', expect.stringMatching(erasedRe)]);
+            const gLine = (await linesAsStored(name, storage, `tx-inst-${tag}-g`))[0];
+            expect.soft(gLine?.counterpartyGaii, `${name}: a line naming the deleted account's app does not take the work's pseudonym`).toBe(gw?.providerGaii);
+            // 100, less the two 11s held, plus the 11 held for the deleted account's app's open work.
+            expect.soft((await storage.getGHII(payerGhii))?.morselBalance, `${name}: what was held for the deleted account's app did not come back`).toBe(89);
+            expect.soft(await storage.settleInstallsOfDeletedAccounts({ nodeId: node }), `${name}: the start step ran twice`).toBeNull();
+            const record = await storage.getHeldNamesRecord(INSTALLS_RECORD);
+            const recorded = (n: string) => record?.held.find(h => h.name === n);
+            expect.soft(recorded(keep), `${name}: the older installs of a held name are not recorded`).toMatchObject({ cortexes: 1, ecosystem_apps: 1, actions: 0 });
+            expect.soft([recorded(own), recorded(gone)], `${name}: the holder's own installs, or a deleted account's, are recorded as held`).toEqual([undefined, undefined]);
+
+            const opened = await openHeldNamesIncident(config, storage);
+            expect(opened.id, `${name}: no incident opened when only the start step had something to show`).toBeTruthy();
+            const id = opened.id as string;
+            const value = (await findSecurityIncident(storage, config, id))?.value as any;
+            const entry = (n: string) => value?.names?.find((e: any) => e.name === n);
+            expect.soft(entry(prev), `${name}: a name held only for its installs has no entry`).toMatchObject({ status: 'open', cortexes: 1, ecosystem_apps: 1, actions: 0, work: 0 });
+
+            const rk = await resolveHeldName(config, storage, { incidentId: id, name: keep, resolution: 'holder' });
+            expect.soft(rk.ok && rk.done, `${name}: deciding for the holder: ${JSON.stringify(rk)}`).toMatchObject({ cortexes_deleted: 0, ecosystem_apps_deleted: 0 });
+            expect.soft(await installsLeft(storage, k), `${name}: "holder" did not keep the installs`).toEqual(all);
+
+            const rp = await resolveHeldName(config, storage, { incidentId: id, name: prev, resolution: 'previous' });
+            expect.soft(rp.ok && rp.done, `${name}: deciding for a previous holder: ${JSON.stringify(rp)}`).toMatchObject({ cortexes_deleted: 1, ecosystem_apps_deleted: 1, work_cancelled: 1 });
+            expect.soft(await installsLeft(storage, p), `${name}: "previous" left the installs`).toEqual(none);
+            const pw = await storage.getWork(tc('p'));
+            expect.soft([pw?.status, pw?.providerGaii], `${name}: the previous holder's app's open work was not settled`).toEqual(['cancelled', expect.stringMatching(erasedRe)]);
+            const pLine = (await linesAsStored(name, storage, `tx-inst-${tag}-p`))[0];
+            expect.soft(pLine?.counterpartyGaii, `${name}: a line naming the previous holder's app does not take the work's pseudonym`).toBe(pw?.providerGaii);
+            expect.soft((await storage.getGHII(payerGhii))?.morselBalance, `${name}: what was held for the previous holder's app did not come back`).toBe(100);
+
+            await forgetIncidents(storage, node);
+            for (const n of [keep, prev, own, payer]) await storage.deleteOwner(n);
+            for (const cx of [nodeOwn, reserved]) await storage.deleteCortexExtension(cx);
+            await forgetHeldRecord(name, storage, INSTALLS_RECORD);
         }
     }, 60_000);
 

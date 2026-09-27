@@ -1,29 +1,38 @@
 /**
  * @file e2e-held-account-names.ts
- * @description The move to the full identity at start (Postgres 0086, and its SQLite half) on a node
- *   whose data it cannot place, proven across three real boots of one database.
+ * @description The move to the full identity at start (Postgres 0086, and its SQLite half) and the
+ *   start step for the cortexes and ecosystem apps of deleted accounts, on a node whose data they
+ *   cannot place, proven across three real boots of one database.
  *
- *   WHY IT OWNS ITS SERVER. The move runs when the store opens and records that it ran, so the only
- *   honest test is a node that is stopped, given the data, and started again. It follows the runner's
- *   backend: Postgres when the env file names it, a temporary SQLite file otherwise.
+ *   WHY IT OWNS ITS SERVER. The move and the start step run when the node starts and record that they
+ *   ran, so the only honest test is a node that is stopped, given the data, and started again. It
+ *   follows the runner's backend: Postgres when the env file names it, a temporary SQLite file
+ *   otherwise.
  *
  *   THE THREE BOOTS.
  *   1. A node with an operator, an agent of the operator's holding operator:admin, a second person,
- *      and two accounts, carol and dora. While it is stopped, rows older than carol's and dora's
- *      accounts are written under their bare names (an action, work, a line of their own), a third
- *      bare name that no account holds gets an action, one gate is bound to all three actions by
- *      account name, and the record that the move ran is removed (with 0085's on Postgres), so the
- *      next start meets the database as a deploy does.
- *   2. The start that carries the move. The node starts. The Security page holds ONE incident that
- *      names carol and dora with their counts and their bindings, and the binding to the third name's
- *      action as one that names nothing, on a gate that now lets everything pass. The operator decides
- *      carol over REST (it is carol's) and dora over MCP (it was a previous holder's), and the
- *      incident closes with the second.
+ *      and three accounts, carol, dora and erin, each with an ecosystem app connected whose token
+ *      reads. While it is stopped, rows older than carol's and dora's accounts are written under their
+ *      bare names (an action, work, a line of their own), and their apps are made older than their
+ *      accounts; erin's account and full identity are removed from the database directly, and her app
+ *      is kept; a fourth bare name that no account holds gets an action, one gate is bound to the three
+ *      actions by account name, and the records that the move and the start step ran are removed
+ *      (with 0085's on Postgres), so the next start meets the database as a deploy does.
+ *   2. The start that carries the move and the start step. The node starts. Erin's app is gone and
+ *      its token is refused. The Security page holds ONE incident that names carol and dora with their
+ *      counts (their ecosystem app among them) and their bindings, and the binding to the fourth
+ *      name's action as one that names nothing, on a gate that now lets everything pass. The operator
+ *      decides carol over REST (it is carol's: her app keeps acting) and dora over MCP (it was a
+ *      previous holder's: her app goes and its token is refused), and the incident closes with the
+ *      second.
  *   3. The next start: the rows are where the decisions put them, the gate is bound to carol's action
  *      under her full identity, and there is still one incident.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-held-account-names
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-held-account-names
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The start step for the cortexes and ecosystem apps of deleted accounts: a
+ *     deleted account's app token is refused after the start, a held app is listed with its name, and
+ *     each decision keeps or removes the app.
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -45,6 +54,7 @@ const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 const HELD_RECORD = 'migration:0086:held';
+const INSTALLS_RECORD = 'migration:installs:held';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -145,6 +155,29 @@ async function register(name: string): Promise<Owner> {
     return o;
 }
 
+interface App { geai: string; token: string }
+
+/** An ecosystem app connected to an account: hello, the owner's approval, the app's token. */
+async function connectApp(o: Owner, app: string): Promise<App> {
+    const hello = await json('/v1/ecosystem-apps/hello', {
+        method: 'POST',
+        body: JSON.stringify({ owner: o.name, app, display_name: 'Held names test app', public_key: Buffer.from(`key-of-${o.name}`).toString('base64'), scopes: ['memory:read', 'memory:write'] }),
+    });
+    assert(hello.status === 200, `hello ${o.name}: ${hello.status} ${JSON.stringify(hello.body?.error)}`);
+    const ok = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+        method: 'POST', headers: auth(o.token), body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+    });
+    assert(ok.status === 200 && ok.body.data?.status === 'approved', `approve ${o.name}: ${ok.status} ${JSON.stringify(ok.body)}`);
+    const tok = await json('/v1/ecosystem-apps/token', {
+        method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(tok.status === 200 && typeof tok.body.access_token === 'string', `app token ${o.name}: ${tok.status} ${JSON.stringify(tok.body)}`);
+    return { geai: ok.body.data.geai as string, token: tok.body.access_token as string };
+}
+
+/** What an app's token gets when it reads its own records: 200 while it is a credential, 401 when not. */
+const appReads = async (a: App): Promise<number> => (await json('/v1/memory', { headers: auth(a.token) })).status;
+
 // ── the chat path: an MCP session of the operator's agent ──
 
 function parseSSE(text: string): any[] {
@@ -192,16 +225,17 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
 
     let server = await startServer();
     const stamp = Date.now() % 1_000_000;
-    const carolName = `hnc${stamp}`, doraName = `hnd${stamp}`, ghost = `hng${stamp}`;
+    const carolName = `hnc${stamp}`, doraName = `hnd${stamp}`, erinName = `hne${stamp}`, ghost = `hng${stamp}`;
     const C_ACT = `hn-c-${stamp}`, D_ACT = `hn-d-${stamp}`, G_ACT = `hn-g-${stamp}`;
     const TC_C = `tc-hn-c-${stamp}`, TC_D = `tc-hn-d-${stamp}`;
     let op!: Owner, other!: Owner;
     let agentToken = '';
     let agentKey = '', agentGaii = '';
+    const apps: Record<string, App> = {};
 
     console.log('Phase 1: the node, and the people on it');
 
-    await test('1a. an operator, their agent with operator:admin, a second person, and carol and dora', async () => {
+    await test('1a. an operator, their agent with operator:admin, a second person, and carol, dora and erin', async () => {
         const reg = await json('/v1/admin/setup/register', {
             method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: `hnop${stamp}` }),
         });
@@ -209,8 +243,6 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         op = { name: `hnop${stamp}`, key: reg.body.private_key, token: '' };
         op.token = await ownerToken(op.name, op.key);
         other = await register(`hnx${stamp}`);
-        await register(carolName);
-        await register(doraName);
         const agent = await json('/v1/agents', {
             method: 'POST', headers: auth(op.token),
             body: JSON.stringify({ name: 'hnagent', owner: op.name, display_name: 'hnagent', capabilities: [], scopes: ['memory:read', 'operator:admin'] }),
@@ -218,6 +250,14 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         assert(agent.status === 201, `agent ${agent.status}: ${JSON.stringify(agent.body.error)}`);
         agentGaii = agent.body.data.agent.gaii;
         agentKey = agent.body.data.private_key;
+    });
+
+    await test('1b. carol, dora and erin each connect an ecosystem app, and each app\'s token reads', async () => {
+        for (const who of [carolName, doraName, erinName]) {
+            apps[who] = await connectApp(await register(who), 'hnhelper');
+            const status = await appReads(apps[who]);
+            assert(status === 200, `${who}'s app reads: ${status}`);
+        }
     });
 
     await stopServer(server);
@@ -247,10 +287,19 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
                 [`tx-hn-${who}`, who, 'earned', 2, PG_URL ? new Date(old) : old]);
         }
         await s.setConfigValue('hooks.pre_work_request', JSON.stringify([`${C_ACT}#${carolName}`, `${D_ACT}#${doraName}`, `${G_ACT}#${ghost}`]));
-        // The database as a deploy meets it: the move has not run on it.
-        await sql(s, 'DELETE FROM system_settings WHERE key IN (?, ?, ?)',
+        // Carol's and dora's apps are older than their accounts, as a previous holder's app would be.
+        for (const who of [carolName, doraName]) {
+            await sql(s, 'UPDATE ecosystem_apps SET createdAt = ? WHERE geai = ?',
+                'UPDATE "EcosystemApp" SET "createdAt" = $1 WHERE "geai" = $2', [PG_URL ? new Date(old) : old, apps[who].geai]);
+        }
+        // Erin's account and full identity are removed from the database directly; her ecosystem app
+        // is kept, for the start step to find.
+        await sql(s, 'DELETE FROM ghiis WHERE ownerName = ?', 'DELETE FROM "Ghii" WHERE "ownerName" = $1', [erinName]);
+        await sql(s, 'DELETE FROM owners WHERE name = ?', 'DELETE FROM "Owner" WHERE "name" = $1', [erinName]);
+        // The database as a deploy meets it: neither the move nor the start step has run on it.
+        await sql(s, 'DELETE FROM system_settings WHERE key IN (?, ?, ?, ?)',
             'DELETE FROM "SystemSetting" WHERE "key" = ANY($1)',
-            PG_URL ? [[HELD_RECORD]] : ['migration:0086_full_identity_on_evidence.sql', 'migration:0085_actions_work_full_identity.sql', HELD_RECORD]);
+            PG_URL ? [[HELD_RECORD, INSTALLS_RECORD]] : ['migration:0086_full_identity_on_evidence.sql', 'migration:0085_actions_work_full_identity.sql', HELD_RECORD, INSTALLS_RECORD]);
         if (PG_URL) {
             await sql(s, '', 'DELETE FROM "_kysely_migrations" WHERE name = ANY($1)',
                 [['0085_actions_work_full_identity.sql', '0086_full_identity_on_evidence.sql']]);
@@ -258,13 +307,18 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         await s.deleteMemory(`system@${NODE_ID}`, 'migrations.hook-bindings-full-identity');
     });
 
-    console.log('\nPhase 2: the start that carries the move');
+    console.log('\nPhase 2: the start that carries the move and the start step');
     server = await startServer();
     op.token = await ownerToken(op.name, op.key);
     other.token = await ownerToken(other.name, other.key);
     let incidentId = '';
 
-    await test('2a. the node starts, and the Security page holds one incident naming carol and dora', async () => {
+    await test('2a. the node starts, and erin\'s app, a deleted account\'s, is gone: its token is refused', async () => {
+        const status = await appReads(apps[erinName]);
+        assert(status === 401, `the deleted account's app token after the start: expected 401, got ${status}`);
+    });
+
+    await test('2b. the Security page holds one incident naming carol and dora, each with her ecosystem app', async () => {
         const found = await heldIncidents(op.token, carolName);
         assert(found.length === 1, `expected one incident naming ${carolName}, got ${found.length}`);
         const i = found[0];
@@ -273,9 +327,11 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         const c = i.names.find((n: any) => n.name === carolName), d = i.names.find((n: any) => n.name === doraName);
         assert(!!c && !!d, `names: ${JSON.stringify(i.names.map((n: any) => n.name))}`);
         for (const n of [c, d]) {
-            assert(n.status === 'open' && n.actions === 1 && n.work === 1 && n.own_lines === 1,
+            assert(n.status === 'open' && n.actions === 1 && n.work === 1 && n.own_lines === 1 && n.ecosystem_apps === 1 && n.cortexes === 0,
                 `${n.name}: ${JSON.stringify(n)}`);
         }
+        assert(!i.names.some((n: any) => n.name === erinName), 'a name no account holds is listed as a name to decide');
+        assert(await appReads(apps[carolName]) === 200 && await appReads(apps[doraName]) === 200, 'a held app stopped before the operator decided');
         assert(c.holder_ghii === `${carolName}@${NODE_ID}`, `carol's holder: ${c.holder_ghii}`);
         // Postgres keeps a stored record's keys in its own order, so a binding is compared field by field.
         const bindings = (c.bindings as any[]).map(b => `${b.hook}|${b.ref}|${b.gate}`);
@@ -287,7 +343,7 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         assert(!i.names.some((n: any) => n.name === ghost), 'a name no account holds is listed as a name to decide');
     });
 
-    await test('2b. the overview counts it open, and a non-operator is refused at its endpoint', async () => {
+    await test('2c. the overview counts it open, and a non-operator is refused at its endpoint', async () => {
         const ov = await json('/v1/admin/security/overview', { headers: auth(op.token) });
         assert(ov.status === 200 && ov.body.data.incidents.open >= 1, `open count: ${JSON.stringify(ov.body.data?.incidents?.open)}`);
         const r = await json(`/v1/admin/security/incidents/${encodeURIComponent(incidentId)}/resolve`, {
@@ -300,7 +356,7 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         assert(anon.status === 401, `nobody deciding a name: expected 401, got ${anon.status}`);
     });
 
-    await test('2c. the incident cannot be closed or deleted while a name is undecided, and a bad decision is refused', async () => {
+    await test('2d. the incident cannot be closed or deleted while a name is undecided, and a bad decision is refused', async () => {
         const plain = await json(`/v1/admin/security/incidents/${encodeURIComponent(incidentId)}/resolve`, { method: 'POST', headers: auth(op.token) });
         assert(plain.status === 409 && plain.body.error?.code === 'CONFLICT', `closing it: ${plain.status} ${JSON.stringify(plain.body.error)}`);
         const del = await json(`/v1/admin/security/incidents/${encodeURIComponent(incidentId)}`, { method: 'DELETE', headers: auth(op.token) });
@@ -315,14 +371,16 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         assert(unknown.status === 404, `a name the incident does not list: expected 404, got ${unknown.status}`);
     });
 
-    await test('2d. over REST: carol\'s rows are hers, and the gate follows her action', async () => {
+    await test('2e. over REST: carol\'s rows are hers, the gate follows her action, and her app keeps acting', async () => {
         const r = await json(`/v1/admin/security/incidents/${encodeURIComponent(incidentId)}/resolve`, {
             method: 'POST', headers: auth(op.token), body: JSON.stringify({ name: carolName, resolution: 'holder' }),
         });
         assert(r.status === 200, `deciding carol: ${r.status} ${JSON.stringify(r.body.error)}`);
         assert(r.body.data.resolution === 'holder' && r.body.data.incident_status === 'open', `answer: ${JSON.stringify(r.body.data)}`);
-        assert(r.body.data.done?.actions_moved === 1 && r.body.data.done?.work_moved === 1 && r.body.data.done?.own_lines_moved === 1,
-            `what it did: ${JSON.stringify(r.body.data.done)}`);
+        assert(r.body.data.done?.actions_moved === 1 && r.body.data.done?.work_moved === 1 && r.body.data.done?.own_lines_moved === 1
+            && r.body.data.done?.ecosystem_apps_deleted === 0, `what it did: ${JSON.stringify(r.body.data.done)}`);
+        const status = await appReads(apps[carolName]);
+        assert(status === 200, `carol's app after "holder": expected 200, got ${status}`);
         const hooks = await json('/v1/admin/hooks', { headers: auth(op.token) });
         assert(hooks.status === 200, `hooks ${hooks.status}`);
         assert(JSON.stringify(hooks.body.data).includes(`${C_ACT}#${carolName}@${NODE_ID}`), 'the gate is not bound to carol\'s action under her full identity');
@@ -332,7 +390,7 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         assert(again.status === 409, `deciding carol again the other way: expected 409, got ${again.status}`);
     });
 
-    await test('2e. over MCP: dora\'s rows were a previous holder\'s, and the incident closes with her', async () => {
+    await test('2f. over MCP: dora\'s rows were a previous holder\'s, her app goes, and the incident closes with her', async () => {
         const ts = new Date().toISOString();
         const tok = await json('/v1/auth/token', {
             method: 'POST', body: JSON.stringify({ gaii: agentGaii, timestamp: ts, signature: await signMsg(agentKey, agentGaii + ts) }),
@@ -345,7 +403,10 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
         assert(r.ok, `deciding dora over MCP: ${r.text.slice(0, 300)}`);
         const answer = JSON.parse(r.text);
         assert(answer.resolution === 'previous' && answer.incident_status === 'resolved', `answer: ${r.text.slice(0, 300)}`);
-        assert(answer.done?.actions_deleted === 1 && answer.done?.own_lines_deleted === 1, `what it did: ${JSON.stringify(answer.done)}`);
+        assert(answer.done?.actions_deleted === 1 && answer.done?.own_lines_deleted === 1 && answer.done?.ecosystem_apps_deleted === 1,
+            `what it did: ${JSON.stringify(answer.done)}`);
+        const status = await appReads(apps[doraName]);
+        assert(status === 401, `dora's app after "previous": expected 401, got ${status}`);
         const [i] = await heldIncidents(op.token, carolName);
         assert(i.status === 'resolved' && typeof i.resolvedAt === 'string', `the incident: ${i.status}`);
         assert(JSON.stringify(i.names.map((n: any) => n.status)) === JSON.stringify(['holder', 'previous']), `statuses: ${JSON.stringify(i.names.map((n: any) => n.status))}`);
@@ -354,7 +415,7 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
     await stopServer(server);
 
     console.log('\nPhase 3: the rows as the decisions left them, and the next start');
-    await test('3a. carol\'s rows are under her full identity, dora\'s are settled, and nothing is left under either bare name', async () => {
+    await test('3a. carol\'s rows are under her full identity, dora\'s are settled, nothing is left under either bare name, and only carol\'s app is left', async () => {
         await withStorage(async (s) => {
             const cGhii = `${carolName}@${NODE_ID}`;
             assert((await s.getAction(C_ACT, cGhii))?.id === C_ACT, 'carol\'s action is not under her full identity');
@@ -365,6 +426,9 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
             const own = await sql(s, 'SELECT gaii FROM wallet_transactions WHERE id IN (?, ?)',
                 'SELECT "gaii" FROM "Transaction" WHERE "txId" = ANY($1)', PG_URL ? [[`tx-hn-${carolName}`, `tx-hn-${doraName}`]] : [`tx-hn-${carolName}`, `tx-hn-${doraName}`]);
             assert(JSON.stringify(own.map((r: any) => r.gaii)) === JSON.stringify([cGhii]), `the own lines: ${JSON.stringify(own)}`);
+            assert(!!(await s.getEcosystemApp(apps[carolName].geai)), 'carol\'s app is gone');
+            assert(!(await s.getEcosystemApp(apps[doraName].geai)), 'dora\'s app survived "previous"');
+            assert(!(await s.getEcosystemApp(apps[erinName].geai)), 'the deleted account\'s app survived the start');
         });
     });
 
