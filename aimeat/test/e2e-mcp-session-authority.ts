@@ -121,7 +121,7 @@ for (const path of ['/v1/mcp', '/v2/mcp/agent']) {
     await test(`${path}: rejects ${label} on an existing session`, async () => {
       const session = await open(actor.token, path);
       const result = await rpc(session, 'tools/call', call, token);
-      assert.equal(result.status, token ? 403 : 401);
+      assert(result.status === (token ? 403 : 401), 'another or missing bearer cannot use this session');
       const own = await rpc(session, 'tools/call', call);
       assert.ok(own.body?.result && !own.body.result.isError, 'refusal leaves the valid session usable');
     });

@@ -47,6 +47,18 @@ const value = { text: 'The original content' };
 let provenanceId = '';
 
 try {
+  await test('a read-only agent cannot import or bulk-write, and no value lands', async () => {
+    const reader = await json('/v1/agents', ownerToken, {
+      owner, name: 'reader', capabilities: ['memory'], scopes: ['memory:read'],
+    });
+    assert.equal(reader.status, 201);
+    const readerToken = await login(reader.body.data.agent.gaii, reader.body.data.private_key, true);
+    for (const path of ['/v1/memory/bulk', '/v1/memory/import']) {
+      const refused = await json(path, readerToken, { entries: [{ key: 'batch.denied', value }] });
+      assert(refused.status === 403, 'memory:read cannot authorize a batch write');
+    }
+    assert.equal((await json('/v1/memory/batch.denied', readerToken)).status, 404);
+  });
   await test('single-write control carries a provenance record', async () => {
     assert.equal((await json('/v1/memory', token, { key: 'batch.source', value })).status, 201);
     const source = await read('batch.source');

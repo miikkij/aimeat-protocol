@@ -327,7 +327,7 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   'src/commerce/beneficiary-release.ts': {
     "ghii.slice(0, at) ← ghii.lastIndexOf('@')": 'Splits a beneficiary GHII into name and node; the name is looked up only when the node is this node\'s.',
   },
-  'src/services/consent.ts': {
+  'src/storage/consent-recipient.ts': {
     "ghii.slice(0, atIdx) ← ghii.lastIndexOf('@')": 'A `ghii:name@node` consent recipient matches only when the accessor\'s name AND node are equal to it.',
   },
 
