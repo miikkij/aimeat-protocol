@@ -21,6 +21,10 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- deleteOwner takes the cortexes the person installed on every provider:
+ *     the record, its lib files, kept versions and dependency edges, and what its activation made (the
+ *     action under the identity it names, the schema lock, the board and its posts, and the prompt and
+ *     seed records under the bare name). Another person's cortex stays as it was.
  *   v1.13.0 -- 2026-09-26 -- The deploy migration gives the ledger lines that name an account deleted
  *     before it, in any form and in either column, the pseudonym that account's work takes, by the
  *     rule the work follows; a line of the name's holder now, a person of another node, a node and a
@@ -247,6 +251,80 @@ async function seedErasable(s: Storage) {
     return { owner, ghii, gaii, stranger, ids, statement };
 }
 
+/**
+ * Two people, each with an active cortex and everything its activation made: an action published by
+ * an ecosystem app acting for them (an identity no per-identity pass of the erasure walks), a schema
+ * lock, a board with a post, a prompt and a seed record under the bare account name, a lib file, a
+ * kept version and a dependency edge. The first person is erased; the second person's cortex must
+ * stay as it is.
+ */
+async function seedCortexErasure(s: Storage) {
+    const node = 'aimeat-conformance-001';
+    const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const person = `confcx${tag}`, other = `confcxo${tag}`;
+    const now = new Date().toISOString();
+    const cortexOf = (who: string) => {
+        const name = `cx-${who}`;
+        return {
+            who, name, app: `eco:helper#${who}@${node}`, action: `cortex-${name}-proofread`, board: `cortex-${name}-notes`,
+            schema: `conf.${name}.item`, prompt: `__cortex__/${name}/prompts/ask`, seed: `conf.${name}.seed`, lib: 'cx.js',
+        };
+    };
+    for (const who of [person, other]) {
+        await s.createOwner({ name: who, displayName: who, publicKey: 'pk', roles: ['owner'], createdAt: now });
+        await s.createGHII({
+            username: who, nodeId: node, ghii: `${who}@${node}`, displayName: who, verificationLevel: 0,
+            ownerName: who, totpEnabled: false, morselBalance: 0, loginCount: 0, createdAt: now, updatedAt: now,
+        });
+        const c = cortexOf(who);
+        await s.createCortexExtension({
+            name: c.name, namespace: who, shortName: c.name, apiVersion: 'v1', version: '1.0.0', description: 'conformance',
+            author: who, tags: [], labels: {}, status: 'active', visibility: 'private', installedAt: now, activatedAt: now,
+            installedBy: who, manifest: 'conformance', components: [],
+            activationArtifacts: {
+                schemaKeys: [c.schema], promptKeys: [c.prompt], actionIds: [c.action], actionProvider: c.app,
+                boardIds: [c.board], seedDataKeys: [c.seed], ontologyKeys: [], libFiles: [c.lib],
+            },
+        });
+        await s.setCortexLibFile(c.name, c.lib, '(function(){})();');
+        await s.saveComponentVersion({
+            kind: 'cortex', name: c.name, version: '1.0.0', bytes: 18, createdAt: now, createdBy: who,
+            snapshot: { manifest: 'conformance', components: [], libs: { [c.lib]: '(function(){})();' } },
+        });
+        await s.replaceDependencyEdges('cortex', c.name, [{
+            fromKind: 'cortex', fromRef: c.name, fromVersion: '1.0.0', toKind: 'none', toName: 'scan:2',
+            toVersion: null, via: 'source', updatedAt: now,
+        }]);
+        await s.createAction({
+            id: c.action, providerGaii: c.app, displayName: c.action, description: 'conformance', inputSchema: {},
+            outputSchema: {}, pricing: { baseMorsels: 0 }, tags: ['cortex', c.name], createdAt: now, updatedAt: now,
+        });
+        await s.setSchema({ keyPattern: c.schema, applyTo: 'exact', schemaJson: { type: 'object' }, schemaMode: 'strict', lockedBy: who, setAt: now, updatedAt: now });
+        await s.createBoard({ id: c.board, name: c.board, description: 'conformance', visibility: 'private', ownerGaii: who, allowedGaiis: [], createdAt: now });
+        await s.createPost({ id: `post-${c.board}`, boardId: c.board, authorGaii: who, title: 'seed', body: 'seed', tags: [], reactions: {}, createdAt: now });
+        for (const key of [c.prompt, c.seed]) {
+            await s.setMemory({ key, ownerGaii: who, value: { v: 1 }, visibility: 'public', tags: ['cortex'], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+        }
+    }
+    return { person, other, cortexOf };
+}
+
+/** What is left of one seeded cortex, read back through the Storage interface. */
+async function cortexLeft(s: Storage, c: ReturnType<Awaited<ReturnType<typeof seedCortexErasure>>['cortexOf']>) {
+    return {
+        record: !!(await s.getCortexExtension(c.name)),
+        lib: (await s.getCortexLibFile(c.name, c.lib)) !== null,
+        versions: (await s.listComponentVersions('cortex', c.name)).length,
+        edges: (await s.listDependencyEdges({ fromKind: 'cortex', fromRef: c.name })).length,
+        action: !!(await s.getAction(c.action, c.app)),
+        schema: !!(await s.getSchema(c.schema, 'exact')),
+        board: !!(await s.getBoard(c.board)),
+        posts: (await s.listPosts(c.board, {})).length,
+        prompt: !!(await s.getMemory(c.who, c.prompt)),
+        seed: !!(await s.getMemory(c.who, c.seed)),
+    };
+}
+
 /** One work row: ten morsels and a fee of one unless `extra` says otherwise. */
 function workRow(trackingCode: string, providerGaii: string, requesterGaii: string, status: string, extra: Partial<WorkRecord> = {}): WorkRecord {
     const now = new Date().toISOString();
@@ -417,6 +495,23 @@ describe('storage providers agree on what they do, not just on their signatures'
             await storage.deleteOwner(p.owner);
             expect.soft(await storage.listActionsByProvider(p.owner), `${name}: the action published in person survived`).toEqual([]);
             expect.soft(await storage.listActionsByProvider(p.gaii), `${name}: the agent's action survived`).toEqual([]);
+        }
+    }, 60_000);
+
+    // A cortex names the account that installed it, and the name is released for reuse: the record
+    // goes with the account, and so does everything its activation made, including the action an app
+    // of theirs published, which no per-identity pass reaches. Somebody else's cortex stays.
+    it('deleteOwner takes the cortexes the person installed and what their activation made', async () => {
+        for (const { name, storage } of provs) {
+            const p = await seedCortexErasure(storage);
+            await storage.deleteOwner(p.person);
+            expect.soft(await cortexLeft(storage, p.cortexOf(p.person)), `${name}: the erased person's cortex left something`).toEqual({
+                record: false, lib: false, versions: 0, edges: 0, action: false, schema: false, board: false, posts: 0, prompt: false, seed: false,
+            });
+            expect.soft(await cortexLeft(storage, p.cortexOf(p.other)), `${name}: somebody else's cortex changed`).toEqual({
+                record: true, lib: true, versions: 1, edges: 1, action: true, schema: true, board: true, posts: 1, prompt: true, seed: true,
+            });
+            await storage.deleteOwner(p.other);
         }
     }, 60_000);
 

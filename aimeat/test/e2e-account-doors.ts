@@ -22,10 +22,13 @@
  *   Phase 9  POST /v1/agents refusals, platform detection, GET /v1/agents/verify
  *   Phase 10 POST /v1/agents/connect (connectivity key)
  *   Phase 11 401 and 403 on every door
- *   Phase 12 erasure: a name registered again inherits no action published in person, no work and
- *            no line in the other side's ledger
+ *   Phase 12 erasure: a name registered again inherits no action published in person, no work, no
+ *            line in the other side's ledger and no cortex
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.7.0 — 2026-09-26 — 60: when an account is deleted, its cortex goes with it: no lib of it is
+ *     served, the name registered again can neither read nor switch it off, and the cortex name
+ *     installs anew, its pinned version serving the new bytes.
  *   v1.6.0 — 2026-09-26 — 59: when an account is deleted, the other side's escrow_hold and earned
  *     lines name the erasure's pseudonym, the one its work names, and no line names the freed name.
  *   v1.5.0 — 2026-09-26 — 58: when an owner deletes one agent, its open work is cancelled and the
@@ -1230,6 +1233,61 @@ await test('59. When an account is deleted, the other side\'s ledger lines name 
     assert(hold.counterparty_gaii === askedRow?.provider_gaii && earned.counterparty_gaii === hold.counterparty_gaii,
         `one pseudonym for the erasure, on the work and in the ledger: ${hold.counterparty_gaii}, ${earned.counterparty_gaii}, ${askedRow?.provider_gaii}`);
     assert(named.length === 0, `the freed name is still in the other side's ledger: ${JSON.stringify(named)}`);
+});
+
+// A cortex belongs to the account that installed it: its record names the account, and the account
+// name is released for reuse. The record goes with the account, and so do its libraries and its kept
+// versions, so a name registered again holds none of it and the cortex's own name is free again.
+await test('60. When an account is deleted, its cortexes go with it: the freed name holds none, and the cortex name installs anew', async () => {
+    const first = await setupOwner('cxgone');
+    const cortex = `acctdoor-cx-${Date.now().toString(36)}`;
+    const manifest = (namespace: string) => `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${cortex}
+  namespace: ${namespace}
+spec:
+  version: "1.0.0"
+  components:
+    - type: lib
+      name: helper
+      filename: helper.js
+      exports: [hello]
+      api_surface: hello()
+    - type: action
+      name: proofread
+      description: Proofreads a text
+      input_schema:
+        type: object
+`;
+    const lib = (who: string) => ({ 'helper.js': `export function hello() { return 'from ${who}'; }` });
+    const inst = await json('/v1/cortex', { method: 'POST', headers: auth(first.token), body: JSON.stringify({ manifest: manifest(first.name), libs: lib('the first') }) });
+    assert(inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    const on = await json(`/v1/cortex/${cortex}/activate`, { method: 'POST', headers: auth(first.token) });
+    assert(on.status === 200, `activate ${on.status}: ${JSON.stringify(on.body?.error)}`);
+    const before = await fetch(`${BASE}/v1/cortex/${cortex}/libs/helper.js`);
+    assert(before.status === 200, `the lib is served before the deletion: ${before.status}`);
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    const latest = await fetch(`${BASE}/v1/cortex/${cortex}/libs/helper.js`);
+    const pinned = await fetch(`${BASE}/v1/cortex/${cortex}@1.0.0/libs/helper.js`);
+
+    const again = await registerAgain(first.name);
+    const seen = await json(`/v1/cortex/${cortex}`, { headers: auth(again.token) });
+    const off = await json(`/v1/cortex/${cortex}/deactivate`, { method: 'POST', headers: auth(again.token) });
+    const reinstall = await json('/v1/cortex', { method: 'POST', headers: auth(again.token), body: JSON.stringify({ manifest: manifest(again.name), libs: lib('the second') }) });
+    const onAgain = await json(`/v1/cortex/${cortex}/activate`, { method: 'POST', headers: auth(again.token) });
+    const pinnedAgain = await fetch(`${BASE}/v1/cortex/${cortex}@1.0.0/libs/helper.js`);
+    const pinnedText = await pinnedAgain.text();
+    await json(`/v1/cortex/${cortex}`, { method: 'DELETE', headers: auth(again.token) });
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+
+    assert(latest.status === 404 && pinned.status === 404, `the deleted account's lib is still served: ${latest.status} latest, ${pinned.status} pinned`);
+    assert(seen.status === 404, `the freed name reads the previous person's cortex: ${seen.status}`);
+    assert(off.status === 404, `the freed name acts on the previous person's cortex: ${off.status}`);
+    assert(reinstall.status === 201, `the cortex name does not install anew: ${reinstall.status} ${JSON.stringify(reinstall.body?.error)}`);
+    assert(onAgain.status === 200 && pinnedText.includes('from the second'), `the pinned address serves another person's bytes: ${pinnedAgain.status} ${pinnedText.slice(0, 80)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

@@ -33,9 +33,16 @@
  *   - settleLeavingPartyWorkDb(db, party) — open work cancelled, held morsels back, finished work kept
  *   - settleErasedPartyWorkDb(db, name, ghiis, pseudonym, agents) — that rule for an erased account
  *   - settleDeletedAgentWorkDb(db, gaii) — that rule for one agent its owner deletes
+ *   - deleteInstalledCortexesDb(db, name, ghiis) — the cortexes the account installed, with what
+ *     their activation made
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.9.0 — 2026-09-26 — deleteInstalledCortexesDb: deleteOwnerCascade takes the cortexes the person
+ *     installed, after the actions under their own identities: each record, the actions under the
+ *     identity it names, the schema locks, boards and prompt, ontology and seed records one of the
+ *     person's principals wrote, and the lib files, kept versions and dependency edges keyed by its
+ *     name (secaudit 2026-09, R4 "found": the cortex record).
  *   v1.8.0 — 2026-09-26 — pseudonymiseLedgerPartyDb: deleteOwnerCascade writes the erasure's
  *     pseudonym in place of the person on the ledger lines of other people that name them, as
  *     counterparty or as the one who acted. The lines stay for those people's books.
@@ -74,6 +81,8 @@ import { resolveGhii } from '../ghii-resolve.js';
 import {
   erasedPartyPseudonym, partyIdentities, OPEN_WORK_STATUSES, erasedAccountParty, deletedAgentParty, type LeavingParty,
 } from '../../../erased-party.js';
+import { erasedCortexParts } from '../../../erased-cortex.js';
+import { invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
 
 /** A Kysely handle: the root connection or an open transaction. */
 type Db = Kysely<DB>;
@@ -383,6 +392,69 @@ export async function settleErasedPartyWorkDb(
   return settleLeavingPartyWorkDb(db, erasedAccountParty(name, ghiis, pseudonym, agents));
 }
 
+/**
+ * Take the cortexes an erased account installed off the node, with what their activation made.
+ *
+ * The rule and its reasons are in ../../../erased-cortex.ts, and the SQLite twin is
+ * deleteInstalledCortexes in ../../sqlite/repos/cortex-erasure.ts. It runs after the per-identity
+ * passes, so what sat under the person's GHII and agents is gone already. What is left is found by
+ * the record: the actions under the identity it names; and, where one of the person's principals
+ * wrote them (the bare name, or `…#name@node`, an ecosystem app of theirs included), the schema
+ * locks, the boards with their posts and subscriptions, and the prompt, ontology and seed records.
+ * Then the lib files, the kept versions, the dependency edges and the records go.
+ *
+ * Postgres LIKE escapes with a backslash by default, which is how partyIdentities escapes.
+ */
+export async function deleteInstalledCortexesDb(db: Db, name: string, ghiis: string[]): Promise<number> {
+  const rows = await db.selectFrom('CortexExtension').select(['name', 'activationArtifacts'])
+    .where('installedBy', '=', name).execute();
+  if (rows.length === 0) return 0;
+  const { exact, suffixPatterns } = partyIdentities(name, ghiis);
+  let locks = 0;
+  for (const row of rows) {
+    const parts = erasedCortexParts(row.activationArtifacts);
+    if (parts.actionIds.length) {
+      // Action.actionId is the business key; `id` is the surrogate.
+      await db.deleteFrom('Action').where('actionId', 'in', parts.actionIds)
+        .where(eb => eb.or([
+          ...(parts.actionProvider ? [eb('providerGaii', '=', parts.actionProvider)] : []),
+          eb('providerGaii', 'in', exact), ...suffixPatterns.map(p => eb('providerGaii', 'like', p)),
+        ])).execute();
+    }
+    if (parts.schemaKeys.length) {
+      const r = await db.deleteFrom('SchemaLock').where('keyPattern', 'in', parts.schemaKeys)
+        .where(eb => eb.or([eb('lockedBy', 'in', exact), ...suffixPatterns.map(p => eb('lockedBy', 'like', p))]))
+        .executeTakeFirst();
+      locks += Number(r.numDeletedRows ?? 0);
+    }
+    if (parts.boardIds.length) {
+      const boards = await db.selectFrom('Board').select('boardId').where('boardId', 'in', parts.boardIds)
+        .where(eb => eb.or([eb('ownerGaii', 'in', exact), ...suffixPatterns.map(p => eb('ownerGaii', 'like', p))]))
+        .execute();
+      const boardIds = boards.map(b => b.boardId);
+      if (boardIds.length) {
+        await db.deleteFrom('BoardPost').where('boardId', 'in', boardIds).execute();
+        await db.deleteFrom('BoardSubscription').where('boardId', 'in', boardIds).execute();
+        await db.deleteFrom('Board').where('boardId', 'in', boardIds).execute();
+      }
+    }
+    if (parts.memoryKeys.length) {
+      await db.deleteFrom('Memory').where('key', 'in', parts.memoryKeys)
+        .where(eb => eb.or([eb('ownerGaii', 'in', exact), ...suffixPatterns.map(p => eb('ownerGaii', 'like', p))]))
+        .execute();
+    }
+  }
+  const names = rows.map(r => r.name);
+  await db.deleteFrom('CortexLibFile').where('extName', 'in', names).execute();
+  await db.deleteFrom('ComponentVersion').where('kind', '=', 'cortex').where('name', 'in', names).execute();
+  await db.deleteFrom('DependencyEdge').where('fromKind', '=', 'cortex').where('fromRef', 'in', names).execute();
+  await db.deleteFrom('CortexExtension').where('installedBy', '=', name).execute();
+  // Every memory write reads the schema locks from a process cache, which a delete refreshes. Its
+  // short lifetime covers a write that reloads it before this transaction commits.
+  if (locks > 0) invalidateSchemaLockCache();
+  return rows.length;
+}
+
 /** The work of one agent its owner deletes: settled by the same rule, the agent's identity kept. */
 export async function settleDeletedAgentWorkDb(
   db: Db, gaii: string,
@@ -416,6 +488,10 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // session's raw `sub`), which neither pass above walks, and the name is released for reuse, so the
   // next holder of the name could change or delete it.
   await db.deleteFrom('Action').where('providerGaii', '=', name).execute();
+
+  // The cortexes this person installed, now that the actions under their own identities are gone:
+  // each record, with what its activation made and what is keyed by its name (../../../erased-cortex.ts).
+  await deleteInstalledCortexesDb(db, name, ghiis.map(g => g.ghii));
 
   // What this person WROTE into somebody else's namespace is that other owner's record of who
   // touched their data, so it is pseudonymised rather than deleted — removing it would silently turn

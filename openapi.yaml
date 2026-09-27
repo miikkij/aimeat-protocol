@@ -7822,7 +7822,12 @@ paths:
     delete:
       operationId: deleteOwner
       summary: Data protection delete
-      description: Delete owner and cascade to all agents, memory, and data (GDPR Art. 17, CCPA). Requires x-signature header.
+      description: >
+        Delete owner and cascade to all agents, memory, and data (GDPR Art. 17, CCPA). Requires
+        x-signature header. The cortexes the account installed go with it: each record, what its
+        activation made (its actions, schema locks, boards, and prompt, ontology and seed records),
+        and its lib files, kept versions and dependency edges, so the account name and the cortex
+        name are both free again.
       tags: [Identity]
       security:
         - BearerAuth: []
