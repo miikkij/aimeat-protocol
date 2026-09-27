@@ -46,6 +46,10 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 AIMEAT_DIR = REPO_ROOT / "aimeat"
 NODE_ID = "aimeat-local-001-dev"
 AGENT = "decidecrew"
+# A second agent of the same owner. The node refuses a review by the agent that asked for the
+# decision (OWN_DECISION): the owner records the verdict in person or through another of their
+# agents, and this is that other agent.
+REVIEWER = "decidereviewer"
 
 pytestmark = pytest.mark.skipif(
     shutil.which("node") is None
@@ -150,6 +154,8 @@ class Live:
         self.gaii = ""
         self.owner_headers: dict = {}
         self.agent_token = ""
+        self.reviewer_gaii = ""
+        self.reviewer_token = ""
         self.jev: JevStub | None = None
         self.proc: subprocess.Popen | None = None
 
@@ -157,6 +163,11 @@ class Live:
     def kw(self) -> dict:
         """The keyword arguments every public function in `decide` takes."""
         return {"agent_name": AGENT, "node_url": self.base, "agent_token": self.agent_token}
+
+    @property
+    def reviewer_kw(self) -> dict:
+        """The same arguments for the owner's second agent, the one that records a person's verdict."""
+        return {"agent_name": REVIEWER, "node_url": self.base, "agent_token": self.reviewer_token}
 
 
 RULE_QUESTIONS = {
@@ -182,9 +193,22 @@ def _put_rule(live: Live, rule_id: str, title: str, decides: str, *, gate: bool)
     assert r.json().get("ok") is True, f"put rule {rule_id}: {r.text}"
 
 
+def _agent(live: Live, name: str) -> tuple[str, str]:
+    """Register an agent of the owner with every scope, and sign it a token: (its GAII, the token)."""
+    r = requests.post(
+        f"{live.base}/v1/agents", headers=live.owner_headers,
+        json={"name": name, "owner": live.owner, "capabilities": ["memory", "actions"], "scopes": ["*"]},
+        timeout=20,
+    )
+    assert r.status_code == 201, f"agent register {name}: {r.status_code} {r.text}"
+    gaii = r.json()["data"]["agent"]["gaii"]
+    return gaii, _auth_token(live.base, gaii, r.json()["data"]["private_key"], is_agent=True)
+
+
 @pytest.fixture(scope="module")
 def live(tmp_path_factory: pytest.TempPathFactory):
-    """One node, one owner, one agent and two rules, for the whole module."""
+    """One node, one owner, two agents (one asks, one records a person's verdict) and two rules,
+    for the whole module."""
     e = Live()
     e.jev = JevStub()
     tmp = tmp_path_factory.mktemp("decide-live")
@@ -236,14 +260,8 @@ def live(tmp_path_factory: pytest.TempPathFactory):
         owner_token = _auth_token(e.base, e.owner, r.json()["data"]["private_key"], is_agent=False)
         e.owner_headers = {"Authorization": f"Bearer {owner_token}"}
 
-        r = requests.post(
-            f"{e.base}/v1/agents", headers=e.owner_headers,
-            json={"name": AGENT, "owner": e.owner, "capabilities": ["memory", "actions"], "scopes": ["*"]},
-            timeout=20,
-        )
-        assert r.status_code == 201, f"agent register: {r.status_code} {r.text}"
-        e.gaii = r.json()["data"]["agent"]["gaii"]
-        e.agent_token = _auth_token(e.base, e.gaii, r.json()["data"]["private_key"], is_agent=True)
+        e.gaii, e.agent_token = _agent(e, AGENT)
+        e.reviewer_gaii, e.reviewer_token = _agent(e, REVIEWER)
 
         # The owner brings their own key, which is the `own` key scope and needs no allowance.
         r = requests.put(f"{e.base}/v1/ai/decide/settings", headers=e.owner_headers,
@@ -408,16 +426,26 @@ def test_the_nodes_own_gate_holds_the_action_and_puts_it_on_the_owners_list(live
 
 def test_a_person_can_confirm_or_override_a_decision(live: Live, answers):
     from aimeat_crewai import gate
-    from aimeat_crewai.decide import decision, review
+    from aimeat_crewai.decide import DecideRefused, decision, review
 
     answers(**_sure(p=0.75, choice="bug", confidence=0.60))
     v = gate("send-a-reply", {"subject": "s4", "body": "b4"}, on=False, **live.kw)
 
-    review(v.decision_id, "overridden", note="Sent it by hand.", **live.kw)
+    # The agent that asked for the decision does not record the verdict on it.
+    with pytest.raises(DecideRefused) as refused:
+        review(v.decision_id, "confirmed", **live.kw)
+    assert refused.value.code == "OWN_DECISION", refused.value
+    assert refused.value.status == 403
+    assert decision(v.decision_id, **live.kw)["record"].get("review") is None, (
+        "a refused review leaves nothing on the record"
+    )
+
+    # Another agent of the owner records the person's verdict, and the record names that agent.
+    review(v.decision_id, "overridden", note="Sent it by hand.", **live.reviewer_kw)
     rev = decision(v.decision_id, **live.kw)["record"]["review"]
     assert rev["outcome"] == "overridden"
     assert rev["note"] == "Sent it by hand."
-    assert rev["by"].startswith(AGENT), "who gave the verdict is on the record"
+    assert rev["by"] == live.reviewer_gaii, "who recorded the verdict is on the record"
 
 
 # ── the numbers thresholds are tuned from ─────────────────────────────────────────────────────
@@ -437,7 +465,8 @@ def test_decision_stats_counts_what_really_happened(live: Live, answers):
 
     answers(**_sure(p=0.75, choice="bug", confidence=0.60))
     v = gate("send-a-reply", {"subject": "s5", "body": "b5"}, on=False, **live.kw)
-    review(v.decision_id, "overridden", **live.kw)
+    rev = review(v.decision_id, "overridden", **live.reviewer_kw)["record"]["review"]
+    assert rev["by"] == live.reviewer_gaii, "the override is the reviewer's, not the asking agent's"
 
     after = {g["key"]: g for g in decision_stats(group_by="rule", **live.kw)}
     g = after["send-a-reply"]

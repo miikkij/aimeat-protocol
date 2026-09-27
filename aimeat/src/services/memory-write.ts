@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.10.0 — 2026-09-27 — An app tool manifest is written under the app's filename
+ *     (services/app-tools-key.ts), whichever id the caller named it by; the stored record carries the key.
  *   v1.9.1 — 2026-09-26 — The organism rule names the writer with localAccountName, so a visitor from
  *     another node is never a member under the local namesake's name (secaudit 2026-09, A6-3).
  *   v1.9.0 — 2026-09-24 — RESERVED_KEY for a key only the node writes (`__redirect__`): refused for
@@ -96,6 +98,7 @@ import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { canonicalAppToolsKey } from './app-tools-key.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -226,9 +229,16 @@ export type MemoryWriteResult =
 export async function writeMemoryRecord(
     deps: MemoryWriteFanout,
     caller: MemoryWriteCaller,
-    input: MemoryWriteInput,
+    requested: MemoryWriteInput,
 ): Promise<MemoryWriteResult> {
     const { storage, config } = deps;
+
+    // 0. An app's tool manifest lives under the app's filename (services/app-tools-key.ts). A manifest
+    //    written as `apps.nuotta.tools` for the app nuotta.html was sold on the market and shown in no
+    //    catalogue. Decided here, before anything reads the key, so every door writes the same one.
+    const input: MemoryWriteInput = {
+        ...requested, key: await canonicalAppToolsKey(storage, caller.targetGaii, requested.key),
+    };
 
     // 1. The gate, inside. REST had this in middleware and MCP had it in a lookup table, which is
     //    two places to forget it and the reason the audit could find surfaces that had neither.

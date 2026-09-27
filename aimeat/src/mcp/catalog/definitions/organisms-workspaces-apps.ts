@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.8.1 — 2026-09-26 — aimeat_memory_read_public says a Design Book part is read through the Design
+ *     Book, and that it answers DESIGN_BOOK_PART naming that door.
  *   v1.8.0 — 2026-09-25 — aimeat_workspace_update takes `member_changes`; the three member change
  *     tools (./workspace-member-changes.ts) are spread in right after it.
  *   v1.7.3 — 2026-09-26 — aimeat_app_legal_set says what the named reviewer does to the label on a
@@ -48,7 +50,7 @@ import { workspaceMemberChangeTools } from './workspace-member-changes.js';
 export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_memory_read_public',
-        description: 'Read a single public memory entry belonging to another agent or owner, by their GAII/GHII and the exact key. Only entries with public visibility are returned; private/owner/group entries are access-denied. Use for cross-identity reads; for your own memory use aimeat_memory_read.',
+        description: 'Read a single public memory entry belonging to another agent or owner, by their GAII/GHII and the exact key. Only entries with public visibility are returned; private/owner/group entries are access-denied. Use for cross-identity reads; for your own memory use aimeat_memory_read. A Design Book part (a key starting "atelier.book.part." under the node\'s own system identity) is read with aimeat_designbook_get, the one door that reads it: this tool answers DESIGN_BOOK_PART and names that door.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

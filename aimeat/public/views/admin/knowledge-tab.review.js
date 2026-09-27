@@ -20,6 +20,10 @@
  *   - CreateForm — the operator's own system package
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Every part is a library component that gets data (admin page group G7): the
+ *     section is Section, the package's head the Verdict (name, line, stamp), the five outcomes radio
+ *     Checks with what each does and its effect mark, the reason a Select, the trail a List, the
+ *     create form the Field family in the SettingBox. No class.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
@@ -29,8 +33,20 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, when, Badge } from './shared.js';
+import { num, when, Badge, Empty } from './shared.js';
 import { getKnowledgeReviews } from '/js/services/admin.js';
+import { Section } from '/components/Section.js';
+import { Verdict } from '/components/Readings.js';
+import { List, Row, Name } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Check } from '/components/Check.js';
+import { Beside, Split, Stack } from '/components/Layout.js';
 
 const S = (key, params) => t('admin.knowledge.' + key, params);
 
@@ -61,76 +77,46 @@ export function ReviewPanel({ pkg, onClose, onSubmit, busy }) {
 
   const sorted = (trail || []).slice().sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
 
+  const trailPart = html`
+    <${Label} block>${S('review.trailTitle')}<//>
+    ${trail === null ? html`<${Note} kind="loading">${S('review.trailLoading')}<//>`
+      : sorted.length === 0 ? html`<${Empty} text=${S('review.trailNone')} />`
+        : html`
+          <${List} cols="name">
+            ${sorted.map((r, i) => html`
+              <${Row} key=${i}>
+                <${Name} before=${html`<${Badge} type=${TONE[r.action] || 'muted'} label=${S('review.action.' + r.action)} />`}
+                  desc=${r.customText || undefined} meta=${`${when(r.timestamp)} · ${r.operatorGaii}`}>${S('review.reasons.' + r.reason)}<//>
+              <//>`)}
+          <//>`}
+    <${Note}>${S('review.trailNote')}<//>`;
+
   return html`
-    <section class="og-sec" id="adm-kn-04">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('review.title')}<small>04</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${S('review.back')}</button>
-        </div>
-      </div>
+    <${Section} id="adm-kn-04" num="04" title=${S('review.title')}
+      doors=${html`<${Action} small soft onClick=${onClose}>${S('review.back')}<//>`}>
+      <${Verdict} word=${pkg.name}
+        line=${S('review.lead', { kind: pkg.content_type, entries: num(pkg.entries_count), author: pkg.author || '—' })}
+        stamp=${`${pkg.package_id} · ${String(pkg.created || '').slice(0, 10)}`} />
 
-      <div class="adm-ov-status">${pkg.name}</div>
-      <p class="adm-alert-line">${S('review.lead', {
-    kind: pkg.content_type, entries: num(pkg.entries_count), author: pkg.author || '—',
-  })}</p>
-      <div class="adm-ov-up">${pkg.package_id} · ${String(pkg.created || '').slice(0, 10)}</div>
-
-      <div class="adm-kn-two">
-        <div>
-          <div class="adm-kn-lbl">${S('review.whatYouCanDo')}</div>
-          ${ACTIONS.map((a, i) => html`
-            <label class="adm-kn-choice ${form.action === a ? 'on' : ''}">
-              <input type="radio" name="kn-action" checked=${form.action === a}
-                onChange=${() => setForm({ ...form, action: a })} />
-              <span>
-                <b>${S('review.action.' + a)}</b>
-                <span class="adm-why">${S('review.does.' + a)}</span>
-              </span>
-              <${Badge} type=${TONE[a]} label=${S('review.effect.' + a)} />
-              ${i === ACTIONS.length - 1 ? null : null}
-            </label>`)}
-
-          <div class="adm-kn-fld">
-            <label>${S('review.reason')}</label>
-            <select value=${form.reason} onChange=${e => setForm({ ...form, reason: e.target.value })}>
-              ${REASONS.map(r => html`<option value=${r}>${S('review.reasons.' + r)}</option>`)}
-            </select>
-          </div>
+      <${Beside} wide above="large" side=${trailPart}>
+        <${Fields}>
+          <${Field} label=${S('review.whatYouCanDo')} group>
+            ${ACTIONS.map(a => html`
+              <${Check} key=${a} radio name="kn-action" value=${a} checked=${form.action === a}
+                hint=${S('review.does.' + a)} onChange=${() => setForm({ ...form, action: a })}>
+                ${S('review.action.' + a)} <${Badge} type=${TONE[a]} label=${S('review.effect.' + a)} /><//>`)}
+          <//>
+          <${Select} label=${S('review.reason')} value=${form.reason} onChange=${v => setForm({ ...form, reason: v })}
+            options=${REASONS.map(r => [r, S('review.reasons.' + r)])} />
           ${form.reason === 'custom' ? html`
-            <div class="adm-kn-fld">
-              <label>${S('review.customReason')}</label>
-              <input type="text" value=${form.customText}
-                onInput=${e => setForm({ ...form, customText: e.target.value })} />
-            </div>` : null}
-
-          <div class="adm-kn-acts">
-            <button type="button" class="og-door" disabled=${busy}
-              onClick=${() => onSubmit(pkg.package_id, form)}>${S('review.submit')}</button>
-          </div>
-        </div>
-
-        <div>
-          <div class="adm-kn-lbl">${S('review.trailTitle')}</div>
-          ${trail === null ? html`<p class="adm-why">${S('review.trailLoading')}</p>`
-    : sorted.length === 0 ? html`
-      <div class="adm-kn-empty">${S('review.trailNone')}</div>`
-      : html`
-        <div class="adm-kn-trail">
-          ${sorted.map(r => html`
-            <div class="adm-kn-trail-row">
-              <div class="adm-kn-trail-head">
-                <${Badge} type=${TONE[r.action] || 'muted'} label=${S('review.action.' + r.action)} />
-                <span>${S('review.reasons.' + r.reason)}</span>
-              </div>
-              ${r.customText ? html`<p class="adm-why">${r.customText}</p>` : null}
-              <div class="adm-kn-when">${when(r.timestamp)} · ${r.operatorGaii}</div>
-            </div>`)}
-        </div>`}
-          <p class="adm-kn-note">${S('review.trailNote')}</p>
-        </div>
-      </div>
-    </section>`;
+            <${TextField} label=${S('review.customReason')} value=${form.customText}
+              onInput=${v => setForm({ ...form, customText: v })} />` : null}
+          <${FormActions}>
+            <${Action} small disabled=${busy} onClick=${() => onSubmit(pkg.package_id, form)}>${S('review.submit')}<//>
+          <//>
+        <//>
+      <//>
+    <//>`;
 }
 
 /** The operator's own package. Kept from the old page, in the face the rest of it now wears. */
@@ -144,68 +130,43 @@ export function CreateForm({ onCreate, onCancel, busy }) {
   const ready = form.name.trim() && form.entries.some(e => e.title.trim());
 
   return html`
-    <div class="adm-kn-newbox poster-aside">
-      <span class="adm-kn-newlabel">${S('create.title')}</span>
-      <div class="adm-kn-form">
-        <div class="adm-kn-fld">
-          <label>${S('create.name')}</label>
-          <input type="text" value=${form.name} onInput=${e => set({ name: e.target.value })} />
-        </div>
-        <div class="adm-kn-fld-row">
-          <div class="adm-kn-fld">
-            <label>${S('create.kind')}</label>
-            <select value=${form.content_type} onChange=${e => set({ content_type: e.target.value })}>
-              ${CONTENT_TYPES.map(c => html`<option value=${c}>${t('knowledge.contentType.' + c) === 'knowledge.contentType.' + c ? c : t('knowledge.contentType.' + c)}</option>`)}
-            </select>
-          </div>
-          <div class="adm-kn-fld">
-            <label>${S('create.maturity')}</label>
-            <select value=${form.maturity} onChange=${e => set({ maturity: e.target.value })}>
-              ${MATURITIES.map(m => html`<option value=${m}>${t('knowledge.maturity.' + m)}</option>`)}
-            </select>
-            <span class="adm-why">${S('create.maturityWhy')}</span>
-          </div>
-        </div>
-        <div class="adm-kn-fld">
-          <label>${S('create.tags')}</label>
-          <input type="text" value=${form.tags} placeholder="one, two, three"
-            onInput=${e => set({ tags: e.target.value })} />
-        </div>
-        <label class="adm-kn-check">
-          <input type="checkbox" checked=${form.visibility === 'public'}
-            onChange=${e => set({ visibility: e.target.checked ? 'public' : 'private' })} />
-          <span><b>${S('create.public')}</b><span class="adm-why">${S('create.publicWhy')}</span></span>
-        </label>
+    <${SettingBox} label=${S('create.title')}>
+      <${Fields}>
+        <${TextField} label=${S('create.name')} value=${form.name} onInput=${v => set({ name: v })} />
+        <${Fields} cols=${2}>
+          <${Select} label=${S('create.kind')} value=${form.content_type} onChange=${v => set({ content_type: v })}
+            options=${CONTENT_TYPES.map(c => [c, t('knowledge.contentType.' + c) === 'knowledge.contentType.' + c ? c : t('knowledge.contentType.' + c)])} />
+          <${Select} label=${S('create.maturity')} hint=${S('create.maturityWhy')} value=${form.maturity}
+            onChange=${v => set({ maturity: v })} options=${MATURITIES.map(m => [m, t('knowledge.maturity.' + m)])} />
+        <//>
+        <${TextField} label=${S('create.tags')} value=${form.tags} placeholder="one, two, three"
+          onInput=${v => set({ tags: v })} />
+        <${Check} checked=${form.visibility === 'public'} hint=${S('create.publicWhy')}
+          onChange=${on => set({ visibility: on ? 'public' : 'private' })}>${S('create.public')}<//>
 
-        <div class="adm-kn-entries">
-          ${form.entries.map((entry, i) => html`
-            <div class="adm-kn-entry">
-              <div class="adm-kn-fld">
-                <label>${S('create.entryTitle', { n: i + 1 })}</label>
-                <input type="text" value=${entry.title} onInput=${e => setEntry(i, 'title', e.target.value)} />
-              </div>
-              <div class="adm-kn-fld">
-                <label>${S('create.entryContent')}</label>
-                <textarea rows="3" value=${entry.content}
-                  onInput=${e => setEntry(i, 'content', e.target.value)}></textarea>
-              </div>
-              ${form.entries.length > 1 ? html`
-                <button type="button" class="og-door og-door--up"
-                  onClick=${() => set({ entries: form.entries.filter((_, j) => j !== i) })}>
-                  ${S('create.removeEntry')}
-                </button>` : null}
-            </div>`)}
-          <button type="button" class="og-door og-door--quiet"
-            onClick=${() => set({ entries: [...form.entries, { title: '', content: '' }] })}>
-            ${S('create.addEntry')}
-          </button>
-        </div>
+        <${Split} heavy>
+          <${Stack} gap="large">
+            ${form.entries.map((entry, i) => html`
+              <${Stack} key=${i}>
+                <${TextField} label=${S('create.entryTitle', { n: i + 1 })} value=${entry.title}
+                  onInput=${v => setEntry(i, 'title', v)} />
+                <${TextArea} code rows=${3} label=${S('create.entryContent')} value=${entry.content}
+                  onInput=${v => setEntry(i, 'content', v)} />
+                ${form.entries.length > 1 ? html`
+                  <${Action} small onClick=${() => set({ entries: form.entries.filter((_, j) => j !== i) })}>
+                    ${S('create.removeEntry')}
+                  <//>` : null}
+              <//>`)}
+            <${Action} small soft onClick=${() => set({ entries: [...form.entries, { title: '', content: '' }] })}>
+              ${S('create.addEntry')}
+            <//>
+          <//>
+        <//>
 
-        <div class="adm-kn-acts">
-          <button type="button" class="og-door" disabled=${!ready || busy}
-            onClick=${() => onCreate(form)}>${S('create.submit')}</button>
-          <button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${S('create.cancel')}</button>
-        </div>
-      </div>
-    </div>`;
+        <${FormActions}>
+          <${Action} small disabled=${!ready || busy} onClick=${() => onCreate(form)}>${S('create.submit')}<//>
+          <${Action} small soft onClick=${onCancel}>${S('create.cancel')}<//>
+        <//>
+      <//>
+    <//>`;
 }

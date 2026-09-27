@@ -10,6 +10,14 @@
  *   Drawn as markup: <div class="search-line"><input class="og-input" …><small>12 of 40</small></div>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.2 — 2026-09-27 — SearchLine big: the field's corner reads var(--shape-corner-control) instead
+ *     of a literal 0 (the AIMEAT value, so AIMEAT is unchanged; a theme reaches it). check:shape-tokens.
+ *   v1.4.1 — 2026-09-27 — SearchLine big under 480px: the order row first, the field under it across
+ *     the width (the old #search-input), appcat parity.
+ *   v1.4.0 — 2026-09-27 — .search-line--big (SearchLine big): the page's one search, the old app
+ *     catalogue's underline field with its order row at its foot, for appcat; additive.
+ *   v1.3.0 — 2026-09-27 — .search-line-glass (SearchLine find): the magnifier the admin Cortex and
+ *     Knowledge searches drew before their field; admin page group G7.
  *   v1.2.0 — 2026-09-26 — .search-line--beside (SearchLine beside): the memory list's search and
  *     filter lines side by side as main drew them (.pf .action-bar .search-bar); fix pass.
  *   v1.1.0 — 2026-09-26 — A way on and its hint after the field keep their line (the Offers page's
@@ -27,9 +35,30 @@
 /* SearchLine beside: one of several lines standing side by side in a row, each growing up to 500px
    (main's memory .pf .action-bar > .search-bar: flex 1, max-width 500px, no margin of its own). */
 .search-line--beside { flex: 1 1 16rem; max-width: 500px; margin: 0; }
+/* SearchLine find: the magnifier before the field (main's admin .adm-cx-find svg, .adm-kn-search svg). */
+.search-line-glass { width: 16px; height: 16px; flex: none; margin-right: -.4rem; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: round; }
 
 @media (max-width: 860px) {
   .search-line { flex-wrap: wrap; }
+}
+/* SearchLine big (appcat): the page's one search, the old app catalogue's .cat-tools and .cat-search:
+   the field on a heavy underline in bold words, coral under focus, what follows it (the order row)
+   at its foot. */
+.search-line.search-line--big { align-items: flex-end; flex-wrap: wrap; gap: 28px; margin: 36px 0 0; }
+.search-line--big .og-input {
+  flex: 1 1 360px; min-width: 240px; max-width: none; padding: 8px 0; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour);
+  border-radius: var(--shape-corner-control); background: transparent; box-shadow: none; color: var(--text); font-family: var(--font-body); font-weight: 700; font-size: 1.05rem;
+}
+.search-line--big .og-input::placeholder { color: var(--text-dim); font-weight: 700; }
+.search-line--big .og-input:focus { outline: none; border-color: var(--accent); box-shadow: none; }
+@media (max-width: 900px) {
+  .search-line.search-line--big { margin-top: 20px; gap: 12px; }
+  .search-line--big .og-input { min-width: 0; }
+}
+/* On a narrow phone the order row comes first and the search takes a line of its own under it, as
+   the old #search-input (order 3, full width) did. */
+@media (max-width: 480px) {
+  .search-line--big .og-input { order: 3; flex-basis: 100%; }
 }
 /* On a phone the lines stand under each other across the width (main's .pf .action-bar column). */
 @media (max-width: 600px) {

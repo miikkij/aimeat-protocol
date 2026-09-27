@@ -1,0 +1,50 @@
+/**
+ * @file print-page.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A page that prints as a document (components/PrintPage.js): the document hidden on
+ *   screen, the working parts hidden on paper, and on paper nothing of the site around the page.
+ *   Every print rule is scoped to body.print-page-active, the mark PrintPage sets while it is on
+ *   screen: every sheet loads on every page, and an unscoped print rule would follow the reader.
+ *   The document's values are main's views/admin.css .adm-cmp-pr-* and its print block, under the
+ *   component's own names.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — A part marked data-print-keep prints too (the admin frame's bar with the
+ *     page's title and the time of the last read, which main's printout carried).
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
+ */
+
+.print-only { display: none; }
+
+/* The document's parts. */
+.print-head { margin-bottom: 1rem; }
+.print-head h2 { margin: 0 0 .2rem; }
+.print-head p { margin: 0; color: var(--muted); font-size: .85rem; }
+.print-entry { margin: .9rem 0 1.2rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
+.print-entry h4 { margin: 0 0 .25rem; font-size: .95rem; }
+.print-entry-tag { margin-left: .5rem; font-weight: 500; color: var(--muted); }
+.print-entry-desc { margin: 0 0 .35rem; }
+.print-entry-field { font-size: .82rem; }
+.print-entry-field > span { color: var(--muted); }
+.print-entry-answers { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .8rem; }
+.print-entry-answers td { vertical-align: top; padding: .15rem .4rem .15rem 0; }
+.print-entry-q { width: 70%; }
+.print-entry-a { white-space: nowrap; }
+.print-entry-src { margin-left: .4rem; color: var(--muted); }
+.print-entry-why { margin-top: .4rem; font-size: .82rem; }
+.print-entry-why > span { color: var(--muted); }
+.print-entry-why ul { margin: .1rem 0 0; padding-left: 1.1rem; }
+.print-list { font-size: .82rem; padding-left: 1.2rem; }
+.print-list-help { display: block; color: var(--muted); }
+
+@media print {
+  /* Nothing of the site around the page: what neither holds the page nor stands inside it. */
+  body.print-page-active *:not(:has(.print-page)):not(:has([data-print-keep])):not(.print-page):not(.print-page *):not([data-print-keep]):not([data-print-keep] *) { display: none !important; }
+  body.print-page-active .print-screen-only { display: none !important; }
+  body.print-page-active .print-only { display: block; }
+  body.print-page-active .print-page { width: 100%; margin: 0; padding: 0; }
+  body.print-page-active .print-entry { break-inside: avoid; }
+  body.print-page-active .print-page h3, body.print-page-active .print-page h4 { break-after: avoid; }
+  @page { margin: 1.8cm; }
+}

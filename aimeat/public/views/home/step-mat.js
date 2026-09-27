@@ -14,6 +14,9 @@
  * @structure StepMat({ state, onDone }) — the open step.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   2026-09-27: The step writes no class: "Here is my welcome mat" is Loud, `quiet` until something
+ *     is pasted, and the prompt's copy is PromptCard `loud`/`quiet`; the markup is the same (page
+ *     group G9, a move).
  *   2026-09-24: A button that is not the next thing to do (nothing pasted yet, the prompt once
  *     something is pasted) is the underlined action link (Jouni's decision "Step button").
  *   2026-09-23: StepMatDone deleted with its link row and one-time teach note (Jouni's decision):
@@ -37,6 +40,7 @@ import { StepCard, StepLede } from '/components/StepCard.js';
 import { PasteBox } from '/components/PasteBox.js';
 import { ErrorNote, ErrorNoteFallback } from '/components/ErrorNote.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Loud } from '/components/Action.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -112,7 +116,7 @@ export function StepMat({ onDone }) {
       <${PromptCard}
         label=${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
         prompt=${shown}
-        className=${hasPaste ? 'poster-action' : 'poster-slab'}
+        loud=${!hasPaste} quiet=${hasPaste}
         copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
         copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
@@ -134,13 +138,12 @@ export function StepMat({ onDone }) {
         <//>`}
 
       <${ActionRow}>
-        <button
-          type="button"
-          class=${hasPaste ? 'poster-slab' : 'poster-action'}
+        <${Loud}
+          quiet=${!hasPaste}
           disabled=${busy || !hasPaste}
           onClick=${submit}>
           ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.mat.submit', 'Here is my welcome mat')}
-        </button>
+        <//>
       <//>
     <//>`;
 }

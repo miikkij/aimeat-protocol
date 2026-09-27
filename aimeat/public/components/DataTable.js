@@ -22,6 +22,8 @@ const html = htm.bind(h);
  *   - scroll: when truthy, wraps the table in `<div class="scrollable">`
  *   - className: extra class(es) appended to `.data-table` (e.g. for column-width
  *     or per-view tweaks)
+ *   - compact: a table to choose from inside a dialog: ink words at .85rem, 6px 8px cells, small
+ *     controls, no hover (the app catalogue's backup import)
  * @usage
  *   import { DataTable } from '/components/index.js';
  *   html`<div class="card"><${DataTable} headers=${['Key','Value']} rows=${rows} /></div>`
@@ -32,12 +34,16 @@ const html = htm.bind(h);
  * server-generated markup like badges.
  *
  * @version-history
+ *   v1.1.0 — 2026-09-27 — `compact`: the old app catalogue's backup import table (.backup-table), for
+ *     appcat parity; additive, data-table.css .data-table--compact.
  *   v1.0.0 — 2026-06-02 — Component unification (#13): created canonical generic
  *     DataTable (same _html/mono cell protocol as admin's), backing the shared
  *     .data-table CSS. The admin shared.js DataTable now wraps this in .adm-card.
  */
-export function DataTable({ headers, rows, scroll, className }) {
-  const cls = `data-table${className ? ` ${className}` : ''}`;
+export function DataTable({ headers, rows, scroll, className, compact }) {
+  // compact (added by appcat's dialogs, parity): a table to choose from inside a dialog, its words in
+  // ink at .85rem in close cells, its controls small (the old catalogue's backup import, .backup-table).
+  const cls = `data-table${compact ? ' data-table--compact' : ''}${className ? ` ${className}` : ''}`;
   const table = html`<table class=${cls}>
     <thead><tr>${headers.map(hd => html`<th>${hd}</th>`)}</tr></thead>
     <tbody>

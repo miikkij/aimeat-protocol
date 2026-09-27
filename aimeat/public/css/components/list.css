@@ -15,6 +15,32 @@
  *   thumbnail's second bar, a found word) are poster.css's .poster-chip--sun in the markup.
  *   NOTE: this file must be linked in spa.html, after listing.css.
  * @version-history
+ *   v1.13.1 — 2026-09-27 — The index: the state's capitals read var(--shape-case-label), and the open
+ *     panel's literal corner 0 goes (nothing under it draws a corner, so AIMEAT is unchanged; a theme
+ *     reaches the case). check:shape-tokens.
+ *   v1.13.0 — 2026-09-27 — List index (appcat parity): the name's line a flex line as the old
+ *     .cat-row-name (a long name ends in "…" instead of vanishing), the icon and the opened panel on
+ *     the card ground, the panel's doors as the old .cat-slab and .cat-word; a faded row's ground at
+ *     60% and its icon's dashed frame in --muted, as the old .cat-row.is-unlisted; under 900px the
+ *     cells in the old order (the opens and the arrow on the row's last line).
+ *   v1.12.0 — 2026-09-27 — .list--index (List index) and the cut n-mark-name-desc-state-n-arrow's
+ *     cells: the old app catalogue's numbered index (.cat-row, .cat-row-panel), its phone rows and its
+ *     coming in (Row order, --list-order), for appcat; additive.
+ *   v1.11.1 — 2026-09-27 — Row hover turns a linked name coral too (.list-row--hover … .list-name-link:
+ *     the fleet's agent rows, main's .flt-row:hover .flt-name); additive, page group G9.
+ *   v1.11.0 — 2026-09-27 — .list-row--quiet-doors (Row quietDoors, main's admin Owners .adm-own-acts:
+ *     the doors of the row under the pointer, in focus, opened or selected) and .list--stack-wide
+ *     (List stackWide, main's admin GHII rows stacking at 1180px, with their labels); additive, page
+ *     group G4.
+ *   v1.10.0 — 2026-09-27 — .list-row--notice (Row rail="notice", main's admin Work .is-over edge) and
+ *     .list-sort (a head entry's onSort, main's admin Applications sortable heads); additive, page
+ *     group G5.
+ *   v1.11.1 — 2026-09-27 — A stacked cell's column name in --text-dim, the colour main's federation
+ *     list chose for contrast (the others had --text-muted, which reads faint in the dark mode).
+ *   v1.9.0 — 2026-09-27 — .list--labels (List labels): on a phone, where the cells stack, each cell
+ *     after the first says its column's name before its value (the operator pages' tables, main's
+ *     [data-l]::before and [data-label]::before in admin-packages.css and admin-msm.css); and a Desc in a
+ *     row's `below` (.list-below > .listing-desc: the Skills rows' description); additive, page group G8.
  *   v1.8.0 — 2026-09-27 — The Name's way in is .list-name-link, the List's own class, with the values
  *     of .og-tbl-name (space-table.css) that it wore before; .list-name .og-tbl-name, a.og-tbl-name,
  *     .is-attention .og-tbl-name and .list-row--toggle:hover .og-tbl-name follow it (Jouni: components
@@ -138,6 +164,9 @@
 .list-row--toggle:hover .list-name-link { color: var(--accent); }
 /* Row hover: a row that opens nothing still answers the pointer (main's .pf .mem-item:hover). */
 .list-row--hover:hover > .listing-name { color: var(--accent); }
+/* A linked name turns too (the fleet's agent rows: the pointer anywhere on the row, main's
+   .flt-row:hover .flt-name). */
+.list-row--hover:hover > .listing-name .list-name-link { color: var(--accent); }
 .listing-row.is-selected > div:not(.listing-open) { background: var(--bg-dim); }
 /* A thing that is past: .6 (outdated to-dos, revoked ecosystem apps; a retired contract drew .72). */
 .listing-row.is-faded > div:not(.listing-open) { opacity: .6; }
@@ -151,6 +180,14 @@
 .list-colour--purple { --list-colour: var(--purple); }
 .list-colour--gray { --list-colour: var(--badge-node-bg); }
 .list-row--warn > div:first-child { border-left: var(--shape-frame-heavy) solid var(--warn, var(--accent)); padding-left: .5rem; }
+/* Row rail="notice": a thing past its limit, the heavy coral line (page group G5; main's admin Work
+   row past its deadline, .adm-work-row.is-over). */
+.list-row--notice > div:first-child { border-left: var(--shape-frame-heavy) solid var(--accent); padding-left: .5rem; }
+/* A head entry's onSort: the column's name is the button that sorts by it, coral while sorted
+   (page group G5; main's admin Applications .adm-ap-tbl th button, .adm-ap-sorted). */
+.list-sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.list-sort:hover { color: var(--text); }
+.list-sort.is-sorted { color: var(--accent); }
 .list-row--colour > div:first-child { border-left: var(--shape-frame-heavy) solid var(--list-colour); padding-left: .45rem; }
 .list-row--colour.list-row--warn > div:first-child { box-shadow: var(--shape-frame-heavy) 0 0 var(--warn, var(--accent)) inset; padding-left: .8rem; }
 .list-row--drag > div:not(.listing-open) { cursor: grab; }
@@ -169,6 +206,9 @@
 /* What always shows under a row: it spans the row, and the row's rule falls under it. */
 .listing-row > .list-below { grid-column: 1 / -1; display: block; padding-top: .2rem; }
 .listing-row:has(> .list-below) > div:not(.list-below, .listing-open) { border-bottom: 0; padding-bottom: .2rem; }
+/* A description under the whole row (a Desc in `below`): the Desc's grey words, the row's width
+   (the operator's Skills rows, main's .adm-sk-desc; page group G8). */
+.list-below > .listing-desc { font-size: .85rem; line-height: 1.55; color: var(--text-dim); max-width: 104ch; }
 /* An opened record's own title, its status at the right (an agent's task; formerly .agt-record-h). */
 .list-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .list-text { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.6; max-width: 72ch; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -231,4 +271,129 @@
 @media (max-width: 860px) {
   .list-filter--end { margin-left: 0; }
   .list--under { margin-left: 0; }
+}
+
+/* List labels: the stacked cells say their column's name, typewriter grey in the label case, before
+   the value on the same line (page group G8; main's admin tables). */
+@media (max-width: 860px) {
+  .list--labels:where(:not(.listing--cols)) > .listing-row > [data-label]:not(:first-child) { display: block; text-align: left; }
+  .list--labels:where(:not(.listing--cols)) > .listing-row > [data-label]:not(:first-child)::before {
+    content: attr(data-label) ': '; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim);
+    text-transform: var(--shape-case-label); letter-spacing: var(--shape-tracking-label);
+  }
+}
+
+/* Row quietDoors: the doors belong to one row at a time, the row under the pointer, the row the
+   keyboard is in, or the opened or selected one (page group G4; main's admin Owners .adm-own-acts).
+   Not visibility: hidden, which takes them out of the tab order; at opacity 0 the keyboard still
+   reaches them and :focus-within brings them back. On a phone only the opened or selected row
+   shows them, where a tap on the name put them. */
+/* The row draws no box (its cells stand in the list's grid), so the doors' own cell keeps taking the
+   pointer: over it the row is under the pointer, and only the doors inside wait for that. */
+.list-row--quiet-doors > .listing-doors { opacity: 0; transition: opacity .1s; }
+.list-row--quiet-doors > .listing-doors > * { pointer-events: none; }
+.list-row--quiet-doors:hover > .listing-doors,
+.list-row--quiet-doors:focus-within > .listing-doors,
+.list-row--quiet-doors:is(.is-open, .is-selected) > .listing-doors { opacity: 1; }
+.list-row--quiet-doors:is(:hover, :focus-within, .is-open, .is-selected) > .listing-doors > * { pointer-events: auto; }
+@media (max-width: 860px) {
+  .list-row--quiet-doors:not(.is-open, .is-selected) > .listing-doors > * { display: none; }
+}
+
+/* List stackWide: a list of many columns stacks already under 1180px, as it does under 860px
+   (listing.css), and its labels are said from there (page group G4; main's admin GHII rows, which
+   stacked at 1180 because seven columns need 892px). */
+@media (max-width: 1180px) {
+  .list--stack-wide { grid-template-columns: minmax(0, 1fr); }
+  .list--stack-wide > .listing-row--head > div { display: none; }
+  .list--stack-wide > .listing-row > div:where(:not(.listing-open)) { border-bottom: 0; padding-top: 0; padding-bottom: .15rem; }
+  .list--stack-wide > .listing-row > div:where(:not(.listing-open)):first-child { padding-top: .7rem; }
+  .list--stack-wide > .listing-row:not(.is-open) > div:last-child { padding-bottom: .7rem; border-bottom: 1px solid var(--border); }
+  .list--stack-wide > .listing-row > .listing-doors { justify-content: flex-start; padding-top: .1rem; flex-wrap: wrap; }
+  .list--stack-wide.list--labels > .listing-row > [data-label]:not(:first-child) { display: block; text-align: left; }
+  .list--stack-wide.list--labels > .listing-row > [data-label]:not(:first-child)::before {
+    content: attr(data-label) ': '; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim);
+    text-transform: var(--shape-case-label); letter-spacing: var(--shape-tracking-label);
+  }
+}
+
+/* ── List index (appcat): the app catalogue's numbered index, the old page's .cat-row and
+   .cat-row-panel with their values. Each row is its own line (a grid of the cut's columns, 14px
+   apart), on the page's ground, the pointer's row on the surface, the opened row on the sun; the
+   panel it opens is a line of doors on the surface with the words about it pushed to the right, an
+   ink rule over it. The rows come in one after another (Row order). Under 900px a row wraps: the
+   number, the name, the figure and the arrow on its first line, the words and the state under them. */
+.listing.list--index { display: block; }
+.listing.list--index > .listing-row {
+  display: grid; grid-template-columns: inherit; gap: 0 14px; align-items: center;
+  padding: 12px 8px; border-bottom: 1px solid var(--border);
+  animation: list-index-in .4s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--list-order, 0) * .03s);
+}
+@keyframes list-index-in { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+.listing.list--index > .listing-row > div:not(.listing-open) { padding: 0; border-bottom: 0; min-width: 0; }
+.listing.list--index > .listing-row:hover { background: var(--bg-surface); }
+.listing.list--index > .listing-row.is-open { background: var(--shape-chosen-ground); color: var(--on-sun); }
+.listing.list--index > .listing-row.is-open .listing-name small, .listing.list--index > .listing-row.is-open > .listing-desc { color: var(--on-sun); }
+.listing.list--index > .listing-row.is-faded .avatar { border-style: dashed; border-color: var(--muted); }
+/* The old page faded the whole row, its ground too: an unlisted row under the pointer or opened
+   shows its ground at the same 60%. */
+.listing.list--index > .listing-row.is-faded:hover { background: color-mix(in srgb, var(--bg-surface) 60%, transparent); }
+.listing.list--index > .listing-row.is-faded.is-open { background: color-mix(in srgb, var(--sun) 60%, transparent); }
+.listing.list--index > .listing-row > .listing-open {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  margin: 12px -8px -12px; padding: 14px 8px 18px 90px; background: var(--surface); color: var(--text);
+  border: 0; border-top: var(--shape-frame) solid var(--shape-rule-colour); box-shadow: none; cursor: default;
+}
+.listing.list--index > .listing-row > .listing-open > .og-doors { gap: 22px; }
+.listing.list--index > .listing-row > .listing-open > .poster-hint { margin: 0 0 0 auto; font-size: .85rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-dim); }
+/* The panel's doors are the old catalogue's own two words (.cat-slab, .cat-word): the slab 44px
+   high, the words smaller with the thinner line; the panel stands on the card ground. */
+.listing.list--index > .listing-row > .listing-open { background: var(--card-bg); }
+.listing.list--index > .listing-row > .listing-open .poster-slab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 18px; line-height: normal; white-space: nowrap; }
+.listing.list--index > .listing-row > .listing-open .og-doors .poster-action { display: inline-block; padding: 0 0 1px; border-bottom-width: var(--shape-frame); font-size: .78rem; line-height: normal; }
+.list--index .listing-name { font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list--index .listing-name .list-name-link { font-size: 1.05rem; white-space: nowrap; }
+.list--index .listing-name > .list-before { margin-right: 6px; }
+.list--index .listing-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
+.list--index .avatar { width: 40px; height: 40px; border-width: var(--shape-frame); background: var(--surface); font-size: 1.25rem; display: flex; align-items: center; justify-content: center; }
+/* The name's line is the old .cat-row-name: the star, the name cut short with "…" when it is too
+   long, and the marks right after it, 6px apart; the typewriter line under it 2px lower. The icon
+   stands on the card ground (the old page's white). */
+.list--index .listing-name { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; row-gap: 0; }
+.list--index .listing-name > .list-before { flex: none; margin-right: 0; }
+.list--index .listing-name > .list-name-link { flex: 1 1 0; max-width: max-content; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.list--index .listing-name > small { flex: 0 0 100%; margin-top: 2px; }
+.list--index .avatar { background: var(--card-bg); }
+/* The catalogue's cut: the number in coral typewriter, what it does in grey, the state in coral
+   typewriter capitals, the opens and the arrow in the poster face at the right. */
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(1) { font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--accent); }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(4) { font-size: .9rem; font-weight: var(--font-poster-text-weight); line-height: 1.45; color: var(--text-dim); }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(5) { font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--accent); text-transform: var(--shape-case-label); letter-spacing: .04em; }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row.is-faded > :nth-child(5) { color: var(--text-dim); }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :is(:nth-child(6), :nth-child(7)) {
+  font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: 1.125rem; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--text);
+}
+@media (max-width: 900px) {
+  .listing.list--index > .listing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 0; }
+  .listing.list--index > .listing-row.is-open { padding: 12px 8px; margin: 0 -8px; }
+  .listing.list--index > .listing-row > .listing-open { flex-basis: 100%; order: 9; margin: 6px 0 -12px; padding: 10px 0 14px 34px; gap: 12px; }
+  /* The old panel stood under the opened row at the list's own width, not the row's wider sun, and
+     its doors 12px apart. */
+  .listing.list--index > .listing-row > .listing-open > .og-doors { gap: 12px; }
+  .listing.list--index > .listing-row > .listing-open > .poster-hint { flex-basis: 100%; margin-left: 0; }
+  /* The cells keep the old page's order: the number and the name, the words, the state, and then
+     the opens and the arrow on a line of their own at the start (the old .cat-row had no order). */
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(1) { flex: 0 0 24px; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(2) { display: none; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(3) { flex: 1 1 0; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(3) small { display: none; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(6) { flex: 0 0 auto; font-size: 1rem; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(7) { flex: 0 0 auto; font-size: 1rem; }
+  .listing.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(4) {
+    flex-basis: 100%; padding-left: 34px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .listing.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(5) { flex-basis: 100%; padding-left: 34px; font-size: .68rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listing.list--index > .listing-row { animation: none; }
 }

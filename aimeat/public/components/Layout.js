@@ -9,7 +9,8 @@
  *
  *   The steps: 'none' 0 · 'tight' .25rem (was .mt-xs) · 'small' .5rem (.mb-half, the gap of
  *   .flex-row) · 'medium' .75rem (the space of .flex-actions and the split) · 'large' 1rem (.mb-1,
- *   .mt-1) · 'section' 1.5rem (.mt-section).
+ *   .mt-1) · 'section' 1.5rem (.mt-section) · 'part' 1.875rem, above or below only (the air between
+ *   the parts of one section's readout: the old app catalogue's visitor parts).
  *
  *   - Row({ gap = 'small', wrap, align = 'center', justify, above, below }): parts side by side.
  *     align = 'center' | 'start' | 'end' | 'baseline' | 'stretch'; justify = 'between' | 'end'.
@@ -22,15 +23,31 @@
  *     (the parts of an opened ecosystem app). `side`: the hairline stands at the part's start and
  *     the part is indented: a quieter side door that belongs to what is above it (an outside
  *     service's "use your own app" on Access).
- *   - Space({ above, below }): only space around what it holds (for a part that had .mb-half,
- *     .mb-1, .mt-1 or .mt-section on it).
- *   - Beside({ side, narrow, wide, align, rule, above, pad, below, id }): the main part with a side
- *     part beside it (one column on a phone).
+ *   - Space({ above, below, inset }): only space around what it holds (for a part that had .mb-half,
+ *     .mb-1, .mt-1 or .mt-section on it); `inset` the same step at both sides.
+ *   - Beside({ side, narrow, wide, start, align, rule, above, pad, below, id }): the main part with a
+ *     side part beside it (one column on a phone); `start` puts the side part first (G3); `stick`
+ *     keeps the side part in sight under the top bar while the main part scrolls, and on a narrower
+ *     screen stands it over the main part (G2).
  *   - Touch({ id, tabs }): every control inside is a thumb's target, 44px at every width (G8);
  *     `tabs`: its tabs too (G1a).
- * @structure Row · Stack · Split · Space · Beside · Touch
+ *   - Columns({ children }): parts of the same weight side by side, one column on a phone (G1).
+ * @structure Row · Stack · Split · Space · Beside · Columns · Touch
  * @usage html`<${Row} wrap>…<//>` · html`<${Stack} gap="large">…<//>` · html`<${Split}><${Actions}>…<//><//>`
  * @version-history
+ *   v1.11.0 — 2026-09-27 — The step 'part' (1.875rem) for `above` and `below`: the air between the
+ *     parts of a readout (the old app catalogue's .vis-block); additive, appcat parity (sections-b).
+ *   v1.10.0 — 2026-09-27 — Space `inset`: the same step at both sides (the old app catalogue's Active
+ *     Extensions bar); additive, appcat parity.
+ *   v1.9.0 — 2026-09-27 — Beside `stick`: the side part stays in sight under the top bar while the
+ *     main part scrolls, and stands over the main part when they no longer fit side by side (the
+ *     admin Portal page's preview beside the parts, main's .adm-pt-bench > .adm-pt-side); additive,
+ *     admin group G2.
+ *   v1.8.0 — 2026-09-27 — Beside `start`: the side part stands before the main part (the admin
+ *     Database and Metrics pages' headline figure with its line beside it, .adm-db-top /
+ *     .adm-mx-top); additive, admin page group G3.
+ *   v1.7.0 — 2026-09-27 — Columns: parts of the same weight side by side, as many as fit at 340px (the
+ *     admin's .adm-two); additive, admin group G1.
  *   v1.6.0 — 2026-09-26 — Stack `list`: the parts are a list's items (ul/li, no bullets), main's Living
  *     ledger; Stack `narrow`: kept to 60rem (main's message rules page, .inbox-org); additive, fix pass.
  *   v1.5.0 — 2026-09-26 — Touch `tabs`: the tabs inside are 44px targets too (an agent's AI settings,
@@ -52,7 +69,9 @@ import htm from 'htm';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
-const STEPS = new Set(['none', 'tight', 'small', 'medium', 'large', 'section']);
+// 'part' (added by appcat sections-b, parity): 1.875rem, the air between the parts of one section's
+// readout (the old visitors' .vis-block, 30px); layout.css draws it for above and below only.
+const STEPS = new Set(['none', 'tight', 'small', 'medium', 'large', 'section', 'part']);
 const step = (prefix, v) => (STEPS.has(v) ? `layout-${prefix}--${v}` : null);
 const ALIGN = new Set(['start', 'end', 'baseline', 'stretch']);
 const JUSTIFY = new Set(['between', 'end']);
@@ -76,8 +95,10 @@ export function Split({ above = 'medium', pad = 'medium', gap, below, heavy, sid
   return html`<div class=${cx(heavy ? 'poster-row--thing' : 'og-split', side && !heavy && 'og-split--side', gap && 'layout-stack', step('gap', gap), step('above', above), step('pad', pad), step('below', below))}>${children}</div>`;
 }
 
-export function Space({ above, below, children }) {
-  return html`<div class=${cx(step('above', above), step('below', below))}>${children}</div>`;
+export function Space({ above, below, inset, children }) {
+  // inset (added for appcat parity): the same step at both sides (the old catalogue's Active
+  // Extensions bar, 24px in from the column's edges).
+  return html`<div class=${cx(step('above', above), step('below', below), step('inset', inset))}>${children}</div>`;
 }
 
 /**
@@ -87,9 +108,14 @@ export function Space({ above, below, children }) {
  * `align` 'end' lines the two parts up at their foot (a reply field and its send button); `rule`
  * sets the heavy rule over it (a part that closes a section); `id` is the anchor a page scrolls to.
  */
-export function Beside({ side, narrow, wide, align, rule, above, pad, below, id, children }) {
+export function Beside({ side, narrow, wide, start, stick, align, rule, above, pad, below, id, children }) {
+  // start (added by admin page group G3): the side part stands at the start, before the main part
+  // (a headline figure with its chart beside it: the admin Database and Metrics pages); on a phone
+  // it stands over the main part.
+  // stick (added by admin page group G2): the side part stays in sight while the main part scrolls
+  // (the Portal page's preview beside its parts); when one column, the side part stands first.
   return html`<div id=${id} class=${cx('layout-beside', narrow && 'layout-beside--narrow', wide && 'layout-beside--wide',
-    align === 'end' && 'layout-beside--end', rule && 'poster-row--thing', step('above', above), step('pad', pad), step('below', below))}>
+    start && 'layout-beside--start', stick && 'layout-beside--stick', align === 'end' && 'layout-beside--end', rule && 'poster-row--thing', step('above', above), step('pad', pad), step('below', below))}>
     <div class="layout-beside-main">${children}</div>
     <div class="layout-beside-side">${side}</div>
   </div>`;
@@ -101,6 +127,15 @@ export function Beside({ side, narrow, wide, align, rule, above, pad, below, id,
  * is the target, the box itself 20px). Main's decision-model card, its rules and providers screens
  * (.pf-aitr / .pf-dr), measured under the 40px floor on a phone before it.
  */
+/**
+ * Columns (added by admin group G1): parts of the same weight side by side, as many as fit at 340px
+ * each, one column when the page is narrower (the admin pages' two sections or two lists of readings
+ * side by side, main's .adm-two).
+ */
+export function Columns({ children }) {
+  return html`<div class="layout-columns">${children}</div>`;
+}
+
 export function Touch({ id, tabs, children }) {
   // tabs (added by page group G1a): the tabs inside are thumb targets too (an agent's AI gate, as
   // main's .pf-aai drew it).

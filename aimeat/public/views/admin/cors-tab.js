@@ -9,10 +9,14 @@
  *   is different), the numeral strip, the people with a list of their own, the agents with one,
  *   how the four lists rank when more than one applies, and the paste for the operator's own AI.
  *   The two writes go through the same PUT routes as before, which now call the same service the
- *   aimeat_admin_cors_set tool calls.
+ *   aimeat_admin_cors_set tool calls. Every part is a library component; the page passes data and
+ *   writes no class.
  * @structure CorsTab({ data, switchPage }) — load · RightNow · Strip · the two ListSections from
  *   cors-tab.form.js · OrderSection · AskAiSection · the actions (save, clear)
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only (admin group G2): Section, Verdict and Readings,
+ *     FigureStrip, the List (cut n-name-doors) for the precedence ladder, SettingBox (`pre`) for the
+ *     paste, Action for the doors. The page sheet admin-cors.css goes.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 -- 2026-09-13 -- Compose section headings from the shared B1 shape.
@@ -22,15 +26,21 @@
  *     update.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure } from '/components/Figure.js';
+import { List, Row, Name, Num, Doors } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { getCorsOverview, setGhiiCors, clearGhiiCors, setAgentCors, clearAgentCors } from '/js/services/admin.js';
 import { ListSection } from './cors-tab.form.js';
@@ -73,92 +83,72 @@ function RightNow({ ov, switchPage }) {
   const countChip = (n) => n === 0
     ? html`<${Badge} type="muted" label=${C('now.chipNone')} />`
     : html`<${Badge} type="info" label=${C('now.chipSet', { n: num(n) })} />`;
-  const row = (title, why, chip, value, last) => html`
-    <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span>${chip}</span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
   return html`
-    <section class="og-sec og-sec--first" id="adm-cors-01">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('now.title')}<small>01</small></h2>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${C('now.toSettings')}</button></div></div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status">${word}</div>
-          <p class="adm-alert-line">${line}</p>
-          <div class="adm-ov-up">${log}</div>
-        </div>
-        <div>
-          ${row(
-            ov.default.wildcard ? C('now.default') : C('now.defaultNamed', { n: num(named.length) }),
-            ov.default.wildcard ? C('now.defaultWhy') : C('now.defaultNamedWhy', { list: named.join(', ') }),
-            html`<${Badge} type="healthy" />`, ov.default.env)}
-          ${row(C('now.cookieDoors'),
-            ov.cookie_doors.named.length === 0 ? C('now.cookieDoorsWhy') : C('now.cookieDoorsNamedWhy', { n: num(ov.cookie_doors.named.length), list: ov.cookie_doors.named.join(', ') }),
-            html`<${Badge} type="healthy" />`, C('now.named', { n: num(ov.cookie_doors.named.length) }))}
-          ${row(C('now.people'), C('now.peopleWhy'), countChip(people), C('now.ofAccounts', { n: num(ov.people.total) }))}
-          ${row(C('now.agents'), C('now.agentsWhy'), countChip(agents), C('now.ofAgents', { n: num(ov.agents.total) }))}
-          ${row(C('now.records'), C('now.recordsWhy'), countChip(records), 'PUT /v1/memory/cors/:key', true)}
-        </div>
-      </div>
-    </section>`;
+    <${Section} first id="adm-cors-01" num="01" title=${C('now.title')}
+      doors=${html`<${Action} small soft onClick=${() => switchPage('config')}>${C('now.toSettings')}<//>`}>
+      <${Verdict} word=${word} line=${line} stamp=${log}>
+        <${Readings} rows=${[
+          { key: 'default', name: ov.default.wildcard ? C('now.default') : C('now.defaultNamed', { n: num(named.length) }),
+            why: ov.default.wildcard ? C('now.defaultWhy') : C('now.defaultNamedWhy', { list: named.join(', ') }),
+            mark: html`<${Badge} type="healthy" />`, value: ov.default.env },
+          { key: 'doors', name: C('now.cookieDoors'),
+            why: ov.cookie_doors.named.length === 0 ? C('now.cookieDoorsWhy') : C('now.cookieDoorsNamedWhy', { n: num(ov.cookie_doors.named.length), list: ov.cookie_doors.named.join(', ') }),
+            mark: html`<${Badge} type="healthy" />`, value: C('now.named', { n: num(ov.cookie_doors.named.length) }) },
+          { key: 'people', name: C('now.people'), why: C('now.peopleWhy'), mark: countChip(people), value: C('now.ofAccounts', { n: num(ov.people.total) }) },
+          { key: 'agents', name: C('now.agents'), why: C('now.agentsWhy'), mark: countChip(agents), value: C('now.ofAgents', { n: num(ov.agents.total) }) },
+          { key: 'records', name: C('now.records'), why: C('now.recordsWhy'), mark: countChip(records), value: 'PUT /v1/memory/cors/:key', last: true },
+        ]} />
+      <//>
+    <//>`;
 }
 
 /** The numeral strip: the default in one word, who is different, and the cookie doors. */
 function Strip({ ov, toSection }) {
   const named = ov.default.origins.filter(o => o !== '*');
-  const cell = (onClick, value, label, sub, cls = '') => onClick
-    ? html`<button type="button" onClick=${onClick}><b class=${cls}>${value}</b><span>${label}</span><small>${sub}</small></button>`
-    : html`<div><b class=${cls}>${value}</b><span>${label}</span><small>${sub}</small></div>`;
-  return html`
-    <div class="og-strip">
-      ${ov.default.wildcard
-        ? cell(null, C('strip.any'), C('strip.anyLabel'), C('strip.anySub'), 'adm-cors-any')
-        : cell(null, num(named.length), C('strip.namedLabel'), C('strip.namedSub'))}
-      ${cell(() => toSection('02'), num(ov.people.with_list.length), C('strip.people'), C('strip.peopleSub', { n: num(ov.people.total) }))}
-      ${cell(() => toSection('03'), num(ov.agents.with_list.length), C('strip.agents'), C('strip.agentsSub', { n: num(ov.agents.total) }))}
-      ${cell(null, num(ov.cookie_doors.paths.length), ov.cookie_doors.named.length === 0 ? C('strip.doors') : C('strip.doorsNamed'), C('strip.doorsSub'))}
-    </div>`;
+  return html`<${FigureStrip} wrap items=${[
+    ov.default.wildcard
+      ? { key: 'default', n: C('strip.any'), tone: 'coral', label: C('strip.anyLabel'), sub: C('strip.anySub') }
+      : { key: 'default', n: num(named.length), label: C('strip.namedLabel'), sub: C('strip.namedSub') },
+    { key: 'people', n: num(ov.people.with_list.length), label: C('strip.people'), sub: C('strip.peopleSub', { n: num(ov.people.total) }), onClick: () => toSection('02') },
+    { key: 'agents', n: num(ov.agents.with_list.length), label: C('strip.agents'), sub: C('strip.agentsSub', { n: num(ov.agents.total) }), onClick: () => toSection('03') },
+    { key: 'doors', n: num(ov.cookie_doors.paths.length), label: ov.cookie_doors.named.length === 0 ? C('strip.doors') : C('strip.doorsNamed'), sub: C('strip.doorsSub') },
+  ]} />`;
 }
 
 /** Section 04: the four lists in the order the door asks them. */
 function OrderSection({ ov, switchPage }) {
-  const step = (n, key, value, last) => html`
-    <div class="adm-cors-step ${last ? 'adm-cors-step--last' : ''}">
-      <span class="adm-cors-step-num poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
-      <span><b>${C('order.' + key)}</b><span class="adm-why">${C('order.' + key + 'Why', { value: ov.default.origins.join(', ') || '—' })}</span></span>
-      ${value}
-    </div>`;
+  const step = (n, key, value) => html`
+    <${Row} key=${key}>
+      <${Num}><${Figure} small step n=${n} /><//>
+      <${Name} desc=${C('order.' + key + 'Why', { value: ov.default.origins.join(', ') || '—' })}>${C('order.' + key)}<//>
+      <${Doors}>${value}<//>
+    <//>`;
+  const route = (r) => html`<${Note} kind="meta" mono inline>${r}<//>`;
   return html`
-    <section class="og-sec" id="adm-cors-04">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('order.title')}<small>04</small></h2></div>
-      <p class="adm-cors-lead">${C('order.lead')}</p>
-      ${step(1, 'record', html`<span class="adm-mval">PUT /v1/memory/cors/:key</span>`)}
-      ${step(2, 'agent', html`<span class="adm-mval">PUT /v1/agents/:name/cors</span>`)}
-      ${step(3, 'person', html`<span class="adm-mval">PUT /v1/ghii/cors</span>`)}
-      ${step(4, 'default', html`<span class="adm-mval"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${C('order.settings')}</button></span>`, true)}
-    </section>`;
+    <${Section} id="adm-cors-04" num="04" title=${C('order.title')}>
+      <${Note} kind="lead">${C('order.lead')}<//>
+      <${List} cols="n-name-doors">
+        ${step(1, 'record', route('PUT /v1/memory/cors/:key'))}
+        ${step(2, 'agent', route('PUT /v1/agents/:name/cors'))}
+        ${step(3, 'person', route('PUT /v1/ghii/cors'))}
+        ${step(4, 'default', html`<${Action} small soft onClick=${() => switchPage('config')}>${C('order.settings')}<//>`)}
+      <//>
+    <//>`;
 }
 
 /** Section 05: the paste for the operator's own AI. */
 function AskAiSection() {
   const paste = buildCorsPrompt({ url: getNodeUrl() });
   return html`
-    <section class="og-sec" id="adm-cors-05">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('ai.title')}<small>05</small></h2>
-        <div class="og-doors"><${CopyButton} text=${paste} label=${C('ai.copy')} className="og-door og-door--quiet" /></div></div>
-      <p class="adm-cors-lead">${C('ai.lead')}</p>
-      <div class="og-box poster-aside poster-aside--small">
-        <span class="og-box-label">${C('ai.label')}</span>
-        <div class="adm-cors-paste">${paste}</div>
-      </div>
-    </section>`;
+    <${Section} id="adm-cors-05" num="05" title=${C('ai.title')}
+      doors=${html`<${Action} small soft copy=${paste}>${C('ai.copy')}<//>`}>
+      <${Note} kind="lead">${C('ai.lead')}<//>
+      <${SettingBox} pre label=${C('ai.label')}>${paste}<//>
+    <//>`;
 }
 
 export default function CorsTab(props) {
   const { data, switchPage } = props;
-  useViewCSS('/css/views/admin-cors.css');
   const [ov, setOv] = useState(null);
   const [failed, setFailed] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
@@ -203,7 +193,7 @@ export default function CorsTab(props) {
   if (!ov) {
     return html`
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      ${failed ? html`<div class="adm-cors-empty">${C('loadFailed')}</div>` : html`<${Spinner} text=${t('dashboard.loading')} />`}`;
+      ${failed ? html`<${Note} kind="quiet">${C('loadFailed')}<//>` : html`<${Spinner} text=${t('dashboard.loading')} />`}`;
   }
 
   const listed = new Set([...ov.people.with_list.map(p => p.ghii), ...ov.agents.with_list.map(a => a.gaii)]);
@@ -213,9 +203,9 @@ export default function CorsTab(props) {
   const agentsFree = ((data?.agents && data.agents.agents) || []).filter(a => !listed.has(a.gaii)).map(a => ({ id: a.gaii, name: a.display_name || a.gaii.split('@')[0], sub: a.gaii }));
 
   return html`
-    <div class="adm-cors">
+    <${Fragment}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <p class="adm-intro">${C('intro')}</p>
+      <${Note} kind="hint">${C('intro')}<//>
       <${RightNow} ov=${ov} switchPage=${switchPage} />
       <${Strip} ov=${ov} toSection=${toSection} />
       <${ListSection} kind="people" number="02" rows=${peopleRows} total=${num(ov.people.total)} candidates=${peopleFree}
@@ -225,5 +215,5 @@ export default function CorsTab(props) {
       <${OrderSection} ov=${ov} switchPage=${switchPage} />
       <${AskAiSection} />
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
 }

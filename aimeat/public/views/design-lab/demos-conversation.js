@@ -9,6 +9,8 @@
  * @structure CONVERSATION_DEMOS — { [id]: { variants: [{ name, render(ex) }], height? } }
  * @usage import { CONVERSATION_DEMOS } from './demos-conversation.js';
  * @version-history
+ *   v1.6.0 — 2026-09-27 — The cap's ways (no hand-written button), ConversationCopy, AiNotice main, Panes framed and a
+ *     board notice whose title opens nothing; the operator pages' parts in the operator's frame.
  *   v1.5.0 — 2026-09-27 — Messages on components: Message, MessageFile, MessageQuestions, MessageComposer and
  *     ConversationList, each drawn by calling it; the Board notices' demo moved here from demos-settings.js and calls
  *     BoardNotice; the Turn's hand-written name line and the Composer's hand-written stacked row went (the Composer's
@@ -33,8 +35,11 @@ import { ResultCards } from '/components/ResultCard.js';
 import { WorkLog } from '/components/WorkLog.js';
 import {
   ConversationFrame, ConversationAbout, ConversationFoot, ConversationMain, ConversationHead,
-  ConversationIcon, ConversationScroll, ConversationWelcome, ConversationJump, ConversationCap,
+  ConversationIcon, ConversationScroll, ConversationWelcome, ConversationJump, ConversationCap, ConversationCopy,
 } from '/components/ConversationFrame.js';
+import { OperatorFrame } from '/components/OperatorFrame.js';
+import { List, Row, Name, SearchLine } from '/components/List.js';
+import { TextArea } from '/components/TextField.js';
 import { SettingsRoot } from '/components/SettingsFrame.js';
 import { Action, Loud } from '/components/Action.js';
 import { Message, Thread, ThreadDay, ThreadTop, ThreadForm } from '/components/Message.js';
@@ -70,6 +75,7 @@ const AGENT = {
   cards: [{ kind: 'page', title: 'Team page', url: 'https://sandbox.aimeat.io/team' }],
 };
 const THREADS = [{ id: 't1', title: 'Make me a page', turns: 4 }, { id: 't2', title: 'What can you do?', turns: 2 }];
+const COPY_TEXT = 'You: Make me a page about my team\n\nAgent: Your page is ready.';
 const STATUS = { agent_name: 'chat#sandbox@aimeat-local-001-dev', pays: 'node', has_own_key: false, allowance_remaining_usd: 1.5, model: 'claude-sonnet-5', enabled: true };
 
 /** The chat page's own composition, with the library parts it is built from. */
@@ -96,8 +102,8 @@ function Conversation({ list = false, empty = false, capped = false }) {
         <//>
         <${ConversationJump} onClick=${noop}>Jump to the latest<//>
         ${capped
-          ? html`<${ConversationCap} title="This conversation has used up its free ride." body="Two ways to keep going:">
-              <a class="btn-primary" href="#">Bring your own key →</a><//>`
+          ? html`<${ConversationCap} title="This conversation has used up its free ride." body="Two ways to keep going:"
+              ways=${[{ href: '#', label: 'Bring your own key →', loud: true }, { href: '#', label: 'Read how the free share works', newTab: true }]} />`
           : html`<${Composer} value="" onInput=${noop} onSend=${noop} onStop=${noop} onAttach=${noop} onDropAttachment=${noop} />`}
       <//>
     <//>`;
@@ -109,6 +115,9 @@ export const CONVERSATION_DEMOS = {
     { name: 'empty, with starters', render: () => html`<${Conversation} empty=${true} />` },
     { name: 'the free share is spent', render: () => html`<${Conversation} capped=${true} />` },
     { name: 'the list open (a phone)', render: () => html`<${Conversation} list=${true} />` },
+    { name: 'copy the conversation: the rail\'s link and the head\'s icon', render: () => html`<div>
+      <${ConversationCopy} text=${COPY_TEXT} label="Copy the conversation" copiedLabel="Copied" />
+      <${ConversationCopy} head text=${COPY_TEXT} label="⧉" copiedLabel="✓" title="Copy the conversation" ariaLabel="Copy the conversation" /></div>` },
   ] },
   'thread-list': { variants: [
     { name: 'default', render: (ex) => html`<${ThreadList} threads=${ex.threads} activeId=${ex.activeId} onOpen=${noop} onNew=${noop} onDelete=${noop} onClose=${noop} />` },
@@ -152,6 +161,7 @@ export const CONVERSATION_DEMOS = {
   'ai-notice': { variants: [
     { name: 'full', render: () => html`<${AiNotice} compact=${false} />` },
     { name: 'compact', render: () => html`<${AiNotice} compact=${true} />` },
+    { name: 'main: the copy in the conversation\'s column (shown on a phone only)', render: () => html`<${AiNotice} main compact=${true} />` },
   ] },
   'nudge': { variants: [{ name: 'default', render: () => html`<${MobileNudge} onDismiss=${noop} />` }] },
   'credit': { variants: [{ name: 'default', render: () => html`<${GooseCredit} />` }] },
@@ -292,6 +302,15 @@ export const CONVERSATION_DEMOS = {
       <${PaneScroll}><${ConversationRows}><${ConversationRow} title="Harbour Studio members" date="Sep 20" preview="12 of 12 delivered" onOpen=${noop} /><//><//>
       <${PaneNote}>This is an announcement. Nobody can answer it.<//>
     <//><//>` },
+    { name: 'framed: a list beside the thing opened from it (an operator page)', render: () => html`<${OperatorFrame} title="System prompts"><${Panes} framed label="Prompts"
+        head=${html`<${SearchLine} find text value="" onInput=${noop} placeholder="Find a prompt" note="3 of 3" />`}
+        side=${html`<${List} cols="name" dense>
+          <${Row} selected><${Name} onOpen=${noop} meta="build-app · v4">Build an app<//><//>
+          <${Row}><${Name} onOpen=${noop} meta="chat-agent · v2">The chat agent<//><//>
+          <${Row}><${Name} onOpen=${noop} meta="welcome-mat · v1">The welcome mat<//><//>
+        <//>`}>
+      <${TextArea} label="Build an app" code rows=${8} value=${'You build one single-file web app on this AIMEAT node.\nRead the owner\'s request first, then the app catalogue.'} onInput=${noop} />
+    <//><//>` },
   ] },
   'board-notices': { variants: [
     { name: 'two notices, one without a kind', render: () => html`<${SettingsRoot}>
@@ -304,5 +323,7 @@ export const CONVERSATION_DEMOS = {
       <${Message} tone="board" who="sandbox" whoNote="owner" time="today 10:02" body="Thank you, I will put it on the wall." plain />
     <//>` },
     { name: 'a long title', render: () => html`<${SettingsRoot}><${BoardNotice} kind="Question" title="Does anybody know whether the Nordic Ferries winter timetable applies to the island route as well?" onOpen=${noop} who="second" time="Sep 20" counts="5 replies" /><//>` },
+    { name: 'a title that opens nothing (an operator page)', render: () => html`<${OperatorFrame} title="Boards"><${BoardNotice} kind="News" title="The ferry timetable changes on Monday"
+      words="The morning boat leaves at 07:10 from now on." who="second" board=${{ name: 'Harbour', onOpen: noop }} time="today 09:12" left="6 days left" counts="2 replies" /><//>` },
   ] },
 };

@@ -15,6 +15,14 @@
  *   - whoOf / readWord: how a row says whose a board is and who may read it
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.3.0 -- 2026-09-27 -- On the library components (page group G5): the strip is the FigureStrip
+ *     (the silent boards in coral), the headline the Verdict with its label and lead, the search the
+ *     Search line with its magnifier, the five chips the filter Tabs (the silent one in the attention
+ *     tone), the boards the List (a row answers the pointer), the board's page the Crumb, the
+ *     PageHead and the Beside with its notices as BoardNotices, its facts as Facts (the visibility a
+ *     sun tag with its switch) and its roster a List with the add field; making one Fields with the
+ *     visibilities as the boxed Choice, the aside and the "starts with" Facts in a dim Box. The page
+ *     sheet admin-boards.css goes; the file writes no class and no style.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
@@ -35,12 +43,28 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import {
   getBoardPosts, patchBoardMembers, createBoard, setBoardVisibility, deleteBoard,
 } from '/js/services/admin.js';
+import { Section } from '/components/Section.js';
+import { Verdict } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { List, Row, Name, Who, Desc, When, Doors, SearchLine } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark, Code, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Tabs } from '/components/Tabs.js';
+import { Facts } from '/components/Facts.js';
+import { Box } from '/components/Box.js';
+import { Crumb } from '/components/Crumb.js';
+import { PageHead } from '/components/PageHead.js';
+import { BoardNotice } from '/components/BoardNotice.js';
+import { TextField } from '/components/TextField.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { Choice } from '/components/Choice.js';
+import { Row as Line, Stack, Beside } from '/components/Layout.js';
 
 const S = (key, params) => t('admin.brd.' + key, params);
 
@@ -72,7 +96,6 @@ function since(iso) {
 }
 
 export default function BoardsTab({ data, reload }) {
-  useViewCSS('/css/views/admin-boards.css');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const [view, setView] = useState('list');     // list | one | make
@@ -141,11 +164,10 @@ export default function BoardsTab({ data, reload }) {
     finally { setBusy(false); }
   }
 
-  const wrap = (inner) => html`<div class="og adm-brd">
+  const wrap = (inner) => html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     ${inner}
-    <${ConfirmUI} />
-  </div>`;
+    <${ConfirmUI} />`;
 
   if (view === 'make') {
     return wrap(html`<${Make} form=${form} setForm=${setForm} onMake=${make} busy=${busy}
@@ -165,12 +187,12 @@ export default function BoardsTab({ data, reload }) {
       onAdd=${(g) => addMember(board, g)} onDrop=${(g) => dropMember(board, g)} />`);
   }
 
+  const makeDoor = html`<${Loud} control onClick=${() => setView('make')}>${S('make')}<//>`;
+
   if (boards.length === 0) {
-    return wrap(html`<section class="og-sec og-sec--first">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('title')}<small>01</small></h2>
-        <button type="button" class="adm-btn" onClick=${() => setView('make')}>${S('make')}</button></div>
+    return wrap(html`<${Section} first num="01" title=${S('title')} doors=${makeDoor}>
       <${Empty} text=${S('empty')} />
-    </section>`);
+    <//>`);
   }
 
   const shown = boards.filter(b => {
@@ -183,79 +205,62 @@ export default function BoardsTab({ data, reload }) {
     return [b.name, b.description, b.id, b.owner_gaii].some(v => String(v || '').toLowerCase().includes(q));
   });
 
-  const chip = (key, label) => html`
-    <button type="button" class="adm-brd-chip ${filter === key ? 'on' : ''} ${key === 'silent' ? 'bad' : ''}"
-      onClick=${() => setFilter(key)}>${label}</button>`;
+  // The five chips: one of them is on; the silent boards are the ones an operator acts on.
+  const chip = (key, label) => ({ value: key, label, attention: key === 'silent' });
+  const head = [S('colBoard'), S('colWhose'), S('colWhoReads'), { label: S('colNotices'), num: true }, S('colMade'), ''];
 
   return wrap(html`
-    <div class="og-strip">
-      <div><b>${num(m.total)}</b><span>${S('cntAll')}</span><small>${S('cntAllSub')}</small></div>
-      <div><b>${num(m.open)}</b><span>${S('cntOpen')}</span><small>${S('cntOpenSub', { shared: num(m.shared), rest: num(m.total - m.open - m.shared) })}</small></div>
-      <div><b>${num(m.notices)}</b><span>${S('cntNotices')}</span><small>${S('cntNoticesSub')}</small></div>
-      <div class="adm-brd-quiet"><b>${num(m.silent)}</b><span>${S('cntSilent')}</span><small>${S('cntSilentSub')}</small></div>
-    </div>
+    <${FigureStrip} wrap items=${[
+      { key: 'all', n: num(m.total), label: S('cntAll'), sub: S('cntAllSub') },
+      { key: 'open', n: num(m.open), label: S('cntOpen'), sub: S('cntOpenSub', { shared: num(m.shared), rest: num(m.total - m.open - m.shared) }) },
+      { key: 'notices', n: num(m.notices), label: S('cntNotices'), sub: S('cntNoticesSub') },
+      // The number an operator acts on is the one in coral.
+      { key: 'silent', n: num(m.silent), tone: 'notice', label: S('cntSilent'), sub: S('cntSilentSub') },
+    ]} />
 
-    <section class="og-sec og-sec--first">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('title')}<small>01</small></h2>
-        <button type="button" class="adm-btn" onClick=${() => setView('make')}>${S('make')}</button>
-      </div>
+    <${Section} first num="01" title=${S('title')} doors=${makeDoor}>
+      <${Verdict} label=${S('heroLabel')} word=${S('hero', { n: num(m.silent), total: num(m.total) })} line=${S('heroSub')}>
+        <${Note} kind="lead">${S('lead')}<//>
+      <//>
 
-      <div class="adm-brd-top">
-        <div>
-          <div class="adm-brd-lbl">${S('heroLabel')}</div>
-          <div class="adm-brd-hero poster-stat-number">${S('hero', { n: num(m.silent), total: num(m.total) })}</div>
-          <p class="adm-brd-hero-sub">${S('heroSub')}</p>
-        </div>
-        <div><p class="adm-brd-lead">${S('lead')}</p></div>
-      </div>
+      <${Line} wrap gap="large" align="end" above="large" below="medium">
+        <${SearchLine} find text value=${find} onInput=${e => setFind(e.target.value)} placeholder=${S('findPlaceholder')} />
+        <${Tabs} tone="filter" value=${filter} onSelect=${setFilter} items=${[
+          chip('all', S('chipAll', { n: num(m.total) })),
+          chip('open', S('chipOpen', { n: num(m.open) })),
+          chip('shared', S('chipShared', { n: num(m.shared) })),
+          chip('roster', S('chipRoster', { n: num(m.roster) })),
+          chip('silent', S('chipSilent', { n: num(m.silent) })),
+        ]} />
+      <//>
 
-      <div class="adm-brd-tools">
-        <div class="adm-brd-find">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M16 16 L21 21"></path></svg>
-          <input type="text" value=${find} onInput=${e => setFind(e.target.value)} placeholder=${S('findPlaceholder')} />
-        </div>
-        <div class="adm-brd-chips">
-          ${chip('all', S('chipAll', { n: num(m.total) }))}
-          ${chip('open', S('chipOpen', { n: num(m.open) }))}
-          ${chip('shared', S('chipShared', { n: num(m.shared) }))}
-          ${chip('roster', S('chipRoster', { n: num(m.roster) }))}
-          ${chip('silent', S('chipSilent', { n: num(m.silent) }))}
-        </div>
-      </div>
-
-      <div class="adm-brd-rows">
-        <div class="adm-brd-hrow">
-          <span>${S('colBoard')}</span><span>${S('colWhose')}</span><span>${S('colWhoReads')}</span>
-          <span class="r">${S('colNotices')}</span><span class="r">${S('colMade')}</span><span></span>
-        </div>
+      <${List} cols="name-who-state-count-when-doors" head=${head} labels>
         ${shown.map(b => {
     const roster = (b.allowed_gaiis || []).length;
     return html`
-          <div class="adm-brd-row" key=${b.id}>
-            <span class="adm-brd-name">${b.name || b.id}<em>${b.id}</em></span>
-            <span class="adm-brd-who">${b.owner_gaii
-    ? html`<b>${ownerOf(b.owner_gaii)}</b><em>${roster > 0 ? S('plusRoster', { n: num(roster) }) : S('andItsAgents')}</em>`
-    : html`<em>${S('unknownOwner')}</em>`}</span>
-            <span><span class="adm-brd-chipcell">${S('vis.' + b.visibility)}</span></span>
-            <span class="adm-brd-posts r ${b.posts ? '' : 'is-none'}">
+          <${Row} key=${b.id} hover>
+            <${Name} meta=${b.id}>${b.name || b.id}<//>
+            ${b.owner_gaii
+    ? html`<${Who} sub=${roster > 0 ? S('plusRoster', { n: num(roster) }) : S('andItsAgents')}>${ownerOf(b.owner_gaii)}<//>`
+    : html`<${Desc}>${S('unknownOwner')}<//>`}
+            <${Desc}><${Mark}>${S('vis.' + b.visibility)}<//><//>
+            <${Desc} faint=${!b.posts} sub=${b.posts ? S('lastPost', { ago: since(b.last_post_at) }) : S('nothingYet')}>
               ${b.posts ? num(b.posts) : '—'}
-              <em>${b.posts ? S('lastPost', { ago: since(b.last_post_at) }) : S('nothingYet')}</em>
-            </span>
-            <span class="adm-brd-made">${day(b.created_at)}</span>
-            <span class="adm-brd-doors">
-              <button type="button" class="adm-brd-door" onClick=${() => openBoard(b)}>${S('openIt')}</button>
-              <button type="button" class="adm-brd-door is-quiet" onClick=${() => remove(b)}>${S('delete')}</button>
-            </span>
-          </div>`;
+            <//>
+            <${When}>${day(b.created_at)}<//>
+            <${Doors}>
+              <${Action} small onClick=${() => openBoard(b)}>${S('openIt')}<//>
+              <${Action} small soft onClick=${() => remove(b)}>${S('delete')}<//>
+            <//>
+          <//>`;
   })}
-      </div>
+      <//>
 
-      <div class="adm-brd-foot">
-        <span>${S('shown', { n: num(shown.length), total: num(m.total) })}</span>
-        <span>${S('organismNote')}</span>
-      </div>
-    </section>`);
+      <${Line} justify="between" wrap gap="large" above="medium">
+        <${Note} kind="meta" inline>${S('shown', { n: num(shown.length), total: num(m.total) })}<//>
+        <${Note} kind="meta" inline>${S('organismNote')}<//>
+      <//>
+    <//>`);
 }
 
 /* ── One board ───────────────────────────────────────────────────────────────────────────────── */
@@ -266,115 +271,92 @@ function One({ board, posts, authors, total, busy, onBack, onFlip, onDelete, onA
   const rules = board.rules || {};
   const isPublic = board.visibility === 'public';
 
+  const add = () => { onAdd(newMember.trim()); setNewMember(''); };
+
+  const side = html`
+    <${Stack} gap="large">
+      <${Facts} rows=${[
+        {
+          k: S('factWhoReads'),
+          v: html`<${Mark} tone="sun">${S('vis.' + board.visibility)}<//>`,
+          action: board.visibility !== 'system' ? html`
+            <${Action} small soft disabled=${busy} onClick=${onFlip}>
+              ${isPublic ? S('makeShared') : S('makePublic')}
+            <//>` : null,
+          sub: S('visWhy.' + board.visibility),
+        },
+        { k: S('factWhoPosts'), v: S('posting.' + (rules.posting || 'anyone')), sub: S('factWhoPostsWhy') },
+        {
+          k: S('factLives'),
+          v: rules.defaultTtlHours
+            ? S('livesHours', { n: num(rules.defaultTtlHours) })
+            : S('livesForever'),
+        },
+        {
+          k: S('factCosts'),
+          v: rules.postCost ? S('costsMorsels', { n: num(rules.postCost) }) : S('costsNothing'),
+          sub: !rules.postCost ? S('costsNothingWhy') : undefined,
+        },
+        {
+          k: S('factCategories'),
+          v: rules.categories?.length ? html`<${Code}>${rules.categories.join(' · ')}<//>` : S('categoriesAny'),
+          sub: rules.categories?.length ? S('categoriesWhy') : undefined,
+        },
+        { k: S('factFederation'), v: board.federate ? S('federateOn') : S('federateOff'), sub: S('federateWhy') },
+      ]} />
+
+      <${Stack} gap="small">
+        <${Label} block>${S('rosterTitle')}<//>
+        <${Note}>${S('rosterWhy')}<//>
+        ${roster.length === 0
+    ? html`<${Note} kind="quiet">${S('rosterEmpty')}<//>`
+    : html`<${List} cols="name-doors" dense>
+            ${roster.map(g => html`
+              <${Row} key=${g}>
+                <${Name} code>${g}<//>
+                <${Doors}><${Action} small soft disabled=${busy} onClick=${() => onDrop(g)}>${S('takeOff')}<//><//>
+              <//>`)}
+          <//>`}
+        <${TextField} code value=${newMember} placeholder=${S('rosterPlaceholder')} ariaLabel=${S('rosterPlaceholder')}
+          onInput=${setNewMember}
+          onEnter=${() => { if (newMember.trim()) add(); }}
+          actions=${html`<${Action} small disabled=${busy || !newMember.trim()} onClick=${add}>${S('add')}<//>`} />
+      <//>
+    <//>`;
+
   return html`
-    <div class="adm-brd-page">
-      <div class="adm-brd-crumb">
-        <button type="button" onClick=${onBack}>${S('title')}</button> · ${board.name || board.id}
-      </div>
+    <${Crumb} steps=${[{ label: S('title'), onClick: onBack }, board.name || board.id]} />
 
-      <div class="adm-brd-head poster-row--thing">
-        <h2 class="poster-record-title">${board.name || board.id}<i>${board.id}${total ? ' · ' + S('nNotices', { n: num(total) }) : ''}</i></h2>
-        <div class="adm-brd-doors">
-          <button type="button" class="adm-brd-door is-quiet" onClick=${onDelete}>${S('delete')}</button>
-        </div>
-      </div>
-      ${board.description && html`<p class="adm-brd-what">${board.description}</p>`}
-      <p class="adm-brd-made-line">${S('madeBy', { who: ownerOf(board.owner_gaii), when: dt(board.created_at) })}</p>
+    <${PageHead} title=${board.name || board.id}
+      sub=${`${board.id}${total ? ' · ' + S('nNotices', { n: num(total) }) : ''}`}
+      desc=${board.description || null}
+      actions=${html`<${Action} small soft onClick=${onDelete}>${S('delete')}<//>`} />
+    <${Note}>${S('madeBy', { who: ownerOf(board.owner_gaii), when: dt(board.created_at) })}<//>
 
-      <div class="adm-brd-two">
-        <div>
-          <div class="adm-brd-phead">${S('newestNotices')}</div>
-          ${posts.length === 0
-    ? html`<p class="adm-brd-hint">${S('noNotices')}</p>`
+    <${Beside} wide side=${side} above="large">
+      <${Label} block>${S('newestNotices')}<//>
+      ${posts.length === 0
+    ? html`<${Note} kind="quiet">${S('noNotices')}<//>`
     : posts.map(p => {
       const standing = authors[p.author_gaii];
+      const thanks = reactionCount(p);
       return html`
-            <div class="adm-brd-post" key=${p.id}>
-              <div class="adm-brd-ptop">
-                <span class="adm-brd-ptitle">${p.title || S('untitled')}</span>
-                <span class="adm-brd-pwhen">${since(p.created_at)}</span>
-              </div>
-              ${p.body && html`<p class="adm-brd-pbody">${p.body}</p>`}
-              <div class="adm-brd-pfoot">
-                <span class="adm-brd-pwho">${p.author_gaii}
-                  ${standing && html`<em>${S('standing', {
+            <${BoardNotice} key=${p.id}
+              kind=${p.category || null}
+              title=${p.title || S('untitled')}
+              words=${p.body || null}
+              who=${p.author_gaii}
+              whoNote=${standing ? `${S('standing', {
     posts: num(standing.posts ?? 0), thanks: num(standing.thanks ?? 0),
-  })}${standing.since ? ' · ' + S('standingSince', { when: day(standing.since) }) : ''}</em>`}
-                </span>
-                ${p.category && html`<span class="adm-brd-ptag">${p.category}</span>`}
-                <span class="adm-brd-pmeta">${p.replies
+  })}${standing.since ? ' · ' + S('standingSince', { when: day(standing.since) }) : ''}` : ''}
+              time=${since(p.created_at)}
+              counts=${`${p.replies
     ? S('nReplies', { n: num(p.replies) })
-    : S('noReplies')}${reactionCount(p) ? ' · ' + S('nThanks', { n: num(reactionCount(p)) }) : ''}</span>
-              </div>
-            </div>`;
+    : S('noReplies')}${thanks ? ' · ' + S('nThanks', { n: num(thanks) }) : ''}`} />`;
     })}
-          ${total > posts.length && html`
-            <p class="adm-brd-more">${S('moreNotices', { shown: num(posts.length), total: num(total) })}</p>`}
-        </div>
-
-        <div>
-          <dl class="adm-brd-facts">
-            <div class="adm-brd-fact">
-              <dt>${S('factWhoReads')}</dt>
-              <dd>
-                <span class="adm-brd-vis">
-                  <span class="adm-brd-visnow">${S('vis.' + board.visibility)}</span>
-                  ${board.visibility !== 'system' && html`
-                    <button type="button" class="adm-brd-visgo" disabled=${busy} onClick=${onFlip}>
-                      ${isPublic ? S('makeShared') : S('makePublic')}
-                    </button>`}
-                </span>
-                <em>${S('visWhy.' + board.visibility)}</em></dd>
-            </div>
-            <div class="adm-brd-fact">
-              <dt>${S('factWhoPosts')}</dt>
-              <dd>${S('posting.' + (rules.posting || 'anyone'))}<em>${S('factWhoPostsWhy')}</em></dd>
-            </div>
-            <div class="adm-brd-fact">
-              <dt>${S('factLives')}</dt>
-              <dd>${rules.defaultTtlHours
-    ? S('livesHours', { n: num(rules.defaultTtlHours) })
-    : S('livesForever')}</dd>
-            </div>
-            <div class="adm-brd-fact">
-              <dt>${S('factCosts')}</dt>
-              <dd>${rules.postCost ? S('costsMorsels', { n: num(rules.postCost) }) : S('costsNothing')}
-                ${!rules.postCost && html`<em>${S('costsNothingWhy')}</em>`}</dd>
-            </div>
-            <div class="adm-brd-fact">
-              <dt>${S('factCategories')}</dt>
-              <dd>${rules.categories?.length
-    ? html`<code>${rules.categories.join(' · ')}</code><em>${S('categoriesWhy')}</em>`
-    : S('categoriesAny')}</dd>
-            </div>
-            <div class="adm-brd-fact">
-              <dt>${S('factFederation')}</dt>
-              <dd>${board.federate ? S('federateOn') : S('federateOff')}
-                <em>${S('federateWhy')}</em></dd>
-            </div>
-          </dl>
-
-          <div class="adm-brd-roster">
-            <div class="adm-brd-lbl">${S('rosterTitle')}</div>
-            <p class="adm-brd-rwhy">${S('rosterWhy')}</p>
-            ${roster.length === 0
-    ? html`<p class="adm-brd-hint">${S('rosterEmpty')}</p>`
-    : roster.map(g => html`
-              <div class="adm-brd-rrow" key=${g}>
-                <span class="adm-brd-rgaii">${g}</span>
-                <button type="button" class="adm-brd-rkill" disabled=${busy} onClick=${() => onDrop(g)}>${S('takeOff')}</button>
-              </div>`)}
-            <div class="adm-brd-radd">
-              <input type="text" value=${newMember} placeholder=${S('rosterPlaceholder')}
-                onInput=${e => setNewMember(e.target.value)}
-                onKeyDown=${e => { if (e.key === 'Enter' && newMember.trim()) { onAdd(newMember.trim()); setNewMember(''); } }} />
-              <button type="button" class="adm-brd-raddgo" disabled=${busy || !newMember.trim()}
-                onClick=${() => { onAdd(newMember.trim()); setNewMember(''); }}>${S('add')}</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
+      ${total > posts.length && html`
+        <${Note}>${S('moreNotices', { shown: num(posts.length), total: num(total) })}<//>`}
+    <//>`;
 }
 
 /** How many thanks a notice carries. The reactions map is emoji → the gaiis that gave it. */
@@ -386,76 +368,51 @@ function reactionCount(post) {
 /* ── Making one ──────────────────────────────────────────────────────────────────────────────── */
 
 function Make({ form, setForm, onMake, busy, onCancel }) {
-  const opt = (key, on) => html`
-    <button type="button" class="adm-brd-opt ${form.visibility === key ? 'on' : ''} ${on ? '' : 'is-off'}"
-      disabled=${!on} onClick=${() => on && setForm({ ...form, visibility: key })}>
-      <b>${S('vis.' + key)}</b>${S('visWhy.' + key)}
-    </button>`;
+  const opt = (key, on) => ({ value: key, label: S('vis.' + key), hint: S('visWhy.' + key), disabled: !on });
+
+  const side = html`
+    <${Stack} gap="large">
+      <${Note} kind="aside">
+        <${Stack} gap="tight">
+          <b>${S('asideTitle')}</b>
+          <span>${S('asideBody')}</span>
+        <//>
+      <//>
+
+      <${Box} tone="dim">
+        <${Label} block>${S('startsWith')}<//>
+        <${Facts} rows=${[
+          { k: S('factWhoPosts'), v: S('posting.anyone'), sub: S('changeableOnBoard') },
+          { k: S('factLives'), v: S('livesForever') },
+          { k: S('factCosts'), v: S('costsNothing') },
+          { k: S('factCategories'), v: S('categoriesAny') },
+          { k: S('rosterTitle'), v: S('rosterEmptyShort') },
+          { k: S('factFederation'), v: S('federateOff') },
+        ]} />
+      <//>
+    <//>`;
 
   return html`
-    <div class="adm-brd-page">
-      <div class="adm-brd-head">
-        <h2 class="poster-section-title">${S('makeTitle')}<small>02</small></h2>
-        <button type="button" class="adm-brd-door" onClick=${onCancel}>${t('common.cancel')}</button>
-      </div>
-      <p class="adm-brd-lead">${S('makeLead')}</p>
+    <${Section} first num="02" title=${S('makeTitle')}
+      doors=${html`<${Action} small onClick=${onCancel}>${t('common.cancel')}<//>`}>
+      <${Note} kind="lead">${S('makeLead')}<//>
 
-      <div class="adm-brd-two adm-brd-two--make">
-        <div>
-          <div class="adm-brd-field">
-            <div class="adm-brd-lbl">${S('fieldName')}</div>
-            <div class="adm-brd-fld">
-              <input type="text" value=${form.name} placeholder=${S('namePlaceholder')}
-                onInput=${e => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <p class="adm-brd-hint">${S('nameHint')}</p>
-          </div>
+      <${Beside} wide side=${side} above="large">
+        <${Fields}>
+          <${TextField} label=${S('fieldName')} hint=${S('nameHint')} value=${form.name} placeholder=${S('namePlaceholder')}
+            onInput=${(v) => setForm({ ...form, name: v })} />
+          <${TextField} label=${S('fieldWhatFor')} hint=${S('whatForHint')} value=${form.description} placeholder=${S('whatForPlaceholder')}
+            onInput=${(v) => setForm({ ...form, description: v })} />
+          <${Choice} boxed cols=${2} label=${S('fieldWhoReads')} hint=${S('whoReadsHint')} value=${form.visibility}
+            options=${[opt('public', true), opt('shared', true), opt('private', true), opt('system', false)]}
+            onChange=${(v) => setForm({ ...form, visibility: v })} />
+        <//>
 
-          <div class="adm-brd-field">
-            <div class="adm-brd-lbl">${S('fieldWhatFor')}</div>
-            <div class="adm-brd-fld">
-              <input type="text" value=${form.description} placeholder=${S('whatForPlaceholder')}
-                onInput=${e => setForm({ ...form, description: e.target.value })} />
-            </div>
-            <p class="adm-brd-hint">${S('whatForHint')}</p>
-          </div>
-
-          <div class="adm-brd-field">
-            <div class="adm-brd-lbl">${S('fieldWhoReads')}</div>
-            <div class="adm-brd-choice">
-              ${opt('public', true)}
-              ${opt('shared', true)}
-              ${opt('private', true)}
-              ${opt('system', false)}
-            </div>
-            <p class="adm-brd-hint">${S('whoReadsHint')}</p>
-          </div>
-
-          <div class="adm-brd-act">
-            <button class="adm-btn" disabled=${busy || !form.name.trim()} onClick=${onMake}>
-              ${busy ? t('common.loading') : S('makeIt')}
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div class="adm-brd-aside poster-aside">
-            <b>${S('asideTitle')}</b>
-            <p>${S('asideBody')}</p>
-          </div>
-
-          <div class="adm-brd-starts">
-            <div class="adm-brd-starts-l">${S('startsWith')}</div>
-            <dl>
-              <div class="adm-brd-srow"><dt>${S('factWhoPosts')}</dt><dd>${S('posting.anyone')}<em>${S('changeableOnBoard')}</em></dd></div>
-              <div class="adm-brd-srow"><dt>${S('factLives')}</dt><dd>${S('livesForever')}</dd></div>
-              <div class="adm-brd-srow"><dt>${S('factCosts')}</dt><dd>${S('costsNothing')}</dd></div>
-              <div class="adm-brd-srow"><dt>${S('factCategories')}</dt><dd>${S('categoriesAny')}</dd></div>
-              <div class="adm-brd-srow"><dt>${S('rosterTitle')}</dt><dd>${S('rosterEmptyShort')}</dd></div>
-              <div class="adm-brd-srow"><dt>${S('factFederation')}</dt><dd>${S('federateOff')}</dd></div>
-            </dl>
-          </div>
-        </div>
-      </div>
-    </div>`;
+        <${FormActions}>
+          <${Loud} disabled=${busy || !form.name.trim()} onClick=${onMake}>
+            ${busy ? t('common.loading') : S('makeIt')}
+          <//>
+        <//>
+      <//>
+    <//>`;
 }

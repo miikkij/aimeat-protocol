@@ -16,6 +16,8 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-09-27: "Sign in" is the Loud component and the failure line the ToastBox (held, said as a
+ *     status), the same markup; the page writes no class (page group G9, a move).
  *   2026-09-23: The page is composed from library components (PageFrame, PageIntro, ErrorNote,
  *     ActionRow), which emit the markup this file wrote (UI consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
@@ -63,6 +65,8 @@ import { PageFrame } from '/components/PageFrame.js';
 import { PageIntro } from '/components/PageIntro.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Loud } from '/components/Action.js';
+import { ToastBox } from '/components/Toast.js';
 import { HomeJourney } from './journey.js';
 import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
@@ -117,9 +121,9 @@ export default function HomeView({ navigate }) {
         <${PageIntro} title=${tr('home.signInTitle', 'Step into your home')}
           sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
         <${ActionRow}>
-          <button type="button" class="poster-slab" onClick=${() => navigate('/v1/portal')}>
+          <${Loud} onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
-          </button>
+          <//>
         <//>
       <//>`;
   }
@@ -153,6 +157,6 @@ export default function HomeView({ navigate }) {
         locale=${getLocale()} />
       <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
         session=${session} showToast=${showToast} />
-      ${toast && html`<div class="toast toast-error toast-hold" role="status">${toast}</div>`}
+      <${ToastBox} toast=${toast ? { msg: toast, type: 'error' } : null} hold role="status" />
     <//>`;
 }

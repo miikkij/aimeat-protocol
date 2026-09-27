@@ -2,12 +2,17 @@
  * @file shared.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin Dashboard shared UI helpers — the admin design system's own
- *   primitives (Badge, StatCard, StatsGrid, Spinner, Empty, ErrorBox, DataTable,
- *   ExpandableHelp, useToast/Toast, EconRow/HealthRow) + formatters. Admin is a
- *   self-contained design system (adm-* scoped); these are intentionally separate
- *   from the main /components primitives.
+ * @description Admin Dashboard shared helpers: the formatters, and the few parts every operator page
+ *   calls by the names it always had (Row, Badge, StatsGrid, Spinner, Empty, ErrorBox, DataTable,
+ *   ExpandableHelp, useToast/Toast). Each part draws a library component and writes no class: the
+ *   admin pages take the shared components' look (Jouni, 2026-09-22), and only the operator menu
+ *   keeps the admin's own.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — The parts draw library components: Row is the Reading, Badge the status
+ *     Mark (the type word keeps its tone by meaning: fine, attention, danger, off), StatsGrid the
+ *     FigureStrip, Spinner the loading Note, ErrorBox the ErrorNote, DataTable the canonical table
+ *     under the heavy rule, ExpandableHelp the Collapsible, Toast the Alert, EconRow a Reading without
+ *     a mark. StatCard and HealthRow go: nothing called them any more.
  *   v1.5.0 -- 2026-09-13 -- Stable toast callbacks keep consumer read effects from restarting.
  *   v1.4.0 — 2026-09-12 — Row and when(): the metric row and the machine-readable stamp every
  *     operator page in the poster face uses, moved here from the Discovery page's own file when the
@@ -16,9 +21,7 @@
  *     (healthy, critical, watch, warning, info, pending, idle) and prints the type as before when
  *     it does not. "HEALTHY" was the one English word on the Finnish admin Prompts page.
  *   v1.2.0 — 2026-06-02 — Component unification (#13 tables): DataTable is now a
- *     thin wrapper that renders `.adm-card` around the canonical
- *     /components/DataTable.js (imported, not bare-re-exported). Admin keeps its
- *     card wrapper and unchanged appearance; the table body is shared.
+ *     thin wrapper around the canonical /components/DataTable.js.
  *   v1.1.0 — 2026-06-02 — i18n the Spinner/ErrorBox defaults (t('common.loading') /
  *     t('common.error')) — were hardcoded English (Rule 4/7.8).
  */
@@ -26,16 +29,20 @@ import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { escHtml } from '/js/utils.js';
 import { t } from '/js/i18n.js';
 import { EmptyState } from '/components/EmptyState.js';
-// Import (not bare re-export) so we hold a local binding to wrap below — a
-// `export { DataTable } from ...` would NOT create a usable local reference.
 import { DataTable as GenericDataTable } from '/components/DataTable.js';
+import { Reading } from '/components/Readings.js';
+import { Mark } from '/components/Mark.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Note } from '/components/Note.js';
+import { ErrorNote } from '/components/ErrorNote.js';
+import { Split } from '/components/Layout.js';
+import { Collapsible } from '/components/Collapsible.js';
+import { Alert } from '/components/Alert.js';
 
-// Display formatters now live in the shared /js/format.js. Import them into local
-// scope (StatCard etc. call num() directly) AND re-export so the existing admin
-// importers (`import { num, dt, fmtUp, fmtBytes } from './shared.js'`) keep working.
+// Display formatters live in the shared /js/format.js; re-exported so the admin importers
+// (`import { num, dt, fmtUp, fmtBytes } from './shared.js'`) keep working.
 import { num, dt, day, fmtUp, fmtBytes, date as fmtDate } from '/js/format.js';
 export { num, dt, day, fmtUp, fmtBytes };
 
@@ -69,117 +76,80 @@ export function when(iso) {
 }
 
 /**
- * One metric row in the poster face: the name and why it matters, a chip, and the value.
- *
- * The shape every operator page in this face uses under its status word (Overview, CORS, Discovery,
- * Hooks). Here rather than in one page's own file because the second copy of it was already being
- * written when this moved.
+ * One metric row: the name and why it matters, a mark, and the value (the Reading).
  * @param {{ title: any, why: any, chip?: any, value: any, last?: boolean }} props
  */
 export function Row({ title, why, chip, value, last }) {
-  return html`
-    <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span>${chip}</span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  return html`<${Reading} name=${title} why=${why} mark=${chip ?? null} value=${value} last=${last} />`;
 }
 
+/** A name and its value on one row (the Reading without a mark). */
+export function EconRow({ label, value }) {
+  return html`<${Reading} name=${label} value=${value} />`;
+}
+
+// The tone of a badge's type word, by meaning. A type with no state (a visibility, a role, a
+// category) is a plain status mark with its word.
+const BADGE_TONE = {
+  success: 'fine', healthy: 'fine', public: 'fine', delivered: 'fine', settled: 'fine', owner: 'fine',
+  approved: 'fine', published: 'fine', active: 'fine', installed: 'fine',
+  warning: 'attention', watch: 'attention', pending: 'attention', suspended: 'attention',
+  danger: 'danger', critical: 'danger', cancelled: 'danger', expired: 'danger', disputed: 'danger',
+  error: 'danger', rejected: 'danger',
+  muted: 'off', neutral: 'off', idle: 'off', general: 'off',
+};
+
 /**
- * Render a badge. `type` picks the tone class (adm-badge-${type}); the visible
- * text is `label` when given, else the type word itself (so `<Badge type="public" />`
- * still reads "public"). Previously `label` was silently dropped — 13 call sites
- * that pass a human label + a semantic tone (e.g. type="success" label="Active")
- * showed the tone word instead of the label.
+ * A status mark. `type` names the state (its tone); the visible text is `label` when given, else
+ * dashboard.badge<Type> when a translation exists, else the type word itself.
+ * @param {{ type: string, label?: any }} props
  */
 export function Badge({ type, label }) {
-  // A badge with no label used to print its type word as it was ("healthy", "critical"), which is
-  // the one English word on an otherwise translated page. The type is a CSS class, so it stays; the
-  // text comes from dashboard.badge<Type> when a translation exists and is the type word otherwise
-  // (a category or a visibility value that has no entry still reads as before).
   const key = `dashboard.badge${String(type).charAt(0).toUpperCase()}${String(type).slice(1)}`;
   const auto = t(key);
-  return html`<span class="adm-badge adm-badge-${type}">${label != null ? label : (auto === key ? type : auto)}</span>`;
+  return html`<${Mark} kind="status" tone=${BADGE_TONE[type]}>${label != null ? label : (auto === key ? type : auto)}<//>`;
 }
+
+// The old stat colours, by meaning, as the strip's tones.
+const STAT_TONE = { indigo: 'notice', red: 'danger', amber: 'warn', mint: 'fine', green: 'fine' };
 
 /**
- * Render a stat card.
- * @param {{ label: string, value: any, sub?: string, tone?: string, color?: string }} props
- *   tone — theme-aware modifier class (indigo|mint|green|cyan|amber|purple|blue|red). Preferred.
- *   color — legacy inline color (still honored if no tone); migrate callers to `tone`.
+ * The figures of a page as a strip.
+ * @param {{ items: Array<{ label: any, value: any, sub?: any, tone?: string }> }} props
  */
-export function StatCard({ label, value, sub, tone, color }) {
-  const toneClass = tone ? ` ${tone}` : '';
-  const style = !tone && color ? `color:${color}` : '';
-  return html`<div class="adm-card">
-    <h2>${label}</h2>
-    <div class="adm-stat${toneClass}" style=${style}>${num(value)}</div>
-    ${sub && html`<div class="adm-stat-label">${sub}</div>`}
-  </div>`;
-}
-
-/** Render a stats grid (4-column) */
 export function StatsGrid({ items }) {
-  return html`<div class="adm-grid adm-grid-4">
-    ${items.map(i => html`<${StatCard} label=${i.label} value=${i.value} sub=${i.sub} tone=${i.tone} color=${i.color} />`)}
-  </div>`;
+  return html`<${FigureStrip} items=${items.map((i, n) => ({ key: n, n: num(i.value), label: i.label, sub: i.sub, tone: STAT_TONE[i.tone] }))} />`;
 }
 
-/** Render an economy-style key-value row */
-export function EconRow({ label, value }) {
-  return html`<div class="adm-erow">
-    <span class="adm-elabel">${label}</span>
-    <span class="adm-eval">${value}</span>
-  </div>`;
-}
-
-/** Render a health-metric row */
-export function HealthRow({ label, obj }) {
-  return html`<div class="adm-hrow">
-    <span class="adm-hmetric">${label}</span>
-    <span><${Badge} type=${obj.zone} /> <span class="adm-hval">${obj.value}</span></span>
-  </div>`;
-}
-
-/** Loading spinner */
+/** The loading line. */
 export function Spinner({ text }) {
-  return html`<div class="empty"><div class="spinner"></div> ${text || t('common.loading')}</div>`;
+  return html`<${Note} kind="loading">${text || t('common.loading')}<//>`;
 }
 
-/** Empty state — delegates to the canonical /components/EmptyState.js. */
+/** Empty state: the canonical /components/EmptyState.js. */
 export function Empty({ text }) {
   return html`<${EmptyState} text=${text} />`;
 }
 
-/** Error box */
+/** What went wrong. */
 export function ErrorBox({ message }) {
-  return html`<div class="error-box"><strong>${t('common.error')}</strong><br/>${escHtml(message)}</div>`;
+  return html`<${ErrorNote} text=${t('common.error')} hint=${message} />`;
 }
 
-/** Expandable/collapsible help section — reusable across all tabs and portal pages */
-/** `open` starts it expanded — for a first-run explanation nobody would think to click. */
+/** A help text that opens and folds; `open` starts it open (a first-run explanation). */
 export function ExpandableHelp({ title, children, open }) {
-  return html`<details class="adm-help" open=${open || null}>
-    <summary class="adm-help-summary">${title}</summary>
-    <div class="adm-help-body">${children}</div>
-  </details>`;
+  const [on, setOn] = useState(!!open);
+  return html`<${Collapsible} title=${title} open=${on} onToggle=${() => setOn(!on)}>${children}<//>`;
 }
 
 /**
- * DataTable (admin) — thin wrapper around the canonical
- * /components/DataTable.js that adds admin's `.adm-card` container. The 36
- * admin importers keep the same `{ headers, rows, scroll }` signature and the
- * same admin appearance (the `.adm table` / `.adm .scrollable` / `.adm .mono`
- * scoped CSS still wins over the generic `.data-table` inside `.adm`).
+ * The canonical table under the heavy rule.
  *
- * SECURITY: cell objects with `_html: true` render `cell.text` as raw HTML;
- * callers MUST sanitize (escHtml()) any user-generated content. See the
- * generic DataTable for the full cell protocol.
+ * SECURITY: cell objects with `_html: true` render `cell.text` as raw HTML; callers MUST sanitize
+ * (escHtml()) any user-generated content. See the generic DataTable for the full cell protocol.
  */
 export function DataTable({ headers, rows, scroll }) {
-  return html`<div class="adm-card">
-    <${GenericDataTable} headers=${headers} rows=${rows} scroll=${scroll} />
-  </div>`;
+  return html`<${Split} heavy><${GenericDataTable} headers=${headers} rows=${rows} scroll=${scroll} /><//>`;
 }
 
 /**
@@ -199,9 +169,7 @@ export function useToast() {
   return [msg, showError, showSuccess, clear];
 }
 
+/** The message a page's act left, with the way to wave it away. */
 export function Toast({ type, text, onDismiss }) {
-  return html`<div class="adm-toast adm-toast-${type}">
-    <span>${text}</span>
-    <button class="adm-toast-dismiss" onClick=${onDismiss}>\u00d7</button>
-  </div>`;
+  return html`<${Alert} type=${type} message=${text} onDismiss=${onDismiss} />`;
 }

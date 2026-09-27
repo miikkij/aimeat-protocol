@@ -20,10 +20,20 @@
  *   - 'current': the frame in coral, the one you are on (this device).
  *   - 'off': a dashed frame and grey words, a thing that is switched off.
  *   - 'edge': no frame, the sun edge at the left (.poster-panel): what a thing needs from elsewhere.
+ *   - 'tabbed': the sun edge at the left of what a row of tabs above it governs, from under the tabs
+ *     to its last line, with no other padding (the app catalogue's Add dialog, Paste / File).
+ *   - 'part': one part of what a thing offers, under a hairline, 14px above and under; a <strong>
+ *     in it is a name on its own line, its code the framed typewriter box (an extension's library
+ *     file, schema or prompt in the app catalogue).
  *   - 'field': a field to fill in for one action (a test of an extension's action): the thin dashed
  *     frame on the page's ground (Jouni's decision "Dashed field box").
  *   - 'dim': the frame on the grey ground: optional under-the-hood details a person need not touch
  *     (an ecosystem app's technical details).
+ *   - 'proposal': a thing proposed and not yet kept (an AI's proposed change): the heavy ink frame on
+ *     the page's ground, 12px in and 12px under what is above it.
+ *   - 'statement': what the person states under their own name (an attestation of where the material
+ *     comes from): the heavy ink frame with rounded corners on the grey ground, 22px under what is
+ *     above it (the app catalogue's ODPS provenance box).
  *   `name` and `marks` draw the box's head (a name in bold with its tags beside it), `end` what stands
  *   at the right end of the head (the mark that hides the box); `doors` the row of ways at its foot.
  *   `as` is the element when the box is an item of a list ('li') or wraps a check box ('label').
@@ -41,16 +51,29 @@
  *   its own element inside the box for it.
  *
  *   SettingBox: a box on a settings page with its label on a line of its own (the note's small
- *   aside); `irreversible` for one whose act cannot be undone. SettingRow is its line of words with
+ *   aside); `irreversible` for one whose act cannot be undone; `pre` for words that keep their own
+ *   line breaks (a prompt to paste). SettingRow is its line of words with
  *   the button at the right; SettingConfirm the line that asks for a word before the act.
  * @structure Box({ tone, flush, packed, scroll, folded, unfoldLabel, onUnfold, document, beside, as, name, marks, end, doors, id, role, ariaLabel, children }) ·
- *   SettingBox({ label, irreversible, children }) · SettingRow({ children }) ·
+ *   SettingBox({ label, irreversible, pre, children }) · SettingRow({ children }) ·
  *   SettingConfirm({ children }) · boxClass(tone) · BoxList({ apart, children }) ·
  *   BoxLine({ name, meta, time, end, column, doors, after, children })
  * @usage html`<${Box}>…<//>` · html`<${Box} tone="raised">…<//>` ·
  *        html`<${Box} name=${pkg.name} marks=${html`<${Mark}>…<//>`} doors=${…}>…<//>` ·
  *        html`<${SettingBox} label=${t('x.export')} irreversible>…<//>`
  * @version-history
+ *   v1.10.0 — 2026-09-27 — Tone 'statement': what the person states under their own name, the heavy
+ *     ink frame with rounded corners on the grey ground (the old app catalogue's .od-attest), appcat
+ *     parity (sections-d); additive, box.css .box--statement.
+ *   v1.9.0 — 2026-09-27 — Tone 'proposal': a thing proposed and not yet kept, in the heavy ink frame
+ *     (the old app catalogue's AI proposal box, .dtl-ai-draft), appcat parity (sections-a); additive,
+ *     box.css .box--proposal.
+ *   v1.8.0 — 2026-09-27 — Tone 'tabbed': the sun edge at the left of what a row of tabs governs (the
+ *     old app catalogue's .tab-content), and tone 'part': one part of what an extension offers (the
+ *     old .cx-part), for appcat; additive, box.css .box--tabbed, .box--part.
+ *   v1.7.0 — 2026-09-27 — SettingBox `pre`: the words keep their line breaks (the admin Statistics and
+ *     Usage pages' prompt for the operator's own AI, main's .adm-st-paste / .adm-us-paste); additive,
+ *     admin page group G3.
  *   v1.6.0 — 2026-09-26 — Tone 'dim' (the grey ground: main's Ecosystem .pf-eco-tech), `scroll="page"`
  *     (32rem: main's organism structure map, .pj-struct-body) and `beside` (the doors at the right of
  *     the words: main's Workflows .wp-verdict); additive, fix pass.
@@ -100,7 +123,14 @@ export function Box({ tone, flush, packed, scroll, folded, unfoldLabel, onUnfold
     // (poster.css .poster-panel), for what a thing needs from elsewhere (main's .pk-expects).
     // tone 'field' (added by page group G6, Extensions): a field to fill in for one action, in the thin
     // dashed frame on the page's ground (Jouni's decision "Dashed field box"; main's .ex-test).
-    const shape = tone === 'edge' ? 'poster-panel box--edge' : tone === 'field' ? 'box--field' : boxClass(tone);
+    // tone 'tabbed' (added by appcat's dialogs, parity): the sun edge down the left of what a row of
+    // tabs above it governs, with no padding but the edge's own (the old catalogue's .tab-content).
+    // tone 'proposal' (added by appcat sections-a, parity): a thing proposed and not yet kept (an AI's
+    // proposed change), in the heavy ink frame on the page's ground (the old catalogue's .dtl-ai-draft).
+    const shape = tone === 'edge' ? 'poster-panel box--edge' : tone === 'tabbed' ? 'poster-panel box--tabbed' : tone === 'field' ? 'box--field'
+        : tone === 'proposal' ? 'box--proposal' : tone === 'statement' ? 'box--statement' : tone === 'part' ? 'box--part' : boxClass(tone);
+    // tone 'part' (added by appcat's dialogs, parity): one part of what a thing offers, under a
+    // hairline, its names bold and its code in the framed typewriter box (the old catalogue's .cx-part).
     // scroll="page" (added by the fix pass): the long text scrolls after 32rem, not 24rem (main's
     // organism structure map, .pj-struct-body).
     const cls = cx(shape, 'box', flush && 'box--flush', packed && 'box--packed', scroll && 'box--scroll', scroll === 'page' && 'box--scroll-page',
@@ -152,9 +182,11 @@ export function BoxLine({ name, meta, time, end, column, doors, after, children 
 }
 
 /** A box on a settings page: its label on a line of its own over the words. */
-export function SettingBox({ label, irreversible, children }) {
+export function SettingBox({ label, irreversible, pre, children }) {
+    // pre (added by admin page group G3): the words keep their own line breaks and break anywhere (a
+    // prompt for the operator's own AI, main's .adm-st-paste / .adm-us-paste: pre-wrap).
     return html`<div class=${cx('og-box', 'poster-aside', 'poster-aside--small', irreversible && 'poster-aside--irreversible')}>
-        ${label ? html`<span class="poster-label">${label}</span>` : null}${children}
+        ${label ? html`<span class="poster-label">${label}</span>` : null}${pre ? html`<div class="og-box-pre">${children}</div>` : children}
     </div>`;
 }
 

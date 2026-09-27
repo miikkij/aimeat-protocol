@@ -24,6 +24,10 @@
  *   - KnowledgeAdminTab (default) — one read, the four sections, and the review panel
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Every part is a library component that gets data (admin page group G7):
+ *     section 05 is Section with the copy as an Action link, its rows Readings (shared.js Row), the
+ *     paste a Code block in the SettingBox beside them. The page writes no class and loads no sheet
+ *     of its own (admin-knowledge.css is gone; the facet bars are components/CountBars.js).
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. One read that carries the count and the shape, a table
@@ -32,15 +36,19 @@
  *     adm-input → adm-textarea (drop redundant resize/font-family inline style);
  *     delete-package button inline color → adm-btn-danger (campsite fix).
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Spinner, ErrorBox, useToast, Toast, Row } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section } from '/components/Section.js';
+import { Action } from '/components/Action.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Beside } from '/components/Layout.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { RightNow, WhatIsHere } from './knowledge-tab.shape.js';
@@ -54,30 +62,18 @@ const S = (key, params) => t('admin.knowledge.' + key, params);
 function AskAi({ summary }) {
   const paste = buildKnowledgePrompt({ url: getNodeUrl(), total: summary.total });
   return html`
-    <section class="og-sec" id="adm-kn-05">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>05</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-kn-ai">
-        <div>
-          <p class="adm-kn-lead">${S('ai.lead', { n: summary.total })}</p>
-          ${Row({ title: S('ai.list'), why: S('ai.listWhy'), chip: null, value: 'aimeat_knowledge_list' })}
-          ${Row({ title: S('ai.get'), why: S('ai.getWhy'), chip: null, value: 'aimeat_knowledge_get' })}
-          ${Row({ title: S('ai.links'), why: S('ai.linksWhy'), chip: null, value: 'aimeat_knowledge_links', last: true })}
-        </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-kn-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+    <${Section} id="adm-kn-05" num="05" title=${S('ai.title')}
+      doors=${html`<${Action} small soft copy=${paste}>${S('ai.copy')}<//>`}>
+      <${Beside} wide side=${html`<${SettingBox} label=${S('ai.label')}><${Code} block>${paste}<//><//>`}>
+        <${Note} kind="lead">${S('ai.lead', { n: summary.total })}<//>
+        <${Row} title=${S('ai.list')} why=${S('ai.listWhy')} chip=${null} value=${'aimeat_knowledge_list'} />
+        <${Row} title=${S('ai.get')} why=${S('ai.getWhy')} chip=${null} value=${'aimeat_knowledge_get'} />
+        <${Row} title=${S('ai.links')} why=${S('ai.linksWhy')} chip=${null} value=${'aimeat_knowledge_links'} last=${true} />
+      <//>
+    <//>`;
 }
 
 export default function KnowledgeAdminTab() {
-  useViewCSS('/css/views/admin-knowledge.css');
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(null);
   const [q, setQ] = useState('');
@@ -166,7 +162,7 @@ export default function KnowledgeAdminTab() {
   if (failed && !data) return html`<${ErrorBox} message=${failed} />`;
   if (!data) return html`<${Spinner} text=${S('loading')} />`;
 
-  return html`<div class="adm-kn">
+  return html`<${Fragment}>
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
     ${opened
@@ -182,5 +178,5 @@ export default function KnowledgeAdminTab() {
         onPage=${setPage} onOpen=${setOpened} />
       ${creating ? html`<${CreateForm} onCreate=${create} onCancel=${() => setCreating(false)} busy=${busy} />` : null}
       <${AskAi} summary=${data.summary} />`}
-  </div>`;
+  <//>`;
 }

@@ -6,6 +6,10 @@
  *   asks for, and whether it runs as several configured copies. It creates the manifest and one
  *   empty action, switched off, which is what section 04 of the Extensions page promises.
  * @version-history
+ *   v3.0.0 — 2026-09-27 — The Field family (admin page group G7): two TextFields in Fields, the ctx
+ *     parts a row of filter Tabs where each is its own on or off (aria-pressed, as before) with the
+ *     multi-instance switch as one more tab in the row, the create the Loud action, the answer the
+ *     form message. No class.
  *   v2.0.0 — 2026-09-12 — The poster face: og-field labels, one ink slab, the ctx parts as square
  *     chips instead of four checkboxes in a row of inline styles. Same call, same result.
  *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
@@ -16,6 +20,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { scaffoldExtension } from '/js/services/admin.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Tabs, Tab } from '/components/Tabs.js';
+import { Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
 
 const X = (key, params) => t('admin.ext.' + key, params);
 
@@ -47,34 +56,24 @@ function ScaffoldForm({ onCreated }) {
   }
 
   return html`
-    <div class="adm-ex-new">
-      <div class="og-field">
-        <label class="og-label" for="adm-ex-new-name">${t('dashboard.servicesName')}</label>
-        <input id="adm-ex-new-name" class="og-input" type="text" value=${name}
-          placeholder=${X('write.namePlaceholder')} onInput=${e => setName(e.target.value)} />
-      </div>
-      <div class="og-field">
-        <label class="og-label" for="adm-ex-new-desc">${t('dashboard.servicesScaffoldDescLabel')}</label>
-        <input id="adm-ex-new-desc" class="og-input" type="text" value=${description}
-          placeholder=${X('write.descPlaceholder')} onInput=${e => setDescription(e.target.value)} />
-      </div>
-
-      <div class="adm-ex-lbl adm-ex-lbl--gap">${X('write.apis')}</div>
-      <div class="adm-ex-chips">
-        ${CTX_PARTS.map(api => html`
-          <button type="button" class="adm-ex-chip ${apis.includes(api) ? 'on' : ''}"
-            aria-pressed=${apis.includes(api) ? 'true' : 'false'} onClick=${() => toggleApi(api)}>${api}</button>`)}
-        <button type="button" class="adm-ex-chip ${multiInstance ? 'on' : ''}"
-          aria-pressed=${multiInstance ? 'true' : 'false'}
-          onClick=${() => setMultiInstance(v => !v)}>${t('dashboard.servicesMultiInstance')}</button>
-      </div>
-
-      <div class="adm-ex-new-go">
-        <button class="adm-btn" onClick=${handleCreate} disabled=${creating || !name.trim()}>
-          ${creating ? '…' : t('dashboard.servicesScaffoldBtn')}</button>
-        ${msg && html`<span class=${msg.ok ? 'adm-ex-ok' : 'adm-ex-bad'}>${msg.text}</span>`}
-      </div>
-    </div>`;
+    <${Fields}>
+      <${TextField} id="adm-ex-new-name" label=${t('dashboard.servicesName')} value=${name}
+        placeholder=${X('write.namePlaceholder')} onInput=${setName} />
+      <${TextField} id="adm-ex-new-desc" label=${t('dashboard.servicesScaffoldDescLabel')} value=${description}
+        placeholder=${X('write.descPlaceholder')} onInput=${setDescription} />
+      <${Field} label=${X('write.apis')} group>
+        <${Tabs} tone="filter" kind="toggle" value=${apis} onSelect=${toggleApi}
+          items=${CTX_PARTS.map(api => ({ value: api, label: api }))}>
+          <${Tab} tone="filter" on=${multiInstance} pressed=${multiInstance}
+            onClick=${() => setMultiInstance(v => !v)}>${t('dashboard.servicesMultiInstance')}<//>
+        <//>
+      <//>
+      <${FormActions}>
+        <${Loud} control onClick=${handleCreate} disabled=${creating || !name.trim()}>
+          ${creating ? '…' : t('dashboard.servicesScaffoldBtn')}<//>
+        ${msg ? html`<${Note} kind="message" error=${!msg.ok}>${msg.text}<//>` : null}
+      <//>
+    <//>`;
 }
 
 export { ScaffoldForm };

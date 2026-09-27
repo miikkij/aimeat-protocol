@@ -5,6 +5,11 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.7.3 — 2026-09-26 — aimeat_action_execute and aimeat_work_inbox say a provider or a requester
+ *     can be a person: an action a person publishes is listed under their GHII.
+ *   v1.7.2 — 2026-09-26 — aimeat_admin_hook_set says a hook binds only an action that is already
+ *     published: publish it, then bind it; a reference no published action answers to is refused
+ *     (security audit A8-3).
  *   v1.7.1 — 2026-09-26 — aimeat_admin_hook_set says a bare id one provider publishes is stored as
  *     its id#provider (security audit A8-3).
  *   v1.7.0 — 2026-09-25 — aimeat_admin_federation_relay_claim_set, and aimeat_admin_federation says what
@@ -86,19 +91,19 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_action_execute',
-        description: 'Hire another agent to run a catalogue action: holds the morsel cost in escrow and creates a pending work item, returning a tracking_code and the cost breakdown. Discover actions and their providers with aimeat_catalogue_search first. Fails if your morsel balance is insufficient. The provider then accepts and delivers (aimeat_work_accept / aimeat_work_deliver); to invoke a server-side capability instead, use aimeat_capabilities_invoke.',
+        description: 'Hire another agent, or a person, to run a catalogue action: holds the morsel cost in escrow and creates a pending work item, returning a tracking_code and the cost breakdown. Discover actions and their providers with aimeat_catalogue_search first. Fails if your morsel balance is insufficient. The provider then accepts and delivers (aimeat_work_accept / aimeat_work_deliver); to invoke a server-side capability instead, use aimeat_capabilities_invoke.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             action_id: { type: 'string', required: true, description: 'Action identifier.' },
-            provider_gaii: { type: 'string', required: true, description: 'GAII of the provider offering this action.' },
+            provider_gaii: { type: 'string', required: true, description: 'The provider_gaii the catalogue lists for the action: an agent\'s GAII, or a person\'s GHII when a person published it.' },
             input: { type: 'object', description: 'Input parameters for the action.' },
             ttl_hours: { type: 'number', description: 'Hours before the work request expires (default 24).' },
         },
     },
     {
         name: 'aimeat_work_inbox',
-        description: 'Check your work inbox: work items other agents have requested from you (where you are the provider), still pending/accepted/in-progress. Each carries a tracking_code you pass to aimeat_work_accept then aimeat_work_deliver. This is the provider side of the action catalogue; to request work from others use aimeat_action_execute. response_format=concise returns just tracking_code/status/action_id.',
+        description: 'Check your work inbox: work items others have requested from you (where you are the provider), still pending/accepted/in-progress. Each carries a tracking_code you pass to aimeat_work_accept then aimeat_work_deliver. This is the provider side of the action catalogue; to request work from others use aimeat_action_execute. response_format=concise returns just tracking_code/status/action_id.',
         caller: 'agent',
         visibility: agentEverywhere,
         supportsResponseFormat: true,
@@ -430,12 +435,12 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_hook_set',
-        description: 'Operator-only. Bind a list of actions to one of the eleven moments, or clear it with an empty list. The actions are called in the order given, each after the last has answered. A gate (any hook whose name starts with pre_) WAITS for them and refuses the thing when one answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address that is not reachable stops everything that moment guards; the other seven are told afterwards and stop nothing. An action reference is a published action\'s id, or its id with its provider (id#provider). An action that is not published here is accepted and named back in `unknown` rather than refused, because binding before publishing is a legitimate order of work. A bare id that more than one provider publishes is refused, with the id#provider of each: bind the one you mean with its provider. A bare id that one provider publishes is stored as its id#provider, so another owner publishing the same id later changes nothing. Read aimeat_admin_hooks first.',
+        description: 'Operator-only. Bind a list of actions to one of the eleven moments, or clear it with an empty list. The actions are called in the order given, each after the last has answered. A gate (any hook whose name starts with pre_) WAITS for them and refuses the thing when one answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address that is not reachable stops everything that moment guards; the other seven are told afterwards and stop nothing. A hook binds only an action that is already published: publish the action first (POST /v1/actions, with its webhook_url), then bind it. An action reference is a published action\'s id, or its id with its provider (id#provider). A reference that no action published here answers to is refused with INVALID_INPUT and nothing is written. A bare id that more than one provider publishes is refused, with the id#provider of each: bind the one you mean with its provider. A bare id that one provider publishes is stored as its id#provider, so another owner publishing the same id later changes nothing. Read aimeat_admin_hooks first: its bindable_actions lists what can be bound, each with the ref to write.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
             hook: { type: 'string', required: true, description: 'The moment, e.g. "pre_owner_registration".' },
-            actions: { type: 'array', required: true, description: 'Action references to call, in order. An empty list clears the moment.' },
+            actions: { type: 'array', required: true, description: 'Action references to call, in order, each naming an action already published here. An empty list clears the moment.' },
         },
     },
     {

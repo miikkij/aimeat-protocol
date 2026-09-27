@@ -7,6 +7,11 @@
  *   and what the run says when it stops. The whole road, with the cost coming from a provider, is
  *   test/e2e-workflows.ts.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The estimate is what one attempt cost, and a step expected to cost more than
+ *     the whole cap starts once, alone, while the run has spent less than the cap (A6-11).
+ *   v1.3.0 — 2026-09-26 — A hold belongs to the model call (A6-11): it counts while the call is open,
+ *     whatever became of the step, a retry's call holds its own, and it goes when the call answers or
+ *     at a restart.
  *   v1.2.0 — 2026-09-26 — What an ai step holds while it runs (A6-11): its estimate from the
  *     workflow's recent runs, else an equal share of the cap nobody holds; start, wait and stop, in
  *     any order of the ready steps, and the hold dropped once the step no longer runs. The stop cases
@@ -18,12 +23,18 @@
 import { describe, it, expect } from 'vitest';
 import {
     spentUsd, spendsAi, usd, recordSignalCost, costCapReached, capUsd, reservedUsd, admitAiStep,
-    stopWhenNoRoomComes, pinCostEstimates, dropEndedReservations, COST_HISTORY_RUNS,
+    stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls, COST_HISTORY_RUNS,
 } from '../../src/services/workflow/run-cost.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../src/models/workflow-schemas.js';
 
 const step = (state: WorkflowRunStep['state'], costUsd?: number, extra: Partial<WorkflowRunStep> = {}): WorkflowRunStep =>
     ({ state, attempt: 0, reads: [], writes: [], ...(costUsd !== undefined ? { costUsd } : {}), ...extra });
+
+/** The step's call of attempt 0 is open and holds `usd` of the cap. */
+const holding = (usd: number): Partial<WorkflowRunStep> => ({ openCalls: [{ attempt: 0, reservedUsd: usd }] });
+
+/** What the step's open calls hold together. */
+const holdOf = (rs: WorkflowRunStep): number => (rs.openCalls ?? []).reduce((sum, c) => sum + (c.reservedUsd ?? 0), 0);
 
 /** An ai step of the definition. */
 const ai = (id: string, prompt = `Say ${id}.`): WorkflowStep =>
@@ -69,8 +80,8 @@ describe('what a run has spent', () => {
         expect(spendsAi({ action: { kind: 'extension' } as never })).toBe(false);
     });
 
-    it('is not what a running step holds: a hold counts only while its step is dispatched', () => {
-        const steps = { a: step('dispatched', undefined, { reservedUsd: 0.02 }), b: step('green', 0.01, { reservedUsd: 0.5 }) };
+    it('is not what an open call holds', () => {
+        const steps = { a: step('dispatched', undefined, holding(0.02)), b: step('green', 0.01) };
         expect(spentUsd({ steps })).toBeCloseTo(0.01, 10);
         expect(reservedUsd({ steps })).toBeCloseTo(0.02, 10);
     });
@@ -88,7 +99,7 @@ describe('the cap', () => {
             expect(admitAiStep(r, 'b')).toBe('start');
             expect(stopWhenNoRoomComes(r, ['b'], NOW)).toBe(false);
             expect(r.status).toBe('running');
-            expect(r.steps.b.reservedUsd).toBeUndefined();
+            expect(r.steps.b.openCalls).toBeUndefined();
         }
     });
 
@@ -128,14 +139,14 @@ describe('the cap', () => {
         expect(r.signalCostUsd).toBeCloseTo(0.015, 10);
     });
 
-    it('says when the run has spent it, so the judge is not asked past it; what running steps hold is not spent', () => {
+    it('says when the run has spent it, so the judge is not asked past it; what open calls hold is not spent', () => {
         expect(costCapReached(run(undefined, { a: step('green', 5) }))).toBe(false);
         expect(costCapReached(run(0.05, { a: step('green', 0.02) }))).toBe(false);
         const r = run(0.03, { a: step('green', 0.02) });
         recordSignalCost(r, 0.01);
         expect(costCapReached(r)).toBe(true);
-        // The judge keeps counting as it did: a step that holds the rest of the cap has spent none of it.
-        expect(costCapReached(run(0.03, { a: step('green', 0.02), b: step('dispatched', undefined, { reservedUsd: 0.02 }) }))).toBe(false);
+        // The judge keeps counting as it did: a call that holds the rest of the cap has spent none of it.
+        expect(costCapReached(run(0.03, { a: step('green', 0.02), b: step('dispatched', undefined, holding(0.02)) }))).toBe(false);
     });
 });
 
@@ -143,17 +154,17 @@ describe('what an ai step holds while it runs', () => {
     it('with no history, is an equal share of the cap nobody holds, across the ai steps not started', () => {
         const r = run(0.06, { a: step('pending'), b: step('pending'), c: step('pending') }, [ai('a'), ai('b'), ai('c')]);
         expect(admitAiStep(r, 'a')).toBe('start');
-        expect(r.steps.a.reservedUsd).toBeCloseTo(0.02, 10);
+        expect(holdOf(r.steps.a)).toBeCloseTo(0.02, 10);
         r.steps.a.state = 'dispatched';
         // b and c share what a does not hold.
         expect(admitAiStep(r, 'b')).toBe('start');
-        expect(r.steps.b.reservedUsd).toBeCloseTo(0.02, 10);
+        expect(holdOf(r.steps.b)).toBeCloseTo(0.02, 10);
     });
 
-    it('with history, is the step\'s own estimate', () => {
-        const r = run(0.05, { a: step('pending', undefined, { estimateUsd: 0.03 }) }, [ai('a')]);
+    it('with history, is the step\'s own estimate, held by the call of the attempt it starts', () => {
+        const r = run(0.05, { a: step('pending', undefined, { estimateUsd: 0.03, attempt: 1 }) }, [ai('a')]);
         expect(admitAiStep(r, 'a')).toBe('start');
-        expect(r.steps.a.reservedUsd).toBe(0.03);
+        expect(r.steps.a.openCalls).toEqual([{ attempt: 1, reservedUsd: 0.03 }]);
     });
 
     it('lets two steps start together when both estimates fit', () => {
@@ -166,17 +177,17 @@ describe('what an ai step holds while it runs', () => {
         const r = run(0.03, { a: step('pending', undefined, { estimateUsd: 0.02 }), b: step('pending', undefined, { estimateUsd: 0.02 }) }, [ai('a'), ai('b')]);
         expect(pass(r, ['a', 'b'])).toEqual({ started: ['a'], waiting: ['b'], stopped: false });
         expect(r.steps.b.state).toBe('pending');
-        expect(r.steps.b.reservedUsd).toBeUndefined();
+        expect(r.steps.b.openCalls).toBeUndefined();
         expect(r.status).toBe('running');
     });
 
-    it('starts the waiting step once the first ends with a real cost that leaves room', () => {
-        const r = run(0.035, { a: step('dispatched', undefined, { estimateUsd: 0.02, reservedUsd: 0.02 }), b: step('pending', undefined, { estimateUsd: 0.02 }) }, [ai('a'), ai('b')]);
+    it('starts the waiting step once the first one\'s call answers with a real cost that leaves room', () => {
+        const r = run(0.035, { a: step('dispatched', undefined, { estimateUsd: 0.02, ...holding(0.02) }), b: step('pending', undefined, { estimateUsd: 0.02 }) }, [ai('a'), ai('b')]);
         expect(pass(r, ['b'])).toEqual({ started: [], waiting: ['b'], stopped: false });
+        aiCallAnswered(r.steps.a, 0, 0.01);
         r.steps.a.state = 'green';
-        r.steps.a.costUsd = 0.01;
         expect(pass(r, ['b'])).toEqual({ started: ['b'], waiting: [], stopped: false });
-        expect(r.steps.b.reservedUsd).toBe(0.02);
+        expect(holdOf(r.steps.b)).toBe(0.02);
     });
 
     it('stops the run when the estimate does not fit and no ai step is running, and names the estimate', () => {
@@ -190,12 +201,42 @@ describe('what an ai step holds while it runs', () => {
     });
 
     it('starts a step that fits even when one before it does not, and stops before the first that never fits', () => {
-        const r = run(0.03, { a: step('pending', undefined, { estimateUsd: 0.05 }), b: step('pending', undefined, { estimateUsd: 0.01 }) }, [ai('a'), ai('b')]);
+        const r = run(0.05, {
+            c: step('dispatched', undefined, holding(0.02)),
+            a: step('pending', undefined, { estimateUsd: 0.04 }), b: step('pending', undefined, { estimateUsd: 0.01 }),
+        }, [ai('c'), ai('a'), ai('b')]);
         expect(pass(r, ['a', 'b'])).toEqual({ started: ['b'], waiting: ['a'], stopped: false });
-        r.steps.b.state = 'green';
-        r.steps.b.costUsd = 0.01;
+        for (const [id, cost] of [['c', 0.02], ['b', 0.01]] as const) {
+            aiCallAnswered(r.steps[id], 0, cost);
+            r.steps[id].state = 'green';
+        }
         expect(pass(r, ['a'])).toEqual({ started: [], waiting: ['a'], stopped: true });
-        expect(r.costCap).toEqual({ capUsd: 0.03, spentUsd: 0.01, stoppedBefore: 'a', neededUsd: 0.05 });
+        expect(r.costCap).toEqual({ capUsd: 0.05, spentUsd: 0.03, stoppedBefore: 'a', neededUsd: 0.04 });
+    });
+
+    it('starts a step expected to cost more than the whole cap once, alone, and starts nothing beside it', () => {
+        const r = run(0.03, { a: step('pending', undefined, { estimateUsd: 0.05 }), b: step('pending', undefined, { estimateUsd: 0.01 }) }, [ai('a'), ai('b')]);
+        expect(pass(r, ['a', 'b'])).toEqual({ started: ['a'], waiting: ['b'], stopped: false });
+        expect(reservedUsd(r)).toBeCloseTo(0.05, 10);
+        // What it really cost counts as usual: past the cap, the run stops before the next ai step.
+        aiCallAnswered(r.steps.a, 0, 0.04);
+        r.steps.a.state = 'green';
+        expect(pass(r, ['b'])).toEqual({ started: [], waiting: ['b'], stopped: true });
+        expect(r.costCap).toEqual({ capUsd: 0.03, spentUsd: 0.04, stoppedBefore: 'b' });
+    });
+
+    it('lets a step expected to cost more than the cap wait while a call is open, and starts it once no call is', () => {
+        const r = run(0.03, { b: step('dispatched', undefined, holding(0.01)), a: step('pending', undefined, { estimateUsd: 0.05 }) }, [ai('b'), ai('a')]);
+        expect(pass(r, ['a'])).toEqual({ started: [], waiting: ['a'], stopped: false });
+        aiCallAnswered(r.steps.b, 0, 0.01);
+        r.steps.b.state = 'green';
+        expect(pass(r, ['a'])).toEqual({ started: ['a'], waiting: [], stopped: false });
+    });
+
+    it('does not start a step expected to cost more than the cap once the run has spent the cap', () => {
+        const r = run(0.03, { b: step('green', 0.03), a: step('pending', undefined, { estimateUsd: 0.05 }) }, [ai('b'), ai('a')]);
+        expect(pass(r, ['a'])).toEqual({ started: [], waiting: ['a'], stopped: true });
+        expect(r.costCap).toEqual({ capUsd: 0.03, spentUsd: 0.03, stoppedBefore: 'a' });
     });
 
     it('names the first waiting step in the definition\'s order', () => {
@@ -204,8 +245,8 @@ describe('what an ai step holds while it runs', () => {
         expect(r.costCap?.stoppedBefore).toBe('b');
     });
 
-    it('waits rather than stops while another ai step runs, even once the spend has reached the cap', () => {
-        const r = run(0.03, { a: step('green', 0.04), b: step('dispatched', undefined, { reservedUsd: 0.01 }), c: step('pending') }, [ai('a'), ai('b'), ai('c')]);
+    it('waits rather than stops while a call is open, even once the spend has reached the cap', () => {
+        const r = run(0.03, { a: step('green', 0.04), b: step('dispatched', undefined, holding(0.01)), c: step('pending') }, [ai('a'), ai('b'), ai('c')]);
         expect(pass(r, ['c'])).toEqual({ started: [], waiting: ['c'], stopped: false });
         expect(r.status).toBe('running');
     });
@@ -217,14 +258,37 @@ describe('what an ai step holds while it runs', () => {
         expect(r.steps.x.state).toBe('skipped');
     });
 
-    it('is dropped once the step no longer runs, whatever ended it', () => {
-        const r = run(0.1, {
-            a: step('dispatched', undefined, { reservedUsd: 0.02 }), b: step('green', 0.01, { reservedUsd: 0.02 }),
-            c: step('skipped', undefined, { reservedUsd: 0.02 }), d: step('pending', undefined, { reservedUsd: 0.02 }),
-        });
-        dropEndedReservations(r);
-        expect(r.steps.a.reservedUsd).toBe(0.02);
-        expect(['b', 'c', 'd'].map(id => r.steps[id].reservedUsd)).toEqual([undefined, undefined, undefined]);
+    it('counts while its call is open, whatever became of the step, and a retry\'s call holds its own', () => {
+        const steps = {
+            a: step('green', 0.01, holding(0.02)), b: step('timed-out', undefined, holding(0.02)), c: step('skipped'),
+            d: step('dispatched', undefined, { attempt: 1, openCalls: [{ attempt: 0, reservedUsd: 0.02 }, { attempt: 1, reservedUsd: 0.02 }] }),
+        };
+        expect(reservedUsd({ steps })).toBeCloseTo(0.08, 10);
+        expect(aiCallOpen({ steps })).toBe(true);
+        expect(aiCallOpen({ steps: { c: step('skipped'), e: step('dispatched') } })).toBe(false);
+    });
+
+    it('goes when its call answers, and what the call cost stays on the step', () => {
+        const rs = step('timed-out', undefined, { attempt: 1, openCalls: [{ attempt: 0, reservedUsd: 0.02 }, { attempt: 1, reservedUsd: 0.02 }] });
+        expect(aiCallAnswered(rs, 0, 0.015)).toBe(true);
+        expect(rs.openCalls).toEqual([{ attempt: 1, reservedUsd: 0.02 }]);
+        expect(rs.costUsd).toBe(0.015);
+        expect(rs.attemptMaxUsd).toBe(0.015);
+        expect(aiCallAnswered(rs, 1, 0.01)).toBe(true);
+        expect(rs.openCalls).toBeUndefined();
+        expect(rs.costUsd).toBeCloseTo(0.025, 10);
+        expect(rs.attemptMaxUsd).toBe(0.015);
+        // Nothing to keep and nothing open: an answer of a step that is not an ai step, or a call already gone.
+        expect(aiCallAnswered(rs, undefined, undefined)).toBe(false);
+        expect(aiCallAnswered(rs, 1, 0)).toBe(false);
+    });
+
+    it('goes at a restart, since the calls ended with the process', () => {
+        const r = run(0.05, { a: step('dispatched', undefined, holding(0.02)), b: step('green', 0.01) });
+        expect(clearOpenCalls(r)).toBe(true);
+        expect(reservedUsd(r)).toBe(0);
+        expect(r.steps.a.state).toBe('dispatched');
+        expect(clearOpenCalls(r)).toBe(false);
     });
 });
 
@@ -242,6 +306,18 @@ describe('the estimate from the workflow\'s recent runs', () => {
         pinCostEstimates(def(), steps, [past('done', { a: 0.01, b: 0.03 }), past('stopped', { a: 0.02 }), past('partial', { a: 0.015, b: 0.01 })]);
         expect(steps.a.estimateUsd).toBe(0.02);
         expect(steps.b.estimateUsd).toBe(0.03);
+    });
+
+    it('is what one attempt cost, so a step that retried twice is expected to cost one attempt', () => {
+        const steps = fresh();
+        const kept = past('done', { a: 0.06 });
+        Object.assign(kept.steps.a, { attempt: 2, attemptMaxUsd: 0.025 });
+        // A run saved before a step kept its most per attempt: its cost, split over its three attempts.
+        const older = past('done', { b: 0.06 });
+        older.steps.b.attempt = 2;
+        pinCostEstimates(def(), steps, [kept, older]);
+        expect(steps.a.estimateUsd).toBe(0.025);
+        expect(steps.b.estimateUsd).toBeCloseTo(0.02, 10);
     });
 
     it('leaves out a run still going and one that never started', () => {

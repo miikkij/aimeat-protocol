@@ -21,12 +21,20 @@
  *   page's own action opens through `inputRef` (an import button that stands elsewhere). With
  *   `onChange(event)` a page reads the pick itself, as it did from its own field. Field words (`label`, `hint`, `message`,
  *   `wide`) stand it in a Field (components/Field.js).
+ *   The drop area's app-catalogue face: `ink` (the heavy dashed ink frame on the surface, coral while a
+ *   file is dragged over it), `mark` (the glyph in place of the arrow), `browseLabel` (the words of
+ *   the framed "Browse files" part inside the area; the whole area is the one button) and `chosen`
+ *   (the chosen file's name, a coral line under them; with `ink`, an empty string keeps that line's
+ *   room while nothing is chosen, as the old page did).
  * @structure FileDrop(props)
  * @usage html`<${FileDrop} multiple items=${items} onFiles=${addFiles} onRename=${rename} onRemove=${removeAt} />`
  *        html`<${FileDrop} plain label=${a('fileLabel')} accept=".html,.htm" inputRef=${fileRef} />`
  *        html`<${FileDrop} button=${'+ ' + t('x.upload')} accept=".md,.json" onFiles=${([f]) => upload(f)} />`
  *        html`<${FileDrop} hidden accept=".zip" inputRef=${fileRef} onFiles=${([f]) => doImport(f)} />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — `ink` with `chosen` "" keeps the chosen line's room (appcat parity); additive.
+ *   v1.1.0 — 2026-09-27 — The drop area's app-catalogue face for appcat's Add dialog: `ink`, `mark`,
+ *     `browseLabel` and `chosen` (the old page's #drop-zone); additive, file-drop.css.
  *   v1.0.1 — 2026-09-27 — The "or click" line and a row's size draw the component's own names
  *     (.file-drop-or, .file-drop-size) instead of the Settings page's .text-meta (a move, same look).
  *   v1.0.0 — 2026-09-26 — Initial: the drop area of the memory file form (views/profile/memory-tab/
@@ -45,7 +53,7 @@ const cx = (...parts) => parts.filter(Boolean).join(' ');
 
 export function FileDrop(props) {
   const { id, items = [], onFiles, onRename, onRemove, multiple, accept, disabled, plain, hidden, button, soft,
-    inputRef, dropLabel, orLabel, removeLabel, iconOf, ariaLabel, onChange } = props;
+    inputRef, dropLabel, orLabel, removeLabel, iconOf, ariaLabel, onChange, ink, mark, browseLabel, chosen } = props;
   const ids = useFieldIds(id);
   const [over, setOver] = useState(false);
   const input = useRef(null);
@@ -81,7 +89,7 @@ export function FileDrop(props) {
   const open = () => { if (!disabled) input.current?.click(); };
   const control = html`
     <div class="file-drop">
-      <div class=${cx('file-dropzone', over && 'dragover', items.length > 0 && 'has-file', disabled && 'is-off')}
+      <div class=${cx('file-dropzone', ink && 'file-dropzone--ink', over && 'dragover', items.length > 0 && 'has-file', disabled && 'is-off')}
         role="button" tabIndex=${disabled ? -1 : 0} aria-disabled=${disabled ? 'true' : undefined}
         aria-label=${ariaLabel} aria-describedby=${props.hint ? ids.hintId : undefined}
         onClick=${open}
@@ -92,9 +100,11 @@ export function FileDrop(props) {
         <input id=${ids.id} ref=${setRef} type="file" class="file-drop-input" multiple=${multiple} accept=${accept} tabIndex="-1"
           onChange=${(e) => { take(e.currentTarget.files); e.currentTarget.value = ''; }} />
         <div class="file-dropzone-empty">
-          <span class="file-drop-arrow" aria-hidden="true">\u{2B06}️</span>
+          <span class="file-drop-arrow" aria-hidden="true">${mark || '\u{2B06}️'}</span>
           <span>${dropLabel || t('profile.files.dropHere')}</span>
           ${orLabel !== null ? html`<span class="file-drop-or">${orLabel || t('profile.files.orClick')}</span>` : null}
+          ${browseLabel ? html`<span class="file-drop-browse">${browseLabel}</span>` : null}
+          ${chosen || (ink && chosen === '') ? html`<span class="file-drop-chosen">${chosen}</span>` : null}
         </div>
       </div>
       ${items.length > 0 ? html`

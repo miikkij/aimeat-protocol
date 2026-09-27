@@ -9,12 +9,22 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — .og-box-pre, the words of a SettingBox `pre` with their own line breaks
+ *     (a prompt to paste; main's .adm-st-paste / .adm-us-paste); additive, admin page group G3.
+ *   v1.1.0 — 2026-09-27 — The box's label (SettingBox label, a .poster-label) stands on its own line
+ *     over the words wherever the box is drawn, not only inside the Settings pages (profile-poster.css
+ *     .pf .og-box > .poster-label): the admin pages draw SettingBox too (main's .og-box-label, block);
+ *     additive, page group G6.
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
  */
 
 .og-box + .og-box { margin-top: .9rem; }
+.og-box > .poster-label { display: block; margin-bottom: .3rem; }
 .og-box-label { display: block; margin-bottom: .3rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .75rem; letter-spacing: .05em; text-transform: var(--shape-case-heading); color: var(--accent); }
 .og-box-row { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
 .og-box-row > button { flex: none; }
 .og-box-confirm { display: flex; align-items: flex-end; gap: 1rem; margin-top: .9rem; }
 .og-box-confirm .og-field { flex: 1 1 auto; }
+/* SettingBox pre: words that keep their own line breaks, a prompt to paste (admin page group G3;
+   main's .adm-st-paste / .adm-us-paste). */
+.og-box-pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; line-height: 1.55; color: var(--text); }

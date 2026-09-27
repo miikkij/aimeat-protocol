@@ -13,6 +13,8 @@
  *   - POST /v1/admin/maintenance/compact-workspace-versions: one-shot version-history compaction
  *
  * @version-history
+ *   v1.2.1 — 2026-09-26 — PUT on a hook binds only actions already published here (security audit
+ *     A8-3); a binding refused because the actions could not be read answers 500, not 400.
  *   v1.2.0 — 2026-09-12 — The hook doors call services/hooks-overview.ts: GET answers the whole page
  *     in one read (which moments decide, what is bound and whether it still works, what could be
  *     bound, every call made), and PUT/DELETE share one write. The third copy of the eleven hook
@@ -59,11 +61,12 @@ export function adminMaintenanceRouter(
         ]));
     });
 
-    // PUT /v1/admin/hooks/:hookName — bind actions to a moment (an empty list clears it)
+    // PUT /v1/admin/hooks/:hookName — bind actions to a moment (an empty list clears it). Every
+    // reference must name an action already published here: publish it, then bind it.
     router.put('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), async (req, res) => {
         const out = await setHookActions(config, storage, req.params.hookName as string, (req.body ?? {}).actions);
         if (!out.ok) {
-            res.status(400).json(error(config.nodeId, out.code, out.message));
+            res.status(out.code === 'INTERNAL_ERROR' ? 500 : 400).json(error(config.nodeId, out.code, out.message));
             return;
         }
         res.json(success(config.nodeId, { ...out, updated: true }));
@@ -79,7 +82,7 @@ export function adminMaintenanceRouter(
         }
         const out = await setHookActions(config, storage, hookName, []);
         if (!out.ok) {
-            res.status(400).json(error(config.nodeId, out.code, out.message));
+            res.status(out.code === 'INTERNAL_ERROR' ? 500 : 400).json(error(config.nodeId, out.code, out.message));
             return;
         }
         res.json(success(config.nodeId, { ...out, updated: true }));

@@ -7,7 +7,19 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — .poster-quiet--chapter (Note quiet `chapter`), the old app catalogue's detail
+ *     .dtl-sync.none; additive, appcat parity (sections-d).
+ *   v1.1.0 — 2026-09-27 — .poster-quiet--small (Note quiet size 'small'), the old app catalogue's
+ *     detail empty lines; additive, appcat parity (sections-a).
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
 .poster-quiet { font-size: var(--text-body-sm); color: var(--text-dim); font-weight: var(--weight-semibold); }
+/* The small quiet line (Note kind="quiet" size="small", appcat): the old app catalogue's detail empty
+   lines (.wc-muted, and Needs' "Nothing beyond the platform itself."), a step smaller, not bold, no
+   margin of its own. */
+.poster-quiet--small { margin: 0; font-size: .85rem; font-weight: var(--font-poster-text-weight); line-height: normal; }
+/* A chapter's "nothing here" line (Note quiet `chapter`, appcat sections-d): the old app catalogue's
+   detail .dtl-sync.none, small and in the lighter grey (the old page's --text-dim is the site's
+   --text-muted), 4px under what is above it. */
+.poster-quiet.poster-quiet--chapter { display: block; margin: 0; padding: 4px 0 0; font-family: var(--font-body); font-size: .8rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted); }

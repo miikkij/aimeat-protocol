@@ -6,15 +6,21 @@
  *   list direction A). Three sections in the order an operator asks: what is true of these people
  *   right now, the people themselves behind a search and seven filter chips, and what a level
  *   means. The four writes go through the same routes as before; nothing new is fetched, and the
- *   sign-in count the route has always returned is on the screen for the first time.
+ *   sign-in count the route has always returned is on the screen for the first time. Every part is
+ *   a library component; the page passes data and writes no class.
  *
  * @structure
  *   - GhiiTab({ data, reload, switchPage }) — the three sections, the strip and the actions
  *   - tally(): every count the page shows, from the one list the dashboard already loaded
- *   - PersonRow: one person as a grid row (a block, with its values named, under 900px)
+ *   - person: one person as a List row (stacked, with its values named, under 1180px)
  *   - setLevel / doDelete / doRemoveEmail / doResetTotp: call admin service
  *
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only (the admin pages on the shared set): Section,
+ *     Verdict, FigureStrip, the filter Tabs and the level as Tabs, TextField, and the List that
+ *     stacks under 1180px and names each value there (stackWide, labels). The identity is the
+ *     name's line, cut to one line where the column is narrow and whole where the row stacks.
+ *     The page sheet admin-ghii.css goes.
  *   v2.2.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.1.0 — 2026-09-12 — The row prints the name before the @ and keeps the whole identity in the
  *     hover and in the stacked view: at 1280 the person column had 4px to spare on a local node's
@@ -35,15 +41,24 @@
  *     and the reset button is the last control in it.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, when, Row, Badge, useToast, Toast } from './shared.js';
 import { updateGhiiLevel, deleteGhii, removeGhiiEmail, resetGhiiTotp } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
+import { Section } from '/components/Section.js';
+import { Verdict } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tinted } from '/components/Figure.js';
+import { List, Row as Item, Name, When, Cell, Doors, More } from '/components/List.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { TextField } from '/components/TextField.js';
+import { Tabs } from '/components/Tabs.js';
+import { Row as Line } from '/components/Layout.js';
 
 const G = (key, vars) => t('dashboard.ghiiPage.' + key, vars);
 
@@ -91,9 +106,6 @@ function matches(u, q) {
 }
 
 export default function GhiiTab({ data, reload, switchPage }) {
-  // A no-op these days: the sheet is a <link> in spa.html, and a view stylesheet that is only
-  // named here loads nowhere. The call stays because every other tab makes it.
-  useViewCSS('/css/views/admin-ghii.css');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const [q, setQ] = useState('');
@@ -151,140 +163,106 @@ export default function GhiiTab({ data, reload, switchPage }) {
       ? G('lineSome', { verified: num(c.l2), rest: num(c.all - c.l2) })
       : (c.totp > 0 ? G('lineNoneVerified', { n: num(c.all) }) : G('lineNothing', { n: num(c.all) })));
 
-  const chip = (id) => html`
-    <button type="button" class="adm-gh-chip ${filter === id ? 'on' : ''}"
-      disabled=${c[id] === 0 && id !== 'all'} onClick=${() => setFilter(id)}>
-      ${G('f' + id.charAt(0).toUpperCase() + id.slice(1))} · ${num(c[id])}
-    </button>`;
+  const filterItems = FILTERS.map((id) => ({
+    value: id,
+    label: G('f' + id.charAt(0).toUpperCase() + id.slice(1)),
+    count: num(c[id]),
+    disabled: c[id] === 0 && id !== 'all',
+  }));
 
   const level = (u) => html`
-    <span class="adm-gh-lvl" data-l=${G('colLevel')}>
-      ${[0, 1, 2].map((n) => html`
-        <button type="button" class="adm-gh-lchip ${(u.verification_level || 0) === n ? 'on' : ''}"
-          disabled=${(u.verification_level || 0) === n}
-          title=${G('levelSetHint', { level: 'L' + n })}
-          onClick=${() => setLevel(u, n)}>L${n}</button>`)}
-    </span>`;
+    <${Tabs} tone="filter" label=${G('colLevel')} value=${u.verification_level || 0}
+      onSelect=${(n) => setLevel(u, n)}
+      items=${[0, 1, 2].map((n) => ({
+    value: n, label: `L${n}`, title: G('levelSetHint', { level: 'L' + n }),
+    disabled: (u.verification_level || 0) === n,
+  }))} />`;
 
-  // Every GHII on this page ends in the same node id, so the row prints the name before the @ and
-  // keeps the whole thing for the hover and for the stacked view. Sixty-four repetitions of
-  // "@aimeat-finland-001-genesis" is not information, and at 1280 it is what pushed the row's own
-  // columns off the side. A GHII that does NOT end in this node's id is printed in full.
-  const shortId = (u) => (u.ghii.endsWith('@' + nodeId) ? u.username || u.ghii : u.ghii);
-
+  // Every GHII on this page ends in the same node id. The identity is the name's line, cut to one
+  // line where the column is narrow (what shows is the name before the @) and whole where the row
+  // stacks and there is room for it; the whole of it is on the name's title too. Sixty-four
+  // repetitions of "@aimeat-finland-001-genesis" is not information.
   const person = (u) => html`
-    <div class="adm-gh-row" key=${u.ghii}>
-      <span>
-        <b>${nameOf(u)}</b>
-        <span class="adm-gh-id" title=${u.ghii}>${shortId(u)}</span>
-        <span class="adm-gh-id adm-gh-id--full">${u.ghii}</span>
-      </span>
-      <span data-l=${G('colMail')}>
+    <${Item} key=${u.ghii} hover>
+      <${Name} meta=${u.ghii} clip title=${u.ghii}>${nameOf(u)}<//>
+      ${u.masked_email
+    ? html`<${Cell} meta><${Tinted} tone=${u.email_verified ? 'fine' : 'dim'}>${u.masked_email}<//><//>`
+    : html`<${Cell} dim>–<//>`}
+      <${Cell}>${level(u)}<//>
+      ${u.totp_enabled
+    ? html`<${Cell}><${Badge} type="healthy" label=${G('on')} /><//>`
+    : html`<${Cell} dim>–<//>`}
+      <${When} at=${u.login_count ? (u.login_count === 1 ? G('timesOne') : G('times', { n: num(u.login_count) })) : null}>
+        ${u.last_login_at ? when(u.last_login_at) : html`<${Tinted} tone="dim">${G('never')}<//>`}
+      <//>
+      <${When}>${when(u.created_at)}<//>
+      <${Doors}>
         ${u.masked_email
-    ? html`<span class="adm-gh-mail ${u.email_verified ? '' : 'adm-gh-mail--unconfirmed'}">${u.masked_email}</span>`
-    : html`<span class="adm-gh-none">–</span>`}
-      </span>
-      ${level(u)}
-      <span data-l=${G('colTotp')}>
-        ${u.totp_enabled
-    ? html`<${Badge} type="healthy" label=${G('on')} />`
-    : html`<span class="adm-gh-none">–</span>`}
-      </span>
-      <span class="adm-gh-when" data-l=${G('colSeen')}>
-        ${u.last_login_at ? when(u.last_login_at) : html`<span class="adm-gh-none">${G('never')}</span>`}
-        ${u.login_count ? html`<small>${u.login_count === 1 ? G('timesOne') : G('times', { n: num(u.login_count) })}</small>` : null}
-      </span>
-      <span class="adm-gh-made" data-l=${G('colMade')}>${when(u.created_at)}</span>
-      <span class="adm-gh-acts">
-        ${u.masked_email
-    ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => doRemoveEmail(u)}>${G('doMail')}</button>`
+    ? html`<${Action} small soft onClick=${() => doRemoveEmail(u)}>${G('doMail')}<//>`
     : null}
         ${u.totp_enabled
-    ? html`<button type="button" class="og-door og-door--quiet" title=${t('dashboard.ghiiTotpResetHint')} onClick=${() => doResetTotp(u)}>${G('doTotp')}</button>`
+    ? html`<${Action} small soft title=${t('dashboard.ghiiTotpResetHint')} onClick=${() => doResetTotp(u)}>${G('doTotp')}<//>`
     : null}
-        <button type="button" class="og-door og-door--danger" onClick=${() => doDelete(u)}>${G('doDelete')}</button>
-      </span>
-    </div>`;
+        <${Action} small tone="danger" onClick=${() => doDelete(u)}>${G('doDelete')}<//>
+      <//>
+    <//>`;
 
   return html`
-    <div class="og adm-gh">
+    <${Fragment}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${G('now')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('owners')}>${G('nowToOwners')}</button>
-          </div>
-        </div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status">${c.all === 1 ? G('statusPerson') : G('statusPeople', { n: num(c.all) })}</div>
-            <p class="adm-alert-line">${statusLine}</p>
-            <div class="adm-ov-up">${nodeId}${oldest ? html`<br />${G('oldest', { when: when(oldest) })}` : null}</div>
-          </div>
-          <div>
-            <${Row} title=${G('rowL0')} why=${G('rowL0Why')} chip=${html`<${Badge} type="critical" label="L0" />`}
-              value=${G('ofAll', { n: num(c.l0), all: num(c.all) })} />
-            <${Row} title=${G('rowL1')} why=${G('rowL1Why')} chip=${html`<${Badge} type="watch" label="L1" />`}
-              value=${G('ofAll', { n: num(c.l1), all: num(c.all) })} />
-            <${Row} title=${G('rowL2')} why=${G('rowL2Why')} chip=${html`<${Badge} type="healthy" label="L2" />`}
-              value=${G('ofAll', { n: num(c.l2), all: num(c.all) })} />
-            <${Row} title=${G('rowTotp')} why=${G('rowTotpWhy')}
-              chip=${html`<${Badge} type=${c.totp ? 'healthy' : 'critical'} label=${G('armedN', { n: num(c.totp) })} />`}
-              value=${G('ofAll', { n: num(c.totp), all: num(c.all) })} />
-            <${Row} title=${G('rowSeen')} why=${G('rowSeenWhy')}
-              chip=${html`<${Badge} type="muted" label=${G('liveN', { n: num(c.seen) })} />`}
-              value=${G('ofAll', { n: num(c.seen), all: num(c.all) })} last=${true} />
-          </div>
-        </div>
-      </section>
+      <${Section} first num="01" title=${G('now')}
+        doors=${html`<${Action} small soft onClick=${() => switchPage('owners')}>${G('nowToOwners')}<//>`}>
+        <${Verdict}
+          word=${c.all === 1 ? G('statusPerson') : G('statusPeople', { n: num(c.all) })}
+          line=${statusLine}
+          stamp=${html`${nodeId}${oldest ? html`<br />${G('oldest', { when: when(oldest) })}` : null}`}>
+          <${Row} title=${G('rowL0')} why=${G('rowL0Why')} chip=${html`<${Badge} type="critical" label="L0" />`}
+            value=${G('ofAll', { n: num(c.l0), all: num(c.all) })} />
+          <${Row} title=${G('rowL1')} why=${G('rowL1Why')} chip=${html`<${Badge} type="watch" label="L1" />`}
+            value=${G('ofAll', { n: num(c.l1), all: num(c.all) })} />
+          <${Row} title=${G('rowL2')} why=${G('rowL2Why')} chip=${html`<${Badge} type="healthy" label="L2" />`}
+            value=${G('ofAll', { n: num(c.l2), all: num(c.all) })} />
+          <${Row} title=${G('rowTotp')} why=${G('rowTotpWhy')}
+            chip=${html`<${Badge} type=${c.totp ? 'healthy' : 'critical'} label=${G('armedN', { n: num(c.totp) })} />`}
+            value=${G('ofAll', { n: num(c.totp), all: num(c.all) })} />
+          <${Row} title=${G('rowSeen')} why=${G('rowSeenWhy')}
+            chip=${html`<${Badge} type="muted" label=${G('liveN', { n: num(c.seen) })} />`}
+            value=${G('ofAll', { n: num(c.seen), all: num(c.all) })} last=${true} />
+        <//>
+      <//>
 
-      <div class="og-strip">
-        <div><b>${num(c.all)}</b><span>${G('stripPeople')}</span><small>${G('stripPeopleSub')}</small></div>
-        <div><b class="og-coral-num">${num(c.l0)}</b><span>${G('stripL0')}</span><small>${G('stripL0Sub')}</small></div>
-        <div><b>${num(c.totp)}</b><span>${G('stripTotp')}</span><small>${G('ofAll', { n: num(c.totp), all: num(c.all) })}</small></div>
-        <div><b>${num(c.cold)}</b><span>${G('stripCold')}</span><small>${G('stripColdSub')}</small></div>
-      </div>
+      <${FigureStrip} items=${[
+    { key: 'people', n: num(c.all), label: G('stripPeople'), sub: G('stripPeopleSub') },
+    { key: 'l0', n: num(c.l0), tone: 'notice', label: G('stripL0'), sub: G('stripL0Sub') },
+    { key: 'totp', n: num(c.totp), label: G('stripTotp'), sub: G('ofAll', { n: num(c.totp), all: num(c.all) }) },
+    { key: 'cold', n: num(c.cold), label: G('stripCold'), sub: G('stripColdSub') },
+  ]} />
 
-      <section class="og-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${G('people')}<small>02</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('agents')}>${G('peopleToAgents')}</button>
-          </div>
-        </div>
-        <p class="adm-gh-lead">${G('peopleLead')}</p>
+      <${Section} num="02" title=${G('people')}
+        doors=${html`<${Action} small soft onClick=${() => switchPage('agents')}>${G('peopleToAgents')}<//>`}>
+        <${Note} kind="lead">${G('peopleLead')}<//>
 
-        <div class="adm-gh-filters">
-          <label class="adm-gh-fld">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
-            <input type="search" value=${q} onInput=${(e) => setQ(e.target.value)}
-              placeholder=${G('searchPlaceholder')} aria-label=${G('searchPlaceholder')} />
-          </label>
-          <span class="adm-gh-sep"></span>
-          ${FILTERS.map(chip)}
-        </div>
+        <${Line} wrap gap="medium" below="medium">
+          <${TextField} search value=${q} onInput=${(v) => setQ(v)}
+            placeholder=${G('searchPlaceholder')} ariaLabel=${G('searchPlaceholder')} />
+          <${Tabs} tone="filter" value=${filter} label=${G('searchPlaceholder')}
+            onSelect=${setFilter} items=${filterItems} />
+        <//>
 
         ${!users.length
-    ? html`<div class="adm-gh-empty">${t('dashboard.noGhiiUsers')}</div>`
+    ? html`<${Note} kind="quiet">${t('dashboard.noGhiiUsers')}<//>`
     : html`
-        <div class="adm-gh-head">
-          <span>${G('colPerson')}</span><span>${G('colMail')}</span><span>${G('colLevel')}</span>
-          <span>${G('colTotp')}</span><span>${G('colSeen')}</span>
-          <span>${G('colMade')}</span><span></span>
-        </div>
-        ${shown.length
-    ? shown.map(person)
-    : html`<div class="adm-gh-empty">${G('noMatch')}</div>`}
-        <div class="adm-gh-foot">
-          <span>${G('footShown', { n: num(shown.length), all: num(c.all) })}</span>
-          <span>${G('footOrder')}</span>
-        </div>`}
-      </section>
+        <${List} cols="name-desc-state-mark-when-when-doors" stackWide labels empty=${G('noMatch')}
+          head=${[G('colPerson'), G('colMail'), G('colLevel'), G('colTotp'), G('colSeen'), G('colMade'), '']}>
+          ${shown.map(person)}
+        <//>
+        <${More} note=${G('footShown', { n: num(shown.length), all: num(c.all) })}>
+          <${Note} kind="meta" inline>${G('footOrder')}<//>
+        <//>`}
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${G('levels')}<small>03</small></h2></div>
+      <${Section} num="03" title=${G('levels')}>
         <${Row} title=${G('lvl0')} why=${G('lvl0Why')} chip=${html`<${Badge} type="critical" label="L0" />`}
           value=${G('nPeople', { n: num(c.l0) })} />
         <${Row} title=${G('lvl1')} why=${G('lvl1Why')} chip=${html`<${Badge} type="watch" label="L1" />`}
@@ -294,10 +272,10 @@ export default function GhiiTab({ data, reload, switchPage }) {
         <${Row} title=${G('lvlTotp')} why=${G('lvlTotpWhy')}
           chip=${html`<${Badge} type=${c.totp ? 'healthy' : 'critical'} label=${G('armedN', { n: num(c.totp) })} />`}
           value=${G('nPeople', { n: num(c.totp) })} last=${true} />
-        <p class="adm-gh-note">${G('levelsNote')}</p>
-      </section>
+        <${Note} kind="hint">${G('levelsNote')}<//>
+      <//>
 
       <${ConfirmUI} />
-    </div>
+    <//>
   `;
 }

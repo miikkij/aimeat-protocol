@@ -91,13 +91,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-09-20",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
-        "aimeat/src/static/sdk-libs/atelier/describe-data.js"
+        "aimeat/src/static/sdk-libs/atelier/describe-data.js",
+        "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:dbc961ab5cca9c97d95ee311"
+      "digest": "sha256:520d90d65fa475ab4f75a68b"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -234,12 +235,12 @@
       "digest": "sha256:acbeb8eacdf197f76c66ab30"
     },
     "node:set-up-content-pipeline": {
-      "reviewedOn": "2026-09-26",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/lifecycle.ts"
       ],
-      "digest": "sha256:7b01f3f9a8a2d0146f22b4e6"
+      "digest": "sha256:653441700d5468fbea454169"
     },
     "node:configure-routing": {
       "reviewedOn": "2026-09-20",
@@ -263,13 +264,13 @@
       "digest": "sha256:cec4c74bb67ae7d2b7990016"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-09-26",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts"
       ],
-      "digest": "sha256:71bc81e305483278eb8d8788"
+      "digest": "sha256:399f4d740c07727874fa9940"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -288,13 +289,13 @@
       "digest": "sha256:94d689cc97e4d19539d2730b"
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-09-26",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:81b3e60f2c10bdec6a10b3bd"
+      "digest": "sha256:2d1fa407d874a3bd502902c1"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-09-20",
@@ -381,7 +382,8 @@
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "f3ed531ef77e3dc7",
       "aimeat/src/services/build-atelier-layers.ts": "e85a439c2160d7dc",
-      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940"
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940",
+      "aimeat/src/services/design-book/component.ts": "c82762215e46dd39"
     },
     "node:aimeat-phaser": {
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
@@ -464,7 +466,7 @@
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
     },
     "node:set-up-content-pipeline": {
-      "aimeat/src/models/workflow-schemas.ts": "3c56b8d8a0bf02ac",
+      "aimeat/src/models/workflow-schemas.ts": "689c8903dfca6de9",
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
@@ -477,7 +479,7 @@
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
     },
     "node:diagnose-a-workflow": {
-      "aimeat/src/models/workflow-schemas.ts": "3c56b8d8a0bf02ac",
+      "aimeat/src/models/workflow-schemas.ts": "689c8903dfca6de9",
       "aimeat/src/mcp/agent-schedules.ts": "491ce215a8732f44",
       "aimeat/src/services/scheduler.ts": "347f524fd059e4c8"
     },
@@ -490,8 +492,8 @@
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85"
     },
     "project:aimeat-design-language": {
-      "aimeat/public/css/theme.css": "0429eb35699ac69e",
-      "aimeat/public/css/poster.css": "5ddc8c98bf9d5a5b",
+      "aimeat/public/css/theme.css": "d05be341732c8d00",
+      "aimeat/public/css/poster.css": "472eb37378041a63",
       "aimeat/public/lib/aimeat-fonts.css": "213a6ac05c5b8cce"
     },
     "project:aimeat-frontend-verify": {

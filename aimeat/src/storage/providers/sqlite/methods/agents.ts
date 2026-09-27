@@ -6,6 +6,10 @@
  *   row reader. Moved out of methods/owner.ts by pure extraction when that file reached the 800-line
  *   limit; bodies verbatim, bound to SqliteStorage via the prototype merge in sqlite/index.ts.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — deleteAgent settles the agent's work first (repos/work-erasure.ts): open work
+ *     is cancelled and the held morsels go back, what stays keeps the agent's identity.
+ *   v1.3.0 — 2026-09-26 — resolveGhii's body moved to repos/ghii-resolve.ts by pure extraction, for the
+ *     boot migration that runs before an instance exists.
  *   v1.2.0 — 2026-09-09 — getAgentByName and transferBalance deleted: no caller.
  *   v1.1.0 — 2026-09-02 — createAgent/updateAgent/deserializeAgent carry `mcpClient` and `mcpLastSeen`
  *     (which AI tool the agent last spoke from over MCP, and when), matching Postgres migration 0063.
@@ -14,6 +18,8 @@
  */
 import type { AgentRecord } from '../../../interface.js';
 import { logger } from '../../../../utils/logger.js';
+import { resolveGhiiIn } from '../repos/ghii-resolve.js';
+import { settleDeletedAgentWork } from '../repos/work-erasure.js';
 import type { SqliteStorage } from '../index.js';
 
 export const agentMethods = {
@@ -144,6 +150,10 @@ export const agentMethods = {
 
   async deleteAgent(this: SqliteStorage, gaii: string): Promise<boolean> {
     const txn = this.db.transaction(() => {
+      // The agent's work first, by the rule an erasure follows (repos/work-erasure.ts): open work is
+      // cancelled and what was held for it goes back, to the requester or to this agent's owner, and
+      // what stays keeps the agent's identity, because its owner is still here.
+      settleDeletedAgentWork(this.db, gaii, id => this.resolveGhii(id));
       // Cascade delete all agent-related data
       this.cascadeDeleteAgentData(gaii);
       // Delete the agent record itself
@@ -161,23 +171,10 @@ export const agentMethods = {
   /**
    * Resolve any identity (GAII, GHII, bare owner) to the owner's GHII identifier.
    * All balance operations go through GHII — agents don't have their own balance.
+   * The body is repos/ghii-resolve.ts, which the boot migration calls before an instance exists.
    */
   resolveGhii(this: SqliteStorage, identity: string): string | null {
-    // GHII format: owner@node (no #)
-    if (!identity.includes('#') && identity.includes('@')) return identity;
-    // GAII format: agent#owner@node → extract owner → lookup GHII
-    if (identity.includes('#')) {
-      const hashIdx = identity.indexOf('#');
-      const atIdx = identity.lastIndexOf('@');
-      if (atIdx > hashIdx) {
-        const owner = identity.slice(hashIdx + 1, atIdx);
-        const row = this.db.prepare('SELECT ghii FROM ghiis WHERE username = ?').get(owner) as { ghii: string } | undefined;
-        return row?.ghii ?? null;
-      }
-    }
-    // Bare owner name → lookup GHII
-    const row = this.db.prepare('SELECT ghii FROM ghiis WHERE username = ?').get(identity) as { ghii: string } | undefined;
-    return row?.ghii ?? null;
+    return resolveGhiiIn(this.db, identity);
   },
 
   async debitBalance(this: SqliteStorage, gaii: string, amount: number): Promise<boolean> {

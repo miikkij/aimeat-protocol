@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Instance translation editor + AI-prompt builder + per-extension key patterns for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — The library's parts (admin page group G7): the editor stands in the dashed
+ *     field Box, its head is the row label, the language a Select, the JSON switch and the AI prompt's
+ *     copy Action links, the keys a scrolling List of key, field and remove mark, the new key a
+ *     TextField that adds on Enter, the answer the form message. No class, no style.
  *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
  */
 import { h } from 'preact';
@@ -11,8 +15,14 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { inputStyle } from './extensions-tab.config-form.js';
+import { Box } from '/components/Box.js';
+import { Select } from '/components/Select.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Action, Icon } from '/components/Action.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { List, Row as ListRow, Cell, Doors } from '/components/List.js';
+import { Row } from '/components/Layout.js';
 
 // ── Translation key patterns by extension ──
 const EXT_TRANSLATION_KEYS = {
@@ -120,54 +130,41 @@ function TranslationEditor({ extName, inst, onSave }) {
   const displayKeys = [...new Set([...allKeys, ...Object.keys(translations)])].sort();
 
   return html`
-    <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-      <div class="adm-flex-center adm-mb-sm" style="flex-wrap:wrap">
-        <strong style="font-size:.85rem">${t('dashboard.servicesTlTitle')}</strong>
-        <select class="${inputStyle}" style="padding:4px 8px;font-size:.8rem" value=${locale}
-          onChange=${e => setLocale(e.target.value)}>
-          <option value="fi">Suomi (fi)</option>
-          <option value="en">English (en)</option>
-        </select>
-        <button class="adm-btn-sm" onClick=${() => { setJsonMode(!jsonMode); if (!jsonMode) setJsonText(JSON.stringify(translations, null, 2)); }}
-          style="font-size:.75rem">${jsonMode ? t('dashboard.servicesTlFormMode') : 'JSON'}</button>
-        <${CopyButton} className="adm-btn-sm"
-          text=${buildTranslationAiPrompt(extName, inst.id, allKeys.length > 0 ? allKeys : ['(no keys detected — add categories to config first)'], locale, translations)}
-          label=${t('dashboard.servicesTlAiPrompt')} copiedLabel=${t('dashboard.servicesTlAiPrompt')}
-          onCopied=${() => setMsg({ ok: true, text: t('dashboard.servicesTlPromptCopied') })} />
-      </div>
+    <${Box} tone="field">
+      <${Row} gap="medium" wrap>
+        <${Label}>${t('dashboard.servicesTlTitle')}<//>
+        <${Select} fit ariaLabel=${t('dashboard.servicesTlTitle')} value=${locale} onChange=${setLocale}
+          options=${[['fi', 'Suomi (fi)'], ['en', 'English (en)']]} />
+        <${Action} small soft onClick=${() => { setJsonMode(!jsonMode); if (!jsonMode) setJsonText(JSON.stringify(translations, null, 2)); }}>
+          ${jsonMode ? t('dashboard.servicesTlFormMode') : 'JSON'}<//>
+        <${Action} small soft
+          copy=${buildTranslationAiPrompt(extName, inst.id, allKeys.length > 0 ? allKeys : ['(no keys detected — add categories to config first)'], locale, translations)}
+          copiedLabel=${t('dashboard.servicesTlAiPrompt')}
+          onCopied=${() => setMsg({ ok: true, text: t('dashboard.servicesTlPromptCopied') })}>${t('dashboard.servicesTlAiPrompt')}<//>
+      <//>
 
       ${jsonMode ? html`
-        <textarea class="adm-textarea adm-input-full" value=${jsonText} onInput=${e => setJsonText(e.target.value)}
-          style="height:200px;font-size:12px"
-          spellcheck="false" />
+        <${TextArea} code rows=${8} ariaLabel="JSON" value=${jsonText} onInput=${setJsonText} />
       ` : html`
-        <div class="adm-flex-col" style="gap:4px;max-height:300px;overflow-y:auto">
+        <${List} cols="label-words-doors" keepCols dense scroll="medium">
           ${displayKeys.map(key => html`
-            <div style="display:flex;align-items:center;gap:6px">
-              <code style="font-size:.75rem;color:var(--text-dim);min-width:140px;flex-shrink:0">${key}</code>
-              <input type="text" class="${inputStyle}" style="flex:1;padding:4px 8px;font-size:.85rem" value=${translations[key] || ''}
-                placeholder=${key.split('.').pop()}
-                onInput=${e => setKey(key, e.target.value)} />
-              ${!autoKeys.includes(key) && html`
-                <button class="adm-btn-sm" style="font-size:.7rem;padding:2px 6px" onClick=${() => removeKey(key)}>\u2715</button>
-              `}
-            </div>
-          `)}
-        </div>
-        <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
-          <input type="text" class="${inputStyle}" style="padding:4px 8px;font-size:.8rem;flex:1" value=${customKey}
-            placeholder=${t('dashboard.servicesTlAddKey')} onInput=${e => setCustomKey(e.target.value)}
-            onKeyDown=${e => { if (e.key === 'Enter') addCustomKey(); }} />
-          <button class="adm-btn-sm" style="font-size:.75rem" onClick=${addCustomKey}>+</button>
-        </div>
+            <${ListRow} key=${key}>
+              <${Cell} code>${key}<//>
+              <${Cell}><${TextField} ariaLabel=${key} value=${translations[key] || ''}
+                placeholder=${key.split('.').pop()} onInput=${v => setKey(key, v)} /><//>
+              <${Doors}>${!autoKeys.includes(key) ? html`<${Icon} small label=${t('common.remove')} onClick=${() => removeKey(key)}>✕<//>` : null}<//>
+            <//>`)}
+        <//>
+        <${TextField} ariaLabel=${t('dashboard.servicesTlAddKey')} value=${customKey}
+          placeholder=${t('dashboard.servicesTlAddKey')} onInput=${setCustomKey} onEnter=${addCustomKey}
+          actions=${html`<${Action} small soft onClick=${addCustomKey}>+<//>`} />
       `}
 
-      <div class="adm-flex-center adm-mt-sm">
-        <button class="adm-btn-action adm-text-sm" onClick=${handleSave} disabled=${saving}>
-          ${saving ? '...' : t('dashboard.servicesTlSave')}</button>
-        ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
-      </div>
-    </div>
+      <${Row} gap="medium" wrap above="small">
+        <${Action} small onClick=${handleSave} disabled=${saving}>${saving ? '...' : t('dashboard.servicesTlSave')}<//>
+        ${msg ? html`<${Note} kind="message" error=${!msg.ok}>${msg.text}<//>` : null}
+      <//>
+    <//>
   `;
 }
 

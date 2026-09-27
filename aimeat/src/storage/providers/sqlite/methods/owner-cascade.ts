@@ -12,6 +12,8 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   v1.4.0 — 2026-09-26 — Work leaves the per-identity cascade: deleteOwner and deleteAgent settle it
+ *     first by one rule (repos/work-erasure.ts), and the rows that rule keeps belong to the other side.
  *   v1.3.0 — 2026-09-19 — ai_decisions joins the cascade (TARGET-080).
  *   v1.2.1 — 2026-09-09 — The tally comment names the function deleteOwner actually calls
  *     (pseudonymiseWriter); the Storage method it named was deleted for having no caller.
@@ -48,15 +50,10 @@ export const cascadeMethods = {
     this.db.prepare('DELETE FROM memory_history WHERE ownerGaii = ?').run(gaii);
     // Actions
     this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(gaii);
-    // Work (as provider or requester) — also clean up related disputes
-    const workRows = this.db.prepare(
-      'SELECT trackingCode FROM work WHERE providerGaii = ? OR requesterGaii = ?'
-    ).all(gaii, gaii) as { trackingCode: string }[];
-    for (const w of workRows) {
-      this.db.prepare('DELETE FROM dispute_audit WHERE disputeId IN (SELECT id FROM disputes WHERE trackingCode = ?)').run(w.trackingCode);
-      this.db.prepare('DELETE FROM disputes WHERE trackingCode = ?').run(w.trackingCode);
-    }
-    this.db.prepare('DELETE FROM work WHERE providerGaii = ? OR requesterGaii = ?').run(gaii, gaii);
+    // Work is not deleted here. Both callers settle it first, by one rule (repos/work-erasure.ts):
+    // open work is cancelled and what was held for it goes back, finished work stays for the other
+    // side. After deleteOwner no row names this identity any more; after deleteAgent the rows that
+    // stay keep the agent's identity, and deleting them here would take the other side's records.
     // Wallet transactions
     this.db.prepare('DELETE FROM wallet_transactions WHERE gaii = ?').run(gaii);
     // Board posts authored by this agent

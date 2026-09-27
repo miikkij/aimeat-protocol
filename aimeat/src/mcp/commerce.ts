@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.7.0 — 2026-09-27 — aimeat_app_tools_publish names the app by its filename when the caller left
+ *     the extension off (services/app-tools-key.ts), so the answer's app and skus match the stored key.
  *   v1.6.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-24 — SECURITY (audit A8-1): aimeat_commerce_beneficiary_approve asks the operator
@@ -60,6 +62,7 @@ import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
+import { canonicalAppToolsId } from '../services/app-tools-key.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, responseFormatSchema, shapeResponse } from './catalog/shape.js';
 import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey } from '../models/app-tool-schemas.js';
@@ -272,9 +275,12 @@ export function registerCommerceTools(
             provenance: z.record(z.string(), z.unknown()).optional(),
         },
         annotationsFor('aimeat_app_tools_publish'),
-        async ({ app_id, tools, odps, provenance }) => {
+        async ({ app_id: named, tools, odps, provenance }) => {
             const parsed = AppToolsDocSchema.safeParse({ tools, ...(odps ? { odps } : {}), ...(provenance ? { provenance } : {}) });
             if (!parsed.success) return fail(`INVALID_TOOL_MANIFEST: ${parsed.error.message}`);
+            // The app's filename, when the caller named the app without it (services/app-tools-key.ts):
+            // the shared write stores it there anyway, and the answer has to name where it went.
+            const app_id = await canonicalAppToolsId(storage, ownerGhii, named);
             const key = appToolsKey(app_id);
             const existing = await storage.getMemory(ownerGhii, key);
             const doc = {

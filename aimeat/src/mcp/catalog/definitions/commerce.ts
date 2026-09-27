@@ -10,6 +10,7 @@
  *   6-decimal MICRO-UNITS (1 EUR = 1_000_000), morsels are plain integers; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   v1.3.1 — 2026-09-27 — aimeat_app_tools_publish: app_id without its extension lands under the app's filename.
  *   v1.3.0 — 2026-09-13 — aimeat_app_tools_publish states the developer's two decisions: a tool and the
  *     extension action it calls list once (DUPLICATE_OF, unless lockedInput), and a publish that makes
  *     an ODPS field too long is refused with ODPS_FIELD_TOO_LONG while unchanged stored text publishes.
@@ -140,7 +141,7 @@ export const commerceTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            app_id: { type: 'string', required: true, description: 'The app\'s published filename (e.g. "shop.html") — the manifest key is apps.{app_id}.tools' },
+            app_id: { type: 'string', required: true, description: 'The app\'s published filename (e.g. "shop.html") — the manifest key is apps.{app_id}.tools. A name without the extension ("shop") is stored under your app "shop.html" when you have one, and the answer names the filename.' },
             tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, outputSchema?, action_id?, agent?, exchange?, price?: {morsels, unit?}, priceMoney?: {amount /* micro-units */, currency}, usageTerms?, provenance?, odps? }]' },
             odps: { type: 'object', required: false, description: 'APP-LEVEL ODPS defaults inherited by every tool: { language, dataHolder: {legalName, businessID, email, URL, addressCountry}, logoURL, brandSlogan, governanceProfile, portfolioPriority, license: {geographicalArea, applicableLaws} }. A tool\'s own `odps` overrides these field by field.' },
             provenance: { type: 'object', required: false, description: 'APP-LEVEL provenance defaults inherited by every tool: { source, legalBasis, consentStatus, retention, transformations, snapshotHash (SHA-256 hex), lineage: [{source, transform, at}] }. State only what you know.' },

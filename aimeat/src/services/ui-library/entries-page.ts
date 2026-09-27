@@ -9,6 +9,8 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.7.0 — 2026-09-27 — SettingsStack's SettingsSection and SwatchPicker's pattern (the home's settings dialog
+ *     passes meanings, not classes).
  *   v1.6.0 — 2026-09-26 — The Timeline is every list of what happened in Settings & Controls (Jouni's decision "Activity log", a unification).
  *   v1.5.0 — 2026-09-26 — A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
  *   v1.4.0 — 2026-09-26 — The Masthead takes a page's own lines under the address and a picture that opens something; the Settings overview draws it (Jouni's decision "Person head").
@@ -66,6 +68,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         useFor: ['One sentence that tells what a control does or what happens next.', 'A grey paragraph that explains a section.'],
         variants: [{ name: 'slab', class: 'poster-hint--slab', when: 'beside a loud action: the mono line that says what it does, or why it cannot be pressed yet' }],
         example: one('You can change the name later.'),
+        note: 'Hint draws only the plain hint. Since 2026-09-27 hint.css also holds rules that Note (components/Note.js, entry \'note\') draws for appcat, the app catalogue rebuilt on components: the hint sizes small, intro, note and text and the chapter line (.poster-hint--small, --intro, --note, --text, --chapter), the caption (.note-caption*), the report (.note-report*) and the state line (.state-line*). Hint takes none of them; a page reaches them through Note.',
     },
     {
         id: 'masthead', name: 'Masthead', kind: 'component', status: 'active',
@@ -145,12 +148,22 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'star-toggle', name: 'StarToggle', kind: 'component', status: 'active',
-        summary: 'A star that keeps one thing always visible.',
+        summary: 'A star that keeps one thing always visible: hollow and grey when off, on the sun when on. The bright star is the app catalogue\'s favourite: the coloured star when on, the hollow one faint until the pointer comes to it.',
         module: '/components/StarToggle.js', sheet: '/css/components/star-toggle.css',
-        data: { shape: 'StarToggle({ on, title, onClick })', fields: { on: 'starred', title: 'what the star does', onClick: 'toggle' } },
-        useFor: ['Beside a thing in a list that shows only some of them.'],
-        variants: [{ name: 'on', class: 'poster-star--on', prop: 'on', when: 'the thing is starred' }],
+        data: {
+            shape: 'StarToggle({ on, title, onClick, bright })',
+            fields: {
+                on: 'starred', title: 'what the star does (its tooltip; with bright also its name for a screen reader)', onClick: 'toggle',
+                bright: 'the coloured star (⭐) when on and the hollow one (☆) faint when off, a little larger under the pointer',
+            },
+        },
+        useFor: ['Beside a thing in a list that shows only some of them.', 'Beside an app\'s name in the app catalogue, to make it a favourite (bright).'],
+        variants: [
+            { name: 'on', class: 'poster-star--on', prop: 'on', when: 'the thing is starred' },
+            { name: 'bright', class: 'poster-star--bright', prop: 'bright', when: 'a favourite beside a name in a row: the coloured star when on, the hollow one faint until pointed at' },
+        ],
         example: { on: true, title: 'Keep this one visible' },
+        note: 'bright came with appcat (2026-09-27): it draws the old app catalogue\'s row star (.fav-toggle).',
     },
     {
         id: 'fold-button', name: 'FoldButton', kind: 'component', status: 'active',
@@ -178,6 +191,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         useFor: ['An empty list, said in words.'],
         variants: [],
         example: one('You have not opened any apps yet.'),
+        note: 'QuietNote draws only the plain quiet line. Since 2026-09-27 quiet-note.css also holds two cuts that Note (components/Note.js, entry \'note\') draws for appcat, the app catalogue rebuilt on components: kind="quiet" size="small" (.poster-quiet--small, a step smaller and not bold) and kind="quiet" chapter (.poster-quiet--chapter, a chapter\'s small light grey "nothing here" line). QuietNote takes neither; a page reaches them through Note.',
     },
     {
         id: 'numbered-index', name: 'NumberedIndex', kind: 'component', status: 'active',
@@ -197,12 +211,21 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'ink-foot', name: 'InkFoot', kind: 'component', status: 'active',
-        summary: 'The foot of a page: two facts in paper words on ink.',
+        summary: 'The foot of a page: two facts in paper words on ink, two columns on a desktop and one on a phone, reaching the page\'s edges. With a brand, one small word in the poster face on the sun runs under both facts.',
         module: '/components/InkFoot.js', sheet: '/css/components/ink-foot.css',
-        data: { shape: 'InkFoot({ children })', fields: { children: 'two paragraphs' } },
-        useFor: ['The last thing on a person\'s own page.'],
-        variants: [],
+        data: {
+            shape: 'InkFoot({ brand, children })',
+            fields: {
+                children: 'two paragraphs',
+                brand: 'a word under both facts, across the foot: small spaced poster letters in the sun colour',
+            },
+        },
+        useFor: ['The last thing on a person\'s own page.', 'The foot of the app catalogue, with the node\'s name under the facts (brand).'],
+        variants: [
+            { name: 'brand', class: 'poster-foot-brand', prop: 'brand', when: 'a name signs the foot under its facts' },
+        ],
         example: one('<p>Everything here is yours.</p><p>Nothing is public until you publish it.</p>'),
+        note: 'brand came with appcat (2026-09-27): it draws the old app catalogue\'s footer word (.footer-brand).',
     },
     {
         id: 'check-item', name: 'CheckItem', kind: 'component', status: 'active',
@@ -262,11 +285,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'settings-stack', name: 'SettingsStack', kind: 'component', status: 'active',
-        summary: 'The inside of a settings dialog: its sections in one column.',
+        summary: 'The inside of a settings dialog: its sections in one column, each under its headline slab.',
         module: '/components/SettingsStack.js', sheet: '/css/components/settings-stack.css',
-        data: { shape: 'SettingsStack({ children })', fields: { children: 'poster-section elements' } },
+        data: { shape: 'SettingsStack({ children }) · SettingsSection({ title, children })', fields: { children: 'the SettingsSections, and a SettingsDoor last', 'SettingsSection.title': 'the section\'s headline, on its slab', 'SettingsSection.children': 'what the section holds' } },
         useFor: ['Inside a Modal that holds a page\'s own settings.'],
-        variants: [],
+        variants: [{ name: 'section', prop: 'SettingsSection title', when: 'one section of the dialog under its headline slab (poster.css .poster-section)' }],
         example: one('<section class="poster-section">…</section>'),
     },
     {
@@ -283,11 +306,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         summary: 'A choice among a few named looks: a preview strip and the choices, the chosen one on the sun.',
         module: '/components/SwatchPicker.js', sheet: '/css/components/swatch-picker.css',
         data: {
-            shape: 'SwatchPicker({ title, hint, preview, emptyLabel, choices, onChoose })',
-            fields: { title: 'what is chosen', hint: 'one line of help', preview: 'the current look, drawn', emptyLabel: 'the words when nothing is chosen', choices: '[{ value, label, active }]', onChoose: 'called with the value' },
+            shape: 'SwatchPicker({ title, hint, preview, pattern, emptyLabel, choices, onChoose })',
+            fields: { title: 'what is chosen', hint: 'one line of help', preview: 'any other preview, drawn by the page', pattern: 'the margin figure\'s name (a to h, or x); the picker draws its swatch itself', emptyLabel: 'the words when nothing is chosen', choices: '[{ value, label, active }]', onChoose: 'called with the value' },
         },
         useFor: ['A pattern or colour choice with a handful of options.'],
-        variants: [],
+        variants: [{ name: 'pattern', prop: 'pattern', when: 'the margin pattern: the preview is the pattern\'s own swatch (.mp-swatch, margin-pattern.css), so the page passes a name, not a class' }],
         example: { title: 'Margin pattern', choices: [{ value: 'none', label: 'None', active: true }, { value: 'dots', label: 'Dots', active: false }] },
     },
     {

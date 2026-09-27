@@ -29,6 +29,8 @@
  * @structure ThemeError · Theme · ThemeInput · ThemeService · themeSnapshot · INNER_PATHS
  * @usage const svc = new ThemeService(config, storage); await svc.offered();
  * @version-history
+ *   v2.4.0 — 2026-09-27 — /v1/appcat is an inner page: the app catalogue on the component library
+ *     wears the theme and style a person picks.
  *   v2.3.0 — 2026-09-24 — SECURITY (audit A8-1): callerIsOperator takes the principal and asks
  *     services/operator-principal.ts with site:theme-write, the question requireOperatorPrincipal asks
  *     on the /v1/themes doors. It took an owner name and read the account's role alone.
@@ -66,7 +68,7 @@ export const BUILTIN_THEME = 'aimeat';
  * page, help, members, the change log, the showroom pages) keeps behaving as it did before themes
  * (Jouni, Q3 and 2026-09-24: "keep the public pages as they behave today").
  */
-export const INNER_PATHS = ['/v1/home', '/v1/chat', '/v1/profile', '/v1/admin', '/v1/fleet'];
+export const INNER_PATHS = ['/v1/home', '/v1/chat', '/v1/profile', '/v1/admin', '/v1/fleet', '/v1/appcat'];
 
 export class ThemeError extends Error {
     constructor(public readonly code: string, message: string, public readonly httpStatus: number, public readonly details?: unknown) {

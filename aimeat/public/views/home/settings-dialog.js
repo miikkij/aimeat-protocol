@@ -20,6 +20,9 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   2026-09-27: The dialog writes no class: the account's links are the Action component, the
+ *     appearance section is SettingsSection, the pattern preview is SwatchPicker `pattern`, the
+ *     start page is StartPageSetting `dialog`; the markup is the same (page group G9, a move).
  *   2026-09-23: Composed from library components (SettingsStack, SettingsAccount, SettingsSwitch,
  *     SwatchPicker, SettingsDoor, Hint), which emit the markup this file wrote (UI consolidation
  *     phase 1, a move).
@@ -52,7 +55,8 @@ import { Modal } from '/components/Modal.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
 import { EditProfileModal, ChangePasswordModal } from '../profile/landing-page.modals.js';
 import { MARGIN_PATTERNS, applyMarginPattern, marginPatternOf } from '/js/margin-pattern.js';
-import { SettingsStack } from '/components/SettingsStack.js';
+import { SettingsStack, SettingsSection } from '/components/SettingsStack.js';
+import { Action } from '/components/Action.js';
 import { SettingsAccount } from '/components/SettingsAccount.js';
 import { SettingsSwitch } from '/components/SettingsSwitch.js';
 import { SwatchPicker } from '/components/SwatchPicker.js';
@@ -88,7 +92,7 @@ function MarginPatternSetting() {
     <${SwatchPicker}
       title=${tr('home.settings.pattern', 'Margin pattern')}
       hint=${tr('home.settings.patternHint', 'A figure on the empty margins, fading toward the middle.')}
-      preview=${current ? html`<div class=${`mp-swatch mp-swatch--${current}`}></div>` : null}
+      pattern=${current}
       emptyLabel=${tr('home.settings.patternOff', 'Off')}
       choices=${[
         { value: '', label: tr('home.settings.patternOff', 'Off'), active: current === '' },
@@ -139,17 +143,16 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
       <${SettingsStack}>
         ${/* Inside a dialog a section starts the way it does on the page: the slab, a size smaller. */''}
         <${SettingsAccount} title=${t('homeJourney.account')}>
-          <button type="button" class="poster-action" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
-          <button type="button" class="poster-action" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
-          <a class="poster-action" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
+          <${Action} onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}<//>
+          <${Action} onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}<//>
+          <${Action} href="/v1/profile?tab=access">${t('homeJourney.security')} →<//>
           <${Hint}>${t('homeJourney.securityHint')}<//>
         <//>
-        <section class="poster-section">
-          <h3 class="poster-section-title">${t('homeJourney.appearance')}</h3>
+        <${SettingsSection} title=${t('homeJourney.appearance')}>
           <${AchievementsToggle} />
           <${MarginPatternSetting} />
-          <${StartPageSetting} className="poster-settings-startpage" />
-        </section>
+          <${StartPageSetting} dialog />
+        <//>
         ${/* Everything that is not the home's own. A full page load rather than a router call: the
               dialog is open over the home, and the cleanest way out of a modal into another shell
               is to leave. */''}

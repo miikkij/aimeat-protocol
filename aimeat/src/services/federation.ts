@@ -11,6 +11,8 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.4.0 — 2026-09-26 — resolveGaii answers local for a person of this node (a GHII with a record
+ *     here), the identity an action published in person is stored under.
  *   v1.3.0 — 2026-09-25 — PeerInfo carries the peer's own relay-claim setting and its last claimed and
  *     unclaimed relay times.
  *   v1.2.0 — 2026-09-03 — `allowRouting` on PeerInfo says which way it points (see federation-tiers).
@@ -135,9 +137,14 @@ export async function resolveGaii(
         return { nodeId: cached.nodeId, nodeUrl: cached.nodeUrl, local: cached.nodeId === config.nodeId };
     }
 
-    // 2. Local check
+    // 2. Local check: an agent of this node, or a person of this node. A person publishes an action
+    // under their GHII (routes/actions.ts), so `alice@this-node` is a provider here like an agent is,
+    // and is not asked of any peer.
     const localAgent = await storage.getAgent(gaii);
     if (localAgent) {
+        return { nodeId: config.nodeId, nodeUrl: config.baseUrl, local: true };
+    }
+    if (!gaii.includes('#') && gaii.endsWith(`@${config.nodeId}`) && await storage.getGHII(gaii)) {
         return { nodeId: config.nodeId, nodeUrl: config.baseUrl, local: true };
     }
 

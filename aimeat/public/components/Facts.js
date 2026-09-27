@@ -9,7 +9,9 @@
  *   the skills, extensions, capabilities, libraries, packages and portfolio copies, identical).
  *
  *   Facts({ rows, wide, flush }): `wide` is the wide cut (a longer name column, more air above: an
- *   opened panel's facts, an AI's rules); `flush` puts the facts at the very top of their box.
+ *   opened panel's facts, an AI's rules); `flush` puts the facts at the very top of their box;
+ *   `tiles` puts each name over its value in a tile, the tiles side by side as the line holds them
+ *   (a thing's short facts: an app's category, tags, size).
  *   A row is { k, v, sub, key, mono, warn, missing, pre, controls, action, actions, state, subTone };
  *   a falsy row is left out, so a page can write `cond && { … }`.
  *   - k: the name. `state` = 'fine' | 'attention' | 'danger' | 'off' draws the name as a Status in that
@@ -28,6 +30,11 @@
  * @usage html`<${Facts} rows=${[{ k: t('x.id'), v: id, mono: true }, { k: t('x.calls'), v: n, sub: t('x.callsSub') }]} />`
  *        html`<${Facts} wide rows=${[{ k: t('x.list'), v: items.map((i) => html`<${FactLine} key=${i.id} sub=${i.when}>${i.name}<//>`) }]} />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — `readout`: what a system observed, the names in small grey typewriter
+ *     capitals, the values bold (the old app catalogue's .mk-sees), appcat parity (sections-c);
+ *     additive, facts.css .facts--readout.
+ *   v1.1.0 — 2026-09-27 — `tiles`: the old app catalogue's About facts (.dtl-meta-grid, .dtl-meta-item),
+ *     appcat parity (sections-a); additive, facts.css .facts--tiles.
  *   v1.0.0 — 2026-09-26 — Initial: the name and value rows ~40 Settings pages wrote by hand
  *     (<div class="facts"><div class="facts-k poster-label">…) as one component, with the meanings the
  *     pages' own rules carried kept as named options (component plan C4).
@@ -64,9 +71,20 @@ function Value({ row }) {
   return html`<dd class=${cls}>${v}${row.action ? html` <span class="facts-after">${row.action}</span>` : null}${has(row.sub) ? html`<${Sub} tone=${row.subTone}>${row.sub}<//>` : null}${row.actions ? html`<${Actions}>${row.actions}<//>` : null}</dd>`;
 }
 
-export function Facts({ rows = [], wide, flush }) {
+export function Facts({ rows = [], wide, flush, tiles, readout }) {
+  // readout (added by appcat sections-c, parity): what a system observed, read out: the names in small
+  // grey typewriter capitals in a 220px column, the values bold (the old app catalogue's .mk-sees,
+  // "What this node sees about AI in this app").
   const list = (rows || []).filter(Boolean);
-  return html`<dl class=${cx('facts', wide && 'facts--wide', flush && 'facts--flush')}>${list.map((row, i) => html`<${Fragment} key=${row.key ?? (typeof row.k === 'string' ? row.k : i)}>
+  // tiles (added by appcat sections-a, parity): each name over its value in a tile of its own, the
+  // tiles side by side as many as the line holds (the old app catalogue's About facts, .dtl-meta-grid).
+  if (tiles) {
+    return html`<dl class="facts facts--tiles">${list.map((row, i) => html`<div class="facts-tile" key=${row.key ?? (typeof row.k === 'string' ? row.k : i)}>
+      <${Name} k=${row.k} state=${row.state} />
+      <${Value} row=${row} />
+    </div>`)}</dl>`;
+  }
+  return html`<dl class=${cx('facts', wide && 'facts--wide', flush && 'facts--flush', readout && 'facts--readout')}>${list.map((row, i) => html`<${Fragment} key=${row.key ?? (typeof row.k === 'string' ? row.k : i)}>
     <${Name} k=${row.k} state=${row.state} />
     <${Value} row=${row} />
   <//>`)}</dl>`;

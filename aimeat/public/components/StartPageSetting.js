@@ -15,11 +15,14 @@
  *
  *   Choosing is stored on the ACCOUNT, so it follows to another device, and it changes the page
  *   you are on not at all. The chat is offered only where this node has one.
- * @structure StartPageSetting({ className })
+ * @structure StartPageSetting({ className, footer, dialog })
  * @usage
  *   import { StartPageSetting } from '/components/StartPageSetting.js';
- *   html`<${StartPageSetting} />`
+ *   html`<${StartPageSetting} />` · html`<${StartPageSetting} dialog />`
  * @version-history
+ *   v1.3.0 — 2026-09-27 — `dialog`: the preference inside a settings dialog, spaced as the dialog
+ *     spaces it (.poster-settings-startpage), in place of the class the home passed (page group G9,
+ *     additive).
  *   v1.2.0 — 2026-09-26 — `footer`: at the foot of a page under the heavy rule, words and tabs on one
  *     line (the Settings overview's .pf-start-page, moved to start-page.css; page group G8, additive).
  *   v1.1.0 — 2026-09-24 — The choices are tabs, the chosen one on the sun (Jouni's decision "Choice").
@@ -45,8 +48,12 @@ const OPTIONS = [
  * `footer` (added by page group G8): the preference at the foot of a page, under the heavy rule,
  * its words and its tabs on one line (the Settings overview; formerly its .pf-start-page).
  * `className` stays for the home's settings dialog, which passes its own place.
+ * `dialog` (added by page group G9): the preference inside a settings dialog (the home's), spaced
+ * as the dialog spaces it (settings-stack.css .poster-settings-startpage), so that dialog passes a
+ * meaning and not the class.
  */
-export function StartPageSetting({ className = '', footer = false }) {
+export function StartPageSetting({ className = '', footer = false, dialog = false }) {
+  const place = [dialog ? 'poster-settings-startpage' : '', className].filter(Boolean).join(' ');
   const [ui, setUi] = useState(null);           // 'home' | 'chat' | 'profile'
   const [chatHere, setChatHere] = useState(true); // whether this node has a chat to land in
   const [busy, setBusy] = useState(false);
@@ -81,7 +88,7 @@ export function StartPageSetting({ className = '', footer = false }) {
 
   const options = OPTIONS.filter(o => o.id !== 'chat' || chatHere || ui === 'chat');
   return html`
-    <div class="start-page ${footer ? 'start-page--footer poster-row--thing' : ''} ${className}">
+    <div class="start-page ${footer ? 'start-page--footer poster-row--thing' : ''} ${place}">
       <div class="start-page-words">
         <span class="start-page-title">${tr('home.startPage.title', 'Start page')}</span>
         <span class="start-page-hint">

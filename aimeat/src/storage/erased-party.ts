@@ -13,6 +13,17 @@
  *   An AI provenance record outlives its owner for a like reason: it answers "which model made these
  *   bytes" for content that can outlive the account ("AiProvenance" in the same file).
  *
+ *   Work between two accounts is the same kind of record. Finished work is the other side's book
+ *   entry, so it stays. Open work cannot go on without the erased side: it is cancelled, and when the
+ *   erased person was the one to do it, the morsels held from the requester go back to the requester.
+ *   When the erased person asked for it, the morsels held were their own, and they go with the
+ *   account.
+ *
+ *   A line in somebody else's ledger is the same kind of record: it is that person's book entry for
+ *   money that moved between them and the erased person, so it stays, with the erased person named by
+ *   the same pseudonym as counterparty, and as the one who acted where they did. The erased person's
+ *   own lines go with the account.
+ *
  *   WHY THE NAME CANNOT STAY IN IT. A deleted username is released for reuse (decision 2026-08-10),
  *   and every purchase read keys on `name@node`. A receipt that kept the name therefore belonged to
  *   whoever registered that name next: the receipts, the paid content in them and a valid licence.
@@ -27,10 +38,20 @@
  *   - ERASED_PARTY_PREFIX: what every pseudonym starts with
  *   - erasedPartyPseudonym(): one fresh pseudonym, for one erasure
  *   - partyIdentities(name, ghiis): every value a receipt may name this person by
+ *   - isPartyIdentity(identity, name, ghiis): the same identities, as a test on one value
+ *   - OPEN_WORK_STATUSES: the work statuses an erasure cancels
+ *   - LeavingParty, erasedAccountParty(), deletedAgentParty(): who leaves the work, and what stays
  * @usage
  *   import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
  *   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The other side's ledger lines take the same pseudonym in both cascades
+ *     (sqlite repos/ledger-erasure.ts, postgres pseudonymiseLedgerPartyDb). No change to the rule.
+ *   v1.3.0 — 2026-09-26 — LeavingParty: the work rule serves a deleted agent too. Its owner is still
+ *     here, so its held morsels go back to the owner and the rows keep its identity as stored.
+ *   v1.2.0 — 2026-09-26 — Work: open requests are cancelled and the requester's held morsels go back,
+ *     finished work stays under the pseudonym (isPartyIdentity, OPEN_WORK_STATUSES; secaudit 2026-09:
+ *     A8-4, N6).
  *   v1.1.0 — 2026-09-26 — The AI provenance records an erased person owns take the same pseudonym, in
  *     both cascades (secaudit 2026-09: A8-4). No change to the rule itself.
  *   v1.0.0 — 2026-09-24 — Initial: the purchase receipts an erased buyer or seller is a party to
@@ -75,4 +96,61 @@ export function partyIdentities(name: string, ghiis: string[]): { exact: string[
     exact: [...new Set([name, ...ghiis])],
     suffixPatterns: [...new Set(ghiis)].map(g => `%#${escapeLike(g)}`),
   };
+}
+
+/**
+ * The identities partyIdentities lists, as a test on one value. For code that has read a row and has
+ * to say which of its two sides is the erased person.
+ */
+export function isPartyIdentity(identity: string, name: string, ghiis: string[]): boolean {
+  return identity === name || ghiis.some(g => identity === g || identity.endsWith(`#${g}`));
+}
+
+/**
+ * The statuses in which work is still open: the provider has not delivered, and what the requester
+ * was charged is held for it. Every other status is finished work: delivered, rated, settled,
+ * cancelled, or a dispute that follows a delivery.
+ */
+export const OPEN_WORK_STATUSES: readonly string[] = ['pending', 'accepted', 'in_progress'];
+
+/**
+ * A party leaving the work, and what the rows that stay keep of it. One rule for the two ways a party
+ * leaves: an account deleted with everything under it, and one agent its owner deletes. Both
+ * providers settle the work from this (sqlite repos/work-erasure.ts, postgres owner-cascade.ts).
+ */
+export interface LeavingParty {
+  /** The values a row's party column may hold for it: exact values, and LIKE suffix patterns. */
+  exact: string[];
+  suffixPatterns: string[];
+  /** The same test on one value. */
+  is(identity: string): boolean;
+  /**
+   * What the leaving side becomes on a row that stays: the erasure's pseudonym, or null to keep the
+   * identity as stored. A deleted agent keeps it, because its owner is still here. A pseudonym also
+   * replaces the name in a dispute on the row, and a leaving requester's callback address goes.
+   */
+  pseudonym: string | null;
+  /**
+   * Whether the morsels held for a request the leaving party made go back to it. An agent's go back
+   * to its owner's balance. A deleted account's balance goes with the account.
+   */
+  refundsItself: boolean;
+}
+
+/**
+ * A deleted account: every identity it can be named by, and the agents it had, which is how their
+ * work is found when the account has no GHII row to build the patterns from.
+ */
+export function erasedAccountParty(name: string, ghiis: string[], pseudonym: string, agents: string[] = []): LeavingParty {
+  const { exact, suffixPatterns } = partyIdentities(name, ghiis);
+  return {
+    exact: [...new Set([...exact, ...agents])], suffixPatterns,
+    is: id => isPartyIdentity(id, name, ghiis) || agents.includes(id),
+    pseudonym, refundsItself: false,
+  };
+}
+
+/** One agent its owner deletes: named by its GAII alone, and kept as stored. */
+export function deletedAgentParty(gaii: string): LeavingParty {
+  return { exact: [gaii], suffixPatterns: [], is: id => id === gaii, pseudonym: null, refundsItself: true };
 }

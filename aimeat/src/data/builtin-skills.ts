@@ -11,6 +11,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.8 -- 2026-09-26 -- diagnose-a-workflow reads a step's openCalls, which hold until the call
+ *            answers, and an estimate of one attempt; set-up-content-pipeline says a step expected to
+ *            cost more than the whole limit runs once, alone.
  *   v1.16.7 -- 2026-09-26 -- diagnose-a-workflow reads costCap.neededUsd, estimateUsd and reservedUsd,
  *            and an ai step left pending while another runs; set-up-content-pipeline says an ai
  *            step starts only when its expected cost fits under maxCostUsd.
@@ -533,8 +536,9 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
 - Show the owner the workflow definition BEFORE saving; \`aimeat_workflow_save\` is a write.
 - Start with a manual run, then schedule.
 - When steps call the owner's own model (\`action.kind: "ai"\`), set \`maxCostUsd\` on the
-  definition: an ai step then starts only when what it is expected to cost fits in what is left,
-  so a run that goes wrong stops at a known cost, and says so on the run.
+  definition: an ai step then starts only when what one attempt is expected to cost fits in what
+  is left, so a run that goes wrong stops at a known cost, and says so on the run. A step expected
+  to cost more than the whole limit still runs once, alone.
 - The schedule runs on the saver's permissions. The agent that saves the workflow must keep every
   permission its steps need; if the owner later takes one away, the scheduled run is refused and
   the owner is asked, once. Chaining agents is giving them work, so a step that dispatches to an
@@ -691,12 +695,13 @@ metadata:
 6. **A run the node ended itself:** status \`stopped\` means the run stopped at its spending limit
    (\`maxCostUsd\`, US dollars per run): its \`reason\` and \`costCap\` say what the run had spent on
    AI and which ai step did not start. When \`costCap.neededUsd\` is present, the run had not spent
-   the limit: that step was expected to cost \`neededUsd\` (its \`estimateUsd\`, the most it cost in
-   the workflow's last ten finished runs), and that did not fit in what was left. Each step carries
-   its own \`costUsd\`, and \`signalCostUsd\` is what the node's model cost judging the run's \`llm\`
-   signals. An ai step whose earlier steps are done and that stays \`pending\` while another ai step
-   runs is waiting for room under the limit; a running ai step shows what it holds as
-   \`reservedUsd\`. Raising the limit
+   the limit: that step was expected to cost \`neededUsd\` (its \`estimateUsd\`, the most one attempt
+   of it cost in the workflow's last ten finished runs), and that did not fit in what was left. Each
+   step carries its own \`costUsd\`, and \`signalCostUsd\` is what the node's model cost judging the
+   run's \`llm\` signals. An ai step whose earlier steps are done and that stays \`pending\` while a
+   model call is open is waiting for room under the limit. A step's \`openCalls\` lists its calls
+   still running, each with what it holds (\`reservedUsd\`) until it answers, even when the watchdog
+   already moved the step on; a restart clears them on a run in flight. Raising the limit
    is a change to the definition, so it waits for the owner like any other. Status \`refused\`
    means the trigger did not start the run: the agent or app that saved the workflow
    (\`savedBy\`) is disconnected or lost a permission its steps need, and \`refusal.missing\` names

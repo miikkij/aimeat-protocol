@@ -14,7 +14,11 @@
  *   folded section when the item says how. It owns the current item: `on` draws it at full strength
  *   and says aria-current.
  *
- *   Rail({ title, groups }): `title` is the rail's name for a screen reader. Each group is
+ *   Rail({ title, groups, tone }): `title` is the rail's name for a screen reader. `tone="light"`:
+ *   the index on the page's own ground under a heavy ink rule, the group words in ink capitals of the
+ *   poster face, the items grey, the counts in grey typewriter (the admin Config page's index on
+ *   main, .adm-cfg-rail). `tone="ink"`: the box in the text colour, which turns light with dark words
+ *   in the dark theme (the old app catalogue's detail rail). Each group is
  *   { label?, items, rule? }: a coral label, then its items; a rule (hr) stands between two groups
  *   unless the later one says `rule: false`.
  *
@@ -33,11 +37,18 @@
  *   label is an identifier (a memory key), in the typewriter letters as written. `notice`: the
  *   label in coral, a line that asks for a look (a check that fails). `note: true`: small grey words
  *   under the item above it, indented to its label (a board poster's standing and since when).
- * @structure Rail({ title, groups }) · scrollToSection(id) · openTab(tabId) · railSection(s)
+ * @structure Rail({ title, groups, tone }) · scrollToSection(id) · openTab(tabId) · railSection(s)
  * @usage html`<${Rail} title=${x('railTitle')} groups=${[
  *          { label: x('railTitle'), items: [{ section: 'sk-own', mark: '01', label: x('secOwn'), count: 12 }] },
  *          { label: x('pages'), items: [{ tab: 'agents', label: t('profile.tabs.agents') }] }]} />`
  * @version-history
+ *   v1.4.0 — 2026-09-27 — `tone="ink"`: the box in the text's own colour, so it turns light in the dark
+ *     theme with dark words (the old app catalogue's detail rail, .dtl-rail; appcat parity); additive.
+ *   v1.3.1 — 2026-09-27 — scrollToSection keeps the section's scroll-margin-top in sight above it
+ *     (16px when it sets none): on the admin the headline no longer lands behind the bars that stay
+ *     at the top (Jouni).
+ *   v1.3.0 — 2026-09-27 — `tone="light"`: the index on the page's ground, main's admin Config index
+ *     (Jouni: the dark look belongs only to the operator menu); additive.
  *   v1.2.0 — 2026-09-26 — The note line (additive, page group G7: the Boards notice page's
  *     .bp-rail-note, the poster's standing under their name).
  *   v1.1.0 — 2026-09-26 — The plain line, the code label and the notice label (additive, page group
@@ -68,7 +79,11 @@ export const scrollToSection = (id) => {
   if (!el) return;
   const box = el.closest('.page-content') || el.closest('.settings-frame-content') || null;
   if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
-  const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - 16;
+  // The section's own scroll-margin-top says how much stays in sight above it: a page with a bar
+  // that stays at the top (the admin's title bar, the Config page's search row) sets it to their
+  // height, so the section's headline lands under them instead of behind them. 16px otherwise.
+  const margin = parseFloat(getComputedStyle(el).scrollMarginTop) || 16;
+  const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - margin;
   box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 };
 
@@ -107,12 +122,12 @@ function RailItem({ item }) {
  */
 
 /**
- * @param {{ title?: string, groups: Array<RailGroup|null|false> }} props
+ * @param {{ title?: string, groups: Array<RailGroup|null|false>, tone?: 'light'|'ink' }} props
  */
-export function Rail({ title, groups }) {
+export function Rail({ title, groups, tone }) {
   const list = /** @type {RailGroup[]} */ ((groups || []).filter((g) => g && (g.label || (g.items || []).some(Boolean))));
   return html`
-    <nav class="og-rail" aria-label=${title}>
+    <nav class=${cx('og-rail', tone === 'light' && 'og-rail--light', tone === 'ink' && 'og-rail--ink')} aria-label=${title}>
       ${list.map((g, gi) => html`
         <${Fragment} key=${'g' + gi}>
           ${gi > 0 && g.rule !== false ? html`<hr />` : null}

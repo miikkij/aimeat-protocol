@@ -21,6 +21,8 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.6.2 — 2026-09-26 — The part is read as stored (storedPart): a component is benched again as its
+ *     page is built, and one that no longer passes renders as the bench's reason.
  *   v1.6.1 — 2026-09-20 — A genre that grew out of an app is not run here, and the answer says why.
  *   v1.6.0 — 2026-09-08 — Check 40px phone controls, clipped content and small text in both
  *     themes. JavaScript errors fail the render; old bench stamps remain historical.
@@ -162,7 +164,7 @@ export async function runPartBench(
   storage: Storage, config: AimeatConfig, id: string,
 ): Promise<DesignBookBenchResult> {
   const book = new DesignBookService(storage, config);
-  const { part } = await book.get(id);
+  const part = await book.storedPart(id);
   // A genre that grew out of an app is a stranger's page with script in it. This bench loads a
   // page from the node's own loopback origin, so it does not run that one (grown-genre.ts).
   if (part.kind === 'genre' && isGrownGenreBody(part.body)) {

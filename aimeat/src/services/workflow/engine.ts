@@ -77,6 +77,17 @@
  *     a step waits and no ai step runs (run-cost.ts admitAiStep, stopWhenNoRoomComes); persist drops
  *     the hold of every step no longer running, and onPushTerminal keeps a step's cost even when the
  *     step was moved on while its call ran (secaudit 2026-09, A6-11).
+ *   v1.13.0 — 2026-09-26 — The hold belongs to the model call (run-cost.ts): onPushTerminal learns the
+ *     attempt that answered and only then drops that call's hold, whatever the watchdog, a retry or a
+ *     cancel did to the step meanwhile, and ticks a live run so a step waiting for room gets it. A run
+ *     with a call open is `waiting-step`. resumeInflight clears every open call, since the calls
+ *     ended with the process (secaudit 2026-09, A6-11).
+ *   v1.14.0 — 2026-09-26 — startRun takes the run's lock before its first save, so nothing advances
+ *     the run before its first tick (secaudit 2026-09, A6-11).
+ *   v1.15.0 — 2026-09-26 — onPushTerminal tells an answer of an earlier attempt from the answer of the
+ *     attempt that runs now. After a retry, an earlier attempt's answer settles its own cost and hold
+ *     and ticks the run, turns the step green only when it succeeded and the output is there, and
+ *     never uses up a retry or turns the step red (secaudit 2026-09, R3 problem 2).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -99,7 +110,9 @@ import {
   dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
 } from './engine-steps.js';
 import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
-import { spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, dropEndedReservations } from './run-cost.js';
+import {
+  spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls,
+} from './run-cost.js';
 import { refuseTriggerStart, clearRefusal } from './trigger-authority.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep,
@@ -265,12 +278,13 @@ export class WorkflowEngine {
     if (opts.mode === 'signals-only') {
       await this.runSignalsOnly(ownerGhii, run);
     } else {
-      await this.persist(ownerGhii, run);
-      // It runs again: a refusal still open for it is over, and the next one is told anew.
-      await clearRefusal(this.storage, this.config.nodeId, ownerGhii, workflowId);
-      // Under the run lock: an ecosystem action step's async reply (onPushTerminal, which also locks)
-      // must not advance the run before this initial tick has persisted the 'dispatched' state.
+      // Under the run lock from the first save on. The watchdog finds the run as soon as it is saved,
+      // and an ecosystem action step's async reply (onPushTerminal) can come at any time; both take
+      // this lock, so neither advances the run before this first tick has saved its 'dispatched' state.
       await this.withLock(runId, async () => {
+        await this.persist(ownerGhii, run);
+        // It runs again: a refusal still open for it is over, and the next one is told anew.
+        await clearRefusal(this.storage, this.config.nodeId, ownerGhii, workflowId);
         // fresh mode: wipe the workflow's prior-run output ONCE, before any step dispatches, so an
         // idempotent skip-existing crew regenerates it (parallel shared-namespace steps can't clobber).
         if (run.defSnapshot.fresh) await clearRunOutputs(this.stepDeps(), ownerGhii, run);
@@ -316,8 +330,8 @@ export class WorkflowEngine {
     let dispatchedAny = false;
     let mutated = false;
     let stopped = false;
-    // ai steps waiting for room under the cost cap: no ai step ends inside one tick, so they wait for
-    // the rest of it, and their signals are not asked again in a later pass.
+    // ai steps waiting for room under the cost cap: no model call answers inside one tick, so they
+    // wait for the rest of it, and their signals are not asked again in a later pass.
     const waiting = new Set<string>();
 
     // Fixpoint: a step reaching a TERMINAL state this tick (green via skip-done, or input-red) can
@@ -367,11 +381,11 @@ export class WorkflowEngine {
           continue;
         }
         // An ai step spends the owner's AI. Under maxCostUsd it starts only when what it is expected to
-        // cost fits beside what the run has spent and what its running ai steps hold; otherwise it
-        // stays pending, and after the pass the run stops if no ai step is running (run-cost.ts).
+        // cost fits beside what the run has spent and what its open model calls hold; otherwise it
+        // stays pending, and after the pass the run stops if no call is open (run-cost.ts).
         if (spendsAi(step) && admitAiStep(run, step.id) === 'wait') { waiting.add(step.id); continue; }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
-        const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok, cost) => this.onPushTerminal(o, w, rid, s, ok, cost));
+        const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok, cost, call) => this.onPushTerminal(o, w, rid, s, ok, cost, call));
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
         dispatchedAny = true; mutated = true;
         // Heads-up if we just dispatched to an offline agent (the sweep fails it after the grace).
@@ -380,7 +394,7 @@ export class WorkflowEngine {
       // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
       if (!advancedTerminal) break;
     }
-    // ai steps left waiting with no ai step running get no room back: the run stops at its cap.
+    // ai steps left waiting with no model call open get no room back: the run stops at its cap.
     if (stopWhenNoRoomComes(run, [...waiting], now)) { stopped = true; mutated = true; }
 
     // A run stopped at its cost cap already carries its status, end and reason (run-cost.ts).
@@ -388,7 +402,8 @@ export class WorkflowEngine {
     if (outcome === 'done' || outcome === 'partial') {
       run.status = outcome; run.endedAt = new Date().toISOString();
     } else if (outcome === 'running') {
-      run.status = Object.values(run.steps).some(s => s.state === 'dispatched' || s.state === 'waiting-human') ? 'waiting-step' : 'running';
+      // A model call still open keeps the run waiting too: its answer can give a waiting step room.
+      run.status = aiCallOpen(run) || Object.values(run.steps).some(s => s.state === 'dispatched' || s.state === 'waiting-human') ? 'waiting-step' : 'running';
     }
     await this.persist(ownerGhii, run);
     if (mutated || dispatchedAny || outcome !== 'running') emitChange('workflows');
@@ -613,11 +628,14 @@ export class WorkflowEngine {
   }
 
   /**
-   * On boot, re-sync in-flight runs: a step's task may have reached done/failed during the restart
-   * gap (after the HTTP response, before the fire-and-forget onTaskTerminal ran), leaving the step
-   * stuck `dispatched`. Re-check each dispatched step's tasks and advance any that already finished —
-   * otherwise the watchdog would wrongly TIME OUT a step whose task actually succeeded. Remaining
-   * in-flight runs are then carried by live task events + the watchdog.
+   * On boot, re-sync in-flight runs. The model calls an ai step had open ended with the process, so
+   * nothing will answer them: their marks, and what they held of the cost cap, go first (run-cost.ts
+   * clearOpenCalls); the watchdog ends such a step by its output or its timeout. Then: a step's task
+   * may have reached done/failed during the restart gap (after the HTTP response, before the
+   * fire-and-forget onTaskTerminal ran), leaving the step stuck `dispatched`. Re-check each
+   * dispatched step's tasks and advance any that already finished — otherwise the watchdog would
+   * wrongly TIME OUT a step whose task actually succeeded. Remaining in-flight runs are then carried
+   * by live task events + the watchdog.
    */
   async resumeInflight(): Promise<void> {
     const active = await readActiveRuns(this.storage, this.config.nodeId);
@@ -625,6 +643,10 @@ export class WorkflowEngine {
     logger.info(`WorkflowEngine: re-syncing ${active.length} in-flight run(s) after restart`);
     for (const a of active) {
       try {
+        await this.withLock(a.runId, async () => {
+          const held = (await this.storage.getMemory(a.ownerGhii, runKey(a.workflowId, a.runId)))?.value as WorkflowRun | undefined;
+          if (held && clearOpenCalls(held)) await this.persist(a.ownerGhii, held);
+        });
         const rec = await this.storage.getMemory(a.ownerGhii, runKey(a.workflowId, a.runId));
         if (!rec) continue;
         const run = rec.value as WorkflowRun;
@@ -675,21 +697,31 @@ export class WorkflowEngine {
    * reuses the same lock + success_signal evaluation + partial-fail + tick. `ok` is whether the
    * push-ack / capability-response succeeded; a step is green iff ok AND its success_signal (if any)
    * passes. `costUsd` is what the step's own model calls cost (an ai step), kept on the step for the
-   * run's cost cap in place of what the step held while it ran.
+   * run's cost cap, and `call` is the attempt the answer was dispatched for: what an ai step's model
+   * call held of the cap goes now, with its answer. An answer of an EARLIER attempt, while the step
+   * runs again after a retry, turns the step green when it succeeded and its output is there, and
+   * otherwise leaves the step to the current attempt: it never uses up a retry or turns it red.
    */
-  async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number): Promise<void> {
+  async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number): Promise<void> {
     await this.withLock(runId, async () => {
       const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
       if (!rec) return;
       const run = rec.value as WorkflowRun;
       const rs = run.steps[stepId];
       if (!rs) return;
-      // What the step's model calls cost is kept whatever became of the step while they ran (a
-      // cancel, a timeout, the watchdog finding its output first): the owner paid for them, and the
-      // cap and the next run's estimate count them. Its reservation goes when the run is saved.
-      const paid = typeof costUsd === 'number' && Number.isFinite(costUsd) && costUsd > 0;
-      if (paid) rs.costUsd = (rs.costUsd ?? 0) + costUsd;
-      if (rs.state !== 'dispatched') { if (paid) await this.persist(ownerGhii, run); return; } // already resolved / not awaiting
+      // What the call cost is kept whatever became of the step while it ran (a cancel, a timeout, a
+      // retry, the watchdog finding its output first): the owner paid for it, and the cap and the next
+      // run's estimate count it. Only now does the hold it carried go (run-cost.ts aiCallAnswered).
+      const answered = aiCallAnswered(rs, call, costUsd);
+      // The step was given a retry after this answer's attempt started, and the current attempt runs.
+      const earlier = call !== undefined && call !== rs.attempt;
+      if (rs.state !== 'dispatched' || (earlier && !ok)) {
+        // Not awaiting this answer. A live run may now have room for an ai step that waited.
+        const live = run.status === 'running' || run.status === 'waiting-step';
+        if (answered && live) await this.tick(ownerGhii, run);
+        else if (answered) await this.persist(ownerGhii, run);
+        return;
+      }
 
       const r = this.resolvedMap(run).get(stepId);
       const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
@@ -703,6 +735,8 @@ export class WorkflowEngine {
       const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
       if (ok && output.ok) {
         rs.state = 'green'; rs.endedAt = now;
+      } else if (earlier) {
+        // An earlier attempt succeeded, and its output is not there: the current attempt decides.
       } else if (stepDef.retry && rs.attempt < stepDef.retry.max) {
         rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
         rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
@@ -747,8 +781,6 @@ export class WorkflowEngine {
   }
 
   private async persist(ownerGhii: string, run: WorkflowRun): Promise<void> {
-    // A step holds its share of the cost cap only while it runs, however it stopped running.
-    dropEndedReservations(run);
     // Terminal-run finish notification (owner opt-in) — mutates run.notifiedFinish so it's persisted
     // below and fires exactly once across every terminal path (tick / cancelRun / sweep).
     await onRunFinished(this.stepDeps(), ownerGhii, run);

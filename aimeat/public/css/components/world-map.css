@@ -1,0 +1,56 @@
+/**
+ * @file world-map.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Counts per country on a world map with its list beside it (components/WorldMap.js):
+ *   the map in the 3px ink frame at 2:1, the land, the five coral shades, the city dots, the legend,
+ *   and the list beside the map that drops under it when there is no room for both. The values are
+ *   the old app catalogue's (app-catalog-visitors.css .vis-geo, .vis-map*, .vis-land, .vis-shade-*,
+ *   .vis-dot, .vis-legend).
+ *
+ *   THE FIVE SHADES ARE ONE COLOUR AT FIVE STRENGTHS, mixed into the page background with color-mix,
+ *   so they follow the theme: on a dark page the lightest shade is still the one closest to the
+ *   background. Land nobody came from is the ink at 13 %, mixed the same way: the subtle surface token
+ *   was tried first and the continents could not be told from the sea.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — The zoom doors at the old .vis-map-controls size; the greys --text-muted (the
+ *     old page's --text-dim); the lists beside the map (List tone "counts") from its top; the places
+ *     heading at the reading's line height. appcat parity (sections-b).
+ *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder B).
+ */
+.world-map { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 24px 32px; align-items: start; }
+.world-map-main > .og-doors { margin: 0 0 10px; gap: 20px; }
+/* The zoom doors are the old .vis-map-controls .dtl-btn: the word at .9rem, at least 24px wide and
+   28px high, its sign in the middle. */
+.world-map-main > .og-doors > .poster-action {
+  display: inline-block; min-width: 24px; min-height: 28px; padding: 0 0 1px;
+  border-bottom-width: var(--shape-frame); font-size: .9rem; line-height: normal; text-align: center;
+}
+.world-map-main > .og-doors > .poster-action:disabled { opacity: .5; border-color: var(--text); }
+.world-map-frame { border: var(--shape-frame-heavy, 3px) solid var(--shape-frame-colour, var(--text)); background: var(--bg); line-height: 0; }
+.world-map-svg { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; }
+.world-map-wait {
+  aspect-ratio: 2 / 1; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: .8rem; line-height: 1.4; color: var(--text-muted);
+}
+.world-map-land { fill: color-mix(in srgb, var(--text) 13%, var(--bg)); stroke: var(--bg); stroke-width: .6; vector-effect: non-scaling-stroke; }
+.world-map-land--hit { cursor: pointer; }
+.world-map-land--hit:hover { stroke: var(--text); stroke-width: 1.5; }
+.world-map-land.is-focus { stroke: var(--text); stroke-width: 2; }
+.world-map-shade-1 { fill: color-mix(in srgb, var(--accent) 22%, var(--bg)); background: color-mix(in srgb, var(--accent) 22%, var(--bg)); }
+.world-map-shade-2 { fill: color-mix(in srgb, var(--accent) 40%, var(--bg)); background: color-mix(in srgb, var(--accent) 40%, var(--bg)); }
+.world-map-shade-3 { fill: color-mix(in srgb, var(--accent) 58%, var(--bg)); background: color-mix(in srgb, var(--accent) 58%, var(--bg)); }
+.world-map-shade-4 { fill: color-mix(in srgb, var(--accent) 78%, var(--bg)); background: color-mix(in srgb, var(--accent) 78%, var(--bg)); }
+.world-map-shade-5 { fill: var(--accent); background: var(--accent); }
+.world-map-dot { fill: var(--sun); stroke: var(--text); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.world-map-legend { display: flex; align-items: center; gap: 4px; margin-top: 10px; font-family: var(--font-mono); font-size: .72rem; line-height: 1; color: var(--text-muted); }
+.world-map-legend span:first-child { margin-right: 6px; }
+.world-map-legend span:last-child { margin-left: 6px; }
+.world-map-step { display: inline-block; width: 22px; height: 10px; }
+.world-map-side > .sub-heading--rule { margin-top: 26px; line-height: normal; }
+/* The lists beside the map start at its top (the old .vis-map-side .vis-table). */
+.world-map-side > .listing.list--counts { margin-top: 0; }
+@media (max-width: 760px) {
+  .world-map { grid-template-columns: minmax(0, 1fr); }
+}

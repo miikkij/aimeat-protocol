@@ -18,6 +18,9 @@
  * @structure ComponentsTab (default) · ComponentGrid · ComponentEditor · pagePath
  * @usage html`<${ComponentsTab} theme=${theme} readOnly=${false} onSaved=${fn} onOpenPage=${fn} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — No class written any more: the action links are Action, Save is Loud
+ *     (control), the count and "saved" the meta Note. The previews stay the catalogue's own frames:
+ *     each draws the component itself (admin page group G8).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles S4 and S5).
  */
 import { h } from 'preact';
@@ -27,6 +30,8 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPut } from '/js/api.js';
 import { Band } from '/components/Band.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { Hint } from '/components/Hint.js';
 import { QuietNote } from '/components/QuietNote.js';
@@ -108,12 +113,12 @@ function ComponentGrid({ theme, components, onOpen, onRemove, readOnly }) {
           choices=${[{ value: '', label: t('themes.all') }, ...uses.map((u) => ({ value: u, label: t('themes.use.' + u) }))]} onChoose=${setUse} />
       <//>
       <${SearchBar} value=${q} onInput=${(e) => setQ(e.target.value)} placeholder=${t('themes.findComponent')} ariaLabel=${t('themes.findComponent')} />
-      <p class="text-meta">${t('themes.shownCount', { n: shown.length, total: components.length })}</p>
+      <${Note} kind="meta">${t('themes.shownCount', { n: shown.length, total: components.length })}<//>
     <//>
     ${gone.length > 0 && html`<${Band} title=${t('themes.cssState.removed')} tight=${true}>
       ${gone.map((id) => html`<${NamedRow} key=${id} label=${id}>
         ${t('themes.removedWhy')}
-        ${!readOnly && html` <button type="button" class="poster-action" onClick=${() => onRemove(id)}>${t('themes.deleteCss')}</button>`}
+        ${!readOnly && html` <${Action} onClick=${() => onRemove(id)}>${t('themes.deleteCss')}<//>`}
       <//>`)}
     <//>`}
     ${shown.length === 0 && html`<${QuietNote}>${t('themes.noComponent')}<//>`}
@@ -122,7 +127,7 @@ function ComponentGrid({ theme, components, onOpen, onRemove, readOnly }) {
         const st = theme.componentCssState?.[c.id];
         return html`<${Specimen} key=${c.id + style + mode} label=${spaced(c.name)} src=${componentFrame({ id: c.id, mode, key: 'grid', style })}
           note=${html`${cssStateText(st)}
-            <br /><button type="button" class="poster-action" onClick=${() => onOpen(c.id, style)}>${readOnly ? t('themes.open') : hasCss(c) ? t('themes.changeCss') : t('themes.styleIt')}</button>`} />`;
+            <br /><${Action} onClick=${() => onOpen(c.id, style)}>${readOnly ? t('themes.open') : hasCss(c) ? t('themes.changeCss') : t('themes.styleIt')}<//>`} />`;
       })}
     <//>`;
 }
@@ -216,17 +221,17 @@ function ComponentEditor({ theme, componentId, initialStyle, readOnly, onBack, o
       ${!readOnly && html`
         ${state.error && html`<${ErrorNote} text=${state.error} />`}
         <${ActionRow}>
-          <button type="button" class="poster-action" disabled=${css === saved} onClick=${() => setCss(saved)}>${t('themes.undo')}</button>
-          ${saved && html`<button type="button" class="poster-action" onClick=${() => setRemoving(true)}>${t('themes.removeCss')}</button>`}
-          <button type="button" class="poster-slab poster-slab--control" disabled=${state.busy || css === saved || !!broken} onClick=${() => (hidden.length || reaches ? setConfirming(true) : save(css))}>${t('themes.save')}</button>
-          ${state.saved && html`<span class="text-meta">${t('themes.saved')}</span>`}
+          <${Action} disabled=${css === saved} onClick=${() => setCss(saved)}>${t('themes.undo')}<//>
+          ${saved && html`<${Action} onClick=${() => setRemoving(true)}>${t('themes.removeCss')}<//>`}
+          <${Loud} control disabled=${state.busy || css === saved || !!broken} onClick=${() => (hidden.length || reaches ? setConfirming(true) : save(css))}>${t('themes.save')}<//>
+          ${state.saved && html`<${Note} kind="meta" inline>${t('themes.saved')}<//>`}
         <//>`}
     <//>
 
     <${Band} title=${t('themes.whereItShows')} tight=${true}>
       ${pages.length === 0 && html`<${QuietNote}>${t('themes.noPage')}<//>`}
       ${pages.length > 0 && html`<${ActionRow}>
-        ${pages.map((p) => html`<button key=${p} type="button" class="poster-action" onClick=${() => onOpenPage(p, drafts.with)}>${t('themes.seeOnPage', { page: innerName(p) })}</button>`)}
+        ${pages.map((p) => html`<${Action} key=${p} onClick=${() => onOpenPage(p, drafts.with)}>${t('themes.seeOnPage', { page: innerName(p) })}<//>`)}
       <//>`}
       ${elsewhere > 0 && html`<${Hint}>${t('themes.alsoPublic', { n: elsewhere })}<//>`}
     <//>

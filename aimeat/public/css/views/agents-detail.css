@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v2.100.1 -- 2026-09-27 -- .pf .pf-agd-empty and .pf-agd-solo go with their last user: the pop-out agent window is the SoloWindow component (solo-window.css, page group G9).
  *   v2.100.0 -- 2026-09-26 -- The agents list, the opened agent's head and notices, the Tasks tab's record, the
  *     rate and request-changes dialogs, the services list and the crew's model picker draw only
  *     components now (page group G1a): their rules no file writes any more go (the form field and its
@@ -212,11 +213,6 @@
  *   v2.32.0 -- 2026-09-25 -- The note rules go: the grey help notes are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
  */
 
-/* Empty state */
-.pf .pf-agd-empty  {
-  text-align: center;
-  padding: 1.5rem;
-}
 /* Resource / memory area lists */
 
 /* Group picker popup (memory tab visibility cycling) */
@@ -317,12 +313,7 @@
 /* ── Drag-to-reorder rows (ungrouped, unfiltered agent list) ── */
 /* A row dragged to a new order, and its grip: the library's Drag grip (css/components/drag-grip.css). */
 
-/* ── Solo (pop-out) window layout ── */
-.pf-agd-solo {
-  padding: 0.5rem 1rem;
-  max-width: 860px; /* card gets ≈828px — same usable width as the list view */
-  margin: 0 auto;
-}
+/* The solo (pop-out) window is the SoloWindow component: css/components/solo-window.css. */
 
 /* ── Badges (platform, readiness, federation) ── */
 

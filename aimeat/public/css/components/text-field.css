@@ -10,6 +10,17 @@
  *   Drawn by components/TextField.js; a page never writes these.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — .text-area--source (TextArea source): the old app catalogue's source editor;
+ *     .text-area--script (TextArea script): its extension editor's files; appcat parity (dialogs);
+ *     additive.
+ *   v1.4.0 — 2026-09-27 — .text-field--mark (TextField size 'mark'): the old detail's About icon field,
+ *     appcat parity (sections-a); additive.
+ *   v1.3.0 — 2026-09-27 — .text-area--prompt and .field-line--prompt (TextArea prompt, actions): the
+ *     old app catalogue's Edit with AI row, appcat parity (sections-a); additive.
+ *   v1.2.0 — 2026-09-27 — The glyph field's ready marks stand beside the square and wrap there (the
+ *     old app catalogue's .icon-field), appcat parity; additive.
+ *   v1.1.0 — 2026-09-27 — .text-field--glyph: one big mark centred in a small square (appcat's Add
+ *     dialog icon field); additive.
  *   v1.0.1 — 2026-09-26 — The eye's focus ring reads var(--shape-frame) (2px in AIMEAT), not a literal
  *     (check:shape-tokens; fix pass).
  *   v1.0.0 — 2026-09-26 — Initial. The secret field's eye moved unchanged out of apps-poster.css
@@ -20,6 +31,19 @@
 
 .text-field--short { max-width: 8rem; }
 .text-field--medium { max-width: 16rem; }
+/* The glyph: one big mark centred in a small square (an app's icon; the old app catalogue's #app-icon). */
+.og-input.text-field--glyph { width: 64px; height: 56px; flex: 0 0 auto; padding: 0; text-align: center; font-size: 1.6rem; }
+/* The mark (size 'mark', appcat sections-a): one mark centred, a step larger, in a field of the whole
+   width (the old detail's About editor icon field, #detail-icon-input). */
+.og-input.text-field--mark, .og-fields.og-fields--plain .og-input.text-field--mark { text-align: center; font-size: 1.2rem; }
+/* A glyph field with ready marks beside it (TextField size="glyph" with a Tabs row in `actions`): the
+   square at the left, the marks filling the rest of the line and wrapping under each other, 14px
+   between them and 6px between the marks, the tops level (the old page's .icon-field, .icon-picks). */
+.field-line:has(> .og-input.text-field--glyph) { flex-wrap: nowrap; align-items: flex-start; gap: 14px; }
+.field-line > .og-input.text-field--glyph + .tab-row { flex: 1 1 auto; min-width: 0; gap: 6px; }
+/* Its hint, how to type any other mark, is a line of running text 6px under the marks (.icon-hint; the
+   field's own 2px gap and 4px here). */
+.og-fields > .og-field:has(.text-field--glyph) > .poster-hint, .og-field:has(.text-field--glyph) > .poster-hint { margin-top: 4px; font-size: .8rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted); }
 
 /* The secret: typed hidden, the eye inside the field's right end. The padding rule names the element
    and three classes' worth, so it outranks profile-poster.css's `.pf input[type=password]` padding
@@ -34,6 +58,39 @@
 .text-field-eye:hover { color: var(--accent); }
 .text-field-eye:focus-visible { outline: var(--shape-frame) solid var(--accent); outline-offset: 2px; }
 .text-field-eye:disabled { opacity: .45; cursor: default; }
+
+/* The prompt (TextArea prompt with actions, appcat): a request to the person's AI, underlined and bold
+   on the page's ground, its send button beside it at the top, the two wrapping under each other when
+   the line is short (the old app catalogue's #detail-ai-input in .dtl-ai-row). */
+.field-line.field-line--prompt { align-items: flex-start; gap: 10px; }
+.field-line--prompt > .og-doors { flex: none; }
+.og-textarea.text-area--prompt {
+  flex: 1 1 0; min-width: 240px; min-height: 64px; width: auto; padding: 10px 12px;
+  background: transparent; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); border-radius: var(--shape-corner);
+  font-family: var(--font-body); font-size: .9rem; font-weight: var(--weight-bold); line-height: normal;
+}
+.og-textarea.text-area--prompt:focus { border-bottom-color: var(--accent); }
+
+/* The source (TextArea source, appcat dialogs): a whole file's source to read and edit, the typewriter
+   face at .8rem 1.5 apart, 1rem inside the heavy ink frame on the card ground, 400px high at least and
+   60% of the window at most, two spaces to a tab (the old app catalogue's #source-code); 13px under it,
+   which the status line's own 10px meets (the old inline box left 3px more). */
+.og-textarea.text-area--source {
+  display: block; width: 100%; min-height: 400px; max-height: 60vh; margin-bottom: 13px; padding: 1rem; resize: vertical; tab-size: 2;
+  border: var(--shape-frame-heavy) solid var(--text); border-radius: var(--shape-corner); background: var(--card-bg);
+  font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; color: var(--text);
+}
+.og-textarea.text-area--source:focus { border-color: var(--accent); }
+/* The script (TextArea script): an extension's file (the old extension editor's .cx-code), .75rem
+   typewriter at 1.5, 10px 12px inside the 2px ink frame on the card ground, 160px high at least; the
+   manifest ('long') 280px and 8px over what follows. */
+.og-fields .og-textarea.text-area--script, .og-textarea.text-area--script {
+  display: block; width: 100%; min-height: 160px; margin: 0; padding: 10px 12px; resize: vertical; tab-size: 2;
+  border: var(--shape-frame) solid var(--text); border-radius: var(--shape-corner); background: var(--card-bg);
+  font-family: var(--font-mono); font-size: .75rem; font-weight: var(--weight-regular); line-height: 1.5; color: var(--text);
+}
+.og-fields .og-textarea.text-area--script-long, .og-textarea.text-area--script-long { min-height: 280px; margin-bottom: 8px; }
+.og-textarea.text-area--script:focus { border-color: var(--accent); }
 
 /* Growing: the height follows what is typed (set by the component), so no scroll bar until the cap. */
 .text-area--grow { overflow-y: auto; }

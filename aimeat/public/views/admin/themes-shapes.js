@@ -14,6 +14,8 @@
  * @structure ShapesTab (default) · keyOf · GROUPS · spaced · SHOWN
  * @usage html`<${ShapesTab} theme=${theme} vocabulary=${v} readOnly=${false} onSaved=${fn} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — No class written any more: Action, Loud (control), the meta Note, the value
+ *     as Code (admin page group G8).
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { h } from 'preact';
@@ -23,6 +25,9 @@ import { t } from '/js/i18n.js';
 import { apiPut } from '/js/api.js';
 import { Band } from '/components/Band.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Code } from '/components/Mark.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { Hint } from '/components/Hint.js';
 import { ErrorNote } from '/components/ErrorNote.js';
@@ -87,18 +92,18 @@ export default function ShapesTab({ theme, vocabulary, readOnly, onSaved }) {
         ${shapes.filter((s) => s.group === group).map((s) => html`
           <${NamedRow} key=${s.name} label=${t('themes.shape.' + keyOf(s.name))}><div>
             ${readOnly
-              ? html`<code>${values[s.name] || s.builtin || ''}</code>`
+              ? html`<${Code}>${values[s.name] || s.builtin || ''}<//>`
               : html`<${TextInput} id=${'shape' + s.name.slice(1)} maxLength="200" value=${values[s.name] || ''} placeholder=${s.builtin || ''}
                   onInput=${(e) => setValues({ ...values, [s.name]: e.target.value })} />`}
-            <p class="text-meta">${t('themes.shapeBuiltin', { value: s.builtin ?? '' })}</p>
+            <${Note} kind="meta">${t('themes.shapeBuiltin', { value: s.builtin ?? '' })}<//>
           </div><//>`)}
       <//>`)}
     ${refused.map((r) => html`<${ErrorNote} key=${r} text=${t('themes.shapeRefused', { reason: r })} />`)}
     ${!readOnly && html`
       ${state.error && html`<${ErrorNote} text=${state.error} />`}
       <${ActionRow}>
-        <button type="button" class="poster-action" disabled=${!changed} onClick=${() => setValues({ ...saved })}>${t('themes.undo')}</button>
-        <button type="button" class="poster-slab poster-slab--control" disabled=${state.busy || !changed || refused.length > 0} onClick=${save}>${t('themes.saveShapes')}</button>
-        ${state.saved && html`<span class="text-meta">${t('themes.saved')}</span>`}
+        <${Action} disabled=${!changed} onClick=${() => setValues({ ...saved })}>${t('themes.undo')}<//>
+        <${Loud} control disabled=${state.busy || !changed || refused.length > 0} onClick=${save}>${t('themes.saveShapes')}<//>
+        ${state.saved && html`<${Note} kind="meta" inline>${t('themes.saved')}<//>`}
       <//>`}`;
 }

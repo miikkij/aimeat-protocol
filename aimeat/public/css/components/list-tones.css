@@ -1,0 +1,227 @@
+/**
+ * @file list-tones.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The List component's tones (public/components/List.js `tone`): the lists of the old app
+ *   catalogue's detail view, each with the values the old page drew (app-catalog-poster.css and
+ *   app-catalog-visitors.css), so appcat reads the same on the same data. A tone overrides the
+ *   Listing's grid (listing.css) with the old list's own shape.
+ *   - history: the states a thing had, newest first (.dtl-version-row, .version-num, .version-current,
+ *     .version-sub and the row's coral typewriter doors).
+ *   - switches: a setting per row, its name, what its state means and its door (.mk-row).
+ *   - counts: a small table of counts (.vis-table, .vis-num, .vis-country-btn).
+ *   - entries: named entries, each a paragraph under its name (.dtl-skill and its head, ref, version,
+ *     the faint × and the words).
+ *   - log: what was done, newest first, one wrapping line per entry (.mk-log).
+ *   - pages: a page a thing ought to have per row, its doors beside it, its editor under it (.lg-row).
+ *   The old page's --text-dim is the site's --text-muted and its --text-muted the site's --text-dim, so
+ *   the greys below read those. Reads the theme's tokens only.
+ *   NOTE: this file must be linked in spa.html, after list.css.
+ * @version-history
+ *   v1.3.1 — 2026-09-27 — log: the code's capitals read var(--shape-case-label) instead of a literal
+ *     uppercase (the AIMEAT value, so AIMEAT is unchanged; a theme reaches them). check:shape-tokens.
+ *   v1.3.0 — 2026-09-27 — checkpoints (the old detail's working-copy history rows): the history with
+ *     the time bold and the note in full under it; additive, appcat parity (sections-a).
+ *   v1.2.0 — 2026-09-27 — releases (the old versions dialog, .version-row): the history with smaller facts
+ *     and plain doors; tree (the old fork lineage, .lineage-node); additive, appcat parity (dialogs).
+ *   v1.1.0 — 2026-09-27 — log (the audit log and the declarations, .mk-log) and pages (the legal pages,
+ *     .lg-row); additive, appcat parity (sections-c).
+ *   v1.0.0 — 2026-09-27 — Initial: history, switches, counts and entries (appcat parity, sections-b).
+ */
+
+/* ── history ── */
+.listing.list--history { display: block; }
+.listing.list--history > .listing-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.listing.list--history > .listing-row:last-child { border-bottom: 0; }
+/* The cells' selectors reach past listing.css's phone rules (0,4,1), as the tones below do. */
+.listing.list--history > .listing-row > div:not(.listing-open) { padding: 0; border-bottom: 0; }
+.listing.list--history > .listing-row > .listing-name {
+  display: block; min-width: 0;
+  font-family: var(--font-headline); font-weight: var(--font-poster-weight); font-size: 1rem; color: var(--text);
+}
+.list--history .listing-name > .poster-chip {
+  display: inline; margin-left: 4px; padding: 2px 8px; border: 0; border-radius: var(--shape-corner); background: var(--shape-chosen-ground); color: var(--text);
+  font-family: var(--font-mono); font-size: .64rem; font-weight: 600; text-transform: var(--shape-case-label); letter-spacing: .04em; vertical-align: baseline;
+}
+.list--history .listing-name > small {
+  margin-top: 2px; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.listing.list--history > .listing-row > .listing-doors { display: flex; flex-wrap: wrap; justify-content: normal; align-items: center; gap: 24px; white-space: normal; }
+.listing.list--history .listing-doors .poster-action {
+  display: block; padding: 0; border: 0; background: none;
+  font-family: var(--font-mono); font-size: .8rem; font-weight: 800; line-height: normal; text-transform: var(--shape-case-action); letter-spacing: .04em;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 4px;
+}
+.listing.list--history .listing-doors .poster-action:hover { color: var(--text); background: none; }
+@media (max-width: 640px) {
+  .list--history .listing-name > small { white-space: normal; overflow: visible; text-overflow: clip; }
+}
+/* releases (List tone 'releases', appcat dialogs): the history in the old versions dialog (.version-row,
+   .version-sub, .version-actions): the facts .72rem, the doors plain coral typewriter words 6px apart. */
+.list--history.list--releases .listing-name > small { font-size: .72rem; }
+.listing.list--history.list--releases > .listing-row > .listing-doors { gap: 6px; flex-wrap: nowrap; flex-shrink: 0; }
+.listing.list--history.list--releases .listing-doors .poster-action { font-weight: 400; text-transform: none; letter-spacing: normal; }
+
+/* ── tree (List tone 'tree', appcat dialogs): the old fork lineage (.lineage-node): plain lines at
+   .85rem with 3px above and under, one line each; a level under its parent's row 16px further in; the
+   one the tree is about in bold ink; the state a small word in its colour (public green, parked grey,
+   hidden amber, deleted coral struck through) and the date small and grey, 6px after it. ── */
+.listing.list--tree { display: block; font-size: .85rem; }
+.listing.list--tree > .listing-row { display: block; padding: 0; border: 0; }
+.listing.list--tree > .listing-row > .listing-name { display: block; padding: 3px 0; border: 0; white-space: nowrap; font-size: inherit; font-weight: 400; color: var(--text); }
+.listing.list--tree > .listing-row > .listing-name.is-attention { font-weight: 700; color: var(--text); }
+.listing.list--tree > .listing-row > .list-below { margin: 0; padding: 0; }
+.list--tree .list-below > .listing.list--tree { margin-left: 16px; }
+/* No row's closing rule under a tree's line on a narrow screen either (listing.css draws one there). */
+.listing.list--tree.list--tree > .listing-row > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.listing.list--tree.list--tree > .listing-row > .listing-name:last-child { padding-bottom: 3px; }
+.list--tree .listing-name .poster-status { margin-left: 6px; padding: 1px 6px; border: 0; border-radius: var(--shape-corner-pill); background: none; font-family: inherit; font-size: .68rem; font-weight: inherit; line-height: normal; text-transform: none; letter-spacing: 0; }
+.list--tree .listing-name .poster-status--fine { color: var(--success); }
+.list--tree .listing-name .poster-status--off { color: var(--text-dim); }
+.list--tree .listing-name .poster-status--attention { color: var(--warning); }
+.list--tree .listing-name .poster-status--danger { color: var(--accent); text-decoration: line-through; }
+.list--tree .listing-name .text-meta-sm { margin-left: 6px; font-size: .72rem; color: var(--text-dim); }
+/* checkpoints (List tone 'checkpoints', appcat sections-a): the history's rows for the saves a working
+   copy passed (the old detail's checkpoint rows: .dtl-version-row, .version-meta, .wc-ckpt-when,
+   .wc-ckpt-note): the time bold in the page's letters, the note under it 2px lower, small and grey, in
+   full; the loud door the detail's slab with the row's underlined coral-row letters on it, 18px in; a
+   door that waits at half strength. */
+.listing.list--history.list--checkpoints > .listing-row > .listing-name {
+  display: flex; flex-direction: column; gap: 2px;
+  font-family: var(--font-body); font-size: .85rem; font-weight: 600; line-height: normal;
+}
+.list--history.list--checkpoints .listing-name > small {
+  display: block; margin: 0; font-family: var(--font-body); font-size: .78rem; font-weight: var(--font-poster-text-weight);
+  line-height: normal; color: var(--text-dim); white-space: normal; overflow: visible; text-overflow: clip;
+}
+.listing.list--history.list--checkpoints .listing-doors .poster-slab {
+  min-height: 44px; padding: 0 18px;
+  font-family: var(--font-mono); font-size: .8rem; font-weight: 800; line-height: normal; text-transform: var(--shape-case-action); letter-spacing: .04em;
+  text-decoration: underline; text-underline-offset: 4px;
+}
+.listing.list--history.list--checkpoints .listing-doors :is(.poster-action, .poster-slab):disabled { opacity: .5; }
+
+/* ── switches ── */
+.listing.list--switches { display: block; }
+.listing.list--switches > .listing-row {
+  display: grid; grid-template-columns: 220px 1fr auto; gap: 8px 24px; align-items: center;
+  padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.listing.list--switches > .listing-row > div:not(.listing-open) { display: block; padding: 0; border-bottom: 0; }
+.listing.list--switches > .listing-row > .listing-name { font-family: var(--font-body); font-weight: 800; font-size: .95rem; color: var(--text); }
+.listing.list--switches > .listing-row > .listing-desc { font-size: .92rem; line-height: 1.5; color: var(--text-muted); }
+.listing.list--switches > .listing-row > .listing-doors { justify-self: end; }
+/* Its doors are the detail's own (.dtl-btn, .dtl-btn.primary): the word at .78rem, the slab 18px in. */
+.list--switches .listing-doors > .poster-action { display: inline-block; padding: 0 0 1px; border-bottom-width: var(--shape-frame); font-size: .78rem; line-height: normal; }
+.list--switches .listing-doors > .poster-slab { padding: 0 18px; font-size: .78rem; line-height: normal; }
+.list--switches .listing-doors > :is(.poster-action, .poster-slab):disabled { opacity: .5; }
+@media (max-width: 900px) {
+  .listing.list--switches > .listing-row { grid-template-columns: 1fr; }
+  .listing.list--switches > .listing-row > .listing-doors { justify-self: start; }
+}
+
+/* ── counts ── */
+.listing.list--counts { display: table; width: 100%; border-collapse: collapse; margin-top: 14px; font-size: .92rem; }
+.listing.list--counts > .listing-row { display: table-row; }
+.listing.list--counts > .listing-row > div:not(.listing-open) {
+  display: table-cell; vertical-align: middle; text-align: left;
+  padding: 8px 0; border-bottom: 1px solid var(--border); background: none;
+  font-family: inherit; font-size: inherit; font-weight: 400; line-height: inherit; color: var(--text);
+}
+.listing.list--counts > .listing-row--head > div:not(.listing-open) {
+  padding: 0 0 6px; border-bottom: var(--shape-frame) solid var(--shape-rule-colour);
+  font-size: .72rem; font-weight: 800; color: var(--accent); text-transform: var(--shape-case-label); letter-spacing: var(--shape-tracking-label);
+}
+.listing.list--counts > .listing-row > div.listing-n:not(.listing-open) { text-align: right; padding-left: 16px; font-family: var(--font-mono); white-space: nowrap; }
+.listing.list--counts > .listing-row--head > .listing-n { font-family: var(--font-mono); }
+.list--counts .list-name-link {
+  display: inline; padding: 0 0 1px; border: 0; border-bottom: var(--shape-frame) solid transparent; background: none; cursor: pointer; text-align: left;
+  font: inherit; font-weight: 700; color: var(--text); text-transform: none; letter-spacing: normal;
+}
+.list--counts .list-name-link:hover, .list--counts .list-name-link:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
+.list--counts > .listing-row.is-selected .list-name-link { border-bottom-color: var(--text); }
+.list--counts .listing-name .text-meta-sm { font-size: inherit; font-weight: 400; color: var(--text-muted); }
+
+/* ── entries ── */
+.listing.list--entries { display: block; }
+.listing.list--entries > .listing-row { display: block; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.listing.list--entries > .listing-row:first-child { border-top: var(--shape-frame-heavy, 3px) solid var(--shape-rule-colour, var(--text)); }
+.listing.list--entries > .listing-row > div:not(.listing-open) { padding: 0; border-bottom: 0; }
+/* The head is one line on its baseline, its parts 10px apart (the old flex .dtl-skill-head); the words
+   take a line of their own under it, their measure 70ch at most (the padding keeps the line's full
+   width, so they never stand beside the head). */
+.listing.list--entries > .listing-row > .listing-name { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 0; font-weight: 400; }
+.list--entries .listing-name > .code-inline {
+  display: inline; margin: 0; padding: 0; background: none;
+  font-family: var(--font-mono); font-size: .85rem; font-weight: 700; color: var(--text);
+}
+.list--entries .listing-name > .poster-chip {
+  margin: 0; padding: 0; border: 0; background: none;
+  font-family: var(--font-mono); font-size: .75rem; font-weight: 400; letter-spacing: normal; color: var(--text-muted);
+}
+.list--entries .listing-name > .poster-icon {
+  width: auto; height: auto; padding: 0 2px; border: 0; background: none; box-shadow: none;
+  font-size: .8rem; line-height: 1; opacity: .5; color: inherit;
+}
+.list--entries .listing-name > .poster-icon:hover { opacity: 1; background: none; color: inherit; }
+.list--entries .listing-name > .list-desc {
+  flex: 0 0 100%; box-sizing: border-box; max-width: none; margin: 6px 0 0; padding-right: max(0px, calc(100% - 70ch));
+  font-size: .92rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text-muted);
+}
+
+/* ── log (sections-c): what was done, newest first (.mk-log and its li). Each entry one line that
+   wraps, 4px 12px between its parts: the date in grey typewriter, 90px at least; the act in coral
+   typewriter capitals; the name bold; who in grey typewriter. The cells sit 3px low beside the name,
+   as the old spans did. The selectors reach past listing.css's phone rules (0,4,1). ── */
+.listing.list--log { display: block; }
+.listing.list--log > .listing-row {
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .9rem; line-height: normal;
+}
+.listing.list--log > .listing-row > div:not(.listing-open) { display: block; padding: 0; border-bottom: 0; min-width: 0; }
+.listing.list--log > .listing-row > .list-when:not(.listing-open) {
+  min-width: 90px; padding-top: 3px;
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 400; letter-spacing: normal; line-height: normal; text-transform: none; color: var(--text-muted);
+}
+.listing.list--log > .listing-row > .list-code:not(.listing-open) {
+  padding-top: 3px; font-family: var(--font-mono); font-size: .72rem; font-weight: 700; line-height: normal; text-transform: var(--shape-case-label); letter-spacing: normal; color: var(--accent);
+}
+.listing.list--log > .listing-row > .listing-name:not(.listing-open) { font-size: inherit; font-weight: 700; line-height: normal; }
+.listing.list--log > .listing-row > .listing-who:not(.listing-open) {
+  padding-top: 3px; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; line-height: normal; color: var(--text-muted);
+}
+
+/* ── pages (sections-c): a page a thing ought to have per row (.lg-rows, .lg-row). The name with its
+   marks after it, 6px 16px apart on their baseline, and why under them in the grey, 70ch at most; the
+   doors beside both, 16px apart, in the middle of the row's height; the editor under the row, 12px
+   below why. One column under 900px, the doors under why. ── */
+.listing.list--pages { display: block; margin: 14px 0 0; }
+.listing.list--pages > .listing-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 24px;
+  padding: 16px 0; border-bottom: 1px solid var(--border);
+}
+.listing.list--pages > .listing-row > div:not(.listing-open) { display: block; padding: 0; border-bottom: 0; min-width: 0; }
+.listing.list--pages > .listing-row > .listing-name:not(.listing-open) {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
+  font-family: var(--font-body); font-size: .95rem; font-weight: 800; line-height: normal; color: var(--text);
+}
+.list--pages .listing-name > .poster-chip { margin: 0; }
+/* Why stands on a line of its own; its words keep to 70ch by the room at its right end, since a
+   70ch-wide item would fit beside a short head and stand there. */
+.list--pages .listing-name > .list-desc {
+  flex: 0 0 100%; box-sizing: border-box; max-width: none; margin: 0; padding-right: max(0px, calc(100% - 70ch));
+  font-size: .9rem; font-weight: 400; line-height: 1.5; color: var(--text-muted);
+}
+.listing.list--pages > .listing-row > .listing-doors:not(.listing-open) { display: flex; align-items: center; justify-content: flex-end; gap: 16px; white-space: nowrap; }
+.listing.list--pages > .listing-row > .list-below:not(.listing-open) { grid-column: 1 / -1; margin-top: 12px; padding: 0; }
+/* Its doors are the detail's own (.dtl-btn): the word at .78rem, its line 2px. */
+.list--pages .listing-doors > .poster-action { display: inline-block; padding: 0 0 1px; border-bottom-width: var(--shape-frame); font-size: .78rem; line-height: normal; }
+.list--pages .listing-doors > .poster-action:disabled { opacity: .5; }
+@media (max-width: 900px) {
+  .listing.list--pages > .listing-row { grid-template-columns: minmax(0, 1fr); }
+  .listing.list--pages > .listing-row > .listing-doors:not(.listing-open) { justify-content: flex-start; flex-wrap: wrap; white-space: normal; }
+}

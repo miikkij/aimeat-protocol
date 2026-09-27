@@ -3,6 +3,13 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.36.0 -- 2026-09-27 -- .poster-aside--chapter (Note aside `chapter`): the old catalogue's detail aside (.mk-aside), for appcat parity (sections-c); additive, outside the app-catalog ranges.
+ *   v1.36.0 -- 2026-09-27 -- .poster-chip--need (Mark tone 'need') and .poster-chips--spread (Marks `spread`): the old catalogue's Needs chips, for appcat parity (sections-a); additive, outside the app-catalog ranges.
+ *   v1.35.0 -- 2026-09-27 -- .poster-aside--disclosure (Note aside tone 'disclosure'): the old catalogue's AI notice (.dtl-ai-notice), for appcat parity; additive, outside the app-catalog ranges.
+ *   v1.34.0 -- 2026-09-27 -- .poster-action--plain (Action tone 'plain'): the old catalogue's grey "▶ toggle", for appcat parity; additive, outside the app-catalog ranges.
+ *   v1.33.0 -- 2026-09-27 -- appcat parity: the line tone's grey is the old catalogue's (its --text-dim is the site's --text-muted); the glyph tone on the card ground in regular weight, as the old .icon-pick. Outside the app-catalog ranges.
+ *   v1.32.0 -- 2026-09-27 -- .poster-slab-words (Loud mark): the loud action's words after its sign, hidden but spoken under 900px (the old catalogue's "+"), for appcat; additive, outside the app-catalog ranges.
+ *   v1.31.0 -- 2026-09-27 -- The tab's line tone (.poster-tab--line: the app catalogue's dialog tabs) and glyph tone (.poster-tab--glyph: a square with one mark, the Add dialog's ready icons), for appcat; additive.
  *   v1.30.0 -- 2026-09-27 -- A count inside the chosen tab takes the tab's own words' colour (it was --on-sun, which a theme that draws the chosen tab on its accent, Pebble, could not read); the action link's pressed tone.
  *   v1.29.0 -- 2026-09-26 -- The shapes are drawn by the components (components/Action.js, Mark.js, Note.js), which pages call with data; .poster-label--block, a label on a line of its own.
  *   v1.28.0 -- 2026-09-26 -- The pill corner stays on the tab and on the action link's tone with a ground (jump), and leaves the action link's underline; a disabled action's line reads --shape-rule-colour and the quiet tone's line --shape-frame (a move: the AIMEAT values equal the old ones).
@@ -144,6 +151,10 @@
 .poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: var(--weight-medium); font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
 .poster-action--text:hover { color: var(--text); }
 .poster-action--text.copied { color: var(--success-fg); }
+/* plain (Action tone 'plain', appcat): a grey word in the page's own letters with no line, the old
+   catalogue's "▶ toggle" over its Active Extensions strip (its --text-muted, the theme's --muted). */
+.poster-action--plain { display: inline-block; padding: 0; border: 0; font-family: inherit; font-weight: 400; font-size: .8rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--muted); }
+.poster-action--plain:hover { color: var(--muted); }
 /* danger: an act that removes or revokes (Settings' delete, revoke and reset links; formerly
    .og-door--danger and the coral .btn-danger words): coral words and a coral line; under the pointer
    the same as the action link's own hover. A difference that carries meaning stays a tone. */
@@ -203,6 +214,25 @@
 /* The tab's attention tone: a filter whose items need the person (Access, "unused" keys), coral in
    frame and words while it is not chosen, as its coral chip was (formerly access-poster.css). */
 .poster-tab--attention:not(.is-on) { border-color: var(--accent); color: var(--accent); }
+/* The tab's line tone (components/Tabs.js tone 'line'): the app catalogue's dialog tabs (Paste / File;
+   the old page's .modal-tab), small capitals with no ground, grey until chosen; the chosen one is ink
+   over a coral line. It sets back the ground and the padding the chosen tab has. */
+.poster-tab--line {
+  padding: 0 0 2px; background: transparent; border: 0; border-bottom: var(--shape-frame-heavy) solid transparent;
+  font-family: var(--font-body); font-weight: var(--weight-heavy); font-size: .78rem; letter-spacing: .04em;
+  text-transform: var(--shape-case-action); color: var(--text-muted);
+}
+.poster-tab--line:hover { color: var(--text); border-color: transparent; background: transparent; }
+.poster-tab--line.is-on { background: transparent; color: var(--text); padding: 0 0 2px; border-bottom-color: var(--accent); }
+/* The tab's glyph tone (Tabs tone 'glyph'): a square holding one mark, in a thin grey frame on the
+   card ground, ink-framed on the sun under the pointer and when chosen: a row of ready icons to pick
+   from (the app catalogue's Add dialog, the old page's .icon-pick). */
+.poster-tab--glyph {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 36px; height: 36px; padding: 0; background: var(--card-bg); border: var(--shape-frame) solid var(--border);
+  border-radius: var(--shape-corner-control); font-size: 1.1rem; font-weight: var(--weight-regular); line-height: normal; text-transform: none; letter-spacing: 0;
+}
+.poster-tab--glyph:hover, .poster-tab--glyph.is-on { border-color: var(--text); background: var(--sun); color: var(--on-sun); padding: 0; }
 
 /* @app-catalog:begin */
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
@@ -233,6 +263,12 @@
 .poster-slab--danger { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
 .poster-slab--danger:hover { color: #fff; box-shadow: 2px 2px 0 var(--text); }
 /* @app-catalog:end */
+/* The loud action's words after its sign (Loud mark, appcat): on a phone the sign alone stands and
+   the words stay for a screen reader (the old catalogue's "+ Create an app", 44px square). */
+@media (max-width: 900px) {
+  .poster-slab:has(> .poster-slab-words) { min-width: 44px; min-height: 44px; padding: 0 12px; }
+  .poster-slab-words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 
 /* The icon button (Jouni's decision "Icon button"): a button that is a mark, not a word. One square
    in a thin ink frame, the sun under the pointer; 44px is the composer's control size, the small cut
@@ -323,6 +359,14 @@
    person can wave away (the phone nudge, a thin dashed ink frame, small bold words). */
 .poster-aside--waiting { padding: .9rem 1rem; border: 2px dashed var(--text); background: var(--bg-dim); font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; }
 .poster-aside--suggestion { padding: 8px 12px; border: 2px dashed var(--text); background: none; font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: 1.5; color: inherit; }
+/* disclosure (appcat): a statement of what a panel is, as the law asks it said before the first
+   exchange (EU AI Act Art. 50(1)): a thin frame with a coral bar at its start, small grey words, the
+   bold ones in ink (the old app catalogue's .dtl-ai-notice). */
+.poster-aside--disclosure { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--border); border-left: var(--shape-frame-heavy) solid var(--accent); border-radius: var(--shape-corner); background: none; font-size: .82rem; line-height: 1.4; color: var(--text-dim); overflow-wrap: anywhere; }
+.poster-aside--disclosure :is(b, strong) { color: var(--text); }
+/* chapter (appcat): the aside of a chapter of the old app catalogue's detail (.mk-aside: "This is on
+   the record", a legal page's readiness): a little less room inside, 22px of air above, 14px below. */
+.poster-aside.poster-aside--chapter { margin: 22px 0 14px; padding: 14px 18px; }
 /* The Tag (Jouni's decision "Tag", 2026-09-23): one small framed word in the typewriter face that names
    a kind, a version, a role or a relation, in four tones: plain names a thing; sun is the chosen one
    or the one that counts now; coral is the one to notice; ink is the one that belongs to you. */
@@ -337,8 +381,13 @@
 /* dim: a tag that counts nothing yet (no workspaces, no rights), grey frame and words, as main's
    .og-chip--dim drew it. */
 .poster-chip--dim { border-color: var(--border); color: var(--text-dim); }
+/* need (appcat): a thing an app needs to run, a cortex it loads or an extension it calls, in the ink
+   frame on the card ground (the old app catalogue's Needs chips, .dtl-chip in .dtl-chips). */
+.poster-chip--need { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-color: var(--text); border-radius: var(--shape-corner); background: var(--card-bg); font-size: 12px; font-weight: 500; letter-spacing: normal; color: var(--text); }
 /* A row of tags. */
 .poster-chips { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+/* A row of tags set further apart (Marks `spread`, appcat): the old catalogue's .dtl-chips. */
+.poster-chips.poster-chips--spread { gap: 8px; align-items: normal; }
 /* The remove mark (Jouni's decision "Remove mark", 2026-09-26): the ✗ after a tag's name that takes a
    tag or a member off, grey until the pointer is on it, then coral. The name stays the strongest thing
    in the tag, and a row of tags does not read as a row of warnings. */

@@ -43,6 +43,10 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   v1.5.0 — 2026-09-26 — CortexCaller carries `identity`, the caller's resolved identity (a person's
+ *     GHII, an agent's GAII). Activation publishes a cortex's actions under it, and deactivation and
+ *     uninstall delete them under it and under `gaii`. Install publishes nothing and does not take it
+ *     (secaudit 2026-09, R3 7c).
  *   v1.4.0 — 2026-09-13 — installCortex refuses a lib component whose filename has no content in
  *     `libs` (INVALID_MANIFEST naming the file and the key), before anything is written. It used to
  *     answer 201 with the component recorded and no bytes, so the app 404ed on the lib URL.
@@ -84,10 +88,16 @@ export interface CortexCaller {
     ownerName: string;
     /**
      * The acting principal: an owner's bare name, or an agent's GAII. Recorded as the actor on
-     * everything an activation materialises (schema locks, prompt and ontology memory, actions,
-     * boards), and used again to tear the same things down.
+     * the schema locks, the prompt, ontology and seed-data memory and the boards an activation
+     * materialises, and used again to tear the same things down.
      */
     gaii: string;
+    /**
+     * The caller's resolved identity (utils/gaii.ts resolveIdentity): a person's GHII, an agent's
+     * GAII. An activation publishes the cortex's actions under it, as POST /v1/actions publishes
+     * one, because every work door finds a provider's actions and work under that identity.
+     */
+    identity: string;
     /** May claim any namespace and act on another owner's cortex. Each door decides this itself. */
     isOperator: boolean;
 }
@@ -213,7 +223,8 @@ export interface CortexDeactivationResult {
  */
 export async function installCortex(
     deps: CortexDeps,
-    caller: CortexCaller,
+    // Install publishes nothing, so it does not take the resolved identity.
+    caller: Omit<CortexCaller, 'identity'>,
     input: { manifest: unknown; libs?: unknown },
 ): Promise<CortexOutcome<CortexInstallResult>> {
     const { storage, config } = deps;
@@ -355,7 +366,7 @@ export async function activateCortex(
         return { ok: true, value: { extension: ext, activatedAt: ext.activatedAt, alreadyActive: true } };
     }
 
-    const artifacts = await activateExtension(ext, config, storage, caller.gaii, caller.isOperator);
+    const artifacts = await activateExtension(ext, config, storage, caller, caller.isOperator);
     const activatedAt = new Date().toISOString();
     await storage.updateCortexExtension(name, {
         status: 'active',
@@ -390,7 +401,7 @@ export async function deactivateCortex(
         return { ok: true, value: { extension: ext, alreadyInactive: true } };
     }
 
-    await deactivateExtension(ext, storage, caller.gaii);
+    await deactivateExtension(ext, storage, caller);
 
     await storage.updateCortexExtension(name, {
         status: 'inactive',
@@ -429,7 +440,7 @@ export async function deleteCortex(
     }
 
     if (ext.status === 'active') {
-        await deactivateExtension(ext, storage, caller.gaii);
+        await deactivateExtension(ext, storage, caller);
     }
 
     // Uninstall removes seed-data; deactivation deliberately does not.

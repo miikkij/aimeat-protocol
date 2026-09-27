@@ -5,6 +5,11 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-09-26 — POST /v1/federation/route names the person who starts a route by the
+ *     resolved identity (resolveIdentity): in the relay claim to the target, in the claim to a
+ *     relaying peer and on the routing fee (secaudit 2026-09, R3 9).
+ *   v1.4.0 — 2026-09-26 — POST /v1/federation/cross-node/work names the requester by the resolved
+ *     identity (resolveIdentity): in the signed payload, in the relay claim and on the routing fee.
  *   v1.3.0 — 2026-09-17 — A multi-hop hop authenticates with its verified relay claim, since v1.2.0
  *     left it no token to show and every multi-hop route answered "no route". The routing fee is
  *     charged only on the node where the route began.
@@ -32,6 +37,7 @@ import type { RouteHop, RouteManifest } from '../../types/route-manifest.js';
 import { buildHopSigningMessage } from '../../types/route-manifest.js';
 import { emitChange } from '../../services/event-bus.js';
 import { buildRelayClaim } from '../../services/relay-claim.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 
 /**
  * Who may drive POST /v1/federation/route: this node's own account holder, or a peer relaying a hop.
@@ -114,7 +120,10 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
         // On a hop, the principal is the one the previous node signed into the claim: the person who
         // started the route, on their own node. Nothing here can re-check that name, and nothing
         // here needs to; it is carried forward into the next claim so the far end sees who asked.
-        const requesterGaii = req.relay ? req.relay.caller : req.auth!.sub;
+        // Where the route starts, the person is named by their full identity (resolveIdentity, their
+        // GHII): a bare account name means nobody on the next node, or that node's own namesake. The
+        // routing fee below is taken from the same identity.
+        const requesterGaii = req.relay ? req.relay.caller : resolveIdentity(req.auth!, config.nodeId);
 
         // Helper: charge 1 morsel routing fee (atomic debit), ONLY on the node where the route began.
         //
@@ -388,13 +397,18 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 return;
             }
 
+            // Who asked, by the full identity: a person's GHII, an agent's GAII. The peer reads it as
+            // the requester, and a bare account name names nobody there, or that node's namesake. The
+            // routing fee below is taken from the same identity.
+            const requester = resolveIdentity(req.auth!, config.nodeId);
+
             // P1-11: Sign outbound cross-node work request
             const workPayload = {
                 action_id,
                 provider_gaii,
                 input,
                 ttl_hours: ttl_hours ?? 24,
-                cross_node_requester: req.auth!.sub,
+                cross_node_requester: requester,
                 origin_node: config.nodeId,
                 timestamp: new Date().toISOString(),
             };
@@ -407,7 +421,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             // This call carries X-Forwarded-From, so to the receiving node it IS a relay and its
             // gate will ask for a claim. Signed here for the same reason and in the same shape.
             const workClaim = await buildRelayClaim(storage, config, {
-                audience: target_node, method: 'POST', path: '/v1/work/request', caller: req.auth!.sub,
+                audience: target_node, method: 'POST', path: '/v1/work/request', caller: requester,
             });
             const response = await fetch(`${peer.url}/v1/work/request`, {
                 method: 'POST',
@@ -426,14 +440,12 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
 
             const data = await response.json().catch(err => { logger.warn('POST /v1/federation/cross-node/work: continuing after a suppressed failure', { error: String(err) }); return null; });
 
-            // Charge 1 morsel routing fee
-            const requesterGaii = req.auth!.sub;
-            // Atomic routing fee debit
-            const debited = await storage.debitBalance(requesterGaii, 1);
+            // Charge 1 morsel routing fee, atomically, to the requester named above
+            const debited = await storage.debitBalance(requester, 1);
             if (debited) {
                 await storage.addTransaction({
                     id: `txn-${randomBytes(8).toString('hex')}`,
-                    gaii: requesterGaii,
+                    gaii: requester,
                     type: 'federation_routing',
                     amount: -1,
                     timestamp: new Date().toISOString(),

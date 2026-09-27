@@ -26,10 +26,19 @@
  *   agent's name plus an owner and node identical on every row, so it is on the name's tooltip and
  *   the account line, not stamped in monospace sixty-eight times.
  *
- * @structure groupNote/rowDetail · ConnectedDot · MigrateBanner · StateGroup · FleetView (default)
+ * @structure groupNote/rowDetail/metaLine · MigrateBanner · FleetView (default)
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.0.0 -- 2026-09-27 -- Drawn from library components and writing no class (page group G9): the
+ *     standalone page is the PageFrame with its PageIntro; the move box the Attention note (its ready
+ *     or blocked line Tinted green or coral, its press the Loud control); the count, the attention
+ *     filter Tab and the all-fine Status in a Layout row; each state a Group heading (state, kind
+ *     where both exist, the tally count) over the grey Note and a List (cut name-doors) whose rows
+ *     keep the name link with the GAII tooltip and the in-place opening (Name onFollow), the
+ *     connected Status and the mode tags after it, the platform, work and messages as its meta line,
+ *     the move action link and the countdown Timestamp at the end, the name coral while the pointer is
+ *     on the row (Row hover). css/views/fleet.css is gone.
  *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.14.0 -- 2026-09-25 -- What a press did, said where it was pressed, is the Form message (css/components/form-message.css, its error cut when refused); a place keeps only its margin, a unification: the look most tabs use.
  *   v1.13.0 -- 2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, its filter and attention tones); the agent tabs take the tab's own size, a unification: Jouni's decision Tabs and filters.
@@ -69,9 +78,18 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { hasSession, getSession, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { Spinner } from '/components/Spinner.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { PageFrame } from '/components/PageFrame.js';
+import { PageIntro } from '/components/PageIntro.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Tinted } from '/components/Figure.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Tab } from '/components/Tabs.js';
+import { Row as Line, Stack, Space } from '/components/Layout.js';
+import { List, Row, Name, Doors, Group } from '/components/List.js';
 import { swallowed } from '/js/swallowed.js';
 
 /** The states that mean a person has something to do. The heading counts these. */
@@ -147,6 +165,18 @@ function rowDetail(c) {
   return t('fleet.days').replace('{n}', String(n));
 }
 
+/** The row's small line: where the agent runs, its open work and its messages, the ones it has. */
+function metaLine(a) {
+  const parts = [
+    a.platform || '',
+    a.stats?.tasks?.active > 0 ? t('fleet.openWork').replace('{n}', String(a.stats.tasks.active)) : '',
+    a.stats?.messages?.total > 0
+      ? (a.stats.messages.total === 1 ? t('fleet.messagesOne') : t('fleet.messages').replace('{n}', String(a.stats.messages.total)))
+      : '',
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
 /**
  * What can be done about the agents that cannot sign in.
  *
@@ -165,24 +195,32 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
   const ready = (migration.daemons ?? []).length > 0;
   const plural = (one, many) => (n === 1 ? t(one) : t(many).replace('{n}', String(n)));
   return html`
-    <div class="flt-migrate poster-aside">
-      ${/* TITLED BY WHAT THE PRESS DOES, not by a diagnosis. It used to read "18 of your agents
-            cannot sign in", and then the list below it showed a group of 12 called "Cannot sign
-            in" and a group of 6 called "Never connected" — so the heading was wrong about a third
-            of its own number, and a reader was left reconciling 18, 12, 6 and 19. The two reasons
-            are the groups' to tell; this box is about the one press that fixes both. */''}
-      <h3 class="flt-migrate-head sub-heading">${plural('fleet.migrate.headOne', 'fleet.migrate.head')}</h3>
-      <p class="flt-migrate-line">${plural('fleet.migrate.whatOne', 'fleet.migrate.what')}</p>
-      <p class="poster-hint flt-migrate-keeps">${t('fleet.migrate.keeps')}</p>
-      ${/* Directly above the button, because it is the answer to "why can I not press this". */''}
-      <p class="flt-migrate-line ${ready ? 'is-ready' : 'is-blocked'}">
-        ${ready ? t('fleet.migrate.ready') : t('fleet.migrate.needConnector')}
-      </p>
-      <button class="poster-slab poster-slab--control" disabled=${migrating || !ready} onClick=${onPress}>
-        ${migrating ? t('fleet.migrate.working') : plural('fleet.migrate.actionOne', 'fleet.migrate.action')}
-      </button>
-      ${outcome && html`<p class="form-message flt-migrate-outcome ${outcome.ok ? '' : 'form-message--error'}">${outcome.text}</p>`}
-    </div>
+    <${Space} below="section">
+      <${Note} kind="aside">
+        <${Stack} gap="small">
+          ${/* TITLED BY WHAT THE PRESS DOES, not by a diagnosis. It used to read "18 of your agents
+                cannot sign in", and then the list below it showed a group of 12 called "Cannot sign
+                in" and a group of 6 called "Never connected" — so the heading was wrong about a third
+                of its own number, and a reader was left reconciling 18, 12, 6 and 19. The two reasons
+                are the groups' to tell; this box is about the one press that fixes both. */''}
+          <${SubHeading} level=${3}>${plural('fleet.migrate.headOne', 'fleet.migrate.head')}<//>
+          <${Note} kind="lead">${plural('fleet.migrate.whatOne', 'fleet.migrate.what')}<//>
+          <${Note}>${t('fleet.migrate.keeps')}<//>
+          ${/* Directly above the button, because it is the answer to "why can I not press this".
+                Not the grey of the lines above it: the one line whose answer changes what the
+                person does next, green when it can go, coral when it cannot. */''}
+          <${Note} kind="lead">
+            <${Tinted} strong tone=${ready ? 'fine' : 'notice'}>${ready ? t('fleet.migrate.ready') : t('fleet.migrate.needConnector')}<//>
+          <//>
+          <${Actions}>
+            <${Loud} control disabled=${migrating || !ready} onClick=${onPress}>
+              ${migrating ? t('fleet.migrate.working') : plural('fleet.migrate.actionOne', 'fleet.migrate.action')}
+            <//>
+          <//>
+          ${outcome && html`<${Note} kind="message" error=${!outcome.ok}>${outcome.text}<//>`}
+        <//>
+      <//>
+    <//>
   `;
 }
 
@@ -192,7 +230,6 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
  * a second heading of the same words is the thing a reader has to work out is not a mistake.
  */
 export default function FleetView({ embedded = false, starter = null } = {}) {
-  useViewCSS('/css/views/fleet.css');
   const [agents, setAgents] = useState(null);
   const [signedIn, setSignedIn] = useState(hasSession());
   const [onlyProblems, setOnlyProblems] = useState(false);
@@ -348,15 +385,16 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
     // and would tear the SSE connection down and back up each time.
   }, [owner]);
 
-  const heading = embedded ? '' : html`<h1 class="flt-title poster-page-title">${t('fleet.title')}</h1>`;
+  // The standalone page owns the browser tab: the page frame, its headline and the line under it.
+  // Embedded, the Settings section head is already on screen, so the fleet is only its parts.
+  const frame = (body) => (embedded
+    ? html`<${Stack} gap="none">${body}<//>`
+    : html`<${PageFrame}><${PageIntro} title=${t('fleet.title')} sub=${t('fleet.desc')} />${body}<//>`);
 
   if (!signedIn) {
-    return html`<div class="flt">
-      ${heading}
-      <${EmptyState} title=${t('fleet.signedOut')} text=${t('fleet.signedOutText')} />
-    </div>`;
+    return frame(html`<${EmptyState} title=${t('fleet.signedOut')} text=${t('fleet.signedOutText')} />`);
   }
-  if (!agents) return html`<div class="flt"><${Spinner} text=${t('fleet.loading')} /></div>`;
+  if (!agents) return frame(html`<${Spinner} text=${t('fleet.loading')} />`);
 
   const problems = agents.filter(a => NEEDS_ATTENTION.has(a.credential?.state));
   const shown = onlyProblems ? problems : agents;
@@ -385,11 +423,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
     }
   }
 
-  return html`
-    <div class="flt">
-      ${heading}
-      ${!embedded && html`<p class="flt-desc">${t('fleet.desc')}</p>`}
-
+  return frame(html`
       ${agents.length === 0
         ? html`${starter}<${EmptyState} title=${t('fleet.emptyTitle')} text=${t('fleet.emptyText')} />`
         : html`
@@ -414,63 +448,66 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
           `}
           ${starter}
           ${!(migration && (migration.would_move ?? []).length > 0) && outcome && html`
-            <p class="form-message flt-migrate-outcome ${outcome.ok ? '' : 'form-message--error'}">${outcome.text}</p>
+            <${Space} below="large"><${Note} kind="message" error=${!outcome.ok}>${outcome.text}<//><//>
           `}
 
-          <div class="flt-summary">
-            <span class="poster-count poster-count--tally">${agents.length === 1
+          <${Line} wrap gap="medium" below="large">
+            <${Mark} kind="count" tone="tally">${agents.length === 1
               ? t('fleet.countAgentsOne')
-              : t('fleet.countAgents').replace('{n}', String(agents.length))}</span>
+              : t('fleet.countAgents').replace('{n}', String(agents.length))}<//>
             ${problems.length > 0
-              ? html`<button class="poster-tab poster-tab--filter poster-tab--attention ${onlyProblems ? 'is-on' : ''}"
+              ? html`<${Tab} tone="filter" attention on=${onlyProblems} pressed=${onlyProblems}
                        onClick=${() => setOnlyProblems(!onlyProblems)}>
                        ${problems.length === 1
                          ? t('fleet.needAttentionOne')
                          : t('fleet.needAttention').replace('{n}', String(problems.length))}
-                     </button>`
-              : html`<span class="poster-status poster-status--fine">${t('fleet.allFine')}</span>`}
+                     <//>`
+              : html`<${Mark} kind="status" tone="fine">${t('fleet.allFine')}<//>`}
             ${/* PRESSING THE FILTER LOOKED LIKE IT DID NOTHING. On this account it hides one healthy
                   agent, 1300px down, so the visible list was byte-identical before and after and a
                   person concluded the control was broken. It says what it took away. */''}
             ${onlyProblems && html`
-              <span class="poster-count poster-count--tally">${agents.length - problems.length === 1
+              <${Mark} kind="count" tone="tally">${agents.length - problems.length === 1
                 ? t('fleet.hiddenOne')
-                : t('fleet.hidden').replace('{n}', String(agents.length - problems.length))}</span>
-              <button class="poster-action" onClick=${() => setOnlyProblems(false)}>${t('fleet.showAll')}</button>
+                : t('fleet.hidden').replace('{n}', String(agents.length - problems.length))}<//>
+              <${Action} onClick=${() => setOnlyProblems(false)}>${t('fleet.showAll')}<//>
             `}
-          </div>
+          <//>
 
           ${groups.map(g => html`
-            <section class="flt-group" key=${`${g.state}-${g.kind}`}>
+            <${Space} key=${`${g.state}-${g.kind}`} below="section">
               ${/* The sentence, once. Every row under this header is in the same state AND of the
                     same credential kind, so the sentence is true of all of them — it would
-                    otherwise be repeated verbatim, fifty-two times on this developer's account. */''}
-              ${/* State words and counts inherit the shared B1 slab's foreground. */''}
-              <h2 class="flt-group-head poster-section-title">
-                <span class="flt-group-state flt-state--${g.state}">${t(`fleet.state.${g.state}`)}</span>
-                ${showKind && html`<span class="flt-group-kind">${g.kind === 'key-and-card' ? t('fleet.kindKey') : t('fleet.kindToken')}</span>`}
-                <span class="flt-group-count">${g.rows.length === 1
+                    otherwise be repeated verbatim, fifty-two times on this developer's account.
+                    The heading is the group heading (Jouni's "Group heading"): the state, the
+                    credential kind where an account has both, and the count as the tally. */''}
+              <${Group}
+                title=${showKind
+                  ? `${t(`fleet.state.${g.state}`)} · ${g.kind === 'key-and-card' ? t('fleet.kindKey') : t('fleet.kindToken')}`
+                  : t(`fleet.state.${g.state}`)}
+                count=${g.rows.length === 1
                   ? t('fleet.groupCountOne')
-                  : t('fleet.groupCount').replace('{n}', String(g.rows.length))}</span>
-              </h2>
-              <p class="poster-hint flt-group-note">${groupNote(g.state, g.kind)}</p>
-              <ul class="flt-list poster-row--thing">
+                  : t('fleet.groupCount').replace('{n}', String(g.rows.length))} />
+              <${Note}>${groupNote(g.state, g.kind)}<//>
+              <${List} cols="name-doors">
                 ${g.rows.map(a => html`
-                  <li class="flt-row" key=${a.gaii}>
-                    <div class="flt-row-main">
-                      ${/* The GAII lives here, on the name it belongs to. As a column it was the
-                            agent's name followed by an owner and node identical on all 68 rows. */''}
-                      <a class="flt-name" title=${a.gaii}
-                         href=${`/v1/profile?tab=agents&agent=${encodeURIComponent(a.name)}`}
-                         onClick=${(e) => openAgent(e, a.name, embedded)}>
-                        ${a.display_name || a.name}
-                      </a>
-                      ${a.credential?.connected && html`<span class="poster-status poster-status--fine flt-live">${t('fleet.connectedNow')}</span>`}
-                      ${/* INTERACTIVE was on 16 of 19 rows: a badge on almost every row separates
-                            nothing and just puts a second grey block after every name. It is the
-                            default, so only a departure from it is worth a badge. */''}
-                      ${a.mode && a.mode !== 'interactive' && html`<span class="poster-chip">${t(`profile.agents.mode.${a.mode}`)}</span>`}
-                      ${a.run_mode && html`<span class="poster-chip">${t(`profile.agents.runMode.${a.run_mode}`)}</span>`}
+                  <${Row} key=${a.gaii} hover>
+                    ${/* The GAII lives here, on the name it belongs to. As a column it was the
+                          agent's name followed by an owner and node identical on all 68 rows. */''}
+                    ${/* INTERACTIVE was on 16 of 19 rows: a badge on almost every row separates
+                          nothing and just puts a second grey block after every name. It is the
+                          default, so only a departure from it is worth a badge. */''}
+                    <${Name} title=${a.gaii}
+                      href=${`/v1/profile?tab=agents&agent=${encodeURIComponent(a.name)}`}
+                      onFollow=${(e) => openAgent(e, a.name, embedded)}
+                      after=${html`
+                        ${a.credential?.connected && html`<${Mark} kind="status" tone="fine">${t('fleet.connectedNow')}<//>`}
+                        ${a.mode && a.mode !== 'interactive' && html`<${Mark}>${t(`profile.agents.mode.${a.mode}`)}<//>`}
+                        ${a.run_mode && html`<${Mark}>${t(`profile.agents.runMode.${a.run_mode}`)}<//>`}`}
+                      meta=${metaLine(a)}>
+                      ${a.display_name || a.name}
+                    <//>
+                    <${Doors}>
                       ${/* MOVE THIS ONE. The banner above moves everything at once, which is right
                             when a person wants the fleet fixed and useless when they want one agent
                             fixed — and one agent is what a person wants while they are testing, or
@@ -484,35 +521,26 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                             was theirs. The rest go disabled, which is true — one move at a time —
                             and says so without claiming to be busy. */''}
                       ${movable.has(a.name) && html`
-                        <button class="poster-action flt-row-move"
+                        <${Action}
                                 disabled=${!!migrating || !connectorReady}
                                 title=${connectorReady ? '' : t('fleet.migrate.needConnector')}
                                 onClick=${() => migrate(a.name)}>
                           ${migrating === a.name ? t('fleet.migrate.working') : t('fleet.migrate.actionRow')}
-                        </button>
+                        <//>
                       `}
                       ${/* The credential kind moved to the group header: it is now part of what
                             DEFINES the group, so a badge repeating it on every row said nothing.
                             What is left here is the countdown, which differs row to row. */''}
-                      ${rowDetail(a.credential) && html`<span class="poster-time flt-days">${rowDetail(a.credential)}</span>`}
-                    </div>
-                    ${(a.platform || a.stats?.tasks?.active > 0 || a.stats?.messages?.total > 0) && html`
-                      <div class="flt-row-meta">
-                        ${a.platform ? html`<span>${a.platform}</span>` : ''}
-                        ${a.stats?.tasks?.active > 0 ? html`<span>${t('fleet.openWork').replace('{n}', String(a.stats.tasks.active))}</span>` : ''}
-                        ${a.stats?.messages?.total > 0 ? html`<span>${a.stats.messages.total === 1
-                          ? t('fleet.messagesOne')
-                          : t('fleet.messages').replace('{n}', String(a.stats.messages.total))}</span>` : ''}
-                      </div>
-                    `}
+                      ${rowDetail(a.credential) && html`<${Mark} kind="time">${rowDetail(a.credential)}<//>`}
+                    <//>
                     ${/* WHAT THE PRESS DID, ON THE ROW IT WAS PRESSED ON. It went to the banner's
                           outcome line, which on this account sits a thousand pixels above the
                           button — so a person pressed, watched every button flicker, and got their
                           answer somewhere they were not looking. The row's own comment about the
                           banner said this already: a state belongs where the person is reading. */''}
-                  </li>
+                  <//>
                 `)}
-              </ul>
+              <//>
               ${/* THE ANSWER STAYS WHERE THE PRESS WAS, which is the GROUP and not the row. On the
                     row it travelled with the row: a successful move takes the agent out of "cannot
                     sign in" and into the healthy group hundreds of pixels down, so the confirmation
@@ -520,13 +548,14 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                     with nothing said. Measured against a live connector on 2026-09-03. It names the
                     agent, because the row it is about may no longer be above it. */''}
               ${rowOutcome?.group === `${g.state}-${g.kind}` && html`
-                <p class="form-message flt-row-said ${rowOutcome.ok ? '' : 'form-message--error'}">
-                  <strong>${rowOutcome.name}</strong> ${rowOutcome.text}
-                </p>
+                <${Space} above="small">
+                  <${Note} kind="message" error=${!rowOutcome.ok}>
+                    <strong>${rowOutcome.name}</strong> ${rowOutcome.text}
+                  <//>
+                <//>
               `}
-            </section>
+            <//>
           `)}
         `}
-    </div>
-  `;
+  `);
 }

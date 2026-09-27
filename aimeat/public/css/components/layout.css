@@ -10,6 +10,17 @@
  *   Reads no colour and no shape. The hairline of the split is .og-split (page-section.css).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.9.0 — 2026-09-27 — .layout-above--part and .layout-below--part (Layout.js step 'part', 1.875rem):
+ *     the air between the parts of a readout; additive, appcat parity (sections-b).
+ *   v1.8.0 — 2026-09-27 — .layout-inset--* (Layout.js Space `inset`): a step at both sides; additive,
+ *     appcat parity (the old catalogue's Active Extensions bar).
+ *   v1.7.0 — 2026-09-27 — .layout-beside--stick, the side part kept in sight while the main part
+ *     scrolls, over it when one column (Layout.js Beside `stick`; formerly admin-portal.css
+ *     .adm-pt-bench > .adm-pt-side; admin group G2).
+ *   v1.6.0 — 2026-09-27 — .layout-beside--start, the side part before the main part (Layout.js
+ *     Beside `start`; formerly .adm-db-top / .adm-mx-top; admin page group G3).
+ *   v1.5.0 — 2026-09-27 — .layout-columns, parts of the same weight side by side (Layout.js Columns;
+ *     formerly admin.css .adm-two; admin group G1).
  *   v1.4.0 — 2026-09-26 — .layout-list, the Stack as a list (Layout.js Stack `list`), and
  *     .layout-stack--narrow, 60rem (Stack `narrow`); fix pass.
  *   v1.3.0 — 2026-09-26 — Touch's tabs cut, .layout-touch--tabs (Layout.js Touch `tabs`; page group G1a).
@@ -46,6 +57,8 @@
 .layout-above--medium { margin-top: .75rem; }
 .layout-above--large { margin-top: 1rem; }
 .layout-above--section { margin-top: 1.5rem; }
+/* 'part' (appcat sections-b): the air between the parts of a readout, the old visitors' .vis-block. */
+.layout-above--part { margin-top: 1.875rem; }
 
 .layout-below--none { margin-bottom: 0; }
 .layout-below--tight { margin-bottom: .25rem; }
@@ -53,6 +66,14 @@
 .layout-below--medium { margin-bottom: .75rem; }
 .layout-below--large { margin-bottom: 1rem; }
 .layout-below--section { margin-bottom: 1.5rem; }
+.layout-below--part { margin-bottom: 1.875rem; }
+
+/* Space `inset` (appcat parity): the same step at both sides (the old catalogue's Active Extensions
+   bar, 24px in from the column's edges). */
+.layout-inset--small { margin-left: .5rem; margin-right: .5rem; }
+.layout-inset--medium { margin-left: .75rem; margin-right: .75rem; }
+.layout-inset--large { margin-left: 1rem; margin-right: 1rem; }
+.layout-inset--section { margin-left: 1.5rem; margin-right: 1.5rem; }
 
 .layout-pad--none { padding-top: 0; }
 .layout-pad--tight { padding-top: .25rem; }
@@ -68,9 +89,29 @@
 .layout-beside--wide { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
 .layout-beside--end { align-items: end; }
 .layout-beside-main, .layout-beside-side { min-width: 0; }
+/* Beside start: the side part stands before the main part, 20rem when narrow (formerly the admin
+   Database and Metrics pages' .adm-db-top / .adm-mx-top, 320px); one column under 1100px, the side
+   over the main part (added by admin page group G3). */
+.layout-beside--start { grid-template-columns: auto minmax(0, 1fr); }
+.layout-beside--start.layout-beside--narrow { grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); }
+.layout-beside--start > .layout-beside-side { order: -1; }
+/* Beside stick: the side part stays in sight under the top bar and a pinned save row (118px, main's
+   .adm-pt-side) while the main part scrolls; one column under 900px, the side part first and still
+   (added by admin group G2). */
+.layout-beside--stick > .layout-beside-side { position: sticky; top: 118px; }
+@media (max-width: 900px) {
+  .layout-beside--stick > .layout-beside-side { position: static; order: -1; }
+}
+@media (max-width: 1100px) {
+  .layout-beside--start, .layout-beside--start.layout-beside--narrow { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 900px) {
   .layout-beside, .layout-beside--narrow, .layout-beside--wide { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Columns: parts of the same weight side by side, as many as fit at 340px, one column when the page
+   is narrower (formerly admin.css .adm-two; added by admin group G1). */
+.layout-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 0 44px; }
 
 /* Touch: every control inside is a thumb's target, 44px at every width; the box around the words
    grows, the words do not. A check line's whole line is the target and its box grows to 20px.

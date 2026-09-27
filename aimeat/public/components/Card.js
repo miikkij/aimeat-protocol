@@ -53,6 +53,8 @@
  *        html`<${Card} tone="section" title=${t('x.title')}>…<//>`
  *        html`<${CardGrid} cols="figures"><${Card} tone="figure" figure=${n} name=${t('x.apps')} onOpen=${go} /><//>`
  * @version-history
+ *   v2.3.0 — 2026-09-27 — CardGrid cols 'strip': the tiles in one line that scrolls sideways (the app
+ *     catalogue's active extensions, appcat); additive, card.css .card-grid--strip.
  *   v2.2.0 — 2026-09-26 — The tile's `lines` (named counts under the meta line: Discover's places and
  *     their workspaces, main's .dv-place / .dv-ws); additive, page group G8.
  *   v2.1.0 — 2026-09-26 — The section's `inRow` option (G3, additive): a section inside a list row.
@@ -69,7 +71,9 @@ import { boxClass } from '/components/Box.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
-const GRID_COLS = new Set(['three', 'two', 'fill', 'one', 'sections', 'panels', 'figures']);
+// 'strip' (added for appcat): the tiles in one line that scrolls sideways (the app catalogue's
+// active extensions).
+const GRID_COLS = new Set(['three', 'two', 'fill', 'one', 'sections', 'panels', 'figures', 'strip']);
 const FRAMED_STATES = new Set(['current', 'off', 'raised']);
 
 /** Enter and Space open a tile that is a door, as a button does. */

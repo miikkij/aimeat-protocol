@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — CortexActivationArtifacts.actionProvider: the identity an activation
+ *     published the cortex's actions under, so tearing them down deletes them there (secaudit 2026-09,
+ *     R3 7c). Optional; a record stored without it keeps working.
  *   v1.5.0 — 2026-09-25 — FederationPeerRecord: the peer's own relay-claim setting, and when it last
  *     relayed with a verified claim and without one.
  *   v1.4.0 — 2026-09-03 — `allowRouting` on the peer record says which way it points: this node
@@ -593,6 +596,13 @@ export interface CortexActivationArtifacts {
   schemaKeys: string[];
   promptKeys: string[];
   actionIds: string[];
+  /**
+   * The identity the actions in `actionIds` were published under: the activating caller's resolved
+   * identity (a person's GHII, an agent's GAII). Deactivation, uninstall and a redeploy delete the
+   * actions under it, whoever does them. Absent on a record stored before 2026-09-26 and on one with
+   * no actions; routes/cortex/activation.ts says what a teardown does then.
+   */
+  actionProvider?: string;
   boardIds: string[];
   seedDataKeys: string[];
   ontologyKeys: string[];

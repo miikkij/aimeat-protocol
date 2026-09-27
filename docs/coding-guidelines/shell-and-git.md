@@ -71,6 +71,62 @@ The first version of this one rejected a real 131-character subject and was corr
 The validator is a pure function (`lintCommitMessage`) with unit tests in
 `test/unit/commit-msg.test.ts`, so a new rule can be argued about against real examples.
 
+## The words in a commit message
+
+A commit message is read by developers who do not know this project, often years later, so it
+uses the terms the software industry already uses. Name the thing: endpoint, route, handler, MCP
+tool, CLI command, function, module, migration, memory key, table, test suite, request, response.
+Ruled by the developer on 2026-09-27, after `git log` of 300 commits showed "door" 256 times,
+"hand" 27 times and "road" 12 times.
+
+Do not use metaphors for software parts. The ones this history used, and what to write instead:
+
+| Do not write | Write |
+|---|---|
+| door | endpoint, route, MCP tool, or interface, whichever it is |
+| road, way in | code path, request path |
+| hand (whose hand wrote it) | author, caller, writer |
+| surface (of a tool) | interface; for MCP: the node MCP server, the connector, the CLI |
+| floor | shared environment, the parallel sessions |
+| the house | the operator, this server |
+
+This is a writing rule and no hook checks it: some of these words are sometimes the correct word
+(a Lifecycle Central screen is named a door, a surface can be a real screen), so a word list would
+refuse correct messages.
+
+Write the subject in the Conventional Commits form the history uses (`fix(scope): what changed`),
+in the imperative or as a plain statement, and say in the body why the change exists and what it
+costs.
+
+## Line length
+
+**Do not hard-wrap the body.** Write each paragraph as one line and put a blank line between
+paragraphs. Hard-wrap only text whose layout matters: a list, code, a stack trace, the trailers.
+**Keep the subject at 72 characters or fewer.**
+
+Why, checked on 2026-09-27:
+
+- The 72-column wrap was made for two things this repo does not use: an 80-column terminal, where
+  `git log` indents the body by 4 columns, and patches sent as email with `git format-patch`, where
+  replies add `> ` quote marks
+  ([Tim Pope, 2008](https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html)). Git's
+  own manual asks only for a short subject, a blank line and the body, and says nothing about
+  wrapping ([git-commit](https://git-scm.com/docs/git-commit), DISCUSSION).
+- A long line no longer runs off the terminal: Git 2.1 (2014) removed the `S` option from the
+  `less` defaults, so the pager wraps it
+  ([release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.1.0.adoc)).
+- VS Code's hover (since April 2025) and GitLens (since 2026) render a commit message as Markdown and
+  turn every newline into a break, so a body wrapped by hand shows as a column of short, ragged lines
+  in a narrow panel ([vscode#245779](https://github.com/microsoft/vscode/pull/245779),
+  [gitlens#5097](https://github.com/gitkraken/vscode-gitlens/issues/5097)).
+- The subject is the part that is still cut: `git log --oneline`, commit lists, and GitHub, which
+  cuts a pull request title made from a subject longer than 72 characters
+  ([discussion](https://github.com/orgs/community/discussions/12450)).
+- No source says hard wraps help an AI reader. For a model a newline inside a paragraph is one more
+  token and does not change the meaning.
+
+Wrap the body at 72 again only if patches start to travel by email.
+
 ## Why both
 
 The script removes the failure. The hook catches it when someone does not use the script — which

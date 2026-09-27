@@ -10,6 +10,8 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.6.0 — 2026-09-27 — StartPageSetting's dialog (and its footer, named) and ToastBox's hold and role: the
+ *     home and the pop-out windows pass meanings, not classes.
  *   v1.5.1 — 2026-09-27 — AgentConsent and DisplayPrefsFields draw their own names from sheets of their
  *     own (agent-consent.css, display-prefs-fields.css; a move); the page-sheet debt note had no
  *     entry left and goes.
@@ -80,7 +82,7 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
                 title: 'section and panel: the headline', aside: 'section: what stands at the right of the title', note: 'panel: a grey typewriter line after the headline',
                 rule: 'panel: the thick rule on top', wide: 'section and panel: spans every column of its grid', inRow: 'section: stands inside a list row, row air and no margin',
                 figure: 'figure: the number; name is its word', children: 'a field or a form inside a tile; the content of a section or a panel',
-                cols: 'CardGrid: three (the default) | two | fill (as many 180px tiles as fit) | one | sections (340px or wider) | panels (the overview\'s two columns) | figures (figure doors in a line); three and two fold to one column under 860px',
+                cols: 'CardGrid: three (the default) | two | fill (as many 180px tiles as fit) | one | sections (340px or wider) | panels (the overview\'s two columns) | figures (figure doors in a line) | strip (the tiles in one line that scrolls sideways, each at least 160px wide); three and two fold to one column under 860px',
                 subtitle: 'classic card: the line under the title', variant: 'classic card: "glass" for the glass ground',
             },
         },
@@ -100,11 +102,12 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
             { name: 'panel door', prop: 'tone="panel" onOpen', class: 'card-panel-title--door', when: 'the headline opens its tab' },
             { name: 'figure', prop: 'tone="figure"', class: 'card-figure', when: 'a number that opens its tab, a small grey word beside it' },
             { name: 'grid', prop: 'CardGrid cols', class: 'card-grid', when: 'the tiles in three, two or one columns, as many as fit, sections, panels or figures' },
+            { name: 'strip', prop: 'CardGrid cols="strip"', class: 'card-grid--strip', when: 'a few tiles in one line that scrolls sideways; a framed tile in it is small and soft: a hairline frame with the small corner on the card ground, its name in semibold, its meta line small and grey in the body face, the surface ground under the pointer (the app catalogue\'s active extensions)' },
             { name: 'classic', prop: 'title, subtitle (no tone, no name)', class: 'card', when: 'the classic shell\'s card' },
             { name: 'glass', prop: 'variant="glass"', class: 'card-glass', when: 'the classic card on the glass ground' },
         ],
         example: { tone: 'framed', name: 'Firefox on this laptop', meta: 'push · since 2026-09-02', doors: 'Send a test' },
-        note: 'card.css holds the classic card and its kin (the content group, the stat card, the category card, moved from theme.css) and, at its end, the tile, grid, section, panel and figure of the Card component. Replaced the Item grid (item-grid.css), the Figure door (figure-door.css), the App cards (app-cards.css), the Notifications device card and the overview\'s .pf-home-card.',
+        note: 'card.css holds the classic card and its kin (the content group, the stat card, the category card, moved from theme.css) and, at its end, the tile, grid, section, panel and figure of the Card component. Replaced the Item grid (item-grid.css), the Figure door (figure-door.css), the App cards (app-cards.css), the Notifications device card and the overview\'s .pf-home-card. CardGrid cols "strip" came with appcat (2026-09-27): it draws the old app catalogue\'s active extensions bar (#cortex-bar-grid and its .cortex-mini-card tiles).',
     },
     {
         id: 'badge', name: 'Badge', kind: 'component', status: 'active',
@@ -132,11 +135,14 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'start-page', name: 'StartPageSetting', kind: 'component', status: 'active',
-        summary: 'The start page setting: where a person lands, in words and a segmented control.',
+        summary: 'The start page setting: where a person lands after signing in (the home, the chat, or settings and controls), in words and a row of tabs, the chosen one on the sun. It reads and stores the choice on the account itself.',
         module: '/components/StartPageSetting.js', sheet: '/css/components/start-page.css',
-        data: { shape: 'StartPageSetting({ className })', fields: { className: 'the row\'s place' } },
+        data: { shape: 'StartPageSetting({ dialog, footer, className })', fields: { dialog: 'inside a settings dialog, spaced as the dialog spaces it', footer: 'at the foot of a page under the heavy rule, words and tabs on one line (the Settings overview)', className: 'a class of the caller\'s own, kept for older callers; a page passes dialog or footer instead' } },
         useFor: ['The home\'s settings dialog and the profile\'s settings.'],
-        variants: [], example: {},
+        variants: [
+            { name: 'dialog', prop: 'dialog', when: 'the home\'s settings dialog (.poster-settings-startpage, settings-stack.css)' },
+            { name: 'footer', class: 'start-page--footer', prop: 'footer', when: 'the foot of the Settings overview' },
+        ], example: {},
     },
     {
         id: 'status-dot', name: 'StatusDot', kind: 'component', status: 'active',
@@ -181,11 +187,23 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'data-table', name: 'DataTable', kind: 'component', status: 'active',
-        summary: 'Rows and columns of records.',
+        summary: 'Rows and columns of records: grey capitals over the columns, a hairline under each row, a soft ground under the pointer. The compact table is closer and quieter, for choosing rows inside a dialog.',
         module: '/components/DataTable.js', sheet: '/css/components/data-table.css',
-        data: { shape: 'DataTable({ headers, rows, scroll, className })', fields: { headers: 'the column names', rows: 'the records, one array each' } },
-        useFor: ['Records compared column by column (admin).'],
-        variants: [], example: { headers: ['Name', 'State'], rows: [['alpha', 'on'], ['beta', 'off']] },
+        data: {
+            shape: 'DataTable({ headers, rows, scroll, compact, className })',
+            fields: {
+                headers: 'the column names', rows: 'the records, one array each; a cell is a value, or { text, mono, title }',
+                scroll: 'the table in a box that scrolls after 600px',
+                compact: 'a table to choose from inside a dialog: ink words at .85rem in close cells, no ground under the pointer, a check box flush in its cell, a status word and a choice drawn small',
+                className: 'a class of the caller\'s own, kept for older callers',
+            },
+        },
+        useFor: ['Records compared column by column (admin).', 'Rows a person ticks and chooses from inside a dialog (compact).'],
+        variants: [
+            { name: 'compact', prop: 'compact', class: 'data-table--compact', when: 'a table to choose from inside a dialog, such as the app catalogue\'s backup restore' },
+        ],
+        example: { headers: ['Name', 'State'], rows: [['alpha', 'on'], ['beta', 'off']] },
+        note: 'compact came with appcat (2026-09-27): it draws the old app catalogue\'s backup import table (.backup-table).',
     },
     {
         id: 'usage-chart', name: 'UsageChart', kind: 'component', status: 'active',
@@ -229,11 +247,32 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'empty-state', name: 'EmptyState', kind: 'component', status: 'active',
-        summary: 'An icon, a line and an action when a list has nothing.',
+        summary: 'What stands where a list has nothing, or has not arrived yet: by default a faint icon, a bold title, a grey italic line and an action, centred. The start tone sets it at the list\'s left edge with a large faint icon and the title in the poster face; the line tone is one semibold line in ink with a grey hint under it; a spinning ring stands in the icon\'s place while the list loads.',
         module: '/components/EmptyState.js', sheet: '/css/components/empty-state.css',
-        data: { shape: 'EmptyState({ icon, title, text, action, children })', fields: { title: 'what is empty', text: 'what to do', action: 'a button' } },
-        useFor: ['An empty list in the classic shell (the poster pages say it with QuietNote).'],
-        variants: [], example: { title: 'Nothing here yet', text: 'Your records appear here.' },
+        data: {
+            shape: 'EmptyState({ icon, title, text, action, children, start, loading, ruled, line, hint, aside })',
+            fields: {
+                icon: 'a large faint sign over the words', title: 'what is empty', text: 'what to do', action: 'a button or a link under the words',
+                children: 'any body instead of text, kept for older callers',
+                start: 'the empty state of a poster list, at the list\'s start: left aligned, the icon large with a faint coral glow, the title in the poster face',
+                loading: 'the list is still being fetched: a ring spins in the icon\'s place (still for a person who asks for less motion), said to a screen reader as a status',
+                ruled: 'a heavy rule over it',
+                line: 'the empty state that stands in for a list under its headline: the words in ink and semibold, no icon, the ring centred while it waits',
+                hint: 'with line: the grey line under the words, held to 460px',
+                aside: 'with start: a small faint line under the words (which files a list takes)',
+            },
+        },
+        useFor: ['An empty list in the classic shell (the poster pages say it with QuietNote).', 'An empty or loading list in the app catalogue (start, line, loading).'],
+        variants: [
+            { name: 'start', prop: 'start', class: 'empty--start', when: 'a poster list with nothing in it yet: left aligned, a large faint icon, the title in the poster face' },
+            { name: 'loading', prop: 'loading', class: 'empty-ring', when: 'the list is still being fetched: a coral ring spins where the icon was' },
+            { name: 'ruled', prop: 'ruled', class: 'empty--ruled', when: 'the empty state stands under a heavy rule, as a list would' },
+            { name: 'line', prop: 'line', class: 'empty--line', when: 'one semibold line in ink where a list under its headline would be' },
+            { name: 'hint', prop: 'line hint', class: 'empty-hint', when: 'a grey line under the words of the line tone that says what fills the list' },
+            { name: 'aside', prop: 'start aside', class: 'empty-aside', when: 'a small faint line under the words of the start tone' },
+        ],
+        example: { title: 'Nothing here yet', text: 'Your records appear here.' },
+        note: 'start, loading, ruled, line, hint and aside came with appcat (2026-09-27): they draw the old app catalogue\'s empty and loading blocks (.empty-state, .cat-spinner, .view-empty, .view-empty-hint and the list\'s .empty-formats line). hint takes its look only with line, aside only with start.',
     },
     {
         id: 'text-utility', name: 'Muted text', kind: 'component', status: 'active',
@@ -269,11 +308,23 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'toast', name: 'Toast', kind: 'component', status: 'active',
-        summary: 'A passing word in a box at the edge of the screen.',
+        summary: 'A passing word in a box at the foot of the screen, drawn in the poster face, above an open dialog too.',
         module: '/components/Toast.js', sheet: '/css/components/toast.css',
-        data: { shape: 'const toast = useToast(); toast.show(message, kind)', fields: { message: 'what happened', kind: 'info | success | error' } },
+        data: {
+            shape: 'const { showToast, ToastContainer } = useToast(); showToast(message, kind) · ToastBox({ toast, hold, role }) · normalizeToastType(kind)',
+            fields: {
+                message: 'what happened', kind: 'success | error | info | warning (true means error)',
+                toast: 'ToastBox: { msg, type }, for a view that keeps its own toast state', hold: 'ToastBox: the pill that stays six seconds (the home and the pop-out windows)',
+                role: 'ToastBox: what a screen reader is told (status, or alert for a failure)',
+            },
+        },
         useFor: ['A result that does not need a place on the page.'],
-        variants: [], example: {},
+        variants: [
+            { name: 'success', class: 'toast-success', prop: 'showToast(msg) | toast.type="success"', when: 'it worked' },
+            { name: 'error', class: 'toast-error', prop: 'showToast(msg, "error")', when: 'it did not work' },
+            { name: 'warn', class: 'toast-warn', prop: 'showToast(msg, "warning")', when: 'it worked, with something to look at' },
+            { name: 'hold', class: 'toast-hold', prop: 'ToastBox hold', when: 'the pill that stays six seconds' },
+        ], example: {},
     },
     {
         id: 'section-header', name: 'Section header (classic)', kind: 'component', status: 'active',
@@ -287,9 +338,24 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         id: 'dialog', name: 'Modal (dialog)', kind: 'component', status: 'active',
         summary: 'The one dialog of the site: a header slab with the title and the close square, a body that scrolls, a footer for the actions; a sheet at the bottom on a phone.',
         module: '/components/Modal.js', sheet: '/css/components/dialog.css',
-        data: { shape: 'Modal({ open, onClose, title, children, footer, footerStart, showClose, size }) · ConfirmDialog({ … })', fields: { title: 'the header', children: 'the body', footer: 'the actions' } },
+        data: {
+            shape: 'Modal({ open, onClose, title, titleRef, children, footer, footerStart, showClose, size, guard, className, bodyClass, leading }) · ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className, leading }) · useConfirm()',
+            fields: {
+                title: 'the header', titleRef: 'the thing the dialog is about (a filename), after the title in the typewriter face',
+                children: 'the body', footer: 'the actions', footerStart: 'a side door at the footer\'s other end',
+                showClose: 'the X (true by default)', size: 'sm 440 | md 560 | lg 840 | xl 1080',
+                guard: 'Escape and the page behind do not close it once something has been typed (true by default)',
+                leading: '"normal": the dialog reads at the browser\'s own line spacing, as the app catalogue\'s dialogs do',
+            },
+        },
         useFor: ['A question or a form over the page.'],
-        variants: [{ name: 'medium', class: 'dlg--md', when: 'a wider dialog' }], example: { title: 'Settings' },
+        variants: [
+            { name: 'medium', class: 'dlg--md', when: 'a wider dialog' },
+            { name: 'normal leading', prop: 'leading="normal"', when: 'the dialog at the browser\'s own line spacing; its rules are in modal.css (the modal entry)' },
+            { name: 'title reference', prop: 'titleRef', when: 'a filename after the title; its rule is in modal.css (the modal entry)' },
+        ],
+        example: { title: 'Settings' },
+        note: 'On 2026-09-27 appcat added `leading` and `titleRef` (the old app catalogue\'s dialog reading and its .aga-app-ref). Their rules are in css/components/modal.css, not in dialog.css, because dialog.css is also copied into the old catalogue\'s page at build time; the modal entry shows them.',
     },
     {
         id: 'margin-pattern', name: 'Margin pattern', kind: 'component', status: 'active',

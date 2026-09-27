@@ -7,6 +7,8 @@
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).
  *   Translated 1:1 from the SQLite/Prisma implementations.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — resolveGhii moved to ../ghii-resolve.ts by pure extraction, so the owner
+ *     cascade gives an erased person's requesters their held morsels back through the same resolver.
  *   v1.3.0 — 2026-09-09 — deleteTransactions and transferBalance deleted: no caller.
  *   v1.2.0 — 2026-08-16 — The ledger resolves the principal on both sides, the way every balance op
  *     already did: a row written with an agent GAII is filed under the owner GHII (with initiatorGaii
@@ -16,11 +18,12 @@
  *   v1.1.0 — 2026-07-15 — Phase 5: atomic balance mutations (debit/credit/creditCapped/transfer).
  *   v1.0.0 — 2026-07-15 — Phase 5: wallet transaction ledger on Postgres+Kysely.
  */
-import { Kysely, sql } from 'kysely';
+import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { WalletTransaction } from '../../../interface.js';
-import type { DB, Transaction } from '../db-types.js';
+import type { Transaction } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
+import { resolveGhii } from '../ghii-resolve.js';
 
 function mapTx(r: Selectable<Transaction>): WalletTransaction {
   return {
@@ -29,25 +32,6 @@ function mapTx(r: Selectable<Transaction>): WalletTransaction {
     initiatorGaii: r.initiatorGaii ?? undefined,
     timestamp: (r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp)).toISOString(),
   };
-}
-
-/**
- * Resolve any identity (GAII, GHII, bare owner) to the owner's GHII identifier. All balance operations go
- * through GHII — agents/ecosystem-apps don't hold their own balance. Mirrors the SQLite provider's resolver.
- */
-async function resolveGhii(db: Kysely<DB>, identity: string): Promise<string | null> {
-  // GHII format: owner@node (no #) — already a GHII.
-  if (!identity.includes('#') && identity.includes('@')) return identity;
-  // GAII format: agent#owner@node → extract owner → lookup GHII by username.
-  let owner = identity;
-  if (identity.includes('#')) {
-    const hashIdx = identity.indexOf('#');
-    const atIdx = identity.lastIndexOf('@');
-    if (atIdx <= hashIdx) return null;
-    owner = identity.slice(hashIdx + 1, atIdx);
-  }
-  const row = await db.selectFrom('Ghii').select('ghii').where('username', '=', owner).executeTakeFirst();
-  return row?.ghii ?? null;
 }
 
 export const walletMethods = {

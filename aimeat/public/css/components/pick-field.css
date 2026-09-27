@@ -1,0 +1,24 @@
+/**
+ * @file pick-field.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The field that narrows a list as you type (components/PickField.js): the matches open
+ *   under the field in the ink frame, each a name with a grey line under it, the lit one (the arrow
+ *   keys, the pointer) on the surface ground; a thing that cannot be picked is grey. The field itself
+ *   is the Text field (form-fields.css). The values are main's .adm-cors-pick-list and
+ *   .adm-pt-pick-list (views/admin-cors.css, views/admin-portal.css).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G2).
+ */
+
+.pick-field { position: relative; }
+/* The mark at the end of a field that opens a list (not a search), on the field's line. */
+.pick-field-mark { position: absolute; right: .3rem; bottom: .55rem; width: 16px; height: 16px; pointer-events: none; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: square; }
+.pick-field-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; margin-top: 2px; max-height: 300px; overflow-y: auto; background: var(--card-bg); border: var(--shape-frame) solid var(--shape-frame-colour); }
+.pick-field-item { display: block; width: 100%; padding: 7px 10px; border: 0; border-radius: var(--shape-corner); background: none; font: inherit; font-size: .85rem; color: var(--text); text-align: left; cursor: pointer; }
+.pick-field-item:hover, .pick-field-item.is-lit { background: var(--bg-surface); }
+.pick-field-item:disabled { color: var(--text-dim); cursor: default; }
+.pick-field-item b { font-weight: 700; }
+.pick-field-item small { display: block; font-size: .75rem; line-height: 1.4; color: var(--text-dim); }
+.pick-field-none { padding: 7px 10px; font-size: .85rem; color: var(--text-dim); }

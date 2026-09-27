@@ -13,6 +13,8 @@
  * @structure registerAdminHooksTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminHooksTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — aimeat_admin_hook_set's `actions` says each reference names an action
+ *     already published: publish it, then bind it (security audit A8-3).
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
  *   v1.0.0 — 2026-09-12 — Initial: aimeat_admin_hooks, aimeat_admin_hook_set.
@@ -51,7 +53,7 @@ export function registerAdminHooksTools(
   mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'),
     {
       hook: z.string().describe('The moment to bind, e.g. "pre_owner_registration". Read aimeat_admin_hooks for the eleven.'),
-      actions: z.array(z.string()).describe('The action references to call, in order. An empty list clears the moment so it stops calling out.'),
+      actions: z.array(z.string()).describe('The action references to call, in order, each naming an action already published here: publish it, then bind it. An empty list clears the moment so it stops calling out.'),
     },
     annotationsFor('aimeat_admin_hook_set'),
     async ({ hook, actions }) => {

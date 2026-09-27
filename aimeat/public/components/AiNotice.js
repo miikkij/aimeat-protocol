@@ -5,9 +5,11 @@
  * @description That a machine is on the other end, said where a person is looking: in full the
  *   first time, one line after that, and always a button that opens the whole explanation. Its look
  *   is css/components/ai-notice.css; the catalogue entry is `ai-notice`.
- * @structure AiNotice({ compact, className })
- * @usage html`<${AiNotice} compact=${turns.length > 0} />`
+ * @structure AiNotice({ compact, main, className })
+ * @usage html`<${AiNotice} compact=${turns.length > 0} />` · html`<${AiNotice} main compact />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — `main`: the copy in the conversation's column, a phone's only
+ *     (.poster-ai-notice--main), so the chat passes a meaning and not the class (additive, G9).
  *   v1.1.0 — 2026-09-24 — "What does that mean?" is the action link's notice tone (Jouni's decision
  *     "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
@@ -37,10 +39,13 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
  * made — the opposite of the honesty the label exists for. The icon belongs on an answer the day
  * these turns carry records, and this comment is the note to add it then.
  */
-export function AiNotice({ compact = false, className = '' }) {
+export function AiNotice({ compact = false, main = false, className = '' }) {
     const [open, setOpen] = useState(false);
+    // main (added by page group G9): the copy in the conversation's column, shown on a phone only
+    // (ai-notice.css .poster-ai-notice--main); the desktop reads the one in the rail.
+    const place = [main ? 'poster-ai-notice--main' : '', className].filter(Boolean).join(' ');
     return html`
-        <div class=${'poster-ai-notice' + (compact ? ' poster-ai-notice--compact' : '') + (className ? ' ' + className : '')}>
+        <div class=${'poster-ai-notice' + (compact ? ' poster-ai-notice--compact' : '') + (place ? ' ' + place : '')}>
             ${/* FULL the first time, one line after that. The duty is to make sure a person knows a
                   machine is on the other end, and somebody twenty messages into their fourth
                   conversation knows. Two lines and a button at the top of every screen from then on

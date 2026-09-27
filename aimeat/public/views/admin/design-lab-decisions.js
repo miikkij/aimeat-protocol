@@ -32,6 +32,9 @@
  *   ProposalPart · OptionPart · DetailsPart · Answer · useChoice · answersOf
  * @usage Mounted by views/admin/design-lab-tab.js (the Decisions switch).
  * @version-history
+ *   v4.8.1 — 2026-09-27 — A built value's note and a page's "not reached" line are the Note's meta
+ *     kind (small grey words; the .text-meta span drew plain text outside Settings), so the built
+ *     part writes no class; the decision pictures keep their own markup (page group G9).
  *   v4.8.0 — 2026-09-26 — A decision may also be drawn in a theme (`look`: the proposal, and each
  *     option today and after, in that theme too, with what changes there), and may be a text page
  *     (`textOnly`: its options said in words, no pictures), for the last round of Settings.
@@ -69,6 +72,7 @@ import { FoldButton } from '/components/FoldButton.js';
 import { ActionRow } from '/components/ActionRow.js';
 import { ChooserFold } from '/components/Chooser.js';
 import { Specimens, Specimen, SpecimenImage } from '/components/Specimen.js';
+import { Note } from '/components/Note.js';
 import { DECISIONS } from '/views/design-lab/decisions-data.js';
 import { CONFLICT_NOTES } from '/views/design-lab/decisions-conflicts.js';
 import { BUILT, BUILT_WITHOUT_DECISION } from '/views/design-lab/built-data.js';
@@ -331,12 +335,12 @@ function BuiltPart({ decision, built, pictures }) {
       ${built.values?.rows?.length > 0 && html`
         <p><strong>${built.values.title}</strong></p>
         ${built.values.rows.map(([label, value, note]) => html`<${NamedRow} key=${label} label=${label}>
-          <code>${value}</code>${note && html`<br /><span class="text-meta">${note}</span>`}
+          <code>${value}</code>${note && html`<br /><${Note} kind="meta" inline>${note}<//>`}
         <//>`)}`}
       ${built.reach?.length > 0 && html`
         <p><strong>${tr('designLab.builtReach', 'What the example theme reaches, page by page')}</strong></p>
         ${built.reach.map((r) => html`<${NamedRow} key=${r.page} label=${r.page}>
-          ${r.reached}${r.not && html`<br /><span class="text-meta">${tr('designLab.builtNotReached', 'Not reached:')} ${r.not}</span>`}
+          ${r.reached}${r.not && html`<br /><${Note} kind="meta" inline>${tr('designLab.builtNotReached', 'Not reached:')} ${r.not}<//>`}
         <//>`)}`}
       ${!built.onMain && html`
         <${ActionRow}>

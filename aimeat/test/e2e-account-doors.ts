@@ -22,9 +22,22 @@
  *   Phase 9  POST /v1/agents refusals, platform detection, GET /v1/agents/verify
  *   Phase 10 POST /v1/agents/connect (connectivity key)
  *   Phase 11 401 and 403 on every door
- *   Phase 12 erasure: a name registered again inherits no action published in person
+ *   Phase 12 erasure: a name registered again inherits no action published in person, no work and
+ *            no line in the other side's ledger
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.6.0 — 2026-09-26 — 59: when an account is deleted, the other side's escrow_hold and earned
+ *     lines name the erasure's pseudonym, the one its work names, and no line names the freed name.
+ *   v1.5.0 — 2026-09-26 — 58: when an owner deletes one agent, its open work is cancelled and the
+ *     requester gets the held morsels back with a ledger line; its finished work stays in the
+ *     requester's list under the agent's own identity.
+ *   v1.4.0 — 2026-09-26 — 57: the same for two people who publish and ask in person, whose actions
+ *     and work are stored under their GHII; the freed name finds none of it in its lists, the Work
+ *     tab, a read by tracking code or the action's address.
+ *   v1.3.0 — 2026-09-26 — 56: when an account is deleted, the open work its agent was to do is
+ *     cancelled and the requester gets the held morsels back with a ledger line; the finished work
+ *     stays in the requester's list without the name; a new account and agent under the same names
+ *     reach none of it (secaudit 2026-09: A8-4, N6).
  *   v1.2.0 — 2026-09-26 — 55: a name registered again after its owner deleted the account holds
  *     none of the actions they published in person (secaudit 2026-09: N6).
  *   v1.1.0 — 2026-09-24 — 0a: the owner names the node writes under are refused on both
@@ -932,6 +945,291 @@ await test('55. A name registered again after its owner deleted the account hold
 
     assert(survivors.length === 0, `the action outlived its owner's account: ${JSON.stringify(survivors)}`);
     assert(reach.status === 404, `the new account reached the previous person's action: ${reach.status}`);
+});
+
+/** Register `name` again, as the next person to pick a freed name does, and sign in. */
+async function registerAgain(name: string): Promise<Owner> {
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register the freed name again: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+    const privateKey = reg.body.data.private_key as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(privateKey, name + NODE_ID + ts) }),
+    });
+    assert(tok.body.ok === true, `token for the new account: ${JSON.stringify(tok.body?.error)}`);
+    return { name, token: tok.body.data.token as string, privateKey };
+}
+
+// Work has two sides, so erasing one account must neither take the other side's records away nor
+// keep the other side's morsels: open work is cancelled and what was held for it goes back, finished
+// work stays in the other side's list under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
+await test('56. When an account is deleted, open work its agent was to do is cancelled and the requester gets the held morsels back; finished work stays without the name', async () => {
+    const first = await setupOwner('workgone');
+    const other = await setupOwner('workkeep');
+    const words = ['work:publish', 'work:read', 'work:accept', 'work:request'];
+    const worker = await setupAgent(first, 'worker', words);
+    const client = await setupAgent(other, 'client', words);
+    const stamp = Date.now().toString(36);
+    const firstAction = `erase-work-${stamp}`, otherAction = `keep-work-${stamp}`;
+    for (const [who, id] of [[worker, firstAction], [client, otherAction]] as const) {
+        const pub = await json('/v1/actions', {
+            method: 'POST', headers: auth(who.token),
+            body: JSON.stringify({ id, display_name: id, description: 'Work between two accounts.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+        });
+        assert(pub.status === 201, `publish ${id} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    }
+    const request = async (who: { token: string }, actionId: string, provider: string) => {
+        const r = await json('/v1/work/request', {
+            method: 'POST', headers: auth(who.token),
+            body: JSON.stringify({ action_id: actionId, provider_gaii: provider, input: { text: 'hello' } }),
+        });
+        assert(r.status === 201, `request ${actionId} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        return r.body.data.tracking_code as string;
+    };
+    const balance = async (o: Owner) => (await json('/v1/wallet', { headers: auth(o.token) })).body.data.balance as number;
+
+    // Finished: the client asks, the worker accepts and delivers.
+    const done = await request(client, firstAction, worker.gaii);
+    const acc = await json(`/v1/work/${done}/accept`, { method: 'POST', headers: auth(worker.token) });
+    assert(acc.status === 200, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+    const dlv = await json(`/v1/work/${done}/deliver`, { method: 'POST', headers: auth(worker.token), body: JSON.stringify({ output: { text: 'done' } }) });
+    assert(dlv.status === 200, `deliver ${dlv.status}: ${JSON.stringify(dlv.body?.error)}`);
+    // Open: the client asks again, and nobody has answered yet. 10 morsels and a fee of 1 are held.
+    const open = await request(client, firstAction, worker.gaii);
+    // Open the other way round: the worker asks the client.
+    const asked = await request(worker, otherAction, client.gaii);
+    const held = await balance(other);
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+
+    const erased = /^erased:[0-9a-f]{24}$/;
+    const after = await balance(other);
+    const lines = (await json('/v1/wallet/transactions?type=escrow_return', { headers: auth(other.token) })).body.data?.transactions ?? [];
+    const line = lines.find((t: any) => t.tracking_code === open);
+    const sent = (await json('/v1/work/sent', { headers: auth(client.token) })).body.data?.items ?? [];
+    const openRow = sent.find((w: any) => w.tracking_code === open);
+    const doneRow = sent.find((w: any) => w.tracking_code === done);
+    const inbox = (await json('/v1/work/inbox', { headers: auth(client.token) })).body.data?.items ?? [];
+    const askedRow = (await json(`/v1/work/${asked}`, { headers: auth(client.token) })).body.data;
+
+    // A new account under the freed name, with an agent of the same name, so the same address.
+    const again = await registerAgain(first.name);
+    const newWorker = await setupAgent(again, 'worker', words);
+    const reached: string[] = [];
+    for (const who of [again, newWorker]) {
+        const mine = [
+            ...((await json('/v1/work/inbox', { headers: auth(who.token) })).body.data?.items ?? []),
+            ...((await json('/v1/work/sent', { headers: auth(who.token) })).body.data?.items ?? []),
+        ].map((w: any) => w.tracking_code);
+        for (const tc of [done, open, asked]) {
+            if (mine.includes(tc)) reached.push(`${tc} listed`);
+            const one = await json(`/v1/work/${tc}`, { headers: auth(who.token) });
+            if (one.status !== 403) reached.push(`${tc} read ${one.status}`);
+        }
+    }
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+    await json(`/v1/owners/${other.name}`, { method: 'DELETE', headers: auth(other.token) });
+
+    assert(after === held + 11, `the requester's held morsels did not come back: ${held} before the deletion, ${after} after`);
+    assert(line?.amount === 11, `no escrow_return line for the cancelled request: ${JSON.stringify(lines)}`);
+    assert(erased.test(line?.counterparty_gaii ?? ''), `the return line names the erased agent: ${line?.counterparty_gaii}`);
+    assert(openRow?.status === 'cancelled', `the open request was not cancelled: ${JSON.stringify(openRow)}`);
+    assert(doneRow?.status === 'delivered', `the finished work left the requester's list: ${JSON.stringify(doneRow)}`);
+    for (const row of [openRow, doneRow]) assert(erased.test(row?.provider_gaii ?? ''), `the requester's list still names the erased agent: ${row?.provider_gaii}`);
+    assert(!inbox.some((w: any) => w.tracking_code === asked), 'the erased agent\'s own request is still in the inbox');
+    assert(askedRow?.status === 'cancelled' && erased.test(askedRow?.requester_gaii ?? ''), `the erased agent's own request: ${JSON.stringify(askedRow)}`);
+    assert(reached.length === 0, `the new account reached the previous person's work: ${reached.join(', ')}`);
+});
+
+// The same with no agent at all: two people who publish and ask in person. Their actions and their
+// work are stored under their GHII, which is the address the freed name gets back, so what has to be
+// true is that nothing of the previous person's is under it any more.
+await test('57. When a person who published an action in person deletes the account, the work on it settles the same way, and the freed name finds none of it', async () => {
+    const first = await setupOwner('actgone');
+    const other = await setupOwner('actkeep');
+    const stamp = Date.now().toString(36);
+    const firstAction = `erase-own-${stamp}`, otherAction = `keep-own-${stamp}`;
+    const publish = async (o: Owner, id: string) => {
+        const pub = await json('/v1/actions', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ id, display_name: id, description: 'Work between two people.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+        });
+        assert(pub.status === 201, `publish ${id} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+        return pub.body.data.provider_gaii as string;
+    };
+    const firstProvider = await publish(first, firstAction);
+    const otherProvider = await publish(other, otherAction);
+    const request = async (o: Owner, actionId: string, provider: string) => {
+        const r = await json('/v1/work/request', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ action_id: actionId, provider_gaii: provider, input: { text: 'hello' } }),
+        });
+        assert(r.status === 201, `request ${actionId} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        return r.body.data.tracking_code as string;
+    };
+    const balance = async (o: Owner) => (await json('/v1/wallet', { headers: auth(o.token) })).body.data.balance as number;
+
+    const done = await request(other, firstAction, firstProvider);
+    for (const [step, body] of [['accept', undefined], ['deliver', { output: { text: 'done' } }]] as const) {
+        const r = await json(`/v1/work/${done}/${step}`, { method: 'POST', headers: auth(first.token), ...(body ? { body: JSON.stringify(body) } : {}) });
+        assert(r.status === 200, `${step} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    }
+    const open = await request(other, firstAction, firstProvider);
+    const asked = await request(first, otherAction, otherProvider);
+    const held = await balance(other);
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+
+    const erased = /^erased:[0-9a-f]{24}$/;
+    const after = await balance(other);
+    const lines = (await json('/v1/wallet/transactions?type=escrow_return', { headers: auth(other.token) })).body.data?.transactions ?? [];
+    const line = lines.find((t: any) => t.tracking_code === open);
+    const sent = (await json('/v1/work/sent', { headers: auth(other.token) })).body.data?.items ?? [];
+    const openRow = sent.find((w: any) => w.tracking_code === open);
+    const doneRow = sent.find((w: any) => w.tracking_code === done);
+    const inbox = (await json('/v1/work/inbox', { headers: auth(other.token) })).body.data?.items ?? [];
+    const askedRow = (await json(`/v1/work/${asked}`, { headers: auth(other.token) })).body.data;
+
+    const again = await registerAgain(first.name);
+    const reached: string[] = [];
+    const mine = [
+        ...((await json('/v1/work/inbox', { headers: auth(again.token) })).body.data?.items ?? []),
+        ...((await json('/v1/work/sent', { headers: auth(again.token) })).body.data?.items ?? []),
+        ...((await json('/v1/work/overview', { headers: auth(again.token) })).body.data?.inbox ?? []),
+        ...((await json('/v1/work/overview', { headers: auth(again.token) })).body.data?.sent ?? []),
+    ].map((w: any) => w.tracking_code);
+    for (const tc of [done, open, asked]) {
+        if (mine.includes(tc)) reached.push(`${tc} listed`);
+        const one = await json(`/v1/work/${tc}`, { headers: auth(again.token) });
+        if (one.status !== 403) reached.push(`${tc} read ${one.status}`);
+    }
+    const found = await json(`/v1/actions/${encodeURIComponent(firstProvider)}/${firstAction}`);
+    if (found.status !== 404) reached.push(`the action ${found.status}`);
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+    await json(`/v1/owners/${other.name}`, { method: 'DELETE', headers: auth(other.token) });
+
+    assert(after === held + 11, `the requester's held morsels did not come back: ${held} before the deletion, ${after} after`);
+    assert(line?.amount === 11 && erased.test(line?.counterparty_gaii ?? ''), `the escrow_return line: ${JSON.stringify(line ?? lines)}`);
+    assert(openRow?.status === 'cancelled', `the open request in the requester's list: ${JSON.stringify(openRow ?? sent)}`);
+    assert(doneRow?.status === 'delivered', `the finished work in the requester's list: ${JSON.stringify(doneRow ?? sent)}`);
+    for (const row of [openRow, doneRow]) assert(erased.test(row?.provider_gaii ?? ''), `the requester's list still names the deleted person: ${row?.provider_gaii}`);
+    assert(!inbox.some((w: any) => w.tracking_code === asked), 'the deleted person\'s own request is still in the inbox');
+    assert(askedRow?.status === 'cancelled' && erased.test(askedRow?.requester_gaii ?? ''), `the deleted person's own request: ${JSON.stringify(askedRow)}`);
+    assert(reached.length === 0, `the freed name reached the previous person's work: ${reached.join(', ')}`);
+});
+
+// Deleting one agent is not deleting the account: its owner is still here, so the agent keeps its
+// name on what stays. Its open work is cancelled and what was held for it goes back; its finished
+// work stays in the other side's list.
+await test('58. When an owner deletes an agent, its open work is cancelled, the requester gets the held morsels back, and its finished work stays', async () => {
+    const first = await setupOwner('agentgone');
+    const other = await setupOwner('agentkeep');
+    const words = ['work:publish', 'work:read', 'work:accept', 'work:request'];
+    const worker = await setupAgent(first, 'worker', words);
+    const client = await setupAgent(other, 'client', words);
+    const actionId = `agent-gone-${Date.now().toString(36)}`;
+    const pub = await json('/v1/actions', {
+        method: 'POST', headers: auth(worker.token),
+        body: JSON.stringify({ id: actionId, display_name: actionId, description: 'Work an agent does.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+    });
+    assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const request = async () => {
+        const r = await json('/v1/work/request', {
+            method: 'POST', headers: auth(client.token),
+            body: JSON.stringify({ action_id: actionId, provider_gaii: worker.gaii, input: { text: 'hello' } }),
+        });
+        assert(r.status === 201, `request ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        return r.body.data.tracking_code as string;
+    };
+    const balance = async (o: Owner) => (await json('/v1/wallet', { headers: auth(o.token) })).body.data.balance as number;
+
+    const done = await request();
+    for (const [step, body] of [['accept', undefined], ['deliver', { output: { text: 'done' } }]] as const) {
+        const r = await json(`/v1/work/${done}/${step}`, { method: 'POST', headers: auth(worker.token), ...(body ? { body: JSON.stringify(body) } : {}) });
+        assert(r.status === 200, `${step} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    }
+    const open = await request();
+    const held = await balance(other);
+
+    const del = await json(`/v1/agents/${worker.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete the agent ${del.status}: ${JSON.stringify(del.body?.error)}`);
+
+    const after = await balance(other);
+    const lines = (await json('/v1/wallet/transactions?type=escrow_return', { headers: auth(other.token) })).body.data?.transactions ?? [];
+    const line = lines.find((t: any) => t.tracking_code === open);
+    const sent = (await json('/v1/work/sent', { headers: auth(client.token) })).body.data?.items ?? [];
+    const openRow = sent.find((w: any) => w.tracking_code === open);
+    const doneRow = sent.find((w: any) => w.tracking_code === done);
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    await json(`/v1/owners/${other.name}`, { method: 'DELETE', headers: auth(other.token) });
+
+    assert(after === held + 11, `the requester's held morsels did not come back: ${held} before, ${after} after`);
+    assert(line?.amount === 11 && line?.counterparty_gaii === worker.gaii, `the escrow_return line: ${JSON.stringify(line ?? lines)}`);
+    assert(openRow?.status === 'cancelled' && openRow?.provider_gaii === worker.gaii, `the open request in the requester's list: ${JSON.stringify(openRow ?? sent)}`);
+    assert(doneRow?.status === 'delivered' && doneRow?.provider_gaii === worker.gaii, `the finished work in the requester's list: ${JSON.stringify(doneRow ?? sent)}`);
+});
+
+// The other side's ledger outlives a deleted account, as its work does, and names the deleted person
+// the way the work does: by the erasure's pseudonym, never by the name, which is released for reuse.
+await test('59. When an account is deleted, the other side\'s ledger lines name the erasure\'s pseudonym, and the freed name is in none of them', async () => {
+    const first = await setupOwner('ledgone');
+    const other = await setupOwner('ledkeep');
+    const stamp = Date.now().toString(36);
+    const firstAction = `ledger-gone-${stamp}`, otherAction = `ledger-keep-${stamp}`;
+    const publish = async (o: Owner, id: string) => {
+        const pub = await json('/v1/actions', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ id, display_name: id, description: 'Work between two people.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+        });
+        assert(pub.status === 201, `publish ${id} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+        return pub.body.data.provider_gaii as string;
+    };
+    const firstProvider = await publish(first, firstAction);
+    const otherProvider = await publish(other, otherAction);
+    const request = async (o: Owner, actionId: string, provider: string) => {
+        const r = await json('/v1/work/request', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ action_id: actionId, provider_gaii: provider, input: { text: 'hello' } }),
+        });
+        assert(r.status === 201, `request ${actionId} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        return r.body.data.tracking_code as string;
+    };
+    const finish = async (o: Owner, tc: string) => {
+        for (const [step, body] of [['accept', undefined], ['deliver', { output: { text: 'done' } }]] as const) {
+            const r = await json(`/v1/work/${tc}/${step}`, { method: 'POST', headers: auth(o.token), ...(body ? { body: JSON.stringify(body) } : {}) });
+            assert(r.status === 200, `${step} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        }
+    };
+    // The other side asks the first person for work and pays for it: an escrow_hold line names them.
+    const asked = await request(other, firstAction, firstProvider);
+    await finish(first, asked);
+    // The first person asks the other side, who delivers and is paid: an earned line names them.
+    const served = await request(first, otherAction, otherProvider);
+    await finish(other, served);
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    const again = await registerAgain(first.name);
+
+    const lines = (await json('/v1/wallet/transactions?per_page=200', { headers: auth(other.token) })).body.data?.transactions ?? [];
+    const hold = lines.find((t: any) => t.type === 'escrow_hold' && t.tracking_code === asked);
+    const earned = lines.find((t: any) => t.type === 'earned' && t.tracking_code === served);
+    const askedRow = (await json(`/v1/work/${asked}`, { headers: auth(other.token) })).body.data;
+    const freed = [first.name, `${first.name}@${NODE_ID}`];
+    const named = lines.filter((t: any) => freed.includes(t.counterparty_gaii) || freed.includes(t.initiator_gaii));
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+    await json(`/v1/owners/${other.name}`, { method: 'DELETE', headers: auth(other.token) });
+
+    const erased = /^erased:[0-9a-f]{24}$/;
+    assert(!!hold && !!earned, `the other side's ledger lost its lines for the two pieces of work: ${JSON.stringify(lines)}`);
+    assert(erased.test(hold.counterparty_gaii ?? ''), `the escrow_hold line names ${hold.counterparty_gaii}, not the erasure's pseudonym`);
+    assert(erased.test(earned.counterparty_gaii ?? ''), `the earned line names ${earned.counterparty_gaii}, not the erasure's pseudonym`);
+    assert(hold.counterparty_gaii === askedRow?.provider_gaii && earned.counterparty_gaii === hold.counterparty_gaii,
+        `one pseudonym for the erasure, on the work and in the ledger: ${hold.counterparty_gaii}, ${earned.counterparty_gaii}, ${askedRow?.provider_gaii}`);
+    assert(named.length === 0, `the freed name is still in the other side's ledger: ${JSON.stringify(named)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

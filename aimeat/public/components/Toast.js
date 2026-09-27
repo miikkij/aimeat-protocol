@@ -10,6 +10,8 @@
  *   then render <${ToastContainer} /> at the view root (NOT inside any element
  *   with transform/filter — those trap the fixed-position pill).
  * @version-history
+ *   v1.4.0 — 2026-09-27 — ToastBox `hold` (the six-second pill, .toast-hold) and `role`, so the home
+ *     and the pop-out windows draw their toast with it and write no class (additive, page group G9).
  *   v1.3.0 — 2026-09-26 — ToastBox: the pill alone, for a view that keeps its own toast state (the
  *     Settings shell, views/profile.js); ToastContainer draws it. Additive, by page group G8.
  *   2026-09-14 — Header follows theme.css: the toast is drawn in the poster face, not as a coloured pill.
@@ -43,11 +45,14 @@ export function normalizeToastType(kind) {
 /**
  * The toast pill itself, for a view that keeps its own toast state ({ msg, type } or null): drawn
  * above an open dialog. ToastContainer draws this.
- * @param {{ toast: { msg: any, type: string } | null }} props
+ * `hold` (added by page group G9): the pill stays for six seconds before it fades (toast.css
+ * .toast-hold: a failure line a person has to read, the home's); `role` says it to a screen reader
+ * ('status', as the home's line did).
+ * @param {{ toast: { msg: any, type: string } | null, hold?: boolean, role?: string }} props
  */
-export function ToastBox({ toast }) {
+export function ToastBox({ toast, hold = false, role }) {
   if (!toast) return null;
-  return html`<div class="toast toast-${normalizeToastType(toast.type)}" ref=${raiseAboveDialogs}>${toast.msg}</div>`;
+  return html`<div class=${`toast toast-${normalizeToastType(toast.type)}${hold ? ' toast-hold' : ''}`} role=${role} ref=${raiseAboveDialogs}>${toast.msg}</div>`;
 }
 
 /**

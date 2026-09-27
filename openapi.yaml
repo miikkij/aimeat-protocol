@@ -395,17 +395,20 @@ components:
           items:
             type: object
             properties:
-              ref: { type: string, description: The reference as the operator wrote it }
+              ref: { type: string, description: The reference as the binding stores it }
               name: { type: string, nullable: true }
-              published: { type: boolean, description: Whether an action with this reference exists here }
+              published: { type: boolean, description: Whether this reference names an action published here. A bare id never does. }
               has_address: { type: boolean, description: A published action without one is bound and does nothing }
               host: { type: string, nullable: true, description: The address's host, never the whole address }
               ambiguous:
                 type: array
                 items: { type: string }
                 description: >
-                  Present when the reference is a bare id that more than one provider publishes: the
-                  id#provider of each. Such a reference names none of them and nothing is called.
+                  Present when the reference is a bare id: the id#provider of each provider that
+                  publishes that id now, possibly none. When a hook runs, only an id#provider
+                  reference names an action, so a bare id names none of them, whatever is published:
+                  nothing is called, and a gate bound to it refuses. Bind the one you mean as
+                  id#provider.
         last:
           allOf:
             - $ref: '#/components/schemas/HookRun'
@@ -1270,6 +1273,15 @@ components:
       pattern: '^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]#[a-z0-9][a-z0-9-]{0,38}[a-z0-9]@[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$'
       example: openclaw001#jouni-miikki@aimeat-finland-001-genesis
 
+    WorkParty:
+      type: string
+      description: |
+        A party to an action or a work item, by its full identity: a person's GHII (`name@node`) or an
+        agent's GAII (`agent#name@node`). An action a person publishes is stored under their GHII, and
+        so is every work item on it and every request they make; an agent's are stored under its GAII.
+        After an account is deleted, the other party's records name it by an `erased:` pseudonym.
+      example: jouni-miikki@aimeat-finland-001-genesis
+
     OwnerRegistration:
       type: object
       required: [name, public_key]
@@ -1834,7 +1846,7 @@ components:
         description:
           type: string
         provider_gaii:
-          $ref: '#/components/schemas/GAII'
+          $ref: '#/components/schemas/WorkParty'
         category:
           type: string
         input_schema:
@@ -1864,7 +1876,7 @@ components:
           type: string
           example: translate-text
         provider_gaii:
-          $ref: '#/components/schemas/GAII'
+          $ref: '#/components/schemas/WorkParty'
         input:
           type: object
           description: Must conform to action's input_schema
@@ -1885,9 +1897,9 @@ components:
         status:
           $ref: '#/components/schemas/WorkStatus'
         provider_gaii:
-          $ref: '#/components/schemas/GAII'
+          $ref: '#/components/schemas/WorkParty'
         requester_gaii:
-          $ref: '#/components/schemas/GAII'
+          $ref: '#/components/schemas/WorkParty'
         action_id:
           type: string
         cost:
@@ -5601,19 +5613,24 @@ components:
           description: >-
             The most one run may spend on the owner's AI, in US dollars: through its `ai` steps, and
             through the node's model judging its `llm` signals. The node adds up what each call cost,
-            as it recorded them. Before an ai step starts, the node sets aside what the step is
-            expected to cost (`estimateUsd` on the run step: the most it cost in the workflow's last
-            ten finished runs that ran it with the same action; with no such run, an equal share of
-            the cap nobody holds, split across the ai steps not yet started). The step starts only
-            when what the run has spent, what its running ai steps hold and that estimate stay within
-            this, so ai steps that fit together still run side by side. A step that does not fit
-            stays `pending` while another ai step runs; with none running, the run ends with status
+            as it recorded them. Before an ai step's model call starts, the node sets aside what one
+            attempt of the step is expected to cost (`estimateUsd` on the run step: the most one
+            attempt cost in the workflow's last ten finished runs that ran it with the same action;
+            with no such run, an equal share of the cap nobody holds, split across the ai steps not
+            yet started). The call starts only when what the run has spent, what its open calls hold
+            and that estimate stay within this, so ai steps that fit together still run side by side.
+            A call holds its share until it answers (`openCalls` on the run step), also when its
+            step was moved on meanwhile by a timeout, a retry, the watchdog finding its output or a
+            cancel; a retry's call beside one still open holds its own share. A step that does not
+            fit stays `pending` while a call is open; with none open, the run ends with status
             `stopped`, `costCap` holds the cap, the spend and the step's estimate, and `reason` says
-            it in words. A step already running finishes and keeps its result, and one that costs
-            more than its estimate takes the run past this by the difference. Once the spend has
-            reached this the judge is not asked, and its `llm` leaf passes as it does when the judge
-            is unavailable. Absent or null: no cap. The owner's daily AI budget bounds every AI call
-            as well.
+            it in words. A step expected to cost more than this whole amount starts alone, when no
+            call is open and the run has spent less than this, and what it really cost counts as
+            usual. A call already started finishes and keeps its result, and one that costs more
+            than its estimate takes the run past this by the difference. Once the spend has reached
+            this the judge is not asked, and its `llm` leaf passes as it does when the judge is
+            unavailable. Absent or null: no cap. The owner's daily AI budget bounds every AI call as
+            well.
         costCapMorsels:
           type: integer
           nullable: true
@@ -5729,9 +5746,23 @@ components:
             properties:
               state: { type: string, enum: [pending, input-red, dispatched, green, output-red, timed-out, skipped, agent-offline, waiting-human] }
               attempt: { type: integer }
-              costUsd: { type: number, description: 'What this step''s own model calls cost, in US dollars, as the node recorded them (an ai step; a retry adds to it).' }
-              estimateUsd: { type: number, description: 'Under maxCostUsd: what this ai step is expected to cost, set when the run starts. The most it cost in the workflow''s last ten finished runs that ran it with the same action; absent when there is no such run.' }
-              reservedUsd: { type: number, description: 'Under maxCostUsd, while this ai step runs: what the node set aside for it from the cap before it started (its estimateUsd, else its share of the cap nobody held). Removed when the step ends; costUsd then says what it cost.' }
+              costUsd: { type: number, description: 'What this step''s own model calls cost, in US dollars, as the node recorded them (an ai step; a retry adds to it, and so does a call that answered after the step was moved on).' }
+              attemptMaxUsd: { type: number, description: 'The most one attempt of this ai step cost, in US dollars: one model call with its re-asks for JSON. Later runs read their estimate from it.' }
+              estimateUsd: { type: number, description: 'Under maxCostUsd: what one attempt of this ai step is expected to cost, set when the run starts. The most one attempt cost in the workflow''s last ten finished runs that ran it with the same action; absent when there is no such run.' }
+              openCalls:
+                type: array
+                description: >-
+                  Under maxCostUsd: the model calls of this ai step that have started and not yet
+                  answered, one per attempt, each with what the node set aside for it from the cap
+                  before it started (the step's estimateUsd, else its share of the cap nobody held).
+                  A call keeps its hold until it answers, whatever became of the step meanwhile; a
+                  restart of the node clears them on a run still in flight, because the calls ended
+                  with it.
+                items:
+                  type: object
+                  properties:
+                    attempt: { type: integer }
+                    reservedUsd: { type: number }
               taskIds: { type: array, items: { type: string } }
               reads: { type: array, items: { type: string } }
               writes: { type: array, items: { type: string } }
@@ -7738,7 +7769,12 @@ paths:
     get:
       operationId: exportOwnerData
       summary: Data protection export
-      description: Export all owner data (GDPR Art. 20, CCPA). Returns all agents, memory, transactions.
+      description: |
+        Export all owner data (GDPR Art. 20, CCPA). Returns all agents, memory, transactions.
+        `work_provided` and `work_requested` at the top level hold the person's own work, filed under
+        their GHII: the work on actions they published in person, and the requests they made in
+        person. Each agent carries its own `work_provided` and `work_requested` beside them, and
+        `disputes` covers the work in both.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -18773,7 +18809,8 @@ paths:
           description: >
             `own` (default) searches all of the caller's content; `public` searches public-visibility
             content across the whole node (knowledge packages, public workspace documents, public
-            memory), each hit carrying its producer.
+            memory), each hit carrying its producer. A Design Book part is never a hit: it is found
+            and read through the Design Book (GET /v1/designbook, GET /v1/designbook/{id}).
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -19356,7 +19393,9 @@ paths:
         with the specified visibility (defaults to 'private'). The copy keeps the
         source's key, so an `organism.*` key gets the organism rule POST /v1/memory
         applies, and a caller that may not write it there is refused (403 ACCESS_DENIED
-        or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist).
+        or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist). A
+        Design Book part is not copied: 403 DESIGN_BOOK_PART names GET /v1/designbook/{id},
+        the one door that reads a part.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19800,7 +19839,11 @@ paths:
       summary: Read public memory entry
       description: |
         Read a public memory entry by GAII and key. No auth required for public
-        entries. For shared entries, consent is checked.
+        entries. For shared entries, consent is checked. A Design Book part (a key
+        starting `atelier.book.part.` under the node's own system identity) is read
+        through the Design Book, the one door that reads it: this door answers
+        403 DESIGN_BOOK_PART, with or without `soft`, and its `details.door` names
+        GET /v1/designbook/{id}.
       tags: [Memory]
       parameters:
         - name: gaii
@@ -20576,6 +20619,11 @@ paths:
     post:
       operationId: publishAction
       summary: Publish action
+      description: |
+        Publish a callable action. It is stored under the caller's full identity (`provider_gaii`):
+        a person's GHII when a person publishes it, an agent's GAII when an agent does. Work on the
+        action is addressed to that identity, and the same caller updates, unpublishes and takes the
+        work on it.
       tags: [Actions]
       security:
         - BearerAuth: []
@@ -20686,6 +20734,10 @@ paths:
       description: |
         Submit a work request for an action. Morsels are moved to escrow.
         Free actions (0 morsels) operate at Core tier.
+
+        The requester and the provider must belong to different owners. A person may not ask their
+        own agent for work, an agent may not ask its own owner, and two agents of one person may not
+        ask each other.
       tags: [Work Queue]
       security:
         - BearerAuth: []
@@ -20707,6 +20759,12 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/WorkItem'
+        '400':
+          description: >
+            Refused before anything is held: the body does not validate (VALIDATION_ERROR, or
+            INVALID_INPUT when `input` is missing), the provider is the requester (SELF_WORK), or
+            the requester and the provider belong to the same owner, whatever kind of principal each
+            one is (SAME_OWNER_WORK).
         '402':
           $ref: '#/components/responses/PaymentRequired'
         '429':
@@ -20738,6 +20796,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/WorkItem'
+        '400':
+          description: The same refusals as POST /v1/work/request (VALIDATION_ERROR, INVALID_INPUT, SELF_WORK, SAME_OWNER_WORK).
         '402':
           $ref: '#/components/responses/PaymentRequired'
 
@@ -20767,7 +20827,10 @@ paths:
     get:
       operationId: getInbox
       summary: Provider inbox
-      description: List pending work items assigned to the authenticated agent.
+      description: |
+        List the open work items (pending, accepted, in progress) the caller is to do. An agent sees
+        its own. A person sees the work on actions they published themselves, under their GHII, and
+        the work of all their agents.
       tags: [Work Queue]
       security:
         - BearerAuth: []
@@ -20786,7 +20849,9 @@ paths:
     get:
       operationId: getSentWork
       summary: Sent work items
-      description: List work items requested by the authenticated agent.
+      description: |
+        List the work items the caller asked for. An agent sees its own requests. A person sees the
+        requests they made themselves, under their GHII, and those of all their agents.
       tags: [Work Queue]
       security:
         - BearerAuth: []
@@ -24986,7 +25051,8 @@ paths:
         It reports what is TRUE rather than what is configured, wherever the two can differ: a bound
         action that was deleted reads as not published, and one without a `webhookUrl` reads as
         carrying no address, because both look identical to a working binding from inside the
-        config.
+        config. A bare id reads as naming nothing, with `ambiguous`, because a hook calls only an
+        `id#provider` reference.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -25061,20 +25127,32 @@ paths:
         that is not reachable stops everything that moment guards. The other seven are told
         afterwards and stop nothing.
 
-        An action reference is a published action's id, or its id with its provider (`id#provider`).
-        A reference that is not published here is accepted and named back in `unknown` rather than
-        refused: binding before publishing is a legitimate order of work, and a silent acceptance is
-        how a binding that calls nothing ends up looking exactly like one that works.
+        A hook binds only an action that is already published: publish the action first
+        (`POST /v1/actions`, with its `webhook_url`), then bind it. An action reference is a
+        published action's id, or its id with its provider (`id#provider`). A reference that no
+        action published here answers to is refused with 400 before anything is written, and the
+        message names it and says to publish the action first. The same holds for a reference
+        already bound whose action is gone when the list is sent again: take it off the list, or
+        publish it again.
 
         A bare id that more than one provider publishes is refused with 400 before anything is
         written, and the message names the `id#provider` of each. It names no one action, and a
         gate bound to such an id refuses rather than calling either.
 
-        A bare id that one provider publishes is stored as that action's `id#provider`, and the
-        answer's `actions` shows it so. Another owner who publishes the same id later cannot change
-        what the binding names.
+        Every reference is stored as the `id#provider` of the action it names, and the answer's
+        `actions` shows it so. Another owner who publishes the same id later cannot change what the
+        binding names.
 
-        An empty list clears the moment, the same as DELETE.
+        When a hook runs, only an `id#provider` reference names an action. A bare id in a stored
+        binding names none, whatever is published or deleted at that moment: nothing is called, a
+        gate bound to it refuses, and `GET /v1/admin/hooks` shows it with `ambiguous`, the
+        `id#provider` of each provider that publishes the id now. Bind the one you mean as
+        `id#provider`. A node settles the bindings in its store once, at the first start that finds
+        a bare id: one that a single provider publishes is stored as its `id#provider`, and one that
+        nobody publishes is taken off its moment.
+
+        When the published actions cannot be read, nothing is bound and the answer is 500. An empty
+        list clears the moment, the same as DELETE, and reads nothing.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -25114,7 +25192,7 @@ paths:
                           cleared: { type: boolean }
                           unknown:
                             type: array
-                            description: References accepted but not published on this node, so they would do nothing
+                            description: Always empty. Kept for the clients that read it; a reference that no published action answers to is refused with 400.
                             items: { type: string }
                           note: { type: string, description: What this binding now means, in the operator's terms }
                           updated: { type: boolean }
@@ -25124,6 +25202,11 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          description: The published actions could not be read, so the binding was not checked and nothing was bound
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
     delete:
       operationId: clearHook
@@ -27056,7 +27139,8 @@ paths:
         are what everyone builds from. PUBLIC for the published shelf — a caller without a
         session sees published parts only; signing in adds the parts still in proposal.
         Retired parts appear in NO default listing (dead is invisible); ask for them by name
-        with status=retired.
+        with status=retired. A component whose stored markup or stylesheet no longer passes the
+        bench this node runs appears in no listing and not on the map, because nobody can take it.
       tags: [Apps]
       security: []
       parameters:
@@ -27084,9 +27168,20 @@ paths:
         because the Book had nothing for it: body `{ prefix, html, css, use, judgement: { reach:
         general|special, why }, from_app? }`, markup and a stylesheet under one class prefix, every
         colour a `var(--ak-…)` token and NO script (its preview is served from this node). Its
-        bench reads the markup against an allowlist of elements and attributes and refuses a
-        stylesheet that loads anything, reaches outside its prefix, fixes itself over the page,
-        moves at idle or carries a literal colour. A component whose builder judged it `general`
+        bench reads the markup against an allowlist of elements and attributes, and refuses markup
+        that leaves an element open where it ends (it would take in whatever the page writes after
+        it) and a stylesheet that loads anything, reaches outside its prefix, fixes itself over the
+        page, moves at idle or carries a literal colour. A rule nested inside another starts with
+        `&`, which stands for the elements of the rule it is nested in; at the top of the
+        stylesheet `&` is the page and is refused. The at-rules a stylesheet may carry are a list:
+        `@media`, `@supports`, `@container` and `@starting-style`, which condition its own rules, and
+        `@keyframes`, `@property`, `@counter-style`, `@font-palette-values`, `@position-try`,
+        `@function` and `@font-feature-values` under a name that starts with its prefix
+        (`@keyframes wkgrid-spin`, `@property --wkgrid-x`), because the whole page shares that name.
+        Every other at-rule is refused, known or unknown, `@scope`, `@layer`, `@page`,
+        `@view-transition`, `@import` and `@font-face` among them, and the refusal says what the
+        list is. An animation, a counter style or a font palette the page defines is still used by
+        its name. A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
@@ -27104,8 +27199,9 @@ paths:
                 part:
                   type: object
                   description: >-
-                    { id, kind: layout|fill|look|motion|illustration|genre|ambient|effect, title,
-                    summary, body, tags? } — the kind decides the body: a whole mosaic layout
+                    { id, kind: layout|fill|look|motion|illustration|genre|ambient|effect|component,
+                    title, summary, body, tags? }. The kind decides the body: { prefix, html, css,
+                    use, judgement: { reach: general|special, why }, from_app? } (component), a whole mosaic layout
                     (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only
                     (motion), { style, palette_words? } (illustration), { template } naming a
                     served genre template, or { app: { owner, filename }, judgement: { reach:
@@ -27194,12 +27290,17 @@ paths:
         builders who reached for it, `kept` counts the apps among them whose owner said the app
         turned out well (the number that says more than "an AI favoured it"), `passed_over` those
         who looked and left, and the rows carry each one's own sentence. Accounts, not measurements.
+        A COMPONENT also answers `bench`, the bench this node runs, run again on the stored body:
+        `{ passes: true }`, or `{ passes: false, why, note }` when it no longer passes. Then nobody
+        can take it, and `part.body` carries its `html` and `css` only for its proposer (the
+        proposing owner, or an agent acting for them), who needs them to fix it and propose it again
+        under the same id; every other reader gets the body without them.
       tags: [Apps]
       security: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: "{ part, version, usage, owner, reasons: { taken, kept, passed_over, took: [{ app, version, why, at, kept }], passed: [...] } }" }
+        '200': { description: "{ part, version, usage, owner, reasons: { taken, kept, passed_over, took: [{ app, version, why, at, kept }], passed: [...] }, bench? }; `bench` for a component only: { passes: true } or { passes: false, why, note }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -27215,7 +27316,9 @@ paths:
         public record already); the browsable gallery at /v1/design-book embeds this per card.
         Answers text/html, not the JSON envelope. A genre that grew out of an app answers 302 to
         the app's own address instead: it is a published page with script in it, and it is never
-        served from the node's origin.
+        served from the node's origin. A component is benched again first: one that no longer
+        passes is a page saying so and why, in the bench's words, with none of its markup or
+        stylesheet.
       tags: [Apps]
       security: []
       parameters:
@@ -27253,7 +27356,10 @@ paths:
         versioned, provenance-stamped door — the replaced layout is archived, so putting it back
         is one restore. Published parts are adoptable by anyone; a proposed one only by its own
         proposer. Adopting is the usage signal that keeps a part alive. Requires memory:write,
-        and the app must belong to the caller's owner.
+        and the app must belong to the caller's owner. A COMPONENT is taken before the app exists:
+        the answer carries `snippet` { html, css, use, prefix }, nothing is written, and the app
+        need not be published yet. The component is benched again first, and one that no longer
+        passes answers 422 BODY_INVALID with the bench's reason.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -27271,12 +27377,12 @@ paths:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
                 ai_provenance_id: { type: string }
       responses:
-        '200': { description: "{ id, filename, version, replaced_version, kind }" }
+        '200': { description: "{ id, filename, version, replaced_version, kind, snippet? }; `snippet` { html, css, use, prefix } for a component" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not published and not yours, or the app belongs to another owner }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: 'GENRE_IS_FORKED — a genre is forked from its template, never adopted; NO_LAYOUT — the app has no stored arrangement to season' }
-        '422': { description: The merged arrangement failed the validator on the app's own look (an ambient too loud for it), in the validator's words }
+        '422': { description: "The merged arrangement failed the validator on the app's own look (an ambient too loud for it), in the validator's words; or a component no longer passes the bench, with the bench's reason" }
 
   /v1/designbook/{id}/bench:
     post:
@@ -40453,6 +40559,11 @@ paths:
     post:
       operationId: activateCortexModel
       summary: Activate cortex model
+      description: >
+        Materialises the cortex's components and answers with what it made (`artifacts`). Its
+        actions are published under the caller's full identity, a person's GHII or an agent's GAII,
+        and `artifacts.actionProvider` names that identity. GET /v1/cortex/{name} shows the same
+        record as `activation_artifacts`.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -40472,6 +40583,10 @@ paths:
     post:
       operationId: deactivateCortexModel
       summary: Deactivate cortex model
+      description: >
+        Removes what the activation made. The cortex's actions are deleted under the identity the
+        activation recorded (`actionProvider`), whichever of the owner's principals, or an
+        operator, deactivates. Uninstall and the redeploy of an active cortex do the same.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -41672,6 +41787,10 @@ paths:
         in a multi-hop relay each node signs for the node it hands to, so a receiver only ever
         decides about a peer whose key it has pinned.
 
+        The node where the route starts names the person who asked by their full identity, their
+        GHII, in the claim's `caller`, and takes the 1-morsel routing fee from that identity. Each
+        later hop carries the same `caller` forward and charges no fee.
+
         WHAT A RECEIVER ANSWERS, on any path a relay reaches, always 403 and never 401. A 401 would
         invite a retry with credentials, and no credential of the original caller's fixes any of
         these. Every message says the refusal is about the link between the two nodes rather than
@@ -41729,6 +41848,9 @@ paths:
         Forward a work request to a remote node. This call carries `X-Forwarded-From`, so to the
         receiving node it IS a relay: it is signed with the same relay claim as
         POST /v1/federation/route and meets the same gate there, with the same RELAY_* refusals.
+        The signed payload names the requester in `cross_node_requester` by their full identity, a
+        person's GHII or an agent's GAII, and the claim names the same caller. The 1-morsel routing
+        fee is taken from that identity's owner.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -63075,8 +63197,9 @@ paths:
       summary: The Work tab in one read
       description: >-
         The work waiting for the caller as a provider and the work they sent as a requester, in one
-        read. An owner session sees the work of all their agents; an agent or federated principal
-        sees only its own, for the same reason the individual inbox and sent endpoints do.
+        read. An owner session sees their own work, under their GHII, and the work of all their
+        agents; an agent or federated principal sees only its own, for the same reason the individual
+        inbox and sent endpoints do.
       tags: [Owner]
       security:
         - BearerAuth: []

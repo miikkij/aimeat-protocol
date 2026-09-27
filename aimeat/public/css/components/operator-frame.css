@@ -1,0 +1,75 @@
+/**
+ * @file operator-frame.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The frame of the admin pages: the operator menu beside the page, the bar over the page
+ *   that stays in sight (title, refresh, clock), the operator's sizes for the page kit inside it, and
+ *   the centred card of a signed-out or refused visit. Drawn by components/OperatorFrame.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — A section brought to the top lands under the bar, its headline in sight
+ *     (scroll-margin-top, which Rail's scrollToSection now reads; Jouni).
+ *   v1.0.0 — 2026-09-27 — Moved out of views/admin.css (.adm, .adm-main, .adm-topbar,
+ *     .adm-topbar-right, .adm-page-title, .adm-time, .adm-login, .adm-card, and the operator's sizes
+ *     for .og-sec) with every value unchanged, under the component's own names.
+ */
+
+.operator-frame { display: flex; min-height: 100vh; position: relative; z-index: 1; background: var(--bg); color: var(--text); }
+
+/* The page. NO overflow of its own: .page-content above is the one scroll region, and an overflow
+   here, even one that never scrolls, becomes the nearest scrollport and breaks every
+   position: sticky inside (the bar, a left index, a pinned row). */
+.operator-frame-main { --poster-page-size: 2.1rem; flex: 1; padding: 0 32px 24px; background: var(--bg); min-width: 0; }
+
+/* The page's title and its refresh stay in sight wherever you are on a long page. */
+.operator-frame-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--bg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.operator-frame-tools { display: flex; align-items: center; gap: 14px; }
+.operator-frame-title { margin: 0; display: flex; align-items: center; gap: 10px; }
+.operator-frame-time { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* The operator's sizes for the page kit: a smaller section title than the Settings side, and a
+   section's number in mono coral beside it. */
+.operator-frame-page .og-sec { --poster-section-size: 1.5rem; }
+/* A section brought to the top lands under the bar that stays there (62px), not behind it. */
+.operator-frame-page .og-sec { scroll-margin-top: 78px; }
+.operator-frame-page .og-sec-h h2 small {
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  font-weight: 400;
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: .7rem;
+}
+
+/* A visit that is not signed in, or not an operator's: one card in the middle, under an ink rule. */
+.operator-frame-shut { max-width: 420px; margin: 60px auto; text-align: center; }
+.operator-frame-shut-card {
+  border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+  padding: 14px 0 12px;
+}
+.operator-frame-shut h2 {
+  font-size: 1.2rem;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 4px;
+}
+.operator-frame-shut p { color: var(--text-dim); font-size: .85rem; margin-bottom: 16px; }
+.operator-frame-shut .operator-frame-shut-note { font-size: .85rem; }
+
+@media (max-width: 768px) {
+  .operator-frame-main { padding: 12px; }
+}

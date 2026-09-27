@@ -11,6 +11,8 @@
  * @structure StyleScreen (default) · GROUPS · tokenKey · ColourRow · contrastKey
  * @usage html`<${StyleScreen} theme=${theme} styleId=${id} vocabulary=${v} readOnly=${false} onBack=${fn} />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — No class written any more: Action, Loud (control), the meta Note, the
+ *     values and token names as Code, a colour group's heading a SubHeading (admin page group G8).
  *   v1.1.0 — 2026-09-26 — The dark block and the words on it (--ink-ground, --on-ink-ground) are among the cards and panels (Jouni's decision "dark-ground").
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles S3).
  */
@@ -21,6 +23,10 @@ import { t } from '/js/i18n.js';
 import { apiPut } from '/js/api.js';
 import { Band } from '/components/Band.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Code } from '/components/Mark.js';
+import { SubHeading } from '/components/SubHeading.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { Hint } from '/components/Hint.js';
 import { ErrorNote } from '/components/ErrorNote.js';
@@ -69,10 +75,10 @@ const contrastWhat = (r) => (CONTRAST_KEYS[`${r.words}|${r.ground}`] ? t(CONTRAS
 /** One colour in both modes: its plain name, a colour well where the value is a plain colour, the value. */
 function ColourRow({ name, light, dark, readOnly, onChange }) {
   const field = (mode, value) => html`<div>
-    <span class="text-meta">${mode === 'light' ? t('themes.light') : t('themes.dark')} </span>
+    <${Note} kind="meta" inline>${mode === 'light' ? t('themes.light') : t('themes.dark')} <//>
     ${(readOnly || !HEX6.test(value || '')) && html`<${ColourMark} value=${value} /> `}
     ${readOnly
-      ? html`<code>${value}</code>`
+      ? html`<${Code}>${value}<//>`
       : html`${HEX6.test(value || '') && html`<input type="color" value=${value} aria-label=${t('themes.colourIn', { name: t(tokenKey(name)), mode: mode === 'light' ? t('themes.light') : t('themes.dark') })}
             onInput=${(e) => onChange(mode, e.currentTarget.value)} /> `}
         <${TextInput} id=${`tok-${mode}-${name.slice(2)}`} maxLength="400" value=${value || ''} onInput=${(e) => onChange(mode, e.target.value)} />`}
@@ -145,7 +151,7 @@ export default function StyleScreen({ theme, styleId, vocabulary, readOnly, onBa
       ${/* A group whose colours are all among the main ones has nothing left to show here. */''}
       ${GROUPS.filter(([, tokens]) => tokens.some((tk) => !MAIN.includes(tk))).map(([group, tokens]) => html`
         <section key=${group}>
-          <h3 class="poster-section-title">${t('themes.group.' + group)}</h3>
+          <${SubHeading} level=${3}>${t('themes.group.' + group)}<//>
           ${tokens.filter((tk) => !MAIN.includes(tk)).map((tk) => html`<${ColourRow} key=${tk} name=${tk} light=${light[tk]} dark=${dark[tk]} readOnly=${readOnly} onChange=${(mode, v) => set(mode, tk, v)} />`)}
         </section>`)}
     <//>
@@ -172,14 +178,14 @@ export default function StyleScreen({ theme, styleId, vocabulary, readOnly, onBa
     <//>
 
     <${Collapsible} title=${t('themes.details')} open=${details} onToggle=${() => setDetails(!details)}>
-      ${GROUPS.flatMap(([, tokens]) => tokens).map((tk) => html`<${NamedRow} key=${tk} label=${t(tokenKey(tk))}><code>${tk}</code><//>`)}
+      ${GROUPS.flatMap(([, tokens]) => tokens).map((tk) => html`<${NamedRow} key=${tk} label=${t(tokenKey(tk))}><${Code}>${tk}<//><//>`)}
     <//>
 
     ${!readOnly && html`
       ${state.error && html`<${ErrorNote} text=${state.error} />`}
       <${ActionRow}>
-        <button type="button" class="poster-action" disabled=${!changed} onClick=${undo}>${t('themes.undo')}</button>
-        <button type="button" class="poster-slab poster-slab--control" disabled=${state.busy || refused.length > 0} onClick=${save}>${t('themes.saveStyle')}</button>
-        ${state.saved && html`<span class="text-meta">${t('themes.saved')}</span>`}
+        <${Action} disabled=${!changed} onClick=${undo}>${t('themes.undo')}<//>
+        <${Loud} control disabled=${state.busy || refused.length > 0} onClick=${save}>${t('themes.saveStyle')}<//>
+        ${state.saved && html`<${Note} kind="meta" inline>${t('themes.saved')}<//>`}
       <//>`}`;
 }

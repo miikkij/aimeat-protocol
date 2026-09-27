@@ -9,8 +9,8 @@
  *   strip, what this does not cover (in the dashed coral box, before the numbers), what has
  *   happened here (the derived rows with a sentence each), what AI is used for (the register as a
  *   filterable table and one opened entry as a framed sheet), the questions themselves, the reports
- *   kept here and the paste for the operator's own AI. The printout is compliance-tab.print.js,
- *   unchanged: the screen is the work and the document is the document.
+ *   kept here and the paste for the operator's own AI. The printout is compliance-tab.print.js:
+ *   the screen is the work and the document is the document.
  *
  *   THE GAPS COME FIRST, ABOVE THE TOTALS. A page that opens with big green numbers is read as a
  *   pass, and this page is not a scoreboard — it exists so somebody finds the thing nobody wrote
@@ -22,8 +22,8 @@
  *   compliance risk this feature was built to remove.
  *
  *   EXPORT IS PRINT AND CSV, NOT A GENERATOR. PDF is the browser's own print-to-PDF against scoped
- *   print CSS, so what is exported is what is on screen and there is no second renderer to drift.
- *   CSV is built here from the same objects the tables render.
+ *   print CSS (components/PrintPage.js), so what is exported is what is on screen and there is no
+ *   second renderer to drift. CSV is built here from the same objects the tables render.
  * @structure
  *   - limitText(item) · gapsLine(groups, empty) — the sentences
  *   - NeedsALook · Strip · Limits · Happened — sections 01 to 03
@@ -31,6 +31,12 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only: the page prints through PrintPage (the body mark,
+ *     the screen-only parts, the document), the period chooser is Tabs in the filter tone, the gaps
+ *     the Verdict with Readings whose ends are the doors or the fine "clear" mark, the strip the
+ *     FigureStrip whose figures are doors, the limits a List of codes in the SettingBox, the derived
+ *     rows Readings in Columns. The page writes no class, and its own sheet (admin-compliance.css)
+ *     is gone.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: the gaps grouped by kind with a door each, the limits in
@@ -62,6 +68,17 @@ import { RegisterSection, QuestionnaireSection, classWord } from './compliance-t
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
 import PrintableReport, { answerText } from './compliance-tab.print.js';
 import SavedReports, { readableId } from './compliance-tab.saved.js';
+import { PrintPage, ScreenOnly } from '/components/PrintPage.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Action, Actions } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Mark, Code } from '/components/Mark.js';
+import { SettingBox } from '/components/Box.js';
+import { Tabs } from '/components/Tabs.js';
+import { Row as Line, Columns } from '/components/Layout.js';
+import { List, Row, Cell } from '/components/List.js';
 
 const html = htm.bind(h);
 const C = (key, params) => t('admin.compliance.' + key, params);
@@ -72,10 +89,10 @@ const PERIODS = [
   { key: '365d', days: 365 },
 ];
 
-/** Scroll a section into view; the strip's cells and the doors use it. */
+/** Scroll a section into view; the strip's figures and the doors use it. */
 const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 const money = (v) => `$${(Number(v) || 0).toFixed(2)}`;
-const code = (s) => html`<span class="adm-cmp-code">${s}</span>`;
+const code = (s) => html`<${Code}>${s}<//>`;
 const codes = (list) => list.map((m, i) => html`${i > 0 ? ' ' : ''}${code(m)}`);
 
 /**
@@ -106,22 +123,12 @@ export function gapsLine(g, registerEmpty) {
   return joined.charAt(0).toUpperCase() + joined.slice(1) + '.';
 }
 
-/** A row in words with a door or a chip on the right. */
-function GapRow({ title, why, right, last }) {
-  return html`
-    <div class="adm-mrow adm-mrow--two ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span class="adm-cmp-right">${right}</span>
-    </div>`;
-}
-
 /** Section 01: the word, its sentence, the line under it, and one row per kind of gap. */
 function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, switchPage }) {
   const empty = report.register.usecases.length === 0;
   const tr = report.derived?.ai_transparency || {};
-  const clear = html`<span class="og-chip adm-cmp-chip--ok">${C('clear')}</span>`;
-  const door = (label, onClick, disabled) => html`
-    <button type="button" class="og-door og-door--quiet" disabled=${disabled} onClick=${onClick}>${label}</button>`;
+  const clear = html`<${Mark} kind="status" tone="fine">${C('clear')}<//>`;
+  const door = (label, onClick, disabled) => html`<${Action} small soft disabled=${disabled} onClick=${onClick}>${label}<//>`;
   const n = g.models.length;
   const undocWhy = n === 0 ? C('gap.undocumentedClear')
     : empty ? C('gap.undocumentedEmpty', { n: num(n) })
@@ -138,50 +145,42 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
     : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) });
   const toApps = () => switchPage('apps');
   return html`
-    <section class="og-sec og-sec--first" id="adm-cmp-01">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('gapsTitle')}<small>01</small></h2>
-        <div class="og-doors">${door(C('toApps'), toApps)}</div></div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${g.total > 0 ? 'danger' : ''}">${word}</div>
-          <p class="adm-alert-line">${gapsLine(g, empty)}</p>
-          <div class="adm-ov-up">${under}</div>
-        </div>
-        <div>
-          <${GapRow} title=${C('gapUndocumented')} why=${undocWhy}
-            right=${n === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting)} />
-          <${GapRow} title=${C('gapAppGap')} why=${appsWhy} right=${g.apps.length === 0 ? clear : door(C('toApps'), toApps)} />
-          <${GapRow} title=${C('gapUnclassified')} why=${ucWhy}
-            right=${g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id))} />
-          <${GapRow} title=${C('gapUnlabelled')} why=${unlWhy} right=${g.unlabelled === 0 ? clear : door(C('toApps'), toApps)} last />
-        </div>
-      </div>
-    </section>`;
+    <${Section} first id="adm-cmp-01" num="01" title=${C('gapsTitle')} doors=${door(C('toApps'), toApps)}>
+      <${Verdict} word=${word} tone=${g.total > 0 ? 'danger' : undefined} line=${gapsLine(g, empty)} stamp=${under}>
+        <${Readings} rows=${[
+          { key: 'undocumented', name: C('gapUndocumented'), why: undocWhy,
+            end: n === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting) },
+          { key: 'apps', name: C('gapAppGap'), why: appsWhy, end: g.apps.length === 0 ? clear : door(C('toApps'), toApps) },
+          { key: 'unclassified', name: C('gapUnclassified'), why: ucWhy,
+            end: g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id)) },
+          { key: 'unlabelled', name: C('gapUnlabelled'), why: unlWhy, end: g.unlabelled === 0 ? clear : door(C('toApps'), toApps), last: true },
+        ]} />
+      <//>
+    <//>`;
 }
 
-/** The numeral strip: five cells, each a door to the section that explains it. */
+/** The numeral strip: five figures, each a door to the section that explains it. */
 function Strip({ report, g, classes }) {
   const d = report.derived || {};
   const tr = d.ai_transparency || {};
   const usage = d.ai_usage || {};
   const consent = d.consent || {};
   const entries = report.register.usecases.length;
-  const cell = (onClick, value, label, sub, hot) => html`
-    <button type="button" onClick=${onClick}><b class=${hot ? 'og-coral-num' : ''}>${value}</b><span>${label}</span>${sub ? html`<small>${sub}</small>` : null}</button>`;
+  const cell = (key, onClick, value, label, sub, hot) => ({ key, onClick, n: value, label, sub: sub || undefined, tone: hot ? 'notice' : undefined });
   const entriesSub = entries === 0 ? C('strip.entriesEmpty') : classes.map(c => `${classWord(c.cls)} ${num(c.n)}`).join(' · ');
   const publicSub = (tr.unlabelled ?? 0) === 0 && (tr.public_total ?? 0) > 0
     ? C('strip.publicSubAll')
     : C('strip.publicSub', { labelled: num(tr.labelled ?? 0), unlabelled: num(tr.unlabelled ?? 0) });
-  return html`<div class="og-strip">
-    ${cell(() => go('adm-cmp-01'), num(g.total), C('strip.gaps'),
-      C('strip.gapsSub', { models: num(g.models.length), apps: num(g.apps.length), unanswered: num(g.usecases.length) }), g.total > 0)}
-    ${cell(() => go('adm-cmp-03'), num(usage.calls ?? 0), C('strip.calls'),
-      C('strip.callsSub', { cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0), models: num((usage.models || []).length) }))}
-    ${cell(() => go('adm-cmp-03'), num(tr.public_total ?? 0), C('strip.public'), publicSub)}
-    ${cell(() => go('adm-cmp-04'), num(entries), C('strip.entries'), entriesSub)}
-    ${cell(() => go('adm-cmp-03'), num(consent.active ?? 0), C('strip.consent'),
-      C('strip.consentSub', { revoked: num(consent.revoked ?? 0), days: num(consent.audit_retention_days ?? 0) }))}
-  </div>`;
+  return html`<${FigureStrip} wrap items=${[
+    cell('gaps', () => go('adm-cmp-01'), num(g.total), C('strip.gaps'),
+      C('strip.gapsSub', { models: num(g.models.length), apps: num(g.apps.length), unanswered: num(g.usecases.length) }), g.total > 0),
+    cell('calls', () => go('adm-cmp-03'), num(usage.calls ?? 0), C('strip.calls'),
+      C('strip.callsSub', { cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0), models: num((usage.models || []).length) })),
+    cell('public', () => go('adm-cmp-03'), num(tr.public_total ?? 0), C('strip.public'), publicSub),
+    cell('entries', () => go('adm-cmp-04'), num(entries), C('strip.entries'), entriesSub),
+    cell('consent', () => go('adm-cmp-03'), num(consent.active ?? 0), C('strip.consent'),
+      C('strip.consentSub', { revoked: num(consent.revoked ?? 0), days: num(consent.audit_retention_days ?? 0) })),
+  ]} />`;
 }
 
 /**
@@ -194,17 +193,16 @@ function Strip({ report, g, classes }) {
 function Limits({ items }) {
   const list = items || [];
   return html`
-    <section class="og-sec" id="adm-cmp-02">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('limitsTitle')}<small>02</small></h2></div>
-      <div class="og-box poster-aside poster-aside--small">
-        <span class="og-box-label">${C('limitsLabel')}</span>
-        <p class="adm-cmp-box-p">${C('limitsNote')}</p>
-        ${list.map((s, i) => html`
-          <div class="adm-cmp-limit ${i === list.length - 1 ? 'adm-cmp-limit--last' : ''}" key=${s.code || i}>
-            <i>${s.code || ''}</i><span>${limitText(s)}</span>
-          </div>`)}
-      </div>
-    </section>`;
+    <${Section} id="adm-cmp-02" num="02" title=${C('limitsTitle')}>
+      <${SettingBox} label=${C('limitsLabel')}>
+        <${Note} kind="hint">${C('limitsNote')}<//>
+        <${List} cols="tag-name" rows=${list} render=${(s, i) => html`
+          <${Row} key=${s.code || i}>
+            <${Cell} sign>${s.code || ''}<//>
+            <${Cell}>${limitText(s)}<//>
+          <//>`} />
+      <//>
+    <//>`;
 }
 
 /** Section 03: what the node derived by itself, one row per number with the sentence behind it. */
@@ -218,35 +216,34 @@ function Happened({ derived, switchPage }) {
   const models = usage.models || [];
   const appsGap = tr.apps_declaring_generation_with_gap;
   const appsGapCount = Array.isArray(appsGap) ? appsGap.length : Number(appsGap) || 0;
-  const row = (title, why, value, last) => html`
-    <div class="adm-mrow adm-mrow--two ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  const row = (key, title, why, value, last) => ({ key, name: title, why, value, last });
   return html`
-    <section class="og-sec" id="adm-cmp-03">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('derivedTitle')}<small>03</small></h2>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('usage')}>${C('toUsage')}</button></div></div>
-      <p class="adm-cmp-lead">${C('derivedNote')}</p>
-      <div class="adm-two">
+    <${Section} id="adm-cmp-03" num="03" title=${C('derivedTitle')}
+      doors=${html`<${Action} small soft onClick=${() => switchPage('usage')}>${C('toUsage')}<//>`}>
+      <${Note} kind="lead">${C('derivedNote')}<//>
+      <${Columns}>
         <div>
-          ${row(C('row.public'), C('row.publicWhy', { labelled: num(tr.labelled ?? 0), unlabelled: num(tr.unlabelled ?? 0) }), num(tr.public_total ?? 0))}
-          ${row(C('row.level'), C('row.levelWhy'), breakdown(tr.public_by_level, 'level'))}
-          ${row(C('row.involvement'), C('row.involvementWhy'), breakdown(tr.public_by_human_involvement, 'involvement'))}
-          ${row(C('row.appsGap'), C('row.appsGapWhy'), num(appsGapCount), true)}
+          <${Readings} rows=${[
+            row('public', C('row.public'), C('row.publicWhy', { labelled: num(tr.labelled ?? 0), unlabelled: num(tr.unlabelled ?? 0) }), num(tr.public_total ?? 0)),
+            row('level', C('row.level'), C('row.levelWhy'), breakdown(tr.public_by_level, 'level')),
+            row('involvement', C('row.involvement'), C('row.involvementWhy'), breakdown(tr.public_by_human_involvement, 'involvement')),
+            row('appsGap', C('row.appsGap'), C('row.appsGapWhy'), num(appsGapCount), true),
+          ]} />
         </div>
         <div>
-          ${row(C('row.calls'), C('row.callsWhy', {
-            prompt: num(usage.prompt_tokens ?? 0), completion: num(usage.completion_tokens ?? 0),
-            cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0),
-          }), num(usage.calls ?? 0))}
-          ${row(C('row.models'), models.length > 0 ? codes(models) : C('row.modelsNone'), num(models.length))}
-          ${row(C('row.consent'), C('row.consentWhy', {
-            scopes, revoked: num(consent.revoked ?? 0), expired: num(consent.expired ?? 0), days: num(consent.audit_retention_days ?? 0),
-          }), num(consent.active ?? 0), true)}
+          <${Readings} rows=${[
+            row('calls', C('row.calls'), C('row.callsWhy', {
+              prompt: num(usage.prompt_tokens ?? 0), completion: num(usage.completion_tokens ?? 0),
+              cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0),
+            }), num(usage.calls ?? 0)),
+            row('models', C('row.models'), models.length > 0 ? codes(models) : C('row.modelsNone'), num(models.length)),
+            row('consent', C('row.consent'), C('row.consentWhy', {
+              scopes, revoked: num(consent.revoked ?? 0), expired: num(consent.expired ?? 0), days: num(consent.audit_retention_days ?? 0),
+            }), num(consent.active ?? 0), true),
+          ]} />
         </div>
-      </div>
-    </section>`;
+      <//>
+    <//>`;
 }
 
 export default function ComplianceTab(props) {
@@ -281,13 +278,6 @@ export default function ComplianceTab(props) {
 
   useEffect(() => { load(days); }, [days, load]);
   useEffect(() => onLiveUpdate(['compliance'], () => load(days)), [days, load]);
-
-  // The print stylesheet is scoped to this class, because every view's CSS is preloaded globally and
-  // an unscoped @media print block would follow the reader onto every other page.
-  useEffect(() => {
-    document.body.classList.add('adm-compliance-active');
-    return () => document.body.classList.remove('adm-compliance-active');
-  }, []);
 
   const saveRegister = async (list) => {
     setSaving(true);
@@ -378,11 +368,12 @@ export default function ComplianceTab(props) {
     downloadBlob(toCsvBlob(headers, rows), `compliance-${report.scope?.node_id || 'node'}-${stamp}.csv`);
   };
 
+  const toast = toastMsg && html`<${Toast} type=${toastMsg.type} text=${toastMsg.text} onDismiss=${clearToast} />`;
+
   if (!report) {
-    return html`<div class="og adm-cmp">
-      ${toastMsg && html`<${Toast} type=${toastMsg.type} text=${toastMsg.text} onDismiss=${clearToast} />`}
-      ${failed ? html`<div class="adm-cmp-empty adm-cmp-empty--last">${C('loadFailed')}</div>` : html`<${Spinner} text=${C('loading')} />`}
-    </div>`;
+    return html`
+      ${toast}
+      ${failed ? html`<${Note} kind="quiet">${C('loadFailed')}<//>` : html`<${Spinner} text=${C('loading')} />`}`;
   }
 
   const scope = report.scope || {};
@@ -393,25 +384,28 @@ export default function ComplianceTab(props) {
   const stats = answerStats(usecases, questions);
   const classes = classCounts(usecases);
 
+  // The print sheet is scoped to the body's mark, which PrintPage sets while this page is open,
+  // because every view's CSS is preloaded globally and an unscoped @media print block would follow
+  // the reader onto every other page.
   return html`
-    <div class="og adm-cmp adm-cmp-print-area">
-      ${toastMsg && html`<${Toast} type=${toastMsg.type} text=${toastMsg.text} onDismiss=${clearToast} />`}
-      <div class="adm-cmp-screen-only">
-        <p class="adm-intro">${C('intro')}</p>
-        <div class="adm-cmp-bar">
-          <div class="adm-cmp-bar-left">
-            ${PERIODS.map(p => html`
-              <button key=${p.key} type="button" class="adm-cmp-fchip ${period === p.key ? 'on' : ''}" onClick=${() => setPeriod(p.key)}>${C('period' + p.key)}</button>`)}
-            <span class="adm-cmp-scope">${C('scope', {
+    <${PrintPage}>
+      <${ScreenOnly}>
+        ${toast}
+        <${Note} kind="lead">${C('intro')}<//>
+        <${Line} wrap justify="between" gap="large" below="small">
+          <${Line} wrap gap="medium">
+            <${Tabs} tone="filter" value=${period} onSelect=${setPeriod}
+              items=${PERIODS.map(p => ({ value: p.key, label: C('period' + p.key) }))} />
+            <${Note} kind="meta" inline mono>${C('scope', {
               id: scope.node_id || '', from: (period0.from || '').slice(0, 10), to: (period0.to || '').slice(0, 10), v: questionnaire?.version || '',
-            })}</span>
-          </div>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => window.print()}>${C('print')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${exportCsv}>${C('csv')}</button>
-            <button type="button" class="og-door og-door--quiet" disabled=${keeping} onClick=${keepNow}>${keeping ? C('savedSaving') : C('savedNow')}</button>
-          </div>
-        </div>
+            })}<//>
+          <//>
+          <${Actions}>
+            <${Action} small soft onClick=${() => window.print()}>${C('print')}<//>
+            <${Action} small soft onClick=${exportCsv}>${C('csv')}<//>
+            <${Action} small soft disabled=${keeping} onClick=${keepNow}>${keeping ? C('savedSaving') : C('savedNow')}<//>
+          <//>
+        <//>
         <${NeedsALook} report=${report} g=${g} stats=${stats} questions=${questions}
           drafting=${drafting} onDraft=${loadDraft} onAnswer=${answerEntry} switchPage=${switchPage} />
         <${Strip} report=${report} g=${g} classes=${classes} />
@@ -421,12 +415,12 @@ export default function ComplianceTab(props) {
           draft=${draft} setDraft=${setDraft} openId=${openId} setOpenId=${setOpenId}
           saving=${saving} drafting=${drafting} onSave=${saveRegister} onDraft=${loadDraft} />
         <${QuestionnaireSection} questionnaire=${questionnaire} />
-        <div class="adm-two">
+        <${Columns}>
           <${SavedReports} refresh=${kept} keeping=${keeping} onKeep=${keepNow} onError=${showError} />
           <${CompliancePromptSection} nodeId=${scope.node_id} days=${days} />
-        </div>
-      </div>
+        <//>
+      <//>
       <${PrintableReport} report=${report} questionnaire=${questionnaire} />
-    </div>
+    <//>
   `;
 }
