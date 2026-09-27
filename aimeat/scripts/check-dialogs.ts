@@ -16,6 +16,8 @@
  * @structure dialogFindings(file, source) → string[] · main() walks the two trees
  * @usage pnpm check:dialogs
  * @version-history
+ *   v1.0.2 — 2026-09-27 — overlay.css allowed: appcat's full-window page layer (the detail view and
+ *     the app viewer), the same kind as app-sandbox.css.
  *   v1.0.1 — 2026-09-13 — Comment stripping repeats until it changes nothing: one pass can join
  *     what sat either side of a removed comment into a fresh opener (alert #1628).
  *   v1.0.0 — 2026-09-13 — Initial (wish "Yksi dialogikomponentti kaikille dialogeille").
@@ -38,6 +40,8 @@ const HOMES = new Set([
 const ALLOWED: Record<string, string> = {
   'public/css/components/app-sandbox.css':
     'The full-screen viewer for a published app (/js/app-sandbox.js): a page layer with its own toolbar that the person leaves by its X, not a question over the page.',
+  'public/css/components/overlay.css':
+    'The full-window page layer of the app catalogue (components/Overlay.js): an app\'s detail view and the app viewer, each with its own toolbar, scrolling body and "On this page" rail, left by its X or the back link, as the old catalogue\'s #detail-view and #iframe-view were; the same kind as app-sandbox.css, not a question over the page.',
 };
 
 const SCAN = [
