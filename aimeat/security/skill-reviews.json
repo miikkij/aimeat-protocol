@@ -191,7 +191,7 @@
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:0ff0f075a0df183d122b6ed5"
+      "digest": "sha256:92f9fb214c8827035913f287"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-09-26",
@@ -441,7 +441,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "adf10232e2b2acac",
-      "aimeat/src/routes/ghii/register-login.ts": "5b394a0c41435277",
+      "aimeat/src/routes/ghii/register-login.ts": "ab22b99f8c27a3b8",
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
     "node:ai-transparency": {
