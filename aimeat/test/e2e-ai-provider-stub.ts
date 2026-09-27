@@ -39,6 +39,11 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.4.0 — 2026-09-28 — The System 2 gateway (V1): 4a and 5a also assert the provenance record a
+ *     transcript and a picture now get, hashed from the text and from the stored bytes; 5e proves
+ *     Jouni's ruling on the node's key (it pays for an operation only when the operator named a node
+ *     default model for it) from the refusal each operation reaches. Nothing else changed: every
+ *     earlier assertion stands as it was.
  *   v1.3.0 — 2026-09-13 — Setup no longer matched production: phase 9 wrote living configs, sources
  *     and a note into workspaces with no manifest, which UNDECLARED_SPACE now refuses. Each workspace
  *     declares living, living-src and notes first, and the source and note writes are asserted, so a
@@ -120,6 +125,14 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
         // One slot, so the second job of a pair is genuinely queued rather than racing to finish.
         AIMEAT_AI_JOB_SLOTS: '1',
+        // 5e: a node key and a node default IMAGE model, but no node default transcription model.
+        // The node's key goes only to OpenRouter's own address, so no stub can answer it; what 5e
+        // proves is which key the gate CHOSE, read off the refusal each operation reaches. No free
+        // starter allowance, so the node's key is chosen and found spent rather than called.
+        AIMEAT_OPENROUTER_INSTANCE_KEY: 'sk-node-e2e-never-sent',
+        AIMEAT_CHAT_FREE_ALLOWANCE_USD: '0',
+        AIMEAT_MODEL_DEFAULT_IMAGE: 'stub/node-image-model',
+        AIMEAT_MODEL_DEFAULT_STT: '',
     };
     const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
@@ -463,6 +476,11 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(form.body.includes('name="response_format"') && form.body.includes('verbose_json'), 'response_format=verbose_json is in the form');
         assert(form.body.includes('name="timestamp_granularities[]"'), 'the segment granularity is in the form');
         assert(form.body.includes('name="language"') && form.body.includes('name="file"'), 'the language hint and the file part are in the form');
+        // Since 2026-09-28 a transcription runs the one gate, so it gets the provenance record every
+        // completion gets, and the record names the transcript by the hash of its text.
+        const hash = r.body.meta?.provenance?.record?.attestation?.contentHash;
+        const expected = 'sha256:' + createHash('sha256').update('The harbour extension was approved.').digest('hex');
+        assert(hash === expected, `the transcript carries a provenance record hashed from its text: ${hash} vs ${expected}`);
     });
 
     await test('4b. Without verbose neither field is sent, and a provider that reports no cost is recorded as inexact', async () => {
@@ -517,6 +535,12 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert((provider.lastRequest('images')!.json as any)?.size === '1024x1024', 'the size was passed through');
         const stored = await fetch(`${BASE}${r.body.data.url}`, { headers: auth(a.token) });
         assert(stored.status === 200, `the bytes are readable at the URL, got ${stored.status}`);
+        // Since 2026-09-28 a picture runs the one gate: its provenance record names it by the SHA-256
+        // of the stored bytes, so the record and the file can be matched without trusting either.
+        const bytes = Buffer.from(await stored.arrayBuffer());
+        const hash = r.body.meta?.provenance?.record?.attestation?.contentHash;
+        const expected = 'sha256:' + createHash('sha256').update(bytes).digest('hex');
+        assert(hash === expected, `the picture carries a provenance record hashed from its bytes: ${hash} vs ${expected}`);
     });
 
     await test('5b. Three moderation refusals give up, and a non-moderation 400 gives up at once', async () => {
@@ -554,6 +578,32 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         const empty = await image();
         assert(empty.status === 502, `expected 502, got ${empty.status}`);
         assert(/no image data/i.test(empty.body.error?.message ?? ''), `named: ${empty.body.error?.message}`);
+    });
+
+    // Jouni, 2026-09-28: the node's key pays for a picture, a transcript or another capability only
+    // when the operator named a node default model for it; otherwise the person's own key does. This
+    // node has a key, a default IMAGE model and no default transcription model (startServer).
+    await test('5e. The node\'s key pays for an image when the operator named a default image model, and not for a transcript without one', async () => {
+        const c = await setupOwner('c');
+        // No key of their own, OpenRouter's own address (the only one the node key may reach), a
+        // model for each operation so the model refusal is not the answer.
+        const s = await writeMemory(c, 'openrouter.settings', { imageModel: 'stub/owner-image-model', sttModel: 'stub/owner-stt-model' });
+        assert(s.status === 201, `settings ${s.status}: ${JSON.stringify(s.body?.error)}`);
+        const before = provider.requests.length;
+
+        const img = await json('/v1/ai/image', { method: 'POST', headers: auth(c.token), body: JSON.stringify({ prompt: 'a red bicycle' }) });
+        // The gate chose the node's key and found the allowance spent: 402. Before the ruling an
+        // image never used the node's key, and the same call answered 400 NO_API_KEY.
+        assert(img.status === 402 && img.body.error?.code === 'QUOTA_EXHAUSTED',
+            `the node's key was chosen for the image: got ${img.status} ${img.body.error?.code}`);
+
+        const stt = await json('/v1/ai/transcribe', {
+            method: 'POST', headers: auth(c.token),
+            body: JSON.stringify({ audio_base64: AUDIO, mime: 'audio/webm', filename: 'note.webm' }),
+        });
+        assert(stt.status === 400 && stt.body.error?.code === 'NO_API_KEY',
+            `no node default transcription model, so the person's own key is needed: got ${stt.status} ${stt.body.error?.code}`);
+        assert(provider.requests.length === before, 'neither refusal reached a provider');
     });
 
     // ── 6. /v1/ai/complete: the branches a completion can end in ──────────────

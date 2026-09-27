@@ -21,6 +21,14 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.5.0 — 2026-09-28 — One gate for every operation (System 2 plan, V1). prepareAiCall takes an
+ *     `op` (text, image, transcribe), resolves the model for it, and returns the target the gateway
+ *     calls (services/ai/gateway.ts, on the AI SDK); completeForOwner calls the gateway instead of the
+ *     transport's complete(), which is gone. For images and transcription the model is chosen first
+ *     and refused by name when unset, as those paths always did, and the node's key pays only when
+ *     the operator named a node default model for the operation (Jouni, 2026-09-28); otherwise the
+ *     agent's or the owner's own key is needed, as before. AiCallOutcome carries the operation, the
+ *     units (audio seconds) and where its cost came from (`costSource`).
  *   v3.4.0 — 2026-09-20 — A key per agent: `agent` on the options; that agent's own OpenRouter key
  *     pays before the owner's and the node's, and its daily cap is checked beside the app's
  *     (services/agent-ai-keys.ts). The usage-accounting group moved to ai-usage-record.ts, unchanged
@@ -88,7 +96,10 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { decrypt, getEncryptionKey } from './encryption.js';
-import { complete, DEFAULT_BASE_URLS, type ProviderType, type CompletionReasoning } from './openrouter.js';
+import { DEFAULT_BASE_URLS, type ProviderType, type CompletionReasoning } from './openrouter.js';
+import { text as gatewayText } from './ai/gateway.js';
+import { adapterTypeOf, type AiAdapterType, type AiOp, type AiTarget, type CostSource } from './ai/types.js';
+import { UNSET_MODEL } from './ai/unset-model.js';
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -241,8 +252,8 @@ export interface CompleteForOwnerOptions {
    */
   uncapped?: boolean;
   /**
-   * An outside reason to stop waiting — a cancelled AI job. Composed with the transport's own
-   * timeout inside `complete()`, never replacing it.
+   * An outside reason to stop waiting — a cancelled AI job. Composed with the call's own timeout in
+   * the gateway (services/ai/gateway.ts), never replacing it.
    *
    * A cancel that lands AFTER the provider has answered does not undo the bookkeeping: the
    * settlement below has already run, and a cancelled call is not a free call. The usage row must
@@ -330,9 +341,34 @@ export interface AiCallPlan {
   model: string;
   /** True when the allowance was spent and a free model is answering instead of nothing. */
   degradedToFree: boolean;
+  /** What this call does. */
+  op: AiOp;
+  /** Which adapter builds the model for this provider (services/ai/adapters/). */
+  providerType: AiAdapterType;
+}
+
+/** Where the gateway sends a planned call: the adapter, the address and the key that pays. */
+export function targetOf(plan: AiCallPlan): AiTarget {
+  return { type: plan.providerType, baseUrl: plan.baseUrl, key: plan.key };
+}
+
+/** The operations whose model is a role of its own, and never the text model. */
+const OP_ROLE: Partial<Record<AiOp, ModelRole>> = { image: 'image', transcribe: 'stt' };
+
+/**
+ * May the node's own key pay for this operation? Text: yes, as it always has. Any other operation:
+ * only when the operator named a node default model for it (Jouni, 2026-09-28), because naming one
+ * is the operator saying the node pays for that capability. Otherwise the person's own key does.
+ */
+export function nodeKeyPaysFor(config: AimeatConfig, op: AiOp): boolean {
+  const role = OP_ROLE[op];
+  if (!role) return op === 'text';
+  return !!resolveModelFor(config, undefined, role);
 }
 
 export interface PrepareAiCallOptions {
+  /** What the call does. Default `text`. */
+  op?: AiOp;
   /** An explicit model. A caller that named one is not asking the node to choose. */
   model?: string;
   modelRole?: 'reasoning' | 'execution';
@@ -366,9 +402,23 @@ export async function prepareAiCall(
   const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
   const provider = (prefs.provider as ProviderType) || 'openrouter';
   const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
+  const op: AiOp = opts.op ?? 'text';
+  const roleModel = (role: ModelRole) => resolveModelFor(config, prefs, role);
 
   assertProviderAllowed(config, baseUrl);
   assertAppAllowed(prefs, opts.appId, gaii);
+
+  // An image or a transcription has a model of its own or no answer at all, and that refusal comes
+  // BEFORE the key, in the order those paths have always refused: a person without a model hears
+  // which setting to fill in, not that a key is missing.
+  let opModel: string | undefined;
+  const opRole = OP_ROLE[op];
+  if (opRole) {
+    opModel = (typeof opts.model === 'string' && opts.model) || roleModel(opRole);
+    const unset = UNSET_MODEL[op];
+    if (!opModel && unset) throw new AiCompletionError(unset.code, 400, unset.message);
+  }
+
   // Whose key pays is one decision and it lives in services/ai-allowance.ts: the person's own key,
   // then the node's if they have allowance left. An own key is never metered here — it is their
   // money and their provider account, which is the whole reason bringing one is recommended.
@@ -377,17 +427,36 @@ export async function prepareAiCall(
   const agentKey = opts.agent ? await readAgentKey(storage, config, gaii, opts.agent, 'openrouter') : null;
   const keyChoice: Omit<AiKeyChoice, 'scope'> & { scope: 'agent' | 'own' | 'node' } = agentKey
     ? { key: agentKey, scope: 'agent', exhausted: false, remainingUsd: 0 }
-    : await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl);
+    : await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl,
+      { nodeKey: nodeKeyPaysFor(config, op) });
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
   const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId, gaii);
   const overCap = await agentCapRefusal(storage, gaii, opts.agent);
   if (overCap) throw new AiCompletionError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
+  const planOf = (model: string, degradedToFree: boolean): AiCallPlan => ({
+    prefs, provider, baseUrl,
+    key: keyChoice.key,
+    keyScope: keyChoice.scope,
+    ...(opts.agent ? { agent: opts.agent } : {}),
+    ...(keyChoice.scope === 'node' ? { allowanceRemainingUsd: keyChoice.remainingUsd } : {}),
+    usage, dailyBudgetUsd, model, degradedToFree,
+    op, providerType: adapterTypeOf(provider, baseUrl),
+  });
+
+  if (opModel) {
+    // No free model makes a picture or a transcript: a spent allowance is a refusal here.
+    if (keyChoice.scope === 'node' && keyChoice.exhausted) {
+      throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
+        'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.');
+    }
+    return planOf(opModel, false);
+  }
+
   // ── Model selection ──
   // Each role asks the owner first and the node second (services/ai-model-defaults.ts). With no
   // instance defaults configured every branch resolves exactly as it did before that existed.
-  const roleModel = (role: ModelRole) => resolveModelFor(config, prefs, role);
   let model: string;
   if (typeof opts.model === 'string' && opts.model) {
     model = opts.model;
@@ -420,14 +489,7 @@ export async function prepareAiCall(
     degradedToFree = true;
   }
 
-  return {
-    prefs, provider, baseUrl,
-    key: keyChoice.key,
-    keyScope: keyChoice.scope,
-    ...(opts.agent ? { agent: opts.agent } : {}),
-    ...(keyChoice.scope === 'node' ? { allowanceRemainingUsd: keyChoice.remainingUsd } : {}),
-    usage, dailyBudgetUsd, model, degradedToFree,
-  };
+  return planOf(model, degradedToFree);
 }
 
 export interface AiCallOutcome {
@@ -444,6 +506,10 @@ export interface AiCallOutcome {
   appId?: string;
   /** Where this call came from, for the usage record. */
   source: string;
+  /** What was consumed besides tokens: audio seconds for a transcription, pictures for an image. */
+  units?: { seconds?: number; images?: number };
+  /** Where `costUsd` came from (services/ai/types.ts). Logged with the settlement. */
+  costSource?: CostSource;
 }
 
 export interface AiCallSettlement {
@@ -468,6 +534,7 @@ export async function settleAiCall(
 ): Promise<AiCallSettlement> {
   const updated = await recordAiUsage(storage, gaii, plan.usage, {
     costUsd: outcome.costUsd, tokens: outcome.totalTokens, appId: outcome.appId,
+    ...(outcome.units?.seconds !== undefined ? { audioSeconds: outcome.units.seconds } : {}),
     model: outcome.model, provider: plan.provider,
     promptTokens: outcome.promptTokens, completionTokens: outcome.completionTokens,
     source: outcome.source, apiKeyScope: plan.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
@@ -477,7 +544,7 @@ export async function settleAiCall(
     ? await debitAllowance(storage, config, gaii, outcome.costUsd)
     : null;
 
-  logger.info(`[ai] gaii=${gaii} app=${outcome.appId || '_unknown'} model=${outcome.model} tokens=${outcome.totalTokens} cost=$${outcome.costUsd.toFixed(4)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
+  logger.info(`[ai] gaii=${gaii} op=${plan.op} app=${outcome.appId || '_unknown'} model=${outcome.model} tokens=${outcome.totalTokens} cost=$${outcome.costUsd.toFixed(4)} costSource=${outcome.costSource ?? 'unknown'} key=${plan.keyScope} day_total=$${updated.total_cost_usd.toFixed(4)}`);
 
   // ── Mint the provenance record (TARGET-058) ──
   // THE mint point for an observed generation. The node just watched a model produce these exact
@@ -566,20 +633,23 @@ export async function completeForOwner(
   const retries = typeof opts.retries === 'number' ? opts.retries
     : prefs.autoRetry === false ? 0
       : (typeof prefs.maxRetries === 'number' ? (prefs.maxRetries as number) : undefined);
-  const options = {
-    temperature: opts.temperature ?? (typeof prefs.temperature === 'number' ? prefs.temperature : undefined),
-    top_p: opts.topP ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
-    max_tokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0
-      ? (opts.maxTokens | 0)
-      : (!opts.uncapped && typeof prefs.max_tokens === 'number' ? (prefs.max_tokens as number) : undefined),
-    ...(reasoning ? { reasoning } : {}),
-    ...(retries !== undefined ? { retries } : {}),
-    ...(opts.signal ? { signal: opts.signal } : {}),
-  };
-
   let result;
   try {
-    result = await complete(plan.key, plan.model, opts.prompt, opts.systemPrompt, plan.baseUrl, options, opts.images);
+    result = await gatewayText({
+      target: targetOf(plan),
+      model: plan.model,
+      prompt: opts.prompt,
+      ...(opts.systemPrompt ? { system: opts.systemPrompt } : {}),
+      ...(opts.images ? { images: opts.images } : {}),
+      temperature: opts.temperature ?? (typeof prefs.temperature === 'number' ? prefs.temperature : undefined),
+      topP: opts.topP ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
+      maxTokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0
+        ? (opts.maxTokens | 0)
+        : (!opts.uncapped && typeof prefs.max_tokens === 'number' ? (prefs.max_tokens as number) : undefined),
+      ...(reasoning ? { reasoning } : {}),
+      ...(retries !== undefined ? { retries } : {}),
+      ...(opts.signal ? { signal: opts.signal } : {}),
+    });
   } catch (e) {
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
@@ -590,23 +660,24 @@ export async function completeForOwner(
     throw new AiCompletionError('PROVIDER_ERROR', 502, (e as Error).message);
   }
 
-  const promptTok = result.usage?.prompt_tokens ?? 0;
-  const completionTok = result.usage?.completion_tokens ?? 0;
-  const totalTok = result.usage?.total_tokens ?? (promptTok + completionTok);
-  const costExact = typeof result.usage?.cost_usd === 'number';
-  const costUsd = costExact ? result.usage!.cost_usd! : estimateCostUsd(promptTok, completionTok);
+  const promptTok = result.usage.promptTokens ?? 0;
+  const completionTok = result.usage.completionTokens ?? 0;
+  const totalTok = result.usage.totalTokens ?? (promptTok + completionTok);
+  const costExact = typeof result.usage.costUsd === 'number';
+  const costUsd = costExact ? result.usage.costUsd! : estimateCostUsd(promptTok, completionTok);
 
   const settled = await settleAiCall(storage, config, gaii, plan, {
     model: result.model,
     promptTokens: promptTok, completionTokens: completionTok, totalTokens: totalTok,
     costUsd, content: result.content, appId: opts.appId, source: 'ai-complete',
+    costSource: costExact ? 'provider' : 'estimate',
   });
 
   return {
     content: result.content,
     model: result.model,
-    finishReason: result.finish_reason ?? null,
-    truncated: result.finish_reason === 'length',
+    finishReason: result.finishReason ?? null,
+    truncated: result.finishReason === 'length',
     usage: { promptTokens: promptTok, completionTokens: completionTok, totalTokens: totalTok, costUsd, costExact },
     budget: {
       dailyBudgetUsd: plan.dailyBudgetUsd,

@@ -26,6 +26,9 @@
  *   const choice = await resolveAiKey(storage, config, gaii, prefs, apiKeyRecord?.value);
  *   if (choice.scope === 'node' && choice.exhausted) { … degrade or refuse … }
  * @version-history
+ *   v1.2.0 — 2026-09-28 — resolveAiKey takes `nodeKey: false` for an operation the node's key does
+ *     not pay for: an image or a transcription pays from the node's key only when the operator named
+ *     a node default model for it (Jouni, 2026-09-28). Text is unchanged.
  *   v1.1.0 — 2026-09-16 — The node's key goes only to OpenRouter's host. resolveAiKey takes the
  *     call's baseUrl and refuses the node key for any other address: a person with no key saved
  *     their own address and received the node's key in the Authorization header.
@@ -137,6 +140,11 @@ export async function resolveAiKey(
   provider: ProviderType,
   apiKeyRecordValue: unknown,
   baseUrl: string,
+  opts: {
+    /** False when the node's key may not pay for this operation at all (nodeKeyPaysFor in
+     *  ai-completion.ts: an image or a transcription for which the operator named no default model). */
+    nodeKey?: boolean;
+  } = {},
 ): Promise<AiKeyChoice> {
   const hasOwn = !!(apiKeyRecordValue as { encrypted?: string } | undefined)?.encrypted;
   if (hasOwn) {
@@ -147,7 +155,7 @@ export async function resolveAiKey(
   }
 
   const instanceKey = (config.openrouterInstanceKey || '').trim();
-  if (instanceKey && provider === 'openrouter') {
+  if (instanceKey && provider === 'openrouter' && opts.nodeKey !== false) {
     // The node's key goes to OpenRouter's own host and nowhere else. The address comes from the
     // person's saved settings, and a person with no key of their own saved an address they
     // control: the node then sent its key there in the Authorization header. Their OWN key may

@@ -28,6 +28,12 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.6.0 — 2026-09-28 — The transport check knows the AI SDK (System 2 plan, V1). `ai` is imported
+ *     by the gateway alone, provider packages by its adapters alone, `@ai-sdk/gateway` by nothing,
+ *     the adapters by the gateway alone, and no AI SDK call gets a string model id, which the AI SDK
+ *     would send to Vercel's hosted gateway. generateImage and transcribe join the raw transport
+ *     exports, and image, speech, transcription and embedding endpoints join the direct-call pattern:
+ *     until now a new door could make pictures and transcripts with nothing metering either.
  *   v1.5.0 — 2026-09-06 — aimeat_secret_set is listed as reviewed WITHOUT a provenance parameter. A
  *     secret is a credential, not content: nobody wrote it and nobody reads it, so there is nothing
  *     to disclose and nobody to disclose it to — and a provenance record is a durable readable row
@@ -58,6 +64,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { createConnectorChecks, CONNECTOR_MCP_DIR, CONNECTOR_SHELL_WRAPPER } from './lib/check-ai-disclosure-connector.js';
+import { createAiSdkBoundaryCheck, AI_GATEWAY, AI_ADAPTERS_DIR } from './lib/check-ai-sdk-boundary.js';
 import { PUBLICLY_LINKED_CONTAINERS } from '../src/storage/types/ai-provenance.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -160,14 +167,16 @@ const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {
   'src/routes/llm-proxy.ts':
     'Reviewed 2026-08-16. It forwards an OpenAI-shaped request and the provider response back byte '
     + 'for byte, streamed frames included, so it needs the raw transport rather than the parsed '
-    + 'answer complete() returns. It is NOT a second decision path: prepareAiCall and settleAiCall, '
+    + 'answer the gateway returns. It is NOT a second decision path: prepareAiCall and settleAiCall, '
     + 'the chokepoint own functions, run before and after every call, so the key choice, the budget, '
     + 'the allowance, the usage record and the provenance mint are the same ones every other AI door '
     + 'uses.',
 };
 
-/** The exports of the transport file that actually reach a provider over HTTP. */
-const RAW_TRANSPORT_EXPORTS = ['complete', 'chatCompletionRaw', 'speechRaw'];
+/** The exports of the transport file that actually reach a provider over HTTP. `complete` is gone
+ *  from the file since 2026-09-28 and stays on the list, so bringing it back behind a door is caught. */
+const RAW_TRANSPORT_EXPORTS = ['complete', 'chatCompletionRaw', 'speechRaw', 'generateImage', 'transcribe'];
+
 
 /**
  * Does this file import a provider-reaching export FROM the raw transport?
@@ -193,7 +202,9 @@ export function importsTransportComplete(src: string): boolean {
 }
 
 function checkOneLlmTransport(): void {
-  const providerCall = /fetch\s*\(\s*[`'"][^`'"]*\/(chat\/completions|completions|messages)\b/;
+  // Every model endpoint the node calls, not only chat: pictures, speech, transcripts and embeddings
+  // spend the same key and have to be metered the same way.
+  const providerCall = /fetch\s*\(\s*[`'"][^`'"]*\/(chat\/completions|completions|messages|images\/generations|audio\/(?:speech|transcriptions)|embeddings)\b/;
   for (const file of walk(join(root, 'src'))) {
     const r = rel(file);
     if (r === LLM_TRANSPORT) continue;
@@ -207,7 +218,9 @@ function checkOneLlmTransport(): void {
 
   for (const file of walk(join(root, 'src'))) {
     const r = rel(file);
-    if (r === LLM_TRANSPORT || r === LLM_CHOKEPOINT) continue;
+    // The adapters wrap the transport's image and audio calls as AI SDK models; the AI SDK boundary check
+    // holds that only the gateway, which runs behind prepareAiCall and settleAiCall, reaches them.
+    if (r === LLM_TRANSPORT || r === LLM_CHOKEPOINT || r.startsWith(AI_ADAPTERS_DIR)) continue;
     const src = stripped(file);
     if (!importsTransportComplete(src)) continue;
     if (r in LLM_TRANSPORT_LEGACY_CALLERS) {
@@ -678,6 +691,8 @@ function listProtected(): void {
   console.log('\ncheck:ai-disclosure protects:\n');
   console.log(`  1. one LLM transport   — ${LLM_TRANSPORT} only; chokepoint ${LLM_CHOKEPOINT}`);
   console.log(`     known second paths: ${Object.keys(LLM_TRANSPORT_LEGACY_CALLERS).join(', ') || 'none'}`);
+  console.log(`     AI SDK: 'ai' only in ${AI_GATEWAY}; provider packages only in ${AI_ADAPTERS_DIR}; `
+    + 'no @ai-sdk/gateway; no string model id');
   console.log(`  2. MCP write tools     — ${AI_PROVENANCE_REQUIRED.length} must carry ai_provenance, `
     + `${AI_PROVENANCE_REVIEWED_WITHOUT.length} reviewed without`);
     const promised = connectorChecks.catalogProvenanceTools();
@@ -696,6 +711,7 @@ if (process.argv.includes('--list')) {
 }
 
 checkOneLlmTransport();
+createAiSdkBoundaryCheck({ root, walk, stripped, rel, fail }).check();
 checkMcpWriteTools();
 connectorChecks.check();
 checkOnePublishPath();

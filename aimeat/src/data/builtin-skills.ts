@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.9 -- 2026-09-28 -- ai-transparency says what the node records by itself: pictures and
+ *            transcripts now get an observed provenance record like text and speech (System 2, V1).
  *   v1.16.8 -- 2026-09-26 -- diagnose-a-workflow reads a step's openCalls, which hold until the call
  *            answers, and an estimate of one attempt; set-up-content-pipeline says a step expected to
  *            cost more than the whole limit runs once, alone.
@@ -365,6 +367,15 @@ text, not description.
 - Markdown faces carry the record in frontmatter and one human-readable line in the body.
 - The record is joined to the exact bytes by a SHA-256 hash, so a third party holding the
   content can ask this node whether it produced them.
+
+## What the node records by itself
+
+The node writes an observed record, with no declaration from you, for everything a model makes
+through it: a text completion (hash of the text), a picture from \`aimeat_image_generate\` or
+\`POST /v1/ai/image\` (hash of the image bytes), a transcript from \`POST /v1/ai/transcribe\`
+(hash of the transcript text), and a spoken reply (hash of the audio bytes). The REST answer
+carries it in \`meta.provenance\`. When you store or publish that output, attach the record you
+were given rather than declaring a new one.
 
 ## What never goes in a record
 

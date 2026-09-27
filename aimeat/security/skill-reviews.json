@@ -58,11 +58,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-09-20",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/src/services/ai-completion.ts"
       ],
-      "digest": "sha256:2e3539a88893f2f4af07a56c"
+      "digest": "sha256:3ad29b04e30d5ab7e5428bd4"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-09-27",
@@ -243,11 +243,11 @@
       "digest": "sha256:f43b419458734a5ad395cd41"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-09-20",
+      "reviewedOn": "2026-09-27",
       "watches": [
         "aimeat/src/routes/ai.ts"
       ],
-      "digest": "sha256:0df0bd3216ebc2fa5c264ec8"
+      "digest": "sha256:ba590609278dfca08d3801f5"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-09-26",
@@ -364,7 +364,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai-completion.ts": "81e90001f1305d31"
+      "aimeat/src/services/ai-completion.ts": "2ca30d1d7d12e134"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/mcp/catalog/definitions/connections.ts": "774105847fbe84e3",
@@ -470,7 +470,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "2d7af2e57b126a83"
+      "aimeat/src/routes/ai.ts": "9a13c65146a02478"
     },
     "node:use-app-bound-skills": {
       "aimeat/src/routes/skills.ts": "44bf52891c9f8fcd"

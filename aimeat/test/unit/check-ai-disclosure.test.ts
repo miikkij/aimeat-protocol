@@ -162,6 +162,50 @@ describe('drop a label on purpose and the build fails', () => {
     expect(out).toContain('calls the raw provider transport instead of the chokepoint');
   });
 
+  it('[llm-transport] an image or transcription transport imported outside the gateway adapters', async () => {
+    // Until 2026-09-28 only complete, chatCompletionRaw and speechRaw were on the list, so a new door
+    // could make pictures and transcripts on the owner's key with nothing metering either.
+    breakFile('src/routes/ai.ts', (src) =>
+      `import { generateImage } from '../services/openrouter.js';\n${src}\nexport const sneak = generateImage;\n`);
+    const { code, out } = await runGate();
+    expect(code).toBe(1);
+    expect(out).toContain('calls the raw provider transport instead of the chokepoint');
+  });
+
+  it('[llm-transport] the AI SDK imported outside the gateway', async () => {
+    breakFile('src/routes/ai.ts', (src) =>
+      `import { generateText } from 'ai';\n${src}\nexport const sneak = generateText;\n`);
+    const { code, out } = await runGate();
+    expect(code).toBe(1);
+    expect(out).toContain('imports the AI SDK outside the gateway');
+  });
+
+  it('[llm-transport] a provider package imported outside the adapters', async () => {
+    breakFile('src/services/ai/gateway.ts', (src) =>
+      `import { createOpenRouter } from '@openrouter/ai-sdk-provider';\n${src}\nexport const sneak = createOpenRouter;\n`);
+    const { code, out } = await runGate();
+    expect(code).toBe(1);
+    expect(out).toContain('imports a provider package outside src/services/ai/adapters/');
+  });
+
+  it('[llm-transport] Vercel\'s gateway package imported anywhere, adapters included', async () => {
+    breakFile('src/services/ai/adapters/sdk.ts', (src) =>
+      `import { gateway } from '@ai-sdk/gateway';\n${src}\nexport const sneak = gateway;\n`);
+    const { code, out } = await runGate();
+    expect(code).toBe(1);
+    expect(out).toContain('@ai-sdk/gateway');
+  });
+
+  it('[llm-transport] a string model id handed to an AI SDK call', async () => {
+    // A string model id is resolved by the AI SDK's default provider, which is Vercel's hosted
+    // gateway: the owner's prompt and key would leave for a third party this node never chose.
+    breakFile('src/services/ai/gateway.ts', (src) =>
+      `${src}\nexport async function sneak(): Promise<unknown> {\n  return generateText({ model: 'openai/gpt-6', prompt: 'x' });\n}\n`);
+    const { code, out } = await runGate();
+    expect(code).toBe(1);
+    expect(out).toContain('passes a string model id');
+  });
+
   it('[one-publish-path] a sixth door writing an app version of its own', async () => {
     breakFile('src/routes/apps/read.ts', (src) =>
       `${src}\n// a new door somebody added without reading this file\nexport async function sneak(storage: import('../../storage/interface.js').Storage): Promise<void> {\n  await storage.createApp({} as never);\n}\n`);
