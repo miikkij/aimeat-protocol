@@ -22,6 +22,7 @@
  * @usage html`<${Section} id="sk-own" num="01" title=${x('secOwn')} count=${sub} first>…<//>`
  *        html`<${Section} fold id="og-map" num="07" title=${x('map')} open=${o} onToggle=${() => setO(!o)}>…<//>`
  * @version-history
+ *   2026-09-27 — `group` passed on to PageSection (a section holding a group of sections).
  *   2026-09-27 — `band` passed on to PageSection.
  *   v1.4.0 — 2026-09-26 — `inner` passes to FoldSection: a fold inside a part, without its number
  *     (page group G1a; additive).
@@ -40,12 +41,12 @@ const html = htm.bind(h);
 
 /**
  * @param {{ fold?: boolean, id?: string, num?: any, title: any, count?: any, doors?: any, first?: boolean,
- *   plain?: boolean, band?: boolean, sub?: any, lead?: any, clip?: boolean, wrap?: boolean, inner?: boolean,
+ *   plain?: boolean, band?: boolean, group?: boolean, sub?: any, lead?: any, clip?: boolean, wrap?: boolean, inner?: boolean,
  *   open?: boolean, onToggle?: () => void, children?: any }} props
  */
-export function Section({ fold, id, num, title, count, doors, first, plain, band, sub, lead, clip, wrap, inner, open, onToggle, children }) {
+export function Section({ fold, id, num, title, count, doors, first, plain, band, group, sub, lead, clip, wrap, inner, open, onToggle, children }) {
   if (fold) return html`<${FoldSection} id=${id} num=${num} title=${title} sub=${sub} lead=${lead} clip=${clip} wrap=${wrap} inner=${inner} open=${open} onToggle=${onToggle}>${children}<//>`;
-  return html`<${PageSection} id=${id} num=${num} title=${title} count=${count} doors=${doors} first=${first} plain=${plain} band=${band}>${children}<//>`;
+  return html`<${PageSection} id=${id} num=${num} title=${title} count=${count} doors=${doors} first=${first} plain=${plain} band=${band} group=${group}>${children}<//>`;
 }
 
 export { PageSection, FoldSection };

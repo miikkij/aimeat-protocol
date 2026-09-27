@@ -8,6 +8,7 @@
  * @structure SETTINGS_ENTRIES
  * @usage import { SETTINGS_ENTRIES } from './entries-settings.js';
  * @version-history
+ *   v1.88.0 — 2026-09-27 — The Rail's light tone and PageSection group (the admin Config page as main drew it).
  *   v1.87.0 — 2026-09-27 — What the admin pages added: PageSection band; the Listing's operator cuts; the Search
  *     line's find; a Board notice's title without onOpen. The Listing and the Search line no longer speak of admin
  *     markup (the admin pages draw the List now).
@@ -163,9 +164,10 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'The dark contents rail beside a Settings page, with its sun shadow: coral group labels, the page\'s sections as numbered links that bring a section to the top, the way back, the page\'s modes and acts, and the sibling pages marked →; a rule between groups, the current item at full strength. On a phone it stands under the page. Its sheet also holds the page\'s root and columns (.og, .og-grid, .og-main), which SettingsPage draws.',
         module: '/components/Rail.js', sheet: '/css/components/tab-page.css',
         data: {
-            shape: 'Rail({ title, groups }) · scrollToSection(id) · openTab(tabId) · railSection({ id, num, label, count, open, href })',
+            shape: 'Rail({ title, groups, tone }) · scrollToSection(id) · openTab(tabId) · railSection({ id, num, label, count, open, href })',
             fields: {
                 title: 'the rail\'s name for a screen reader',
+                tone: 'light: the index on the page\'s own ground under a heavy ink rule (the admin Config page\'s index)',
                 groups: '[{ label, rule, items }]: a coral label, then its items; a rule stands between two groups unless the later one says rule: false',
                 'item.section': 'the id of a section to scroll to; open() first opens a folded one; with href (\'#id\') the item is an anchor',
                 'item.tab': 'a Settings tab to open (mark and count default to →)', 'item.href, item.newTab': 'a link (mark and count default to →)',
@@ -181,6 +183,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         useFor: ['Beside a Settings page, to move between its sections and to its sibling pages. A page usually gives SettingsPage the short form (sections, pages, back) and lets it build the rail.'],
         variants: [
             { name: 'current', class: 'on', prop: 'item.on', when: 'the item of what is shown now, at full strength' },
+            { name: 'light', class: 'og-rail--light', prop: 'tone="light"', when: 'an index on the page\'s own ground: ink group words, grey items, grey counts (the admin Config page, as main drew it; the dark look is the operator menu\'s alone)' },
             { name: 'still', prop: 'item.still', when: 'a line that only says something, at full strength (a static count)' },
             { name: 'plain', class: 'og-rail-plain', prop: 'item.plain', when: 'a line that only says something at the rail\'s own strength (a workflow\'s agents, "5 more")' },
             { name: 'code', class: 'og-rail-code', prop: 'item.code', when: 'the label is an identifier (a memory key), as written' },
@@ -240,7 +243,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'An open section of a Settings page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body.',
         module: '/components/PageSection.js', sheet: '/css/components/page-section.css',
         data: {
-            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, children })',
+            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, group, children })',
             fields: {
                 id: 'the section\'s anchor, which the rail scrolls to', num: 'the small number beside the title', title: 'the section\'s name',
                 count: 'a count instead of the number', doors: 'the section\'s actions at the right of its head (Action links)',
@@ -253,6 +256,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'first', class: 'og-sec--first', prop: 'first', when: 'the first section under the page head' },
             { name: 'plain', prop: 'plain', when: 'a box that stands as a section of its own without a title (a member\'s "Leave" on an organism\'s settings)' },
             { name: 'band', class: 'og-sec-h--band', prop: 'band', when: 'the title\'s band across the whole column (the classic pages)' },
+            { name: 'group', class: 'og-sec--group', prop: 'group', when: 'a section that holds a group of sections, its band smaller and across the column (the admin Config domains)' },
             { name: 'split', class: 'og-split', prop: 'Split (Layout.js)', when: 'a part of a section set off by a hairline: its last actions, a group inside it' },
             { name: 'side split', class: 'og-split--side', prop: 'Split side (Layout.js)', when: 'the line at the part\'s start and the part indented: a quieter side door' },
         ],
