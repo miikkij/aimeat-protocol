@@ -9,6 +9,8 @@
  *   stand-in whose calls stay open until the case answers them. The same road with a real provider is
  *   test/e2e-workflows.ts.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — A step keeps the most one attempt cost, and the next run expects one attempt
+ *     (secaudit 2026-09, A6-11).
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, A6-11).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -225,9 +227,10 @@ describe('an ai step\'s call holds its share of the limit until it answers', () 
         run = await readRun(storage);
         expect(reservedUsd(run)).toBe(0);
         expect(spentUsd(run)).toBeCloseTo(0.035, 10);
+        expect(run.steps.left.attemptMaxUsd).toBeCloseTo(0.02, 10);
     });
 
-    it('a failing call: its cost is kept and its hold goes when it answers; after the retry fails too the step is red', async () => {
+    it('a failing call: its cost is kept and its hold goes when it answers; after the retry fails too the step is red, and it keeps one attempt as its most', async () => {
         const storage = memStorage();
         const wantsJson: Signal = { kind: 'deterministic', key: 'out.left', op: 'json_field', path: 'ok', equals: true };
         await seed(storage, defOf([ai('left', { retry: { max: 1, backoff_min: 0 } })], 0.05), {
@@ -242,6 +245,7 @@ describe('an ai step\'s call holds its share of the limit until it answers', () 
         expect(model.calls).toHaveLength(1);
         expect(reservedUsd(run)).toBeCloseTo(0.02, 10);
         expect(spentUsd(run)).toBeCloseTo(0.01, 10);
+        expect(run.steps.left.attemptMaxUsd).toBeCloseTo(0.01, 10);
 
         // The retry answers in words where the step wanted JSON: red, with no retry left.
         await answer(0, 0.03, 'plain words');
@@ -250,6 +254,12 @@ describe('an ai step\'s call holds its share of the limit until it answers', () 
         expect(run.status).toBe('partial');
         expect(reservedUsd(run)).toBe(0);
         expect(spentUsd(run)).toBeCloseTo(0.04, 10);
+        expect(run.steps.left.attemptMaxUsd).toBeCloseTo(0.03, 10);
+
+        // The next run expects the step to cost one attempt, not the two this run made.
+        const next: Record<string, WorkflowRunStep> = { left: stepAt('pending') };
+        pinCostEstimates(run.defSnapshot, next, [run]);
+        expect(next.left.estimateUsd).toBeCloseTo(0.03, 10);
     });
 
     it('a cancel while a call is open: the cancelled run holds the call\'s share until it answers, then keeps what it cost', async () => {

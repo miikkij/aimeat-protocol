@@ -17,7 +17,7 @@
  *
  *   HOW THE CAP HOLDS WHEN STEPS RUN SIDE BY SIDE. What a call cost is known only when the provider
  *   answers, and the ai steps with no order between them start in the same pass. So before an ai
- *   step's model call starts, the engine sets aside what the step is expected to cost,
+ *   step's model call starts, the engine sets aside what one attempt of the step is expected to cost,
  *   and the call starts only when what the run has spent, what its open calls hold and that estimate
  *   stay within the cap. Steps that fit together still start together, and a step that fits starts
  *   even when one before it does not. A step that does not fit stays pending while a call is open,
@@ -37,14 +37,22 @@
  *   calls ended with the process (clearOpenCalls, from engine.ts resumeInflight). On a finished run a
  *   mark changes nothing, since a finished run starts no step.
  *
- *   THE ESTIMATE. The most the step cost in the workflow's last COST_HISTORY_RUNS finished runs that
- *   ran it with the same action, read once when the run starts and kept on the step (`estimateUsd`).
- *   A step's cost moves with its prompt, its input and its model; the highest recent cost is one that
- *   has already happened, and a changed action starts its history again. A step with no such run gets
- *   an equal share of the part of the cap nobody holds, split across the ai steps not yet started, so
- *   a first run can still spend past the cap by what its steps cost beyond their shares. Every open
- *   call holds its own estimate, so a step that costs more than its estimate takes the run past the
- *   cap by that difference, never by a whole pass of steps.
+ *   THE ESTIMATE. The most one attempt of the step cost in the workflow's last COST_HISTORY_RUNS
+ *   finished runs that ran it with the same action (`attemptMaxUsd`; for a run saved before steps kept
+ *   that, the step's `costUsd` split over its attempts), read once when the run starts and kept on the
+ *   step (`estimateUsd`). A hold is taken per call, so the estimate is per call too: a step that
+ *   retried does not make the next run hold several calls' cost for one. A step's cost moves with its
+ *   prompt, its input and its model; the highest recent cost is one that has already happened, and a
+ *   changed action starts its history again. A step with no such run gets an equal share of the part
+ *   of the cap nobody holds, split across the ai steps not yet started, so a first run can still spend
+ *   past the cap by what its steps cost beyond their shares. Every open call holds its own estimate, so
+ *   a step that costs more than its estimate takes the run past the cap by that difference, never by a
+ *   whole pass of steps.
+ *
+ *   A STEP EXPECTED TO COST MORE THAN THE WHOLE CAP would never fit, and waiting cannot change that.
+ *   It starts alone: when no call is open and the run has spent less than the cap. Nothing starts
+ *   beside it while its call is open. What it really cost counts as usual and becomes the next run's
+ *   estimate, so it never holds a workflow up for good.
  * @structure spendsAi(step) · capUsd(def) · spentUsd(run) · reservedUsd(run) · aiCallOpen(run) ·
  *   recordSignalCost(run, cost) · costCapReached(run) · usd(amount) · pinCostEstimates(def, steps, past)
  *   · admitAiStep(run, stepId) · aiCallAnswered(rs, attempt, costUsd) · clearOpenCalls(run) ·
@@ -54,6 +62,9 @@
  *   // after the pass: if (stopWhenNoRoomComes(run, [...waiting], now)) stopped = true;
  *   // when a call answers: aiCallAnswered(run.steps[stepId], attempt, costUsd);
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The estimate is what one attempt cost (attemptMaxUsd, else the step's cost
+ *     split over its attempts), and a step expected to cost more than the whole cap starts alone while
+ *     the run has spent less than the cap (secaudit 2026-09, A6-11).
  *   v1.3.0 — 2026-09-26 — A hold belongs to the model call: a call started under a cap is marked on its
  *     step with what it holds (openCalls), and the mark goes only when the call answers or at a restart,
  *     whatever became of the step meanwhile; a retry's call holds its own (aiCallAnswered, aiCallOpen,
@@ -136,9 +147,21 @@ export function usd(amount: number): string {
 }
 
 /**
- * Give each ai step of a run about to start its estimate, when the workflow has a cap: the most the
- * step cost in the workflow's last COST_HISTORY_RUNS finished runs in which it had the same action.
- * `past` is the workflow's runs, newest first (store.ts listRuns). A step with no such run gets none.
+ * What one attempt of a past run's step cost: the most one attempt cost, or, for a run saved before
+ * steps kept that, what the step cost split over its attempts.
+ */
+function attemptCostUsd(rs: WorkflowRunStep | undefined): number {
+  if (!rs) return 0;
+  if (rs.attemptMaxUsd !== undefined) return amount(rs.attemptMaxUsd);
+  const attempts = Number.isInteger(rs.attempt) && rs.attempt > 0 ? rs.attempt + 1 : 1;
+  return amount(rs.costUsd) / attempts;
+}
+
+/**
+ * Give each ai step of a run about to start its estimate, when the workflow has a cap: the most one
+ * attempt of the step cost in the workflow's last COST_HISTORY_RUNS finished runs in which it had the
+ * same action. `past` is the workflow's runs, newest first (store.ts listRuns). A step with no such
+ * run gets none.
  */
 export function pinCostEstimates(
   def: Pick<WorkflowDef, 'maxCostUsd' | 'steps'>, steps: Record<string, WorkflowRunStep>, past: WorkflowRun[],
@@ -152,7 +175,7 @@ export function pinCostEstimates(
     for (const r of recent) {
       const then = r.defSnapshot?.steps?.find(s => s.id === step.id);
       if (!then || stableStringify(then.action) !== action) continue;
-      most = Math.max(most, amount(r.steps?.[step.id]?.costUsd));
+      most = Math.max(most, attemptCostUsd(r.steps?.[step.id]));
     }
     if (most > 0) steps[step.id].estimateUsd = most;
   }
@@ -170,10 +193,11 @@ function expectedUsd(run: WorkflowRun, stepId: string, cap: number, spent: numbe
 
 /**
  * May the ai step `stepId`, ready to start, start its model call now? `start`: yes, and under a cap
- * the call is marked on the step (`openCalls`) holding what the step is expected to cost. `wait`:
+ * the call is marked on the step (`openCalls`) holding what one attempt is expected to cost. `wait`:
  * that does not fit beside what the run has spent and what its open calls hold; the step stays
- * pending. The engine asks every ready step first, so a step that fits starts even when one before
- * it does not, and then asks stopWhenNoRoomComes.
+ * pending. A step expected to cost more than the whole cap would never fit, so it starts alone: when
+ * no call is open and the run has spent less than the cap. The engine asks every ready step first, so
+ * a step that fits starts even when one before it does not, and then asks stopWhenNoRoomComes.
  */
 export function admitAiStep(run: WorkflowRun, stepId: string): 'start' | 'wait' {
   const cap = capUsd(run.defSnapshot);
@@ -183,22 +207,25 @@ export function admitAiStep(run: WorkflowRun, stepId: string): 'start' | 'wait' 
   const held = reservedUsd(run);
   const expected = expectedUsd(run, stepId, cap, spent, held);
   const fits = spent + held < cap && spent + held + expected <= cap + EPSILON_USD;
-  if (!fits) return 'wait';
+  const alone = expected > cap && !aiCallOpen(run) && spent < cap;
+  if (!fits && !alone) return 'wait';
   rs.openCalls = [...(rs.openCalls ?? []), { attempt: rs.attempt, reservedUsd: expected }];
   return 'start';
 }
 
 /**
- * A model call of the step has answered. What it cost is kept on the step (`costUsd`), and its mark
- * goes with the hold it carried, whatever became of the step while it ran. `attempt` is the attempt
- * the call was started for; an answer without one (a step that is not an ai step) has no mark.
- * Returns whether the step changed.
+ * A model call of the step has answered. What it cost is kept on the step (`costUsd`, and
+ * `attemptMaxUsd` when it is the most one attempt has cost), and its mark goes with the hold it
+ * carried, whatever became of the step while it ran. `attempt` is the attempt the call was started
+ * for; an answer without one (a step that is not an ai step) has no mark. Returns whether the step
+ * changed.
  */
 export function aiCallAnswered(rs: WorkflowRunStep, attempt: number | undefined, costUsd: unknown): boolean {
   let changed = false;
   const paid = amount(costUsd);
   if (paid > 0) {
     rs.costUsd = (rs.costUsd ?? 0) + paid;
+    rs.attemptMaxUsd = Math.max(amount(rs.attemptMaxUsd), paid);
     changed = true;
   }
   const open = rs.openCalls ?? [];
@@ -257,8 +284,8 @@ function stopAtCostCap(run: WorkflowRun, stepId: string, nowIso: string, cap: nu
   run.endedAt = nowIso;
   run.costCap = { capUsd: cap, spentUsd: spent, stoppedBefore: stepId, ...(neededUsd ? { neededUsd } : {}) };
   run.reason = neededUsd
-    ? `Stopped before step "${stepId}": it was expected to cost ${usd(neededUsd)}, the most it cost in this `
-      + `workflow's recent runs. This run had spent ${usd(spent)} on AI, and this workflow allows ${usd(cap)} `
+    ? `Stopped before step "${stepId}": it was expected to cost ${usd(neededUsd)}, the most one attempt of it `
+      + `cost in this workflow's recent runs. This run had spent ${usd(spent)} on AI, and this workflow allows ${usd(cap)} `
       + 'per run (maxCostUsd), so the step did not fit.'
     : `Stopped before step "${stepId}": this run had spent ${usd(spent)} on AI, `
       + `and this workflow allows ${usd(cap)} per run (maxCostUsd).`;

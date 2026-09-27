@@ -60,6 +60,8 @@
  *     an estimate (secaudit 2026-09, A6-11).
  *   v1.15.0 — 2026-09-26 — The hold belongs to the model call: WorkflowRunStep.openCalls, one per
  *     attempt with what it holds, in place of the step's reservedUsd (secaudit 2026-09, A6-11).
+ *   v1.16.0 — 2026-09-26 — WorkflowRunStep.attemptMaxUsd, the most one attempt cost, which later
+ *     estimates read (secaudit 2026-09, A6-11).
  */
 import { z } from 'zod';
 import { SignalSchema, type Signal } from './workflow-signals.js';
@@ -499,9 +501,15 @@ export interface WorkflowRunStep {
    */
   costUsd?: number;
   /**
-   * Under a cost cap: what this ai step is expected to cost, in US dollars, set when the run starts.
-   * It is the most the step cost in the workflow's last ten finished runs that ran it with the same
-   * action. Absent when there is no such run.
+   * The most one attempt of this ai step cost, in US dollars: one model call with its re-asks for
+   * JSON. Later runs read their estimate from it, so a step that retried is expected to cost one
+   * attempt, not all of them.
+   */
+  attemptMaxUsd?: number;
+  /**
+   * Under a cost cap: what one attempt of this ai step is expected to cost, in US dollars, set when the
+   * run starts. It is the most one attempt cost in the workflow's last ten finished runs that ran the
+   * step with the same action. Absent when there is no such run.
    */
   estimateUsd?: number;
   /**
