@@ -66,10 +66,14 @@ per-call TLS handshakes, no per-crew connector subprocess, and parallel
 kickoffs can all share it (loopback HTTP is naturally concurrent, unlike a
 shared stdio subprocess). The daemon holds the agent tokens itself. What it
 checks is its own secret: a fresh one is written into `serve.json` at every
-start, and a request without it is refused (0.29.0 with a connector that
-writes it). `serve_params()`, the daemon's REST helpers and `serve_client()`
-send it for you; a client that builds its own HTTP session adds
-`serve_auth_headers(ensure_serve())`.
+start. Since 0.29.0, `serve_params()`, the daemon's REST helpers and
+`serve_client()` send it for you; a client that builds its own HTTP session
+adds `serve_auth_headers(ensure_serve())`. The daemon in aimeat 3.19.x still
+lets in a request that sends no secret, and names its caller once in the
+daemon's log so that you can find the program to update. From aimeat 3.20.0
+the daemon refuses that request with 401. The placeholder bearer
+`loopback-trusted` that this package sent before 0.29.0 counts as no secret.
+A request with a wrong secret gets 401 in both releases.
 
 ```python
 from aimeat_crewai import create_liaison_agent, serve_params
