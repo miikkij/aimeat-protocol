@@ -10,7 +10,8 @@
 -- handles them (settleErasedPartyWorkDb in methods/owner-cascade.ts):
 --   - their actions go;
 --   - their open work is cancelled, and when they were the one to do it, the morsels held from the
---     requester go back with an escrow_return line in the requester's ledger;
+--     requester go back with an escrow_return line in the requester's ledger, when the requester's
+--     account existed when the row was written; to an account registered later, nothing goes back;
 --   - their finished work stays for the other side, with their side under a random `erased:`
 --     pseudonym, one per person; their callback address goes, and so does their name in a dispute
 --     on it. The dispute log's hashes stay as they were stored.
@@ -115,6 +116,15 @@ BEGIN
                     WHEN strpos(w."requesterGaii", '@') > 0 THEN w."requesterGaii"
                     ELSE (SELECT g."ghii" FROM "Ghii" g WHERE g."username" = w."requesterGaii" LIMIT 1)
                 END;
+                -- Only to an account that existed when the row was written. A name is released for
+                -- reuse, so an account registered after the row under the requester's name is
+                -- somebody else, and nothing goes back, as for a requester whose account is gone.
+                IF payer IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM "Ghii" g JOIN "Owner" o ON o."name" = g."ownerName"
+                    WHERE g."ghii" = payer AND o."createdAt" <= w."createdAt"
+                ) THEN
+                    payer := NULL;
+                END IF;
                 IF payer IS NOT NULL THEN
                     UPDATE "Ghii" SET "morselBalance" = COALESCE("morselBalance", 0) + w."costTotal" WHERE "ghii" = payer;
                     IF FOUND THEN
