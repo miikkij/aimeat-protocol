@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.19.0 -- 2026-09-26 -- deleteOwner deletes the app grants and the personal access tokens issued
+ *     in the account name (app_grants, personal_access_tokens).
  *   v1.18.0 -- 2026-09-26 -- The ecosystem apps go through repos/eco-app-erasure.ts deleteEcosystemApps,
  *     which the start step and the operator's decision on a held name call too.
  *   v1.17.0 -- 2026-09-26 -- deleteOwner takes the ecosystem apps the person connected, as it takes the
@@ -233,6 +235,12 @@ export const ownerMethods = {
       // own. A pending row is a live invitation to bind an app to this account, and the name is
       // released for reuse, so leaving one hands the next registrant somebody else's handshake.
       this.db.prepare('DELETE FROM eco_auth WHERE ownerName = ?').run(name);
+
+      // 10c. The apps the person granted access to and the personal access tokens they made. Both are
+      // credentials issued in the account name, which is released for reuse, so they go with the
+      // account and the next holder of the name starts with none.
+      this.db.prepare('DELETE FROM app_grants WHERE owner = ?').run(name);
+      this.db.prepare('DELETE FROM personal_access_tokens WHERE owner = ?').run(name);
 
       // 11. Delete the owner record itself
       const result = this.db.prepare('DELETE FROM owners WHERE name = ?').run(name);

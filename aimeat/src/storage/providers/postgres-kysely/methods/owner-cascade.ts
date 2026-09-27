@@ -35,6 +35,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.14.0 — 2026-09-26 — deleteOwnerCascade deletes the app grants and the personal access tokens
+ *     issued in the account name (AppGrant, PersonalAccessToken).
  *   v1.13.0 — 2026-09-26 — cascadeDeleteIdentityData and deleteInstalledCortexesDb move to
  *     identity-erasure.ts, and the ecosystem apps go through deleteEcosystemAppsDb there, so the start
  *     step and the operator's decision on a held name call the same functions. Exported again here.
@@ -249,6 +251,12 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // a live invitation to bind an app to this account, and the name is released for reuse, so leaving
   // one hands the next registrant somebody else's handshake.
   await db.deleteFrom('EcoAuth').where('ownerName', '=', name).execute();
+
+  // The apps the person granted access to and the personal access tokens they made. Both are
+  // credentials issued in the account name, which is released for reuse, so they go with the account
+  // and the next holder of the name starts with none.
+  await db.deleteFrom('AppGrant').where('owner', '=', name).execute();
+  await db.deleteFrom('PersonalAccessToken').where('owner', '=', name).execute();
 
   // Live sessions: a surviving refresh token for a deleted account is a live credential.
   await db.deleteFrom('Session').where('owner', '=', name).execute();
