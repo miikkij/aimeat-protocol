@@ -7845,7 +7845,8 @@ paths:
         credential the account issued: its sessions and refresh cookie, its agents' tokens and their
         MCP access tokens, its personal access tokens, and its app grants' access and refresh tokens
         are refused from the deletion on, also after the name is registered again and an agent of
-        the same name, which gets the same identity, is connected.
+        the same name, which gets the same identity, is connected. The app grants and the personal
+        access tokens are deleted with the account, so the next holder of the name lists none.
       tags: [Identity]
       security:
         - BearerAuth: []

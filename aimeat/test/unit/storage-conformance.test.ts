@@ -21,6 +21,8 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.19.0 -- 2026-09-26 -- deleteOwner takes the app grants and the personal access tokens issued in
+ *     the account name on every provider; another person's stay.
  *   v1.18.0 -- 2026-09-26 -- The start step for the cortexes and ecosystem apps of deleted accounts, on
  *     every provider: a name no account holds loses them as an account deletion takes them (the app's
  *     open work cancelled with what was held going back, the lines naming it under the work's
@@ -753,6 +755,43 @@ describe('storage providers agree on what they do, not just on their signatures'
                 record: true, listed: 1, memory: true, actions: 1, recipe: true,
             });
             await storage.deleteOwner(p.other);
+        }
+    }, 60_000);
+
+    // An app grant and a personal access token are credentials issued in the account name, which is
+    // released for reuse: both go with the account, and the next holder of the name starts with none.
+    // Somebody else's stay.
+    it('deleteOwner takes the app grants and the access tokens issued in the account name', async () => {
+        const node = 'aimeat-conformance-001';
+        for (const { name, storage } of provs) {
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const now = new Date().toISOString();
+            const issued = async (who: string) => {
+                await storage.createOwner({ name: who, displayName: who, publicKey: 'pk', roles: ['owner'], createdAt: now });
+                const grantId = `appgrant-conf-${who}`;
+                await storage.createAppGrant({
+                    grantId, app: `${who}/conf.html`, appName: 'conf', appOrigin: 'http://localhost:9911', owner: who, gaii: `${who}@${node}`,
+                    scopes: ['memory:read'], refreshTokenHash: `rt-${who}`, createdAt: now, lastUsedAt: now, revoked: false,
+                });
+                const tokenHash = `pat-${who}`;
+                await storage.createPat({
+                    id: randomUUID(), tokenHash, label: 'conformance', owner: who, scopes: [], grantOwner: true, grantOperator: false,
+                    readOwnerData: false, gaii: `${who}@${node}`, createdAt: now, expiresAt: null, lastUsedAt: null, revoked: false,
+                });
+                return { who, grantId, tokenHash };
+            };
+            const left = async (p: { who: string; grantId: string; tokenHash: string }) => ({
+                grant: !!(await storage.getAppGrant(p.grantId)),
+                grants: (await storage.listAppGrantsByOwner(p.who)).length,
+                token: !!(await storage.getPatByHash(p.tokenHash)),
+                tokens: (await storage.listPats(p.who)).length,
+            });
+            const person = await issued(`confcred${tag}`);
+            const other = await issued(`confcredo${tag}`);
+            await storage.deleteOwner(person.who);
+            expect.soft(await left(person), `${name}: the erased person's grant or token survived`).toEqual({ grant: false, grants: 0, token: false, tokens: 0 });
+            expect.soft(await left(other), `${name}: somebody else's grant or token changed`).toEqual({ grant: true, grants: 1, token: true, tokens: 1 });
+            await storage.deleteOwner(other.who);
         }
     }, 60_000);
 

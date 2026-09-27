@@ -26,6 +26,9 @@
  *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.11.0 — 2026-09-26 — 64: when an account is deleted, its app grants and personal access tokens
+ *     go with it: the new holder of the name lists none, and its own grant of an app with the same id
+ *     reads its records.
  *   v1.10.0 — 2026-09-26 — 62 (b): the deleted account's owner token approves no device authorization
  *     request for the new holder's account. 63: POST /v1/agents/verify refuses a signed-out owner
  *     token and accepts a current one.
@@ -1490,6 +1493,61 @@ await test('63. The device approval endpoint refuses a signed-out owner token an
 
     assert(signedOut.status === 401, `the signed-out owner token approved a device authorization request: ${signedOut.status} ${JSON.stringify(signedOut.body?.data ?? signedOut.body?.error)}`);
     assert(current.status === 200 && current.body.data?.status === 'approved', `the current owner token is refused: ${current.status} ${JSON.stringify(current.body?.error)}`);
+});
+
+// An app grant and a personal access token are issued in the account name, which is released for
+// reuse: both go with the account. The new holder of the name lists none, and its own grant of an app
+// published under the same file name, which gives it the same app id, is its own and reads its records.
+await test('64. When an account is deleted, its app grants and access tokens go with it: the new holder lists none, and its own grant of the same app works', async () => {
+    const first = await setupOwner('grantgone');
+    const appFile = `grantgone-${Date.now().toString(36)}.html`;
+    /** Publish the app as `holder`, grant it memory:read, and return the grant's access token. */
+    const grantRead = async (holder: Owner): Promise<string> => {
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: auth(holder.token),
+            body: JSON.stringify({ filename: appFile, content: Buffer.from('<h1>granted</h1>', 'utf8').toString('base64'), name: 'Granted', description: 'An app its owner granted', category: 'utility', tags: [] }),
+        });
+        assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+        const redirect = 'http://localhost:9911/callback';
+        const verifier = randomBytes(32).toString('base64url');
+        const authz = await fetch(`${BASE}/v1/app-grants/authorize?${new URLSearchParams({
+            app: `${holder.name}/${appFile}`, response_type: 'code', scope: 'memory:read', redirect_uri: redirect,
+            code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256',
+        })}`, { redirect: 'manual' });
+        const requestId = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+        const consent = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(holder.token), body: JSON.stringify({ request_id: requestId }) });
+        const code = new URL(consent.body.data.redirect_url).searchParams.get('code') ?? '';
+        const tok = await json('/v1/app-grants/token', {
+            method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }),
+        });
+        assert(tok.body.ok === true, `grant token: ${JSON.stringify(tok.body?.error)}`);
+        return tok.body.data.access_token as string;
+    };
+    await grantRead(first);
+    const made = await json('/v1/access/tokens', { method: 'POST', headers: auth(first.token), body: JSON.stringify({ label: 'the first account', grant_owner: true }) });
+    assert(made.status === 201, `access token ${made.status}: ${JSON.stringify(made.body?.error)}`);
+
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    const again = await registerAgain(first.name);
+
+    const found: string[] = [];
+    const grants = ((await json('/v1/app-grants', { headers: auth(again.token) })).body.data?.grants ?? []) as any[];
+    if (grants.length) found.push(`the new holder's app list shows ${JSON.stringify(grants.map(g => g.app))}`);
+    const tokens = ((await json('/v1/access/tokens', { headers: auth(again.token) })).body.data?.tokens ?? []) as any[];
+    if (tokens.length) found.push(`the new holder's token list shows ${JSON.stringify(tokens.map(t => t.label))}`);
+
+    const key = `acctdoor.grant.${Date.now().toString(36)}`;
+    const kept = await json('/v1/memory', {
+        method: 'POST', headers: auth(again.token), body: JSON.stringify({ key, value: { of: 'the new holder' }, visibility: 'private' }),
+    });
+    assert(kept.status === 201, `the new holder writes: ${kept.status} ${JSON.stringify(kept.body?.error)}`);
+    const own = await grantRead(again);
+    const read = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(own) });
+    if (read.status !== 200) found.push(`the new holder's own grant of the same app is refused: ${read.status} ${JSON.stringify(read.body?.error)}`);
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+
+    assert(found.length === 0, found.join('; '));
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
