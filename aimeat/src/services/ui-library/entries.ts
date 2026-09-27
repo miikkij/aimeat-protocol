@@ -7,6 +7,7 @@
  * @structure UI_ENTRY_SOURCES
  * @usage import { UI_ENTRY_SOURCES } from './entries.js';
  * @version-history
+ *   v1.6.0 — 2026-09-27 — The app catalogue on components: the catalogue family (entries-catalogue.ts).
  *   v1.5.0 — 2026-09-27 — The admin dashboard on components: the operator family (entries-operator.ts).
  *   v1.4.0 — 2026-09-27 — Settings & Controls on components: the kit (entries-kit.ts), the fields (entries-fields.ts),
  *     the page parts (entries-page-kit.ts), the list (entries-list.ts) and the special views (entries-views-knowledge.ts,
@@ -31,6 +32,7 @@ import { LIST_ENTRIES } from './entries-list.js';
 import { KNOWLEDGE_VIEW_ENTRIES } from './entries-views-knowledge.js';
 import { WORK_VIEW_ENTRIES } from './entries-views-work.js';
 import { OPERATOR_ENTRIES } from './entries-operator.js';
+import { CATALOGUE_ENTRIES } from './entries-catalogue.js';
 import { SHAPE_ENTRIES } from './entries-shapes.js';
 import { USE_OF } from './entries-use.js';
 
@@ -49,5 +51,6 @@ export const UI_ENTRY_SOURCES: UiEntrySource[] = [
     ...KNOWLEDGE_VIEW_ENTRIES,
     ...WORK_VIEW_ENTRIES,
     ...OPERATOR_ENTRIES,
+    ...CATALOGUE_ENTRIES,
     ...SHAPE_ENTRIES,
 ].map(e => ({ ...e, use: USE_OF[e.id] ?? [] }));

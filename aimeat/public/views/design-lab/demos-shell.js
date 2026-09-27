@@ -25,6 +25,9 @@ import htm from 'htm';
 import { Alert } from '/components/Alert.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { DataTable } from '/components/DataTable.js';
+import { Check } from '/components/Check.js';
+import { Mark } from '/components/Mark.js';
+import { Select } from '/components/Select.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { KeyValueRow } from '/components/KeyValueRow.js';
 import { Pagination, LoadMore } from '/components/Pagination.js';
@@ -76,13 +79,29 @@ export const SHELL_DEMOS = {
     { name: 'load more', render: () => html`<${LoadMore} onMore=${noop} label="Load more" />` },
   ] },
   collapsible: one('open', () => html`<${Collapsible} title="Details" open=${true} onToggle=${noop}><p>What opens.</p><//>`),
-  'data-table': one('default', () => html`<${DataTable} headers=${['Name', 'State']} rows=${[['alpha', 'on'], ['beta', 'off']]} />`),
+  'data-table': { variants: [
+    { name: 'default', render: () => html`<${DataTable} headers=${['Name', 'State']} rows=${[['alpha', 'on'], ['beta', 'off']]} />` },
+    { name: 'compact: rows to choose from in a dialog', render: () => html`<${DataTable} compact headers=${['', 'App', 'Versions', 'Status']} rows=${[
+      [html`<${Check} checked=${true} onChange=${noop} ariaLabel="Harbour Studio" />`, 'Harbour Studio', '3', html`<${Mark} kind="status" tone="fine">new<//>`],
+      [html`<${Check} checked=${false} onChange=${noop} ariaLabel="Lumo Bakery" />`, 'Lumo Bakery', '1',
+        html`<${Mark} kind="status" tone="attention">exists<//><br /><${Select} fit ariaLabel="Status" value="skip" onChange=${noop} options=${[['skip', 'Skip'], ['replace', 'Replace'], ['new', 'Import as new']]} />`],
+    ]} />` },
+  ] },
   'usage-chart': one('frame', () => html`<div class="usage-chart"><p>The chart's canvas sits here; its data comes from the node.</p></div>`),
   divider: one('default', () => html`<div class="section-divider">or</div>`),
   'form-field': one('default', () => html`<${FormField} label="Name" hint="Lower-case letters and dashes."><input class="input-field" value="claude" /><//>`),
   'search-bar': one('default', () => html`<${SearchBar} value="" onInput=${noop} placeholder="Search" />`),
   spinner: one('default', () => html`<${Spinner} text="Loading…" />`),
-  'empty-state': one('default', () => html`<${EmptyState} title="Nothing here yet" text="Your records appear here." />`),
+  'empty-state': { variants: [
+    { name: 'default', render: () => html`<${EmptyState} title="Nothing here yet" text="Your records appear here." />` },
+    { name: 'start, with an aside', render: () => html`<${EmptyState} start icon="🚀" title="No apps yet" text="Drop an HTML file here, or ask your AI to build one for Lumo Bakery." aside="Supports: HTML files and ZIP packages" />` },
+    { name: 'start, nothing matches', render: () => html`<${EmptyState} start icon="🔍" title="Nothing matches" text="No app of Harbour Studio has that word in its name or its description." />` },
+    { name: 'start, loading', render: () => html`<${EmptyState} start loading title="Loading apps…" text="Reading the catalogue from the node." />` },
+    { name: 'line, ruled, with a hint', render: () => html`<${EmptyState} line ruled text="No community apps yet" hint="Apps that other people on this node publish appear here." />` },
+    { name: 'line, ruled, loading', render: () => html`<${EmptyState} line ruled loading text="Loading apps…" hint="Reading the catalogue from the node." />` },
+    { name: 'line, with a hint', render: () => html`<${EmptyState} line text="No favourites yet" hint="Press the star beside an app to keep it here." />` },
+    { name: 'long', render: () => html`<${EmptyState} start icon="🚀" title=${'No apps yet for Nordic Ferries and the other harbour companies you work with'} text=${'Drop an HTML file here, or ask your AI to build one. A long sentence wraps under the title on a narrow phone screen.'} />` },
+  ] },
   'text-utility': one('default', () => html`<span class="text-muted">updated 2 hours ago</span>`),
   'toggle-switch': one('on', () => html`<${ToggleSwitch} checked=${true} onChange=${noop} label="Notifications" />`),
   'site-footer': one('default', () => html`<footer class="site-footer"><div class="site-footer-row"><a href="#">Glossary</a><a href="#">Site map</a></div><div class="site-footer-row site-footer-machine"><a href="#">llms.txt</a><a href="#">API contract</a></div></footer>`),

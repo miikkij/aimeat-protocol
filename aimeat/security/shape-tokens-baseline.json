@@ -1,14 +1,14 @@
 {
   "_note": "Shape literals in the component sheets where a theme shape value exists (src/services/themes/shapes.ts): recorded debt, not approval. A count may only go down: after a component reads the shape values, lower its counts or remove the file. Seeded 2026-09-24 on Jouni's word; only his decision permits re-seeding with pnpm check:shape-tokens --record.",
   "_measured": {
-    "date": "2026-09-27T02:30:13.751Z",
-    "files": 40,
-    "literals": 107,
+    "date": "2026-09-27T07:56:06.744Z",
+    "files": 44,
+    "literals": 113,
     "kinds": {
       "shadow": 37,
       "case": 15,
-      "frame": 23,
-      "corner": 32
+      "frame": 24,
+      "corner": 37
     }
   },
   "files": {
@@ -25,6 +25,9 @@
     },
     "public/css/components/badge.css": {
       "case": 1
+    },
+    "public/css/components/box.css": {
+      "corner": 1
     },
     "public/css/components/button.css": {
       "shadow": 5
@@ -48,6 +51,9 @@
       "frame": 3,
       "shadow": 1
     },
+    "public/css/components/empty-state.css": {
+      "frame": 1
+    },
     "public/css/components/error-note.css": {
       "frame": 1
     },
@@ -58,6 +64,9 @@
     "public/css/components/free-text.css": {
       "frame": 1,
       "case": 1
+    },
+    "public/css/components/hint.css": {
+      "corner": 1
     },
     "public/css/components/image-deliverable.css": {
       "corner": 2
@@ -103,6 +112,9 @@
     },
     "public/css/components/search-bar.css": {
       "shadow": 1
+    },
+    "public/css/components/search-preview.css": {
+      "corner": 3
     },
     "public/css/components/settings-door.css": {
       "case": 1

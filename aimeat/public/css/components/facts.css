@@ -9,6 +9,12 @@
  *   Drawn by components/Facts.js: <dl class="facts"><dt class="facts-k poster-label">…</dt><dd class="facts-v">…</dd></dl>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.1 — 2026-09-27 — The readout's names read var(--shape-case-label) instead of a literal
+ *     uppercase (the AIMEAT value, so AIMEAT is unchanged; a theme reaches them). check:shape-tokens.
+ *   v1.5.0 — 2026-09-27 — .facts--readout (Facts `readout`): the old app catalogue's .mk-sees, appcat
+ *     parity (sections-c); additive.
+ *   v1.4.0 — 2026-09-27 — .facts--tiles and .facts-tile (Facts `tiles`): the old app catalogue's About
+ *     facts, appcat parity (sections-a); additive.
  *   v1.3.0 — 2026-09-26 — Drawn by components/Facts.js. The meanings the pages' own rules carried become
  *     the component's options, each with the look it had: flush (formerly appdev .ad-kv, apps .ap-kv,
  *     knowledge .kp-kv margin-top 0, and extensions .ex-kv--wide .2rem), missing (a value not known:
@@ -54,4 +60,26 @@
 @media (max-width: 860px) {
   .facts, .facts--wide { grid-template-columns: 1fr; gap: .3rem 0; }
   .facts-k { padding-top: .6rem; }
+}
+
+/* The tiles (Facts `tiles`, appcat): each name over its value in a tile, as many tiles on a line as it
+   holds at 180px or more, on a phone too (the old app catalogue's About facts, .dtl-meta-grid and
+   .dtl-meta-item: the coral label, the value bold in ink). */
+.facts.facts--tiles { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 18px 24px; margin: 0; line-height: normal; }
+.facts--tiles > .facts-tile { min-width: 0; }
+.facts--tiles .facts-k.poster-label { padding: 0; font-size: .72rem; letter-spacing: .1em; font-weight: 800; line-height: normal; }
+.facts--tiles .facts-v { font-family: var(--font-body); font-size: .9rem; font-weight: 700; line-height: normal; word-break: break-word; }
+
+/* The readout (Facts `readout`, appcat sections-c): what a system observed, the names in small grey
+   typewriter capitals in a 220px column, the values bold; one column under 900px (the old app
+   catalogue's .mk-sees; its --text-dim is the site's --text-muted). */
+.facts.facts--readout { grid-template-columns: 220px minmax(0, 1fr); gap: 6px 24px; margin: 0 0 8px; font-size: .92rem; line-height: 1.5; }
+.facts--readout .facts-k.poster-label {
+  padding: 3px 0 0; font-family: var(--font-mono); font-size: .72rem; font-weight: 500; line-height: 1.5;
+  letter-spacing: .06em; text-transform: var(--shape-case-label); color: var(--text-muted);
+}
+.facts--readout .facts-v { font-size: inherit; font-weight: 600; line-height: inherit; }
+@media (max-width: 900px) {
+  .facts.facts--readout { grid-template-columns: minmax(0, 1fr); gap: 6px 24px; }
+  .facts--readout .facts-k.poster-label { padding-top: 3px; }
 }

@@ -15,6 +15,17 @@
  *   thumbnail's second bar, a found word) are poster.css's .poster-chip--sun in the markup.
  *   NOTE: this file must be linked in spa.html, after listing.css.
  * @version-history
+ *   v1.13.1 — 2026-09-27 — The index: the state's capitals read var(--shape-case-label), and the open
+ *     panel's literal corner 0 goes (nothing under it draws a corner, so AIMEAT is unchanged; a theme
+ *     reaches the case). check:shape-tokens.
+ *   v1.13.0 — 2026-09-27 — List index (appcat parity): the name's line a flex line as the old
+ *     .cat-row-name (a long name ends in "…" instead of vanishing), the icon and the opened panel on
+ *     the card ground, the panel's doors as the old .cat-slab and .cat-word; a faded row's ground at
+ *     60% and its icon's dashed frame in --muted, as the old .cat-row.is-unlisted; under 900px the
+ *     cells in the old order (the opens and the arrow on the row's last line).
+ *   v1.12.0 — 2026-09-27 — .list--index (List index) and the cut n-mark-name-desc-state-n-arrow's
+ *     cells: the old app catalogue's numbered index (.cat-row, .cat-row-panel), its phone rows and its
+ *     coming in (Row order, --list-order), for appcat; additive.
  *   v1.11.1 — 2026-09-27 — Row hover turns a linked name coral too (.list-row--hover … .list-name-link:
  *     the fleet's agent rows, main's .flt-row:hover .flt-name); additive, page group G9.
  *   v1.11.0 — 2026-09-27 — .list-row--quiet-doors (Row quietDoors, main's admin Owners .adm-own-acts:
@@ -304,4 +315,85 @@
     content: attr(data-label) ': '; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim);
     text-transform: var(--shape-case-label); letter-spacing: var(--shape-tracking-label);
   }
+}
+
+/* ── List index (appcat): the app catalogue's numbered index, the old page's .cat-row and
+   .cat-row-panel with their values. Each row is its own line (a grid of the cut's columns, 14px
+   apart), on the page's ground, the pointer's row on the surface, the opened row on the sun; the
+   panel it opens is a line of doors on the surface with the words about it pushed to the right, an
+   ink rule over it. The rows come in one after another (Row order). Under 900px a row wraps: the
+   number, the name, the figure and the arrow on its first line, the words and the state under them. */
+.listing.list--index { display: block; }
+.listing.list--index > .listing-row {
+  display: grid; grid-template-columns: inherit; gap: 0 14px; align-items: center;
+  padding: 12px 8px; border-bottom: 1px solid var(--border);
+  animation: list-index-in .4s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--list-order, 0) * .03s);
+}
+@keyframes list-index-in { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+.listing.list--index > .listing-row > div:not(.listing-open) { padding: 0; border-bottom: 0; min-width: 0; }
+.listing.list--index > .listing-row:hover { background: var(--bg-surface); }
+.listing.list--index > .listing-row.is-open { background: var(--sun); color: var(--on-sun); }
+.listing.list--index > .listing-row.is-open .listing-name small, .listing.list--index > .listing-row.is-open > .listing-desc { color: var(--on-sun); }
+.listing.list--index > .listing-row.is-faded .avatar { border-style: dashed; border-color: var(--muted); }
+/* The old page faded the whole row, its ground too: an unlisted row under the pointer or opened
+   shows its ground at the same 60%. */
+.listing.list--index > .listing-row.is-faded:hover { background: color-mix(in srgb, var(--bg-surface) 60%, transparent); }
+.listing.list--index > .listing-row.is-faded.is-open { background: color-mix(in srgb, var(--sun) 60%, transparent); }
+.listing.list--index > .listing-row > .listing-open {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  margin: 12px -8px -12px; padding: 14px 8px 18px 90px; background: var(--surface); color: var(--text);
+  border: 0; border-top: var(--shape-frame) solid var(--shape-rule-colour); box-shadow: none; cursor: default;
+}
+.listing.list--index > .listing-row > .listing-open > .og-doors { gap: 22px; }
+.listing.list--index > .listing-row > .listing-open > .poster-hint { margin: 0 0 0 auto; font-size: .85rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-dim); }
+/* The panel's doors are the old catalogue's own two words (.cat-slab, .cat-word): the slab 44px
+   high, the words smaller with the thinner line; the panel stands on the card ground. */
+.listing.list--index > .listing-row > .listing-open { background: var(--card-bg); }
+.listing.list--index > .listing-row > .listing-open .poster-slab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 18px; line-height: normal; white-space: nowrap; }
+.listing.list--index > .listing-row > .listing-open .og-doors .poster-action { display: inline-block; padding: 0 0 1px; border-bottom-width: var(--shape-frame); font-size: .78rem; line-height: normal; }
+.list--index .listing-name { font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list--index .listing-name .list-name-link { font-size: 1.05rem; white-space: nowrap; }
+.list--index .listing-name > .list-before { margin-right: 6px; }
+.list--index .listing-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
+.list--index .avatar { width: 40px; height: 40px; border-width: var(--shape-frame); background: var(--surface); font-size: 1.25rem; display: flex; align-items: center; justify-content: center; }
+/* The name's line is the old .cat-row-name: the star, the name cut short with "…" when it is too
+   long, and the marks right after it, 6px apart; the typewriter line under it 2px lower. The icon
+   stands on the card ground (the old page's white). */
+.list--index .listing-name { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; row-gap: 0; }
+.list--index .listing-name > .list-before { flex: none; margin-right: 0; }
+.list--index .listing-name > .list-name-link { flex: 1 1 0; max-width: max-content; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.list--index .listing-name > small { flex: 0 0 100%; margin-top: 2px; }
+.list--index .avatar { background: var(--card-bg); }
+/* The catalogue's cut: the number in coral typewriter, what it does in grey, the state in coral
+   typewriter capitals, the opens and the arrow in the poster face at the right. */
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(1) { font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--accent); }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(4) { font-size: .9rem; font-weight: var(--font-poster-text-weight); line-height: 1.45; color: var(--text-dim); }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(5) { font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--accent); text-transform: var(--shape-case-label); letter-spacing: .04em; }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row.is-faded > :nth-child(5) { color: var(--text-dim); }
+.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :is(:nth-child(6), :nth-child(7)) {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.125rem; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--text);
+}
+@media (max-width: 900px) {
+  .listing.list--index > .listing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 0; }
+  .listing.list--index > .listing-row.is-open { padding: 12px 8px; margin: 0 -8px; }
+  .listing.list--index > .listing-row > .listing-open { flex-basis: 100%; order: 9; margin: 6px 0 -12px; padding: 10px 0 14px 34px; gap: 12px; }
+  /* The old panel stood under the opened row at the list's own width, not the row's wider sun, and
+     its doors 12px apart. */
+  .listing.list--index > .listing-row > .listing-open > .og-doors { gap: 12px; }
+  .listing.list--index > .listing-row > .listing-open > .poster-hint { flex-basis: 100%; margin-left: 0; }
+  /* The cells keep the old page's order: the number and the name, the words, the state, and then
+     the opens and the arrow on a line of their own at the start (the old .cat-row had no order). */
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(1) { flex: 0 0 24px; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(2) { display: none; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(3) { flex: 1 1 0; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(3) small { display: none; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(6) { flex: 0 0 auto; font-size: 1rem; }
+  .list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(7) { flex: 0 0 auto; font-size: 1rem; }
+  .listing.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(4) {
+    flex-basis: 100%; padding-left: 34px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .listing.list--index.listing--n-mark-name-desc-state-n-arrow > .listing-row > :nth-child(5) { flex-basis: 100%; padding-left: 34px; font-size: .68rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listing.list--index > .listing-row { animation: none; }
 }

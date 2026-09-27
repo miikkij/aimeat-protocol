@@ -8,6 +8,8 @@
  * @structure PAGE_KIT_ENTRIES
  * @usage import { PAGE_KIT_ENTRIES } from './entries-page-kit.js';
  * @version-history
+ *   v1.4.0 — 2026-09-27 — What appcat added: Tabs' line, glyph, caption and fill; Layout's step 'part'
+ *     and Space inset.
  *   v1.3.0 — 2026-09-27 — Section's group (the admin Config domains' band).
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Layout's Columns, Beside start and stick; Tabs'
  *     TabPanel; Section's band.
@@ -58,15 +60,18 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'section-component', name: 'Section', kind: 'component', status: 'active',
-        summary: 'One door to a section of a Settings page, open or folded. Open, it is PageSection: the heavy rule on top, the ink section title with a small coral number or count, the actions at the right, the body. With fold, it is FoldSection: one row that opens in place.',
+        summary: 'One door to a section of a page, open or folded. Open, it is PageSection: the heavy rule on top, the ink section title with a small coral number or count, the actions at the right, the body; as a chapter of a long page of one thing, a coral "03 / 19" over a slab across the column with the actions on it; as a part of a dialog\'s body, the slab a size smaller. With fold, it is FoldSection: one row that opens in place.',
         module: '/components/Section.js', sheet: '/css/components/page-section.css', classes: ['og-sec', 'og-sec--first', 'og-sec-h'],
         data: {
-            shape: 'Section({ id, num, title, count, doors, first, plain, band, group, fold, sub, lead, open, onToggle, clip, wrap, inner, children }) · PageSection · FoldSection (both re-exported)',
+            shape: 'Section({ id, num, title, count, doors, first, plain, band, group, chapter, part, fold, sub, lead, open, onToggle, clip, wrap, inner, children }) · PageSection · FoldSection (both re-exported)',
             fields: {
                 id: 'the section\'s anchor, which the rail scrolls to', num: 'the small number beside the title', title: 'the section\'s name',
-                count: 'an open section: a count instead of the number', doors: 'an open section: its actions at the right of the head',
-                first: 'an open section: the first under the page head, no rule on top', plain: 'an open section with no head: the rule on top and the body',
+                count: 'an open section: a count instead of the number', doors: 'an open section: its actions at the right of the head; in a chapter, on the slab in the slab\'s own colour',
+                first: 'an open section: the first under the page head, no rule on top; a chapter: the one right after the page\'s head, with less air above it', plain: 'an open section with no head: the rule on top and the body',
                 band: 'an open section: the title\'s dark band spans the whole column (the classic pages\' look)',
+                group: 'an open section that holds a group of sections: its band smaller, across the column',
+                chapter: 'the words of the chapter\'s number ("03 / 19"): a chapter of a long page of one thing, the number in coral typewriter letters over the slab, far more air above than under it',
+                part: 'a part of a dialog\'s body: the slab title a size smaller, 1rem under it and 2rem between parts (dialog.css sizes it); only id, title and children apply',
                 fold: 'the section is one row until it is opened (FoldSection)', sub: 'a folded section: the mono word at the right of its row',
                 lead: 'a folded section: a line under its row, shown open or shut', open: 'a folded section: its body is shown', onToggle: 'a folded section: its row was pressed',
                 clip: 'a folded section: a long sub cut with … on its line', wrap: 'a folded section: under 1100px the sub goes under the title',
@@ -80,11 +85,13 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'plain', prop: 'plain', when: 'a box that stands as a section of its own without a title' },
             { name: 'band', prop: 'band', when: 'the title\'s band across the column, as the classic pages drew it (PageSection band)' },
             { name: 'group', prop: 'group', when: 'a section holding a group of sections: a smaller band across the column (PageSection group)' },
+            { name: 'chapter', prop: 'chapter="03 / 19"', class: 'og-sec--chapter', when: 'a chapter of a long page of one thing (an app\'s detail): its number over the slab, the doors on the slab, 112px of air above' },
+            { name: 'part', prop: 'part', when: 'a part of a dialog\'s body (Settings, Help): the slab title a size smaller, the parts 2rem apart' },
             { name: 'fold', prop: 'fold', when: 'a section closed by default, one row until opened (FoldSection)' },
             { name: 'fold inner', prop: 'fold inner', when: 'one of several folds under one rule inside a part' },
         ],
         example: { id: 'og-files', num: '01', title: 'Files', count: 12, children: '…' },
-        note: 'The shape named `section` is poster.css\'s section title; this entry is the component. Its open look is page-section.css (the page-section entry), its folded look fold-row.css (the fold-row entry).',
+        note: 'The shape named `section` is poster.css\'s section title; this entry is the component. Its open look is page-section.css (the page-section entry), its folded look fold-row.css (the fold-row entry). chapter and part came with appcat on 2026-09-27 and pass to PageSection: chapter replaced the old app catalogue\'s .dtl-section with its counter line (::before, --dtl-chapters), part its dialogs\' section.poster-section, whose size and spacing dialog.css gives.',
     },
     {
         id: 'folds', name: 'Folds', kind: 'component', status: 'active',
@@ -117,16 +124,18 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'tab-row', name: 'Tabs', kind: 'component', status: 'active',
-        summary: 'What chooses what a page, a list or a field shows: a row of tabs, the chosen one on the sun. Plain tabs are underlined capitals, a filter row has small framed words with a tally, and the row right under a page head stands on the heavy rule. The arrow keys move along the row.',
+        summary: 'What chooses what a page, a list or a field shows: a row of tabs, the chosen one on the sun. Plain tabs are underlined capitals, a filter row has small framed words with a tally, and the row right under a page head stands on the heavy rule. A row can carry its own coral word before the tabs, or share its whole width among them; a line tab is grey capitals with a coral line under the chosen one, and a glyph tab is a small square holding one mark. The arrow keys move along the row.',
         module: '/components/Tabs.js', sheet: '/css/components/tab-row.css',
         data: {
-            shape: 'Tabs({ items, value, onSelect, tone, kind, label, labelledBy, bar, disabled, children }) · Tab({ on, tone, count, attention, disabled, title, ariaLabel, pressed, expanded, onClick, children }) · TabPanel({ value, id, label, children })',
+            shape: 'Tabs({ items, value, onSelect, tone, kind, label, labelledBy, bar, disabled, caption, fill, children }) · Tab({ on, tone, count, attention, disabled, title, ariaLabel, pressed, expanded, onClick, children }) · TabPanel({ value, id, label, children })',
             fields: {
                 items: '[{ value, label, count, title, disabled, attention, on, key }]: one tab each; count is the small tally inside it; attention marks a filter whose items need the person (coral until it is chosen); on says it is chosen where value cannot (a facet "All")',
                 value: 'the chosen value, or the list of chosen values with kind="toggle"', onSelect: '(value, item): a tab was pressed',
-                tone: 'none (underlined capitals) | \'filter\' (small framed words, the facet row\'s spacing) | \'fold\' (coral typewriter words) | \'tile\' (framed tiles)',
+                tone: 'none (underlined capitals) | \'filter\' (small framed words, the facet row\'s spacing) | \'fold\' (coral typewriter words) | \'tile\' (framed tiles) | \'line\' (small grey capitals with no ground, the chosen one ink over a coral line) | \'glyph\' (a square holding one mark, the chosen one on the sun)',
                 kind: '\'choice\' (the default: one of these, a radio group) | \'view\' (switches what the page shows, a tab list) | \'toggle\' (each on or off, pressed)',
                 'label, labelledBy': 'the row\'s name for a screen reader', bar: 'the row right under a page head, on the heavy rule',
+                caption: 'the row\'s own word, a small coral label before the tabs (an order row\'s "Order"); the row then keeps one line and scrolls sideways on a phone',
+                fill: 'the tabs share the row\'s whole width in equal parts, each word centred (the tabs over a dialog\'s body)',
                 disabled: 'every tab is off (a person who may not change it)', children: 'stand after the tabs in the row (a field for a number of your own)',
                 'Tab pressed, expanded': 'one tab alone that opens a panel: it says aria-pressed and aria-expanded',
                 TabPanel: 'what a row of view tabs shows for the chosen value: it fades in over about 180ms when the value changes, and stands still for a person who asks for reduced motion; id and label name it for a screen reader',
@@ -143,18 +152,24 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'view', prop: 'kind="view"', when: 'the tabs switch what the page shows' },
             { name: 'toggle', prop: 'kind="toggle"', when: 'several can be on at once (facets, days)' },
             { name: 'panel', class: 'tab-panel', prop: 'TabPanel value', when: 'the part a view tab shows, fading in when the chosen tab changes' },
+            { name: 'line', class: 'poster-tab--line', prop: 'tone="line"', when: 'a quiet row of choices over a list or a dialog\'s body: grey capitals, the chosen one ink over a coral line (the app catalogue\'s order row and its Paste / File tabs)' },
+            { name: 'glyph', class: 'poster-tab--glyph', prop: 'tone="glyph"', when: 'a row of ready marks to pick one from: small squares on the card ground, the chosen one on the sun (the app catalogue\'s icons in its Add dialog)' },
+            { name: 'caption', class: 'tab-row--caption', prop: 'caption', when: 'a row that names itself with a small coral word before its tabs, one line that scrolls sideways on a phone (the app catalogue\'s "Order")' },
+            { name: 'fill', class: 'tab-row--fill', prop: 'fill', when: 'two or three tabs that share the row\'s whole width, each word centred, over what they switch (a dialog\'s Paste / File)' },
         ],
         example: { tone: 'filter', kind: 'toggle', value: ['bound'], items: [{ value: '', label: 'All', count: 12 }, { value: 'bound', label: 'Bound to an app', count: 3 }] },
-        note: 'The tabs wear poster.css (.poster-tab and its tones, shared with the admin and the home); this sheet lays out the row only. It replaced .pf-tabs, .sub-tabs, .platform-tabs and the facet rows (.sk-facets, .ad-facets, .cp-facets, .ex-facets, .lb-facets, .pk-facets, .ac-filters, .dw-filters, .wal-filters).',
+        note: 'The tabs wear poster.css (.poster-tab and its tones, shared with the admin and the home); this sheet lays out the row only. It replaced .pf-tabs, .sub-tabs, .platform-tabs and the facet rows (.sk-facets, .ad-facets, .cp-facets, .ex-facets, .lb-facets, .pk-facets, .ac-filters, .dw-filters, .wal-filters). On 2026-09-27 appcat, the app catalogue rebuilt on components, added the line and glyph tones (the old catalogue\'s .modal-tab and .icon-pick), caption (its order row, .cat-sort and .cat-sort-label) and fill (its dialog tabs, .modal-tabs).',
     },
     {
         id: 'layout', name: 'Layout', kind: 'component', status: 'active',
-        summary: 'How the parts of a page stand beside and under each other, so a page writes no utility class: a row, a stack, a part under a hairline, plain space, a main part with a side part, parts of the same weight in columns, and a part whose every control is a thumb\'s size. Every space is a named step of one scale: none 0, tight .25rem, small .5rem, medium .75rem, large 1rem, section 1.5rem.',
+        summary: 'How the parts of a page stand beside and under each other, so a page writes no utility class: a row, a stack, a part under a hairline, plain space, a main part with a side part, parts of the same weight in columns, and a part whose every control is a thumb\'s size. Every space is a named step of one scale: none 0, tight .25rem, small .5rem, medium .75rem, large 1rem, section 1.5rem, and part 1.875rem above or below only.',
         module: '/components/Layout.js', sheet: '/css/components/layout.css',
         data: {
-            shape: 'Row({ gap, wrap, align, justify, above, below, children }) · Stack({ gap, above, below, list, narrow, children }) · Split({ above, pad, gap, below, heavy, side, children }) · Space({ above, below, children }) · Beside({ side, narrow, wide, start, stick, align, rule, above, pad, below, id, children }) · Columns({ children }) · Touch({ id, tabs, children })',
+            shape: 'Row({ gap, wrap, align, justify, above, below, children }) · Stack({ gap, above, below, list, narrow, children }) · Split({ above, pad, gap, below, heavy, side, children }) · Space({ above, below, inset, children }) · Beside({ side, narrow, wide, start, stick, align, rule, above, pad, below, id, children }) · Columns({ children }) · Touch({ id, tabs, children })',
             fields: {
                 'gap, above, below, pad': 'a step of the scale: \'none\' | \'tight\' | \'small\' | \'medium\' | \'large\' | \'section\'; the space between the parts, above, below, and inside under a split\'s rule',
+                'above, below \'part\'': 'the step \'part\', 1.875rem, for above and below only: the air between the parts of one section\'s readout (a chart, then a table, then a list)',
+                inset: 'Space: the same step at both sides, \'small\' | \'medium\' | \'large\' | \'section\' (a strip held in from the column\'s edges)',
                 wrap: 'Row: the parts wrap onto more lines', align: 'Row: \'center\' (the default) | \'start\' | \'end\' | \'baseline\' | \'stretch\'; Beside: \'end\' lines the two parts up at their foot',
                 justify: 'Row: \'between\' | \'end\'', list: 'Stack: the parts are the items of a list (no bullets), which a screen reader hears as a list',
                 narrow: 'Stack: kept to 60rem, for a page of settings forms; Beside: the side part is 18rem',
@@ -181,9 +196,11 @@ export const PAGE_KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'columns', class: 'layout-columns', prop: 'Columns', when: 'two or more sections or lists of the same weight side by side' },
             { name: 'touch', class: 'layout-touch', prop: 'Touch', when: 'a part a person works on with a thumb: every control 44px at every width' },
             { name: 'touch tabs', class: 'layout-touch--tabs', prop: 'Touch tabs', when: 'the same, and its tabs too' },
+            { name: 'part apart', class: 'layout-above--part', prop: 'Space above="part" (or below="part"; also on Row, Stack, Split, Beside)', when: 'the parts of one section\'s readout, 1.875rem apart (the app catalogue\'s visitor readout)' },
+            { name: 'inset', class: 'layout-inset--large', prop: 'Space inset="large" (or small, medium, section)', when: 'a strip held in from the column\'s edges by the same step at both sides (the app catalogue\'s Active Extensions strip)' },
         ],
         example: { Row: { wrap: true, gap: 'small' }, Stack: { gap: 'large' }, Split: { above: 'medium' } },
-        note: 'It replaced the profile utilities (.flex-row, .flex-row-wrap, .flex-col, .flex-between, .flex-actions, .mt-xs, .mb-half, .mb-1, .mt-1, .mt-section), the pages\' own split rules and the Boards page\'s .bp-composer and .bp-app; on 2026-09-27 the admin\'s .adm-two (Columns), .adm-db-top and .adm-mx-top (Beside start) and .adm-pt-bench (Beside stick). The split\'s lines are .og-split and .og-split--side in page-section.css.',
+        note: 'It replaced the profile utilities (.flex-row, .flex-row-wrap, .flex-col, .flex-between, .flex-actions, .mt-xs, .mb-half, .mb-1, .mt-1, .mt-section), the pages\' own split rules and the Boards page\'s .bp-composer and .bp-app; on 2026-09-27 the admin\'s .adm-two (Columns), .adm-db-top and .adm-mx-top (Beside start) and .adm-pt-bench (Beside stick). The same day appcat, the app catalogue rebuilt on components, added the step \'part\' (the old catalogue\'s .vis-block air) and Space inset (the margins of its Active Extensions strip). The split\'s lines are .og-split and .og-split--side in page-section.css.',
     },
     {
         id: 'contents-tree', name: 'ContentsTree', kind: 'component', status: 'active',

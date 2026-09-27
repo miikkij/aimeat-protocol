@@ -22,12 +22,19 @@
  *   `unmanaged` (a key typed hidden WITHOUT the eye, main's look for a key field by the lead's ruling:
  *   type password, autocomplete off, password managers told to keep out),
  *   `search` (a search field; `note` is the small count beside it: the Search line), `size` = 'short'
- *   (a number, a time) | 'medium' (a name, a tag), `actions` (buttons in one row after the field),
+ *   (a number, a time) | 'medium' (a name, a tag) | 'glyph' (one big mark centred in a small square: an
+ *   app's icon) | 'mark' (one mark centred, a step larger, the field's whole width), `actions`
+ *   (buttons in one row after the field),
  *   `box` (that row inside the thin dashed frame: Jouni's decision "Dashed field box"), `invalid`.
  *   TextArea named options: `code`, `rows`, `grow` (grows with what is typed; a number caps it in
  *   pixels, true caps it at 60% of the window), `onSend(value, event)` on Ctrl+Enter or Cmd+Enter,
  *   `indent` (a script editor: Tab puts two spaces in at the caret instead of leaving the field),
- *   `onSave(value, event)` on Ctrl+S or Cmd+S (the browser's own save of the page does not open).
+ *   `onSave(value, event)` on Ctrl+S or Cmd+S (the browser's own save of the page does not open),
+ *   `actions` (buttons beside the field, on its line), `prompt` (a request to the person's AI: the
+ *   field underlined and bold, its send button beside it), `page` (a page's text written by hand: the
+ *   framed typewriter box, 280px high at least), `source` (a whole file's source: the typewriter face
+ *   in the heavy ink frame, 400px high at least, 60% of the window at most), `script` (an extension's
+ *   file: small typewriter in the thin ink frame, 160px high at least; 'long' 280px).
  * @structure TextField(props) · TextArea(props) · Eye({ open })
  * @usage html`<${TextField} label=${t('x.name')} value=${name} onInput=${setName} onEnter=${save} />`
  *        html`<${TextField} secret label=${a('codeLabel')} value=${code} onInput=${setCode} />`
@@ -35,6 +42,20 @@
  *          actions=${html`<${Action} small onClick=${save}>${x('save')}<//>`} />`
  *        html`<${TextArea} label=${t('x.body')} rows=${4} value=${body} onInput=${setBody} />`
  * @version-history
+ *   v1.7.0 — 2026-09-27 — TextArea `source`: a whole file's source in the heavy ink frame (the old app
+ *     catalogue's source editor, #source-code), and `script`: an extension's file (the old .cx-code),
+ *     appcat parity (dialogs); additive, text-field.css .text-area--source, .text-area--script.
+ *   v1.6.0 — 2026-09-27 — TextArea `page`: a page's text in the framed typewriter box (the old app
+ *     catalogue's .lg-textarea, a legal page), appcat parity (sections-c); additive, form-fields.css
+ *     .og-textarea--page.
+ *   v1.6.0 — 2026-09-27 — TextField `size="mark"`: one mark centred in a full-width field (the old
+ *     detail's About editor icon field), appcat parity (sections-a); additive, text-field.css.
+ *   v1.5.0 — 2026-09-27 — TextArea `actions` and `prompt`: the old app catalogue's Edit with AI row
+ *     (#detail-ai-input and its button, .dtl-ai-row), appcat parity (sections-a); additive,
+ *     text-field.css .text-area--prompt, .field-line--prompt.
+ *   v1.4.0 — 2026-09-27 — TextField `size="glyph"`: one big mark centred in a small square (the app
+ *     catalogue's Add dialog icon field, the old page's #app-icon), for appcat; additive,
+ *     text-field.css .text-field--glyph.
  *   v1.3.0 — 2026-09-27 — TextArea's `indent` (Tab puts two spaces in) and `onSave` (Ctrl+S or Cmd+S):
  *     the admin Extensions page's action-script editors, as main's hand-written textareas did;
  *     additive, admin page group G7.
@@ -56,7 +77,10 @@ import { useFieldIds, inField, messageOf } from '/components/Field.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
-const SIZES = new Set(['short', 'medium']);
+// 'glyph' (added by appcat's dialogs): one big mark centred in a small square (an app's icon).
+// 'mark' (added by appcat sections-a): one mark centred and a step larger in a field of the whole
+// width (the old detail's About editor icon field).
+const SIZES = new Set(['short', 'medium', 'glyph', 'mark']);
 
 /** The eye: open shows what is typed; the stroke across it says it is shown now. */
 function Eye({ open }) {
@@ -149,9 +173,18 @@ export function TextField(props) {
 export function TextArea(props) {
   const {
     id, value, placeholder, rows, code, grow, invalid, error, maxLength, spellCheck, name, required,
-    disabled, readOnly, autoFocus, ariaLabel, title, inputRef, indent,
+    disabled, readOnly, autoFocus, ariaLabel, title, inputRef, indent, prompt, actions, page, source, script,
     onInput, onChange, onSend, onSave, onEscape, onBlur, onFocus, onKeyDown, onPaste,
   } = props;
+  // source (added by appcat's dialogs, parity): a whole file's source to read and edit, in the
+  // typewriter face inside the heavy ink frame, 400px high at least (the old source editor, #source-code).
+  // script (added by appcat's dialogs, parity): an extension's file in the thin ink frame, small
+  // typewriter, 160px high at least, 'long' 280px (the old extension editor's .cx-code).
+  // page (added by appcat sections-c, parity): a page's text written by hand (a legal page): the
+  // typewriter face in a framed box on the grey ground, 280px high at least (the old .lg-textarea).
+  // prompt and actions (added by appcat sections-a, parity): the field a person writes a request to
+  // their AI in, underlined and bold, with the button that sends it beside it (the old app catalogue's
+  // Edit with AI row, #detail-ai-input in .dtl-ai-row).
   // indent and onSave (added by admin page group G7): a script editor keeps Tab for two spaces at the
   // caret and saves on Ctrl+S / Cmd+S, as main's action-script editors did by hand.
   const keys = keyHandler({ onKeyDown, onSend, onEscape, multiline: true });
@@ -183,8 +216,8 @@ export function TextArea(props) {
   useLayoutEffect(() => { fit(own.current); }, [value, fit, own]);
 
   const bad = !!invalid || !!messageOf(props.message, error)?.error;
-  const control = html`<textarea id=${ids.id} ref=${setRef} name=${name}
-    class=${cx('og-textarea', code && 'og-textarea--code', grow && 'text-area--grow', bad && 'og-textarea--invalid')}
+  const area = html`<textarea id=${ids.id} ref=${setRef} name=${name}
+    class=${cx('og-textarea', code && 'og-textarea--code', grow && 'text-area--grow', prompt && 'text-area--prompt', page && 'og-textarea--page', source && 'text-area--source', script && 'text-area--script', script === 'long' && 'text-area--script-long', bad && 'og-textarea--invalid')}
     rows=${rows} value=${value ?? ''} placeholder=${placeholder} title=${title} maxLength=${maxLength}
     spellCheck=${code ? false : spellCheck} required=${required} disabled=${disabled} readOnly=${readOnly}
     aria-label=${ariaLabel} aria-invalid=${bad ? 'true' : undefined}
@@ -195,6 +228,7 @@ export function TextArea(props) {
     onFocus=${onFocus}
     onPaste=${onPaste ? (e) => onPaste(e.clipboardData?.getData('text') ?? '', e) : undefined}
     onKeyDown=${onKey}></textarea>`;
+  const control = actions ? html`<div class=${cx('field-line', prompt && 'field-line--prompt')}>${area}${actions}</div>` : area;
   return inField(props, ids, control, false);
 }
 

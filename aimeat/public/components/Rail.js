@@ -17,7 +17,8 @@
  *   Rail({ title, groups, tone }): `title` is the rail's name for a screen reader. `tone="light"`:
  *   the index on the page's own ground under a heavy ink rule, the group words in ink capitals of the
  *   poster face, the items grey, the counts in grey typewriter (the admin Config page's index on
- *   main, .adm-cfg-rail). Each group is
+ *   main, .adm-cfg-rail). `tone="ink"`: the box in the text colour, which turns light with dark words
+ *   in the dark theme (the old app catalogue's detail rail). Each group is
  *   { label?, items, rule? }: a coral label, then its items; a rule (hr) stands between two groups
  *   unless the later one says `rule: false`.
  *
@@ -41,6 +42,8 @@
  *          { label: x('railTitle'), items: [{ section: 'sk-own', mark: '01', label: x('secOwn'), count: 12 }] },
  *          { label: x('pages'), items: [{ tab: 'agents', label: t('profile.tabs.agents') }] }]} />`
  * @version-history
+ *   v1.4.0 — 2026-09-27 — `tone="ink"`: the box in the text's own colour, so it turns light in the dark
+ *     theme with dark words (the old app catalogue's detail rail, .dtl-rail; appcat parity); additive.
  *   v1.3.1 — 2026-09-27 — scrollToSection keeps the section's scroll-margin-top in sight above it
  *     (16px when it sets none): on the admin the headline no longer lands behind the bars that stay
  *     at the top (Jouni).
@@ -119,12 +122,12 @@ function RailItem({ item }) {
  */
 
 /**
- * @param {{ title?: string, groups: Array<RailGroup|null|false>, tone?: 'light' }} props
+ * @param {{ title?: string, groups: Array<RailGroup|null|false>, tone?: 'light'|'ink' }} props
  */
 export function Rail({ title, groups, tone }) {
   const list = /** @type {RailGroup[]} */ ((groups || []).filter((g) => g && (g.label || (g.items || []).some(Boolean))));
   return html`
-    <nav class=${cx('og-rail', tone === 'light' && 'og-rail--light')} aria-label=${title}>
+    <nav class=${cx('og-rail', tone === 'light' && 'og-rail--light', tone === 'ink' && 'og-rail--ink')} aria-label=${title}>
       ${list.map((g, gi) => html`
         <${Fragment} key=${'g' + gi}>
           ${gi > 0 && g.rule !== false ? html`<hr />` : null}

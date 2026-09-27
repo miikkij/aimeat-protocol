@@ -10,6 +10,10 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.71.0 — 2026-09-27 — The catalogue family's words (appcat): IndexFrame, Overlay, Stops, SlotBars, WorldMap and
+ *     its model, DataMap, DayWindow, the List's tones and the Modal's options; the data table picks (compact), the
+ *     empty state waits (loading), the crumb trail's sheet holds Action's dashed, inline and file doors (act), and a step card's question
+ *     holds a form's fields (edit).
  *   v1.70.2 — 2026-09-27 — The instruction block's entry id is instruction-block (formerly hello-mcp).
  *   v1.70.1 — 2026-09-27 — The list and conversation family's words: List, Message, MessageComposer, MessageFile,
  *     MessageQuestions, ConversationList, ConversationPane.
@@ -94,7 +98,7 @@ import type { UiUse } from './types.js';
 
 export const USE_OF: Record<string, UiUse[]> = {
     // The setup path
-    'step-card': ['layout', 'explain'], 'prompt-card': ['copy', 'act'], 'paste-box': ['edit'], 'koti-paste': ['edit'],
+    'step-card': ['layout', 'explain', 'edit'], 'prompt-card': ['copy', 'act'], 'paste-box': ['edit'], 'koti-paste': ['edit'],
     'text-input': ['edit'], 'koti-agent-name': ['edit'], 'named-value': ['view', 'edit'], 'mode-tabs': ['pick'],
     'step-list': ['explain'], 'waiting-note': ['wait', 'explain'], 'front-door': ['navigate', 'act'],
     // Page parts
@@ -120,8 +124,8 @@ export const USE_OF: Record<string, UiUse[]> = {
     'page-base': ['layout'], 'top-bar': ['navigate', 'notify'], button: ['act'], 'copy-button': ['copy'], card: ['layout', 'view'],
     badge: ['status'], pill: ['status'], seg: ['pick'], 'start-page': ['pick', 'edit'], 'status-dot': ['status'],
     'presence-dot': ['status'], 'key-value-row': ['view'], pagination: ['navigate'], collapsible: ['open'],
-    'data-table': ['list', 'compare'], 'usage-chart': ['view', 'compare', 'count'], divider: ['layout'], 'form-field': ['edit'],
-    'search-bar': ['search'], spinner: ['wait'], 'empty-state': ['explain', 'act'], 'text-utility': ['explain'],
+    'data-table': ['list', 'compare', 'pick'], 'usage-chart': ['view', 'compare', 'count'], divider: ['layout'], 'form-field': ['edit'],
+    'search-bar': ['search'], spinner: ['wait'], 'empty-state': ['explain', 'act', 'wait'], 'text-utility': ['explain'],
     'toggle-switch': ['edit'], 'site-footer': ['navigate'], alert: ['status', 'notify'], toast: ['notify'],
     'section-header': ['explain'], dialog: ['confirm', 'edit'], 'margin-pattern': ['layout'], 'notification-bell': ['notify', 'act'],
     'open-items-button': ['count', 'navigate'], 'agent-consent': ['confirm'], 'contact-card': ['explain', 'navigate'],
@@ -129,7 +133,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'memory-embed': ['view'], mermaid: ['view'], 'offer-card-view': ['view', 'explain'],
     // Settings & Controls (phase 5)
     'settings-frame': ['layout', 'navigate'], 'side-menu': ['navigate', 'count'],
-    'tab-page': ['layout', 'navigate'], 'crumb-trail': ['navigate'], 'page-head': ['explain', 'act'], 'figure-strip': ['count'],
+    'tab-page': ['layout', 'navigate'], 'crumb-trail': ['navigate', 'act'], 'page-head': ['explain', 'act'], 'figure-strip': ['count'],
     'page-section': ['layout'], 'fold-row': ['open', 'layout'], 'setting-box': ['edit', 'confirm'], 'form-fields': ['edit'],
     'space-table': ['list', 'open'], facts: ['view'], listing: ['list', 'open', 'act'], 'search-line': ['search'],
     'code-block': ['view', 'copy'], 'form-message': ['status', 'notify'], switch: ['edit', 'status'], 'select-field': ['pick', 'edit'],
@@ -186,6 +190,10 @@ export const USE_OF: Record<string, UiUse[]> = {
     'save-bar': ['act', 'status', 'notify'], 'move-buttons': ['act'], 'day-chart': ['count', 'compare', 'view'],
     'trend-line': ['count', 'view'], 'count-bars': ['count', 'compare', 'pick'], 'print-page': ['view', 'layout'],
     'settings-index': ['edit', 'search', 'navigate', 'list'], shots: ['compare', 'view'],
+    // CATALOGUE (appcat: the app catalogue on components)
+    'index-frame': ['layout', 'navigate'], overlay: ['open', 'layout', 'view'], stops: ['status', 'explain', 'act'],
+    'slot-bars': ['count', 'compare', 'view'], 'world-map': ['count', 'compare', 'view', 'pick'], 'world-map-model': ['count'],
+    'data-map': ['view', 'explain'], 'day-window': ['pick'], 'list-tones': ['list', 'view'], modal: ['confirm', 'edit'],
     // The shapes of poster.css
     'page-title': ['explain'], section: ['layout'], panel: ['layout'], row: ['layout', 'list'], label: ['explain'],
     action: ['act', 'navigate', 'pick'], slab: ['act'], icon: ['act'], 'menu-row': ['pick', 'act'], 'box-shape': ['view'], frame: ['view'], record: ['view', 'open'], 'choice-shape': ['pick'],

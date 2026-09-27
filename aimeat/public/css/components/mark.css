@@ -6,6 +6,17 @@
  *   in poster.css: the pointer on a tag that is a button (Mark with onClick, the visibility tag of
  *   memory and documents; it was .pf .vis-pill).
  * @version-history
+ *   v1.8.1 — 2026-09-27 — The heavy tag's and the notice word's capitals read var(--shape-case-label)
+ *     instead of a literal uppercase (the AIMEAT value, so AIMEAT is unchanged; a theme reaches them).
+ *     check:shape-tokens.
+ *   v1.8.0 — 2026-09-27 — The tag's 'name' tone (.poster-chip--name): the old app catalogue's
+ *     .aga-chip; additive, appcat parity (sections-d).
+ *   v1.7.0 — 2026-09-27 — .poster-label--ruled (Label ruled): a block label over the ink rule (the old
+ *     app catalogue's .cx-label), appcat parity (dialogs); additive.
+ *   v1.6.0 — 2026-09-27 — The tag's 'heavy' tone (.poster-chip--heavy) and the word (.mark-word, Mark
+ *     kind="word"): the old app catalogue's .lg-rec and .lg-state; additive, appcat parity (sections-c).
+ *   v1.5.0 — 2026-09-27 — The tag's 'on' tone (.poster-chip--on): a thing switched on, the old app
+ *     catalogue's Promoted badge (.dtl-badge-on); additive, appcat parity (sections-d).
  *   v1.4.0 — 2026-09-26 — A tag's live square (.mark-live, .mark-live-dot), main's overview .pf-fed-dot; page group G8.
  *   v1.3.0 — 2026-09-26 — A mark that explains itself in its tooltip (.mark-explains: the help pointer), main's Ecosystem .pf-eco-valid; page group G5.
  *   v1.2.0 — 2026-09-26 — A tag with its presence (.mark-presence: the status dot after the name, the
@@ -18,6 +29,13 @@
 .mark-button { cursor: pointer; }
 /* fine: a tag in the success colour, as main's .pf .badge-success drew it (page group G4). */
 .poster-chip.poster-chip--fine { border-color: var(--success); color: var(--success-fg); }
+/* on: a thing switched on (the old app catalogue's Promoted badge, .dtl-badge-on, which stands on the
+   ink slab): words and frame in the success colour itself, .7rem, 1px 8px inside (appcat parity). */
+/* name: one name among several (the old app catalogue's bundled agents, .aga-chip): grey typewriter
+   words, .72rem, 1px 8px inside a thin grey frame on the card ground (its --text-muted is the site's
+   --text-dim); appcat parity, sections-d. */
+.poster-chip.poster-chip--name { padding: 1px 8px; border-color: var(--border); background: var(--card); font-size: .72rem; font-weight: 400; letter-spacing: normal; line-height: normal; color: var(--text-dim); }
+.poster-chip.poster-chip--on { padding: 1px 8px; border-color: var(--success); font-size: .7rem; font-weight: 600; letter-spacing: inherit; color: var(--success); }
 /* presence: an agent's tag with its status dot after the name and, while away, the word in coral
    (Mark presence/away; main's Offers .op-agent, page group G6). */
 .mark-presence { display: inline-flex; align-items: center; gap: .3rem; }
@@ -29,3 +47,16 @@
    overview .pf-fed-dot and its .pf-lp-info chips' inline-flex, page group G8). */
 .mark-live { display: inline-flex; align-items: center; gap: 6px; }
 .mark-live-dot { width: 8px; height: 8px; background: var(--success); flex: none; }
+/* heavy: a recommendation that asks to be noticed, the heavier frame and the words in capitals (the
+   old app catalogue's "Recommended" legal page, .lg-rec: 2px ink frame, 1px 7px inside; appcat
+   parity, sections-c). */
+.poster-chip.poster-chip--heavy { display: inline-flex; align-items: center; padding: 1px 7px; border-width: var(--shape-frame); text-transform: var(--shape-case-label); }
+/* word (Mark kind="word"): a state in small typewriter words without a frame, grey; ink when the thing
+   is there, coral capitals when it is missing (the old app catalogue's .lg-state; its --text-dim is
+   the site's --text-muted; appcat parity, sections-c). */
+.mark-word { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; letter-spacing: .04em; color: var(--text-muted); }
+.mark-word.mark-word--ink { color: var(--text); }
+.mark-word.mark-word--notice { color: var(--accent); text-transform: var(--shape-case-label); font-weight: 700; }
+/* The ruled label (Label ruled, appcat): a block label over the ink rule, heading what follows, .72rem
+   capitals 6px over the 2px rule (the old app catalogue's .cx-label and .pb-preview-label). */
+.poster-label.poster-label--ruled { margin: 0; padding-bottom: 6px; border-bottom: var(--shape-frame) solid var(--text); font-size: .72rem; letter-spacing: .1em; line-height: normal; }

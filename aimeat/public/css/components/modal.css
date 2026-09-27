@@ -1,0 +1,32 @@
+/**
+ * @file modal.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The options of the SPA's dialog component (components/Modal.js) that the shared
+ *   dialog look (css/components/dialog.css) does not carry. dialog.css is also copied into the old app
+ *   catalogue's page at build time, so an option only the SPA draws lives here instead, and the old
+ *   page's build stays as it is. Reads no colour.
+ * @structure line spacing · the title's reference
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial: .dlg--leading-normal (Modal leading="normal"): the dialog reads at
+ *     the browser's own line spacing, as the old app catalogue's dialogs did (with its question's size
+ *     and its phone slab cut); .dlg-title-ref (Modal titleRef): the filename after a title in the
+ *     typewriter face (appcat).
+ */
+
+/* Modal leading="normal": the browser's own line spacing, which every part inherits; the footer keeps
+   the site's own (dialog.css sets it there). */
+dialog.dlg.dlg--leading-normal { line-height: normal; }
+/* …where a question (ConfirmDialog leading="normal") is the old catalogue's running text, .95rem, and
+   on a phone a part's slab title is the old catalogue's shorter cut. */
+dialog.dlg.dlg--leading-normal .modal-confirm-message { font-size: .95rem; }
+@media (max-width: 560px) {
+  dialog.dlg.dlg--leading-normal .dlg-body .poster-section-title { padding: .45rem .8rem .4rem; }
+}
+
+/* Modal titleRef: the thing the dialog is about, after its title in the typewriter face and in its
+   own letters, 6px after the space (the old app catalogue's .aga-app-ref beside a dialog's title). */
+dialog.dlg .dlg-title .dlg-title-ref {
+  margin-left: 6px; font-family: var(--font-mono); font-size: .8rem; font-weight: var(--weight-regular);
+  text-transform: none; letter-spacing: 0; color: inherit;
+}

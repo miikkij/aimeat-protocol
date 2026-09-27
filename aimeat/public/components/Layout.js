@@ -9,7 +9,8 @@
  *
  *   The steps: 'none' 0 · 'tight' .25rem (was .mt-xs) · 'small' .5rem (.mb-half, the gap of
  *   .flex-row) · 'medium' .75rem (the space of .flex-actions and the split) · 'large' 1rem (.mb-1,
- *   .mt-1) · 'section' 1.5rem (.mt-section).
+ *   .mt-1) · 'section' 1.5rem (.mt-section) · 'part' 1.875rem, above or below only (the air between
+ *   the parts of one section's readout: the old app catalogue's visitor parts).
  *
  *   - Row({ gap = 'small', wrap, align = 'center', justify, above, below }): parts side by side.
  *     align = 'center' | 'start' | 'end' | 'baseline' | 'stretch'; justify = 'between' | 'end'.
@@ -22,8 +23,8 @@
  *     (the parts of an opened ecosystem app). `side`: the hairline stands at the part's start and
  *     the part is indented: a quieter side door that belongs to what is above it (an outside
  *     service's "use your own app" on Access).
- *   - Space({ above, below }): only space around what it holds (for a part that had .mb-half,
- *     .mb-1, .mt-1 or .mt-section on it).
+ *   - Space({ above, below, inset }): only space around what it holds (for a part that had .mb-half,
+ *     .mb-1, .mt-1 or .mt-section on it); `inset` the same step at both sides.
  *   - Beside({ side, narrow, wide, start, align, rule, above, pad, below, id }): the main part with a
  *     side part beside it (one column on a phone); `start` puts the side part first (G3); `stick`
  *     keeps the side part in sight under the top bar while the main part scrolls, and on a narrower
@@ -34,6 +35,10 @@
  * @structure Row · Stack · Split · Space · Beside · Columns · Touch
  * @usage html`<${Row} wrap>…<//>` · html`<${Stack} gap="large">…<//>` · html`<${Split}><${Actions}>…<//><//>`
  * @version-history
+ *   v1.11.0 — 2026-09-27 — The step 'part' (1.875rem) for `above` and `below`: the air between the
+ *     parts of a readout (the old app catalogue's .vis-block); additive, appcat parity (sections-b).
+ *   v1.10.0 — 2026-09-27 — Space `inset`: the same step at both sides (the old app catalogue's Active
+ *     Extensions bar); additive, appcat parity.
  *   v1.9.0 — 2026-09-27 — Beside `stick`: the side part stays in sight under the top bar while the
  *     main part scrolls, and stands over the main part when they no longer fit side by side (the
  *     admin Portal page's preview beside the parts, main's .adm-pt-bench > .adm-pt-side); additive,
@@ -64,7 +69,9 @@ import htm from 'htm';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
-const STEPS = new Set(['none', 'tight', 'small', 'medium', 'large', 'section']);
+// 'part' (added by appcat sections-b, parity): 1.875rem, the air between the parts of one section's
+// readout (the old visitors' .vis-block, 30px); layout.css draws it for above and below only.
+const STEPS = new Set(['none', 'tight', 'small', 'medium', 'large', 'section', 'part']);
 const step = (prefix, v) => (STEPS.has(v) ? `layout-${prefix}--${v}` : null);
 const ALIGN = new Set(['start', 'end', 'baseline', 'stretch']);
 const JUSTIFY = new Set(['between', 'end']);
@@ -88,8 +95,10 @@ export function Split({ above = 'medium', pad = 'medium', gap, below, heavy, sid
   return html`<div class=${cx(heavy ? 'poster-row--thing' : 'og-split', side && !heavy && 'og-split--side', gap && 'layout-stack', step('gap', gap), step('above', above), step('pad', pad), step('below', below))}>${children}</div>`;
 }
 
-export function Space({ above, below, children }) {
-  return html`<div class=${cx(step('above', above), step('below', below))}>${children}</div>`;
+export function Space({ above, below, inset, children }) {
+  // inset (added for appcat parity): the same step at both sides (the old catalogue's Active
+  // Extensions bar, 24px in from the column's edges).
+  return html`<div class=${cx(step('above', above), step('below', below), step('inset', inset))}>${children}</div>`;
 }
 
 /**

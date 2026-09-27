@@ -9,6 +9,15 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — .og-mast--thing as the old page drew it (appcat parity): the picture on the
+ *     card ground, the fainter line and hint, the chips alike, the 52px Launch slab and the smaller
+ *     quiet word. Only the thing head changes (appcat's detail is its one user).
+ *   v1.4.0 — 2026-09-27 — .og-mast--low: the catalogue's slab (44px, the sign spaced from the words)
+ *     and its smaller quiet words with the thinner line (.cat-slab, .cat-word), appcat parity; additive.
+ *   v1.3.0 — 2026-09-27 — .og-mast--thing, .og-mast-main, .og-mast-picture (PageHead thing, picture):
+ *     the old app catalogue's app detail masthead (.dtl-mast) for appcat's detail; additive.
+ *   v1.2.0 — 2026-09-27 — .og-mast-line and .og-mast--low (PageHead line, low): the old app
+ *     catalogue's masthead (.cat-masthead, .cat-title, .cat-mastline) for appcat; additive.
  *   v1.1.0 — 2026-09-26 — .og-title--key, the title that is a memory key (moved from memory.css .mp-title--key; additive, G3).
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
  */
@@ -34,4 +43,84 @@
 @media (max-width: 1100px) {
   .og-mast { flex-direction: column; }
   .og-mast-actions { align-items: flex-start; }
+}
+
+/* The page's own typewriter line under the title (PageHead line), and the head that stands on its
+   foot (PageHead low): the old app catalogue's masthead, values unchanged. */
+.og-mast-line { margin-top: 2px; min-height: 1.2em; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
+.og-mast.og-mast--low { flex-direction: row; align-items: flex-end; gap: 24px; margin: 0 0 26px; }
+.og-mast--low .og-mast-words { gap: 12px; }
+.og-mast--low .og-title { margin: 0; max-width: 12ch; }
+.og-mast--low .og-mast-actions { align-items: flex-end; gap: 10px; padding-top: 0; }
+.og-mast--low .og-mast-actions > .og-doors { gap: 18px; align-items: baseline; justify-content: flex-end; }
+/* The catalogue's own two words: its slab is 44px high with the sign spaced from the words, and its
+   quiet words are smaller with a thinner line (.cat-slab, .cat-word). */
+.og-mast--low .og-mast-actions > .poster-slab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 18px; white-space: nowrap; }
+.og-mast--low .og-mast-actions .og-doors .poster-action { display: inline-block; padding: 0 0 1px; border-bottom-width: var(--shape-frame); font-size: .78rem; }
+/* A menu among the words stands in a line of its own height, as the old .backup-menu-wrap. */
+.og-mast--low .og-mast-actions .og-doors > .card-menu { display: block; }
+@media (max-width: 900px) {
+  .og-mast--low .og-mast-actions > .poster-slab { min-width: 44px; padding: 0 12px; }
+  .og-mast.og-mast--low { gap: 12px; margin-bottom: 0; }
+  .og-mast--low .og-title { --poster-page-size: 2.2rem; }
+  .og-mast--low .og-mast-line { margin-top: -2px; font-size: .72rem; }
+  .og-mast--low .og-mast-actions { gap: 8px; }
+  .og-mast--low .og-mast-actions > .og-doors { display: none; }
+}
+
+/* The head of one thing's own page (PageHead thing, picture): the old app catalogue's app detail
+   masthead (.dtl-mast, .dtl-mast-icon, .dtl-mast-name, .dtl-mast-line, .dtl-mast-desc,
+   .dtl-mast-side), values unchanged. The picture is the glyph in the framed box, or the screenshot,
+   wider than the box, cut from its top. */
+.og-mast.og-mast--thing { flex-direction: row; align-items: flex-end; gap: 24px; margin: 22px 0 26px; }
+.og-mast-main { display: flex; gap: 24px; align-items: flex-end; min-width: 0; }
+.og-mast--thing .og-mast-words { gap: 0; }
+.og-mast--thing .og-title { margin: 0; }
+.og-mast--thing .og-mast-line { margin-top: 14px; min-height: 0; overflow-wrap: anywhere; }
+.og-mast--thing .og-desc { margin-top: 12px; font-size: 1.05rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text); max-width: 66ch; }
+.og-mast--thing .poster-chips { margin-top: 14px; gap: 8px; }
+.og-mast--thing .og-mast-actions { align-items: flex-end; gap: 10px; padding-top: 0; }
+.og-mast--thing .og-mast-actions .poster-hint { max-width: 300px; margin: 0; text-align: right; }
+.og-mast-picture {
+  flex: 0 0 auto; width: 96px; height: 96px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner);
+  background: var(--surface, var(--bg)); font-size: 3rem; line-height: 1;
+}
+.og-mast-picture--shot { width: 224px; height: 140px; }
+.og-mast-picture--shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+/* As the old page drew them (appcat parity): the picture on the card ground, the line and the hint in
+   the fainter grey, the chips all alike (a thin ink frame round mono words on the card ground; its
+   later .dtl-chip rule overrode the sun and coral variants), the chip that is a button in the body
+   face (.lg-chip { font: inherit }), the Launch slab 52px high on the deep sun shadow and the quiet
+   word smaller with the thinner line (.dtl-mast-side .cat-slab, .cat-word). */
+.og-mast--thing .og-mast-picture { background: var(--card-bg); line-height: normal; }
+.og-mast--thing .og-mast-line { color: var(--text-muted); }
+.og-mast--thing .poster-chips { margin-top: 10px; align-items: stretch; }
+.og-mast--thing .poster-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px;
+  border: 1px solid var(--shape-frame-colour); border-radius: var(--shape-corner-pill);
+  background: var(--card-bg); color: var(--text);
+  font-family: var(--font-mono); font-size: 12px; font-weight: var(--weight-medium); letter-spacing: normal; line-height: inherit;
+}
+.og-mast--thing .poster-chip.mark-button { font: inherit; }
+.og-mast--thing .og-mast-actions > .poster-slab {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 52px; padding: 0 26px; white-space: nowrap;
+  font-family: var(--font-body); font-size: 1rem; font-weight: var(--font-poster-strong-weight);
+  box-shadow: var(--shape-shadow-raised);
+}
+.og-mast--thing .og-mast-actions > .poster-slab:hover { box-shadow: var(--shape-shadow-action); }
+.og-mast--thing .og-mast-actions > .poster-action { display: inline-block; padding: 0 0 1px; border-bottom-width: var(--shape-frame); font-family: var(--font-body); font-size: .78rem; }
+.og-mast--thing .og-mast-actions .poster-hint { font-size: .78rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted); }
+@media (max-width: 900px) {
+  .og-mast--thing .og-mast-actions > .poster-slab { box-shadow: var(--shape-shadow-action); }
+  .og-mast.og-mast--thing { flex-direction: column; align-items: stretch; gap: 16px; }
+  .og-mast--thing .og-mast-main { gap: 14px; }
+  .og-mast--thing .og-title { --poster-page-size: 2.2rem; }
+  .og-mast-picture { width: 56px; height: 56px; font-size: 1.8rem; }
+  .og-mast-picture--shot { width: 100%; height: auto; aspect-ratio: 16 / 10; }
+  .og-mast--thing .og-mast-main:has(.og-mast-picture--shot) { flex-direction: column; align-items: stretch; }
+  .og-mast--thing .og-mast-actions { align-items: stretch; }
+  .og-mast--thing .og-mast-actions .poster-hint { max-width: none; text-align: left; }
 }

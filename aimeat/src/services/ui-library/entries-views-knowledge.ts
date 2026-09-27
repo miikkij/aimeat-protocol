@@ -197,18 +197,29 @@ export const KNOWLEDGE_VIEW_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'number-band', name: 'NumberBand', kind: 'component', status: 'active',
-        summary: 'The numbers of an account on a diagonal coral band with a sun stripe under it: each number big in the poster face with its word in small capitals under it, a door to the page it counts that turns sun under the pointer. No numbers, no band.',
+        summary: 'The numbers of an account on a diagonal coral band with a sun stripe under it: each number big in the poster face with its word in small capitals under it, a door to the page it counts that turns sun under the pointer. No numbers, no band. The fitted band is as tall as its numbers, so a second row still stands on the coral; on a phone it is a solid coral block in two columns with the sun flat along its foot.',
         module: '/components/NumberBand.js', sheet: '/css/components/number-band.css',
-        data: { shape: 'NumberBand({ items })', fields: { items: '[{ key, icon, n, label, onOpen, fine }]: the number, its word, where it leads; `fine` marks something earned (morsels); `icon` is said to nobody' } },
-        useFor: ['The overview of Settings & Controls: how much the person has, each number a way to where it is.'],
-        variants: [{ name: 'earned', class: 'number-band-value--fine', prop: 'items[].fine', when: 'a number that counts something earned, such as morsels' }],
+        data: {
+            shape: 'NumberBand({ items, fitted })',
+            fields: {
+                items: '[{ key, icon, n, label, onOpen, fine }]: the number, its word, where it leads; `fine` marks something earned (morsels); `icon` is said to nobody',
+                fitted: 'the band as tall as its numbers, the sun stripe near its foot, the words in the body face; in it a number without onOpen is a figure, not a door',
+            },
+        },
+        useFor: ['The overview of Settings & Controls: how much the person has, each number a way to where it is.',
+            'The app catalogue\'s counts over its lists and over an opened app (fitted): numbers to read, not doors.'],
+        variants: [
+            { name: 'earned', class: 'number-band-value--fine', prop: 'items[].fine', when: 'a number that counts something earned, such as morsels' },
+            { name: 'fitted', class: 'number-band--fitted', prop: 'fitted', when: 'numbers to read, one row or two, on a band that fits them' },
+            { name: 'figure', class: 'number-band-item--figure', prop: 'fitted, an item without onOpen', when: 'a number that only says its figure: no pointer, no sun under it' },
+        ],
         themeHooks: { selector: '.number-band', hooks: [
             { name: '--number-band-ground', kind: 'colour', default: 'var(--accent)', what: 'the band' },
             { name: '--number-band-stripe', kind: 'colour', default: 'var(--sun)', what: 'the stripe under the band, and a number under the pointer' },
             { name: '--number-band-ink', kind: 'colour', default: 'var(--bg)', what: 'the numbers and their words on the band' },
         ] },
         example: { items: [{ key: 'memory', n: 128, label: 'Memories' }, { key: 'agents', n: 3, label: 'Agents' }, { key: 'morsels', n: 420, label: 'Morsels', fine: true }] },
-        note: 'Was the ProfileCard\'s stats of views/profile/landing-page.cards.js (.pf-lp-stat*); its own names since 2026-09-27. The numbers keep the band\'s ink whatever colour a style gives big numbers, so Pebble no longer draws them in its accent on its accent band.',
+        note: 'Was the ProfileCard\'s stats of views/profile/landing-page.cards.js (.pf-lp-stat*); its own names since 2026-09-27. The numbers keep the band\'s ink whatever colour a style gives big numbers, so Pebble no longer draws them in its accent on its accent band. fitted came with appcat (2026-09-27): it draws the old app catalogue\'s band (.cat-band) over the lists and in an opened app\'s head.',
     },
     {
         id: 'open-card', name: 'OpenCard', kind: 'component', status: 'active',

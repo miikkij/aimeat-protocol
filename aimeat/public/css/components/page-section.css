@@ -9,6 +9,24 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-27 — The chapter number's spacing reads var(--shape-tracking-label) instead of a literal
+ *     .1em (the AIMEAT value, so AIMEAT is unchanged; a theme reaches it). check:poster-shapes.
+ *   2026-09-27 — .og-doors--tight (Actions `tight`): a picker's door row, 8px apart, the old detail's
+ *     skill picker; additive, appcat parity (sections-b).
+ *   2026-09-27 — .og-lead--record (Note lead size 'record'): a statement on the record, the old
+ *     detail's .mk-author-is; additive, appcat parity (sections-c).
+ *   2026-09-27 — .og-doors--apart (Actions `apart`): a door row 10px apart from what is around it, the
+ *     old detail's .dtl-seo-switch; additive, appcat parity (sections-c).
+ *   2026-09-27 — .og-lead--chapter (Note lead `chapter`): a chapter's lead, the old detail's .dtl-desc;
+ *     .og-doors--chapter (Actions `chapter`): a chapter's door row, the old .dtl-btn-row; additive,
+ *     appcat parity (sections-a).
+ *   2026-09-27 — .og-sec-h--spaced and .og-sec-foot (PageSection list `spaced`, `foot`): the old
+ *     catalogue's own list head and the grey line under it; the list's slab under 560px with the
+ *     old phone padding; additive, appcat parity.
+ *   2026-09-27 — .og-sec--list, .og-sec-h--folds, .og-sec-fold: the headline over a list with its count
+ *     on the slab, and the arrow of a list that folds (PageSection list, appcat, the shell); additive.
+ *   2026-09-27 — .og-sec--chapter, .og-sec-chapter, .og-sec-doors: a chapter of a long page of one
+ *     thing, the app catalogue's detail sections (PageSection `chapter`, appcat); additive.
  *   2026-09-27 — .og-sec--group: a section holding a group of sections, its band in main's admin
  *     Config domain cut (Section `group`).
  *   2026-09-27 — .og-sec-h--band: the headline's band spans the column (PageSection `band`).
@@ -37,6 +55,24 @@
 .pf .og .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 .og-hint { margin: .6rem 0 0; font-size: .85rem; line-height: 1.5; font-weight: 600; color: var(--text-dim); }
 .og-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }
+/* A chapter's door row (Actions `chapter`, appcat): the old detail's .dtl-btn-row, its words and its
+   slabs at .78rem, the slab 18px in from its ends, a door that cannot be pressed at half strength. */
+.og-doors.og-doors--chapter { gap: 24px; }
+.og-doors--chapter > :is(.poster-action--small, .poster-slab--control) { font-size: .78rem; }
+.og-doors--chapter > .poster-slab--control { padding: 0 18px; }
+.og-doors--chapter > :is(.poster-action, .poster-slab):disabled { opacity: .5; }
+.og-doors--chapter > .poster-action:disabled { border-color: var(--text); }
+/* A door row apart (Actions `apart`, appcat sections-c): 10px of air above and below it, which meets
+   the air of what is beside it rather than adding to it (the old .dtl-seo-switch, .dtl-seo-wording). */
+.og-doors.og-doors--apart { margin: 10px 0; }
+/* A tight door row (Actions `tight`, appcat sections-b): its parts 8px apart, a picker's door, choice
+   and door (the old detail's skill picker row: .dtl-btn-row with gap 8px). */
+.og-doors.og-doors--tight { gap: 8px; }
+/* A chapter's lead (Note lead `chapter`, appcat): the old app catalogue's detail .dtl-desc. */
+.og-lead.og-lead--chapter { margin: 0 0 14px; font-size: 1rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); }
+/* A statement on the record (Note lead size 'record', appcat sections-c): semibold ink at the reading
+   size, 10px over what follows (the old detail's .mk-author-is: "Reviewed by …, declared …"). */
+.og-lead.og-lead--record { margin: 0 0 10px; font-size: 1rem; font-weight: 600; line-height: 1.6; color: var(--text); }
 /* The split: a part of a section set off from what is above it by a hairline (a panel's last doors,
    a group inside it). Its space above belongs to the place. */
 .og-split { border-top: 1px solid var(--border); }
@@ -45,3 +81,50 @@
 .og-split--side { border-top: 0; border-left: var(--shape-frame) solid var(--border); padding-left: .75rem; }
 .og-hint--label { margin-top: 1.1rem; }
 .og-hint--label small { font-family: var(--font-mono); font-size: .75rem; color: var(--accent); margin-left: .4rem; }
+
+/* A chapter of a long page of one thing (PageSection `chapter`, appcat): the app catalogue's detail
+   sections (.dtl-section in src/static/app-catalog/styles/app-catalog-poster.css) with their values.
+   Far more air above a chapter than under its slab, so the gap reads as "the previous one ended";
+   the number over the slab in coral typewriter; the slab across the column, its doors on it in the
+   slab's own colour. */
+.og-sec--chapter { padding: 0; margin: 112px 0 0; border-top: 0; scroll-margin-top: 24px; }
+.og-sec--chapter.og-sec--first { margin-top: 72px; padding-top: 0; }
+.og-sec-chapter { display: block; margin-bottom: 8px; font-family: var(--font-mono); font-size: .72rem; font-weight: 700; letter-spacing: var(--shape-tracking-label); color: var(--accent); }
+.og-sec--chapter > .og-sec-h { display: block; margin-bottom: 0; }
+.og-sec--chapter > .og-sec-h > .poster-section-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px; }
+.og-sec-doors { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.og-sec-doors .poster-action, .og-sec-doors .poster-action:hover { color: var(--bg); border-bottom-color: var(--bg); }
+.og-sec-doors .poster-action:hover { border-bottom-color: var(--sun); }
+@media (max-width: 900px) {
+  .og-sec--chapter { margin-top: 72px; }
+  .og-sec--chapter.og-sec--first { margin-top: 48px; }
+}
+@media (max-width: 560px) {
+  .og-sec--chapter > .og-sec-h > .poster-section-title { font-size: 1.7rem; padding: .45rem .8rem .4rem; }
+}
+
+/* The headline over a list of things (PageSection list, appcat): the old app catalogue's
+   .cat-list-title and .published-header: the slab across the column with the count in its own
+   letters, the arrow at its end when the list folds (turned over while the list is open). */
+.og-sec.og-sec--list { padding: 0; margin: 48px 0 0; border-top: 0; }
+.og-sec--list > .og-sec-h { margin-bottom: 0; align-items: center; flex-wrap: nowrap; gap: 12px; }
+.og-sec--list > .og-sec-h > .poster-section-title { flex: 1 1 auto; display: flex; align-items: baseline; gap: 12px; font-size: 1.9rem; }
+.og-sec--list > .og-sec-h > .poster-section-title > small {
+  font-family: var(--font-mono); font-size: .9rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: inherit; margin: 0;
+}
+.og-sec-h--folds { cursor: pointer; }
+.og-sec-fold {
+  flex: none; background: none; border: 0; padding: 0; cursor: pointer; transform: rotate(180deg); transition: transform .2s;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; color: var(--text);
+}
+.og-sec-fold.og-sec-fold--shut { transform: none; }
+/* PageSection list `spaced` and `foot` (appcat parity): 6px between the headline and the list (the
+   old #local-apps-header), and the small grey line under the list (.cat-list-foot). */
+.og-sec--list > .og-sec-h.og-sec-h--spaced { margin-bottom: 6px; }
+.og-sec--list > .og-sec-foot { margin: 14px 0 0; font-size: .85rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-dim); }
+@media (max-width: 900px) {
+  .og-sec.og-sec--list { margin-top: 28px; }
+}
+@media (max-width: 560px) {
+  .og-sec--list > .og-sec-h > .poster-section-title { font-size: 1.7rem; padding: .45rem .8rem .4rem; }
+}

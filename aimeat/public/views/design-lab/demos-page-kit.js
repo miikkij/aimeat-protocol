@@ -9,6 +9,10 @@
  * @structure PAGE_KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { PAGE_KIT_DEMOS } from './demos-page-kit.js';
  * @version-history
+ *   v1.3.0 — 2026-09-27 — What appcat added: Tabs' line, glyph, caption and fill; Layout's step 'part'
+ *     and Space inset; Rail's ink tone; the crumb sheet's dashed, inline and file Action tones;
+ *     PageHead's line, low, thing and picture; PageSection's list, chapter and part with the door rows
+ *     and leads of its sheet; SubHeading's rule, readout, quiet and part.
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Layout's Columns, Beside start and stick (in the
  *     operator's frame), Tabs' TabPanel, Section's and PageSection's band.
  *   v1.1.0 — 2026-09-27 — The demos of settings-page, section-component, folds, tab-row, layout and
@@ -50,6 +54,8 @@ const SECTIONS = [
 ];
 const PAGES = [{ onClick: noop, label: 'Agents' }, { onClick: noop, label: 'Boards' }];
 const LONG = 'Nordic Ferries: the seasonal timetable, the harbour contracts and every note the crew wrote about them';
+/** A screenshot of an app, as a data URL: a menu page with a heading bar and three lines. */
+const SHOT = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200"><rect width="320" height="200" fill="#f4f1ea"/><rect width="320" height="40" fill="#e8543b"/><rect x="24" y="64" width="180" height="14" fill="#1a1a1a"/><rect x="24" y="96" width="260" height="8" fill="#888"/><rect x="24" y="116" width="220" height="8" fill="#888"/><rect x="24" y="136" width="240" height="8" fill="#888"/></svg>')}`;
 
 /** A part whose rules key on the page root (.og) stands inside a page with a short head. */
 const inPage = (body) => html`<${SettingsRoot}><${SettingsPage} crumb=${['Organisms', 'Harbour Studio']} title="Harbour Studio">${body}<//><//>`;
@@ -123,6 +129,15 @@ export const PAGE_KIT_DEMOS = {
         <${Section} fold inner title="Claude Code" open=${false} onToggle=${noop}>…<//>
         <${Section} fold inner title="Codex" open=${false} onToggle=${noop}>…<//><//>`) },
     { name: 'band', render: () => inPage(html`<${Section} band id="dl-pk-s6" num="01" title="Result" first><${Note} kind="lead">The title's band spans the column, as the classic pages draw it.<//><//>`) },
+    { name: 'group', render: () => inPage(html`<${Section} group id="dl-pk-s7" title="AI and agents" first>
+        <${Section} id="dl-pk-s8" num="01" title="Models"><${Note} kind="lead">A section inside the group.<//><//><//>`) },
+    { name: 'chapter, first and next', render: () => inPage(html`<${Section} chapter="01 / 19" first id="dl-pk-s9" title="Work with this app"
+        doors=${html`<${Action} small onClick=${noop}>Open<//>`}><${Note} kind="lead">Lumo Bakery's order page, as its visitors see it.<//><//>
+        <${Section} chapter="02 / 19" id="dl-pk-s10" title="About"><${Note} kind="lead">The next chapter stands far below the one before.<//><//>`) },
+    { name: 'chapter, long title', render: () => inPage(html`<${Section} chapter="07 / 19" id="dl-pk-s11" title=${LONG}
+        doors=${html`<${Action} small onClick=${noop}>Edit<//>`}><${Note} kind="lead">A long title wraps on the slab and the doors go under it.<//><//>`) },
+    { name: 'part of a dialog', render: () => html`<${SettingsRoot}><${Section} part id="dl-pk-s12" title="Appearance"><${Note} kind="lead">The look and the language of the catalogue.<//><//>
+        <${Section} part id="dl-pk-s13" title="Server"><${Note} kind="lead">Where the catalogue keeps your apps.<//><//><//>` },
   ] },
   folds: { variants: [
     { name: 'events', render: () => html`<${SettingsRoot}><${Folds}>${events.map((e) => html`<${FoldRow} key=${e.num} ...${e} onClick=${noop} />`)}<//><//>` },
@@ -156,6 +171,16 @@ export const PAGE_KIT_DEMOS = {
     { name: 'view tabs and their panel', render: () => html`<${SettingsRoot}><${Tabs} bar kind="view" label="Nodes" value="stats" onSelect=${noop}
         items=${[{ value: 'nodes', label: 'Nodes' }, { value: 'stats', label: 'Statistics' }]} />
       <${TabPanel} value="stats" label="Statistics"><${Note} kind="lead">The panel of the chosen tab fades in when the tab changes.<//><//><//>` },
+    // What appcat added (2026-09-27): the line and glyph tones, a row's caption, and tabs that fill the row.
+    { name: 'line', render: () => html`<${SettingsRoot}><${Tabs} tone="line" label="Order" value="new" onSelect=${noop}
+        items=${[{ value: 'new', label: 'Newest' }, { value: 'name', label: 'Name' }, { value: 'used', label: 'Most used' }]} /><//>` },
+    { name: 'glyph', render: () => html`<${SettingsRoot}><${Tabs} tone="glyph" label="Icon" value="star" onSelect=${noop}
+        items=${[{ value: 'star', label: '★' }, { value: 'diamond', label: '◆' }, { value: 'dot', label: '●' }, { value: 'peak', label: '▲' }]} /><//>` },
+    { name: 'caption', render: () => html`<${SettingsRoot}><${Tabs} tone="line" caption="Order" label="Order" value="name" onSelect=${noop}
+        items=${[{ value: 'new', label: 'Newest' }, { value: 'name', label: 'Name' }, { value: 'used', label: 'Most used' }, { value: 'visits', label: 'Most visited' }]} /><//>` },
+    { name: 'fill', render: () => html`<${SettingsRoot}><${Tabs} tone="line" fill kind="view" label="Add an app" value="paste" onSelect=${noop}
+        items=${[{ value: 'paste', label: 'Paste' }, { value: 'file', label: 'File' }]} />
+      <${TabPanel} value="paste" label="Paste"><${Note} kind="lead">Paste the app's HTML here; its name and description fill in.<//><//><//>` },
   ] },
   layout: { variants: [
     { name: 'row, wraps', render: () => html`<${SettingsRoot}><${Row} wrap>
@@ -179,6 +204,10 @@ export const PAGE_KIT_DEMOS = {
         <${Note} kind="lead">The records table holds most of it: Harbour Studio's briefs and the ferry timetables.<//><//>`) },
     { name: 'beside, the side sticks', render: () => op('Portal', html`<${Beside} stick wide side=${html`<${Box} tone="raised">The page as a visitor sees it stays in sight here.<//>`}>
         <${Stack} gap="large">${['Masthead', 'Apps', 'Boards', 'Contact', 'Footer'].map((p) => html`<${Box} key=${p} name=${p}>A part of the front page, in the order it shows.<//>`)}<//><//>`) },
+    // What appcat added (2026-09-27): the step 'part' and Space inset.
+    { name: 'part apart', render: () => html`<${SettingsRoot}><${Note} kind="lead">Visits by day: 212 this week.<//>
+        <${Space} above="part"><${Note} kind="lead">Where people came from: aimeat.io 140, a shared link 72.<//><//><//>` },
+    { name: 'inset', render: () => html`<${SettingsRoot}><${Space} inset="large"><${Box}>Active extensions: ferry-timetable, invoice-reader.<//><//><//>` },
   ] },
   'contents-tree': { variants: [
     { name: 'one space open', render: () => html`<${SettingsRoot}><${ContentsTree} title="Harbour Studio" groups=${tree('seat')} draftLabel="draft"
@@ -205,11 +234,20 @@ export const PAGE_KIT_DEMOS = {
       { mark: '·', label: 'The key is missing', notice: true, onClick: noop },
       { mark: '·', label: 'bot', onClick: noop }, { note: true, label: 'poster since 2026-09-12' },
     ]) },
+    // What appcat added (2026-09-27): the ink tone, light with dark words in the dark theme.
+    { name: 'ink', render: () => html`<${SettingsRoot}><${Rail} tone="ink" title="On this page" groups=${[{ label: 'On this page', items: [
+      { section: 'dl-pk-files', mark: '01', label: 'Work', on: true }, { section: 'dl-pk-people', mark: '02', label: 'About' },
+      { section: 'dl-pk-settings', mark: '03', label: 'Versions', count: 7 }] }]} /><//>` },
   ] },
   'crumb-trail': { variants: [
     { name: 'the page you are on', render: () => html`<${SettingsRoot}><${Crumb} steps=${['Settings', 'Build and share', 'Skills']} /><//>` },
     { name: 'a link back, and here', render: () => html`<${SettingsRoot}><${Crumb} steps=${['Settings', { label: 'Contacts', onClick: noop }, { label: 'Aino Laine', here: true }]} /><//>` },
     { name: 'long', render: () => html`<${SettingsRoot}><${Crumb} steps=${['Settings', { label: 'Organisms', onClick: noop }, { label: 'Harbour Studio', onClick: noop }, LONG]} /><//>` },
+    // The Action tones appcat added to this sheet (2026-09-27), drawn by Action.
+    { name: 'dashed word', render: () => html`<${SettingsRoot}><p>The name was <${Action} tone="dashed" onClick=${noop}>generated<//> from the app's title.</p><//>` },
+    { name: 'inline word', render: () => html`<${SettingsRoot}><p>An app that talks with people says it is an AI. <${Action} tone="inline" onClick=${noop}>Read Article 50 →<//></p>
+        <p>Privacy notice, published. <${Action} tone="inline" small onClick=${noop}>Open →<//></p><//>` },
+    { name: 'file link', render: () => html`<${SettingsRoot}><${Actions}><${Action} tone="file" onClick=${noop}>View odps.yaml<//><${Action} tone="file" onClick=${noop}>View odps.json<//><//><//>` },
   ] },
   'page-head': { variants: [
     { name: 'title, tags, sentence, actions', render: () => html`<${SettingsRoot}><${PageHead} title="Access" sub="who may do what"
@@ -222,6 +260,18 @@ export const PAGE_KIT_DEMOS = {
         edit=${html`<${TextField} ariaLabel="Name" value="Invoice check" onInput=${noop} actions=${html`<${Action} small onClick=${noop}>Save<//>`} />`} /><//>` },
     { name: 'tags loading', render: () => html`<${SettingsRoot}><${PageHead} title="Skills" marks=${[]} desc="What your agents know how to do." /><//>` },
     { name: 'long', render: () => html`<${SettingsRoot}><${PageHead} title=${LONG} sub="40 documents" desc=${LONG} /><//>` },
+    // What appcat added (2026-09-27): line, low, and the head of one thing's own page with its picture.
+    { name: 'line', render: () => html`<${SettingsRoot}><${PageHead} title="Skills" line="sandbox · 12 skills, 3 bound to an app" desc="What your agents know how to do." /><//>` },
+    { name: 'low', render: () => html`<${SettingsRoot}><${PageHead} low title="My Apps" line="sandbox · 30 apps published on aimeat.io"
+        actions=${html`<${Loud} mark="+" onClick=${noop}>Create an app<//><${Actions}><${Action} onClick=${noop}>Settings<//><${Action} onClick=${noop}>Help<//><//>`} /><//>` },
+    { name: 'thing, with its glyph', render: () => html`<${SettingsRoot}><${PageHead} thing title="Ferry Timetable" picture=${{ glyph: '★' }}
+        line="sandbox/ferry-timetable.html · version 7 · 212 visits this week" desc="The seasonal timetable of Nordic Ferries, with the harbour notices beside each crossing."
+        marks=${[{ label: 'published', tone: 'sun' }, { label: 'travel' }]}
+        actions=${html`<${Loud} large onClick=${noop}>Launch<//><${Action} onClick=${noop}>Edit the source<//>`} /><//>` },
+    { name: 'thing, with a screenshot', render: () => html`<${SettingsRoot}><${PageHead} thing title="Lumo Bakery Menu"
+        picture=${{ glyph: '◆', src: SHOT, alt: 'The menu page' }} line="sandbox/lumo-menu.html · version 2"
+        desc="The bakery's seasonal menu, as a one-page site." actions=${html`<${Loud} large onClick=${noop}>Launch<//>`} /><//>` },
+    { name: 'thing, long', render: () => html`<${SettingsRoot}><${PageHead} thing title=${LONG} picture=${{ glyph: '◆' }} line="sandbox/nordic-ferries-everything.html" desc=${LONG} /><//>` },
   ] },
   'page-section': { variants: [
     { name: 'a number and actions', render: () => inPage(html`<${PageSection} id="dl-pk-p1" num="02" title="People" doors=${html`<${Action} onClick=${noop}>Invite<//>`}>
@@ -232,6 +282,23 @@ export const PAGE_KIT_DEMOS = {
     { name: 'split', render: () => inPage(html`<${PageSection} id="dl-pk-p3" num="03" title="Rules"><${Note} kind="lead">The board's rules are saved.<//>
         <${Split}><${Actions}><${Action} tone="danger" onClick=${noop}>Delete board<//><//><//><//>`) },
     { name: 'long', render: () => inPage(html`<${PageSection} id="dl-pk-p4" num="04" title=${LONG}><${Note} kind="lead">A title long enough to wrap.<//><//>`) },
+    // What appcat added (2026-09-27): the list headline, the chapter, the dialog part, and the door rows
+    // and leads this sheet carries for Action and Note.
+    { name: 'list, spaced, with its foot', render: () => inPage(html`<${PageSection} list spaced id="dl-pk-p6" title="Your apps" count=${12}
+        foot="3 more are drafts; they show on the Drafts page."><${Note} kind="lead">Ferry Timetable, Lumo Bakery Menu, Harbour Notices …<//><//>`) },
+    { name: 'list that folds, shut', render: () => inPage(html`<${PageSection} list id="dl-pk-p7" title="Community apps" count=${44}
+        onFold=${noop} folded foldLabel="Show or hide the community apps"><${Note} kind="lead">Hidden while the list is folded.<//><//>`) },
+    { name: 'list, its place before the headline', render: () => inPage(html`<${PageSection} list plain id="dl-pk-p8"><${Note} kind="loading">Loading your apps…<//><//>`) },
+    { name: 'chapter, its doors and lead', render: () => inPage(html`<${PageSection} chapter="03 / 19" id="dl-pk-p9" title="About"
+        doors=${html`<${Action} small onClick=${noop}>Edit<//>`}>
+        <${Note} kind="lead" chapter>The seasonal timetable of Nordic Ferries, with the harbour notices beside each crossing.<//>
+        <${Actions} chapter><${Loud} control onClick=${noop}>Launch<//><${Action} small onClick=${noop}>Copy the link<//><${Action} small disabled>Publish<//><//><//>`) },
+    { name: 'record lead, doors apart and tight', render: () => inPage(html`<${PageSection} id="dl-pk-p10" num="05" title="Who answers for this app">
+        <${Note} kind="lead" size="record">Reviewed by sandbox, declared on 2026-09-20.<//>
+        <${Actions} apart><${Action} small onClick=${noop}>Change the wording<//><//>
+        <${Actions} tight><${Action} small onClick=${noop}>Add a skill<//><${Action} small onClick=${noop}>ferry-notices<//><${Action} small onClick=${noop}>Bind<//><//><//>`) },
+    { name: 'dialog part', render: () => html`<${SettingsRoot}><${PageSection} part id="dl-pk-p11" title="Backup">
+        <${Note} kind="hint">Save all your apps in one zip file, and bring them back from it.<//><//><//>` },
   ] },
   'fold-row': { variants: [
     { name: 'shut', render: () => inPage(html`<${FoldSection} id="dl-pk-f1" num="03" title="Map" sub="12 spaces" open=${false} onToggle=${noop}>…<//>`) },
@@ -247,5 +314,13 @@ export const PAGE_KIT_DEMOS = {
     { name: 'a heading with its line', render: () => html`<${SettingsRoot}><${SubHeading} level=${3} id="dl-pk-sh" desc="Groups you share records with.">Sharing groups<//><//>` },
     { name: 'in a line', render: () => html`<${SettingsRoot}><p><${SubHeading} inline>Model<//> Claude Sonnet 4.5</p><//>` },
     { name: 'the line alone', render: () => html`<${SettingsRoot}><${HeadDesc}>Every device that is signed in to your account.<//><//>` },
+    // What appcat added (2026-09-27): rule, rule="readout", quiet and part.
+    { name: 'rule', render: () => html`<${SettingsRoot}><${SubHeading} rule level=${4}>What it holds<//><${Note} kind="lead">Timetables, harbour notices and the crew's notes.<//><//>` },
+    { name: 'rule, readout', render: () => html`<${SettingsRoot}><${Note} kind="lead">Visits by day: 212 this week.<//>
+        <${SubHeading} rule="readout" level=${4}>Where people came from<//><${Note} kind="lead">aimeat.io 140, a shared link 72.<//><//>` },
+    { name: 'quiet', render: () => html`<${SettingsRoot}><${SubHeading} quiet>Active extensions<//><//>` },
+    { name: 'part', render: () => html`<${SettingsRoot}><${SubHeading} part level=${4}>What people will see<//><${Note} kind="lead">A short line under the app's name.<//><//>` },
+    { name: 'part apart', render: () => html`<${SettingsRoot}><${Note} kind="lead">The app's marks are set.<//><${SubHeading} part="apart" level=${4}>Who answers for this app<//>
+        <${Note} kind="lead">sandbox, on Harbour Studio's behalf.<//><//>` },
   ] },
 };

@@ -65,6 +65,8 @@
  *   v1.17.0 — 2026-09-24 — The SPA routes hand serveSpa their live page body (services/
  *     page-body-live.ts): the apps, the change log, the members and the help questions in the HTML
  *     as sent, for Bing.
+ *   v1.18.0 — 2026-09-27 — /v1/appcat serves the SPA: the app catalogue on the component library,
+ *     beside the old /app-catalog.html, which stays as it is.
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -529,6 +531,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/fleet',
     '/v1/members',
     '/v1/admin',
+    // appcat, the app catalogue on the component library (2026-09-27). Registered here AND in
+    // spa.html's ROUTES; the old /app-catalog.html stays as it is.
+    '/v1/appcat',
     // The design lab's preview page, which the lab shows in frames. Registered here AND in
     // spa.html's ROUTES.
     '/v1/design-lab/frame',

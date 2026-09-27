@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — .data-table--compact (DataTable compact): the old app catalogue's backup import
+ *     table, appcat parity (dialogs); additive.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1460-1491), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
@@ -42,4 +44,16 @@
 /* Generic scrollable wrapper (the admin-scoped `.adm .scrollable` already exists
    for admin tables; this one covers DataTable used outside `.adm`). */
 .scrollable { max-height: 600px; overflow-y: auto; }
+
+/* The compact table (DataTable compact, appcat): a table to choose from inside a dialog, the old app
+   catalogue's backup import (.backup-table): ink words at .85rem, 6px 8px cells on the hairline, the
+   heads .72rem grey capitals (its --text-muted is the site's --text-dim), no hover; a check box flush
+   in its cell, a state word small, a choice small on the grey ground. */
+.data-table.data-table--compact { font-size: .85rem; }
+.data-table--compact th { padding: 6px 8px; font-size: .72rem; font-weight: var(--weight-bold); letter-spacing: .04em; color: var(--text-dim); white-space: normal; }
+.data-table--compact td { padding: 6px 8px; border-bottom-color: var(--border); color: var(--text); vertical-align: top; }
+.data-table--compact tr:hover td { background: none; }
+.data-table--compact td > .check > input { margin: 0; }
+.data-table--compact .poster-status { padding: 2px 6px; font-family: inherit; font-size: .62rem; font-weight: var(--weight-semibold); line-height: normal; }
+.data-table--compact .select-field { width: auto; min-width: 0; margin-top: 2px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--shape-corner-control); background: var(--surface); font-family: inherit; font-size: .78rem; font-weight: var(--weight-regular); line-height: normal; color: var(--text); }
 

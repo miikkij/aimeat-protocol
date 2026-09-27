@@ -11,6 +11,16 @@
  *   read, under the component's names (UI consolidation phase 5, a move).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.1 — 2026-09-27 — The index strip's line under a word reads var(--shape-frame) instead of a
+ *     literal 2px (the AIMEAT value, so AIMEAT is unchanged; a theme reaches it). check:shape-tokens.
+ *   v1.4.0 — 2026-09-27 — The index (appcat parity): the way home and the tags toggle in mono coral
+ *     (the bold rows' face no longer reaches them, on a phone too), the title's mark on the card
+ *     ground. Additive to .side-menu--index.
+ *   v1.3.0 — 2026-09-27 — .side-menu--index (SideMenu index, appcat): a page's own index with the old
+ *     app catalogue's rail values (.cat-rail-*): the way home under a heavy rule, the title with its
+ *     framed mark, bold rows, the tally count (.side-menu-tally) grey and on a coral chip when open,
+ *     the small rows of a long list, and the sideways strips under 900px. Additive: nothing outside
+ *     .side-menu--index, .side-menu-title, .side-menu-tally and .side-menu-item--small changes.
  *   v1.2.0 — 2026-09-26 — The group title's spacing reads the label spacing (calc(var(--shape-tracking-label) * 1.2), .12em); the corner sits on the open item only, the one with a ground, and its rule reads --shape-rule-colour (a move: the AIMEAT values equal the old ones).
  *   v1.1.0 — 2026-09-25 — Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
  *   v1.0.0 — 2026-09-25 — Moved from the profile sheets (.pf-side-*), a move.
@@ -47,3 +57,52 @@
 
 .pf .side-menu-item--active { color: var(--on-sun); }
 .pf .side-menu-home { text-decoration: none; margin-bottom: 0.35rem; }
+
+/* ── A page's own index (SideMenu index; the old app catalogue's rail, .cat-rail-*) ─────────── */
+.side-menu-title { display: flex; align-items: center; gap: 10px; padding: 6px 0 16px; }
+.side-menu-title-mark {
+  width: 38px; height: 38px; flex: 0 0 auto; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border: var(--shape-frame-heavy) solid var(--shape-frame-colour); background: var(--card-bg); font-size: 1.1rem;
+}
+.side-menu-title-words {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; line-height: var(--font-poster-leading);
+  letter-spacing: var(--font-poster-tracking); text-transform: var(--shape-case-heading); color: var(--text);
+}
+.side-menu-tally { margin-left: auto; flex: 0 0 auto; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.side-menu-item--active .side-menu-tally { background: var(--accent); color: var(--bg); padding: 1px 7px; }
+.side-menu-item--small { font-size: .9rem; color: var(--text-dim); }
+.side-menu--index { display: flex; flex-direction: column; }
+.side-menu--index > .side-menu-home { border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); border-bottom: 0; padding: 14px 0 0; text-decoration: none; }
+.side-menu--index > .side-menu-home:hover { color: var(--accent); text-decoration: underline; }
+.side-menu--index .side-menu-group { display: flex; flex-direction: column; margin-top: 18px; }
+.side-menu--index > .side-menu-title + .side-menu-group { margin-top: 0; }
+.side-menu--index .side-menu-group-title { font-weight: 800; padding-bottom: 6px; }
+.side-menu--index .side-menu-item { justify-content: space-between; gap: 8px; padding: 7px 0; font-family: var(--font-body); font-weight: 700; }
+.side-menu--index .side-menu-item--small { padding: 6px 0; font-size: .9rem; color: var(--text-dim); }
+.side-menu--index .side-menu-item--active { color: var(--on-sun); font-weight: 800; padding: 7px 8px; }
+.side-menu--index .side-menu-item--small.side-menu-item--active { padding: 6px 8px; }
+.side-menu--index .side-menu-label { overflow: visible; white-space: normal; }
+.side-menu--index .side-menu-more { justify-content: flex-start; margin-top: 14px; padding: 0; }
+/* The way home and the "all tags" toggle keep their mono coral words over the bold rows' face. */
+.side-menu--index > .side-menu-item.side-menu-home { display: block; padding: 14px 0 0; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--accent); }
+.side-menu--index > .side-menu-item.side-menu-home:hover { color: var(--accent); }
+.side-menu--index .side-menu-item.side-menu-more { display: block; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--accent); }
+.side-menu--index .side-menu-item.side-menu-more:hover { color: var(--text); }
+@media (max-width: 900px) {
+  .side-menu--index { gap: 12px; }
+  .side-menu--index .side-menu-title { display: none; }
+  .side-menu--index .side-menu-group { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 14px; margin-top: 10px; padding-bottom: 6px; scrollbar-width: none; }
+  .side-menu--index > .side-menu-title + .side-menu-group { margin-top: 0; }
+  .side-menu--index .side-menu-group::-webkit-scrollbar { display: none; }
+  .side-menu--index .side-menu-group-title { display: none; }
+  .side-menu--index .side-menu-item, .side-menu--index .side-menu-item--small {
+    width: auto; flex: 0 0 auto; gap: 6px; padding: 4px 0; border: 0; border-bottom: var(--shape-frame) solid var(--shape-rule-colour);
+    font-size: .78rem; font-weight: 800; text-transform: var(--shape-case-action); letter-spacing: .04em; color: var(--text);
+  }
+  .side-menu--index .side-menu-item--active, .side-menu--index .side-menu-item--small.side-menu-item--active { padding: 4px 8px; border-bottom: 0; }
+  .side-menu--index .side-menu-label { white-space: nowrap; }
+  .side-menu--index .side-menu-more { flex: 0 0 auto; margin-top: 0; border-bottom: 0; text-transform: none; }
+  /* The way home and the tags toggle are not strip words: mono coral as on a desktop. */
+  .side-menu--index > .side-menu-item.side-menu-home { width: auto; padding: 14px 0 0; border: 0; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); text-transform: none; letter-spacing: normal; }
+  .side-menu--index .side-menu-item.side-menu-more { padding: 0; letter-spacing: normal; }
+}

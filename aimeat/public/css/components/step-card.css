@@ -8,6 +8,14 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — A guide's step in a dialog (.poster-step--rule) draws its parts as the old
+ *     app catalogue's prompt builder: the head, the track cards, the idea field, the template choice,
+ *     the packs and their tiers, the prompt box, the copy slab; appcat parity (dialogs). Only appcat's
+ *     Generate dialog draws a ruled step.
+ *   v1.4.0 — 2026-09-27 — .poster-step--question: one numbered question of a form (the old app
+ *     catalogue's tool editor, .mz-group); additive, appcat parity (sections-d).
+ *   v1.3.0 — 2026-09-27 — .poster-step--rule: a guide's step inside a dialog under the heavy rule (the
+ *     app catalogue's prompt builder); additive, appcat dialogs builder 2.
  *   v1.2.1 — 2026-09-27 — The agent consent panel's rules inside a step (.agc-step, .agc-explain, the
  *     head row's wrap) moved unchanged to css/components/agent-consent.css under its own names.
  *   v1.2.0 — 2026-09-24 — The frames, corner, open shadow and title case read the theme's shape values
@@ -40,6 +48,46 @@
 .poster-step--open .poster-step-num { border-color: var(--text); background: var(--sun); color: var(--text); }
 .poster-step-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: var(--shape-case-heading); margin: 0; }
 .poster-step-lede { color: var(--text-dim); font-size: 0.98rem; line-height: 1.55; margin: 0 0 1.1rem; }
+/* `rule` (added by appcat dialogs builder 2): a step of a guide inside a dialog, under the heavy ink
+   rule with no frame, its number on ink and its title in the section face (the old catalogue's
+   prompt builder, .pb-step / .pb-step-head / .pb-step-num). */
+.poster-step--rule {
+  border: 0; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); border-radius: var(--shape-corner);
+  background: none; box-shadow: none; padding: 1.1rem 0 0; margin-bottom: 1.4rem;
+}
+.poster-step--rule .poster-step-num { border-color: var(--text); background: var(--text); color: var(--bg); }
+.poster-step--rule .poster-step-title {
+  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
+  text-transform: var(--shape-case-heading); font-size: 1.2rem; letter-spacing: -.01em;
+}
+/* `question` (added by appcat sections-d, parity): one numbered question of a form, no frame, a
+   hairline under it, 22px above and under; the number a 28px ink square, the title in the section
+   face; its lede and everything it asks stand 40px in, in line with the title, and at the left edge
+   on a narrow screen (the old catalogue's tool editor, .mz-group; its --text-dim is the site's
+   --text-muted). */
+.poster-step.poster-step--question {
+  border: 0; border-bottom: 1px solid var(--border);
+  background: none; box-shadow: none; padding: 22px 0; margin: 0;
+}
+.poster-step--question > .poster-step-head { gap: 12px; margin: 0; }
+.poster-step--question .poster-step-num { width: 28px; height: 28px; border: 0; background: var(--text); color: var(--bg); font-size: .8rem; font-weight: var(--weight-regular); }
+.poster-step--question .poster-step-title {
+  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
+  text-transform: var(--shape-case-heading); font-size: 1.2rem; letter-spacing: -.01em; line-height: normal; color: var(--text);
+}
+.poster-step--question > :not(.poster-step-head) { margin-left: 40px; }
+/* A row of doors inside a question (the folded "a second currency") stands 14px under what is above. */
+.poster-step--question > .og-doors { margin-top: 14px; }
+/* Its fold ("a second currency and the pacing burn") is the coral typewriter word with no air of its
+   own, ink while open (the old <summary class="mz-more-head">). */
+.poster-step--question > .og-doors > .poster-action--more { padding: 0; }
+.poster-step--question > .og-doors > .poster-action--more[aria-expanded="true"] { color: var(--text); }
+/* A row that folds a part open under it (the ODPS description's head) keeps 4px under it (.od-tool-head). */
+.poster-step--question > .og-doors:has(> .poster-action--small[aria-expanded]) { margin-bottom: 4px; }
+.poster-step--question > .poster-step-lede { max-width: 66ch; margin: 8px 0 0 40px; font-size: .88rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted); }
+@media (max-width: 900px) {
+  .poster-step--question > :not(.poster-step-head), .poster-step--question > .poster-step-lede { margin-left: 0; }
+}
 /* The agent consent panel inside a step is css/components/agent-consent.css. */
 @media (max-width: 560px) {
   .poster-step { padding: 1rem 1rem; }
@@ -47,3 +95,69 @@
 /* Every card that carries the dots needs to be their containing block, or they escape upward to
    whatever ancestor is positioned. Measured once at 263px above the card it belonged to. */
 .poster-step { position: relative; }
+
+/* ── A guide's step in a dialog (StepCard rule), part by part as the old prompt builder drew them
+   (app-catalog-poster.css .pb-*; appcat parity). Its --text-dim is the site's --text-muted and its
+   --text-muted the site's --text-dim; its running text (.modal p) was .95rem ink at 1.55. ── */
+.poster-step.poster-step--rule { padding: 18px 0 0; margin-bottom: 22px; }
+.og-lead:has(+ .poster-step--rule) { margin-bottom: 20px; }
+.poster-step--rule > .poster-step-head { gap: 12px; margin-bottom: 12px; }
+.poster-step--rule .poster-step-num { width: 28px; height: 28px; border: 0; font-size: .8rem; font-weight: var(--weight-bold); }
+/* The parts of a step stand 12px apart (its Stack); where the old builder had 14px, 26px or a 3px
+   inline gap, the part adds the rest below. */
+/* The app being improved (a coral report line at the step's top) in heavy words, no space above. */
+.poster-step--rule .note-report { margin-top: 0; }
+.poster-step--rule .note-report > strong { font-weight: var(--weight-heavy); }
+/* Running words: the hints and the tier legend. */
+.poster-step--rule .poster-hint { margin: 0; font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); }
+/* The two track cards: a heavy ink frame on the page's ground, the name in the section face in
+   capitals, what it means small and grey under it; the chosen one on the sun with the ink shadow. */
+.poster-step--rule .choice--boxed { gap: 10px; margin-bottom: 2px; }
+.poster-step--rule .poster-choice { display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start; padding: 12px 14px; border: var(--shape-frame-heavy) solid var(--text); border-radius: var(--shape-corner); font-family: var(--font-body); font-size: .8rem; line-height: 1.45; }
+/* The unchosen card on the page's ground in grey; the chosen one keeps poster.css's sun and shadow. */
+.poster-step--rule .poster-choice:not(.on) { background: var(--bg); box-shadow: none; color: var(--text-muted); }
+.poster-step--rule .poster-choice b { margin: 0 0 4px; font-family: var(--font-poster-section); font-weight: var(--font-poster-strong-weight); font-size: .95rem; line-height: normal; text-transform: var(--shape-case-heading); }
+.poster-step--rule .poster-choice b .poster-chip--coral {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border: 0; border-radius: var(--shape-corner-pill); vertical-align: 2px;
+  background: var(--accent); color: var(--on-ink-ground); font-family: var(--font-mono); font-size: .7rem; font-weight: var(--weight-bold); letter-spacing: .04em; line-height: normal; text-transform: var(--shape-case-label);
+}
+.poster-step--rule .poster-choice.on b .poster-chip--coral { background: var(--on-sun); color: var(--sun); }
+/* The idea: bold words over the heavy ink line, no frame, two lines high to start. */
+.poster-step--rule .og-textarea { min-height: 60px; max-height: 120px; margin-bottom: 5px; padding: 8px 0; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--text); border-radius: var(--shape-corner-control); background: transparent; font-family: var(--font-body); font-size: 1rem; font-weight: var(--weight-bold); line-height: 1.5; }
+.poster-step--rule .og-textarea:focus { border-bottom-color: var(--accent); }
+/* A field's label in a step is plain words, 10px over what it names (16px over the template choice);
+   the template choice is the old underlined field with its grey arrow. */
+.poster-step--rule .og-field { gap: 10px; }
+.poster-step--rule .og-field > .poster-hint:not(:last-child) { margin-bottom: 2px; }
+.poster-step--rule .og-field > .poster-label { font-family: var(--font-body); font-size: .85rem; font-weight: var(--font-poster-text-weight); line-height: normal; color: var(--text); text-transform: none; letter-spacing: 0; }
+.poster-step--rule .select-field {
+  appearance: none; -webkit-appearance: none; width: 100%; box-sizing: border-box; cursor: pointer; margin: 6px 0 2px;
+  padding: 10px 32px 10px 14px; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); border-radius: var(--shape-corner-control);
+  background-color: transparent; color: var(--text); font-family: var(--font-body); font-size: .88rem; font-weight: var(--weight-bold); line-height: normal;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: right 16px center, right 12px center; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+.poster-step--rule .select-field:focus { border-bottom-color: var(--accent); outline: none; }
+/* The capability packs: framed pills 6px apart, their tier a small grey typewriter word on a faint
+   ground (the hard one coral). */
+.poster-step--rule .layout-row:has(> .check--pill) { gap: 6px; }
+.poster-step--rule .check--pill { padding: 5px 10px; font-size: .8125rem; line-height: normal; }
+.poster-step--rule .check--pill .poster-chip {
+  padding: 1px 5px; border: 0; border-radius: var(--shape-corner-pill); background: color-mix(in srgb, var(--text-dim) 15%, transparent); color: var(--text-dim);
+  font-family: var(--font-mono); font-size: .625rem; font-weight: var(--weight-semibold); letter-spacing: .03em; line-height: normal; text-transform: var(--shape-case-label);
+}
+.poster-step--rule .check--pill .poster-chip--coral { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+/* The prompt: its coral capitals label over the ink rule, then the heavy-framed typewriter box that
+   scrolls after 150px; the copy slab and the add word in the old button size. */
+.poster-step--rule .poster-label--block { padding-bottom: 6px; border-bottom: var(--shape-frame) solid var(--text); font-size: .72rem; letter-spacing: .1em; line-height: normal; }
+.poster-step--rule .code-block {
+  box-sizing: border-box; min-height: 90px; max-height: 150px; overflow-y: auto; margin: 0; padding: 12px;
+  border: var(--shape-frame-heavy) solid var(--text); border-radius: var(--shape-corner); background: var(--card-bg);
+  font-family: var(--font-mono); font-size: .78rem; line-height: 1.5; color: var(--text-dim); white-space: pre-wrap; word-break: break-word;
+}
+.poster-step--rule .poster-slab.poster-slab--control { margin-top: 18px; padding: 0 18px; font-size: .78rem; font-weight: var(--font-poster-strong-weight); }
+.poster-step--rule .poster-action { margin-top: 18px; padding-bottom: 1px; border-bottom-width: var(--shape-frame); font-size: .78rem; }
+@media (max-width: 560px) {
+  .poster-step.poster-step--rule { padding: 18px 0 0; }
+  .poster-step--rule .choice--boxed { grid-template-columns: minmax(0, 1fr); }
+}

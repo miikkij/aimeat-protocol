@@ -10,6 +10,12 @@
  *   keeps its own layout (a row, a gap); this part sets only the words.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-09-27 — .check--strong: a choice that decides what a form does (the old app
+ *     catalogue's .mz-check), appcat parity (sections-d); additive.
+ *   v1.3.0 — 2026-09-27 — .check--ruled: a choice of a list with a rule under it (the old app
+ *     catalogue's .protect-row), appcat parity; additive.
+ *   v1.2.0 — 2026-09-27 — .check--pill, a framed choice among several on the sun while ticked (the app
+ *     catalogue's capability packs); additive, appcat dialogs builder 2.
  *   v1.1.0 — 2026-09-26 — The Check (components/Check.js) and its line's layout (.check, --inline, --hint,
  *     --off), the values most Settings check lines draw (component plan C5).
  *   v1.0.0 — 2026-09-26 — Initial, with the values of the body-size check lines (Archivo 16px 400, ink).
@@ -29,3 +35,30 @@
 .check--hint input { margin-top: .3rem; }
 .check-words .poster-hint { display: block; margin: 0; }
 .check--off { cursor: default; opacity: .6; }
+
+/* `pill` (added by appcat dialogs builder 2): one framed choice among several side by side, on the sun
+   while ticked (the old catalogue's capability packs, .pb-pack-item: a 2px ink frame, bold words). */
+.check--pill {
+  display: inline-flex; gap: .4rem; padding: .3rem .65rem;
+  border: var(--shape-frame) solid var(--shape-rule-colour); border-radius: var(--shape-corner-pill);
+  background: var(--bg); font-family: var(--font-body); font-size: var(--text-small); font-weight: var(--weight-bold);
+  user-select: none;
+}
+.check--pill:hover { background: var(--surface); }
+.check--pill:has(input:checked) { background: var(--sun); color: var(--on-sun); }
+.check--pill input { margin: 0; accent-color: var(--text); }
+
+/* `ruled` (appcat parity): one choice of a list, 12px above and under it and a thin rule under it, the
+   words .92rem at 1.5 in the grey with their bold name in ink, the 18px box in ink at the first line's
+   top (the old catalogue's .protect-row; its --text-dim is the site's --text-muted). */
+.check.check--ruled {
+  align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border);
+  font-size: .92rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted);
+}
+.check--ruled input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--text); }
+.check--ruled strong { color: var(--text); }
+
+/* `strong` (appcat parity, sections-d): a choice that decides what a form does, 14px under what is
+   above it, 10px between the 18px ink box and the bold words (the old catalogue's .mz-check). */
+.check.check--strong { gap: 10px; margin-top: 14px; font-size: .95rem; font-weight: 800; line-height: normal; }
+.check--strong input { width: 18px; height: 18px; margin: 0; accent-color: var(--text); }

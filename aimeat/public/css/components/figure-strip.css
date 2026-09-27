@@ -10,6 +10,10 @@
  *   Drawn by components/FigureStrip.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.6.1 — 2026-09-27 — .og-strip--free's number at the face's own spacing, as the old .vis-stat-val
+ *     (appcat parity, sections-b; the option is appcat's alone).
+ *   v1.6.0 — 2026-09-27 — .og-strip--free (FigureStrip `free`): figures without the rules, the word
+ *     under the number in coral capitals, the old app catalogue's visitor numbers; additive, appcat.
  *   v1.5.0 — 2026-09-27 — A figure that is a button (a filter or a door: the admin's Overview,
  *     Applications, Owners, Security, CORS and Compliance strips), its rules moved from admin.css
  *     (.adm .og-strip > button) with their values.
@@ -65,4 +69,15 @@
 @media (max-width: 1100px) {
   .og-strip { flex-wrap: wrap; }
   .og-strip > div, .og-strip > button { flex-basis: 50%; border-right: 0; }
+}
+
+/* Free: the figures stand free inside a section, no rules, each number over its word in the row
+   label's coral capitals (the old app catalogue's .vis-stats, .vis-stat-val, .vis-stat-label). */
+.og-strip.og-strip--free { flex-wrap: wrap; gap: 18px 36px; margin: 0 0 22px; border: 0; }
+.og-strip.og-strip--free > div { flex: 0 0 auto; display: block; padding: 0; border: 0; }
+.og-strip.og-strip--free b { display: block; font-size: 1.9rem; line-height: 1; letter-spacing: normal; }
+.og-strip.og-strip--free span { display: block; margin-top: 6px; font-size: var(--text-xs, .72rem); font-weight: var(--weight-heavy, 800); color: var(--accent); text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label, .1em); }
+@media (max-width: 760px) {
+  .og-strip.og-strip--free { gap: 16px 24px; }
+  .og-strip.og-strip--free b { font-size: 1.5rem; }
 }

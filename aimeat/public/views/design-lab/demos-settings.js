@@ -111,7 +111,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { SettingsFrame, SettingsFrameHead, SettingsFrameBody } from '/components/SettingsFrame.js';
-import { SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuMore } from '/components/SideMenu.js';
+import { SideMenu, SideMenuTitle, SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuLabel, SideMenuMore } from '/components/SideMenu.js';
 import { Switch } from '/components/Switch.js';
 
 const html = htm.bind(h);
@@ -135,6 +135,13 @@ const menu = (collapsed) => html`
   <//>
   <${SideMenuMore} onClick=${noop}>Show all tools<//>`;
 
+/** A page's own index (SideMenu index), bare as the app catalogue draws it outside the Settings root. */
+const index = (children) => html`<${SideMenu} index label="My Apps"><${SideMenuHome} href="#">← Home<//>${children}<//>`;
+const views = html`<${SideMenuGroup} role="tablist" label="My Apps">
+    <${SideMenuItem} tab tally active=${true} count=${12} onClick=${noop}>Your apps<//>
+    <${SideMenuItem} tab tally active=${false} count=${48} onClick=${noop}>Community<//>
+    <${SideMenuItem} tab tally active=${false} count=${3} onClick=${noop}>Favourites<//><//>`;
+
 export const SETTINGS_DEMOS = {
   'settings-frame': { variants: [
     { name: 'a tab open', render: () => html`<div class="pf">
@@ -149,6 +156,34 @@ export const SETTINGS_DEMOS = {
   ] },
   'side-menu': { variants: [
     { name: 'groups open, one folded', render: () => html`<div class="pf"><div class="settings-frame-menu">${menu(true)}</div></div>` },
+    { name: 'index: a page\'s own, whole', render: () => index(html`<${SideMenuTitle} mark="📚">My Apps<//>${views}
+      <${SideMenuGroup} title="State">
+        <${SideMenuItem} tally active=${false} count=${9} onClick=${noop}>Listed<//>
+        <${SideMenuItem} tally active=${false} count=${2} onClick=${noop}>Unlisted<//>
+        <${SideMenuLabel}>Something missing<//>
+        <${SideMenuItem} tally active=${false} count=${1} onClick=${noop}>No icon<//><//>
+      <${SideMenuGroup} title="Tags">
+        <${SideMenuItem} tally small active=${true} count=${6} onClick=${noop}>All<//>
+        <${SideMenuItem} tally small active=${false} count=${4} onClick=${noop}>bakery<//>
+        <${SideMenuItem} tally small active=${false} count=${2} onClick=${noop}>ferries<//>
+        <${SideMenuMore} onClick=${noop}>All 14 tags<//><//>`) },
+    { name: 'index title: the name beside its framed mark', render: () => index(html`<${SideMenuTitle} mark="📚">My Apps<//>`) },
+    { name: 'index view switch: a group with no title', render: () => index(views) },
+    { name: 'index second word inside a group', render: () => index(html`<${SideMenuGroup} title="State">
+        <${SideMenuItem} tally active=${false} count=${9} onClick=${noop}>Listed<//>
+        <${SideMenuLabel}>Something missing<//>
+        <${SideMenuItem} tally active=${false} count=${1} onClick=${noop}>No icon<//>
+        <${SideMenuItem} tally active=${false} count=${3} onClick=${noop}>No description<//><//>`) },
+    { name: 'index tally: 0, not counted yet, and open', render: () => index(html`<${SideMenuGroup} title="State">
+        <${SideMenuItem} tally active=${false} count=${0} onClick=${noop}>Drafts<//>
+        <${SideMenuItem} tally active=${false} count="" onClick=${noop}>Unlisted<//>
+        <${SideMenuItem} tally active=${true} count=${9} onClick=${noop}>Listed<//><//>`) },
+    { name: 'index small rows of a long list', render: () => index(html`<${SideMenuGroup} title="Tags">
+        ${['bakery', 'ferries', 'harbour', 'invoices', 'menus'].map((tag, i) => html`<${SideMenuItem} key=${tag} tally small active=${i === 1} count=${5 - i} onClick=${noop}>${tag}<//>`)}
+        <${SideMenuMore} onClick=${noop}>All 14 tags<//><//>`) },
+    { name: 'index long names', render: () => index(html`<${SideMenuTitle} mark="📚">The apps of Harbour Studio and Nordic Ferries<//>
+      <${SideMenuGroup} title="Tags">
+        <${SideMenuItem} tally small active=${false} count=${2} onClick=${noop}>seasonal-timetable-and-harbour-contracts<//><//>`) },
   ] },
   // The og- page kit, drawn with the markup the tabs write (Access, Agents, Organisms).
   'space-table': { variants: [

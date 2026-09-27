@@ -1,0 +1,43 @@
+/**
+ * @file stops.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Where a piece of work stands (components/Stops.js): a row per stop under the heavy
+ *   rule (the first without it), the coral label in its own column, the figure (on the sun for the
+ *   stop that holds the work), the line of what it means, the picture in the heavy frame, the sentence
+ *   of what to do next and the small typewriter line, both set in under the figures, and the doors at
+ *   the column's start between them. The values are the old app catalogue's "Where your work is"
+ *   band (.wc-* in src/static/app-catalog/styles/app-catalog-poster.css over app-catalog.css).
+ * @version-history
+ *   v1.1.1 — 2026-09-27 — The label's spacing reads var(--shape-tracking-label) instead of a literal
+ *     .1em (the AIMEAT value, so AIMEAT is unchanged; a theme reaches it). check:poster-shapes.
+ *   v1.1.0 — 2026-09-27 — appcat parity: the rows as wide as the widest stop (the old band shrank to
+ *     its content), the figures at normal leading, the picture 14px under the rows, .stops-lead
+ *     (.wc-explain: 18px above, 10px below, 1rem at the poster text weight, 1.55) and .stops-foot
+ *     (.wc-size: 8px above, .75rem typewriter in the grey), in normal flow so their margins meet as
+ *     the old ones did; .stops-after goes (its words are the lead and the foot now).
+ *   v1.0.0 — 2026-09-27 — Initial (appcat).
+ */
+
+.stops { display: block; }
+.stops-rows { display: flex; flex-direction: column; gap: 14px; width: fit-content; max-width: 100%; min-width: 0; }
+.stops-row {
+  display: flex; flex-direction: row; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 14px 0 0; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+}
+.stops-row:first-child { border-top: 0; padding-top: 0; }
+.stops-label { flex: 0 0 176px; font-size: .72rem; color: var(--accent); text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label); font-weight: 800; }
+.stops-value { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.75rem; line-height: normal; letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.stops-row--on .stops-value { background: var(--sun); color: var(--on-sun, var(--text)); padding: 2px 10px; }
+.stops-note { font-size: 1rem; font-weight: 700; color: var(--text); }
+.stops-picture {
+  display: block; flex: none; box-sizing: border-box; margin-top: 14px; max-width: 260px; max-height: 160px; object-fit: cover; object-position: top center;
+  border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner);
+}
+.stops-lead { margin: 18px 0 10px 192px; max-width: 62ch; font-size: 1rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); }
+.stops-foot { margin: 8px 0 0 192px; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+
+@media (max-width: 900px) {
+  .stops-label { flex: 0 0 100%; }
+  .stops-lead, .stops-foot { margin-left: 0; }
+}

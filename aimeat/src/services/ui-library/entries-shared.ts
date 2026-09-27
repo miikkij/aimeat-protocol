@@ -25,12 +25,30 @@ import type { UiEntryWritten } from './types.js';
 export const SHARED_ENTRIES: UiEntryWritten[] = [
     {
         id: 'card-menu', name: 'CardMenu', kind: 'component', status: 'active',
-        summary: 'The dots in the top right corner of a card, and the menu they open.',
+        summary: 'The dots in the top right corner of a card, and the menu they open. The same menu can open from a line of words drawn as the action link, and its list can stand in the poster frame (the ink frame with the sun shadow).',
         module: '/components/CardMenu.js', sheet: '/css/components/card-menu.css',
-        data: { shape: 'CardMenu({ state, actions, label, onOpened, inline })', fields: { state: "'off', 'open' or 'working': the colour of the dots", actions: '[{ label, run, done, danger }]', label: 'what the dots are, for a screen reader', onOpened: 'called the first time it opens', inline: "'start' or 'end': the dots in a line of words, the menu opening from that edge" } },
-        useFor: ['Acting on one card: always the same corner, on every card.', 'The actions of one message that do not fit its line (Messages).'],
-        variants: [{ name: 'inline', class: 'card-menu--inline', prop: 'inline', when: 'the dots in a line of words, not in a card\'s corner' }],
+        data: {
+            shape: 'CardMenu({ state, actions, label, onOpened, inline, word, framed, disabled })',
+            fields: {
+                state: "'off', 'open' or 'working': the colour of the dots",
+                actions: '[{ label, run, done, doneLabel, danger } | { divider: true }]: the rows; done shows doneLabel (else "Done") for a moment, danger is the menu row\'s danger tone, a divider draws a line between two groups',
+                label: 'what the dots are, for a screen reader and the tooltip; with word, the tooltip of the words', onOpened: 'called the first time it opens',
+                inline: "'start' or 'end': the dots in a line of words, the menu opening from that edge",
+                word: 'the words the menu opens from, drawn as the action link in their own line instead of the dots; the menu opens from their right edge unless inline says \'start\'',
+                framed: 'the list in the poster frame: the ink frame with the sun shadow, 6px off what opened it',
+                disabled: 'the dots or the words cannot be pressed now (an export the menu started is running)',
+            },
+        },
+        useFor: ['Acting on one card: always the same corner, on every card.', 'The actions of one message that do not fit its line (Messages).',
+            'A page\'s small menu of acts that opens from a line of words ("Backups and imports").'],
+        variants: [
+            { name: 'inline', class: 'card-menu--inline', prop: 'inline', when: 'the dots in a line of words, not in a card\'s corner' },
+            { name: 'word', prop: 'word', when: 'the menu opens from words drawn as the action link, not from the dots' },
+            { name: 'framed', class: 'card-menu-list--framed', prop: 'framed', when: 'the opened list in the ink frame with the sun shadow' },
+            { name: 'disabled', prop: 'disabled', when: 'the dots or the words cannot be pressed while what the menu started runs' },
+        ],
         example: { state: 'open', label: 'Your welcome mat', actions: [{ label: 'Take it off your open items' }] },
+        note: 'word, framed and disabled came with appcat on 2026-09-27: together they replaced the old app catalogue\'s "Backups and imports" (.cat-word #backup-btn) and the menu it opened (.backup-menu).',
     },
     {
         id: 'markdown', name: 'Markdown', kind: 'component', status: 'active',
