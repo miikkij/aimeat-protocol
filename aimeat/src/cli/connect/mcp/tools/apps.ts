@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.10.0 -- 2026-09-27 -- The versions, screenshot, seo, marks, visitors, visitors_measure, legal and
  *     audit tools moved into aimeat_app_manage (app-manage.ts).
  *   v1.9.0 -- 2026-09-25 -- aimeat_package_install_requests over GET /v1/package-install-requests(/:id)
@@ -47,7 +48,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     filename: z.string().describe('App filename, e.g. "starwars.html"'),
     roadmap: z.string().optional().describe('One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is REQUIRED when somebody else helps build this app.'),
     owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    content: z.string().optional().describe('The app HTML as plain text — this door base64-encodes it for you'),
+    content: z.string().optional().describe('The app HTML as plain text — this tool base64-encodes it for you'),
     content_base64: z.string().optional().describe('Already-encoded HTML, if you did the encoding yourself'),
     name: z.string().describe('Display name shown in the catalogue'),
     description: z.string().optional().describe('Short description'),

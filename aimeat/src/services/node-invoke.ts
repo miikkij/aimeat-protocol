@@ -29,6 +29,7 @@
  * @usage
  *   const out = await invokeNodeCapability(config, { id, input, bearer, agentName });
  * @version-history
+ *   2026-09-27 — A capability that moved into aimeat_app_manage answers 410 TOOL_MOVED with the replacing call.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import type { AimeatConfig } from '../config.js';
@@ -36,6 +37,7 @@ import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
 import { AimeatClient } from '../tool-dispatch/api-client.js';
 import { findNodeCapability, NON_INVOKABLE, listNodeCapabilities } from './node-capabilities.js';
 import { logger } from '../utils/logger.js';
+import { movedToolMessage } from '../mcp/catalog/moved-tools.js';
 
 export interface InvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
 export interface InvokeSuccess { ok: true; capability: string; result: unknown; duration_ms: number }
@@ -65,6 +67,9 @@ export async function invokeNodeCapability(
     return { ok: false, status: 400, code: 'NOT_INVOKABLE', message: 'That one cannot run itself. Name the capability you actually want.' };
   }
   const capability = findNodeCapability(id);
+  // A tool that became an action of another names the call that replaces it (mcp/catalog/moved-tools.ts).
+  const moved = capability ? null : movedToolMessage(id);
+  if (moved) return { ok: false, status: 410, code: 'TOOL_MOVED', message: moved };
   if (!capability) {
     // A near-miss list beats "not found" for a caller that guessed at a name, and it is free: the
     // catalogue is in memory.

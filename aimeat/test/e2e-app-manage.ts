@@ -17,6 +17,7 @@
  *   - Phase 4: grants, backup, cost, bundled agents, subdomains, cortex source
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-manage
  * @version-history
+ *   v1.1.0 — 2026-09-27 — Phase 5: the ten old tool names answer TOOL_MOVED with the new call, on the node MCP server and through aimeat_invoke.
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
 
@@ -378,6 +379,38 @@ await test('20. …and refuses the source without cortex:write, and to another o
     const other = await callTool(sOther, 'aimeat_cortex_list', { name: cxName, include_source: true });
     assert(other.isError && other.text.startsWith(expected), `another owner, expected ${expected}: ${other.text}`);
     await callTool(s, 'aimeat_cortex_delete', { name: cxName });
+});
+
+console.log('\nPhase 5 — the ten tools that moved answer with the call that replaces them');
+
+const MOVED: Array<[string, string]> = [
+    ['aimeat_app_versions', 'versions'], ['aimeat_app_screenshot', 'screenshot'], ['aimeat_app_seo_set', 'seo'],
+    ['aimeat_app_marks_set', 'marks'], ['aimeat_app_legal_set', 'legal'], ['aimeat_app_audit', 'audit'],
+    ['aimeat_app_visitors', 'visitors'], ['aimeat_app_visitors_measure', 'visitors_measure'],
+    ['aimeat_app_ui_get', 'ui_get'], ['aimeat_app_ui_set', 'ui_set'],
+];
+
+await test('21. Each of the ten old names answers TOOL_MOVED and names the exact new call, and none is listed', async () => {
+    const listed: string[] = [];
+    let cursor: string | undefined;
+    do {
+        const body = await mcpRpc(s, 'tools/list', cursor ? { cursor } : {});
+        for (const t of body?.result?.tools ?? []) listed.push(t.name);
+        cursor = body?.result?.nextCursor;
+    } while (cursor);
+    for (const [old, action] of MOVED) {
+        assert(!listed.includes(old), `${old} is not in tools/list`);
+        const r = await callTool(s, old, { filename: APP });
+        assert(r.isError && r.text.startsWith('TOOL_MOVED'), `${old}: expected TOOL_MOVED, got ${r.text.slice(0, 200)}`);
+        assert(r.text.includes(`aimeat_app_manage with action "${action}"`), `${old} names its action: ${r.text.slice(0, 300)}`);
+        assert(r.text.includes('filename'), `${old} says how the fields map: ${r.text.slice(0, 300)}`);
+    }
+});
+
+await test('22. aimeat_invoke with an old name gives the same answer', async () => {
+    const r = await callTool(s, 'aimeat_invoke', { capability: 'aimeat_app_seo_set', input: { filename: APP } });
+    // aimeat_invoke answers a refusal as JSON: { code, message }.
+    assert(r.isError && r.data.code === 'TOOL_MOVED' && String(r.data.message).includes('aimeat_app_manage with action "seo"'), `invoke: ${r.text.slice(0, 300)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

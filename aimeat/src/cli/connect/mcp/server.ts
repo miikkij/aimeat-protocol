@@ -25,6 +25,7 @@
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-09-27 -- A call to a tool that moved into aimeat_app_manage answers TOOL_MOVED with the new call.
  *   v1.9.4 -- 2026-05-28 -- Update connector guidance and fail missing credentials without a stack trace
  *   v2.0.0 -- 2026-05-29 -- Multi-agent serve: registry-driven, per-agent poller, task-runner hook
  *   v2.1.0 -- 2026-05-30 -- v2 purpose-scoped surfaces: `--surface <appdev|agent|service|admin>`
@@ -40,6 +41,7 @@ import { loadAllAgents, getConfigDir } from '../config.js';
 import { checkConnectorHome } from '../home-access.js';
 import { buildRegistry, type AgentRegistry } from '../agent-registry.js';
 import { registerAllTools } from './tools/index.js';
+import { answerMovedTools } from '../../../mcp/moved-tools-answer.js';
 import { registerResources } from './resources.js';
 import { startPollerForAgent } from './poller.js';
 import { isRunner } from '../task-runner.js';
@@ -73,6 +75,8 @@ export function buildMcpServer(role: SurfaceRole | 'all', registry: AgentRegistr
     patchable.registerTool = origRegister;
   }
   registerResources(mcp, registry);
+  // A tool that became an action of another answers with the call that replaces it (mcp/moved-tools-answer.ts).
+  answerMovedTools(mcp);
   return mcp;
 }
 

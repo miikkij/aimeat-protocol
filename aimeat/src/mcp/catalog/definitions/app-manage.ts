@@ -14,20 +14,21 @@
  *   ONE TABLE. APP_MANAGE_ACTIONS is the only place an action's fields, required fields, permission
  *   word and one-line summary are written. The catalog input, the description, the per-action
  *   permission check (catalog/action-scopes.ts) and checkAppManageInput(), which all three MCP
- *   surfaces call before anything else, are derived from it.
+ *   interfaces call before anything else, are derived from it.
  * @structure APP_MANAGE_FIELDS · APP_MANAGE_ACTIONS · checkAppManageInput · appManageTools ·
  *   UI_DETAIL_PARAM · uiReadQuery
  * @usage
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
 import type { AimeatToolDefinition, ToolInputField } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
-/** What the `detail` field of ui_get says, on every surface. */
+/** What the `detail` field of ui_get says, on every interface. */
 export const UI_DETAIL_PARAM = 'For ui_get: names from the catalogue index to get IN FULL: component ids ("table", "statRow") or section names ("effects", "layouts", "ambients"). Omit it for the index alone.';
 
 /** The query the connector and the CLI send the ui route: the index, and the named parts in full. */
@@ -179,7 +180,7 @@ export type AppManageCheck =
 /**
  * Check one call against its action's field list, and name everything wrong in one answer: an
  * unknown action, every missing required field, and every field the action does not take.
- * `extra` names parameters a surface adds itself (the connector's agent_name), which are ignored.
+ * `extra` names parameters an interface adds itself (the connector's agent_name), which are ignored.
  */
 export function checkAppManageInput(input: Record<string, unknown>, extra: string[] = []): AppManageCheck {
     const actionName = typeof input.action === 'string' ? input.action : '';

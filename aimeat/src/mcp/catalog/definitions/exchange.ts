@@ -13,6 +13,7 @@
  *   Morsels are plain integers; money is 6-decimal micro-units. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.1.2 — 2026-09-19 — aimeat_app_tool_invoke says to read the tool's inputSchema first, and that a
  *     mismatch is refused before charging with every missing field named.
  *   v1.1.1 — 2026-09-03 — Say WHY the six agentMcp tools are off the CLI dispatch, and where a fleet
@@ -75,7 +76,7 @@ export const exchangeTools: AimeatToolDefinition[] = [
             contract_ref: { type: 'string', required: false, description: 'Your reference for this contract. Omit to auto-generate one (mcp:<uuid>).' },
             cap_units: { type: 'number', required: false, description: 'Budget ceiling in the action\'s unit (morsels or money micro-units). Must cover one charge. Omit = uncapped.' },
             plan_id: { type: 'string', required: false, description: 'A provider-declared plan id (bundle/subscription). Omit = per_call.' },
-            app_id: { type: 'string', required: false, description: 'The consuming app id ("owner/filename") when this contract powers an app — surfaces on the per-app cost view.' },
+            app_id: { type: 'string', required: false, description: 'The consuming app id ("owner/filename") when this contract powers an app — shown on the per-app cost view.' },
         },
     },
     {
@@ -108,7 +109,7 @@ export const exchangeTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_exchange_need_post',
-        description: 'Post a NEED to the marketplace — an open call for a data-service capability. Describe what you want; optionally pin a target `ext`+`action`, a minimum-output `spec` (the shape a fulfilment MUST return, so a provider/AI can judge fit), a `budget_cap` in `budget_unit`, and `autonomy` (supervised = you approve a bid; auto = an agent may close it). Providers browse open needs and BID; the response also surfaces offerings that already satisfy it (accept directly, no bid needed).',
+        description: 'Post a NEED to the marketplace — an open call for a data-service capability. Describe what you want; optionally pin a target `ext`+`action`, a minimum-output `spec` (the shape a fulfilment MUST return, so a provider/AI can judge fit), a `budget_cap` in `budget_unit`, and `autonomy` (supervised = you approve a bid; auto = an agent may close it). Providers browse open needs and BID; the response also lists offerings that already satisfy it (accept directly, no bid needed).',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

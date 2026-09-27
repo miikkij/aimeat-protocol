@@ -8014,6 +8014,11 @@ paths:
           description: Not authenticated
         '404':
           description: NO_SUCH_CAPABILITY, with near misses in `details.did_you_mean` when there are any
+        '410':
+          description: |
+            TOOL_MOVED: the capability became an action of another tool (the ten app tools that
+            aimeat_app_manage replaced on 2026-09-27). The message names the tool, the action and
+            the fields to call instead. Nothing was run.
 
   /v1/agents/v2/basic-agents:
     get:

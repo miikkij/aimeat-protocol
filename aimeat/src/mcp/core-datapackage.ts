@@ -25,6 +25,7 @@
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, B3).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -106,7 +107,7 @@ export function registerCoreDataPackageTools(
                     message: `The rows are ${Math.round(bytes / 1024)} kB, over the ${MAX_ROWS_BYTES / 1024 / 1024} MB one-call limit.`,
                     what_to_do: 'Publish the table in periods (one version per window), or move the production to an '
                         + 'extension action or a workflow step — there the rows never pass through a model context and '
-                        + 'are neither token-billed nor size-capped by this door.',
+                        + 'are neither token-billed nor size-capped by this tool.',
                 });
             }
 

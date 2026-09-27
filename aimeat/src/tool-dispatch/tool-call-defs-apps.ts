@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   v1.9.0 -- 2026-09-27 -- aimeat_app_versions, aimeat_app_ui_get and aimeat_app_ui_set moved into
  *     aimeat_app_manage (tool-call-defs-app-manage.ts).
  *   v1.10.0 -- 2026-09-23 -- aimeat_ui_component_list and aimeat_ui_component_get: the component
@@ -221,7 +222,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             roadmap: { type: 'string', description: 'One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is required when somebody else helps build this app.' },
             spec_token: { type: 'string', description: 'Current app build spec digest.' },
             spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
-            content: { type: 'string', description: 'The app HTML as plain text — this door base64-encodes it for you. Use @file:path to load from disk.' },
+            content: { type: 'string', description: 'The app HTML as plain text — this tool base64-encodes it for you. Use @file:path to load from disk.' },
             content_base64: { type: 'string', description: 'Already-encoded HTML, if you did the encoding yourself.' },
             name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
             description: { type: 'string', description: 'Short description.' },
@@ -343,7 +344,7 @@ export const appTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_extension_invoke',
         description: 'Invoke an extension action.',
         input: {
-            extension_name: { type: 'string', description: 'Extension name. (`name` is accepted as the older spelling this door used.)' },
+            extension_name: { type: 'string', description: 'Extension name. (`name` is accepted as the older spelling this tool used.)' },
             name: { type: 'string', description: 'Older spelling of extension_name.' },
             action_id: { type: 'string', required: true, description: 'Action identifier.' },
             input: { type: 'object', description: 'Input parameters.' },
@@ -564,7 +565,7 @@ export const appTools: ConnectCliToolDefinition[] = [
     {
         // → GET /v1/appdev/overview[?model=&sections=] — the "big picture" build research surface.
         name: 'aimeat_appdev_overview',
-        description: 'One-call AppDev research surface: your apps, library packs (with proofs), templates, learned pitfalls.',
+        description: 'One-call AppDev research tool: your apps, library packs (with proofs), templates, learned pitfalls.',
         input: {
             model: { type: 'string', description: 'Your own model (indicative): marks proven packs and orders learned pitfalls; filters nothing.' },
             sections: { type: 'string', description: 'Comma-separated section filter (apps,library_packs,templates,pitfalls,...).' },

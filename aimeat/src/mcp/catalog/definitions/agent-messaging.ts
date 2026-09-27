@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   2026-09-26 — aimeat_contact_invite says it takes messages:send, as POST /v1/contacts/invite now
  *     does for an agent.
  *   2026-09-26 — aimeat_contact_invite says an invitation counts against the same 20 lookups per
@@ -40,13 +41,13 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 export const agentMessagingTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_handbook_get',
-        description: 'This node\'s operating guide. Call it with no arguments, first: it returns the handbook for the surface you are connected to, which names the tools that matter for the job and the order to use them in, followed by this node\'s skills, one line each, saying which situation each one covers. When a line matches what the person asked for, load that skill with aimeat_skill_get before you start. Pass `surface` only to read another surface\'s handbook. Before building an app, pass `tier: "build-app"`: it returns the first part of the build specification every app follows, and lists the other parts and the sections for particular situations, each read with "build-app/<id>". An agent working over HTTP can ask for a tier handbook by id ("tier1", "tier2") or a managed prompt by its id; that answer carries the prompt name, description, content and variables.',
+        description: 'This node\'s operating guide. Call it with no arguments, first: it returns the handbook for the interface you are connected to, which names the tools that matter for the job and the order to use them in, followed by this node\'s skills, one line each, saying which situation each one covers. When a line matches what the person asked for, load that skill with aimeat_skill_get before you start. Pass `surface` only to read another interface\'s handbook. Before building an app, pass `tier: "build-app"`: it returns the first part of the build specification every app follows, and lists the other parts and the sections for particular situations, each read with "build-app/<id>". An agent working over HTTP can ask for a tier handbook by id ("tier1", "tier2") or a managed prompt by its id; that answer carries the prompt name, description, content and variables.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
             tier: { type: 'string', description: 'A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.' },
-            surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full'], description: 'Another surface\'s handbook than your own. Leave it out to get the one for the surface you are connected to.' },
+            surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full'], description: 'Another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.' },
         },
     },
     {
@@ -243,7 +244,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
             display_name: { type: 'string', description: 'The name shown to the person. Defaults to the agent name.' },
             scopes: { type: 'array', description: 'Exactly what it may do, e.g. ["memory:read","memory:write"]. Never more than you hold yourself.' },
             mode: { type: 'string', description: "How the node treats its tasks: 'task-runner' activates a queued task without asking the owner each time; also autonomous, interactive, coordinator, workstation." },
-            run_mode: { type: 'string', description: "'spawn' starts a worker per piece of work (right for bursty jobs); 'resident' stays up (right for a front door, at a few seconds of cold start saved)." },
+            run_mode: { type: 'string', description: "'spawn' starts a worker per piece of work (right for bursty jobs); 'resident' stays up (right for an agent that answers people as they write, at a few seconds of cold start saved)." },
             crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape — the same document aimeat_crew_publish takes. Strongly recommended.' },
         },
     },
@@ -408,7 +409,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_dm_inbox',
-        description: 'Read recent federated direct messages addressed to THIS agent (across the inbox / "Postilaatikko") — replies and messages people sent you, newest first. A reply to an agent is delivered to its owner\'s inbox, so this surfaces messages where you are the recipient. Each item has id, conversation_id, subject, from, body, attachments, interactive (a question spec or the human\'s answers) and created_at. Use aimeat_dm_thread for a full conversation. Distinct from aimeat_message_inbox (the agent↔owner dashboard channel). Requires the messages:read scope.',
+        description: 'Read recent federated direct messages addressed to THIS agent (across the inbox / "Postilaatikko") — replies and messages people sent you, newest first. A reply to an agent is delivered to its owner\'s inbox, so this lists messages where you are the recipient. Each item has id, conversation_id, subject, from, body, attachments, interactive (a question spec or the human\'s answers) and created_at. Use aimeat_dm_thread for a full conversation. Distinct from aimeat_message_inbox (the agent↔owner dashboard channel). Requires the messages:read scope.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -475,7 +476,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_contact_resolve_email',
-        description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email). The same door as POST /v1/contacts/resolve, on the messages:read permission. One account has 20 lookups in 10 minutes, the owner and all their agents together, and saving a person by email with aimeat_contact_add counts as one; past that the answer is RATE_LIMITED with the seconds to wait.',
+        description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email). The same endpoint as POST /v1/contacts/resolve, on the messages:read permission. One account has 20 lookups in 10 minutes, the owner and all their agents together, and saving a person by email with aimeat_contact_add counts as one; past that the answer is RATE_LIMITED with the seconds to wait.',
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {

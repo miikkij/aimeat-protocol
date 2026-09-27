@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   2026-09-19 — The two template tools name a genre, not the Classic shell, as their example of
  *     what the node ships.
  *   v1.4.1 — 2026-09-13 — aimeat_appdev_overview says its model orders learned pitfalls and hides
@@ -439,7 +440,7 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_appdev_proof_attach',
-        description: 'Attach a SELF-REPORTED per-model acceleration proof (pass/fail + evidence) to a community contribution you own: a community library pack (your public cortex lib — proofs surface on /v1/library-packs with self_reported: true) or one of your app-template proposals. Append-only ledger, duplicate (model, test_set, date) rejected; honest fails make your passes credible. This is the "proven acceleration" attribution sellers build a track record with — a node-verified badge is a separate later feature, never implied by these.',
+        description: 'Attach a SELF-REPORTED per-model acceleration proof (pass/fail + evidence) to a community contribution you own: a community library pack (your public cortex lib — proofs appear on /v1/library-packs with self_reported: true) or one of your app-template proposals. Append-only ledger, duplicate (model, test_set, date) rejected; honest fails make your passes credible. This is the "proven acceleration" attribution sellers build a track record with — a node-verified badge is a separate later feature, never implied by these.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.1.0 — 2026-08-09 — Phase 4: the managed prompts a person picks (MCP prompts primitive).
  *   v1.0.0 — 2026-08-09 — Initial: MCP handshake instructions + the public app URL.
  */
@@ -248,7 +249,7 @@ async function main() {
             // about 2 kB, so what an agent acts on now leads and the surface line follows it; both
             // still arrive inside the part a cutting client shows.
             const core = instructions.indexOf('aimeat_handbook_get first');
-            const surface = instructions.indexOf('This surface is the owner');
+            const surface = instructions.indexOf('This interface is the owner');
             assert(core >= 0 && core < 400, `the way in leads, at ${core}`);
             assert(surface > core && surface < 1900, `the agent surface still introduces itself, at ${surface}`);
         });

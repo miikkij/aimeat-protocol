@@ -14,6 +14,7 @@
  * @structure dataMapTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v2.1.0 — 2026-09-20 — DATA_MAP_PARAM: what the `data_map` parameter says on both MCP doors,
  *     built from the service's own spec constant, with a whole example object an E2E test writes.
  *   v2.0.0 — 2026-08-25 — spec/2 wording; the coverage mode is gone with the Data Wallet list.
@@ -41,7 +42,7 @@ export const DATA_MAP_PARAM = `The WHOLE map in one object, carrying spec "${DAT
 export const dataMapTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_datamap_get',
-        description: 'READ THIS BEFORE YOU CHANGE AN APP YOU DID NOT WRITE. An app\'s data map says what the app is for, what people use it for, what shape it is (one person, shared, a group, an organism workspace, static), how its data is actually arranged, what machinery it leans on, and what leaves the house. Then one row per group of keys: what it holds, what kind of thing it is, what it is used for, where it lives, who owns it, who reads it, who writes it, what shape the record is, how long it is kept, whether losing it matters, and ONE SENTENCE saying why it is there rather than somewhere else. That sentence is the reason this exists: without it a new feature\'s data lands wherever was easiest to reach, which is how a shared CRM ended up keeping the team\'s campaigns in one person\'s private memory where nobody else could see them. An app with no map says so plainly — that is a finding, not a blank, and writing one is the fix.',
+        description: 'READ THIS BEFORE YOU CHANGE AN APP YOU DID NOT WRITE. An app\'s data map says what the app is for, what people use it for, what shape it is (one person, shared, a group, an organism workspace, static), how its data is actually arranged, what machinery it leans on, and what leaves this server. Then one row per group of keys: what it holds, what kind of thing it is, what it is used for, where it lives, who owns it, who reads it, who writes it, what shape the record is, how long it is kept, whether losing it matters, and ONE SENTENCE saying why it is there rather than somewhere else. That sentence is the reason this exists: without it a new feature\'s data lands wherever was easiest to reach, which is how a shared CRM ended up keeping the team\'s campaigns in one person\'s private memory where nobody else could see them. An app with no map says so plainly — that is a finding, not a blank, and writing one is the fix.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -60,7 +61,7 @@ export const dataMapTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_memory_hands',
-        description: 'How many hands have been on one memory key, and whose. A key gets rewritten and the value changes; who touched it was never written down anywhere until this existed, and a field on the record could not hold it because the next write would overwrite it. Worth asking before overwriting something you did not write, and it is the answer somebody needs when a person asks what happened to their data. The answer carries what it cannot see: counting began the day it was switched on, so a key written before that and never written since has no hands here, and it counts the doors a principal comes through rather than the places AIMEAT writes on its own behalf.',
+        description: 'How many hands have been on one memory key, and whose. A key gets rewritten and the value changes; who touched it was never written down anywhere until this existed, and a field on the record could not hold it because the next write would overwrite it. Worth asking before overwriting something you did not write, and it is the answer somebody needs when a person asks what happened to their data. The answer carries what it cannot see: counting began the day it was switched on, so a key written before that and never written since has no hands here, and it counts the endpoints and tools a principal comes through rather than the places AIMEAT writes on its own behalf.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
