@@ -12,7 +12,9 @@
     "test/unit/memory-write-authority.test.ts",
     "test/unit/route-responsibility.test.ts",
     "test/unit/workflow-lock-lifecycle.test.ts",
-    "test/unit/extension-vm-fetch-contract.test.ts"
+    "test/unit/extension-vm-fetch-contract.test.ts",
+    "test/unit/storage-patch-contract.test.ts",
+    "test/unit/storage-owner-relations.test.ts"
   ],
   "exclude": ["node_modules", "dist", "src/generated/prisma-postgres"]
 }

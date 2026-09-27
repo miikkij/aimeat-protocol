@@ -29,7 +29,6 @@ async function rest(path: string, method = 'GET', token?: string, body?: unknown
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000),
   });
   // The HTTP boundary is validated by the assertions below, not a generated static response.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { status: response.status, body: await response.json() as Record<string, any> };
 }
 

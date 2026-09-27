@@ -1,0 +1,539 @@
+{
+  "note": "Classification inventory for four columns omitted by the legacy cascade gate. This is not a deletion exemption list. Source-reviewed is not runtime erasure proof; required decisions remain open. No retention policy is established here.",
+  "relations": {
+    "AgentUsageDaily.ownerGhii": {
+      "role": "ownership",
+      "current": "Deleted by the per-identity cascade, matching ownerGhii or agentGaii.",
+      "reason": "These are this identity's usage rows; counterparty consumerGhii is deliberately not matched.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-conformance.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
+    "AgentUsageEvent.ownerGhii": {
+      "role": "ownership",
+      "current": "Deleted by the per-identity cascade, matching ownerGhii or agentGaii.",
+      "reason": "These are this identity's usage rows; counterparty consumerGhii is deliberately not matched.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-conformance.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
+    "AgentUsageEventArchive.ownerGhii": {
+      "role": "ownership",
+      "current": "Deleted by the per-identity cascade, matching ownerGhii or agentGaii.",
+      "reason": "These are this identity's usage rows; counterparty consumerGhii is deliberately not matched.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "AiDecision.ownerGhii": {
+      "role": "ownership",
+      "current": "Deleted by the per-identity cascade.",
+      "reason": "The decisions belong to the erased owner.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "AiProvenance.ownerGhii": {
+      "role": "authorship",
+      "current": "Owner and principal are replaced with the erasure pseudonym; statement remains.",
+      "reason": "Content may outlive its author; a reused account name must not inherit provenance ownership.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts",
+        "src/storage/erased-party.ts"
+      ],
+      "test": "test/unit/storage-conformance.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
+    "McpServer.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteMcpServersByOwner; node and organism server ownership stays separate.",
+      "reason": "Live credentials cannot pass to a new registrant of the same name.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "McpServer.createdBy": {
+      "role": "authorship",
+      "current": "Removed with an owner-owned server; no creator-only erasure for shared servers.",
+      "reason": "Creator attribution is not node or organism server ownership.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "AgentEnrolmentGrant.createdBy": {
+      "role": "authorship",
+      "current": "Owner rows are deleted by eraseOwner through owner deletion methods; no creator-only sweep.",
+      "reason": "The owning account and the creator are separate relations.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "AgentV2Task.createdBy": {
+      "role": "authorship",
+      "current": "Owner rows are deleted by eraseOwner through owner deletion methods; no creator-only sweep.",
+      "reason": "The owning account and the creator are separate relations.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "AgentTask.createdBy": {
+      "role": "authorship",
+      "current": "Rows are deleted by agentGaii or ownerGaii/group, not by creator alone.",
+      "reason": "Creation is attribution; a creator is not necessarily the data owner.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "GroupShare.createdBy": {
+      "role": "authorship",
+      "current": "Rows are deleted by agentGaii or ownerGaii/group, not by creator alone.",
+      "reason": "Creation is attribution; a creator is not necessarily the data owner.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "ScheduledJob.createdBy": {
+      "role": "ownership",
+      "current": "eraseOwner deletes matches for both the bare owner name and GHII.",
+      "reason": "These fields identify the account whose scheduled executions or instances must end.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "ExtensionInstance.createdBy": {
+      "role": "ownership",
+      "current": "eraseOwner deletes matches for both the bare owner name and GHII.",
+      "reason": "These fields identify the account whose scheduled executions or instances must end.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "SsoConnection.createdBy": {
+      "role": "authorship",
+      "current": "No creator-only erasure in the owner deletion flow reviewed.",
+      "reason": "The connection belongs to a node or organism; automatic removal by creator would break other members.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "WorkspaceRow.createdBy": {
+      "role": "authorship",
+      "current": "No creator-only erasure in the owner deletion flow reviewed.",
+      "reason": "Workspace data can belong to an organism and other members; creator deletion alone is not its ownership policy.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "ComponentVersion.createdBy": {
+      "role": "history",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Version and publication history need an explicit attribution and retention decision.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "PublishAttempt.publisher": {
+      "role": "history",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Version and publication history need an explicit attribution and retention decision.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "UsageCall.ownerGhii": {
+      "role": "history",
+      "current": "No account-erasure step found in the reviewed flow; separate retention jobs exist.",
+      "reason": "Retention jobs do not by themselves prevent same-name account reads; decide erasure or pseudonymization separately.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "UsageCallArchive.ownerGhii": {
+      "role": "history",
+      "current": "No account-erasure step found in the reviewed flow; separate retention jobs exist.",
+      "reason": "Retention jobs do not by themselves prevent same-name account reads; decide erasure or pseudonymization separately.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "UsageRollup.ownerGhii": {
+      "role": "history",
+      "current": "No account-erasure step found in the reviewed flow; separate retention jobs exist.",
+      "reason": "Retention jobs do not by themselves prevent same-name account reads; decide erasure or pseudonymization separately.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "AccountEvent.ownerGhii": {
+      "role": "history",
+      "current": "No account-erasure step found in the reviewed flow; separate retention jobs exist.",
+      "reason": "Retention jobs do not by themselves prevent same-name account reads; decide erasure or pseudonymization separately.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "AccountEventArchive.ownerGhii": {
+      "role": "history",
+      "current": "No account-erasure step found in the reviewed flow; separate retention jobs exist.",
+      "reason": "Retention jobs do not by themselves prevent same-name account reads; decide erasure or pseudonymization separately.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "FinanceInvoice.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Accounting records and numbering cannot be assigned a new deletion/retention policy by refactoring.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "FinanceVoucher.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Accounting records and numbering cannot be assigned a new deletion/retention policy by refactoring.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "FinanceFiscalYear.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Accounting records and numbering cannot be assigned a new deletion/retention policy by refactoring.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "FinanceCounter.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Accounting records and numbering cannot be assigned a new deletion/retention policy by refactoring.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "Company.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Company ownership and continued operation need a transfer or retirement decision.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "CompanySmtp.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed; the row includes passwordEnc.",
+      "reason": "A retained live mail credential is a security concern distinct from keeping company accounting records.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "OutboundContact.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Contact permissions and message copies need separate treatment from company bookkeeping.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "OutboundMessage.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Contact permissions and message copies need separate treatment from company bookkeeping.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "Capability.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner enumerates and deletes the owner's capabilities.",
+      "reason": "An erased owner's published capability cannot stay executable as that account.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "existing-contract"
+    },
+    "ContactConsent.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Owner-keyed inbox content and consent must not silently become a new same-name registrant's data.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "DirectMessage.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "Owner-keyed inbox content and consent must not silently become a new same-name registrant's data.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "Conversation.createdBy": {
+      "role": "authorship",
+      "current": "No creator-only erasure in the owner deletion flow reviewed.",
+      "reason": "A conversation may belong to multiple participants; each mailbox copy and the shared thread need separate decisions.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "Organism.createdBy": {
+      "role": "authorship",
+      "current": "Memberships are removed; no creator-only organism deletion in the reviewed flow.",
+      "reason": "An organism can outlive its creator and must not be deleted with that person.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "Package.authorGhii": {
+      "role": "authorship",
+      "current": "No author-only erasure in the owner deletion flow reviewed.",
+      "reason": "Published content, discussions and reviews can outlive an author; attribution/pseudonymization needs a decision.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "TemplateDiscussion.authorGhii": {
+      "role": "authorship",
+      "current": "No author-only erasure in the owner deletion flow reviewed.",
+      "reason": "Published content, discussions and reviews can outlive an author; attribution/pseudonymization needs a decision.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "TemplateReview.authorGhii": {
+      "role": "authorship",
+      "current": "No author-only erasure in the owner deletion flow reviewed.",
+      "reason": "Published content, discussions and reviews can outlive an author; attribution/pseudonymization needs a decision.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "PackageInstance.ownerGhii": {
+      "role": "ownership",
+      "current": "No matching erasure step in the owner deletion flow reviewed.",
+      "reason": "An installation is account-owned even when its package author is someone else.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "RealtimeRoom.createdBy": {
+      "role": "relation",
+      "current": "No creator-only erasure in the owner deletion flow reviewed.",
+      "reason": "Creator identity can control shared published resources; transfer, retirement and attribution must be distinguished.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    },
+    "SubdomainSite.createdBy": {
+      "role": "relation",
+      "current": "No creator-only erasure in the owner deletion flow reviewed.",
+      "reason": "Creator identity can control shared published resources; transfer, retirement and attribution must be distinguished.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
+        "src/storage/providers/sqlite/methods/owner-cascade.ts"
+      ],
+      "test": "test/unit/storage-owner-relations.test.ts",
+      "verification": "source-reviewed",
+      "decision": "required"
+    }
+  }
+}
