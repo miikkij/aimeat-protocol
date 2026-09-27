@@ -16,7 +16,8 @@
  *   is a security decision before it is a design one: a part's preview is served from the node's
  *   own origin, so a part that carried script would be anybody's code running as this node. For
  *   the same reason the markup is read against an ALLOWLIST of elements and attributes, and the
- *   stylesheet may not load anything, reach outside its own prefix, or fix itself over the page.
+ *   stylesheet may not load anything, reach outside its own prefix, carry an at-rule off its list, or
+ *   fix itself over the page.
  *
  *   IT WEARS WHATEVER PAGE IT LANDS IN. Every colour is a `var(--ak-…)` token, never a literal,
  *   so inside a genre it takes the genre's ground, ink and accent through the genre's bridge, and
@@ -35,6 +36,11 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.13.0 — 2026-09-26 — The at-rules a component's stylesheet may carry are a list: @media, @supports,
+ *     @container and @starting-style, and @keyframes, @property, @counter-style, @font-palette-values,
+ *     @position-try, @function and @font-feature-values under a name that starts with its prefix, with
+ *     the blocks of @font-feature-values inside it. Every other at-rule, known or unknown, is refused,
+ *     and every refusal of an at-rule says what the list is.
  *   v1.12.0 — 2026-09-26 — A component's stylesheet reaches only the component: @layer, @page and
  *     @view-transition are refused, each in a sentence of its own, and the name a @keyframes, @property
  *     or @counter-style defines starts with the component's prefix, the refusal showing the prefixed
@@ -107,7 +113,7 @@
 import { createHash } from 'node:crypto';
 import { DesignBookError } from './errors.js';
 import {
-  MAX_NESTING, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem, type NameDefinition, type NameKind,
+  MAX_NESTING, nameKindOf, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem, type NameDefinition, type NameKind,
 } from './component-scan.js';
 import { escapeHtml } from '../site-tags.js';
 
@@ -234,6 +240,7 @@ function checkMarkup(html: string, prefix: string): void {
 
 /** At-rules that load something from an address. */
 const LOADING_AT_RULES = new Set(['import', 'font-face', 'namespace']);
+const LOADS_NOTHING = 'A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).';
 /**
  * Inside @scope, "&" stands for the elements its prelude chooses, which can be outside the component,
  * and the component's own classes already keep every rule inside it. So @scope is refused, with the
@@ -253,14 +260,46 @@ const PAGE_AT_RULES = new Map<string, (prefix: string) => string>([
 ]);
 
 /**
- * What @keyframes, @property and @counter-style define. The whole page shares the name, so a
- * component defines names of its own only: its prefix, or its prefix and a dash (after the "--" of a
- * custom property). A name it only USES may be the page's own.
+ * THE AT-RULES A COMPONENT'S STYLESHEET MAY CARRY ARE A LIST, so an at-rule nobody has thought of yet
+ * is refused too: the ones that condition the rules inside them and name nothing the page shares
+ * (CONDITIONS), and the ones that define a name, under a name of the component's own (DEFINED).
  */
-const DEFINED: Record<NameKind, { noun: string; stem: string; dashes: string; use: (name: string) => string; still: string }> = {
+const CONDITIONS = new Set(['media', 'supports', 'container', 'starting-style']);
+/** The blocks of @font-feature-values: their names belong to the font family it names, so they stand only inside it. */
+const FEATURE_BLOCKS = new Set(['styleset', 'stylistic', 'character-variant', 'swash', 'ornaments', 'annotation', 'historical-forms']);
+/** The list, as every refusal of an at-rule says it. */
+const USES_ONLY = 'uses only @media, @supports, @container and @starting-style, which condition its own rules, '
+  + 'and @keyframes, @property, @counter-style, @font-palette-values, @position-try, @function and @font-feature-values under a name that starts with its prefix';
+
+/** May a component's stylesheet carry this at-rule where it stands? The name it defines is checked apart (ownDefinition). */
+const listed = (a: { name: string; within: string | null }): boolean => CONDITIONS.has(a.name) || nameKindOf(a.name) !== null
+  || (FEATURE_BLOCKS.has(a.name) && a.within === 'font-feature-values');
+
+/** Why an at-rule off the list is refused: in words of its own where a component reaches for one, and with the list either way. */
+function atRuleRefusal(name: string, prefix: string): string {
+  if (FEATURE_BLOCKS.has(name)) return `A component's stylesheet carries @${name} only inside the @font-feature-values it belongs to: it ${USES_ONLY}.`;
+  const own = LOADING_AT_RULES.has(name) ? LOADS_NOTHING : name === 'scope' ? SCOPE_REFUSAL(prefix) : PAGE_AT_RULES.get(name)?.(prefix);
+  return own ? `${own} A component's stylesheet ${USES_ONLY}.` : `A component's stylesheet carries no @${name.slice(0, 40)}: it ${USES_ONLY}.`;
+}
+
+/**
+ * What the at-rules that define a page-wide name define. The whole page shares the name, so a
+ * component defines names of its own only: its prefix, or its prefix and a dash (after the "--" of a
+ * dashed name). A name it only USES may be the page's own.
+ */
+const DEFINED: Record<NameKind, {
+  noun: string; stem: string; dashes: string; after?: string; use: (name: string) => string; still: string; found?: (name: string, atRule: string) => string;
+}> = {
   keyframes: { noun: 'animation', stem: 'spin', dashes: '', use: n => `animation-name: ${n}`, still: 'An animation the page defines is still used by its name.' },
   property: { noun: 'custom property', stem: 'x', dashes: '--', use: n => `var(${n})`, still: 'The page\'s tokens are still read by their names.' },
   'counter-style': { noun: 'counter style', stem: 'count', dashes: '', use: n => `list-style-type: ${n}`, still: 'A counter style the page defines is still used by its name.' },
+  'font-palette-values': { noun: 'font palette', stem: 'palette', dashes: '--', use: n => `font-palette: ${n}`, still: 'A palette the page defines is still used by its name.' },
+  'position-try': { noun: 'position fallback', stem: 'try', dashes: '--', use: n => `position-try-fallbacks: ${n}`, still: 'A fallback the page defines is still used by its name.' },
+  function: { noun: 'custom function', stem: 'fn', dashes: '--', after: '()', use: n => `${n}()`, still: 'A function the page defines is still called by its name.' },
+  'font-feature-values': {
+    noun: 'font family', stem: 'font', dashes: '', use: n => `font-family: ${n}`, still: 'A font family the page uses keeps the feature values the page gives it.',
+    found: (n, at) => `The stylesheet defines feature values for the font family "${n}" with @${at}, a family the whole page shares, so the page's own text in that family would change.`,
+  },
 };
 
 /** Is the name this at-rule defines one of the component's own? */
@@ -274,10 +313,12 @@ function definitionRefusal(d: NameDefinition, prefix: string): string {
   const def = DEFINED[d.kind];
   const stem = (d.name ?? '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || def.stem;
   const own = `${def.dashes}${prefix}-${stem}`;
-  const found = d.name === null
+  const name = d.name?.slice(0, 40);
+  const found = name === undefined
     ? `"${d.text}" does not name one ${def.noun} the bench can read.`
-    : `The stylesheet defines the ${def.noun} "${d.name.slice(0, 40)}" with @${d.atRule}, a name the whole page shares, so the page's own ${def.noun} of that name would change.`;
-  return `${found} A component defines names of its own only: start the name with its prefix, "@${d.atRule} ${own}", and use it as "${def.use(own)}". ${def.still}`;
+    : def.found?.(name, d.atRule)
+      ?? `The stylesheet defines the ${def.noun} "${name}" with @${d.atRule}, a name the whole page shares, so the page's own ${def.noun} of that name would change.`;
+  return `${found} A component defines names of its own only: start the name with its prefix, "@${d.atRule} ${own}${def.after ?? ''}", and use it as "${def.use(own)}". ${def.still}`;
 }
 /** Functions that take an address: url() as a token or a function, and the ones that take it as a plain string. */
 const loads = (fn: string) => fn === 'url' || fn === 'src' || fn === 'image' || fn.endsWith('image-set');
@@ -297,15 +338,11 @@ function checkStyles(css: string, prefix: string): void {
   // from its tokens, every name with its escapes resolved, since `u\72 l(` is url( to a browser; the
   // declarations and selectors from its parser. A string is one token: what it holds is text.
   const sheet = readStylesheet(css);
-  if (sheet.atRules.some(name => LOADING_AT_RULES.has(name))) refuse('A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).');
-  if (sheet.atRules.includes('scope')) refuse(SCOPE_REFUSAL(prefix));
-  // A COMPONENT'S STYLESHEET REACHES ONLY THE COMPONENT: no at-rule that acts on the whole page, and
-  // every name it defines for the whole page (an animation, a custom property, a counter style) is
-  // its own. What it uses by name may be the page's own.
-  for (const name of sheet.atRules) {
-    const pageWide = PAGE_AT_RULES.get(name);
-    if (pageWide) refuse(pageWide(prefix));
-  }
+  // A COMPONENT'S STYLESHEET REACHES ONLY THE COMPONENT. It carries the at-rules on the list and no
+  // other, known or unknown, and every name it defines for the whole page (an animation, a custom
+  // property, a font palette, …) is its own. What it uses by name may be the page's own.
+  const unlisted = sheet.atRules.find(a => !listed(a));
+  if (unlisted) refuse(atRuleRefusal(unlisted.name, prefix));
   const foreign = sheet.definitions.find(d => !ownDefinition(d, prefix));
   if (foreign) refuse(definitionRefusal(foreign, prefix));
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.

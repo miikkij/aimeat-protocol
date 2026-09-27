@@ -5,6 +5,10 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.15.0 — 2026-09-26 — The at-rules are a list: @font-palette-values, @position-try, @function and
+ *     @font-feature-values pass under a name that starts with the prefix and are refused under another,
+ *     an at-rule off the list (@document, @charset, one nobody has named yet, a feature block outside
+ *     @font-feature-values) is refused with the list, and the reader is timed on at-rules that define a name.
  *   v1.14.0 — 2026-09-26 — @layer, @page and @view-transition are refused, each by name; a @keyframes,
  *     @property or @counter-style whose name does not start with the prefix is refused with the
  *     prefixed form, and one whose name does passes, as does a use of the page's own names.
@@ -309,6 +313,7 @@ describe('the component bench', () => {
       ['comments', '/* '], ['strings', '"a\\'], ['escapes', '\\75 '], ['declarations', 'animation ', '.a{'], ['strings in rules', '"{\'', '.a{'],
       ['flat at-rules', '@media '], ['selector lists', '.a, '], ['conditions', '(', '@supports '], ['blocks', '@media{'], ['nested rules', '& {', '.a{'],
       ['pseudo-classes', ':is(', '.a'], ['var fallbacks', 'var(--a,(', '.a{b:'], ['closed declarations', 'a:b; ', '.a{'],
+      ['at-rules that define a name', '@keyframes '], ['custom functions', '@function --a('],
     ]) timed(`stylesheet, ${shape}`, () => readStylesheet(ceiling(unit, head)));
     // Nesting at the most the bench reads is parsed, and parsed quickly.
     timed('stylesheet, nested as deep as the bench reads', () => {
@@ -442,8 +447,29 @@ describe('the component bench', () => {
     ['@counter-style decimal { system: numeric; symbols: "0" "1"; }',
       /defines the counter style "decimal" with @counter-style, a name the whole page shares.*"@counter-style wkgrid-decimal", and use it as "list-style-type: wkgrid-decimal"/],
     ['@counter-style DISC { system: cyclic; symbols: "*"; }', /defines the counter style "disc" with @counter-style/],
+    ['@font-palette-values --ak-pal { font-family: Inter; override-colors: 0 var(--ak-ink); }',
+      /defines the font palette "--ak-pal" with @font-palette-values, a name the whole page shares.*"@font-palette-values --wkgrid-ak-pal", and use it as "font-palette: --wkgrid-ak-pal"/],
+    ['@position-try --ak-top { top: 0; }',
+      /defines the position fallback "--ak-top" with @position-try, a name the whole page shares.*"@position-try --wkgrid-ak-top", and use it as "position-try-fallbacks: --wkgrid-ak-top"/],
+    ['@function --ak-gap() { result: 4px; }',
+      /defines the custom function "--ak-gap" with @function, a name the whole page shares.*"@function --wkgrid-ak-gap\(\)", and use it as "--wkgrid-ak-gap\(\)"/],
+    ['@font-feature-values Inter { @styleset { nice: 1; } }',
+      /defines feature values for the font family "inter" with @font-feature-values, a family the whole page shares.*"@font-feature-values wkgrid-inter", and use it as "font-family: wkgrid-inter"/],
   ])('refuses %s: the name it defines does not start with the prefix', (rule, message) => {
     expect(bad({ css: `${WEEK_GRID.css}\n${rule}` })).toThrow(message);
+  });
+
+  // The at-rules a component's stylesheet may carry are a list, so an at-rule nobody has thought of
+  // yet is refused too, and the refusal says what the list is.
+  it.each([
+    ['document', '@document url-prefix() { .wkgrid-cell { color: var(--ak-accent); } }'],
+    ['charset', '@charset "utf-8";'],
+    ['charset', '@\\63 harset "utf-8";'],
+    ['tomorrow', '@tomorrow (x) { .wkgrid-cell { color: var(--ak-accent); } }'],
+    ['styleset', '@styleset { nice: 1; }'],
+  ])('refuses @%s, which is not on the list, and says what a component may use: %s', (name, rule) => {
+    expect(bad({ css: `${rule}\n${WEEK_GRID.css}` })).toThrow(new RegExp(`@${name}.*uses only @media, @supports, @container and @starting-style, which condition its own rules, `
+      + 'and @keyframes, @property, @counter-style, @font-palette-values, @position-try, @function and @font-feature-values under a name that starts with its prefix'));
   });
 
   it('passes @keyframes, @property and @counter-style under names of its own, and the page\'s own names where it uses them', () => {
@@ -454,6 +480,9 @@ describe('the component bench', () => {
       '@property --wkgrid-x { syntax: "<length>"; inherits: false; initial-value: 0px; }',
       '@counter-style wkgrid-count { system: cyclic; symbols: "*"; }\n.wkgrid-row { list-style-type: wkgrid-count; }',
       '.wkgrid-cell { animation: ak-fade 1s; }', '.wkgrid-row { counter-increment: ak-step; list-style-type: decimal; }',
+      '@container (min-width: 30em) { .wkgrid-cell { min-height: 32px; } }', '@starting-style { .wkgrid-cell { opacity: 0; } }',
+      '@font-palette-values --wkgrid-pal { font-family: Inter; override-colors: 0 var(--ak-ink); }', '@position-try --wkgrid-top { top: 0; }',
+      '@function --wkgrid-gap() { result: 4px; }', '@font-feature-values wkgrid-font { @styleset { nice: 1; } @swash { fancy: 1; } }',
     ]) {
       expect(() => validateComponentBody({ ...WEEK_GRID, css: `${WEEK_GRID.css}\n${css}` }), css).not.toThrow();
     }

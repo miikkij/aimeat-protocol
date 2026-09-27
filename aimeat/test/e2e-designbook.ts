@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.3 — 2026-09-26 — At propose, the at-rules are a list: @container, @starting-style and the four
+ *     more at-rules that define a name pass under the prefix, those four are refused under another name
+ *     with the prefixed form, and @document is refused with the list.
  *   v1.8.2 — 2026-09-26 — At propose, @layer, @page and @view-transition are refused by name, and a
  *     @keyframes, @property or @counter-style passes under a name that starts with the prefix and is
  *     refused under another, with the prefixed form.
@@ -674,6 +677,28 @@ const GOOD_BODY = {
             if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(form))) wrong.push(`${rule.split(' {')[0]}: ${said(r)}`);
         }
         assert(wrong.length === 0, `each is refused with the prefixed form: ${wrong.join('; ')}`);
+    });
+
+    await test('the at-rules a stylesheet may carry are a list: a font palette, a position fallback, a custom function and font feature values pass under the prefix and are refused under another name, and an at-rule off the list is refused with the list', async () => {
+        const stamp = Date.now() % 100000;
+        const own = await proposeComponent(`comp-rules-${stamp}`, componentBody({
+            css: '.wkgrid { color: var(--ak-ink); }\n@container (min-width: 1px) { .wkgrid-cell { min-height: 40px; } }\n@starting-style { .wkgrid-cell { opacity: 0; } }\n'
+                + '@font-palette-values --wkgrid-pal { font-family: Inter; }\n@position-try --wkgrid-top { top: 0; }\n@function --wkgrid-gap() { result: 4px; }\n'
+                + '@font-feature-values wkgrid-font { @styleset { nice: 1; } }',
+        }));
+        assert(own.status === 201, `the conditions and names of its own pass: ${said(own)}`);
+        const wrong: string[] = [];
+        for (const [rule, expected] of [
+            ['@font-palette-values --ak-pal { font-family: Inter; }', '"@font-palette-values --wkgrid-ak-pal"'],
+            ['@position-try --ak-top { top: 0; }', '"@position-try --wkgrid-ak-top"'],
+            ['@function --ak-gap() { result: 4px; }', '"@function --wkgrid-ak-gap()"'],
+            ['@font-feature-values Inter { @styleset { nice: 1; } }', '"@font-feature-values wkgrid-inter"'],
+            ['@document url-prefix() { .wkgrid-cell { min-height: 40px; } }', 'carries no @document: it uses only @media, @supports, @container and @starting-style'],
+        ]) {
+            const r = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: `.wkgrid { color: var(--ak-ink); }\n${rule}` }));
+            if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${rule.split(' {')[0]}: ${said(r)}`);
+        }
+        assert(wrong.length === 0, `each is refused in its own words: ${wrong.join('; ')}`);
     });
 
     await test('markup that leaves an element open where it ends is refused, with the element named', async () => {
