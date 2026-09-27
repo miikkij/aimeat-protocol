@@ -3,12 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The cortex redeploy: create a cortex, or replace an installed one in place. PUT
- *   /v1/cortex/:name and aimeat_cortex_install with update:true both call upsertCortex(). Extracted
- *   from src/routes/cortex.ts to satisfy max-file-lines; routes/cortex.ts re-exports it, so its
- *   importers are unchanged.
+ *   /v1/cortex/:name, aimeat_cortex_install with update:true and a presigned cortex ZIP under an
+ *   installed name (routes/upload.ts) all call upsertCortex(). Extracted from src/routes/cortex.ts to
+ *   satisfy max-file-lines; routes/cortex.ts re-exports it, so its importers are unchanged.
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The presigned cortex upload replaces an installed cortex through
+ *     upsertCortex, with mayReplaceOthers false (secaudit 2026-09, R4 4b).
  *   v1.3.0 — 2026-09-26 — The redeploy of an active cortex tears down and re-activates as the caller
  *     (CortexActor), so its actions are published under the caller's resolved identity, as a plain
  *     activation publishes them (secaudit 2026-09, R3 7c).
@@ -51,10 +53,11 @@ const upsertRefusal = (status: number, code: string, message: string, details?: 
   ({ ok: false, refusal: { status, code, message, details } });
 
 /**
- * Create a cortex, or replace an installed one in place: PUT /v1/cortex/:name, and
- * aimeat_cortex_install with update:true. Extracted from the PUT handler unchanged, so the redeploy
- * has one implementation whichever door asks for it. The tool could only create, and its
- * description sent an agent to this route over HTTP, which an MCP-only agent cannot reach.
+ * Create a cortex, or replace an installed one in place: PUT /v1/cortex/:name,
+ * aimeat_cortex_install with update:true, and a presigned cortex ZIP under an installed name.
+ * Extracted from the PUT handler unchanged, so the redeploy has one implementation whichever
+ * endpoint or MCP tool asks for it. The tool could only create, and its description sent an agent to
+ * this route over HTTP, which an MCP-only agent cannot reach.
  *
  * Redeploy without a live gap. Unlike the old deactivate→DELETE→re-POST dance, an existing cortex
  * keeps its identity and stays served for the whole call: lib bytes are swapped in place (overwrite,

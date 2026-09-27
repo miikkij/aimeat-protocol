@@ -9,9 +9,9 @@
  *   A handler here reads the signed token's meta, unpacks whatever shape the bytes arrive in, and
  *   renders the answer. The decisions belong to the service each capability already has, so the
  *   app, storage and cortex-install paths call services/app-publish.ts, storage-file-write.ts and
- *   cortex-lifecycle.ts rather than restating their gates. Presigned upload is the door an author
- *   is told to use for anything over ~1 kB, which makes a gate that is missing here a gate that is
- *   missing for most real traffic.
+ *   cortex-lifecycle.ts, and a cortex replace calls routes/cortex/upsert.ts, rather than restating
+ *   their gates. Presigned upload is the endpoint an author is told to use for anything over ~1 kB,
+ *   which makes a gate that is missing here a gate that is missing for most real traffic.
  * @structure
  *   - uploadRouter() — Express router factory with single PUT endpoint
  *   - handleAppUpload() — process HTML app uploads
@@ -24,6 +24,11 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.20.0 — 2026-09-26 — A ZIP under the name of a cortex the uploader installed goes through
+ *     upsertCortex, the redeploy PUT /v1/cortex/:name and aimeat_cortex_install update:true run. An
+ *     active cortex is taken down and activated again from the new manifest, its actions published
+ *     under the uploader; its visibility, install time and seed data stay, and a lib it no longer
+ *     names stops being served (secaudit 2026-09, R4 4b).
  *   v1.19.1 — 2026-09-26 — The app, extension, skill and cortex uploads name their owner with
  *     localAccountName, so an upload by a visitor from another node lands under its own name, as the
  *     direct doors already do, never under the local namesake (secaudit 2026-09, F-1).
@@ -127,12 +132,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, StorageFileRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
-import { validateNamespaceOwnership } from '../services/cortex-manifest.js';
-import { installCortex, libsWithoutContent, missingLibsMessage } from '../services/cortex-lifecycle.js';
-import {
-    keptVersionRefusal, extensionCodeOf, cortexCodeOf, cortexLibsAfterDeploy,
-    snapshotExtensionVersion, snapshotCortexVersion, servedCortexLibs,
-} from '../services/component-versions.js';
+import { installCortex } from '../services/cortex-lifecycle.js';
+import { upsertCortex } from './cortex/upsert.js';
+import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
 import { writeStorageFile } from '../services/storage-file-write.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
@@ -154,7 +156,6 @@ import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
-import { emitChange } from '../services/event-bus.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -720,63 +721,40 @@ async function handleCortexUpload(
         return;
     }
 
-    // ── EXISTING NAME — replace in place. installCortex creates and never replaces, and the
-    //    in-place upsert lives inline in PUT /v1/cortex/:name rather than in a service, so this
-    //    branch has nothing shared to call. It has to stay: re-uploading is how a cortex bundle over
-    //    ~1 kB is iterated on, and turning that into a duplicate-name failure would leave an agent
-    //    with no way to redeploy at all.
+    // ── EXISTING NAME — the redeploy PUT /v1/cortex/:name and aimeat_cortex_install update:true run
+    //    (routes/cortex/upsert.ts upsertCortex). Re-uploading is how a cortex bundle over ~1 kB is
+    //    iterated on, so this endpoint replaces the cortex in place the same way: a lib the manifest names
+    //    arrives or is already stored, a kept version never takes other bytes, and an ACTIVE cortex is
+    //    taken down and activated again from the new manifest, so no action, board, schema lock or
+    //    prompt of the replaced activation stays with nothing pointing at it.
     //
     //    SECURITY (C-4): the cortex NAME comes out of the uploaded manifest, and setCortexLibFile is
-    //    an unconditional upsert keyed on (extName, libName) with no owner column. Naming someone
-    //    else's cortex replaces their lib bytes, which are served back as JavaScript from the apex
-    //    origin to everyone who has that cortex active. Both gates therefore run BEFORE the first
-    //    lib write, because that write is what does the damage.
-    if (!isOperator && !validateNamespaceOwnership(incoming.namespace, ownerName)) {
-        res.status(403).json({
-            success: false, error: 'NAMESPACE_DENIED',
-            message: `You cannot install a cortex in namespace "${incoming.namespace}". Use your own namespace "${ownerName}" or "community".`,
+    //    an unconditional upsert keyed on (extName, libName) with no owner column. The upsert asks the
+    //    namespace claim and whose cortex it is before it writes the first lib byte. Replacing a cortex
+    //    another owner installed is refused to an operator too (mayReplaceOthers false), as on the
+    //    tool that minted this upload's token.
+    //
+    //    The token's subject is the uploading principal as its session resolved it (the tool mints it
+    //    from an agent's GAII), and a re-activation publishes the cortex's actions under it. A bare
+    //    account name is completed to the account's GHII, as resolveIdentity completes an owner's.
+    const identity = sub.includes('#') || sub.includes('@') ? sub : `${ownerName}@${config.nodeId}`;
+    const out = await upsertCortex({ storage, config }, { ownerName, gaii: sub, identity, isOperator }, {
+        name: incoming.name, manifest: incoming.manifest, libs: result.libs,
+    }, false);
+    if (!out.ok) {
+        res.status(out.refusal.status).json({
+            success: false, error: out.refusal.code, message: out.refusal.message,
+            ...(out.refusal.details ? { details: out.refusal.details } : {}),
         });
         return;
     }
-    if (existing.installedBy !== ownerName) {
-        res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'Not your cortex extension' });
-        return;
-    }
-
-    // Every lib the new manifest names arrives in this ZIP or is already stored; otherwise the
-    // replace would record a component the node never serves (the install door refuses the same).
-    const stored = new Set<string>();
-    for (const c of existing.components) {
-        if (c.type === 'lib' && (await storage.getCortexLibFile(incoming.name, c.filename)) !== null) stored.add(c.filename);
-    }
-    const missing = libsWithoutContent(incoming.components, result.libs ?? {}, stored);
-    if (missing.length) {
-        res.status(400).json({ success: false, error: 'INVALID_MANIFEST', message: missingLibsMessage(missing) });
-        return;
-    }
-
-    // A kept version is immutable on this door as on PUT /v1/cortex/:name: other lib bytes under a
-    // version already kept are refused before the first byte is written (A6-7).
-    const kept = await keptVersionRefusal(storage, 'cortex', incoming.name, incoming.version,
-        cortexCodeOf(await cortexLibsAfterDeploy(storage, incoming.name, incoming.components, result.libs ?? {})));
-    if (kept) { res.status(kept.status).json({ success: false, error: kept.code, message: kept.message }); return; }
-
-    if (result.libs) {
-        for (const [filename, content] of Object.entries(result.libs)) {
-            await storage.setCortexLibFile(incoming.name, filename, content);
-        }
-    }
-
-    const record = (await storage.updateCortexExtension(incoming.name, incoming)) ?? incoming;
-    await snapshotCortexVersion(storage, record, await servedCortexLibs(storage, record), ownerName)
-        .catch(err => logger.warn('Cortex upload: version not kept', { name: record.name, version: record.version, error: String(err) }));
-    emitChange('cortex');
-    respondCortexInstalled(res, record, true, sub);
+    respondCortexInstalled(res, out.value.record, true, sub);
 }
 
 /** The upload's answer, shared by the install branch and the replace branch above. */
 function respondCortexInstalled(
-    res: Response, record: CortexExtensionRecord, replaced: boolean, sub: string,
+    res: Response, record: Pick<CortexExtensionRecord, 'name' | 'namespace' | 'version' | 'status' | 'components'>,
+    replaced: boolean, sub: string,
 ): void {
     logger.info(`Cortex installed via upload: ${record.name}`, { version: record.version, by: sub, replaced });
     emitResourceListChanged(sub);

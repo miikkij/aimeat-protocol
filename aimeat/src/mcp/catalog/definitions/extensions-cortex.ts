@@ -12,6 +12,9 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.4.0 — 2026-09-26 — aimeat_cortex_install says that a ZIP upload under the name of a cortex the
+ *     caller installed replaces it the way update:true does, and what the redeploy of an active one
+ *     takes down.
  *   v1.3.0 — 2026-09-26 — aimeat_cortex_deactivate says what a deactivation removes, whoever activated
  *     the cortex, and what stays.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -111,13 +114,13 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_install',
-        description: 'Install a cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI), or redeploy one you installed. Two modes. UPLOAD MODE: call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE: provide the manifest YAML string plus a libs map directly. Activate a new one afterwards with aimeat_cortex_activate. REDEPLOYING: pass update:true with the inline manifest and libs to replace your installed cortex of that metadata.name in place, with no delete: it stays served for the whole call, an active one stays active and re-runs its initialisation, and identical bytes answer "unchanged". Without update:true a name that already exists is refused. update:true works in inline mode only; the ZIP upload creates. Do not delete a live cortex to reinstall it, because every app loading its lib breaks until the new one is active. The answer names each lib\'s address in lib_urls; that is the exact script src an app loads.',
+        description: 'Install a cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI), or redeploy one you installed. Two modes. UPLOAD MODE: call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE: provide the manifest YAML string plus a libs map directly. Activate a new one afterwards with aimeat_cortex_activate. REDEPLOYING: pass update:true with the inline manifest and libs to replace your installed cortex of that metadata.name in place, with no delete: it stays served for the whole call, an active one is taken down and activated again from the new manifest (its old actions, boards, schema locks and prompts go, its seed data stays), and identical bytes answer "unchanged". Without update:true an inline install of a name that already exists is refused. A ZIP upload that carries the name of a cortex you installed replaces it the same way, without update:true. Do not delete a live cortex to reinstall it, because every app loading its lib breaks until the new one is active. The answer names each lib\'s address in lib_urls; that is the exact script src an app loads.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             manifest: { type: 'string', description: 'Cortex manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
             libs: { type: 'object', description: 'Map of filename to JavaScript source code for lib files. Omit for upload mode.' },
-            update: { type: 'boolean', description: 'Replace your installed cortex of the manifest\'s metadata.name in place (inline mode only). Without it an existing name is refused.' },
+            update: { type: 'boolean', description: 'Replace your installed cortex of the manifest\'s metadata.name in place (inline mode). Without it an inline install of an existing name is refused; a ZIP upload replaces a cortex you installed either way.' },
         },
     },
     {

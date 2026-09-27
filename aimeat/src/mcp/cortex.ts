@@ -10,6 +10,9 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.9.1 -- 2026-09-26 -- The upload response and the refusal of update:true without a manifest say
+ *     that a ZIP under the name of a cortex the caller installed replaces it in place, as the upload
+ *     endpoint does (secaudit 2026-09, R4 4b).
  *   v1.9.0 -- 2026-09-27 -- aimeat_cortex_list takes `name` (one cortex in full) and `include_source`
  *     (its manifest and libs, cortex:write), through services/cortex-read.ts like the REST reads.
  *   v1.8.2 -- 2026-09-26 -- The caller carries its resolved identity, which for an MCP session is the
@@ -174,21 +177,22 @@ export function registerCortexTools(
         {
             manifest: z.string().optional().describe('YAML manifest string. Omit to get an upload URL for a ZIP bundle.'),
             libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files.'),
-            update: z.boolean().optional().describe('Replace your installed cortex of the manifest\'s metadata.name in place (inline mode only). Without it an existing name is refused.'),
+            update: z.boolean().optional().describe('Replace your installed cortex of the manifest\'s metadata.name in place (inline mode). Without it an inline install of an existing name is refused; a ZIP upload replaces a cortex you installed either way.'),
         },
         annotationsFor('aimeat_cortex_install'),
         async ({ manifest, libs, update }) => {
             const agentGaii = getAgentGaii();
 
-            // The ZIP road creates only: its upload handler takes no options, so a flag minted into
-            // the token would be carried and then ignored. Refused here, where the caller still has
-            // the manifest in hand, instead of answering with an upload URL that cannot do the job.
+            // The ZIP upload takes no options: its handler installs a new name and replaces a cortex
+            // of the uploader's own by name, whatever a flag says, so a flag minted into the token
+            // would be carried and then ignored. update:true belongs to the inline redeploy, and a
+            // call that sets it without a manifest is told which code path does what.
             if (!manifest && update) {
                 return {
                     content: [{
                         type: 'text' as const,
-                        text: 'update:true redeploys inline only: send the manifest YAML and the libs map in this call. '
-                            + 'The ZIP upload creates a new cortex and cannot replace an installed one.',
+                        text: 'update:true takes the inline manifest: send the manifest YAML and the libs map in this call. '
+                            + 'To redeploy from a ZIP, call without update and upload the ZIP: one that carries the name of a cortex you installed replaces it in place.',
                     }],
                     isError: true,
                 };
@@ -218,7 +222,8 @@ export function registerCortexTools(
                             max_size_bytes: maxBytes,
                             expires_in_seconds: 3600,
                             zip_structure: 'manifest.yaml at root, lib files in libs/ directory',
-                            note: 'Create a ZIP with manifest.yaml and libs/*.js, then PUT it to upload_url.',
+                            note: 'Create a ZIP with manifest.yaml and libs/*.js, then PUT it to upload_url. '
+                                + 'A ZIP that carries the name of a cortex you installed replaces it in place; an active one is activated again from the new manifest.',
                         }, null, 2),
                     }],
                 };
