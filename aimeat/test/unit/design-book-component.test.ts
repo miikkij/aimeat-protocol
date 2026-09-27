@@ -5,6 +5,11 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.17.0 — 2026-09-26 — A declaration that names a counter, an anchor, a view transition or a
+ *     timeline the page shares is refused with the prefixed form, as is one that names it through
+ *     var(), a function or inherit, and `all` other than a reset; names of its own, none, and a page's
+ *     names that a rule only uses pass, and the bench is timed on a declaration of many names. The case
+ *     of the page's own names uses `counter-increment: wkgrid-step`, a counter of the component's own.
  *   v1.16.0 — 2026-09-26 — A stylesheet that ends inside a block, a bracket, a comment, a string or a
  *     rule with no block is refused, by what is open, and one whose comments and strings close passes;
  *     the reader is timed on blocks and brackets left open.
@@ -373,6 +378,9 @@ describe('the component bench', () => {
     });
     timed('the bench, styles', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }' + 'animation '.repeat(1100) }); } catch { /* refused is the right answer */ } });
     timed('the bench, selectors', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid' + ':is(.wkgrid'.repeat(900) + ')'.repeat(900) + ' { color: var(--ak-ink); }' }); } catch { /* refused is the right answer */ } });
+    timed('the bench, names in a declaration', () => {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); counter-reset:' + ' wkgrid-a 1,'.repeat(950) + ' wkgrid-b; }' })).not.toThrow();
+    });
   });
 
   it('cannot reach outside itself', () => {
@@ -525,13 +533,58 @@ describe('the component bench', () => {
       '@keyframes \\77 kgrid-out { to { opacity: 0; } }',
       '@property --wkgrid-x { syntax: "<length>"; inherits: false; initial-value: 0px; }',
       '@counter-style wkgrid-count { system: cyclic; symbols: "*"; }\n.wkgrid-row { list-style-type: wkgrid-count; }',
-      '.wkgrid-cell { animation: ak-fade 1s; }', '.wkgrid-row { counter-increment: ak-step; list-style-type: decimal; }',
+      '.wkgrid-cell { animation: ak-fade 1s; }', '.wkgrid-row { counter-increment: wkgrid-step; list-style-type: decimal; }',
       '@container (min-width: 30em) { .wkgrid-cell { min-height: 32px; } }', '@starting-style { .wkgrid-cell { opacity: 0; } }',
       '@font-palette-values --wkgrid-pal { font-family: Inter; override-colors: 0 var(--ak-ink); }', '@position-try --wkgrid-top { top: 0; }',
       '@function --wkgrid-gap() { result: 4px; }', '@font-feature-values wkgrid-font { @styleset { nice: 1; } @swash { fancy: 1; } }',
     ]) {
       expect(() => validateComponentBody({ ...WEEK_GRID, css: `${WEEK_GRID.css}\n${css}` }), css).not.toThrow();
     }
+  });
+
+  // A counter, an anchor, a view transition and a timeline have names the whole page shares, so a
+  // declaration that defines or changes one names one of the component's own, as an at-rule does.
+  it.each([
+    ['counter-increment: sec 100000', /The declaration "counter-increment: sec 100000" names the counter "sec", a name the whole page shares, so the page's own counter of that name would change\. A component defines and changes names of its own only: start the name with its prefix, "counter-increment: wkgrid-sec", and use it as "content: counter\(wkgrid-sec\)"\. The page's own counters are still used by their names\./],
+    ['counter-reset: sec', /names the counter "sec".*"counter-reset: wkgrid-sec"/],
+    ['counter-reset: wkgrid-a reversed(sec) 3', /names the counter "sec"/],
+    ['counter-set: wkgrid-a 1, --sec 2', /names the counter "--sec".*"counter-set: wkgrid-sec"/],
+    ['anchor-name: --menu', /names the anchor "--menu".*"anchor-name: --wkgrid-menu", and use it as "position-anchor: --wkgrid-menu"\. The page's own anchors are still used by their names\./],
+    ['view-transition-name: hero', /names the view transition "hero".*"view-transition-name: wkgrid-hero", and use it as "::view-transition-group\(wkgrid-hero\)"/],
+    ['view-transition-name: auto', /names the view transition "auto"/],
+    ['view-timeline-name: --reveal', /names the timeline "--reveal".*"view-timeline-name: --wkgrid-reveal", and use it as "animation-timeline: --wkgrid-reveal"/],
+    ['scroll-timeline-name: --page', /names the timeline "--page"/],
+    ['timeline-scope: --page', /names the timeline "--page"/],
+    ['scroll-timeline: --page block', /names the timeline "--page".*"scroll-timeline: --wkgrid-page"/],
+    ['view-timeline: --wkgrid-a block 10%, --page y', /names the timeline "--page"/],
+    ['counter-increment: var(--wkgrid-n)', /The declaration "counter-increment: var\(--wkgrid-n\)" writes its counter name as var\(\), and the bench reads such a name only as a word, so it cannot tell which counter that is\. The whole page shares counter names, so a component writes each one as the word itself, starting with its prefix: "counter-increment: wkgrid-step"\./],
+    ['counter-increment: wkgrid-a var(--wkgrid-n)', /writes its counter name as var\(\)/],
+    ['anchor-name: --wkgrid-fn()', /writes its anchor name as --wkgrid-fn\(\)/],
+    ['counter-increment: "sec"', /writes its counter name as "sec"/],
+    ['counter-increment: inherit', /The declaration "counter-increment: inherit" gives an element the counters of its parent, and the parent of the component is the page's, so the page's own counters would change\. A component defines and changes names of its own only: "counter-increment: wkgrid-step", or none\./],
+    ['view-transition-name: inherit', /gives an element the view transitions of its parent/],
+    ['all: inherit', /The declaration "all: inherit" sets every property at once, the names of counters, anchors, view transitions and timelines among them.*Write "all: unset", "all: initial", "all: revert" or "all: revert-layer", as the word itself\./],
+    ['all: var(--wkgrid-all)', /The declaration "all: var\(--wkgrid-all\)" sets every property at once/],
+  ])('refuses "%s": it defines or changes a name the whole page shares', (decl, message) => {
+    expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid-row { ${decl}; }` })).toThrow(message);
+  });
+
+  it('passes the names of its own in those declarations, and the page\'s own names where it only uses them', () => {
+    for (const decl of [
+      'counter-increment: wkgrid-step', 'counter-reset: wkgrid-step 0 --wkgrid-sub', 'counter-reset: reversed(wkgrid-step) 3', 'counter-set: wkgrid-step 2, wkgrid-sub',
+      'counter-increment: none', 'counter-reset: unset', 'anchor-name: --wkgrid-menu, --wkgrid-tip', 'view-transition-name: wkgrid-hero', 'view-transition-name: none',
+      'view-transition-name: match-element', 'view-timeline: --wkgrid-reveal block 10% 20px', 'scroll-timeline: --wkgrid-scroll inline', 'timeline-scope: --wkgrid-scroll, --wkgrid-reveal',
+      'timeline-scope: all', 'all: unset', 'all: revert',
+      // Using a name the page defines stays allowed, as using a page animation does.
+      'content: counter(sec) ". "', 'position-anchor: --menu', 'animation-timeline: --page', 'list-style-type: decimal',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, css: `${WEEK_GRID.css}\n.wkgrid-row { ${decl}; }` }), decl).not.toThrow();
+    }
+    // The reader gives each part of a value at its top level, for the checks to read the names in it.
+    expect(readStylesheet('.a { counter-reset: reversed(b) 2, --c; d: var(--e) "f" }').declarations.map(d => d.parts)).toEqual([
+      [{ type: 'function', name: 'reversed', words: ['b'] }, { type: 'number' }, { type: 'comma' }, { type: 'word', name: '--c' }],
+      [{ type: 'function', name: 'var', words: ['--e'] }, { type: 'other', text: '"f"' }],
+    ]);
   });
 
   // A pseudo-class only narrows the element its compound names, and a pseudo-element hangs off it,

@@ -32,9 +32,12 @@
  *   and a block, a bracket, a comment, a string or a rule still open where it ends takes those rules
  *   in. The tokens say what is open (`open`).
  * @structure readMarkup · readStylesheet · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
- *   StylesheetOpen · NameKind · NameDefinition · nameKindOf · DeclarationRead · ComplexSelector · Compound · Pseudo
+ *   StylesheetOpen · NameKind · NameDefinition · nameKindOf · DeclarationRead · ValuePart · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.8.0 — 2026-09-26 — Every declaration carries the parts of its value at the top level (`parts`):
+ *     a word, a number, a comma, a function with the words it holds, or anything else as written, for
+ *     the check that reads the names a declaration gives counters, anchors and timelines.
  *   v2.7.0 — 2026-09-26 — readStylesheet says what is still open where the stylesheet ends (`open`):
  *     the comment or the string the text ends in, else the innermost open bracket or block, else a
  *     rule at the top that has no block, a ";" or a "}" with no rule before it included, since a
@@ -304,6 +307,18 @@ export interface Compound {
  */
 export interface ComplexSelector { lead: string | null; compounds: Compound[]; combinators: string[] }
 
+/** One part of a declaration's value at its top level, as the parser read it. */
+export type ValuePart =
+  /** An identifier, escapes resolved and lower-cased. */
+  | { type: 'word'; name: string }
+  /** A number, a percentage or a dimension. */
+  | { type: 'number' }
+  | { type: 'comma' }
+  /** A function by its name, with what it holds when that is words only (`reversed(x)`), and null otherwise. */
+  | { type: 'function'; name: string; words: string[] | null }
+  /** Anything else, a string or a hash among them, as written. */
+  | { type: 'other'; text: string };
+
 /** One declaration as the checks read it, outside the conditions of an at-rule's prelude. */
 export interface DeclarationRead {
   /** The property with its escapes resolved, lower-cased. */
@@ -315,6 +330,8 @@ export interface DeclarationRead {
   keywords: string[];
   /** Every literal colour in the value outside var(): "#111111", "rgb(". */
   literals: string[];
+  /** The parts of the value at its top level, or null when the parser kept the value as raw text. */
+  parts: ValuePart[] | null;
   /** The value as written, for a message. */
   text: string;
 }
@@ -566,12 +583,26 @@ export function readStylesheet(css: string): StylesheetReading {
   return reading;
 }
 
-/** One declaration, its value's keywords and literal colours read from the parser's nodes. */
+/** One part of a value at its top level (ValuePart). */
+function partOf(node: CssNode, css: string): ValuePart {
+  if (node.type === 'Identifier') return { type: 'word', name: nameOf(node.name) };
+  if (node.type === 'Number' || node.type === 'Percentage' || node.type === 'Dimension') return { type: 'number' };
+  if (node.type === 'Operator' && node.value === ',') return { type: 'comma' };
+  if (node.type === 'Function') {
+    const held = node.children.toArray().filter(n => n.type !== 'WhiteSpace');
+    const words = held.flatMap(n => (n.type === 'Identifier' ? [nameOf(n.name)] : []));
+    return { type: 'function', name: nameOf(node.name), words: words.length > 0 && words.length === held.length ? words : null };
+  }
+  return { type: 'other', text: textOf(css, node) };
+}
+
+/** One declaration, its value's keywords, literal colours and parts read from the parser's nodes. */
 function declarationOf(node: Declaration, css: string): DeclarationRead {
-  const read: DeclarationRead = { property: nameOf(node.property), important: Boolean(node.important), keyword: null, keywords: [], literals: [], text: textOf(css, node.value) };
+  const read: DeclarationRead = { property: nameOf(node.property), important: Boolean(node.important), keyword: null, keywords: [], literals: [], parts: null, text: textOf(css, node.value) };
   if (node.value.type === 'Raw') return read;
   const parts = node.value.children.toArray().filter(n => n.type !== 'WhiteSpace');
   if (parts.length === 1 && parts[0].type === 'Identifier') read.keyword = nameOf(parts[0].name);
+  read.parts = parts.map(part => partOf(part, css));
   // A colour inside var(--x, …) is a fallback, which the page's token overrides: not a literal.
   let insideVar = 0;
   walk(node.value, {

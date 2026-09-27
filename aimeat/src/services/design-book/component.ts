@@ -36,6 +36,12 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.15.0 — 2026-09-26 — A declaration that names a counter, an anchor, a view transition or a
+ *     timeline (counter-reset, counter-set, counter-increment, anchor-name, view-transition-name,
+ *     view-timeline-name, scroll-timeline-name, timeline-scope and the two timeline shorthands) names
+ *     only the component's own, its prefix after an optional "--", or none, written as the word itself:
+ *     var() or any other function there is refused, and so is inherit, which takes the parent's names.
+ *     `all` takes only unset, initial, revert or revert-layer. A name it only uses may be the page's.
  *   v1.14.0 — 2026-09-26 — A stylesheet ends at its top level: one that leaves a block, a bracket, a
  *     comment, a string or a rule open where it ends is refused in a sentence that names what is open,
  *     because an app pastes it before the page's own rules and what is open takes them in.
@@ -116,8 +122,8 @@
 import { createHash } from 'node:crypto';
 import { DesignBookError } from './errors.js';
 import {
-  MAX_NESTING, nameKindOf, readMarkup, readStylesheet, type ComplexSelector, type Compound, type MarkupProblem, type NameDefinition, type NameKind,
-  type StylesheetOpen,
+  MAX_NESTING, nameKindOf, readMarkup, readStylesheet, type ComplexSelector, type Compound, type DeclarationRead, type MarkupProblem, type NameDefinition,
+  type NameKind, type StylesheetOpen, type ValuePart,
 } from './component-scan.js';
 import { escapeHtml } from '../site-tags.js';
 
@@ -326,6 +332,63 @@ function definitionRefusal(d: NameDefinition, prefix: string): string {
 }
 
 /**
+ * THE NAMES A DECLARATION DEFINES OR CHANGES FOR THE WHOLE PAGE: a counter, an anchor, a view
+ * transition and a timeline. In these properties every word that names one is a name of the
+ * component's own, its prefix after an optional "--", as at an at-rule, and a name is written as the
+ * word itself: the bench cannot read which name var() or another function gives. `keywords` are the
+ * property's words that name nothing. A declaration that only USES such a name (content: counter(x),
+ * position-anchor, animation-timeline) may use the page's own.
+ */
+interface NameProperty { noun: string; dashes: string; stem: string; use: (name: string) => string; keywords?: ReadonlySet<string>; wraps?: string }
+const COUNTER: NameProperty = { noun: 'counter', dashes: '', stem: 'step', use: n => `content: counter(${n})` };
+const TIMELINE: NameProperty = { noun: 'timeline', dashes: '--', stem: 'scroll', use: n => `animation-timeline: ${n}` };
+const AXES = ['block', 'inline', 'x', 'y'];
+const NAME_PROPERTIES: Record<string, NameProperty> = {
+  'counter-reset': { ...COUNTER, wraps: 'reversed' }, 'counter-set': COUNTER, 'counter-increment': COUNTER,
+  'anchor-name': { noun: 'anchor', dashes: '--', stem: 'anchor', use: n => `position-anchor: ${n}` },
+  'view-transition-name': { noun: 'view transition', dashes: '', stem: 'item', use: n => `::view-transition-group(${n})`, keywords: new Set(['match-element']) },
+  'view-timeline-name': TIMELINE, 'scroll-timeline-name': TIMELINE, 'timeline-scope': { ...TIMELINE, keywords: new Set(['all']) },
+  'scroll-timeline': { ...TIMELINE, keywords: new Set(AXES) }, 'view-timeline': { ...TIMELINE, keywords: new Set([...AXES, 'auto']) },
+};
+/** The CSS-wide keywords that take nothing from the page. `inherit` gives an element its parent's value, and the component's parent is the page's. */
+const RESETS = new Set(['initial', 'unset', 'revert', 'revert-layer']);
+
+/** Why a declaration names a counter, an anchor, a view transition or a timeline the whole page shares, or null when every name in it is the component's own. */
+function pageNameRefusal(d: DeclarationRead, prefix: string): string | null {
+  const text = `${d.property}: ${d.text}`.replace(/\s+/g, ' ').slice(0, 60);
+  // `all` sets every property at once, these among them.
+  if (d.property === 'all') {
+    return d.keyword !== null && RESETS.has(d.keyword) ? null : `The declaration "${text}" sets every property at once, the names of counters, anchors, view transitions and timelines among them, `
+      + 'and anything but a reset can give the component the names of the page around it. Write "all: unset", "all: initial", "all: revert" or "all: revert-layer", as the word itself.';
+  }
+  const p = NAME_PROPERTIES[d.property];
+  if (!p) return null;
+  const own = (name: string) => ownClass(name.startsWith('--') ? name.slice(2) : name, prefix);
+  const ownFor = (name: string) => `${p.dashes}${prefix}-${name.replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || p.stem}`;
+  const pageName = (name: string) => `The declaration "${text}" names the ${p.noun} "${name.slice(0, 40)}", a name the whole page shares, so the page's own ${p.noun} of that name would change. `
+    + `A component defines and changes names of its own only: start the name with its prefix, "${d.property}: ${ownFor(name)}", and use it as "${p.use(ownFor(name))}". The page's own ${p.noun}s are still used by their names.`;
+  // A value the parser kept raw is one part the bench cannot read.
+  const parts: ValuePart[] = d.parts ?? [{ type: 'other', text: d.text }];
+  for (const part of parts) {
+    if (part.type === 'number' || part.type === 'comma') continue;
+    if (part.type === 'word') {
+      if (part.name === 'none' || RESETS.has(part.name) || p.keywords?.has(part.name) || own(part.name)) continue;
+      if (part.name !== 'inherit') return pageName(part.name);
+      return `The declaration "${text}" gives an element the ${p.noun}s of its parent, and the parent of the component is the page's, so the page's own ${p.noun}s would change. `
+        + `A component defines and changes names of its own only: "${d.property}: ${ownFor('')}", or none.`;
+    }
+    if (part.type === 'function' && part.name === p.wraps && part.words?.length === 1) {
+      if (own(part.words[0])) continue;
+      return pageName(part.words[0]);
+    }
+    const what = part.type === 'function' ? `${part.name}()` : part.type === 'other' ? part.text.slice(0, 40) : '';
+    return `The declaration "${text}" writes its ${p.noun} name as ${what}, and the bench reads such a name only as a word, so it cannot tell which ${p.noun} that is. `
+      + `The whole page shares ${p.noun} names, so a component writes each one as the word itself, starting with its prefix: "${d.property}: ${ownFor('')}".`;
+  }
+  return null;
+}
+
+/**
  * What the bench says when something is still open where the stylesheet ends (component-scan.ts
  * readStylesheet): an app pastes the stylesheet before the page's own rules, which the open part takes in.
  */
@@ -376,6 +439,12 @@ function checkStyles(css: string, prefix: string): void {
   if (unlisted) refuse(atRuleRefusal(unlisted.name, prefix));
   const foreign = sheet.definitions.find(d => !ownDefinition(d, prefix));
   if (foreign) refuse(definitionRefusal(foreign, prefix));
+  // Every name a declaration defines or changes for the whole page is its own too: a counter, an
+  // anchor, a view transition, a timeline.
+  for (const d of sheet.declarations) {
+    const pageName = pageNameRefusal(d, prefix);
+    if (pageName) refuse(pageName);
+  }
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
   if (sheet.functions.some(loads)) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
   if (sheet.depth > MAX_NESTING) {
