@@ -120,7 +120,7 @@ everywhere at once, and say so in the Changes section.
 | the person who read an AI draft and answers for it | named on an app by its owner in person; the visible AI label then names them or comes off, by the operator's label setting | reviewer (the act: reviewed) | katselmoija (the act on the label: tarkistanut) | revisor (the act: revisado) |
 | the mark that tells a person AI made something | the chip on a served app and the words beside it; the operator's setting decides whether it also marks what the law does not require | visible AI label | näkyvä tekoälymerkintä | etiqueta visible de IA |
 | a chain of steps one trigger runs | agents, the owner's own model, extensions and questions to the person, each step checked for whether it produced | workflow | työnkulku | flujo de trabajo (flujo in a title that names it) |
-| the most one workflow run may spend on AI | US dollars per run; what its AI steps cost and what the node's model costs judging its worded signals both count, and an AI step starts only while its expected cost still fits | spending limit | kulukatto | límite de gasto |
+| the most one workflow run may spend on AI | US dollars per run; what its AI steps cost and what the node's model costs judging its worded signals both count, and an AI step starts only while its expected cost still fits, except that a step expected to cost more than the whole limit starts once, alone | spending limit | kulukatto | límite de gasto |
 | an app's own address | `<name>.apps.<domain>`, where the sign-in of the person who opens the app does not exist | an address of its own | oma osoite | su propia dirección / dirección propia |
 | where an app runs on a shared server with no app addresses | a frame on the server's own address whose origin is opaque: the app reads nobody's sign-in and gets only its own permissions | isolated frame | eristetty kehys | marco aislado |
 
@@ -231,6 +231,8 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-09-27** — spending limit, its second column: a step expected to cost more than the whole
+  limit starts once, alone, and its real cost is what counts. The words in the three languages stay.
 - **2026-09-26** — spending limit, its second column corrected: the judging of a run's worded
   signals counts toward the limit as its AI steps do, and an AI step starts only while its expected
   cost still fits. The words in the three languages stay.
