@@ -17,6 +17,8 @@
  * @structure ThemesTab (default) · ThemeRow · WhoChooses · NewThemeDialog
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v2.1.0 — 2026-09-27 — No class written any more: the action links are Action, the loud actions
+ *     Loud (control), the small grey facts and "saved" the meta Note (admin page group G8).
  *   v2.0.0 — 2026-09-24 — The two-level model of 07: S1 and S8 here, the theme's own screens in
  *     themes-theme.js; the view holds the built-in look; every word through t().
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4).
@@ -37,6 +39,8 @@ import { Modal } from '/components/Modal.js';
 import { FormField } from '/components/FormField.js';
 import { TextInput } from '/components/TextInput.js';
 import { ActionRow } from '/components/ActionRow.js';
+import { Action, Loud, Actions } from '/components/Action.js';
+import { Note } from '/components/Note.js';
 import { Choice, StyleMarks, versionLabel } from './themes-bits.js';
 import ThemeScreen from './themes-theme.js';
 
@@ -83,7 +87,7 @@ function WhoChooses({ policy, themes, onSaved }) {
         choices=${available.map((th) => ({ value: th.id, label: th.name }))} onChoose=${(id) => save({ ...policy, default: id })} />
       <${SettingsSwitch} checked=${policy.personalChoice} onChange=${() => save({ ...policy, personalChoice: !policy.personalChoice })}>${t('themes.personalChoice')}<//>
       <${Hint}>${policy.personalChoice ? t('themes.personalOn') : t('themes.personalOff')}<//>
-      ${state.saved && html`<p class="text-meta">${t('themes.savedNextLoad')}</p>`}
+      ${state.saved && html`<${Note} kind="meta">${t('themes.savedNextLoad')}<//>`}
       ${state.error && html`<${ErrorNote} text=${state.error} />`}
     <//>`;
 }
@@ -101,14 +105,14 @@ function ThemeRow({ theme, policy, versions, onOpen, onCopy, onRetire, onRestore
   return html`
     <${NamedRow} label=${theme.name}><div>
       <span>${theme.styles.filter((s) => !s.retired).map((s) => html`<${StyleMarks} key=${s.id} swatch=${s.swatch} name=${s.name} /> `)}</span>
-      <p class="text-meta">${facts}</p>
+      <${Note} kind="meta">${facts}<//>
       <${ActionRow}>
-        <button type="button" class="poster-action" onClick=${onOpen}>${t('themes.open')}</button>
-        <button type="button" class="poster-action" onClick=${onCopy}>${t('themes.copy')}</button>
-        ${!theme.builtin && html`<button type="button" class="poster-action" onClick=${onRetire}>
-          ${theme.retired ? t('themes.bringBack') : t('themes.retire')}</button>`}
-        ${last && html`<button type="button" class="poster-action" onClick=${() => onRestore(last)}>
-          ${t('themes.backTo', { date: versionLabel(last.at) })}</button>`}
+        <${Action} onClick=${onOpen}>${t('themes.open')}<//>
+        <${Action} onClick=${onCopy}>${t('themes.copy')}<//>
+        ${!theme.builtin && html`<${Action} onClick=${onRetire}>
+          ${theme.retired ? t('themes.bringBack') : t('themes.retire')}<//>`}
+        ${last && html`<${Action} onClick=${() => onRestore(last)}>
+          ${t('themes.backTo', { date: versionLabel(last.at) })}<//>`}
       <//>
     </div><//>`;
 }
@@ -129,8 +133,8 @@ function NewThemeDialog({ themes, basedOn, onClose, onMade }) {
     }
   };
   const footer = html`
-    <button type="button" class="poster-action" onClick=${onClose}>${t('themes.cancel')}</button>
-    <button type="button" class="poster-slab poster-slab--control" disabled=${state.busy} onClick=${make}>${t('themes.makeIt')}</button>`;
+    <${Action} onClick=${onClose}>${t('themes.cancel')}<//>
+    <${Loud} control disabled=${state.busy} onClick=${make}>${t('themes.makeIt')}<//>`;
   return html`<${Modal} open=${true} onClose=${onClose} size="sm" title=${t('themes.newTheme')} footer=${footer}>
     <${Choice} label=${t('themes.copyOf')} hint=${t('themes.copyOfHint')} value=${from}
       choices=${themes.map((th) => ({ value: th.id, label: th.name }))} onChoose=${setFrom} />
@@ -187,7 +191,7 @@ export default function ThemesTab() {
     <${Hint}>${t('themes.intro')}<//>
     ${error && html`<${ErrorNote} text=${error} />`}
     <${Band} title=${t('themes.themes')}>
-      <p><button type="button" class="poster-slab poster-slab--control" onClick=${() => setMaking({ basedOn: 'aimeat' })}>${t('themes.newTheme')}</button></p>
+      <${Actions}><${Loud} control onClick=${() => setMaking({ basedOn: 'aimeat' })}>${t('themes.newTheme')}<//><//>
       ${data.themes.map((th) => html`
         <${ThemeRow} key=${th.id} theme=${th} policy=${data.policy} versions=${versions[th.id]}
           onOpen=${() => setOpen(th.id)} onCopy=${() => setMaking({ basedOn: th.id })}

@@ -13,6 +13,8 @@
  * @structure DesignLabTab (default: the library / decisions switch) · Library · Overview · PartDetail
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v1.4.1 — 2026-09-27 — A specimen's name is the Action component, the same link; the tab writes
+ *     no class (page group G9, a move).
  *   v1.4.0 — 2026-09-24 — "component" for a catalogue entry, as everywhere (Jouni's ruling).
  *   v1.3.0 — 2026-09-24 — The preview wears any theme and style of this server, offered or not (R16):
  *     a theme and style picker above the library, passed to every frame as `look=` and `style=`.
@@ -38,6 +40,7 @@ import { BackLink } from '/components/BackLink.js';
 import { QuietNote } from '/components/QuietNote.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { Specimens, Specimen } from '/components/Specimen.js';
+import { Action } from '/components/Action.js';
 import { Choice } from './themes-bits.js';
 import { DEMOS } from '/views/design-lab/demos.js';
 import DecisionsView from './design-lab-decisions.js';
@@ -110,7 +113,7 @@ function Overview({ entries, onOpen, look }) {
         <${Specimens}>
           ${shown.map((e) => html`
             <${Specimen} key=${e.id}
-              label=${html`<button type="button" class="poster-action" onClick=${() => onOpen(e.id)}>${spaced(e.name)}${e.status === 'unused' ? ' · ' + tr('designLab.unused', 'unused') : ''}</button>`}
+              label=${html`<${Action} onClick=${() => onOpen(e.id)}>${spaced(e.name)}${e.status === 'unused' ? ' · ' + tr('designLab.unused', 'unused') : ''}<//>`}
               src=${frameSrc(e.id, 0, 'light', look)}
               note=${e.summary} />`)}
         <//>`}`;

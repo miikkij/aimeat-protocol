@@ -14,9 +14,14 @@
  *   that costs money to learn the other way, which is that a gate whose address is down refuses
  *   everything it guards.
  *
+ *   Every part is a library component; the page passes data and writes no class.
+ *
  * @structure HookBind({ data, onBind, busy }) — the moment, the picker, the order, the contract
  * @usage <${HookBind} data=${data} onBind=${bind} busy=${busy} />
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): Field and Select for the moment
+ *     and the action, removable Mark tags for the picked actions, Code blocks for the contract,
+ *     SettingBox for the warning, Loud and Action for the buttons, Beside for the two columns.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose the shared heading and externalize spacing.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
@@ -26,6 +31,14 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Section } from '/components/Section.js';
+import { Field, FormActions } from '/components/Field.js';
+import { Select } from '/components/Select.js';
+import { Mark, Marks, Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Action, Loud } from '/components/Action.js';
+import { Beside, Stack } from '/components/Layout.js';
 
 const S = (key, params) => t('admin.hooks.' + key, params);
 
@@ -56,80 +69,51 @@ export function HookBind({ data, onBind, busy }) {
   const gate = row?.kind === 'gate';
   const seconds = Math.round(data.summary.timeout_ms / 1000);
 
+  const contract = html`
+    <${Label} block>${S('bind.whatIsSent')}<//>
+    <${Code} block>${sentExample(hook, data.node_id ?? '')}<//>
+    <${Label} block>${S('bind.whatItAnswers')}<//>
+    <${Code} block>${S('bind.contract', { s: seconds })}<//>
+    <${SettingBox} label=${S('bind.warnLabel')}>${S('bind.warnBody', { s: seconds })}<//>`;
+
   return html`
-    <section class="og-sec" id="adm-hook-03">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('bind.title')}<small>03</small></h2></div>
-      <p class="adm-hook-lead">${S('bind.lead')}</p>
+    <${Section} id="adm-hook-03" num="03" title=${S('bind.title')}>
+      <${Note} kind="lead">${S('bind.lead')}<//>
 
-      <div class="adm-hook-two">
-        <div class="adm-hook-form">
-          <div>
-            <div class="adm-hook-lbl">${S('bind.theMoment')}</div>
-            <div class="adm-hook-fld">
-              <select value=${hook} onChange=${e => choose(e.target.value)}>
-                ${data.hooks.map(h_ => html`<option key=${h_.name} value=${h_.name}>${h_.name}</option>`)}
-              </select>
-              <span class="adm-hook-mono">${gate ? S('moments.canRefuse') : S('moments.toldAfter')}</span>
-            </div>
-            <p class="adm-hook-note">${S('moments.w_' + (row?.name ?? ''))}</p>
-          </div>
+      <${Beside} wide side=${contract}>
+        <${Stack} gap="large">
+          <${Field} id="adm-hook-bind-moment" label=${S('bind.theMoment')}
+            labelNote=${gate ? S('moments.canRefuse') : S('moments.toldAfter')} hint=${S('moments.w_' + (row?.name ?? ''))}>
+            <${Select} id="adm-hook-bind-moment" value=${hook} onChange=${choose}
+              options=${data.hooks.map(h_ => ({ value: h_.name, label: h_.name }))} />
+          <//>
 
-          <div>
-            <div class="adm-hook-lbl">${S('bind.whatItCalls')}</div>
+          <${Field} group label=${S('bind.whatItCalls')} hint=${S('bind.actionsWhy')}>
             ${refs.length > 0 ? html`
-              <div class="adm-hook-picked">
+              <${Marks}>
                 ${refs.map((ref, i) => html`
-                  <span key=${ref} class="adm-hook-chip">
-                    <span>${i + 1}. ${nameOf(ref)}</span>
-                    <button type="button" aria-label=${S('bind.remove')} onClick=${() => drop(ref)}>✗</button>
-                  </span>`)}
-              </div>` : null}
+                  <${Mark} key=${ref} tone="ink" removeLabel=${S('bind.remove')} onRemove=${() => drop(ref)}>${i + 1}. ${nameOf(ref)}<//>`)}
+              <//>` : null}
             ${data.bindable_actions.length === 0
-              ? html`<p class="adm-hook-note">${S('bind.noActions')}</p>`
+              ? html`<${Note} kind="hint">${S('bind.noActions')}<//>`
               : available.length === 0
-                ? html`<p class="adm-hook-note">${S('bind.allPicked')}</p>`
-                : html`
-                  <div class="adm-hook-fld">
-                    <select value="" onChange=${e => { if (e.target.value) add(e.target.value); }}>
-                      <option value="">${S('bind.pickAction')}</option>
-                      ${available.map(a => html`
-                        <option key=${a.ref} value=${a.ref}>
-                          ${a.name}${a.has_address ? ` · ${a.host}` : ` · ${S('bind.optionNoAddress')}`}
-                        </option>`)}
-                    </select>
-                  </div>`}
-            <p class="adm-hook-note">${S('bind.actionsWhy')}</p>
-          </div>
+                ? html`<${Note} kind="hint">${S('bind.allPicked')}<//>`
+                : html`<${Select} value="" placeholder=${S('bind.pickAction')} ariaLabel=${S('bind.pickAction')}
+                    onChange=${(v) => { if (v) add(v); }}
+                    options=${available.map(a => ({ value: a.ref, label: `${a.name}${a.has_address ? ` · ${a.host}` : ` · ${S('bind.optionNoAddress')}`}` }))} />`}
+          <//>
 
-          <div>
-            <div class="adm-hook-lbl">${S('bind.order')}</div>
-            <p class="adm-hook-note adm-hook-note--flush">
-              ${refs.length === 0 ? S('bind.orderNone') : gate ? S('bind.orderGate') : S('bind.orderNotify')}
-            </p>
-          </div>
+          <${Field} group label=${S('bind.order')}>
+            <${Note} kind="hint">${refs.length === 0 ? S('bind.orderNone') : gate ? S('bind.orderGate') : S('bind.orderNotify')}<//>
+          <//>
 
-          <div class="adm-hook-acts">
-            <button type="button" class="og-slab" disabled=${busy || !touched} onClick=${save}>
+          <${FormActions}>
+            <${Loud} control disabled=${busy || !touched} onClick=${save}>
               ${refs.length === 0 ? S('bind.clearIt') : S('bind.bindIt')}
-            </button>
-            ${touched ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setTouched(false)}>${S('bind.cancel')}</button>` : null}
-          </div>
-        </div>
-
-        <div>
-          <div class="adm-hook-lbl">${S('bind.whatIsSent')}</div>
-          <div class="adm-hook-frame adm-hook-frame--request">
-            <pre class="adm-hook-pre">${sentExample(hook, data.node_id ?? '')}</pre>
-          </div>
-          <div class="adm-hook-lbl">${S('bind.whatItAnswers')}</div>
-          <div class="adm-hook-frame">
-            <pre class="adm-hook-pre">${S('bind.contract', { s: seconds })}</pre>
-          </div>
-          <div class="og-box adm-hook-contract-warning poster-aside poster-aside--small">
-            <span class="og-box-label">${S('bind.warnLabel')}</span>
-            <div class="adm-hook-box-body">${S('bind.warnBody', { s: seconds })}</div>
-          </div>
-        </div>
-      </div>
-    </section>`;
+            <//>
+            ${touched ? html`<${Action} small soft onClick=${() => setTouched(false)}>${S('bind.cancel')}<//>` : null}
+          <//>
+        <//>
+      <//>
+    <//>`;
 }

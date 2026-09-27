@@ -9,10 +9,14 @@
  *   before; they keep working and lose the card around them.
  *
  * @structure
- *   - ExtensionRecord({ ext, onClose, onUninstall, onReload }) — the whole record
+ *   - ExtensionRecord({ ext, onClose, onUninstall, onReload }) — the whole record, the List's Panel
  *   - Instances: create, pause, delete, edit config and translations for a multi-instance extension
  *
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Every part is a library component that gets data (admin page group G7): the
+ *     record is the List's Panel (its title, the close door at its right, its doors at the foot), the
+ *     chips Marks, the actions and the callers Lists, the installation facts Facts, the instances a
+ *     List whose row opens its editors below it, the new instance a TextField with its Loud action.
  *   2026-09-13 -- Compose the shared compact record title.
  *   v1.1.0 -- 2026-09-13 -- Compose the action rule and replace inline instance layout with classes.
  *   v1.0.0 — 2026-09-12 — Initial. What an extension exposes and what calls it were both invisible
@@ -25,6 +29,15 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, dt, shortDate, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { List, Row, Name, Cell, Doors, Panel } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Mark, Marks, Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Facts } from '/components/Facts.js';
+import { Box } from '/components/Box.js';
+import { Beside, Split, Stack } from '/components/Layout.js';
+import { TextField } from '/components/TextField.js';
+import { FormActions } from '/components/Field.js';
 import {
   getExtensionInstances, createExtensionInstance, updateExtensionInstance, deleteExtensionInstance,
   activateExtension, deactivateExtension, reinstallExtension,
@@ -88,46 +101,46 @@ function Instances({ ext, schema, onError }) {
     load();
   }
 
-  return html`
-    <div class="adm-ex-panel">
-      <div class="adm-ex-lbl">${X('inst.title')}</div>
-      ${loading && html`<p class="adm-ex-hint">${t('dashboard.loading')}</p>`}
-      ${!loading && list.length === 0 && html`<p class="adm-ex-hint">${X('inst.none')}</p>`}
-      ${list.map(inst => html`
-        <div class="adm-ex-frow">
-          <b>${inst.id}</b>
-          <span class="adm-ex-box-row adm-ex-inst-row">
-            <em>${inst.status === 'active' ? X('inst.running') : X('inst.paused')}<small>${X('inst.madeBy', { who: inst.createdBy || inst.created_by || '—', when: dt(inst.createdAt || inst.created_at) })}</small></em>
-            <span>
-              ${schema && html`<button type="button" class="og-door og-door--quiet"
-                onClick=${() => { setEditCfg(editCfg === inst.id ? null : inst.id); setCfgData({ ...(inst.config || {}) }); }}>${X('inst.config')}</button>`}
-              <button type="button" class="og-door og-door--quiet" onClick=${() => setEditTl(editTl === inst.id ? null : inst.id)}>${X('inst.words')}</button>
-              <button type="button" class="og-door og-door--quiet" onClick=${() => toggle(inst)}>${inst.status === 'active' ? X('inst.pause') : X('inst.start')}</button>
-              <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${() => remove(inst)}>${X('inst.remove')}</button>
-            </span>
-          </span>
-        </div>
-        ${editCfg === inst.id && html`<div class="adm-ex-panel">
-          <${ConfigForm} schema=${schema} config=${cfgData} onChange=${setCfgData} />
-          <div class="adm-ex-acts adm-ex-inst-actions">
-            <button class="adm-btn" onClick=${() => saveConfig(inst)}>${X('inst.save')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setEditCfg(null)}>${X('inst.cancel')}</button>
-          </div>
-        </div>`}
-        ${editTl === inst.id && html`<${TranslationEditor} extName=${ext.name} inst=${inst} onSave=${saveTranslations} />`}`)}
+  /** What an instance's row opens under itself: its config form, its translations, or both. */
+  const below = (inst) => {
+    const cfg = editCfg === inst.id ? html`
+      <${Stack} gap="medium">
+        <${ConfigForm} schema=${schema} config=${cfgData} onChange=${setCfgData} />
+        <${FormActions}>
+          <${Loud} control onClick=${() => saveConfig(inst)}>${X('inst.save')}<//>
+          <${Action} small soft onClick=${() => setEditCfg(null)}>${X('inst.cancel')}<//>
+        <//>
+      <//>` : null;
+    const tl = editTl === inst.id ? html`<${TranslationEditor} extName=${ext.name} inst=${inst} onSave=${saveTranslations} />` : null;
+    return cfg || tl ? html`${cfg}${tl}` : undefined;
+  };
 
-      <div class="adm-ex-acts">
-        <div class="og-field adm-ex-inst-field">
-          <label class="og-label" for=${'ex-inst-' + ext.name}>${X('inst.newId')}</label>
-          <input id=${'ex-inst-' + ext.name} class="og-input" type="text" value=${newId}
-            placeholder="my-instance-01" onInput=${e => setNewId(e.target.value)} />
-        </div>
-        <button class="adm-btn" onClick=${create} disabled=${!newId.trim()}>${X('inst.create')}</button>
-        <p>${X('inst.createWhy')}</p>
-      </div>
-      ${schema && newId.trim() && html`<${ConfigForm} schema=${schema} config=${newConfig} onChange=${setNewConfig} />`}
+  return html`
+    <${Split} above="large">
+      <${Label} block>${X('inst.title')}<//>
+      <${List} cols="label-words-doors" dense loading=${loading ? t('dashboard.loading') : false} empty=${X('inst.none')}>
+        ${list.map(inst => html`
+          <${Row} key=${inst.id} below=${below(inst)}>
+            <${Cell} code>${inst.id}<//>
+            <${Name} meta=${X('inst.madeBy', { who: inst.createdBy || inst.created_by || '—', when: dt(inst.createdAt || inst.created_at) })}>
+              ${inst.status === 'active' ? X('inst.running') : X('inst.paused')}<//>
+            <${Doors}>
+              ${schema ? html`<${Action} small row soft
+                onClick=${() => { setEditCfg(editCfg === inst.id ? null : inst.id); setCfgData({ ...(inst.config || {}) }); }}>${X('inst.config')}<//>` : null}
+              <${Action} small row soft onClick=${() => setEditTl(editTl === inst.id ? null : inst.id)}>${X('inst.words')}<//>
+              <${Action} small row soft onClick=${() => toggle(inst)}>${inst.status === 'active' ? X('inst.pause') : X('inst.start')}<//>
+              <${Action} small row soft tone="danger" onClick=${() => remove(inst)}>${X('inst.remove')}<//>
+            <//>
+          <//>`)}
+      <//>
+
+      <${TextField} id=${'ex-inst-' + ext.name} size="medium" label=${X('inst.newId')} value=${newId}
+        placeholder="my-instance-01" onInput=${setNewId}
+        actions=${html`<${Loud} control onClick=${create} disabled=${!newId.trim()}>${X('inst.create')}<//>`} />
+      <${Note}>${X('inst.createWhy')}<//>
+      ${schema && newId.trim() ? html`<${ConfigForm} schema=${schema} config=${newConfig} onChange=${setNewConfig} />` : null}
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
 }
 
 export default function ExtensionRecord({ ext, onClose, onUninstall, onReload }) {
@@ -140,6 +153,7 @@ export default function ExtensionRecord({ ext, onClose, onUninstall, onReload })
   const asks = (ext.requiredApis || []).filter(Boolean);
   const schedules = ext.schedules || [];
   const uses = ext.used_by || {};
+  const actions = ext.actions || [];
   // An agent's GAII carries the person's name before the #; an owner's GHII is already the name.
   // The full id goes on the small line only when it says something the name did not.
   const who = (ext.installedBy || '—').split('#')[0];
@@ -162,73 +176,63 @@ export default function ExtensionRecord({ ext, onClose, onUninstall, onReload })
     setBusy(false);
   }
 
+  const calledBy = html`
+    <${Label} block>${X('calledByTitle')}<//>
+    <${Box}>
+      <${List} cols="name-what" keepCols dense>
+        ${callers.map(c => html`<${Row} key=${c.kind + c.name}><${Name}>${c.name}<//><${Cell} meta>${c.kind}<//><//>`)}
+        ${callers.length === 0 ? html`<${Row}><${Name}>${X('calledByNothing')}<//><${Cell} meta>—<//><//>` : null}
+      <//>
+    <//>
+    <${Note}>${callers.length ? X('calledByWhy') : X('calledByNothingWhy')}<//>`;
+
+  const doors = html`
+    <${Loud} control onClick=${() => setActive(!active)} disabled=${busy}>${active ? X('switchOff') : X('switchOn')}<//>
+    <${Action} small soft onClick=${reinstall} disabled=${busy}>${X('reinstall')}<//>
+    <${Action} small soft tone="danger" onClick=${() => onUninstall(ext)}>${X('uninstall')}<//>
+    <${Note} inline>${active ? X('switchOffWhy') : X('switchOnWhy')}<//>`;
+
   return html`
-    <div class="adm-ex-rec">
+    <${Panel} title=${ext.name} mark=${html`<${Action} small soft onClick=${onClose}>${X('close')} ↩<//>`} doors=${doors}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="adm-ex-rec-h">
-        <div>
-          <h3 class="poster-record-title poster-record-title--small">${ext.name}</h3>
-          <span class="adm-ex-rec-sub">${ext.description || X('noDescription')}</span>
-          <div class="adm-ex-rec-chips">
-            <span class=${active ? 'is-live' : 'is-off'}>${active ? X('active') : X('switchedOff')}</span>
-            <span>${ext.version || '—'}</span>
-            ${ext.author && html`<span>${X('by', { who: ext.author })}</span>`}
-            <span class=${ext.federation?.enabled ? '' : 'is-off'}>${ext.federation?.enabled ? X('federating') : X('notFederating')}</span>
-            ${ext.instances && html`<span>${X('supportsInstances')}</span>`}
-          </div>
-        </div>
-        <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${X('close')} ↩</button>
-      </div>
+      <${Note}>${ext.description || X('noDescription')}<//>
+      <${Marks}>
+        <${Mark} tone=${active ? 'fine' : 'dim'}>${active ? X('active') : X('switchedOff')}<//>
+        <${Mark}>${ext.version || '—'}<//>
+        ${ext.author ? html`<${Mark}>${X('by', { who: ext.author })}<//>` : null}
+        <${Mark} tone=${ext.federation?.enabled ? undefined : 'dim'}>${ext.federation?.enabled ? X('federating') : X('notFederating')}<//>
+        ${ext.instances ? html`<${Mark}>${X('supportsInstances')}<//>` : null}
+      <//>
 
-      <div class="adm-ex-grid">
-        <div>
-          <div class="adm-ex-lbl">${X('actionsTitle', { n: num((ext.actions || []).length) })}</div>
-          ${(ext.actions || []).map(a => html`
-            <div class="adm-ex-act">
-              <i>${a.method || 'POST'}</i>
-              <code>/v1/ext/${ext.name}/${a.id}</code>
-              <em>${a.id}</em>
-            </div>`)}
-          ${(ext.actions || []).length === 0 && html`<p class="adm-ex-hint">${X('noActions')}</p>`}
+      <${Beside} narrow above="large" side=${calledBy}>
+        <${Label} block>${X('actionsTitle', { n: num(actions.length) })}<//>
+        <${List} cols="tag-name-desc" keepCols dense empty=${X('noActions')}>
+          ${actions.map(a => html`
+            <${Row} key=${a.id}>
+              <${Cell} sign>${a.method || 'POST'}<//>
+              <${Cell} code>/v1/ext/${ext.name}/${a.id}<//>
+              <${Cell} meta clip>${a.id}<//>
+            <//>`)}
+        <//>
 
-          <div class="adm-ex-lbl adm-ex-lbl--gap">${X('installedTitle')}</div>
-          <div class="adm-ex-frow"><b>${X('f.when')}</b><span>${shortDate(ext.installedAt)}<small>${
-  active ? X('f.activatedAt', { when: shortDate(ext.activatedAt) }) : X('f.notActive')}</small></span></div>
-          <div class="adm-ex-frow"><b>${X('f.by')}</b><span>${who}<small>${who === ext.installedBy ? '' : (ext.installedBy || '')}</small></span></div>
-          <div class="adm-ex-frow"><b>${X('f.asks')}</b><span>${asks.length ? asks.join(', ') : X('f.asksNone')}<small>${X('f.asksWhy')}</small></span></div>
-          <div class="adm-ex-frow"><b>${X('f.storage')}</b><span>ext:${ext.name}<small>${X('f.storageWhy')}</small></span></div>
-          ${schedules.length > 0 && html`
-            <div class="adm-ex-frow"><b>${X('f.clock')}</b><span>${schedules.map(s => s.cron).join(', ')}<small>${
-  X('f.clockWhy', { actions: schedules.map(s => s.action).join(', ') })}</small></span></div>`}
-        </div>
+        <${Label} block>${X('installedTitle')}<//>
+        <${Facts} rows=${[
+          { k: X('f.when'), v: shortDate(ext.installedAt), sub: active ? X('f.activatedAt', { when: shortDate(ext.activatedAt) }) : X('f.notActive') },
+          { k: X('f.by'), v: who, sub: who === ext.installedBy ? '' : (ext.installedBy || '') },
+          { k: X('f.asks'), v: asks.length ? asks.join(', ') : X('f.asksNone'), sub: X('f.asksWhy') },
+          { k: X('f.storage'), v: 'ext:' + ext.name, mono: true, sub: X('f.storageWhy') },
+          schedules.length > 0 && { k: X('f.clock'), v: schedules.map(s => s.cron).join(', '), sub: X('f.clockWhy', { actions: schedules.map(s => s.action).join(', ') }) },
+        ]} />
+      <//>
 
-        <div>
-          <div class="adm-ex-lbl">${X('calledByTitle')}</div>
-          <div class="adm-ex-box">
-            ${callers.map(c => html`<div class="adm-ex-box-row"><em>${c.name}</em><span>${c.kind}</span></div>`)}
-            ${callers.length === 0 && html`<div class="adm-ex-box-row"><em>${X('calledByNothing')}</em><span>—</span></div>`}
-          </div>
-          <p class="adm-ex-hint">${callers.length ? X('calledByWhy') : X('calledByNothingWhy')}</p>
-        </div>
-      </div>
-
-      ${(ext.actions || []).length > 0 && html`
-        <div class="adm-ex-panel">
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setScripts(!scripts)}>
+      ${actions.length > 0 ? html`
+        <${Split} above="large">
+          <${Action} small soft expanded=${scripts} onClick=${() => setScripts(!scripts)}>
             ${scripts ? X('hideScripts') : X('showScripts')}
-          </button>
-          ${scripts && html`<${ActionScriptEditor} extName=${ext.name} actions=${ext.actions || []} />`}
-        </div>`}
+          <//>
+          ${scripts ? html`<${ActionScriptEditor} extName=${ext.name} actions=${actions} />` : null}
+        <//>` : null}
 
-      ${ext.instances && html`<${Instances} ext=${ext} schema=${schema} onError=${showErr} />`}
-
-      <div class="adm-ex-acts poster-row--thing">
-        <button class="adm-btn" onClick=${() => setActive(!active)} disabled=${busy}>
-          ${active ? X('switchOff') : X('switchOn')}
-        </button>
-        <button type="button" class="og-door og-door--quiet" onClick=${reinstall} disabled=${busy}>${X('reinstall')}</button>
-        <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${() => onUninstall(ext)}>${X('uninstall')}</button>
-        <p>${active ? X('switchOffWhy') : X('switchOnWhy')}</p>
-      </div>
-    </div>`;
+      ${ext.instances ? html`<${Instances} ext=${ext} schema=${schema} onError=${showErr} />` : null}
+    <//>`;
 }

@@ -12,10 +12,15 @@
  *   list can be read before it is sent, because the number on the slab is a promise and a person
  *   wants to see what it stands for.
  *
+ *   Every part is a library component; the page passes data and writes no class.
+ *
  * @structure DiscoveryInstant({ status, onChanged }) — the four rows, the box, the last notices,
  *   the plan dialog
  * @usage <${DiscoveryInstant} status=${status} onChanged=${load} />
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): Section, Readings, Beside,
+ *     SettingBox for the send box, the List (cut when-words) for the last notices, Mark tags and a
+ *     Code block in the plan dialog, Loud and Action for the buttons.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.1 — 2026-09-13 — The plan dialog is the large size and its actions sit in its footer.
@@ -26,8 +31,16 @@ import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Badge, useToast, Toast, Row, when } from './shared.js';
+import { Badge, useToast, Toast, when } from './shared.js';
 import { Modal } from '/components/Modal.js';
+import { Section } from '/components/Section.js';
+import { Readings } from '/components/Readings.js';
+import { List, Row, When, Desc } from '/components/List.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Mark, Marks, Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Beside, Space } from '/components/Layout.js';
 import * as adminService from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -58,13 +71,15 @@ function runChip(run) {
 function RunLine({ run }) {
   const who = run.by ? S('instant.runBy', { who: run.by }) : S('instant.runAuto');
   return html`
-    <div class="adm-disc-run">
-      <span>${when(run.at)}</span>
-      <b>${S('instant.runCount', { n: run.urlCount, hosts: run.hosts })}</b>
-      <span>${run.status ?? S('instant.noAnswer')}${run.failed.length ? ` · ${S('instant.runFailed', { n: run.failed.length })}` : ''}</span>
-      <span>${S('now.scope_' + (run.scope || 'app'))}</span>
-      <span>${who}</span>
-    </div>`;
+    <${Row}>
+      <${When}>${when(run.at)}<//>
+      <${Desc}>
+        <b>${S('instant.runCount', { n: run.urlCount, hosts: run.hosts })}</b>
+        ${' · '}${run.status ?? S('instant.noAnswer')}${run.failed.length ? ` · ${S('instant.runFailed', { n: run.failed.length })}` : ''}
+        ${' · '}${S('now.scope_' + (run.scope || 'app'))}
+        ${' · '}${who}
+      <//>
+    <//>`;
 }
 
 export function DiscoveryInstant({ status, onChanged }) {
@@ -119,62 +134,62 @@ export function DiscoveryInstant({ status, onChanged }) {
     : S('now.instantNever');
   const wholeSent = !!everything.last_sent_at;
 
-  return html`
-    <section class="og-sec" id="adm-disc-03">
-      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('instant.title')}<small>03</small></h2>
-        <div class="og-doors">
-          ${can ? html`<button type="button" class="og-door og-door--quiet" disabled=${!!sending} onClick=${() => announce('pages')}>${S('instant.onlyPages', { n: status.sitemap.page_count })}</button>` : null}
-        </div></div>
-      <p class="adm-disc-lead">${S('instant.lead')}</p>
+  const box = html`
+    <${SettingBox} label=${S('instant.boxLabel')}>
+      ${!ix.key_configured ? html`
+        ${S('instant.noKeyBox')}
+        <${Space} above="large"><${Actions}><${Action} small soft href="https://www.bing.com/indexnow" newTab>${S('instant.getKey')}<//><//><//>`
+      : off ? S('instant.offBox')
+      : html`
+        ${S('instant.boxBody', { n: everything.url_count, pages: status.sitemap.page_count })}
+        <${Space} above="large">
+          <${Actions}>
+            <${Loud} control disabled=${!!sending || everything.url_count === 0} onClick=${() => announce('all')}>
+              ${sending === 'all' ? S('instant.sending') : S('instant.send', { n: everything.url_count })}
+            <//>
+            <${Action} small soft onClick=${openPlan}>${S('instant.seeList')}<//>
+          <//>
+        <//>
+        <${Note} kind="hint">${S('instant.boxNote')}<//>`}
+    <//>
+    ${ix.runs.length > 0 ? html`
+      <${Space} above="large">
+        <${Label} block>${S('instant.runs')}<//>
+        <${List} cols="when-words" dense>
+          ${ix.runs.map((run) => html`<${RunLine} key=${run.at} run=${run} />`)}
+        <//>
+      <//>` : null}`;
 
-      <div class="adm-disc-two">
-        <div>
-          ${Row({ title: S('instant.keyFile'), why: keyWhy, chip: keyChip,
-            value: ix.key_url ? html`<a class="og-door og-door--quiet" href=${ix.key_url} target="_blank" rel="noopener">${shortKeyPath(ix.key_url)}</a>` : '—' })}
-          ${Row({ title: S('instant.onPublish'), why: S('instant.onPublishWhy'),
-            chip: html`<${Badge} type=${ix.auto ? 'healthy' : 'muted'} label=${ix.auto ? S('instant.on') : S('instant.off')} />`,
-            value: 'AIMEAT_SEO_INDEXNOW_AUTO' })}
-          ${Row({ title: S('instant.lastNotice'), why: S('instant.lastNoticeWhy'), chip: runChip(last), value: lastValue })}
-          ${Row({ title: S('instant.whole'),
+  return html`
+    <${Section} id="adm-disc-03" num="03" title=${S('instant.title')}
+      doors=${can ? html`<${Action} small soft disabled=${!!sending} onClick=${() => announce('pages')}>${S('instant.onlyPages', { n: status.sitemap.page_count })}<//>` : null}>
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      <${Note} kind="lead">${S('instant.lead')}<//>
+
+      <${Beside} wide side=${box}>
+        <${Readings} rows=${[
+          { key: 'key', name: S('instant.keyFile'), why: keyWhy, mark: keyChip,
+            value: ix.key_url ? html`<${Action} small soft href=${ix.key_url} newTab>${shortKeyPath(ix.key_url)}<//>` : '—' },
+          { key: 'publish', name: S('instant.onPublish'), why: S('instant.onPublishWhy'),
+            mark: html`<${Badge} type=${ix.auto ? 'healthy' : 'muted'} label=${ix.auto ? S('instant.on') : S('instant.off')} />`,
+            value: 'AIMEAT_SEO_INDEXNOW_AUTO' },
+          { key: 'last', name: S('instant.lastNotice'), why: S('instant.lastNoticeWhy'), mark: runChip(last), value: lastValue },
+          { key: 'whole', name: S('instant.whole'),
             why: wholeSent ? S('instant.wholeWhySent', { at: when(everything.last_sent_at) }) : S('instant.wholeWhyNever', { pages: status.sitemap.page_count, apps: status.apps.on }),
-            chip: html`<${Badge} type=${wholeSent ? 'healthy' : 'watch'} label=${wholeSent ? S('instant.sent') : S('instant.neverSent')} />`,
-            value: S('instant.wholeVal', { n: everything.url_count, hosts: everything.host_count }), last: true })}
-        </div>
-        <div>
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${S('instant.boxLabel')}</span>
-            ${!ix.key_configured ? html`
-              <div class="adm-disc-box-body">${S('instant.noKeyBox')}</div>
-              <div class="adm-disc-box-acts"><a class="og-door og-door--quiet" href="https://www.bing.com/indexnow" target="_blank" rel="noopener">${S('instant.getKey')}</a></div>`
-            : off ? html`<div class="adm-disc-box-body">${S('instant.offBox')}</div>`
-            : html`
-              <div class="adm-disc-box-body">${S('instant.boxBody', { n: everything.url_count, pages: status.sitemap.page_count })}</div>
-              <div class="adm-disc-box-acts">
-                <button type="button" class="og-slab" disabled=${!!sending || everything.url_count === 0} onClick=${() => announce('all')}>
-                  ${sending === 'all' ? S('instant.sending') : S('instant.send', { n: everything.url_count })}
-                </button>
-                <button type="button" class="og-door og-door--quiet" onClick=${openPlan}>${S('instant.seeList')}</button>
-              </div>
-              <p class="adm-disc-note">${S('instant.boxNote')}</p>`}
-          </div>
-          ${ix.runs.length > 0 ? html`
-            <div class="adm-disc-runs">
-              <div class="adm-disc-lbl">${S('instant.runs')}</div>
-              ${ix.runs.map((run) => html`<${RunLine} key=${run.at} run=${run} />`)}
-            </div>` : null}
-        </div>
-      </div>
+            mark: html`<${Badge} type=${wholeSent ? 'healthy' : 'watch'} label=${wholeSent ? S('instant.sent') : S('instant.neverSent')} />`,
+            value: S('instant.wholeVal', { n: everything.url_count, hosts: everything.host_count }), last: true },
+        ]} />
+      <//>
 
       <${Modal} open=${planOpen} onClose=${() => setPlanOpen(false)} title=${S('instant.planTitle')} size="lg"
         footer=${plan && html`
-          <button type="button" class="poster-action" onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}</button>
-          <button type="button" class="poster-slab poster-slab--control" disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}</button>`}>
+          <${Action} onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}<//>
+          <${Loud} control disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}<//>`}>
         ${plan && html`
-          <div class="adm-disc-plan-hosts">
-            ${plan.hosts.map((h_) => html`<span key=${h_.host} class="adm-disc-fchip">${h_.host.replace(/^https?:\/\//, '')} · ${h_.url_count}</span>`)}
-          </div>
-          <div class="adm-disc-plan-urls">${plan.urls.map((u) => html`<div key=${u}>${u}</div>`)}</div>`}
+          <${Marks}>
+            ${plan.hosts.map((h_) => html`<${Mark} key=${h_.host}>${h_.host.replace(/^https?:\/\//, '')} · ${h_.url_count}<//>`)}
+          <//>
+          <${Code} block scroll="large">${plan.urls.join('\n')}<//>`}
       <//>
-    </section>`;
+    <//>`;
 }

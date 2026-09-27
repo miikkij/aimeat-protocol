@@ -9,6 +9,8 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.5.2 — 2026-09-27 — OwnAimeat names its module (components/OwnAimeat.js) and the words it takes
+ *     (the catalogue pass, operator family).
  *   v1.5.1 — 2026-09-27 — InstructionBlock draws its own names from instruction-block.css (formerly
  *     .ib-* in hello-mcp.css; a move); its entry id follows its sheet (hello-mcp → instruction-block).
  *   v1.5.0 — 2026-09-26 — Markdown's small cut (.md-body--small, `small`), Jouni's decision "Small reader".
@@ -141,12 +143,21 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'own-aimeat', name: 'OwnAimeat', kind: 'component', status: 'active',
-        summary: 'The home\'s "get your own AIMEAT" card on a demo site, stacked from the poster box, label, headline and slab.',
-        module: null, sheet: '/css/components/own-aimeat.css', classes: ['poster-own-aimeat'],
-        data: { shape: 'markup: .poster-own-aimeat (OwnAimeatBlock in views/surface/blocks-home.js)', fields: { headline: 'the card headline', href: 'where to get one' } },
-        useFor: ['The home of a demo node, as a layout block.'],
+        summary: 'A demo site\'s one prompt to buy: a record-face card with its small row label, the headline, one paragraph, and the loud slab to the store, which opens in a new tab. With no store address it draws nothing.',
+        module: '/components/OwnAimeat.js', sheet: '/css/components/own-aimeat.css',
+        data: {
+            shape: 'OwnAimeat({ label, title, text, cta, href })',
+            fields: {
+                label: 'the small row label at the top ("Demo")',
+                title: 'the headline',
+                text: 'the one paragraph under it',
+                cta: 'the slab\'s words',
+                href: 'the store\'s address; without it the card is not drawn (a stored layout can outlive its store)',
+            },
+        },
+        useFor: ['The home of a demo node, as a layout block the operator adds; no built-in home has it.'],
         variants: [],
-        example: { headline: 'Get your own', href: '/v1/store' },
-        note: 'Its markup sits in OwnAimeatBlock (views/surface/blocks-home.js), which a node draws only when it has a store address and its operator added the block.',
+        example: { label: 'Demo', title: 'This is a demo. Get your own AIMEAT.', text: 'Many people share this site to try things out.', cta: 'Go to the store →', href: 'https://store.example.com' },
+        note: 'The markup OwnAimeatBlock (views/surface/blocks-home.js) wrote, moved unchanged into components/OwnAimeat.js on 2026-09-27, so the block passes the words and the store\'s address. Its look is own-aimeat.css with the record and slab shapes of poster.css.',
     },
 ];

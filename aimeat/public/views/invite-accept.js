@@ -28,6 +28,10 @@
  *     match the invited address sees a "wrong account" panel (sign out / switch account) instead of an
  *     accept button; the server's 403 EMAIL_MISMATCH is rendered the same way as a fallback. Re-fetch
  *     the `viewer` verdict on login/logout. Redirect follows the accept response's return target.
+ *   v1.3.0 — 2026-09-27 — Drawn from library components and writing no class (page group G9): the
+ *     card is AskPage (the tag, the question, the ways to answer, and the other ways in under "or"),
+ *     the invitation's summary the dim Box named by the organism, the fields TextFields in Fields,
+ *     a refusal the error message, the answers Loud and Action. css/views/invite-accept.css is gone.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -38,6 +42,14 @@ import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, logout } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
+import { AskPage } from '/components/AskPage.js';
+import { Action, Loud } from '/components/Action.js';
+import { Box } from '/components/Box.js';
+import { Fields } from '/components/Field.js';
+import { TextField } from '/components/TextField.js';
+import { Label, Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Stack } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -126,37 +138,33 @@ export default function InviteAccept() {
   }
 
   if (state.status === 'loading') {
-    return html`<div class="inv-wrap"><div class="inv-card"><p class="inv-muted">${tr('common.loading', 'Loading…')}</p></div></div>`;
+    return html`<${AskPage} message=${tr('common.loading', 'Loading…')} />`;
   }
   if (state.status === 'error') {
     return html`
-      <div class="inv-wrap">
-        <div class="inv-card">
-          <h1 class="inv-title">${tr('invite.errorTitle', 'Invitation unavailable')}</h1>
-          <p class="inv-muted">${escHtml(state.error)}</p>
-          <a class="btn-outline inv-btn" href="/v1/profile">${tr('common.back', 'Back')}</a>
-        </div>
-      </div>`;
+      <${AskPage} title=${tr('invite.errorTitle', 'Invitation unavailable')}
+        doors=${html`<${Action} href="/v1/profile">${tr('common.back', 'Back')}<//>`}>
+        <${Note} kind="lead">${escHtml(state.error)}<//>
+      <//>`;
   }
 
   const inv = state.inv;
   const viewer = state.viewer;
   const org = inv.organism || {};
   const workspaces = inv.workspaces || [];
+  const tag = html`<${Mark} tone="coral">${tr('invite.badge', 'Invitation')}<//>`;
+  // What the invitation is to, by whom and as what, in the dim box: the organism by name.
   const summary = html`
-    <div class="inv-summary">
-      <div class="inv-org">
-        <div class="inv-org-name">${escHtml(org.name || '')}</div>
-        ${org.description ? html`<div class="inv-muted">${escHtml(org.description)}</div>` : null}
-      </div>
-      <p class="inv-muted">${tr('invite.invitedBy', 'Invited by')} <strong>${escHtml(inv.invited_by || '')}</strong> ${tr('invite.asRole', 'as')} <strong>${escHtml(inv.org_role || 'member')}</strong>.</p>
+    <${Box} tone="dim" name=${escHtml(org.name || '')}>
+      ${org.description ? html`<${Note}>${escHtml(org.description)}<//>` : null}
+      <${Note} kind="lead">${tr('invite.invitedBy', 'Invited by')} <strong>${escHtml(inv.invited_by || '')}</strong> ${tr('invite.asRole', 'as')} <strong>${escHtml(inv.org_role || 'member')}</strong>.<//>
       ${workspaces.length ? html`
-        <div class="inv-wslabel">${tr('invite.workspacesLabel', "You'll get access to:")}</div>
-        <ul class="inv-wslist">
-          ${workspaces.map((w) => html`<li key=${w.ws}>${escHtml(w.name || w.ws)} — ${escHtml(w.role)}</li>`)}
-        </ul>` : null}
-      ${inv.message ? html`<p class="inv-message">“${escHtml(inv.message)}”</p>` : null}
-    </div>`;
+        <${Label} block>${tr('invite.workspacesLabel', "You'll get access to:")}<//>
+        <${Stack} list gap="tight">
+          ${workspaces.map((w) => html`<span key=${w.ws}>${escHtml(w.name || w.ws)} — ${escHtml(w.role)}</span>`)}
+        <//>` : null}
+      ${inv.message ? html`<${Note} kind="quiet">“${escHtml(inv.message)}”<//>` : null}
+    <//>`;
 
   // Signed in, but this account is NOT the invited party (verified email doesn't match) — OR the
   // server refused a POST with EMAIL_MISMATCH. Never let a wrong account absorb an operator-curated
@@ -165,85 +173,57 @@ export default function InviteAccept() {
   if (wrongAccount) {
     const who = (viewer && viewer.owner) || session?.owner || '';
     return html`
-      <div class="inv-wrap">
-        <div class="inv-card">
-          <span class="inv-badge">${tr('invite.badge', 'Invitation')}</span>
-          <h1 class="inv-title">${tr('invite.mismatchTitle', 'Wrong account')}</h1>
-          ${summary}
-          <p class="inv-error">
-            ${who ? fill(tr('invite.signedInAs', "You're signed in as {owner}."), { owner: who }) + ' ' : null}
-            ${fill(tr('invite.mismatchBody', 'This invitation was sent to {email}. It can only be accepted by the account whose verified email is that address. Sign out and open the link again, or ask the inviter to add your account directly.'), { email: inv.email || '' })}
-          </p>
-          <div class="inv-actions">
-            <button class="btn-primary inv-btn" onClick=${signOutAndRetry}>${tr('invite.signOutRetry', 'Sign out')}</button>
-            <button class="btn-outline inv-btn" onClick=${signInInstead}>${tr('invite.switchAccount', 'Use a different account')}</button>
-          </div>
-        </div>
-      </div>`;
+      <${AskPage} tag=${tag} title=${tr('invite.mismatchTitle', 'Wrong account')}
+        doors=${html`
+          <${Action} onClick=${signInInstead}>${tr('invite.switchAccount', 'Use a different account')}<//>
+          <${Loud} onClick=${signOutAndRetry}>${tr('invite.signOutRetry', 'Sign out')}<//>`}>
+        ${summary}
+        <${Note} kind="message" error>
+          ${who ? fill(tr('invite.signedInAs', "You're signed in as {owner}."), { owner: who }) + ' ' : null}
+          ${fill(tr('invite.mismatchBody', 'This invitation was sent to {email}. It can only be accepted by the account whose verified email is that address. Sign out and open the link again, or ask the inviter to add your account directly.'), { email: inv.email || '' })}
+        <//>
+      <//>`;
   }
 
   // Already signed in as the invited party (verified email matches): accept as the current account.
   if (authed) {
     return html`
-      <div class="inv-wrap">
-        <div class="inv-card">
-          <span class="inv-badge">${tr('invite.badge', 'Invitation')}</span>
-          <h1 class="inv-title">${tr('invite.acceptTitle', "You're invited")}</h1>
-          ${summary}
-          ${formError ? html`<p class="inv-error">${escHtml(formError)}</p>` : null}
-          <div class="inv-actions">
-            <button class="btn-primary inv-btn" onClick=${() => accept({})} disabled=${submitting}>
-              ${submitting ? tr('invite.joining', 'Joining…') : tr('invite.acceptCta', 'Accept & join')}
-            </button>
-          </div>
-        </div>
-      </div>`;
+      <${AskPage} tag=${tag} title=${tr('invite.acceptTitle', "You're invited")}
+        doors=${html`
+          <${Loud} onClick=${() => accept({})} disabled=${submitting}>
+            ${submitting ? tr('invite.joining', 'Joining…') : tr('invite.acceptCta', 'Accept & join')}
+          <//>`}>
+        ${summary}
+        ${formError ? html`<${Note} kind="message" error>${escHtml(formError)}<//>` : null}
+      <//>`;
   }
 
   // Not signed in: register right here (email locked + recorded as verified) and join in one step.
   return html`
-    <div class="inv-wrap">
-      <div class="inv-card">
-        <span class="inv-badge">${tr('invite.badge', 'Invitation')}</span>
-        <h1 class="inv-title">${tr('invite.acceptTitle', "You're invited")}</h1>
-        ${summary}
-
-        <div class="inv-form">
-          <div class="inv-field">
-            <label>${tr('invite.emailLabel', 'Your email')}</label>
-            <input class="input-field input-sm" type="email" value=${inv.email || ''} readonly />
-          </div>
-          <div class="inv-field">
-            <label>${tr('invite.usernameLabel', 'Choose a username')}</label>
-            <input class="input-field input-sm" autofocus value=${form.username}
-              onInput=${(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder=${tr('invite.usernamePlaceholder', 'e.g. alice')} />
-          </div>
-          <div class="inv-field">
-            <label>${tr('invite.passwordLabel', 'Choose a password')}</label>
-            <input class="input-field input-sm" type="password" value=${form.password}
-              onInput=${(e) => setForm((f) => ({ ...f, password: e.target.value }))} placeholder=${tr('invite.passwordPlaceholder', 'At least 8 characters')} />
-          </div>
-          <div class="inv-field">
-            <label>${tr('invite.displayNameLabel', 'Display name (optional)')}</label>
-            <input class="input-field input-sm" value=${form.display_name}
-              onInput=${(e) => setForm((f) => ({ ...f, display_name: e.target.value }))} />
-          </div>
-          ${formError ? html`<p class="inv-error">${escHtml(formError)}</p>` : null}
-          <div class="inv-actions">
-            <button class="btn-primary inv-btn" onClick=${acceptAsNew} disabled=${submitting}>
-              ${submitting ? tr('invite.creating', 'Creating account…') : tr('invite.registerCta', 'Create account & join')}
-            </button>
-          </div>
-        </div>
-
-        <div class="inv-or">${tr('invite.or', 'OR')}</div>
+    <${AskPage} tag=${tag} title=${tr('invite.acceptTitle', "You're invited")}
+      doors=${html`
+        <${Loud} onClick=${acceptAsNew} disabled=${submitting}>
+          ${submitting ? tr('invite.creating', 'Creating account…') : tr('invite.registerCta', 'Create account & join')}
+        <//>`}
+      or=${tr('invite.or', 'OR')}
+      ways=${html`
         ${providers.map((p) => html`
-          <button key=${p.id} class="btn-outline inv-btn inv-signin" onClick=${() => socialSignIn(p)}>
+          <${Action} key=${p.id} onClick=${() => socialSignIn(p)}>
             ${fill(tr('invite.continueWith', 'Continue with {label}'), { label: p.label || p.id })}
-          </button>`)}
-        <button class="btn-outline inv-btn inv-signin" onClick=${signInInstead}>
+          <//>`)}
+        <${Action} onClick=${signInInstead}>
           ${tr('invite.signInInstead', 'Already have an account? Sign in')}
-        </button>
-      </div>
-    </div>`;
+        <//>`}>
+      ${summary}
+      <${Fields}>
+        <${TextField} label=${tr('invite.emailLabel', 'Your email')} type="email" value=${inv.email || ''} readOnly />
+        <${TextField} label=${tr('invite.usernameLabel', 'Choose a username')} autoFocus value=${form.username}
+          onInput=${(v) => setForm((f) => ({ ...f, username: v }))} placeholder=${tr('invite.usernamePlaceholder', 'e.g. alice')} />
+        <${TextField} label=${tr('invite.passwordLabel', 'Choose a password')} type="password" value=${form.password}
+          onInput=${(v) => setForm((f) => ({ ...f, password: v }))} placeholder=${tr('invite.passwordPlaceholder', 'At least 8 characters')} />
+        <${TextField} label=${tr('invite.displayNameLabel', 'Display name (optional)')} value=${form.display_name}
+          onInput=${(v) => setForm((f) => ({ ...f, display_name: v }))} />
+      <//>
+      ${formError ? html`<${Note} kind="message" error>${escHtml(formError)}<//>` : null}
+    <//>`;
 }

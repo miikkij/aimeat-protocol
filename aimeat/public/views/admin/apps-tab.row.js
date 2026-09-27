@@ -2,9 +2,9 @@
  * @file public/views/admin/apps-tab.row.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description One app as a table row (design canvas "AIMEAT Admin Applications", direction A):
- *   what it is, who owns it, how big, how often it has been opened, how many people forked it, when
- *   it was published, and what an operator can do to it.
+ * @description One app as a row of the list (design canvas "AIMEAT Admin Applications", direction
+ *   A): what it is, who owns it, how big, how often it has been opened, how many people forked it,
+ *   when it was published, and what an operator can do to it.
  *
  *   DELETING LIVES IN THE ROW MENU. It removes an app, its versions and its screenshot for good and
  *   the owner is not asked, and it used to be a red button on every one of seventy-six rows, beside
@@ -14,21 +14,24 @@
  *   OPEN IS FIRST because an operator was choosing by filename: the page never offered a way to
  *   look at the app it was about to take off the wall.
  * @structure appChips · AppRow
- * @usage html`<${AppRow} app=${a} onHide=${fn} onRestore=${fn} onDelete=${fn} ... />`
+ * @usage html`<${AppRow} app=${a} onHide=${fn} onRestore=${fn} onDelete=${fn} ... />` inside the page's List
  * @version-history
+ *   v1.1.0 — 2026-09-27 — On the library components (page group G5): the row is a List Row (an app
+ *     taken down is faded), its chips the Name's marks, the reason its line, the figures Num cells,
+ *     the doors action links and the ⋯ menu of the Doors (CardMenu: the arrow keys, Escape, a line
+ *     between the groups, the delete in the danger tone). The file writes no class and no style.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, fmtBytes, num, Badge } from './shared.js';
+import { Row, Name, Cell, Num, When, Doors } from '/components/List.js';
+import { Action } from '/components/Action.js';
 
 const html = htm.bind(h);
 const A = (key, params) => t('admin.apps.' + key, params);
-
-const DOTS = html`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></svg>`;
 
 /** What is true about this app, in chips. The quiet state (on the wall, nothing set) shows none. */
 export function appChips(app) {
@@ -44,51 +47,35 @@ export function appChips(app) {
 }
 
 export function AppRow({ app, onHide, onRestore, onDelete, onSeo, busy }) {
-  const [menu, setMenu] = useState(false);
   const name = app.manifest?.name || app.filename;
-  const close = () => setMenu(false);
+  const reason = app.operator_hidden
+    ? `${app.operator_hide_reason ? `"${escHtml(app.operator_hide_reason)}" ` : ''}${app.operator_hidden_by
+      ? A('takenBy', { by: escHtml(app.operator_hidden_by), at: dt(app.operator_hidden_at) })
+      : ''}`
+    : null;
+  // The one irreversible action lives in the menu, not on the row.
+  const menu = [
+    { label: A('menu.open'), onClick: () => window.open(app.download_url, '_blank', 'noopener') },
+    { label: app.operator_seo_blocked ? A('menu.seoAllow') : A('menu.seoBlock'), onClick: () => onSeo(app) },
+    { divider: true },
+    !app.operator_hidden && { label: A('menu.takeDown'), onClick: () => onHide(app) },
+    { label: A('menu.delete'), onClick: () => onDelete(app), danger: true },
+  ];
 
   return html`
-    <tr class=${app.operator_hidden ? 'adm-ap-row--down' : ''}>
-      <td>
-        <span class="adm-ap-name">${escHtml(name)}</span>
-        <span class="adm-ap-file">${escHtml(app.filename)}${app.version_number ? ` · v${num(app.version_number)}` : ''}</span>
-        <span class="adm-ap-chips">${appChips(app)}</span>
-        ${app.operator_hidden && html`
-          <span class="adm-ap-reason">
-            ${app.operator_hide_reason ? `"${escHtml(app.operator_hide_reason)}" ` : ''}
-            ${app.operator_hidden_by
-              ? A('takenBy', { by: escHtml(app.operator_hidden_by), at: dt(app.operator_hidden_at) })
-              : ''}
-          </span>`}
-      </td>
-      <td class="adm-ap-owner" data-label=${A('col.owner')}>${escHtml(app.owner)}</td>
-      <td class="r" data-label=${A('col.size')}>${fmtBytes(app.size || 0)}</td>
-      <td class="r" data-label=${A('col.opened')}>${num(app.downloads || 0)}</td>
-      <td class="r" data-label=${A('col.forks')}>${num(app.forks || 0)}</td>
-      <td class="r" data-label=${A('col.published')}>${dt(app.created_at)}</td>
-      <td class="r">
-        <span class="adm-ap-acts">
-          <a class="og-door og-door--quiet" href=${app.download_url} target="_blank" rel="noopener">${A('open')}</a>
-          ${app.operator_hidden
-            ? html`<button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => onRestore(app)}>${A('putBack')}</button>`
-            : html`<button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => onHide(app)}>${A('takeDown')}</button>`}
-          <span class="adm-ap-menuwrap">
-            <button type="button" class="adm-ap-kebab" aria-label=${A('more')} aria-expanded=${menu}
-              onClick=${() => setMenu(m => !m)} onBlur=${() => window.setTimeout(close, 150)}>${DOTS}</button>
-            ${menu && html`
-              <span class="adm-ap-menu">
-                <button type="button" onClick=${() => { close(); window.open(app.download_url, '_blank', 'noopener'); }}>${A('menu.open')}</button>
-                <button type="button" onClick=${() => { close(); onSeo(app); }}>
-                  ${app.operator_seo_blocked ? A('menu.seoAllow') : A('menu.seoBlock')}
-                </button>
-                <span class="adm-ap-menu-sep"></span>
-                ${!app.operator_hidden && html`
-                  <button type="button" onClick=${() => { close(); onHide(app); }}>${A('menu.takeDown')}</button>`}
-                <button type="button" class="adm-ap-danger" onClick=${() => { close(); onDelete(app); }}>${A('menu.delete')}</button>
-              </span>`}
-          </span>
-        </span>
-      </td>
-    </tr>`;
+    <${Row} faded=${!!app.operator_hidden}>
+      <${Name} meta=${`${escHtml(app.filename)}${app.version_number ? ` · v${num(app.version_number)}` : ''}`}
+        marks=${appChips(app)} desc=${reason || null}>${escHtml(name)}<//>
+      <${Cell} meta>${escHtml(app.owner)}<//>
+      <${Num} quiet>${fmtBytes(app.size || 0)}<//>
+      <${Num} quiet>${num(app.downloads || 0)}<//>
+      <${Num} quiet>${num(app.forks || 0)}<//>
+      <${When}>${dt(app.created_at)}<//>
+      <${Doors} menu=${menu} menuLabel=${A('more')}>
+        <${Action} small soft href=${app.download_url} newTab>${A('open')}<//>
+        ${app.operator_hidden
+          ? html`<${Action} small soft disabled=${busy} onClick=${() => onRestore(app)}>${A('putBack')}<//>`
+          : html`<${Action} small soft disabled=${busy} onClick=${() => onHide(app)}>${A('takeDown')}<//>`}
+      <//>
+    <//>`;
 }

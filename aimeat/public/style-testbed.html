@@ -55,12 +55,10 @@
   <link rel="stylesheet" href="/css/components/toast.css" />
   <link rel="stylesheet" href="/css/components/section-header.css" />
   <link rel="stylesheet" href="/css/views/profile.css" />
-  <link rel="stylesheet" href="/css/views/admin.css" />
   <link rel="stylesheet" href="/css/views/portal-classic.css" />
   <link rel="stylesheet" href="/css/views/portal-dev.css" />
   <link rel="stylesheet" href="/css/components/json-view.css" />
   <link rel="stylesheet" href="/css/views/agents-detail.css" />
-  <link rel="stylesheet" href="/css/views/admin-agent-integration.css" />
   <!-- Testbed's own layout (loaded LAST so stb-* wins on equal specificity) -->
   <link rel="stylesheet" href="/css/style-testbed.css" />
 </head>
@@ -90,7 +88,7 @@
       <strong>Nothing is ever lost:</strong> "delete clone" only removes a duplicate whose look already lives in
       canonical — if a clone has something canonical lacks, pick <em>Add / merge into canonical</em>. The
       "maps&nbsp;to" line under each clone shows exactly which canonical class each variant becomes.
-      Admin (<code>.adm-*</code>) stays its own design system, consolidated separately.
+      The admin pages draw the same library components since 2026-09-27; they have no system of their own.
     </p>
   </header>
 
@@ -291,15 +289,6 @@
           <div class="stb-decide-wrap"></div>
         </div>
 
-        <!-- Admin reference -->
-        <div class="stb-variant stb-admin" data-clone=".adm-input (admin — own system)" data-sites="43" data-admin="1">
-          <div class="stb-variant-head"><span class="stb-vname">Admin · <code>.adm-input</code></span><span class="stb-tag stb-admin-tag">admin — separate</span></div>
-          <div class="stb-specimens stb-specimens-col adm stb-scope">
-            <input class="adm-input adm-input-full" type="text" placeholder="text input" />
-          </div>
-          <p class="stb-diff">8×12 · 6px radius · indigo focus ring rgba(99,102,241,.15) (different hue, won't theme-flip). Stays admin; consolidate within admin only.</p>
-          <div class="stb-decide-wrap"></div>
-        </div>
       </div>
 
       <label class="stb-note-wrap">Family note: <input class="stb-note" data-note="Inputs" type="text" placeholder="e.g. unify on canonical size but keep sentence-case labels" /></label>
@@ -386,25 +375,6 @@
           <div class="stb-decide-wrap"></div>
         </div>
 
-        <!-- Admin StatsGrid reference -->
-        <div class="stb-variant stb-admin" data-clone=".adm-card+.adm-stat (admin StatsGrid)" data-sites="~20 tabs" data-admin="1">
-          <div class="stb-variant-head"><span class="stb-vname">Admin StatsGrid · <code>.adm-card/.adm-stat</code></span><span class="stb-tag stb-admin-tag">admin — separate</span></div>
-          <div class="stb-specimens adm stb-scope">
-            <div class="adm-card"><h2>Members</h2><div class="adm-stat indigo">1,284</div><div class="adm-stat-label">last 24h</div></div>
-          </div>
-          <p class="stb-diff">LABEL-FIRST · rich 8-tone color system · the de-facto shared component (~20 tabs). Stays admin; consolidate within admin.</p>
-          <div class="stb-decide-wrap"></div>
-        </div>
-
-        <!-- Admin agent-integration reference -->
-        <div class="stb-variant stb-admin" data-clone=".adm-agi-stat-card (admin AgentIntegration)" data-sites="~6" data-admin="1">
-          <div class="stb-variant-head"><span class="stb-vname">Admin AgentIntegration · <code>.adm-agi-stat-*</code></span><span class="stb-tag stb-admin-tag">admin — separate</span></div>
-          <div class="stb-specimens adm stb-scope">
-            <div class="adm-agi-stat-card"><div class="adm-agi-stat-value adm-agi-stat-value--success">1,284</div><div class="adm-agi-stat-label">Completed</div></div>
-          </div>
-          <p class="stb-diff">a SECOND admin stat tile (didn't reuse StatsGrid) — fold into the one admin stat component during admin consolidation</p>
-          <div class="stb-decide-wrap"></div>
-        </div>
 
         <!-- Dead profile hero -->
         <div class="stb-variant stb-dead" data-clone=".pf .stat-card .num/.label (profile hero)" data-sites="0" data-dead="1">

@@ -6,13 +6,18 @@
  *   Database"): the live row count beside the seven-day line the hourly snapshots were already
  *   carrying, the hour/day/week numerals, and the tables with a share of all rows, a bar and a
  *   day's growth, ordered by size, by growth or by name. "Capture a snapshot now" forces one.
- *   Re-fetches on the aimeat-live-update event like the other server-data tabs.
+ *   Re-fetches on the aimeat-live-update event like the other server-data tabs. The page draws
+ *   library components only and writes no class (admin page group G3).
  * @structure
  *   - snapshotAt(snaps, hoursAgo) -- newest snapshot at or before now-hoursAgo (baseline for a delta)
  *   - signed(n)                   -- +N / -N / 0 as text
- *   - Line({ points, onPick })    -- the seven-day line with a reading under the cursor
- *   - DatabaseTab (default)       -- the two sections, and the wait state before the second snapshot
+ *   - Headline                    -- the row count in the poster face, and what it is made of
+ *   - Waiting                     -- the box before the second snapshot, with the capture action
+ *   - DatabaseTab (default)       -- the two sections
  * @version-history
+ *   v3.0.0 -- 2026-09-27 -- Library components only: Section, Beside with the TrendLine, FigureStrip,
+ *     SearchLine and the filter Tabs, the tables as a List with the share Meter, Box for the wait;
+ *     admin-database.css goes. The line (formerly Line here) is components/TrendLine.js.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 -- 2026-09-13 -- Compose shared B1 headings; table ratios use SVG width data.
  *   v2.0.0 -- 2026-09-12 -- The poster face. The cards become two sections; the 168 hourly
@@ -22,7 +27,7 @@
  *     size and the one an operator is looking for; and before the second snapshot the deltas read
  *     as absent rather than as zero.
  *   v1.2.0 -- 2026-08-17 -- Two defects found while the Metrics tab was built from this file as
- *     the model. (1) Root wrapper is a plain div: class="adm" is the dashboard SHELL's flex-row
+ *     the model. (1) Root wrapper is a plain div: the class .adm is the dashboard SHELL's flex-row
  *     class, so the nested copy laid this tab out as one horizontal row of full-height columns
  *     (delta cards pushed off-screen). (2) `load` depended on useToast's unstable showErr, so
  *     every fetch re-ran the load effect: a continuous ~25 req/s poll whenever the tab was open.
@@ -30,13 +35,24 @@
  *     (version-history + archived row counts) when the server reports them.
  *   v1.0.0 -- 2026-07-16 -- Initial: live counts, hour/24h/7d totals, per-table 24h growth.
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Spinner, Empty, useToast, Toast } from './shared.js';
+import { Section } from '/components/Section.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure, Tinted, Meter } from '/components/Figure.js';
+import { Label } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Action, Loud } from '/components/Action.js';
+import { Box } from '/components/Box.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Tabs } from '/components/Tabs.js';
+import { List, Row as ListRow, Name, Num, Cell, SearchLine } from '/components/List.js';
+import { Row, Stack, Beside } from '/components/Layout.js';
+import { TrendLine } from '/components/TrendLine.js';
 import * as api from '/js/services/admin.js';
 
 const D = (key, params) => t('admin.database.' + key, params);
@@ -54,55 +70,43 @@ function signed(n) {
   return (n > 0 ? '+' : '') + num(n);
 }
 
-const W = 720, H = 160;
-
-/**
- * The row count over the snapshots the page holds: one series, one hue, one recessive midline.
- * The cursor reads the point nearest to it; the newest point is marked, because "where we are now"
- * is the one value a person looks for first.
- */
-function Line({ series, at, onPick }) {
-  const lo = Math.min(...series.map(p => p.v));
-  const hi = Math.max(...series.map(p => p.v));
-  const span = Math.max(1, hi - lo);
-  // The newest point carries a 3px tick, so the series stops two units short of the right edge
-  // and the tick is not sliced in half by the viewBox.
-  const x = i => (series.length < 2 ? W - 2 : (i / (series.length - 1)) * (W - 2));
-  const y = v => H - 12 - ((v - lo) / span) * (H - 24);
-  const points = series.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
-  const pick = (e) => {
-    const box = e.currentTarget.getBoundingClientRect();
-    const rel = (e.clientX - box.left) / Math.max(1, box.width);
-    onPick(Math.min(series.length - 1, Math.max(0, Math.round(rel * (series.length - 1)))));
-  };
-  const cur = at != null ? series[at] : null;
+/** The row count in the poster face, and what it is made of. */
+function Headline({ current }) {
   return html`
-    <div class="adm-db-chart">
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label=${D('chartLabel')}>
-        <line class="adm-db-mid" x1="0" y1=${H / 2} x2=${W} y2=${H / 2} vector-effect="non-scaling-stroke" />
-        <text class="adm-db-midlabel" x="4" y=${H / 2 - 5}>${num(Math.round(lo + span / 2))}</text>
-        <polyline class="adm-db-line" points=${points} vector-effect="non-scaling-stroke" />
-        ${cur ? html`<line class="adm-db-cursor" x1=${x(at)} y1="0" x2=${x(at)} y2=${H} vector-effect="non-scaling-stroke" />` : null}
-        ${/* The box scales to its column, so a circle would draw as an ellipse: the newest point
-              is a tick whose stroke does not scale. */ ''}
-        <line class="adm-db-dot" x1=${x(series.length - 1)} y1=${y(series[series.length - 1].v) - 7}
-          x2=${x(series.length - 1)} y2=${y(series[series.length - 1].v) + 7} vector-effect="non-scaling-stroke" />
-        <rect class="adm-db-hit" x="0" y="0" width=${W} height=${H}
-          onMouseMove=${pick} onMouseLeave=${() => onPick(null)} />
-      </svg>
-      ${cur ? html`<span class="adm-db-read">${dt(cur.at)} · ${num(cur.v)}</span>` : null}
-    </div>`;
+    <${Stack} gap="none">
+      <${Label} block>${D('heroLabel')}<//>
+      <${Figure} large n=${num(current.totalRows)} />
+      ${/* The two memory numbers count rows INSIDE the Memory table, so they say so: printed
+            bare under "rows, all tables" they read as counts of the whole database. */ ''}
+      <${Stack} gap="none" above="small">
+        <${Note} kind="meta" mono><${Tinted} strong>${num(current.tableCount)}<//> ${D('tables')}<//>
+        ${current.memoryVersionRows !== undefined && current.memoryArchivedRows !== undefined
+    ? html`<${Note} kind="meta" mono>${D('memoryComposition', { v: num(current.memoryVersionRows), a: num(current.memoryArchivedRows) })}<//>`
+    : null}
+      <//>
+    <//>`;
+}
+
+/** Before the second snapshot there is nothing to subtract, and the page says so. */
+function Waiting({ capturing, onCapture }) {
+  return html`
+    <${Box} tone="dim">
+      <${Stack} gap="medium">
+        <${SubHeading} level=${3}>${D('waitTitle')}<//>
+        <${Note} kind="lead">${D('waitBody')}<//>
+        <${Row}><${Loud} control onClick=${onCapture} disabled=${capturing}>${capturing ? D('capturing') : D('captureNow')}<//><//>
+        <${Note} kind="meta" mono>${D('waitHourly')}<//>
+      <//>
+    <//>`;
 }
 
 export default function DatabaseTab() {
-  useViewCSS('/css/views/admin-database.css');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
   const [find, setFind] = useState('');
   const [order, setOrder] = useState('biggest');
-  const [at, setAt] = useState(null);
 
   // This ref kept `load` stable before useToast memoized its callbacks. Previously every
   // completed fetch rebuilt `load` and re-ran the effect, measured at about 25 requests/s.
@@ -189,112 +193,75 @@ export default function DatabaseTab() {
   };
   const stillCount = rows.filter(r => !r.delta).length;
 
-  const cell = (value, label, sub, dim) => html`
-    <div class=${dim ? 'adm-db-strip-dim' : ''}><b>${value}</b><span>${label}</span><small>${sub}</small></div>`;
-  const chip = (id, label) => html`
-    <button type="button" class="adm-db-chip ${order === id ? 'on' : ''}" onClick=${() => setOrder(id)}>${label}</button>`;
+  // The line's midline marks the value half way between its lowest and highest reading.
+  const values = series.map(p => p.v);
+  const lo = values.length ? Math.min(...values) : 0;
+  const span = values.length ? Math.max(1, Math.max(...values) - lo) : 1;
+
+  /** A strip figure; `dim` when there is nothing to measure yet, which reads as absent, not zero. */
+  const cell = (key, value, label, sub, dim) => ({ key, n: value, label, sub, tone: dim ? 'dim' : undefined });
 
   return html`
-    <div class="og adm-db">
+    <${Fragment}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${D('sizeTitle')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door" onClick=${capture} disabled=${capturing}>
-              ${capturing ? D('capturing') : D('captureNow')}
-            </button>
-          </div></div>
-
-        <div class="adm-db-top">
-          <div>
-            <div class="adm-db-lbl">${D('heroLabel')}</div>
-            <div class="adm-db-hero poster-stat-number poster-stat-number--large">${num(current.totalRows)}</div>
-            ${/* The two memory numbers count rows INSIDE the Memory table, so they say so: printed
-                  bare under "rows, all tables" they read as counts of the whole database. */ ''}
-            <p class="adm-db-hero-sub">
-              <b>${num(current.tableCount)}</b> ${D('tables')}<br />
-              ${current.memoryVersionRows !== undefined && current.memoryArchivedRows !== undefined
-    ? D('memoryComposition', { v: num(current.memoryVersionRows), a: num(current.memoryArchivedRows) })
-    : null}
-            </p>
-          </div>
-
+      <${Section} first num="01" title=${D('sizeTitle')}
+        doors=${html`<${Action} small onClick=${capture} disabled=${capturing}>${capturing ? D('capturing') : D('captureNow')}<//>`}>
+        <${Beside} start narrow side=${html`<${Headline} current=${current} />`}>
           ${series.length > 1 ? html`
-            <div>
-              <div class="adm-db-chart-h">
-                <span class="adm-db-lbl">${D('chartLabel')}</span>
-                <small>${D('chartRange', { n: num(snapshots.length) })}</small>
-              </div>
-              <${Line} series=${series} at=${at} onPick=${setAt} />
-              <div class="adm-db-x">
-                <span>${num(series[0].v)} · ${dt(series[0].at)}</span>
-                <span>${num(current.totalRows)} · ${D('chartNow')}</span>
-              </div>
-            </div>
-          ` : html`
-            <div class="adm-db-wait">
-              <h3>${D('waitTitle')}</h3>
-              <p>${D('waitBody')}</p>
-              <button class="adm-btn" onClick=${capture} disabled=${capturing}>
-                ${capturing ? D('capturing') : D('captureNow')}
-              </button>
-              <small>${D('waitHourly')}</small>
-            </div>
-          `}
-        </div>
+            <${TrendLine} label=${D('chartLabel')} note=${D('chartRange', { n: num(snapshots.length) })}
+              points=${values} mid=${num(Math.round(lo + span / 2))}
+              readAt=${(i) => `${dt(series[i].at)} · ${num(series[i].v)}`}
+              ends=${[`${num(series[0].v)} · ${dt(series[0].at)}`, `${num(current.totalRows)} · ${D('chartNow')}`]} />
+          ` : html`<${Waiting} capturing=${capturing} onCapture=${capture} />`}
+        <//>
 
-        <div class="og-strip">
-          ${cell(signed(totalDelta(base1h)), D('lastHour'), base1h ? D('subHour') : D('noBaseline'), !base1h)}
-          ${cell(signed(totalDelta(base24h)), D('lastDay'), base24h ? D('subDay') : D('noBaseline'), !base24h)}
-          ${cell(signed(week),
-    weekBase ? D('lastWeek') : D('sinceFirst'),
-    weekPct !== null ? D('subWeek', { pct: weekPct })
-      : base7d ? D('subSinceFirst', { when: dt(base7d.capturedAt) }) : D('noBaseline'),
-    week === null)}
-          ${/* The count is what this page ASKED for (a week of hourly readings), not what the
-                store holds: the job keeps thirty days. The label says which. */ ''}
-          ${cell(num(snapshots.length), D('snapshots'), D('subSnapshots'))}
-        </div>
-      </section>
+        <${FigureStrip} wrap items=${[
+    cell('hour', signed(totalDelta(base1h)), D('lastHour'), base1h ? D('subHour') : D('noBaseline'), !base1h),
+    cell('day', signed(totalDelta(base24h)), D('lastDay'), base24h ? D('subDay') : D('noBaseline'), !base24h),
+    cell('week', signed(week),
+      weekBase ? D('lastWeek') : D('sinceFirst'),
+      weekPct !== null ? D('subWeek', { pct: weekPct })
+        : base7d ? D('subSinceFirst', { when: dt(base7d.capturedAt) }) : D('noBaseline'),
+      week === null),
+    // The count is what this page ASKED for (a week of hourly readings), not what the store
+    // holds: the job keeps thirty days. The label says which.
+    cell('snapshots', num(snapshots.length), D('snapshots'), D('subSnapshots')),
+  ]} />
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${D('whereTitle')}<small>02</small></h2></div>
-        <p class="adm-db-lead">${byGrowth ? D('leadGrowth') : D('leadSize')}</p>
+      <${Section} num="02" title=${D('whereTitle')}>
+        <${Note} kind="lead">${byGrowth ? D('leadGrowth') : D('leadSize')}<//>
 
-        <div class="adm-db-tools">
-          <div class="adm-db-find">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M16 16 L21 21"></path></svg>
-            <input type="text" value=${find} onInput=${e => setFind(e.target.value)} placeholder=${D('findPlaceholder')} />
-          </div>
-          <div class="adm-db-chips">
-            ${chip('biggest', D('orderBiggest'))}
-            ${chip('growth', D('orderGrowth'))}
-            ${chip('az', D('orderAz'))}
-          </div>
-        </div>
+        <${Row} wrap justify="between" align="end">
+          <${SearchLine} beside find text value=${find} onInput=${e => setFind(e.target.value)}
+            placeholder=${D('findPlaceholder')} />
+          <${Tabs} tone="filter" value=${order} onSelect=${setOrder} items=${[
+    { value: 'biggest', label: D('orderBiggest') },
+    { value: 'growth', label: D('orderGrowth') },
+    { value: 'az', label: D('orderAz') },
+  ]} />
+        <//>
 
-        <div class="adm-db-rows">
-          <div class="adm-db-hrow">
-            <span>${D('table')}</span><span class="r">${D('rows')}</span>
-            <span class="r">${D('colDay')}</span><span class="r">${D('colShare')}</span><span></span>
-          </div>
+        <${List} cols="name-n-n-n-bar" labels head=${[
+    D('table'), { label: D('rows'), num: true }, { label: D('colDay'), num: true }, { label: D('colShare'), num: true }, '',
+  ]}>
           ${rows.map(r => html`
-            <div class="adm-db-row" key=${r.table}>
-              <span class="adm-db-name">${r.table}</span>
-              <span class="adm-db-n r">${num(r.n)}</span>
-              <span class="adm-db-d r">${signed(r.delta)}</span>
-              <span class="adm-db-pct r">${shareOf(r)}</span>
-              <span class="adm-db-share"><svg width=${barOf(r).toFixed(1) + '%'} aria-hidden="true"></svg></span>
-            </div>`)}
-        </div>
+            <${ListRow} key=${r.table}>
+              <${Name} code>${r.table}<//>
+              <${Num}>${num(r.n)}<//>
+              <${Num} quiet>${signed(r.delta)}<//>
+              <${Num} quiet>${shareOf(r)}<//>
+              <${Cell}><${Meter} thin pct=${barOf(r)} /><//>
+            <//>`)}
+        <//>
 
-        <div class="adm-db-foot">
-          <span>${D('shown', { n: num(rows.length), total: num(current.tableCount) })}${
-  byGrowth && stillCount > 0 ? ' ' + D('stillCount', { n: num(stillCount) }) : ''}</span>
-          <span class="adm-db-note">${byGrowth ? D('noteGrowth') : D('noteSize')}</span>
-        </div>
-      </section>
-    </div>
+        <${Row} wrap justify="between" align="baseline" above="medium">
+          <${Note} kind="meta" inline>${D('shown', { n: num(rows.length), total: num(current.tableCount) })}${
+  byGrowth && stillCount > 0 ? ' ' + D('stillCount', { n: num(stillCount) }) : ''}<//>
+          <${Note} kind="meta" inline mono>${byGrowth ? D('noteGrowth') : D('noteSize')}<//>
+        <//>
+      <//>
+    <//>
   `;
 }

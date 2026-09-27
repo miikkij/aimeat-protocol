@@ -1,0 +1,38 @@
+/**
+ * @file trend-line.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One number over time as a line (components/TrendLine.js): its name and note over it,
+ *   the line in ink on the heavy rule, the optional sun ground under it and dashed midline with its
+ *   value, the coral tick on the newest reading, the cursor and the reading box, and the two ends
+ *   under it. Reads only the theme's tokens. Drawn by the component; a page never writes these.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial: admin-database.css (.adm-db-chart*, .adm-db-line, .adm-db-mid*,
+ *     .adm-db-dot, .adm-db-cursor, .adm-db-hit, .adm-db-read, .adm-db-x) and admin-metrics-poster.css
+ *     (.adm-mx-chart*, .adm-mx-area, .adm-mx-line, .adm-mx-now, …) as one component; the frames read
+ *     the shape tokens (admin page group G3).
+ */
+
+.trend-line { min-width: 0; }
+.trend-line-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.trend-line-head small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.trend-line-plot { position: relative; border-bottom: var(--shape-frame) solid var(--shape-rule-colour); }
+.trend-line-plot svg { display: block; width: 100%; height: 160px; }
+/* The ground under the line is the sun at half weight: the readings often sit in a narrow band, and
+   a full-strength fill would cover most of the box. */
+.trend-line-area { fill: var(--sun); opacity: .5; }
+.trend-line-path { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; }
+.trend-line-mid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 4 5; }
+/* The one gridline says what it marks, or it is a decoration. The box is scaled horizontally, so the
+   label keeps its own size rather than stretching with it. */
+.trend-line-midlabel { font-family: var(--font-mono); font-size: 11px; fill: var(--text-dim); }
+.trend-line-now { stroke: var(--accent); stroke-width: 3; }
+.trend-line-cursor { stroke: var(--accent); stroke-width: 1; }
+.trend-line-hit { fill: transparent; cursor: crosshair; }
+.trend-line-read {
+  position: absolute; top: 0; right: 0;
+  font-family: var(--font-mono); font-size: .72rem; color: var(--text); background: var(--bg);
+  padding: 2px 6px; border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner);
+}
+.trend-line-ends { display: flex; justify-content: space-between; gap: 12px; padding-top: 7px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }

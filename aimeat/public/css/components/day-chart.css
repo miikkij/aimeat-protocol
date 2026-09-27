@@ -1,0 +1,78 @@
+/**
+ * @file day-chart.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Numbers by day as bars (components/DayChart.js): the framed chart with its head and
+ *   legend, the reading line over the plot, the plot where each day holds one or two bars, the days
+ *   under it and the note; and the row of thin bars of one series (DaySpark). The frame reads the
+ *   theme's shape tokens; the words read the theme's colours.
+ *
+ *   FOUR COLOURS HERE ARE NOT THEME TOKENS, and that is deliberate. A series colour is data: the
+ *   same series must keep its colour when the theme flips, or one bar means two things in light and
+ *   dark. 'first' and 'second' are slots 1 and 2 of the validated categorical palette (worst
+ *   colour-blind separation 24.7, normal vision 33.6, both modes passing against both surfaces);
+ *   'critical' is the reserved status red, because a refusal is a status and never a series; 'plain'
+ *   is the words' grey token. The values are the ones the operator's Statistics and Usage pages
+ *   carried in their own sheets.
+ *   Drawn by the component; a page never writes these classes.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial: admin-stats.css (.adm-st-chart*, .adm-st-plot, .adm-st-day,
+ *     .adm-st-pair, .adm-st-xaxis, .adm-st-legend, .adm-st-key*, .adm-st-yhint*, .adm-st-bar*,
+ *     .adm-st-spark) and admin-usage.css (.adm-us-chart*, the same parts) as one component; the
+ *     frame and the bars' ends read the shape tokens (admin page group G3).
+ */
+
+.day-chart {
+  --day-first: #2a78d6;
+  --day-second: #eb6834;
+  --day-critical: #d03b3b;
+  border: var(--shape-frame) solid var(--shape-frame-colour);
+  border-radius: var(--shape-corner);
+  background: var(--card-bg);
+  padding: 16px 18px 12px;
+  min-width: 0;
+}
+.day-spark {
+  --day-first: #2a78d6;
+  --day-second: #eb6834;
+  --day-critical: #d03b3b;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 34px;
+}
+
+.day-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; flex-wrap: wrap; }
+.day-chart-title { font-weight: 700; font-size: .95rem; color: var(--text); }
+.day-chart-legend { display: flex; gap: 16px; align-items: center; font-size: .78rem; color: var(--text-dim); }
+.day-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.day-chart-key { width: 10px; height: 10px; display: block; border-radius: var(--shape-corner); }
+.day-chart-read { font-family: var(--font-mono); font-size: .66rem; color: var(--text-dim); }
+.day-chart-read--on { color: var(--text); }
+
+.day-chart-plot { display: flex; align-items: flex-end; gap: 6px; height: 150px; margin-top: 14px; padding-bottom: 2px; border-bottom: 1px solid var(--border); }
+.day-chart-day { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
+.day-chart-day:hover { background: var(--bg-surface); }
+.day-chart-pair { display: flex; align-items: flex-end; gap: 2px; width: 100%; height: 100%; }
+.day-chart-x { display: flex; gap: 6px; margin-top: 6px; }
+.day-chart-x span { flex: 1 1 0; text-align: center; font-family: var(--font-mono); font-size: .64rem; color: var(--text-dim); min-width: 0; overflow: hidden; }
+.day-chart-note { margin: 10px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+
+/* A bar: anchored to the baseline, 2px between neighbours; its height attribute carries the value. */
+.day-chart-bar { display: block; flex: 1 1 0; min-width: 0; border-radius: var(--shape-corner); }
+.day-chart-pair .day-chart-bar { max-width: 14px; }
+/* Thin marks: seven bars across a wide column would read as blocks rather than a sparkline. */
+.day-spark .day-chart-bar { max-width: 10px; }
+.day-chart-bar--first { background: var(--day-first); }
+.day-chart-bar--second { background: var(--day-second); }
+.day-chart-bar--critical { background: var(--day-critical); }
+.day-chart-bar--plain { background: var(--text-dim); }
+
+/* A phone: a lower plot, closer days, and only the first and last day written under it. */
+@media (max-width: 768px) {
+  .day-chart-plot { height: 120px; gap: 3px; }
+  .day-chart-x { gap: 3px; }
+  .day-chart-x span:not(:first-child):not(:last-child) { visibility: hidden; }
+}

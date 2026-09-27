@@ -17,6 +17,8 @@
  *   difference between a counter at zero for this week and a counter nothing has ever written —
  *   which the old page could not do, and which is why `requests_total` read 0 for two months
  *   without anyone being able to see that its middleware had never been mounted.
+ *
+ *   The page draws library components only and writes no class (admin page group G3).
  * @structure
  *   - Period — the chips and the two dates, in section 01's header, governing only what is under it
  *   - RightNow (01) — the word, the five rows, the strip
@@ -24,6 +26,9 @@
  *   - StatsTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v4.0.0 — 2026-09-27 — Library components only: Section, Verdict and Readings, FigureStrip, the
+ *     filter Tabs for the period, TextField for the two dates, Action for the doors and the copy,
+ *     SettingBox for the paste, Beside for the checks and the paste; admin-stats.css goes.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v3.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v3.0.0 — 2026-09-12 — The poster face and six numbered sections. Counted-over-a-period and
@@ -38,16 +43,23 @@
  *     mailbox notification sections, per-day charts, self-managed data fetching
  *   v1.0.0 -- 2026-05-01 -- Initial stats tab with basic cards and Chart.js charts
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { num, fmtUp, Badge, Row, Spinner, ErrorBox } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { num, fmtUp, Badge, Spinner, ErrorBox } from './shared.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextField } from '/components/TextField.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Row, Beside } from '/components/Layout.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -70,23 +82,22 @@ const PRESETS = ['today', '7d', '30d', 'all'];
 function Period({ period, custom, onPick, onCustom, onApply }) {
   const [open, setOpen] = useState(false);
   return html`
-    <div class="adm-st-period">
-      <span class="adm-st-period-l">${S('period.label')}</span>
-      ${PRESETS.map(p => html`
-        <button type="button" class="adm-st-fchip ${period === p ? 'on' : ''}"
-          onClick=${() => { setOpen(false); onPick(p); }}>${S('period.' + p)}</button>`)}
+    <${Row} wrap>
+      <${Note} kind="meta" inline>${S('period.label')}<//>
+      <${Tabs} tone="filter" label=${S('period.label')} value=${period}
+        items=${PRESETS.map(p => ({ value: p, label: S('period.' + p) }))}
+        onSelect=${(p) => { setOpen(false); onPick(p); }} />
       ${open ? html`
-        <span class="adm-st-dates">
-          <input type="date" value=${custom.from} aria-label=${S('period.from')}
-            onInput=${e => onCustom({ ...custom, from: e.target.value })} />
-          <span class="adm-st-dash">–</span>
-          <input type="date" value=${custom.to} aria-label=${S('period.to')}
-            onInput=${e => onCustom({ ...custom, to: e.target.value })} />
-          <button type="button" class="adm-st-fchip" disabled=${!custom.from || !custom.to}
-            onClick=${onApply}>${S('period.apply')}</button>
-        </span>`
-    : html`<button type="button" class="og-door og-door--quiet" onClick=${() => setOpen(true)}>${S('period.pick')}</button>`}
-    </div>`;
+        <${Row} wrap>
+          <${TextField} type="date" value=${custom.from} ariaLabel=${S('period.from')}
+            onInput=${(v) => onCustom({ ...custom, from: v })} />
+          <${Note} kind="meta" inline>–<//>
+          <${TextField} type="date" value=${custom.to} ariaLabel=${S('period.to')}
+            onInput=${(v) => onCustom({ ...custom, to: v })} />
+          <${Action} small disabled=${!custom.from || !custom.to} onClick=${onApply}>${S('period.apply')}<//>
+        <//>`
+    : html`<${Action} small soft onClick=${() => setOpen(true)}>${S('period.pick')}<//>`}
+    <//>`;
 }
 
 /**
@@ -125,116 +136,84 @@ function RightNow({ rows, live, days, from, to, control }) {
   ].join(' · ');
 
   return html`
-    <section class="og-sec og-sec--first" id="adm-st-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        ${control}
-      </div>
-
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${alarming ? 'danger' : ''}">
-            ${lead ? S('now.word', { n: num(lead.total), what: S('word.' + lead.name) }) : S('now.wordNothing')}
-          </div>
-          <p class="adm-alert-line">
-            ${!lead ? S('now.lineNothing')
+    <${Section} first id="adm-st-01" num="01" title=${S('now.title')} doors=${control}>
+      <${Verdict}
+        word=${lead ? S('now.word', { n: num(lead.total), what: S('word.' + lead.name) }) : S('now.wordNothing')}
+        tone=${alarming ? 'danger' : undefined}
+        line=${!lead ? S('now.lineNothing')
     : alarming ? S('now.lineRefused', { n: num(perDay) })
       : S('now.lineOrdinary', { what: S('counter.' + lead.name).toLowerCase(), n: num(perDay) })}
-          </p>
-          <div class="adm-ov-up">${stamp}</div>
-          ${alarming ? html`
-            <div class="adm-st-acts">
-              <a class="og-door og-door--danger" href="#/admin/security">${S('now.seeWho')}</a>
-            </div>` : null}
-        </div>
+        stamp=${stamp}
+        doors=${alarming ? html`<${Action} small tone="danger" href="#/admin/security">${S('now.seeWho')}<//>` : null}>
+        <${Readings} rows=${[
+    {
+      key: 'refused', name: S('counter.refused'), why: S('now.refusedWhy'),
+      mark: refused.state === 'live'
+        ? html`<${Badge} type="danger" label=${S('now.aDay', { n: num(Math.round(refused.total / Math.max(1, days.length))) })} />`
+        : html`<${Badge} type="muted" label=${S('now.chipQuiet')} />`,
+      value: S('now.inPeriod', { n: num(refused.total) }),
+    },
+    {
+      key: 'memory', name: S('now.memory'), why: S('now.memoryWhy'),
+      mark: html`<${Badge} type=${memoryOps ? 'success' : 'muted'} label=${memoryOps ? S('now.chipHealthy') : S('now.chipQuiet')} />`,
+      value: S('now.memoryValue', { n: num(memoryOps), r: num(reads.total), w: num(writes.total) }),
+    },
+    {
+      key: 'schema', name: S('counter.schema'), why: S('now.schemaWhy'),
+      mark: schema.failed
+        ? html`<${Badge} type="warning" label=${S('now.chipFailed', { n: num(schema.failed) })} />`
+        : html`<${Badge} type=${schema.total ? 'success' : 'muted'} label=${schema.total ? S('now.chipAllPassed') : S('now.chipQuiet')} />`,
+      value: S('now.schemaValue', { n: num(schema.total) }),
+    },
+    {
+      key: 'requests', name: S('counter.requests'), why: requests.state === 'never' ? S('now.requestsNoneWhy') : S('now.requestsWhy'),
+      mark: requests.state === 'never'
+        ? html`<${Badge} type="muted" label=${S('now.chipNothingYet')} />`
+        : html`<${Badge} type="info" label=${S('now.aDay', { n: num(Math.round(requests.total / Math.max(1, days.length))) })} />`,
+      value: requests.state === 'never' ? 'requests_total' : S('now.inPeriod', { n: num(requests.total) }),
+    },
+    {
+      key: 'consent', name: S('now.consent'), why: S('now.consentWhy'), last: true,
+      mark: html`<${Badge} type="muted" label=${S('now.chipEver', { n: num(consentEver) })} />`,
+      value: S('now.inPeriod', { n: num(consentOps) }),
+    },
+  ]} />
+      <//>
 
-        <div>
-          ${Row({
-    title: S('counter.refused'), why: S('now.refusedWhy'),
-    chip: refused.state === 'live'
-      ? html`<${Badge} type="danger" label=${S('now.aDay', { n: num(Math.round(refused.total / Math.max(1, days.length))) })} />`
-      : html`<${Badge} type="muted" label=${S('now.chipQuiet')} />`,
-    value: S('now.inPeriod', { n: num(refused.total) }),
-  })}
-          ${Row({
-    title: S('now.memory'), why: S('now.memoryWhy'),
-    chip: html`<${Badge} type=${memoryOps ? 'success' : 'muted'}
-      label=${memoryOps ? S('now.chipHealthy') : S('now.chipQuiet')} />`,
-    value: S('now.memoryValue', { n: num(memoryOps), r: num(reads.total), w: num(writes.total) }),
-  })}
-          ${Row({
-    title: S('counter.schema'), why: S('now.schemaWhy'),
-    chip: schema.failed
-      ? html`<${Badge} type="warning" label=${S('now.chipFailed', { n: num(schema.failed) })} />`
-      : html`<${Badge} type=${schema.total ? 'success' : 'muted'}
-        label=${schema.total ? S('now.chipAllPassed') : S('now.chipQuiet')} />`,
-    value: S('now.schemaValue', { n: num(schema.total) }),
-  })}
-          ${Row({
-    title: S('counter.requests'), why: requests.state === 'never' ? S('now.requestsNoneWhy') : S('now.requestsWhy'),
-    chip: requests.state === 'never'
-      ? html`<${Badge} type="muted" label=${S('now.chipNothingYet')} />`
-      : html`<${Badge} type="info" label=${S('now.aDay', { n: num(Math.round(requests.total / Math.max(1, days.length))) })} />`,
-    value: requests.state === 'never' ? 'requests_total' : S('now.inPeriod', { n: num(requests.total) }),
-  })}
-          ${Row({
-    title: S('now.consent'), why: S('now.consentWhy'), last: true,
-    chip: html`<${Badge} type="muted" label=${S('now.chipEver', { n: num(consentEver) })} />`,
-    value: S('now.inPeriod', { n: num(consentOps) }),
-  })}
-        </div>
-      </div>
-
-      <div class="og-strip">
-        <div>
-          <b class=${alarming ? 'adm-st-coral' : ''}>${lead ? num(lead.total) : '0'}</b>
-          <span>${lead ? S('word.' + lead.name) : S('strip.nothing')}</span>
-          <small>${lead ? S('strip.aDay', { n: num(perDay) }) : S('strip.nothingSub')}</small>
-        </div>
-        <div>
-          <b>${num(memoryOps)}</b><span>${S('strip.memory')}</span>
-          <small>${S('strip.memorySub', { r: num(reads.total), w: num(writes.total) })}</small>
-        </div>
-        <div>
-          <b>${num(schema.total)}</b><span>${S('strip.schema')}</span>
-          <small>${S('strip.schemaSub', { n: num(schema.failed) })}</small>
-        </div>
-        <div>
-          <b>${fmtUp(live.uptime_seconds || 0)}</b><span>${S('strip.up')}</span>
-          <small>${S('strip.upSub', { at: (live.started_at || '').slice(0, 16).replace('T', ' ') })}</small>
-        </div>
-      </div>
-    </section>`;
+      <${FigureStrip} wrap items=${[
+    {
+      key: 'lead', n: lead ? num(lead.total) : '0', tone: alarming ? 'notice' : undefined,
+      label: lead ? S('word.' + lead.name) : S('strip.nothing'),
+      sub: lead ? S('strip.aDay', { n: num(perDay) }) : S('strip.nothingSub'),
+    },
+    { key: 'memory', n: num(memoryOps), label: S('strip.memory'), sub: S('strip.memorySub', { r: num(reads.total), w: num(writes.total) }) },
+    { key: 'schema', n: num(schema.total), label: S('strip.schema'), sub: S('strip.schemaSub', { n: num(schema.failed) }) },
+    {
+      key: 'up', n: fmtUp(live.uptime_seconds || 0), label: S('strip.up'),
+      sub: S('strip.upSub', { at: (live.started_at || '').slice(0, 16).replace('T', ' ') }),
+    },
+  ]} />
+    <//>`;
 }
 
 /** Section 06: what an agent can do with these numbers, and the paste. */
 function AskAi({ from, to }) {
   const paste = buildStatsPrompt({ url: getNodeUrl(), from, to });
   return html`
-    <section class="og-sec" id="adm-st-06">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-st-ai">
-        <div>
-          <p class="adm-st-lead">${S('ai.lead')}</p>
-          ${Row({ title: S('ai.read'), why: S('ai.readWhy'), chip: null, value: 'aimeat_admin_statistics' })}
-          ${Row({ title: S('ai.who'), why: S('ai.whoWhy'), chip: null, value: 'aimeat_admin_security_overview' })}
-          ${Row({ title: S('ai.raw'), why: S('ai.rawWhy'), chip: null, value: '/v1/metrics', last: true })}
-        </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-st-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+    <${Section} id="adm-st-06" num="06" title=${S('ai.title')}
+      doors=${html`<${Action} small soft copy=${paste}>${S('ai.copy')}<//>`}>
+      <${Beside} wide side=${html`<${SettingBox} label=${S('ai.label')} pre>${paste}<//>`}>
+        <${Note} kind="lead">${S('ai.lead')}<//>
+        <${Readings} rows=${[
+    { key: 'read', name: S('ai.read'), why: S('ai.readWhy'), mark: null, value: 'aimeat_admin_statistics' },
+    { key: 'who', name: S('ai.who'), why: S('ai.whoWhy'), mark: null, value: 'aimeat_admin_security_overview' },
+    { key: 'raw', name: S('ai.raw'), why: S('ai.rawWhy'), mark: null, value: '/v1/metrics', last: true },
+  ]} />
+      <//>
+    <//>`;
 }
 
 export default function StatsTab({ data }) {
-  useViewCSS('/css/views/admin-stats.css');
   const [period, setPeriod] = useState('7d');
   const [custom, setCustom] = useState({ from: '', to: '' });
   const [applied, setApplied] = useState(null);
@@ -276,7 +255,7 @@ export default function StatsTab({ data }) {
     onCustom=${setCustom}
     onApply=${() => { setApplied({ ...custom }); setPeriod('custom'); }} />`;
 
-  return html`<div class="adm-st">
+  return html`<${Fragment}>
     <${RightNow} rows=${rows} live=${sd} days=${days} from=${from} to=${to} control=${control} />
     <${WhatMoved} rows=${rows} days=${days} onShowNumbers=${() => {
     setNumbers(true);
@@ -286,5 +265,5 @@ export default function StatsTab({ data }) {
     <${LiveNow} live=${sd} gauges=${sd.gauges || {}} />
     <${DidItArrive} period=${sd} />
     <${AskAi} from=${from} to=${to} />
-  </div>`;
+  <//>`;
 }

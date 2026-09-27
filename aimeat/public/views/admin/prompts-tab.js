@@ -21,9 +21,16 @@
  *   it and is never touched after that, and 'orphan' is one
  *   the software no longer ships, which cannot be reset at all. An operator used to learn the first
  *   of those by watching an hour's work vanish at the next deploy.
+ *
+ *   The page draws library components only and writes no class (admin page group G3).
  * @structure PromptsTab (default) · RightNow · TakingCurrent · WhatChanged
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v3.1.0 — 2026-09-27 — The list and the open prompt are ConversationPane's `Panes framed` (Panes.js
+ *     folded into it: one component for a list beside the thing opened from it); the rows are `side`.
+ *   v3.0.0 — 2026-09-27 — Library components only: Section, Verdict and Readings, FigureStrip, the
+ *     list and the open prompt in Panes, the steps as a List with the step Figure, the whole-site
+ *     reset in a SettingBox; admin-prompts.css goes.
  *   2026-09-15 -- Header describes 'yours' as it now behaves: unchanged prompts follow updates.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
@@ -34,20 +41,28 @@
  *   v1.1.0 — 2026-09-09 — GROUP_NAMES covers every seeded group.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, dt, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Figure } from '/components/Figure.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
+import { SettingBox } from '/components/Box.js';
+import { List, Row, Name, Cell, Doors } from '/components/List.js';
+import { Panes } from '/components/ConversationPane.js';
 import { swallowed } from '/js/swallowed.js';
 import {
   getSystemPrompts, getSystemPrompt, updateSystemPrompt,
   resetSystemPrompt, resetAllSystemPrompts, resetPromptGroup, getPromptVersions, restorePromptVersion,
 } from '/js/services/admin.js';
-import { PromptList, groupLabel } from './prompts-tab.list.js';
+import { PromptList, PromptListHead, groupLabel } from './prompts-tab.list.js';
 import { PromptEditor } from './prompts-tab.editor.js';
 
 const html = htm.bind(h);
@@ -59,80 +74,68 @@ function RightNow({ facts, number, onShowChanged }) {
   const line = facts.changed === 0
     ? P('now.lineFactory', { n: num(facts.all) })
     : P('now.lineEdited', { n: num(facts.all), changed: num(facts.changed), code: num(facts.changedCode) });
-  const row = (title, why, chip, value, last) => html`
-    <div class=${'adm-mrow' + (last ? ' adm-mrow--last' : '')}>
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span>${chip}</span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  const row = (key, title, why, chip, value, last) => ({ key, name: title, why, mark: chip, value, last });
   return html`
-    <section class="og-sec og-sec--first" id="adm-pr-now">
-      <div class="og-sec-h"><h2 class="poster-section-title">${P('now.title')}<small>${number}</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onShowChanged}>${P('now.showChanged')}</button>
-        </div></div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status">${word}</div>
-          <p class="adm-alert-line">${line}</p>
-          <div class="adm-ov-up">${P('now.groups', { n: num(facts.groups) })}<br />${facts.lastChange}</div>
-        </div>
-        <div>
-          ${row(P('now.yoursRow'), P('now.yoursWhy'),
-            html`<${Badge} type=${facts.changedYours > 0 ? 'watch' : 'muted'}
-              label=${P('now.ofValue', { n: num(facts.changedYours), total: num(facts.yours) })} />`,
-            P('now.compared'))}
-          ${row(P('now.codeRow'), P('now.codeWhy'),
-            html`<${Badge} type=${facts.changedCode > 0 ? 'critical' : 'muted'}
-              label=${P('now.ofValue', { n: num(facts.changedCode), total: num(facts.code) })} />`,
-            P('now.everyBoot'))}
-          ${row(P('now.orphanRow'), P('now.orphanWhy'),
-            html`<${Badge} type=${facts.orphan > 0 ? 'critical' : 'healthy'} label=${num(facts.orphan)} />`,
-            P('now.noFactory'))}
-          ${row(P('now.offRow'), P('now.offWhy'),
-            facts.off > 0
-              ? html`<${Badge} type="critical" label=${num(facts.off)} />`
-              : html`<${Badge} type="healthy" label=${P('now.none')} />`,
-            '404')}
-          ${row(P('now.langRow'), P('now.langWhy'),
-            html`<${Badge} type=${facts.translated > 0 ? 'info' : 'muted'}
-              label=${P('now.ofValue', { n: num(facts.translated), total: num(facts.all) })} />`,
-            'Accept-Language', true)}
-        </div>
-      </div>
-      <div class="og-strip">
-        <div><b>${num(facts.all)}</b><span>${P('strip.prompts')}</span><small>${P('strip.promptsSub')}</small></div>
-        <div><b class="adm-pr-coral">${num(facts.changed)}</b><span>${P('strip.changed')}</span><small>${P('strip.changedSub')}</small></div>
-        <div><b>${num(facts.code)}</b><span>${P('strip.code')}</span><small>${P('strip.codeSub')}</small></div>
-        <div><b>${num(facts.orphan)}</b><span>${P('strip.orphan')}</span><small>${P('strip.orphanSub')}</small></div>
-      </div>
-    </section>`;
+    <${Section} first id="adm-pr-now" num=${number} title=${P('now.title')}
+      doors=${html`<${Action} small soft onClick=${onShowChanged}>${P('now.showChanged')}<//>`}>
+      <${Verdict} word=${word} line=${line}
+        stamp=${html`${P('now.groups', { n: num(facts.groups) })}<br />${facts.lastChange}`}>
+        <${Readings} rows=${[
+    row('yours', P('now.yoursRow'), P('now.yoursWhy'),
+      html`<${Badge} type=${facts.changedYours > 0 ? 'watch' : 'muted'}
+        label=${P('now.ofValue', { n: num(facts.changedYours), total: num(facts.yours) })} />`,
+      P('now.compared')),
+    row('code', P('now.codeRow'), P('now.codeWhy'),
+      html`<${Badge} type=${facts.changedCode > 0 ? 'critical' : 'muted'}
+        label=${P('now.ofValue', { n: num(facts.changedCode), total: num(facts.code) })} />`,
+      P('now.everyBoot')),
+    row('orphan', P('now.orphanRow'), P('now.orphanWhy'),
+      html`<${Badge} type=${facts.orphan > 0 ? 'critical' : 'healthy'} label=${num(facts.orphan)} />`,
+      P('now.noFactory')),
+    row('off', P('now.offRow'), P('now.offWhy'),
+      facts.off > 0
+        ? html`<${Badge} type="critical" label=${num(facts.off)} />`
+        : html`<${Badge} type="healthy" label=${P('now.none')} />`,
+      '404'),
+    row('lang', P('now.langRow'), P('now.langWhy'),
+      html`<${Badge} type=${facts.translated > 0 ? 'info' : 'muted'}
+        label=${P('now.ofValue', { n: num(facts.translated), total: num(facts.all) })} />`,
+      'Accept-Language', true),
+  ]} />
+      <//>
+      <${FigureStrip} wrap items=${[
+    { key: 'all', n: num(facts.all), label: P('strip.prompts'), sub: P('strip.promptsSub') },
+    { key: 'changed', n: num(facts.changed), tone: 'notice', label: P('strip.changed'), sub: P('strip.changedSub') },
+    { key: 'code', n: num(facts.code), label: P('strip.code'), sub: P('strip.codeSub') },
+    { key: 'orphan', n: num(facts.orphan), label: P('strip.orphan'), sub: P('strip.orphanSub') },
+  ]} />
+    <//>`;
 }
 
 /** Section 03: what the everyday button does, and the one that is not safe. */
 function TakingCurrent({ facts, number, onResetAll }) {
-  const step = (n, key, value, last) => html`
-    <div class=${'adm-pr-step' + (last ? ' adm-pr-step--last' : '')}>
-      <span class="adm-pr-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
-      <span><b>${P('taking.' + key)}</b><span class="adm-why">${P('taking.' + key + 'Why')}</span></span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  const step = (n, key, value) => html`
+    <${Row} key=${key}>
+      <${Cell}><${Figure} small step n=${n} /><//>
+      <${Name} desc=${P('taking.' + key + 'Why')}>${P('taking.' + key)}<//>
+      <${Doors}><${Note} kind="meta" inline mono>${value}<//><//>
+    <//>`;
   return html`
-    <section class="og-sec" id="adm-pr-taking">
-      <div class="og-sec-h"><h2 class="poster-section-title">${P('taking.title')}<small>${number}</small></h2></div>
-      <p class="adm-pr-lead">${P('taking.lead')}</p>
-      ${step(1, 'writes', P('taking.keepsHistory'))}
-      ${step(2, 'languages', P('taking.worthAWarning'))}
-      ${step(3, 'group', P('taking.wholeGroup'))}
-      ${step(4, 'orphan', P('taking.orphanValue', { n: num(facts.orphan) }), true)}
-      <div class="og-box adm-pr-reset-note poster-aside poster-aside--small">
-        <span class="og-box-label">${P('taking.dangerLabel')}</span>
+    <${Section} id="adm-pr-taking" num=${number} title=${P('taking.title')}>
+      <${Note} kind="lead">${P('taking.lead')}<//>
+      <${List} cols="n-name-doors">
+        ${step(1, 'writes', P('taking.keepsHistory'))}
+        ${step(2, 'languages', P('taking.worthAWarning'))}
+        ${step(3, 'group', P('taking.wholeGroup'))}
+        ${step(4, 'orphan', P('taking.orphanValue', { n: num(facts.orphan) }))}
+      <//>
+      <${SettingBox} label=${P('taking.dangerLabel')}>
         ${P('taking.danger')}
-        <div class="og-doors adm-pr-reset-doors">
-          <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${onResetAll}>${P('taking.takeAll')}</button>
-        </div>
-      </div>
-    </section>`;
+        <${Actions} under>
+          <${Action} small soft tone="danger" onClick=${onResetAll}>${P('taking.takeAll')}<//>
+        <//>
+      <//>
+    <//>`;
 }
 
 /** Section 04: what changed lately, across every group. */
@@ -142,24 +145,21 @@ function WhatChanged({ prompts, number, onOpen }) {
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
     .slice(0, 8);
   return html`
-    <section class="og-sec" id="adm-pr-log">
-      <div class="og-sec-h"><h2 class="poster-section-title">${P('log.title')}<small>${number}</small></h2></div>
+    <${Section} id="adm-pr-log" num=${number} title=${P('log.title')}>
       ${recent.length === 0
-        ? html`<p class="adm-pr-note">${P('log.none')}</p>`
-        : recent.map((p, i) => html`
-          <div class=${'adm-mrow' + (i === recent.length - 1 ? ' adm-mrow--last' : '')} key=${p.id}>
-            <span>
-              <b>${p.name}</b>
-              <span class="adm-why">${groupLabel(p.group)} · ${p.differs_from_default ? P('log.differs') : P('log.matches')}</span>
-            </span>
-            <span><button type="button" class="og-door og-door--quiet" onClick=${() => onOpen(p.id)}>${P('log.open')}</button></span>
-            <span class="adm-mval">v${num(p.version)} · ${dt(p.updatedAt)} · ${p.updatedBy || '-'}</span>
-          </div>`)}
-    </section>`;
+        ? html`<${Note}>${P('log.none')}<//>`
+        : html`<${Readings} rows=${recent.map((p, i) => ({
+          key: p.id,
+          name: p.name,
+          why: `${groupLabel(p.group)} · ${p.differs_from_default ? P('log.differs') : P('log.matches')}`,
+          mark: html`<${Action} small soft onClick=${() => onOpen(p.id)}>${P('log.open')}<//>`,
+          value: `v${num(p.version)} · ${dt(p.updatedAt)} · ${p.updatedBy || '-'}`,
+          last: i === recent.length - 1,
+        }))} />`}
+    <//>`;
 }
 
 export default function PromptsTab({ data }) {
-  useViewCSS('/css/views/admin-prompts.css');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -334,29 +334,29 @@ export default function PromptsTab({ data }) {
   let counter = 0;
   const n = () => String(++counter).padStart(2, '0');
 
+  const counts = { all: facts.all, changed: facts.changed, off: facts.off, orphan: facts.orphan };
+
   return html`
-    <div class="adm-pr">
+    <${Fragment}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <p class="adm-pr-intro">${P('intro')}</p>
+      <${Note}>${P('intro')}<//>
 
       <${RightNow} facts=${facts} number=${n()} onShowChanged=${() => { setFilter('changed'); setQuery(''); }} />
 
-      <section class="og-sec" id="adm-pr-find">
-        <div class="og-sec-h"><h2 class="poster-section-title">${P('find.title')}<small>${n()}</small></h2>
-          <div class="og-doors"><span class="adm-pr-note">${P('find.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
-        <div class="adm-pr-bench">
-          <${PromptList} prompts=${shown} counts=${{ all: facts.all, changed: facts.changed, off: facts.off, orphan: facts.orphan }}
-            query=${query} filter=${filter} openId=${openId}
-            onQuery=${setQuery} onFilter=${setFilter} onOpen=${openPrompt} onResetGroup=${takeGroup} />
+      <${Section} id="adm-pr-find" num=${n()} title=${P('find.title')}
+        doors=${html`<${Note} kind="meta" inline>${P('find.count', { n: num(shown.length), total: num(facts.all) })}<//>`}>
+        <${Panes} framed label=${P('find.title')}
+          head=${html`<${PromptListHead} counts=${counts} query=${query} filter=${filter} onQuery=${setQuery} onFilter=${setFilter} />`}
+          side=${html`<${PromptList} prompts=${shown} openId=${openId} onOpen=${openPrompt} onResetGroup=${takeGroup} />`}>
           <${PromptEditor} prompt=${open} draft=${draft} versions=${versions} saving=${saving} loading=${loading}
             onDraft=${setDraftField} onLocale=${setLocale} onSave=${save} onTakeCurrent=${takeCurrent}
             onToggleActive=${toggleActive} onVersions=${showVersions} onRestore=${restore} />
-        </div>
-      </section>
+        <//>
+      <//>
 
       <${TakingCurrent} facts=${facts} number=${n()} onResetAll=${takeAll} />
       <${WhatChanged} prompts=${prompts} number=${n()} onOpen=${openPrompt} />
 
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
 }

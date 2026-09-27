@@ -10,6 +10,8 @@
  * @structure CONFLICT_DECISIONS — [the DECISIONS shape] · CONFLICT_NOTES — [{ title, text }]
  * @usage import { CONFLICT_DECISIONS, CONFLICT_NOTES } from './decisions-conflicts.js';
  * @version-history
+ *   v1.5.2 — 2026-09-27 — The admin Agents crops find the list row's action link and the section's
+ *     action link the page draws now.
  *   v1.5.1 — 2026-09-27 — The Nodes crops find the tab row by the name the Tabs bar draws
  *     (.tab-row--bar, formerly .sub-tabs); the MCP guide's crops the names the guide and the block
  *     draw (.setup-guide-cmd-text, .instruction-block-text).
@@ -186,8 +188,8 @@ export const CONFLICT_DECISIONS = [
     variants: [
       { id: 'home-action', name: 'The home\'s action link', code: '.poster-action (poster.css)', becomes: 'stays as it is. Accepting it on its own means it is the one look, larger in Settings', look: 'Archivo .9rem 800 caps, a 3px ink line', where: 'the home, the chat, every dialog', keptAsIs: true, crop: { url: '/v1/home', selector: '.poster-masthead-actions .poster-action', around: '.poster-masthead-actions' } },
       { id: 'settings-door', name: 'Settings\' way on in a page head or a section', code: '.og-door (organism-controls.css)', becomes: 'the small tone (no visible change)', look: '.8rem 800 caps, a 2px ink line', where: 'on main, Settings & Controls: the head of a page and its sections. This branch already draws the home\'s link there', crop: null },
-      { id: 'row-door', name: 'Settings\' way on at the end of a list row', code: '.adm-ag-go .og-door and its kin in each row\'s sheet (.og-tbl-door, .ac-row, .adm-ex-go; .sk-go on main)', becomes: 'the small tone in a row (no visible change)', look: '.72rem 800, a 2px ink line; lower-case in the admin rows, capitals in main\'s Settings rows', where: 'the admin rosters (Agents, Extensions, GHII users); on main also the Settings lists (Skills, Libraries, Packages, Access)', crop: { url: '/v1/admin?tab=agents', selector: '.adm-ag-go .og-door' } },
-      { id: 'quiet-door', name: 'Settings\' lower-case way on', code: '.og-door--quiet (organism-controls.css)', becomes: 'the lower-case tone (no visible change)', look: '.88rem 800, no capitals, a 2px ink line; .72rem in a row', where: 'the admin: section heads and rows; on main also Settings & Controls, under a list and beside a row\'s main way on', crop: { url: '/v1/admin?tab=agents', selector: '.og-sec-h .og-door--quiet' } },
+      { id: 'row-door', name: 'Settings\' way on at the end of a list row', code: '.adm-ag-go .og-door and its kin in each row\'s sheet (.og-tbl-door, .ac-row, .adm-ex-go; .sk-go on main)', becomes: 'the small tone in a row (no visible change)', look: '.72rem 800, a 2px ink line; lower-case in the admin rows, capitals in main\'s Settings rows', where: 'the admin rosters (Agents, Extensions, GHII users); on main also the Settings lists (Skills, Libraries, Packages, Access)', crop: { url: '/v1/admin?tab=agents', selector: '.listing-row .poster-action' } },
+      { id: 'quiet-door', name: 'Settings\' lower-case way on', code: '.og-door--quiet (organism-controls.css)', becomes: 'the lower-case tone (no visible change)', look: '.88rem 800, no capitals, a 2px ink line; .72rem in a row', where: 'the admin: section heads and rows; on main also Settings & Controls, under a list and beside a row\'s main way on', crop: { url: '/v1/admin?tab=agents', selector: '.og-sec-h .poster-action' } },
     ],
     changes: [
       { page: 'Admin, and Settings & Controls on main, if you accept the proposal', what: 'Nothing you can see. The pages draw their ways on with the action link\'s small and lower-case tones instead of a look of their own.' },

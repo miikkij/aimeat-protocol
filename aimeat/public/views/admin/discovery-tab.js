@@ -20,6 +20,9 @@
  *     discovery-tab.shared.js.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.0.0 — 2026-09-27 — Library components only (admin group G2): Section, Verdict and Readings,
+ *     FigureStrip, Beside, SettingBox (`pre`) for the paste, Action for the doors and the
+ *     links out. The page sheet admin-discovery.css goes; the page writes no class.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-11 — The poster face: the status word, the metric rows, the strip, six numbered
@@ -28,16 +31,21 @@
  *     (discovery-tab.indexnow.js); the identity moved to discovery-tab.identity.js.
  *   v1.0.0 — 2026-08-25 — Initial.
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { Spinner, ErrorBox, Badge, useToast, Toast, Row, when } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Spinner, ErrorBox, Badge, useToast, Toast, when } from './shared.js';
+import { Section } from '/components/Section.js';
+import { Verdict, Readings } from '/components/Readings.js';
+import { FigureStrip } from '/components/FigureStrip.js';
+import { Action } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { Beside } from '/components/Layout.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as adminService from '/js/services/admin.js';
 import { DiscoveryEngines } from './discovery-tab.engines.js';
@@ -83,57 +91,48 @@ function RightNow({ status, served, toSection, onToggle, busy }) {
   const lastValue = last
     ? S('now.instantVal', { n: last.urlCount, at: when(last.at), status: last.status ?? S('instant.noAnswer') })
     : S('now.instantNever');
-  const openDoor = (href) => html`<a class="og-door og-door--quiet" href=${href} target="_blank" rel="noopener">${S('open')}</a>`;
+  const openDoor = (href) => html`<${Action} small soft href=${href} newTab>${S('open')}<//>`;
   return html`
-    <section class="og-sec og-sec--first" id="adm-disc-01">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet ${off ? '' : 'og-door--danger'}" disabled=${busy} onClick=${onToggle}>
-            ${off ? S('now.turnOn') : S('now.turnOff')}
-          </button>
-        </div>
-      </div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${off ? 'danger' : ''}">${off ? S('now.wordOff') : S('now.wordOn')}</div>
-          <p class="adm-alert-line">${lines.join(' ')}</p>
-          <div class="adm-ov-up">${log}</div>
-        </div>
-        <div>
-          ${Row({ title: S('now.crawl'), why: S('now.crawlWhy'),
-            chip: html`<${Badge} type=${off ? 'danger' : 'healthy'} label=${S('now.chipServed')} />`,
-            value: status.robots.content_signal })}
-          ${Row({ title: S('now.training'), why: S('now.trainingWhy'),
-            chip: html`<${Badge} type=${status.robots.training_crawlers_blocked ? 'watch' : 'info'} label=${status.robots.training_crawlers_blocked ? S('now.chipKeptOut') : S('now.chipLetIn')} />`,
-            value: html`<button type="button" class="og-door og-door--quiet" onClick=${() => toSection('config')}>${S('change')}</button>` })}
-          ${Row({ title: S('now.pages'), why: S('now.pagesWhy'),
-            chip: html`<${Badge} type="healthy" label=${S('now.chipPages', { n: status.sitemap.page_count })} />`,
-            value: html`/sitemap.xml · ${openDoor(status.sitemap.url)}` })}
-          ${Row({ title: S('now.appList'), why: S('now.appListWhy'),
-            chip: html`<${Badge} type=${status.apps.on > 0 ? 'healthy' : 'muted'} label=${S('now.chipOf', { n: status.apps.on, total: status.apps.total })} />`,
-            value: html`/sitemap-index.xml · ${openDoor(status.sitemap.index_url)}` })}
-          ${Row({ title: S('now.proofs'), why: S('now.proofsWhy'),
-            chip: html`<${Badge} type=${proofs === 2 ? 'healthy' : 'watch'} label=${served.checked ? S('now.chipProofs', { n: proofs }) : S('engines.checking')} />`,
-            value: html`Google · Bing · <button type="button" class="og-door og-door--quiet" onClick=${() => toSection('02')}>${S('now.toEngines')}</button>` })}
-          ${Row({ title: S('now.instant'), why: S('now.instantWhy'),
-            chip: keyChip(ix), value: lastValue, last: true })}
-        </div>
-      </div>
+    <${Section} first id="adm-disc-01" num="01" title=${S('now.title')}
+      doors=${html`<${Action} small soft tone=${off ? undefined : 'danger'} disabled=${busy} onClick=${onToggle}>
+        ${off ? S('now.turnOn') : S('now.turnOff')}
+      <//>`}>
+      <${Verdict} word=${off ? S('now.wordOff') : S('now.wordOn')} tone=${off ? 'danger' : undefined} line=${lines.join(' ')} stamp=${log}>
+        <${Readings} rows=${[
+          { key: 'crawl', name: S('now.crawl'), why: S('now.crawlWhy'),
+            mark: html`<${Badge} type=${off ? 'danger' : 'healthy'} label=${S('now.chipServed')} />`,
+            value: status.robots.content_signal },
+          { key: 'training', name: S('now.training'), why: S('now.trainingWhy'),
+            mark: html`<${Badge} type=${status.robots.training_crawlers_blocked ? 'watch' : 'info'} label=${status.robots.training_crawlers_blocked ? S('now.chipKeptOut') : S('now.chipLetIn')} />`,
+            value: html`<${Action} small soft onClick=${() => toSection('config')}>${S('change')}<//>` },
+          { key: 'pages', name: S('now.pages'), why: S('now.pagesWhy'),
+            mark: html`<${Badge} type="healthy" label=${S('now.chipPages', { n: status.sitemap.page_count })} />`,
+            value: html`/sitemap.xml · ${openDoor(status.sitemap.url)}` },
+          { key: 'apps', name: S('now.appList'), why: S('now.appListWhy'),
+            mark: html`<${Badge} type=${status.apps.on > 0 ? 'healthy' : 'muted'} label=${S('now.chipOf', { n: status.apps.on, total: status.apps.total })} />`,
+            value: html`/sitemap-index.xml · ${openDoor(status.sitemap.index_url)}` },
+          { key: 'proofs', name: S('now.proofs'), why: S('now.proofsWhy'),
+            mark: html`<${Badge} type=${proofs === 2 ? 'healthy' : 'watch'} label=${served.checked ? S('now.chipProofs', { n: proofs }) : S('engines.checking')} />`,
+            value: html`Google · Bing · <${Action} small soft onClick=${() => toSection('02')}>${S('now.toEngines')}<//>` },
+          { key: 'instant', name: S('now.instant'), why: S('now.instantWhy'), mark: keyChip(ix), value: lastValue, last: true },
+        ]} />
+      <//>
       <${Strip} status=${status} proofs=${proofs} />
-    </section>`;
+    <//>`;
 }
 
 /** The numeral strip: the pages, the findable applications, the engines that know you, the last notice. */
 function Strip({ status, proofs }) {
   const last = status.indexnow.last;
   const scopeWord = (scope) => S('now.scope_' + (scope || 'app'));
-  return html`
-    <div class="og-strip">
-      <div><b>${status.sitemap.page_count}</b><span>${S('now.stripPages')}</span><small>${S('now.stripPagesSub')}</small></div>
-      <div><b>${status.apps.on}</b><span>${S('now.stripApps')}</span><small>${S('now.stripAppsSub', { total: status.apps.total, pending: status.apps.pending })}</small></div>
-      <div><b class=${proofs === 0 ? 'adm-disc-coral' : ''}>${S('now.stripOf', { n: proofs })}</b><span>${S('now.stripEngines')}</span><small>${proofs === 2 ? S('now.stripEnginesBoth') : proofs === 1 ? S('now.stripEnginesOne') : S('now.stripEnginesNone')}</small></div>
-      <div><b>${last ? last.urlCount : 0}</b><span>${S('now.stripLast')}</span><small>${last ? S('now.stripLastSub', { at: when(last.at), what: scopeWord(last.scope) }) : S('now.stripLastNone')}</small></div>
-    </div>`;
+  return html`<${FigureStrip} wrap items=${[
+    { key: 'pages', n: status.sitemap.page_count, label: S('now.stripPages'), sub: S('now.stripPagesSub') },
+    { key: 'apps', n: status.apps.on, label: S('now.stripApps'), sub: S('now.stripAppsSub', { total: status.apps.total, pending: status.apps.pending }) },
+    { key: 'engines', n: S('now.stripOf', { n: proofs }), tone: proofs === 0 ? 'notice' : undefined, label: S('now.stripEngines'),
+      sub: proofs === 2 ? S('now.stripEnginesBoth') : proofs === 1 ? S('now.stripEnginesOne') : S('now.stripEnginesNone') },
+    { key: 'last', n: last ? last.urlCount : 0, label: S('now.stripLast'),
+      sub: last ? S('now.stripLastSub', { at: when(last.at), what: scopeWord(last.scope) }) : S('now.stripLastNone') },
+  ]} />`;
 }
 
 /** Section 06: the outside checks, and the paste for the operator's own AI. */
@@ -141,29 +140,23 @@ function Checks({ status }) {
   const base = baseOf(status);
   const enc = encodeURIComponent(base);
   const paste = buildDiscoveryPrompt({ url: getNodeUrl() });
-  const open = (href) => html`<a class="og-door og-door--quiet" href=${href} target="_blank" rel="noopener">${S('open')}</a>`;
+  const open = (href) => html`<${Action} small soft href=${href} newTab>${S('open')}<//>`;
   return html`
-    <section class="og-sec" id="adm-disc-06">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('checks.title')}<small>06</small></h2>
-        <div class="og-doors"><${CopyButton} text=${paste} label=${S('checks.copyAi')} className="og-door og-door--quiet" /></div></div>
-      <div class="adm-disc-checks">
-        <div>
-          <p class="adm-disc-lead">${S('checks.lead')}</p>
-          ${Row({ title: S('checks.rich'), why: S('checks.richWhy'), chip: null, value: open(`https://search.google.com/test/rich-results?url=${enc}`) })}
-          ${Row({ title: S('checks.schema'), why: S('checks.schemaWhy'), chip: null, value: open(`https://validator.schema.org/#url=${enc}`) })}
-          ${Row({ title: S('checks.speed'), why: S('checks.speedWhy'), chip: null, value: open(`https://pagespeed.web.dev/analysis?url=${enc}`) })}
-          ${Row({ title: S('checks.bingInspect'), why: S('checks.bingInspectWhy'), chip: null, value: open('https://www.bing.com/webmasters/urlinspection'), last: true })}
-        </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('checks.aiLabel')}</span>
-          <div class="adm-disc-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+    <${Section} id="adm-disc-06" num="06" title=${S('checks.title')}
+      doors=${html`<${Action} small soft copy=${paste}>${S('checks.copyAi')}<//>`}>
+      <${Beside} wide side=${html`<${SettingBox} pre label=${S('checks.aiLabel')}>${paste}<//>`}>
+        <${Note} kind="lead">${S('checks.lead')}<//>
+        <${Readings} rows=${[
+          { key: 'rich', name: S('checks.rich'), why: S('checks.richWhy'), mark: null, value: open(`https://search.google.com/test/rich-results?url=${enc}`) },
+          { key: 'schema', name: S('checks.schema'), why: S('checks.schemaWhy'), mark: null, value: open(`https://validator.schema.org/#url=${enc}`) },
+          { key: 'speed', name: S('checks.speed'), why: S('checks.speedWhy'), mark: null, value: open(`https://pagespeed.web.dev/analysis?url=${enc}`) },
+          { key: 'bing', name: S('checks.bingInspect'), why: S('checks.bingInspectWhy'), mark: null, value: open('https://www.bing.com/webmasters/urlinspection'), last: true },
+        ]} />
+      <//>
+    <//>`;
 }
 
 export default function DiscoveryTab({ switchPage }) {
-  useViewCSS('/css/views/admin-discovery.css');
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -234,7 +227,7 @@ export default function DiscoveryTab({ switchPage }) {
   if (error) return html`<${ErrorBox} message=${error} />`;
   if (!status) return html`<${Spinner} text=${S('loading')} />`;
 
-  return html`<div class="adm-disc">
+  return html`<${Fragment}>
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${RightNow} status=${status} served=${served} toSection=${toSection} onToggle=${toggleIndexing} busy=${busy} />
     <${DiscoveryEngines} status=${status} served=${served} onRecheck=${checkServed} onChanged=${load} />
@@ -242,5 +235,5 @@ export default function DiscoveryTab({ switchPage }) {
     <${DiscoveryIdentity} status=${status} onChanged=${load} />
     <${DiscoveryApps} status=${status} onChanged=${load} />
     <${Checks} status=${status} />
-  </div>`;
+  <//>`;
 }

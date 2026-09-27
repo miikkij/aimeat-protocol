@@ -15,7 +15,8 @@
  *     'link' (a coral word inside a sentence or a fact's value, in the words' own letters: the crumb
  *     link; `small`, `soft` and `row` do not apply to it).
  *   - Loud: the one action a place is for; `control` in a row of controls, `large`, `danger` for an
- *     act that cannot be undone.
+ *     act that cannot be undone; `quiet` while it is not yet (or no longer) the thing to do: drawn as
+ *     the action link, the same button, so a press or focus is not lost when it turns loud.
  *   - Icon: a button that is a mark, not a word; `small`, `pressed`.
  *   - `copy`: on any of the three, the text it copies; it says `copiedLabel` for a moment after.
  *   - `href`: the action is a link (`newTab`, `download` for a file link).
@@ -26,6 +27,9 @@
  *        html`<${Action} small copy=${ref} copiedLabel=${t('x.copied')}>${t('x.copyRef')}<//>`
  *        html`<${Actions}>…<//>`
  * @version-history
+ *   v1.6.0 — 2026-09-27 — Loud `quiet`: the place's action while it waits for its turn (a name not
+ *     yet typed, a prompt already copied) is drawn as the action link, one button that turns loud
+ *     when it can act (the home's steps, which wrote the two classes in turn); page group G9, additive.
  *   v1.5.0 — 2026-09-26 — `form`: a submit outside its form names the form (a dialog footer's "do
  *     it", the Apps page's publish dialog); page group G6, additive.
  *   v1.4.0 — 2026-09-26 — `noReferrer` on a link that opens beside (rel noopener noreferrer: an
@@ -96,9 +100,10 @@ export function Action({ small, soft, row, tone, copy, copiedLabel, copiedTitle,
 }
 
 /** The loud action: the dark block with the sun shadow. */
-export function Loud({ control, large, danger, copy, copiedLabel, copiedTitle, onCopied, onClick, title, children, ...rest }) {
+export function Loud({ control, large, danger, quiet, copy, copiedLabel, copiedTitle, onCopied, onClick, title, children, ...rest }) {
     const [copied, run] = useCopy(copy, onCopied, onClick);
-    const cls = cx('poster-slab', control && 'poster-slab--control', large && 'poster-slab--large',
+    // quiet (added by page group G9): not its turn yet, so the action link; the same element.
+    const cls = quiet ? cx('poster-action', copied && 'copied') : cx('poster-slab', control && 'poster-slab--control', large && 'poster-slab--large',
         danger && 'poster-slab--danger', copied && 'copied');
     return html`<${Press} ...${rest} cls=${cls} title=${(copied && copiedTitle) || title}
         onClick=${copy !== undefined && copy !== null ? run : onClick}>${copied ? (copiedLabel || t('common.copied')) : children}<//>`;

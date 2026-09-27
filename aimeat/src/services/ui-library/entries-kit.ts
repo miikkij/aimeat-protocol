@@ -7,6 +7,8 @@
  * @structure KIT_ENTRIES
  * @usage import { KIT_ENTRIES } from './entries-kit.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre (the setting-box entry names Box.js
+ *     as its module now), Meter's tones and Result, a FigureStrip item's onClick and title.
  *   v1.1.0 — 2026-09-27 — The seven kit components: action-component, mark, note, box, avatar, roads, figure;
  *     figure-strip, facts, setting-box, code-block, form-message and loading-mark moved in from
  *     entries-settings.ts, rewritten to the kit calls that draw them.
@@ -24,7 +26,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
             'poster-action--back', 'poster-action--text', 'poster-action--danger', 'poster-action--notice', 'poster-action--jump',
             'poster-slab', 'poster-slab--large', 'poster-slab--control', 'poster-slab--danger', 'poster-icon', 'poster-icon--small'],
         data: {
-            shape: 'Action({ small, soft, row, tone, href, newTab, noReferrer, download, copy, copiedLabel, copiedTitle, onCopied, onClick, disabled, title, ariaLabel, pressed, expanded, busy, type, form, id, role, onMouseEnter, onFocus, children }) · Loud({ control, large, danger, …the same press props }) · Icon({ small, pressed, label, title, copy, copiedLabel, onClick, …the same press props, children }) · Actions({ under, end, children })',
+            shape: 'Action({ small, soft, row, tone, href, newTab, noReferrer, download, copy, copiedLabel, copiedTitle, onCopied, onClick, disabled, title, ariaLabel, pressed, expanded, busy, type, form, id, role, onMouseEnter, onFocus, children }) · Loud({ control, large, danger, quiet, …the same press props }) · Icon({ small, pressed, label, title, copy, copiedLabel, onClick, …the same press props, children }) · Actions({ under, end, children })',
             fields: {
                 small: 'the Settings size: smaller, with a thinner line', soft: 'a softer way on: lower-case words ("Show 13 more", "Copy ref")',
                 row: 'at the end of a dense row: smaller still',
@@ -35,6 +37,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
                 expanded: 'it opens something under it (aria-expanded)', busy: 'it is working (aria-busy)',
                 form: 'a submit that stands outside its form names the form (a dialog footer)', onMouseEnter: 'prepares the work while the pointer comes to it (with onFocus for the keyboard)',
                 control: 'Loud: a 44px block in a row of controls', large: 'Loud: the home\'s large door', danger: 'Loud: an act that cannot be undone, coral with an ink shadow',
+                quiet: 'Loud: the place\'s action while it waits for its turn (a name not yet typed, a prompt already copied), drawn as the action link; the same button turns loud when it can act',
                 label: 'Icon: the name a screen reader says and the tooltip', children: 'the words, or the Icon\'s mark',
                 under: 'Actions: the row at the foot of an opened panel, with space above it', end: 'Actions: the row stands at the right',
             },
@@ -60,6 +63,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'loud control', prop: 'Loud control', class: 'poster-slab--control', when: 'a 44px slab in a row of controls (Send, a dialog\'s Save)' },
             { name: 'loud large', prop: 'Loud large', class: 'poster-slab--large', when: 'the home\'s large door' },
             { name: 'loud danger', prop: 'Loud danger', class: 'poster-slab--danger', when: 'an act that cannot be undone: coral with an ink shadow' },
+            { name: 'loud quiet', prop: 'Loud quiet', class: 'poster-action', when: 'the place\'s action before its turn (the home\'s steps): the action link until it can act' },
             { name: 'icon', prop: 'Icon', class: 'poster-icon', when: 'a mark without words in a square thin ink frame' },
             { name: 'icon small', prop: 'Icon small', class: 'poster-icon--small', when: 'the 28px square everywhere but the composer' },
             { name: 'row of actions', prop: 'Actions', when: 'the actions of a place in one line, wrapping on a phone (.og-doors); under at the foot of an opened panel, end at the right' },
@@ -138,7 +142,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
         summary: 'The frame around one thing: a 2px ink frame on the card ground (the Object box), with an optional head (a name in bold, its tags, a mark at the right end) and a row of actions at its foot; its tones say what the thing is for. Also the settings box, and a stack of small boxes one thing each.',
         module: '/components/Box.js', sheet: '/css/components/box.css',
         data: {
-            shape: 'Box({ tone, flush, packed, scroll, folded, unfoldLabel, onUnfold, document, beside, as, name, marks, end, doors, id, role, ariaLabel, children }) · SettingBox({ label, irreversible, children }) · SettingRow({ children }) · SettingConfirm({ children }) · BoxList({ apart, children }) · BoxLine({ name, meta, time, end, column, doors, after, children }) · boxClass(tone) (for Card and Road only)',
+            shape: 'Box({ tone, flush, packed, scroll, folded, unfoldLabel, onUnfold, document, beside, as, name, marks, end, doors, id, role, ariaLabel, children }) · SettingBox({ label, irreversible, pre, children }) · SettingRow({ children }) · SettingConfirm({ children }) · BoxList({ apart, children }) · BoxLine({ name, meta, time, end, column, doors, after, children }) · boxClass(tone) (for Card and Road only)',
             fields: {
                 tone: 'none (one thing) | raised (the thing that stands out: an opened row, the way to take first) | copy (a text to copy, on the grey ground) | row (one result in a list, small padding) | attention (coral frame: needs a look) | waiting (sun frame: waits for an answer) | current (coral frame: the one you are on) | off (dashed, grey: switched off) | edge (no frame, the sun edge at the left: what a thing needs from elsewhere) | field (the thin dashed frame around a field to fill in) | dim (the grey ground: details a person need not touch)',
                 flush: 'the parts pad themselves (a chart, a picture): no padding', packed: 'it stands in a grid or a row that spaces it: no margin',
@@ -148,7 +152,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
                 as: 'the element: div (default) | li | label | section | article',
                 name: 'the head\'s name in bold', marks: 'tags beside the name', end: 'what stands at the right end of the head (the mark that hides the box)',
                 doors: 'the row of actions at the foot', children: 'what the box holds',
-                SettingBox: 'a box on a settings page: its label on its own line over the words; irreversible for an act that cannot be undone',
+                SettingBox: 'a box on a settings page: its label on its own line over the words; irreversible for an act that cannot be undone; pre for words that keep their own line breaks (a prompt to paste)',
                 SettingRow: 'the settings box\'s line of words with its button at the right', SettingConfirm: 'the line that asks for a word before the act',
                 BoxList: 'a stack of small boxes, one thing each; apart puts .3rem above it',
                 BoxLine: 'one small box: name, meta (grey typewriter lines; { text, keep: true } is not translated), time, end (a grey word at the far end), column (the parts under each other), doors, after (what the doors caused)',
@@ -176,9 +180,10 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'head', prop: 'name, marks, end', class: 'box-head', when: 'a box that names its thing: the name in bold, its tags, a mark at the right' },
             { name: 'box list', prop: 'BoxList, BoxLine', class: 'box-line', when: 'a stack of small boxes, one entry in each' },
             { name: 'setting box', prop: 'SettingBox', when: 'a setting in its own frame (setting-box.css); irreversible for a solid frame' },
+            { name: 'setting box pre', prop: 'SettingBox pre', when: 'a prompt for the operator\'s own AI, its line breaks kept (.og-box-pre, setting-box.css)' },
         ],
         example: { name: 'Recovery key', children: 'Keep it where you keep passwords.', doors: 'Copy' },
-        note: 'The frame and its raised, copy and row tones are the shapes of css/poster.css (entry \'box-shape\'); box.css holds only what the shapes do not: the head and foot, padding and margin by meaning, and the tones that colour a frame. The settings box keeps the library classes og-box, og-box-row and og-box-confirm (entry \'setting-box\', shared with the admin). The meter is Figure\'s Meter.',
+        note: 'The frame and its raised, copy and row tones are the shapes of css/poster.css (entry \'box-shape\'); box.css holds only what the shapes do not: the head and foot, padding and margin by meaning, and the tones that colour a frame. The settings box keeps the library classes og-box, og-box-row, og-box-confirm and og-box-pre (entry \'setting-box\'); since 2026-09-27 the admin pages draw it with SettingBox too. The meter is Figure\'s Meter.',
     },
     {
         id: 'avatar', name: 'Avatar', kind: 'component', status: 'active',
@@ -235,14 +240,15 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'figure', name: 'Figure', kind: 'component', status: 'active',
-        summary: 'A figure, read only: one number in the poster face with a small typewriter line under it, the sun sticker that carries the one fact to see first, the meter that fills to a share (coral for a limit, red from 90 %), and words or a number in a state colour inside other words.',
+        summary: 'A figure, read only: one number in the poster face with a small typewriter line under it, one centred result with its words over it, the sun sticker that carries the one fact to see first, the meter that fills to a share (coral for a limit, red from 90 %; a share bar in coral, ink or grey), and words or a number in a state colour inside other words.',
         module: '/components/Figure.js', sheet: '/css/components/figure.css',
         data: {
-            shape: 'Figure({ n, sub, small, large, step, band, tone, end, title }) · Sticker({ figure, children }) · Meter({ pct, quota, early, figure, beside, fill, thin }) · Tinted({ tone, strong, whole, children })',
+            shape: 'Figure({ n, sub, small, large, step, band, tone, end, title }) · Result({ label, n, sub, tone }) · Sticker({ figure, children }) · Meter({ pct, quota, early, figure, beside, fill, thin, tone }) · Tinted({ tone, strong, whole, children })',
             fields: {
                 n: 'the figure', sub: 'the small typewriter line under it ("morsels", "Tue")',
                 small: 'the cut a row of a list uses', large: 'the hero cut', step: 'a step\'s number in coral', band: 'the figure on the coral band',
-                tone: 'Figure: fine (came in, fine) | notice (went out, needs a look) | dim (not there yet); Tinted: fine | notice | warn | danger | dim | faint (a word that says nothing is there)',
+                tone: 'Figure: fine (came in, fine) | notice (went out, needs a look) | dim (not there yet); Result: fine | danger (a gain or a loss); Meter: notice (a coral fill) | ink | dim (a grey fill), a share bar that says which band it is, instead of the sun (not with quota); Tinted: fine | notice | warn | danger | dim | faint (a word that says nothing is there)',
+                'Result.label': 'the words over the figure', 'Result.n': 'the one figure, centred', 'Result.sub': 'the line under it',
                 end: 'the figure stands at the end of its cell, on one line', title: 'the tooltip',
                 figure: 'Sticker: the short figure over its one action; Meter: the words written on the bar',
                 pct: 'Meter: the share, 0 to 100 (clamped)', quota: 'Meter: a meter of a limit, coral, red from 90 %', early: 'with quota: it warns from 60 %',
@@ -265,6 +271,12 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'beside', prop: 'Meter beside', class: 'meter--beside', when: 'a meter in a line of words' },
             { name: 'fill', prop: 'Meter fill', class: 'meter--fill', when: 'a meter that takes the rest of its line' },
             { name: 'thin', prop: 'Meter thin', class: 'meter--thin', when: 'the progress through steps' },
+            { name: 'meter notice', prop: 'Meter tone="notice"', class: 'meter--notice', when: 'a share bar in coral: a band that needs a look (the operator\'s readiness ladder)' },
+            { name: 'meter ink', prop: 'Meter tone="ink"', class: 'meter--ink', when: 'a share bar in ink (the operator\'s agents)' },
+            { name: 'meter dim', prop: 'Meter tone="dim"', class: 'meter--dim', when: 'a share bar in grey: a band that counts little' },
+            { name: 'result', prop: 'Result', class: 'figure-result', when: 'one figure that sums a page, centred, its words over it and a line under it (the P&L\'s result before taxes)' },
+            { name: 'result fine', prop: 'Result tone="fine"', class: 'figure-result--fine', when: 'a result that is a gain' },
+            { name: 'result danger', prop: 'Result tone="danger"', class: 'figure-result--danger', when: 'a result that is a loss' },
             { name: 'tinted', prop: 'Tinted tone', class: 'tinted--notice', when: 'a word in a state colour inside other words' },
             { name: 'faint', prop: 'Tinted tone="faint"', class: 'tinted--faint', when: 'a word that says nothing is there ("never")' },
             { name: 'whole', prop: 'Tinted whole', class: 'tinted--whole', when: 'words kept on one line (a host name)' },
@@ -274,14 +286,16 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
     },
     // The older Settings entries the kit draws now, moved here unchanged from entries-settings.ts
     // (which had passed its length limit): two with a kit module of their own (Facts, FigureStrip),
-    // and four whose classes the admin pages share, so module stays null and the summary names the call.
+    // the setting box (Box.js since 2026-09-27, when the admin pages took SettingBox), and three whose
+    // classes the admin pages share, so module stays null and the summary names the call.
     {
         id: 'figure-strip', name: 'Figure strip', kind: 'component', status: 'active',
         summary: 'A few figures between two heavy ink rules: the number in the poster face, its word, a small typewriter line under it; two to a row on a phone. A page passes the figures as data to FigureStrip.',
         module: '/components/FigureStrip.js', sheet: '/css/components/figure-strip.css',
         data: {
-            shape: 'FigureStrip({ items: [{ n, of, label, sub, tone, key }], loading, wrap, flush, lead })',
+            shape: 'FigureStrip({ items: [{ n, of, label, sub, tone, key, onClick, title }], loading, wrap, flush, lead })',
             fields: {
+                onClick: 'the figure is a button (a filter, a door to its page) whose word underlines under the pointer', title: 'the figure\'s tooltip',
                 n: 'the figure: a number, a word or a time; "…" while it loads, "·" when there is none', of: 'the "of how many" after it ("/4"), smaller and grey',
                 label: 'the word beside the figure (always drawn, empty or not)', sub: 'the typewriter line under it; "" still draws the empty line, undefined draws none',
                 tone: 'coral (a word in coral capitals: a state, a time) | word (a word in capitals where a number would stand) | notice (a number in coral) | fine | warn | danger (the Status colours) | dim (not there yet) | long (a long word such as an address, smaller); two join with a space: "word fine"',
@@ -303,9 +317,10 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'wrap', prop: 'wrap', class: 'og-strip--wrap', when: 'the lines under the figures are read whole' },
             { name: 'flush', prop: 'flush', class: 'og-strip--flush', when: 'the strip opens its box' },
             { name: 'lead', prop: 'lead', class: 'og-strip--lead', when: 'the strip opens a tab\'s content' },
+            { name: 'buttons', prop: 'items[].onClick, title', when: 'figures that are filters or doors (the operator\'s Overview, Applications, Owners, Security, CORS and Compliance strips)' },
         ],
         example: { items: [{ n: 12, label: 'spaces', sub: '3 shared with you' }, { n: 4, of: '/6', label: 'people', sub: '2 admins' }] },
-        note: 'The class names (.og-strip, .og-strip-*) are shared with the admin pages, which still write the strip by hand. The node stats StatCard and the pages\' own figure colours (.is-coral, .is-low, .is-good, .is-dim, .op-st-*, .sc-res--*) became items and tones.',
+        note: 'The class names (.og-strip, .og-strip-*) stay as they were; since 2026-09-27 the admin pages draw the strip with FigureStrip too, and a figure that is a button took its rules from admin.css (.adm .og-strip > button). The node stats StatCard and the pages\' own figure colours (.is-coral, .is-low, .is-good, .is-dim, .op-st-*, .sc-res--*) became items and tones.',
     },
     {
         id: 'facts', name: 'Facts', kind: 'component', status: 'active',
@@ -340,21 +355,22 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'setting-box', name: 'Setting box', kind: 'component', status: 'active',
-        summary: 'A box on a settings page in the small aside\'s dashed coral frame: its label on a line of its own, a row of words with its button at the right, and a confirmation line with its field. A Settings page draws it with SettingBox, SettingRow and SettingConfirm (components/Box.js); the admin pages write its classes.',
-        module: null, sheet: '/css/components/setting-box.css', classes: ['og-box', 'og-box-label', 'og-box-row', 'og-box-confirm'],
+        summary: 'A box on a settings page in the small aside\'s dashed coral frame: its label on a line of its own, a row of words with its button at the right, a confirmation line with its field, and words that keep their own line breaks. Settings & Controls and the admin pages draw it with SettingBox, SettingRow and SettingConfirm (components/Box.js).',
+        module: '/components/Box.js', sheet: '/css/components/setting-box.css',
         data: {
-            shape: 'SettingBox({ label, irreversible, children }) · SettingRow({ children }) · SettingConfirm({ children }) · <div class="og-box poster-aside poster-aside--small"><span class="og-box-label">…</span><div class="og-box-row"><p>…</p><button>…</button></div></div> (admin)',
-            fields: { label: 'what the box is about', irreversible: 'the act cannot be undone: the solid frame', row: 'the sentence and its button', confirm: 'the field that asks for the name before an act that cannot be undone' },
+            shape: 'SettingBox({ label, irreversible, pre, children }) · SettingRow({ children }) · SettingConfirm({ children })',
+            fields: { label: 'what the box is about: the row label on a line of its own over the words, wherever the box is drawn', irreversible: 'the act cannot be undone: the solid frame', pre: 'the words keep their own line breaks and break anywhere (a prompt for the operator\'s own AI)', row: 'the sentence and its button (SettingRow)', confirm: 'the field that asks for the name before an act that cannot be undone (SettingConfirm)' },
         },
-        useFor: ['A setting that needs its own frame, such as leaving or deleting.'],
+        useFor: ['A setting that needs its own frame, such as leaving or deleting.', 'A prompt to paste into the operator\'s own AI, beside what it reads (the operator\'s Statistics, Usage, CORS, Discovery, Federation and Hooks pages).'],
         variants: [
             { name: 'row', prop: 'SettingRow', class: 'og-box-row', when: 'the sentence with its button at the right' },
             { name: 'confirm', prop: 'SettingConfirm', class: 'og-box-confirm', when: 'the line that asks for a word before the act' },
-            { name: 'label (admin)', class: 'og-box-label', when: 'the admin pages\' label in the poster face; SettingBox draws the row label (.poster-label) on its own line' },
+            { name: 'pre', prop: 'SettingBox pre', class: 'og-box-pre', when: 'a prompt to paste, its line breaks kept' },
+            { name: 'label (old markup)', class: 'og-box-label', when: 'the label in the poster face that pages wrote by hand; no page writes it now, SettingBox draws the row label (.poster-label) on its own line' },
             { name: 'irreversible', prop: 'irreversible', when: 'an act that cannot be undone: the solid frame (.poster-aside--irreversible)' },
         ],
         example: { label: 'Leave', row: 'You can come back when invited.' },
-        note: 'module is null because its classes are shared with the admin pages, which write them as markup; in Settings & Controls it is SettingBox, SettingRow and SettingConfirm in components/Box.js (entry \'box\').',
+        note: 'Its module is Box.js, which the box entry shares: SettingBox, SettingRow and SettingConfirm draw these classes. On 2026-09-27 the admin pages moved onto SettingBox (main\'s .og-box-label, and the paste boxes .adm-st-paste and .adm-us-paste became the label on its own line and pre). .og-box-label keeps its rule, which no page writes now.',
     },
     {
         id: 'code-block', name: 'Code block', kind: 'component', status: 'active',

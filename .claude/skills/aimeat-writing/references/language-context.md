@@ -62,6 +62,7 @@ everywhere at once, and say so in the Changes section.
 | someone else's system | another AIMEAT they can sign into and whose memory they browse | environment / remote environment | ympäristö / etäympäristö | entorno / entorno remoto |
 | the machine | the host, when the sentence is really about the machine: what holds a credential, what has an address, what is reachable | server | palvelin | servidor |
 | whoever pays for the shared AI key | the operator of this installation, on an operator surface | this server / the server's key | palvelin / palvelimen avain | este servidor / la clave del servidor |
+| the dark side menu of the admin pages | the menu only the operator of this installation sees; its heading tells at once that this is the operator's side | operator menu | operaattorin valikko | menú del operador |
 | stored knowledge | what the person and their agents wrote here | memory | muisti | memoria |
 | one stored thing | a single record under one key | entry | merkintä | entrada |
 | the AI acting for them | scoped, named, revocable, acts in their name | agent | agentti | agente |

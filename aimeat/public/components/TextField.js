@@ -25,7 +25,9 @@
  *   (a number, a time) | 'medium' (a name, a tag), `actions` (buttons in one row after the field),
  *   `box` (that row inside the thin dashed frame: Jouni's decision "Dashed field box"), `invalid`.
  *   TextArea named options: `code`, `rows`, `grow` (grows with what is typed; a number caps it in
- *   pixels, true caps it at 60% of the window), `onSend(value, event)` on Ctrl+Enter or Cmd+Enter.
+ *   pixels, true caps it at 60% of the window), `onSend(value, event)` on Ctrl+Enter or Cmd+Enter,
+ *   `indent` (a script editor: Tab puts two spaces in at the caret instead of leaving the field),
+ *   `onSave(value, event)` on Ctrl+S or Cmd+S (the browser's own save of the page does not open).
  * @structure TextField(props) · TextArea(props) · Eye({ open })
  * @usage html`<${TextField} label=${t('x.name')} value=${name} onInput=${setName} onEnter=${save} />`
  *        html`<${TextField} secret label=${a('codeLabel')} value=${code} onInput=${setCode} />`
@@ -33,6 +35,9 @@
  *          actions=${html`<${Action} small onClick=${save}>${x('save')}<//>`} />`
  *        html`<${TextArea} label=${t('x.body')} rows=${4} value=${body} onInput=${setBody} />`
  * @version-history
+ *   v1.3.0 — 2026-09-27 — TextArea's `indent` (Tab puts two spaces in) and `onSave` (Ctrl+S or Cmd+S):
+ *     the admin Extensions page's action-script editors, as main's hand-written textareas did;
+ *     additive, admin page group G7.
  *   v1.2.0 — 2026-09-26 — TextField's `noManager` option: a field shown as typed that password
  *     managers keep out of (autocomplete off, data-1p-ignore, data-lpignore: the Wallet's payout
  *     address, as main drew it); additive, page group G7.
@@ -144,9 +149,27 @@ export function TextField(props) {
 export function TextArea(props) {
   const {
     id, value, placeholder, rows, code, grow, invalid, error, maxLength, spellCheck, name, required,
-    disabled, readOnly, autoFocus, ariaLabel, title, inputRef,
-    onInput, onChange, onSend, onEscape, onBlur, onFocus, onKeyDown, onPaste,
+    disabled, readOnly, autoFocus, ariaLabel, title, inputRef, indent,
+    onInput, onChange, onSend, onSave, onEscape, onBlur, onFocus, onKeyDown, onPaste,
   } = props;
+  // indent and onSave (added by admin page group G7): a script editor keeps Tab for two spaces at the
+  // caret and saves on Ctrl+S / Cmd+S, as main's action-script editors did by hand.
+  const keys = keyHandler({ onKeyDown, onSend, onEscape, multiline: true });
+  const onKey = (e) => {
+    keys(e);
+    if (e.defaultPrevented) return;
+    if (indent && e.key === 'Tab') {
+      e.preventDefault();
+      const ta = e.currentTarget;
+      const start = ta.selectionStart;
+      ta.value = ta.value.substring(0, start) + '  ' + ta.value.substring(ta.selectionEnd);
+      ta.selectionStart = ta.selectionEnd = start + 2;
+      onInput?.(ta.value, e);
+    } else if (onSave && e.key === 's' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      onSave(e.currentTarget.value, e);
+    }
+  };
   const ids = useFieldIds(id);
   const [own, setRef] = useBothRefs(inputRef);
   useEffect(() => { if (autoFocus) own.current?.focus(); }, [autoFocus, own]);
@@ -171,7 +194,7 @@ export function TextArea(props) {
     onBlur=${onBlur ? (e) => onBlur(e.currentTarget.value, e) : undefined}
     onFocus=${onFocus}
     onPaste=${onPaste ? (e) => onPaste(e.clipboardData?.getData('text') ?? '', e) : undefined}
-    onKeyDown=${keyHandler({ onKeyDown, onSend, onEscape, multiline: true })}></textarea>`;
+    onKeyDown=${onKey}></textarea>`;
   return inField(props, ids, control, false);
 }
 

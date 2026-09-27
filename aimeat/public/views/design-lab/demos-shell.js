@@ -10,6 +10,8 @@
  * @structure SHELL_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHELL_DEMOS } from './demos-shell.js';
  * @version-history
+ *   v1.3.0 — 2026-09-27 — The start page setting's dialog and footer drawn by the component (live: they
+ *     read this account's choice), beside its markup; the toast drawn by ToastBox, with hold and role.
  *   v1.2.2 — 2026-09-27 — The contact card's, the link preview's and the Mermaid fallback's frames
  *     write their components' own names (.contact-card, .link-preview, .mermaid-fallback).
  *   v1.2.1 — 2026-09-27 — The display preferences and the agent consent are drawn by their
@@ -38,6 +40,9 @@ import { DisplayPrefsFields } from '/components/DisplayPrefsFields.js';
 import { InboxLink } from '/components/InboxLink.js';
 import { JsonValue } from '/components/JsonView.js';
 import { OfferBadges, OfferRequirements } from '/components/offer-card-view.js';
+import { StartPageSetting } from '/components/StartPageSetting.js';
+import { SettingsStack } from '/components/SettingsStack.js';
+import { ToastBox } from '/components/Toast.js';
 import { CLOSE_ICON } from '/js/dialog.js';
 
 const html = htm.bind(h);
@@ -58,7 +63,11 @@ export const SHELL_DEMOS = {
   badge: one('tints', () => html`<span><span class="badge badge-success">active</span> <span class="badge badge-warn">paused</span> <span class="badge badge-muted">off</span></span>`),
   pill: one('default', () => html`<span class="pill">pill</span>`),
   seg: one('default', () => html`<div class="seg"><button type="button" class="seg-btn active">Home</button><button type="button" class="seg-btn">Settings</button></div>`),
-  'start-page': one('default', () => html`<div class="start-page"><div class="start-page-words"><span class="start-page-title">Start page</span><span class="start-page-hint">Where you land when you sign in.</span></div><div class="seg start-page-seg"><button type="button" class="seg-btn active">Home</button><button type="button" class="seg-btn">Settings & controls</button></div></div>`),
+  'start-page': { variants: [
+    { name: 'default (its markup, without the node)', render: () => html`<div class="start-page"><div class="start-page-words"><span class="start-page-title">Start page</span><span class="start-page-hint">Where you land when you sign in.</span></div><div class="seg start-page-seg"><button type="button" class="seg-btn active">Home</button><button type="button" class="seg-btn">Settings & controls</button></div></div>` },
+    { name: 'dialog: in a settings dialog (live, this account\'s choice)', render: () => html`<${SettingsStack}><${StartPageSetting} dialog /><//>` },
+    { name: 'footer: at a page foot (live, this account\'s choice)', render: () => html`<${StartPageSetting} footer />` },
+  ] },
   'status-dot': one('states', () => html`<span><${StatusDot} status="ok" title="Running" /> <${StatusDot} status="warn" title="Slow" /> <${StatusDot} status="error" title="Down" /></span>`),
   'presence-dot': one('online', () => html`<${PresenceDot} status="online" label=${true} />`),
   'key-value-row': one('default', () => html`<${KeyValueRow} label="Node" value="aimeat-local-001-dev" mono=${true} />`),
@@ -81,7 +90,12 @@ export const SHELL_DEMOS = {
     { name: 'success', render: () => html`<${Alert} type="success" message="Saved." />` },
     { name: 'error', render: () => html`<${Alert} type="error" message="It did not save." />` },
   ] },
-  toast: one('default', () => html`<div class="toast toast-success">Saved.</div>`),
+  toast: { variants: [
+    { name: 'success', render: () => html`<${ToastBox} toast=${{ msg: 'Saved.', type: 'success' }} />` },
+    { name: 'error', render: () => html`<${ToastBox} toast=${{ msg: 'It did not save: the name is taken.', type: 'error' }} role="alert" />` },
+    { name: 'warn', render: () => html`<${ToastBox} toast=${{ msg: 'Saved, but bot has not read it yet.', type: 'warning' }} />` },
+    { name: 'hold: it stays six seconds', render: () => html`<${ToastBox} hold role="status" toast=${{ msg: 'The welcome mat could not be published. Try again in a minute.', type: 'error' }} />` },
+  ] },
   'section-header': one('default', () => html`<div><h2 class="section-title">Storage</h2><p class="section-desc">What this node keeps, and for how long.</p></div>`),
   dialog: one('default', () => html`<dialog class="dlg" open><header class="dlg-head"><h2 class="dlg-title">Settings</h2><button type="button" class="dlg-close" aria-label="Close" dangerouslySetInnerHTML=${{ __html: CLOSE_ICON }}></button></header><div class="dlg-body"><p>The body scrolls; the header and footer stay.</p></div><footer class="dlg-foot"><button type="button" class="poster-action">Cancel</button><button type="button" class="poster-slab poster-slab--control">Save</button></footer></dialog>`),
   'margin-pattern': one('default', () => html`<p>The pattern sits in the page margins of the home, the chat and the settings (set in the home's settings).</p>`),

@@ -9,9 +9,14 @@
  *   to sign up. A refusal here names what it stopped, so an account that could not be created has a
  *   reason somebody can read back to the person who was turned away.
  *
+ *   Every part is a library component; the page passes data and writes no class.
+ *
  * @structure HookRuns({ data }) — the filter, the table, the empty state
  * @usage <${HookRuns} data=${data} />
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): Tabs (filter) for the filter,
+ *     the canonical table (shared.js DataTable) for the calls, More for the foot, Note for the empty
+ *     line and the reasons.
  *   v1.1.0 — 2026-09-13 — Compose the shared poster section heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
@@ -20,7 +25,11 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Badge, when } from './shared.js';
+import { Badge, DataTable, when } from './shared.js';
+import { Section } from '/components/Section.js';
+import { Tabs } from '/components/Tabs.js';
+import { More } from '/components/List.js';
+import { Note } from '/components/Note.js';
 
 const S = (key, params) => t('admin.hooks.' + key, params);
 
@@ -40,45 +49,29 @@ export function HookRuns({ data }) {
   const shown = all ? rows : rows.slice(0, PAGE);
 
   return html`
-    <section class="og-sec" id="adm-hook-04">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('runs.title')}<small>04</small></h2>
-        <div class="adm-hook-filters">
-          <button type="button" class=${'adm-hook-fchip' + (refusedOnly ? '' : ' on')} onClick=${() => { setRefusedOnly(false); setAll(false); }}>${S('runs.filterAll')}</button>
-          <button type="button" class=${'adm-hook-fchip' + (refusedOnly ? ' on' : '')} onClick=${() => { setRefusedOnly(true); setAll(false); }}>${S('runs.filterRefused')}</button>
-        </div>
-      </div>
-      <p class="adm-hook-lead">${S('runs.lead')}</p>
+    <${Section} id="adm-hook-04" num="04" title=${S('runs.title')}
+      doors=${html`<${Tabs} tone="filter" value=${refusedOnly ? 'refused' : 'all'} onSelect=${(v) => { setRefusedOnly(v === 'refused'); setAll(false); }} label=${S('runs.title')}
+        items=${[{ value: 'all', label: S('runs.filterAll') }, { value: 'refused', label: S('runs.filterRefused') }]} />`}>
+      <${Note} kind="lead">${S('runs.lead')}<//>
 
       ${rows.length === 0
-        ? html`<div class="adm-hook-empty">${(data.runs || []).length === 0 ? S('runs.none') : S('runs.noneMatch')}</div>`
-        : html`<div class="adm-table-scroll"><table class="adm-table adm-hook-tbl">
-            <thead><tr>
-              <th>${S('runs.colWhen')}</th><th>${S('runs.colMoment')}</th><th>${S('runs.colCalled')}</th>
-              <th>${S('runs.colAnswer')}</th><th>${S('runs.colTook')}</th><th>${S('runs.colWhat')}</th>
-            </tr></thead>
-            <tbody>
-              ${shown.map((r, i) => html`<tr key=${r.at + i}>
-                <td class="adm-hook-when">${when(r.at)}</td>
-                <td class="adm-hook-when">${r.hook}</td>
-                <td class="adm-hook-when">${r.actionName || r.actionRef}</td>
-                <td>
-                  <${Badge} type=${TONE[r.answer] || 'muted'} label=${S('runs.answer_' + r.answer)} />
-                  ${r.status ? html` <span class="adm-hook-mono">${r.status}</span>` : null}
-                </td>
-                <td class="adm-hook-num">${S('runs.ms', { n: r.ms })}</td>
-                <td class="adm-hook-what">
-                  ${r.subject || '—'}
-                  ${!r.allowed ? html`<span class="adm-why">${S('runs.stopped')}${r.reason ? `: ${r.reason}` : ''}</span>`
-                    : r.reason ? html`<span class="adm-why">${r.reason}</span>` : null}
-                </td>
-              </tr>`)}
-            </tbody>
-          </table></div>`}
+        ? html`<${Note} kind="quiet">${(data.runs || []).length === 0 ? S('runs.none') : S('runs.noneMatch')}<//>`
+        : html`<${DataTable} scroll
+            headers=${[S('runs.colWhen'), S('runs.colMoment'), S('runs.colCalled'), S('runs.colAnswer'), S('runs.colTook'), S('runs.colWhat')]}
+            rows=${shown.map(r => [
+              { text: when(r.at), mono: true },
+              { text: r.hook, mono: true },
+              { text: r.actionName || r.actionRef, mono: true },
+              html`<${Badge} type=${TONE[r.answer] || 'muted'} label=${S('runs.answer_' + r.answer)} />${r.status ? html` <${Note} kind="meta" mono inline>${r.status}<//>` : null}`,
+              { text: S('runs.ms', { n: r.ms }), mono: true },
+              { mono: true, text: html`${r.subject || '—'}${!r.allowed
+                ? html`<${Note} kind="meta">${S('runs.stopped')}${r.reason ? `: ${r.reason}` : ''}<//>`
+                : r.reason ? html`<${Note} kind="meta">${r.reason}<//>` : null}` },
+            ])} />`}
 
       ${rows.length > 0 ? html`
-        <div class="adm-hook-foot">
-          <span class="adm-hook-mono">${S('runs.shown', { n: shown.length, total: rows.length, kept: data.summary.runs_kept })}</span>
-          ${rows.length > PAGE ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setAll(!all)}>${all ? S('runs.showFewer') : S('runs.showAll', { n: rows.length })}</button>` : null}
-        </div>` : null}
-    </section>`;
+        <${More} note=${S('runs.shown', { n: shown.length, total: rows.length, kept: data.summary.runs_kept })}
+          label=${all ? S('runs.showFewer') : S('runs.showAll', { n: rows.length })}
+          onMore=${rows.length > PAGE ? () => setAll(!all) : undefined} />` : null}
+    <//>`;
 }

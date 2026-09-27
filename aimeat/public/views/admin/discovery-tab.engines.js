@@ -13,9 +13,14 @@
  *   (the parent fetches it); a DNS proof cannot be seen from here, so no tag is a neutral chip
  *   rather than a cross, and the row says so.
  *
+ *   Every part is a library component; the page passes data and writes no class.
+ *
  * @structure DiscoveryEngines({ status, served, onRecheck, onChanged }) — Bing, Google, the rest
  * @usage <${DiscoveryEngines} status=${status} served=${served} onRecheck=${checkServed} onChanged=${load} />
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): the List (cut
+ *     name-desc-state-doors) for the engines, TextField (code) for the proof fields, Action links
+ *     out, Loud and Action for the save and the discard.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face). Replaces
  *     discovery-tab.steps.js.
@@ -26,24 +31,28 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Badge, useToast, Toast } from './shared.js';
+import { Section } from '/components/Section.js';
+import { List, Row, Name, Desc, Cell, Doors } from '/components/List.js';
+import { Action, Loud } from '/components/Action.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { TextField } from '/components/TextField.js';
+import { FormActions } from '/components/Field.js';
+import { Stack, Space } from '/components/Layout.js';
 import * as adminService from '/js/services/admin.js';
 import { baseOf } from './discovery-tab.shared.js';
 
 const S = (key, params) => t('dashboard.seo.' + key, params);
 
-/** The proof field: an underline field in mono, with the code that is already saved as its placeholder. */
+/** The proof field: a code field, with the code that is already saved as its placeholder. */
 function CodeField({ value, onInput, placeholder, set }) {
-  return html`
-    <div class="adm-disc-fld adm-disc-fld--mono">
-      <input type="text" value=${value} spellcheck="false" autocomplete="off"
-        placeholder=${set ? S('engines.codeSet') : placeholder}
-        onInput=${e => onInput(e.target.value)} />
-    </div>`;
+  return html`<${TextField} code value=${value} autoComplete="off" ariaLabel=${placeholder}
+    placeholder=${set ? S('engines.codeSet') : placeholder} onInput=${onInput} />`;
 }
 
 /** A door out to the service the step is performed in. Opens in a new tab: the operator is mid-way through a list. */
 function Out({ href, label }) {
-  return html`<a class="og-door og-door--quiet" href=${href} target="_blank" rel="noopener">${label}</a>`;
+  return html`<${Action} small soft href=${href} newTab>${label}<//>`;
 }
 
 function TagChip({ seen, checked }) {
@@ -97,57 +106,62 @@ export function DiscoveryEngines({ status, served, onRecheck, onChanged }) {
       : html`<${Badge} type=${ix.key_served ? 'healthy' : 'muted'} label=${ix.key_served ? S('now.chipKeyServed') : S('now.chipKeyUnchecked')} />`;
 
   return html`
-    <section class="og-sec" id="adm-disc-02">
+    <${Section} id="adm-disc-02" num="02" title=${S('engines.title')}
+      doors=${html`<${Action} small soft onClick=${onRecheck}>${S('engines.recheck')}<//>`}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('engines.title')}<small>02</small></h2>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${onRecheck}>${S('engines.recheck')}</button></div></div>
-      <p class="adm-disc-lead">${S('engines.lead')}</p>
+      <${Note} kind="lead">${S('engines.lead')}<//>
 
-      <div class="adm-disc-erow">
-        <span><b>${S('engines.bing')}</b><span class="adm-why">${S('engines.bingWhy')}</span></span>
-        <span>
-          <div class="adm-disc-erow-how">${served.bing ? S('engines.bingHowOk') : S('engines.bingHow')}</div>
-          ${served.bing ? null : html`
-            <div class="adm-disc-gap"></div>
-            <${CodeField} value=${bing} onInput=${setBing} placeholder=${S('engines.bingCode')} set=${status.verification.bing} />
-            <p class="adm-disc-note">${S('engines.afterCode')} ${S('engines.dnsNote')}</p>`}
-        </span>
-        <span><${TagChip} seen=${served.bing} checked=${served.checked} /></span>
-        <span class="adm-disc-erow-acts">
-          <${Out} href=${BING} label=${S('engines.openBing')} />
-          <${Out} href=${siteAt('bing')} label=${S('engines.siteAt', { engine: 'Bing', host })} />
-        </span>
-      </div>
+      <${List} cols="name-desc-state-doors">
+        <${Row}>
+          <${Name} desc=${S('engines.bingWhy')}>${S('engines.bing')}<//>
+          <${Desc}>
+            <${Stack} gap="medium">
+              <span>${served.bing ? S('engines.bingHowOk') : S('engines.bingHow')}</span>
+              ${served.bing ? null : html`
+                <${CodeField} value=${bing} onInput=${setBing} placeholder=${S('engines.bingCode')} set=${status.verification.bing} />
+                <${Note} kind="hint">${S('engines.afterCode')} ${S('engines.dnsNote')}<//>`}
+            <//>
+          <//>
+          <${Cell}><${TagChip} seen=${served.bing} checked=${served.checked} /><//>
+          <${Doors}>
+            <${Out} href=${BING} label=${S('engines.openBing')} />
+            <${Out} href=${siteAt('bing')} label=${S('engines.siteAt', { engine: 'Bing', host })} />
+          <//>
+        <//>
 
-      <div class="adm-disc-erow">
-        <span><b>${S('engines.google')}</b><span class="adm-why">${S('engines.googleWhy')}</span></span>
-        <span>
-          <div class="adm-disc-erow-how">${served.google ? S('engines.googleHowOk') : S('engines.googleHow')}</div>
-          ${served.google ? null : html`
-            <div class="adm-disc-gap"></div>
-            <${CodeField} value=${google} onInput=${setGoogle} placeholder=${S('engines.googleCode')} set=${status.verification.google} />`}
-          <p class="adm-disc-note">${S('engines.googleLists')} <span class="adm-disc-code">${status.sitemap.url}</span> <span class="adm-disc-code">${status.sitemap.index_url}</span></p>
-        </span>
-        <span><${TagChip} seen=${served.google} checked=${served.checked} /></span>
-        <span class="adm-disc-erow-acts">
-          <${Out} href=${GSC} label=${S('engines.openGsc')} />
-          <${Out} href=${GSC_SITEMAPS} label=${S('engines.submitLists')} />
-          <${Out} href=${siteAt('google')} label=${S('engines.siteAt', { engine: 'Google', host })} />
-        </span>
-      </div>
+        <${Row}>
+          <${Name} desc=${S('engines.googleWhy')}>${S('engines.google')}<//>
+          <${Desc}>
+            <${Stack} gap="medium">
+              <span>${served.google ? S('engines.googleHowOk') : S('engines.googleHow')}</span>
+              ${served.google ? null : html`
+                <${CodeField} value=${google} onInput=${setGoogle} placeholder=${S('engines.googleCode')} set=${status.verification.google} />`}
+              <${Note} kind="hint">${S('engines.googleLists')} <${Code}>${status.sitemap.url}<//> <${Code}>${status.sitemap.index_url}<//><//>
+            <//>
+          <//>
+          <${Cell}><${TagChip} seen=${served.google} checked=${served.checked} /><//>
+          <${Doors}>
+            <${Out} href=${GSC} label=${S('engines.openGsc')} />
+            <${Out} href=${GSC_SITEMAPS} label=${S('engines.submitLists')} />
+            <${Out} href=${siteAt('google')} label=${S('engines.siteAt', { engine: 'Google', host })} />
+          <//>
+        <//>
 
-      <div class="adm-disc-erow adm-disc-erow--last">
-        <span><b>${S('engines.others')}</b><span class="adm-why">${S('engines.othersWhy')}</span></span>
-        <span><div class="adm-disc-erow-how">${ix.key_configured ? S('engines.othersHow') : S('engines.othersNoKey')}</div></span>
-        <span>${keyChip}</span>
-        <span class="adm-disc-erow-acts">
-          ${ix.key_url ? html`<${Out} href=${ix.key_url} label=${S('engines.openKey')} />` : null}
-        </span>
-      </div>
+        <${Row}>
+          <${Name} desc=${S('engines.othersWhy')}>${S('engines.others')}<//>
+          <${Desc}>${ix.key_configured ? S('engines.othersHow') : S('engines.othersNoKey')}<//>
+          <${Cell}>${keyChip}<//>
+          <${Doors}>
+            ${ix.key_url ? html`<${Out} href=${ix.key_url} label=${S('engines.openKey')} />` : null}
+          <//>
+        <//>
+      <//>
 
-      <div class="adm-disc-acts">
-        <button type="button" class="og-slab" disabled=${saving || (!google.trim() && !bing.trim())} onClick=${save}>${S('engines.save')}</button>
-        ${(google || bing) ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => { setGoogle(''); setBing(''); }}>${S('discard')}</button>` : null}
-      </div>
-    </section>`;
+      <${Space} above="large">
+        <${FormActions}>
+          <${Loud} control disabled=${saving || (!google.trim() && !bing.trim())} onClick=${save}>${S('engines.save')}<//>
+          ${(google || bing) ? html`<${Action} small soft onClick=${() => { setGoogle(''); setBing(''); }}>${S('discard')}<//>` : null}
+        <//>
+      <//>
+    <//>`;
 }

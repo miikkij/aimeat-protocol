@@ -9,6 +9,8 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.14.0 — 2026-09-27 — The own-aimeat demo moves to demos-operator.js, drawn by calling OwnAimeat;
+ *     OwnAimeatDemo and its OwnAimeatBlock import go.
  *   v1.13.0 — 2026-09-27 — The box and choice tile shapes' demos are box-shape and choice-shape, as their entries.
  *   v1.12.0 — 2026-09-26 — The Markdown reader's small cut beside the full one (Jouni's decision "Small reader").
  *   v1.11.0 — 2026-09-26 — The box's raised tone.
@@ -39,7 +41,6 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { TagList } from '/components/TagList.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
-import { OwnAimeatBlock } from '/views/surface/blocks-home.js';
 
 const html = htm.bind(h);
 const noop = () => {};
@@ -51,13 +52,6 @@ const AI_RECORD = { level: 'ai-generated', disclosure: { required: true, strengt
 function SandboxOpen() {
   useEffect(() => { openAppSandboxed('/v1/portal', 'Front page'); }, []);
   return html`<p>The overlay covers this frame.</p>`;
-}
-
-/** A store address exists in this frame only, so the demo card draws. */
-function OwnAimeatDemo() {
-  const w = /** @type {any} */ (window);
-  w.__SITE = { ...(w.__SITE || {}), store: w.__SITE?.store || 'https://store.example.com' };
-  return html`<${OwnAimeatBlock} />`;
 }
 
 export const SHARED_DEMOS = {
@@ -98,7 +92,6 @@ export const SHARED_DEMOS = {
   ] },
   'tags': { variants: [{ name: 'default', render: (ex) => html`<${TagList} tags=${ex.tags} max=${ex.max} onTag=${noop} />` }] },
   'app-sandbox': { height: 420, variants: [{ name: 'open', render: () => html`<${SandboxOpen} />` }] },
-  'own-aimeat': { variants: [{ name: 'on a demo node', render: () => html`<${OwnAimeatDemo} />` }] },
 };
 
 /** One element with the shape's classes; `cls` is the base, `extra` the cut. */

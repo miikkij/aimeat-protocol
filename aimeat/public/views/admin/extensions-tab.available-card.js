@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description Available (bundled) extension card with disk-script editor + add-action for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — The library's parts (admin page group G7): the card is the Object Box with
+ *     the name in its head and the version at its end, the facts a line of meta words (multi-instance
+ *     support in the fine tone), the ways Action links, the answer the form message; the disk-script
+ *     editor is the dashed field Box with the actions as Tabs, the add-action form Fields and the
+ *     script a typewriter TextArea that owns its Tab-indent and its Ctrl+S save. escHtml goes: htm
+ *     escapes every value, so the escaped names showed a literal &amp; to anyone whose name had one.
  *   v1.2.0 — 2026-09-12 — The action count is one translated string with the number in it. Gluing
  *     a number to a lowercased noun read as "7 toiminnot" in Finnish, which no Finnish says.
  *   v1.1.0 — 2026-09-05 — The script-editor button loses its emoji: no emoji anywhere in the interface.
@@ -14,10 +20,17 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { getDiskScript, saveDiskScript, addDiskAction } from '/js/services/admin.js';
-import { inputStyle, labelStyle, fieldWrap } from './extensions-tab.config-form.js';
+import { Box } from '/components/Box.js';
+import { Tabs } from '/components/Tabs.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
+import { Action, Actions } from '/components/Action.js';
+import { Label, Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { Tinted } from '/components/Figure.js';
+import { Row, Stack } from '/components/Layout.js';
 
 // ── Available Extension Card (with disk script editor + add action) ──
 function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, loadAvailable }) {
@@ -77,119 +90,74 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
   }
 
   return html`
-    <div class="adm-card" style="padding:16px;display:flex;flex-direction:column;gap:8px">
-      <div class="adm-flex-between">
-        <strong style="font-size:1.05rem">${escHtml(ext.name)}</strong>
-        <span class="adm-text-dim adm-text-base">v${escHtml(ext.version)}</span>
-      </div>
-      <p class="adm-text-dim" style="margin:0;font-size:.9rem">${escHtml(ext.description)}</p>
-      <div class="adm-flex-wrap adm-text-sm">
-        <span class="adm-text-dim">${t('dashboard.servicesApis')}: ${ext.requiredApis.join(', ')}</span>
-        <span style="color:${ext.instancesSupported ? 'var(--green, #22c55e)' : 'var(--text-dim)'}">
-          ${ext.instancesSupported ? t('dashboard.servicesMultiInstance') : t('dashboard.servicesSingleInstance')}
-        </span>
-        <span class="adm-text-dim">${t('admin.ext.actionsCount', { n: actions.length })}</span>
-      </div>
-      <div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <${Box} packed name=${ext.name} end=${html`<${Note} kind="meta" inline mono>v${ext.version}<//>`}>
+      <${Note}>${ext.description}<//>
+      <${Row} gap="medium" wrap>
+        <${Note} kind="meta" inline>${t('dashboard.servicesApis')}: ${ext.requiredApis.join(', ')}<//>
+        <${Note} kind="meta" inline>${ext.instancesSupported
+          ? html`<${Tinted} tone="fine">${t('dashboard.servicesMultiInstance')}<//>`
+          : t('dashboard.servicesSingleInstance')}<//>
+        <${Note} kind="meta" inline>${t('admin.ext.actionsCount', { n: actions.length })}<//>
+      <//>
+      <${Actions}>
         ${isInstalled
           ? html`
-            <button class="adm-btn-action" disabled=${isInstalling} onClick=${handleReinstall}>
+            <${Action} small disabled=${isInstalling} onClick=${handleReinstall}>
               ${isInstalling ? '...' : t('dashboard.servicesReinstall')}
-            </button>
-            <span class="adm-text-sm adm-text-dim">${t('dashboard.servicesInstalled')}</span>
-          `
-          : html`<button class="adm-btn-action" disabled=${isInstalling} onClick=${() => onInstall(ext.name)}>
+            <//>
+            <${Note} inline>${t('dashboard.servicesInstalled')}<//>`
+          : html`<${Action} small disabled=${isInstalling} onClick=${() => onInstall(ext.name)}>
               ${isInstalling ? t('dashboard.servicesInstalling') : t('dashboard.servicesInstall')}
-            </button>`
-        }
-        <button class="adm-btn-sm" onClick=${() => setShowEditor(!showEditor)}
-          style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+            <//>`}
+        <${Action} small soft pressed=${showEditor} onClick=${() => setShowEditor(!showEditor)}>
           ${t('dashboard.servicesScriptEditor')}
-        </button>
-        ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
-      </div>
+        <//>
+        ${msg ? html`<${Note} kind="message" error=${!msg.ok}>${msg.text}<//>` : null}
+      <//>
 
-      ${showEditor && html`
-        <div style="margin-top:4px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-          <div class="adm-flex-center adm-mb-sm" style="flex-wrap:wrap">
-            <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
-            ${actions.map(a => html`
-              <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
-                style="font-size:.75rem${selectedAction === a.id ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-                ${a.method} ${escHtml(a.id)}
-              </button>
-            `)}
-            <button class="adm-btn-sm" onClick=${() => setShowAddAction(!showAddAction)}
-              style="font-size:.75rem;color:var(--green, #22c55e)${showAddAction ? ';border-color:var(--green, #22c55e)' : ''}">
+      ${showEditor ? html`
+        <${Box} tone="field">
+          <${Label} block>${t('dashboard.servicesScriptEditor')}<//>
+          <${Tabs} label=${t('dashboard.servicesScriptEditor')} value=${selectedAction} onSelect=${loadScript}
+            items=${actions.map(a => ({ value: a.id, label: `${a.method} ${a.id}` }))}>
+            <${Action} small soft pressed=${showAddAction} onClick=${() => setShowAddAction(!showAddAction)}>
               + ${t('dashboard.servicesAddAction')}
-            </button>
-          </div>
+            <//>
+          <//>
 
-          ${showAddAction && html`
-            <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;padding:8px;border:1px solid var(--glass-border);border-radius:4px">
-              <div style=${fieldWrap}>
-                <label class="${labelStyle}">ID</label>
-                <input type="text" value=${newActionId} onInput=${e => setNewActionId(e.target.value)}
-                  class="${inputStyle}" style="width:160px;padding:4px 8px;font-size:.85rem" placeholder="my-action" />
-              </div>
-              <div style=${fieldWrap}>
-                <label class="${labelStyle}">Method</label>
-                <select class="${inputStyle}" style="padding:4px 8px;font-size:.85rem" value=${newActionMethod}
-                  onChange=${e => setNewActionMethod(e.target.value)}>
-                  <option value="POST">POST</option><option value="GET">GET</option>
-                  <option value="PUT">PUT</option><option value="DELETE">DELETE</option>
-                </select>
-              </div>
-              <div style=${fieldWrap + ';flex:1;min-width:120px'}>
-                <label class="${labelStyle}">${t('dashboard.servicesScaffoldDescLabel')}</label>
-                <input type="text" value=${newActionDesc} onInput=${e => setNewActionDesc(e.target.value)}
-                  class="${inputStyle}" style="padding:4px 8px;font-size:.85rem" placeholder="What does this action do?" />
-              </div>
-              <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleAddAction}
-                disabled=${adding || !newActionId.trim()}>
-                ${adding ? '...' : t('dashboard.servicesAddAction')}</button>
-            </div>
-          `}
+          ${showAddAction ? html`
+            <${Row} gap="small" wrap align="end">
+              <${TextField} size="medium" label="ID" value=${newActionId} onInput=${setNewActionId} placeholder="my-action" />
+              <${Select} fit label="Method" value=${newActionMethod} onChange=${setNewActionMethod}
+                options=${['POST', 'GET', 'PUT', 'DELETE']} />
+              <${TextField} label=${t('dashboard.servicesScaffoldDescLabel')} value=${newActionDesc}
+                onInput=${setNewActionDesc} placeholder="What does this action do?" />
+              <${Action} small onClick=${handleAddAction} disabled=${adding || !newActionId.trim()}>
+                ${adding ? '...' : t('dashboard.servicesAddAction')}<//>
+            <//>
+          ` : null}
 
-          ${loading && html`<p class="adm-text-dim adm-text-base">${t('dashboard.loading')}...</p>`}
+          ${loading ? html`<${Note} kind="loading">${t('dashboard.loading')}...<//>` : null}
 
-          ${selectedAction && !loading && html`
-            <div>
-              <code class="adm-text-sm adm-text-dim">${ext.name}/actions/${selectedAction}.js</code>
-              <textarea class="adm-textarea adm-input-full" value=${script} onInput=${e => setScript(e.target.value)}
-                style="height:320px;font-size:12px;margin-top:4px"
-                spellcheck="false"
-                onKeyDown=${e => {
-                  if (e.key === 'Tab') {
-                    e.preventDefault();
-                    const ta = e.target;
-                    const start = ta.selectionStart;
-                    const end = ta.selectionEnd;
-                    const val = ta.value;
-                    ta.value = val.substring(0, start) + '  ' + val.substring(end);
-                    ta.selectionStart = ta.selectionEnd = start + 2;
-                    setScript(ta.value);
-                  }
-                  if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    handleSave();
-                  }
-                }}
-              />
-              <div class="adm-flex-center" style="margin-top:6px">
-                <button class="adm-btn-action adm-text-sm" onClick=${handleSave} disabled=${saving}>
-                  ${saving ? '...' : t('dashboard.servicesScriptSave')}</button>
-                <span style="font-size:.75rem" class="adm-text-dim">Ctrl+S</span>
-              </div>
-            </div>
-          `}
+          ${selectedAction && !loading ? html`
+            <${Stack}>
+              <${Code}>${ext.name}/actions/${selectedAction}.js<//>
+              <${TextArea} code indent rows=${14} ariaLabel=${`${ext.name}/actions/${selectedAction}.js`}
+                value=${script} onInput=${setScript} onSave=${handleSave} />
+              <${Row} gap="medium">
+                <${Action} small onClick=${handleSave} disabled=${saving}>
+                  ${saving ? '...' : t('dashboard.servicesScriptSave')}<//>
+                <${Note} inline>Ctrl+S<//>
+              <//>
+            <//>
+          ` : null}
 
-          ${actions.length === 0 && !showAddAction && html`
-            <p class="adm-text-dim adm-text-base" style="margin:0">${t('dashboard.servicesNoActions')}</p>
-          `}
-        </div>
-      `}
-    </div>
+          ${actions.length === 0 && !showAddAction ? html`
+            <${Note} kind="quiet">${t('dashboard.servicesNoActions')}<//>
+          ` : null}
+        <//>
+      ` : null}
+    <//>
     <${ConfirmUI} />
   `;
 }

@@ -3,13 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Section 04 of the admin Discovery page: the name, the sentence and the picture a
- *   search result and a shared link show, as underline fields beside the two previews. The previews
- *   render from the SERVED values, so an operator sees the effect of what they saved rather than
- *   the text they typed; a field they are editing shows in the field alone until it is saved.
+ *   search result and a shared link show, as fields beside the two previews. The previews render
+ *   from the SERVED values, so an operator sees the effect of what they saved rather than the text
+ *   they typed; a field they are editing shows in the field alone until it is saved.
+ *
+ *   Every part is a library component; the page passes data and writes no class.
  *
  * @structure DiscoveryIdentity({ status, onChanged }) — the seven fields, Save, the two previews
  * @usage <${DiscoveryIdentity} status=${status} onChanged=${load} />
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): TextField and TextArea for the
+ *     fields, Fields for the pair, the library's SearchResult and ShareCard for the previews, Loud
+ *     and Action for the buttons, Beside for the two columns.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face). The fields and the
  *     previews lived in discovery-tab.js before.
@@ -20,6 +25,13 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useToast, Toast } from './shared.js';
+import { Section } from '/components/Section.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { TextField, TextArea } from '/components/TextField.js';
+import { Fields, FormActions } from '/components/Field.js';
+import { SearchResult, ShareCard } from '/components/SearchPreview.js';
+import { Beside, Stack } from '/components/Layout.js';
 import * as adminService from '/js/services/admin.js';
 
 const S = (key, params) => t('dashboard.seo.' + key, params);
@@ -35,47 +47,18 @@ const FIELDS = [
   { path: 'seo.twitter_site',      key: 'twitterSite',     type: 'text',     from: (i) => i.twitter_site || '' },
 ];
 
-function Field({ field, value, onInput }) {
-  const label = html`<div class="adm-disc-lbl">${S('identity.f_' + field.key)}</div>`;
-  const hint = html`<p class="adm-disc-note">${S('identity.h_' + field.key)}</p>`;
+function SeoField({ field, value, onInput }) {
+  const label = S('identity.f_' + field.key);
   if (field.type === 'textarea' || field.type === 'lines') {
     const text = field.type === 'lines' ? (value || []).join('\n') : value;
-    return html`<div>${label}
-      <textarea class="adm-disc-box-fld ${field.type === 'lines' ? 'adm-disc-box-fld--mono' : ''}" rows="3" value=${text}
-        onInput=${e => onInput(e.target.value)} />
-      ${field.type === 'textarea' ? html`<p class="adm-disc-note">${S('identity.h_' + field.key)} ${S('identity.chars', { n: String(value || '').length })}</p>` : hint}
-    </div>`;
+    return html`<${TextArea} label=${label} rows=${3} code=${field.type === 'lines'} value=${text}
+      hint=${field.type === 'textarea'
+        ? `${S('identity.h_' + field.key)} ${S('identity.chars', { n: String(value || '').length })}`
+        : S('identity.h_' + field.key)}
+      onInput=${onInput} />`;
   }
-  return html`<div>${label}
-    <div class="adm-disc-fld ${field.type === 'mono' ? 'adm-disc-fld--mono' : ''}">
-      <input type="text" value=${value} spellcheck="false" placeholder=${S('identity.p_' + field.key)} onInput=${e => onInput(e.target.value)} />
-    </div>
-    ${hint}
-  </div>`;
-}
-
-/** What a search result and a shared link look like right now, from the served values. */
-function Preview({ identity, host }) {
-  return html`
-    <div>
-      <div class="adm-disc-lbl">${S('identity.serp')}</div>
-      <div class="adm-disc-frame">
-        <div class="adm-disc-serp-url">${identity.organization_url}</div>
-        <div class="adm-disc-serp-title">${identity.site_name}</div>
-        <div class="adm-disc-serp-desc">${identity.site_description}</div>
-      </div>
-      <div class="adm-disc-lbl">${S('identity.card')}</div>
-      <div class="adm-disc-frame adm-disc-frame--card">
-        ${identity.og_image
-          ? html`<img class="adm-disc-card-img" src=${identity.og_image} alt="" loading="lazy" />`
-          : html`<div class="adm-disc-card-img adm-disc-card-img--empty">${S('noImage')}</div>`}
-        <div class="adm-disc-card-body">
-          <div class="adm-disc-card-title">${identity.site_name}</div>
-          <div class="adm-disc-serp-desc">${identity.site_description}</div>
-          <div class="adm-disc-card-host">${host}</div>
-        </div>
-      </div>
-    </div>`;
+  return html`<${TextField} label=${label} code=${field.type === 'mono'} value=${value} spellCheck=${false}
+    placeholder=${S('identity.p_' + field.key)} hint=${S('identity.h_' + field.key)} onInput=${onInput} />`;
 }
 
 export function DiscoveryIdentity({ status, onChanged }) {
@@ -112,28 +95,28 @@ export function DiscoveryIdentity({ status, onChanged }) {
   const host = status.sitemap.url.replace(/^https?:\/\//, '').replace(/\/sitemap\.xml$/, '');
   const pairA = FIELDS.find(f => f.pair === 'a');
   const pairB = FIELDS.find(f => f.pair === 'b');
+  const identity = status.identity;
 
   return html`
-    <section class="og-sec" id="adm-disc-04">
+    <${Section} id="adm-disc-04" num="04" title=${S('identity.title')}
+      doors=${dirty ? html`<${Action} small soft onClick=${() => setEdits({})}>${S('identity.discard')}<//>` : null}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('identity.title')}<small>04</small></h2>
-        <div class="og-doors">
-          ${dirty ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setEdits({})}>${S('identity.discard')}</button>` : null}
-        </div></div>
-      <p class="adm-disc-lead">${S('identity.lead')}</p>
-      <div class="adm-disc-identity">
-        <div class="adm-disc-fields">
-          ${FIELDS.filter(f => !f.pair).slice(0, 3).map(field => html`<${Field} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
-          <div class="adm-disc-pair">
-            <${Field} field=${pairA} value=${current(pairA)} onInput=${v => edit(pairA, v)} />
-            <${Field} field=${pairB} value=${current(pairB)} onInput=${v => edit(pairB, v)} />
-          </div>
-          ${FIELDS.filter(f => !f.pair).slice(3).map(field => html`<${Field} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
-          <div class="adm-disc-acts">
-            <button type="button" class="og-slab" disabled=${saving || !dirty} onClick=${save}>${S('identity.save')}</button>
-          </div>
-        </div>
-        <${Preview} identity=${status.identity} host=${host} />
-      </div>
-    </section>`;
+      <${Note} kind="lead">${S('identity.lead')}<//>
+      <${Beside} wide side=${html`
+        <${SearchResult} label=${S('identity.serp')} url=${identity.organization_url} title=${identity.site_name} desc=${identity.site_description} />
+        <${ShareCard} label=${S('identity.card')} image=${identity.og_image} noImage=${S('noImage')}
+          title=${identity.site_name} desc=${identity.site_description} host=${host} />`}>
+        <${Stack} gap="large">
+          ${FIELDS.filter(f => !f.pair).slice(0, 3).map(field => html`<${SeoField} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
+          <${Fields} cols=${2}>
+            <${SeoField} field=${pairA} value=${current(pairA)} onInput=${v => edit(pairA, v)} />
+            <${SeoField} field=${pairB} value=${current(pairB)} onInput=${v => edit(pairB, v)} />
+          <//>
+          ${FIELDS.filter(f => !f.pair).slice(3).map(field => html`<${SeoField} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
+          <${FormActions}>
+            <${Loud} control disabled=${saving || !dirty} onClick=${save}>${S('identity.save')}<//>
+          <//>
+        <//>
+      <//>
+    <//>`;
 }

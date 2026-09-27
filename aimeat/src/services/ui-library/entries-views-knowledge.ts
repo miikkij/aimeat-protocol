@@ -7,6 +7,7 @@
  * @structure KNOWLEDGE_VIEW_ENTRIES
  * @usage import { KNOWLEDGE_VIEW_ENTRIES } from './entries-views-knowledge.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — PagePreview's email and live (SitePreview folded in), from the admin pages.
  *   v1.1.1 — 2026-09-27 — SetupGuide draws its own names from setup-guide.css (formerly .ast-* in
  *     hello-mcp.css; a move).
  *   v1.1.0 — 2026-09-27 — The special views of the organism pages, the Memory and Access pages, the
@@ -168,13 +169,31 @@ export const KNOWLEDGE_VIEW_ENTRIES: UiEntryWritten[] = [
     // The overview, Portfolio and the Agents page (page groups G8 and G1a).
     {
         id: 'page-preview', name: 'PagePreview', kind: 'component', status: 'active',
-        summary: 'A web page shown as it will look, in the raised Object box with no inner air: a sandboxed frame (scripts run, nothing else is allowed) 34rem high, 24rem on a phone; the loading line until the page\'s text is there.',
+        summary: 'A web page shown as it will look, in the raised Object box with no inner air: a sandboxed frame (scripts run, nothing else is allowed) 34rem high, 24rem on a phone; the loading line until the page\'s text is there. An email shows where nothing in it runs, 600px wide on white. A live page of this site shows by its address, with its title as a row label, three ways over it (wide, phone, fold it away), a grey note under it, the link that opens it, and each of its parts numbered in an ink square as the list beside it numbers them.',
         module: '/components/PagePreview.js', sheet: '/css/components/page-preview.css',
-        data: { shape: 'PagePreview({ title, srcdoc, loading, loadingLabel })', fields: { title: 'the frame\'s name, for a screen reader', srcdoc: 'the page\'s whole HTML', loading: 'the page is on its way', loadingLabel: 'the words of the loading line' } },
-        useFor: ['Seeing a published page before it goes out, such as a portfolio.'],
-        variants: [{ name: 'loading', prop: 'loading, or no srcdoc', when: 'the page\'s text is not there yet' }],
+        data: {
+            shape: 'PagePreview({ title, srcdoc, loading, loadingLabel, email, live, src, href, openLabel, wideLabel, phoneLabel, foldLabel, unfoldLabel, note, markedNote, marks, refresh, empty })',
+            fields: {
+                title: 'the frame\'s name, for a screen reader; live: also the row label over it', srcdoc: 'the page\'s whole HTML', loading: 'the page is on its way', loadingLabel: 'the words of the loading line',
+                email: 'an email as it reaches its reader: nothing in it runs (a sandbox with no permission), 600px wide and 420px high on the white ground, centred',
+                live: 'a live page of this site by its address, beside the thing that arranges it', src: 'live: the frame\'s address', refresh: 'live: a new value loads the page again',
+                href: 'live: the link that opens the page on its own', openLabel: 'live: that link\'s words',
+                'wideLabel, phoneLabel, foldLabel, unfoldLabel': 'live: the words of the three ways (wide, phone width, fold it away and back)',
+                note: 'live: the grey line under the frame', markedNote: 'live: added to the note while the parts are numbered',
+                marks: 'live: { root, count }: the element whose children are the parts, and how many are shown; each part gets its number only when the count matches, since a wrong number is worse than none',
+                empty: 'live: a line in the frame\'s place and nothing else (a page behind a sign-in)',
+            },
+        },
+        useFor: ['Seeing a published page before it goes out, such as a portfolio.', 'An operator\'s email template before it is sent (email), and the front page beside the list that arranges its parts (live).'],
+        variants: [
+            { name: 'loading', prop: 'loading, or no srcdoc', when: 'the page\'s text is not there yet' },
+            { name: 'email', class: 'page-preview-frame--mail', prop: 'email', when: 'an email template: nothing runs, 600px on white (the operator\'s Email page)' },
+            { name: 'live', class: 'page-preview-live', prop: 'live src', when: 'the front page by its address, with its three ways, its note and its link (the operator\'s Portal page)' },
+            { name: 'live, phone', class: 'page-preview-live-frame--phone', prop: 'live (the phone way pressed)', when: 'the same page at a phone\'s width' },
+            { name: 'live, nothing to show', class: 'page-preview-live-empty', prop: 'live empty', when: 'a page behind a sign-in: a line in the frame\'s place' },
+        ],
         example: { title: 'Lumo Bakery portfolio', srcdoc: '<h1>Lumo Bakery</h1><p>Seasonal bread, baked at five.</p>' },
-        note: 'Was .pf-prev and .pf-prev-frame of the Portfolio page (views/profile/portfolio/page.js).',
+        note: 'Was .pf-prev and .pf-prev-frame of the Portfolio page (views/profile/portfolio/page.js). On 2026-09-27 it took the admin Email page\'s template preview (email, main\'s .adm-em-stage) and folded in SitePreview, the admin Portal page\'s live preview (live, main\'s .adm-pt-pv* and .adm-pt-frame); SitePreview.js and site-preview.css are gone, their look is page-preview.css\'s .page-preview-live*. The numbers inside the framed page carry their own look, since no sheet of this page reaches into the frame.',
     },
     {
         id: 'number-band', name: 'NumberBand', kind: 'component', status: 'active',

@@ -13,6 +13,9 @@
  *   that may never ship, and a part's sheet is catalogued and drawn by pages.
  * @usage Loaded by the lab's preview page only (views/design-lab/frame.js); no other page carries it.
  * @version-history
+ *   v1.11.0 — 2026-09-27 — The admin's old names the lab's pictures draw (.adm-sidebar, .adm-nav-item,
+ *     .adm-badge, .adm-own-chip, .adm-ag-go, .adm-hook-fchip, .adm-st-chip), copied from the admin
+ *     sheets that went with the admin pages' move onto components.
  *   v1.10.0 — 2026-09-27 — The lab's own copies of the page rules its pictures still draw, now that
  *     the components draw only their own class names (.sub-tabs and others, at the end).
  *   v1.9.0 — 2026-09-26 — The last round of Settings: the suggested reply on the yellow, a delivery
@@ -239,3 +242,28 @@ dialog.dlg.dl-was .dlg-foot .btn-danger-solid:hover:not(:disabled) { background:
    "Coral headline" picture's .p-1 needs no copy: on a .card, profile-poster.css .pf .card decided
    the padding. */
 .poster-specimen-stage .pf .mb-half { margin-bottom: .5rem; }
+
+/* The admin's own names as they were on main before the admin pages drew components (2026-09-27):
+   views/admin.css, admin-owners.css, admin-agents.css, admin-hooks.css and admin-stats.css went with
+   the pages; the pictures of those looks keep a copy here, under the lab's .adm wrapper. */
+.poster-specimen-stage .adm { --sidebar-bg: #1A1A2E; --sidebar-text: #FAFAF8; --sidebar-dim: #9AA0B0; }
+.poster-specimen-stage .adm-sidebar { width: 220px; background: var(--sidebar-bg); padding: 16px 0; }
+.poster-specimen-stage .adm-nav-item { display: flex; align-items: center; gap: 10px; padding: 6px 18px; color: var(--sidebar-text); font-size: .82rem; border: none; background: none; width: 100%; text-align: left; font-family: inherit; font-weight: 600; }
+.poster-specimen-stage .adm-nav-item .cnt { font-family: var(--font-mono); color: var(--sidebar-dim); font-size: .66rem; font-weight: 500; }
+.poster-specimen-stage .adm-badge { display: inline-block; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; }
+.poster-specimen-stage .adm-badge-healthy { background: var(--success-bg); color: var(--success-fg); }
+.poster-specimen-stage .adm-badge-warning { background: var(--warn-bg); color: var(--warn-fg); }
+.poster-specimen-stage .adm-badge-critical { background: var(--danger-bg); color: var(--danger-fg); }
+.poster-specimen-stage .adm-badge-muted { background: var(--bg-surface); color: var(--text-dim); }
+.poster-specimen-stage .adm-own-chip { font-family: var(--font-mono); font-weight: 500; font-size: .66rem; line-height: 1.6; padding: 1px 6px; border: 2px solid var(--border); color: var(--text-dim); white-space: nowrap; }
+.poster-specimen-stage .adm-own-chip--op { border-color: var(--accent); color: var(--accent); }
+.poster-specimen-stage .adm-own-chip--you { background: var(--sun); border-color: var(--on-sun); color: var(--on-sun); }
+.poster-specimen-stage .adm-ag-go { text-align: right; }
+.poster-specimen-stage .adm-ag-go .og-door { font-size: .72rem; }
+.poster-specimen-stage .adm-hook-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; }
+.poster-specimen-stage .adm-hook-fchip:hover { border-color: var(--text); color: var(--text); }
+.poster-specimen-stage .adm-hook-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+.poster-specimen-stage .adm-st-chip { display: inline-block; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; line-height: 1.6; white-space: nowrap; }
+.poster-specimen-stage .adm-st-chip--ok { background: var(--success-bg); color: var(--success-fg); }
+.poster-specimen-stage .adm-st-chip--bad { background: var(--danger-bg); color: var(--danger-fg); }
+.poster-specimen-stage .adm-st-chip--muted { background: var(--bg-surface); color: var(--text-dim); }

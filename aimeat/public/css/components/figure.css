@@ -9,6 +9,8 @@
  *   it, its state colours, and the meter's size. Reads only theme tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — The meter's tones .meter--notice, --ink, --dim (Meter tone), main's admin
+ *     readiness bands and share bars (admin-agent-integration.css, admin-agents.css); page group G4.
  *   v1.4.0 — 2026-09-27 — The result (.figure-result and its parts), main's P&L result look.
  *   v1.3.0 — 2026-09-26 — Tinted's whole cut (.tinted--whole), from main's .ac-shost-h (additive, page group G3).
  *   v1.2.0 — 2026-09-26 — The quota meter's early warn step (.is-warn, --warn from 60 %), from main's
@@ -61,6 +63,11 @@
 .meter--fill { flex: 1; min-width: 200px; }
 /* Early: a quota meter that warns from 60 % before it turns red at 90 % (main's AI budget bar). */
 .poster-box--quota.is-warn rect { fill: var(--warn); }
+/* A share bar's band (Meter tone; admin Agent integration's readiness ladder and the ink bar of
+   admin Agents): coral, ink or grey instead of the sun. */
+.meter--notice rect { fill: var(--accent); }
+.meter--ink rect { fill: var(--text); }
+.meter--dim rect { fill: var(--text-dim); }
 
 @media (max-width: 860px) {
   .meter--beside { flex-basis: auto; }

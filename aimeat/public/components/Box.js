@@ -41,16 +41,20 @@
  *   its own element inside the box for it.
  *
  *   SettingBox: a box on a settings page with its label on a line of its own (the note's small
- *   aside); `irreversible` for one whose act cannot be undone. SettingRow is its line of words with
+ *   aside); `irreversible` for one whose act cannot be undone; `pre` for words that keep their own
+ *   line breaks (a prompt to paste). SettingRow is its line of words with
  *   the button at the right; SettingConfirm the line that asks for a word before the act.
  * @structure Box({ tone, flush, packed, scroll, folded, unfoldLabel, onUnfold, document, beside, as, name, marks, end, doors, id, role, ariaLabel, children }) ·
- *   SettingBox({ label, irreversible, children }) · SettingRow({ children }) ·
+ *   SettingBox({ label, irreversible, pre, children }) · SettingRow({ children }) ·
  *   SettingConfirm({ children }) · boxClass(tone) · BoxList({ apart, children }) ·
  *   BoxLine({ name, meta, time, end, column, doors, after, children })
  * @usage html`<${Box}>…<//>` · html`<${Box} tone="raised">…<//>` ·
  *        html`<${Box} name=${pkg.name} marks=${html`<${Mark}>…<//>`} doors=${…}>…<//>` ·
  *        html`<${SettingBox} label=${t('x.export')} irreversible>…<//>`
  * @version-history
+ *   v1.7.0 — 2026-09-27 — SettingBox `pre`: the words keep their line breaks (the admin Statistics and
+ *     Usage pages' prompt for the operator's own AI, main's .adm-st-paste / .adm-us-paste); additive,
+ *     admin page group G3.
  *   v1.6.0 — 2026-09-26 — Tone 'dim' (the grey ground: main's Ecosystem .pf-eco-tech), `scroll="page"`
  *     (32rem: main's organism structure map, .pj-struct-body) and `beside` (the doors at the right of
  *     the words: main's Workflows .wp-verdict); additive, fix pass.
@@ -152,9 +156,11 @@ export function BoxLine({ name, meta, time, end, column, doors, after, children 
 }
 
 /** A box on a settings page: its label on a line of its own over the words. */
-export function SettingBox({ label, irreversible, children }) {
+export function SettingBox({ label, irreversible, pre, children }) {
+    // pre (added by admin page group G3): the words keep their own line breaks and break anywhere (a
+    // prompt for the operator's own AI, main's .adm-st-paste / .adm-us-paste: pre-wrap).
     return html`<div class=${cx('og-box', 'poster-aside', 'poster-aside--small', irreversible && 'poster-aside--irreversible')}>
-        ${label ? html`<span class="poster-label">${label}</span>` : null}${children}
+        ${label ? html`<span class="poster-label">${label}</span>` : null}${pre ? html`<div class="og-box-pre">${children}</div>` : children}
     </div>`;
 }
 

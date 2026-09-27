@@ -8,9 +8,14 @@
  *
  * @structure
  *   - ChannelChat({ boardId }): inline board chat feed + composer (5s polling)
- *   - ChatInstancesTab({ data, reload }): operator-channel CRUD + chat-session table
+ *   - ChatInstancesTab({ data, reload }): operator-channel CRUD + chat-session list
  *
  * @version-history
+ *   v1.2.0 — 2026-09-27 — On the library components (page group G5): the channels are a Section
+ *     with the name field and its create action (TextField), each channel a List row that opens its
+ *     chat in the row's Panel; the chat is the Thread of comment Messages (scrolls, kept at its foot)
+ *     with the send field under it; the sessions the List with its heading row, the status the Status
+ *     mark, the delete the icon button. The file writes no class and no style.
  *   v1.1.0 — 2026-09-05 — The speech-bubble emoji before a channel name and the cross-mark emoji on the delete button go: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -26,6 +31,14 @@ import {
   deleteChatInstance,
   getBoards, getBoardPosts, createBoard, postToBoard,
 } from '/js/services/admin.js';
+import { Section } from '/components/Section.js';
+import { List, Row, Name, Cell, When, Doors } from '/components/List.js';
+import { Action, Icon } from '/components/Action.js';
+import { Mark } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { TextField } from '/components/TextField.js';
+import { Thread, Message } from '/components/Message.js';
+import { Space } from '/components/Layout.js';
 
 /* ── Inline Chat View ── */
 function ChannelChat({ boardId }) {
@@ -63,38 +76,25 @@ function ChannelChat({ boardId }) {
   }
 
   return html`
-    <div style="margin-top:10px;padding:10px 12px 12px;border-radius:8px;background:rgba(0,0,0,0.15)">
-      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div ref=${feedRef} style="
-        height:220px;min-height:100px;overflow-y:auto;resize:vertical;
-        border:1px solid var(--glass-border);border-radius:8px;
-        background:rgba(0,0,0,0.25);padding:10px;margin-bottom:10px;
-      ">
-        ${loading && html`<div class="adm-text-dim">${t('dashboard.loading')}...</div>`}
-        ${!loading && !posts.length && html`<div class="adm-text-dim adm-text-base" style="text-align:center;padding:24px;font-style:italic">${t('dashboard.chatNoMessages')}</div>`}
-        ${posts.map(p => {
-          const raw = p.author_gaii || p.authorGaii || 'operator';
-          const author = raw.includes('#') ? raw.split('#')[1].split('@')[0] : raw.split('@')[0];
-          return html`
-            <div style="margin-bottom:10px;padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.04);border-left:2px solid rgba(6,182,212,0.3)">
-              <div class="adm-flex-between" style="align-items:baseline;margin-bottom:3px">
-                <span class="adm-text-accent" style="font-size:.72rem;font-weight:700">${escHtml(author)}</span>
-                <span class="adm-text-dim" style="font-size:.62rem">${dt(p.created_at || p.createdAt)}</span>
-              </div>
-              <div class="adm-text-base adm-text-bright" style="line-height:1.5;white-space:pre-wrap">${escHtml(p.body || '')}</div>
-            </div>
-          `;
-        })}
-      </div>
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+    <${Thread} capped scrollRef=${feedRef}>
+      ${loading && html`<${Note} kind="loading">${t('dashboard.loading')}...<//>`}
+      ${!loading && !posts.length && html`<${Note} kind="quiet">${t('dashboard.chatNoMessages')}<//>`}
+      ${posts.map(p => {
+        const raw = p.author_gaii || p.authorGaii || 'operator';
+        const author = raw.includes('#') ? raw.split('#')[1].split('@')[0] : raw.split('@')[0];
+        return html`
+          <${Message} key=${p.id || (p.created_at || p.createdAt)} tone="comment" plain
+            who=${escHtml(author)} time=${dt(p.created_at || p.createdAt)} body=${escHtml(p.body || '')} />
+        `;
+      })}
+    <//>
 
-      <div class="adm-flex">
-        <input class="adm-input" value=${msg} onInput=${e => setMsg(e.target.value)}
-          placeholder=${t('dashboard.chatMessagePlaceholder')}
-          onKeyDown=${e => e.key === 'Enter' && send()}
-          style="flex:1;background:rgba(0,0,0,0.2)" />
-        <button class="adm-btn-action" onClick=${send}>${t('dashboard.chatSendMessage')}</button>
-      </div>
-    </div>
+    <${Space} above="small">
+      <${TextField} value=${msg} onInput=${setMsg} onEnter=${send}
+        placeholder=${t('dashboard.chatMessagePlaceholder')} ariaLabel=${t('dashboard.chatMessagePlaceholder')}
+        actions=${html`<${Action} small onClick=${send}>${t('dashboard.chatSendMessage')}<//>`} />
+    <//>
   `;
 }
 
@@ -143,51 +143,43 @@ export default function ChatInstancesTab({ data, reload }) {
     }, { danger: true });
   }
 
+  const head = [t('dashboard.chatChannelName'), t('dashboard.chatChannelPlatform'), 'GHII', t('dashboard.created'),
+    t('dashboard.statusLabel'), ''];
+
   return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <p class="adm-text-dim adm-text-base adm-mb-md">${t('dashboard.chatExplain')}</p>
+    <${Note}>${t('dashboard.chatExplain')}<//>
 
     <!-- Operator Channels -->
-    <div class="adm-card">
-      <h3>${t('dashboard.chatOperatorChannels')}</h3>
-      <p class="adm-text-sm adm-text-dim" style="margin-bottom:10px">${t('dashboard.chatOperatorChannelsExplain')}</p>
+    <${Section} first title=${t('dashboard.chatOperatorChannels')}>
+      <${Note}>${t('dashboard.chatOperatorChannelsExplain')}<//>
 
-      <div class="adm-flex-wrap adm-mb-lg" style="align-items:flex-end">
-        <div style="flex:1;min-width:160px">
-          <label class="adm-text-xs adm-text-dim">${t('dashboard.chatChannelName')}</label>
-          <input ref=${nameRef} class="adm-input adm-input-full" value=${name} onInput=${e => setName(e.target.value)}
-            placeholder=${t('dashboard.chatChannelNamePlaceholder')}
-            onKeyDown=${e => e.key === 'Enter' && doCreateChannel()} />
-        </div>
-        <button class="adm-btn-action" onClick=${doCreateChannel} style="white-space:nowrap">+ ${t('dashboard.chatCreateChannel')}</button>
-      </div>
+      <${Space} below="large">
+        <${TextField} inputRef=${nameRef} label=${t('dashboard.chatChannelName')} value=${name} onInput=${setName}
+          placeholder=${t('dashboard.chatChannelNamePlaceholder')} onEnter=${doCreateChannel}
+          actions=${html`<${Action} small onClick=${doCreateChannel}>+ ${t('dashboard.chatCreateChannel')}<//>`} />
+      <//>
 
       ${!channels.length
-        ? html`<div class="adm-text-dim" style="font-style:italic;padding:8px 0">${t('dashboard.chatNoChannels')}</div>`
-        : html`<div class="adm-flex-col" style="gap:12px">
+        ? html`<${Note} kind="quiet">${t('dashboard.chatNoChannels')}<//>`
+        : html`<${List} cols="name-doors">
           ${channels.map(ch => {
             const cid = ch.id || ch.name;
             const isOpen = openChats.has(cid);
             const displayName = (ch.name || ch.id).replace(/^ops:/, '');
             return html`
-              <div style="border:1px solid ${isOpen ? '#06b6d4' : 'var(--glass-border)'};border-radius:10px;padding:12px 14px;background:${isOpen ? 'rgba(6,182,212,0.04)' : 'rgba(255,255,255,0.02)'};transition:all .2s ease">
-                <div class="adm-flex-between">
-                  <div class="adm-flex-center" style="gap:10px">
-                    <div>
-                      <div style="font-weight:700;font-size:.95rem"># ${escHtml(displayName)}</div>
-                      ${ch.post_count != null ? html`<div class="adm-text-xs adm-text-dim">${ch.post_count} messages</div>` : null}
-                    </div>
-                  </div>
-                  <button class="adm-btn-action" onClick=${() => toggleChat(cid)} style="font-size:.8rem"
-                  >${isOpen ? '\u25B2 Collapse' : '\u25BC Expand'}</button>
-                </div>
-                ${isOpen && html`<${ChannelChat} boardId=${cid} />`}
-              </div>
+              <${Row} key=${cid} open=${isOpen} panel=${isOpen ? html`<${ChannelChat} boardId=${cid} />` : null}>
+                <${Name} meta=${ch.post_count != null ? `${ch.post_count} messages` : null}># ${escHtml(displayName)}<//>
+                <${Doors}>
+                  <${Action} small expanded=${isOpen} onClick=${() => toggleChat(cid)}
+                  >${isOpen ? '▲ Collapse' : '▼ Expand'}<//>
+                <//>
+              <//>
             `;
           })}
-        </div>`
+        <//>`
       }
-    </div>
+    <//>
 
     <!-- AI Chat Instances -->
     <${StatsGrid} items=${[
@@ -196,26 +188,16 @@ export default function ChatInstancesTab({ data, reload }) {
 
     ${!sessions.length
       ? html`<${Empty} text=${t('dashboard.noChatInstances')} />`
-      : html`<div class="adm-card"><div class="scrollable"><table>
-        <thead><tr>
-          <th>${t('dashboard.chatChannelName')}</th>
-          <th>${t('dashboard.chatChannelPlatform')}</th>
-          <th>GHII</th>
-          <th>${t('dashboard.created')}</th>
-          <th>${t('dashboard.statusLabel')}</th>
-          <th></th>
-        </tr></thead>
-        <tbody>
-          ${sessions.map(s => html`<tr>
-            <td>${escHtml(s.app_name || s.id || '')}</td>
-            <td>${escHtml(s.platform || '')}</td>
-            <td class="mono adm-text-sm">${escHtml(String(s.ghii || '').substring(0, 20))}</td>
-            <td class="adm-text-dim">${dt(s.created_at)}</td>
-            <td><span class="badge ${s.is_anonymous ? 'bg-dim' : 'bg-green'}">${s.is_anonymous ? 'anon' : t('dashboard.active')}</span></td>
-            <td><button class="adm-btn-sm" onClick=${() => doDeleteInstance(s.id)} title="Delete">\u2717</button></td>
-          </tr>`)}
-        </tbody>
-      </table></div></div>`
+      : html`<${List} cols="name-kind-id-when-state-doors" head=${head} labels>
+          ${sessions.map(s => html`<${Row} key=${s.id}>
+            <${Name}>${escHtml(s.app_name || s.id || '')}<//>
+            <${Cell}>${escHtml(s.platform || '')}<//>
+            <${Cell} meta>${escHtml(String(s.ghii || '').substring(0, 20))}<//>
+            <${When}>${dt(s.created_at)}<//>
+            <${Cell}><${Mark} kind="status" tone=${s.is_anonymous ? 'off' : 'fine'}>${s.is_anonymous ? 'anon' : t('dashboard.active')}<//><//>
+            <${Doors}><${Icon} small label="Delete" onClick=${() => doDeleteInstance(s.id)}>✗<//><//>
+          <//>`)}
+        <//>`
     }
     <${ConfirmUI} />
   `;

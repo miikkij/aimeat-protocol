@@ -15,15 +15,27 @@
  * @structure CortexDetail (default export) · pieceName() · pieceDetail()
  * @usage <${CortexDetail} ext=${detail} row=${row} onBack=${...} ... />
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Every part is a library component that gets data (admin page group G7): the
+ *     way back is the back Action, the head the PageHead (the name, its version beside it, its
+ *     status marks, its words), the facts line the typewriter meta Note, the sections Section, the
+ *     pieces and the versions Lists, the box SettingBox, the three moves Loud and Action. No class.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose shared B1 headings and stylesheet-owned spacing.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { num, dt, Badge } from './shared.js';
 import { isSiteOwn } from './cortex-tab.groups.js';
+import { Section } from '/components/Section.js';
+import { PageHead } from '/components/PageHead.js';
+import { List, Row, Name, Cell, Desc, When } from '/components/List.js';
+import { Action, Actions, Loud } from '/components/Action.js';
+import { Code } from '/components/Mark.js';
+import { Note } from '/components/Note.js';
+import { SettingBox } from '/components/Box.js';
+import { SubHeading } from '/components/SubHeading.js';
 
 const html = htm.bind(h);
 const C = (key, params) => t('admin.cortex.' + key, params);
@@ -39,7 +51,7 @@ const KIND_WORD = {
     'lib': 'lib',
 };
 
-const code = (s) => html`<span class="adm-cx-code">${String(s)}</span>`;
+const code = (s) => html`<${Code}>${String(s)}<//>`;
 
 /** The one line under a piece's name: what that kind of piece actually is on this site. */
 function pieceDetail(comp, artifacts) {
@@ -91,81 +103,67 @@ export default function CortexDetail({ ext, row, busy, onBack, onTurnOff, onTurn
     const n = () => String(++counter).padStart(2, '0');
 
     return html`
-    <div class="adm-cx">
-      <button type="button" class="og-door og-door--quiet" onClick=${onBack}>${C('detail.back')}</button>
+    <${Fragment}>
+      <${Action} small tone="back" onClick=${onBack}>${C('detail.back')}<//>
 
-      <div class="adm-cx-head">
-        <h2>${ext.name}</h2>
-        <span class="adm-cx-ver">${ext.version || '?'}</span>
-        <${Badge} type=${on ? 'success' : 'warning'} label=${on ? C('state.on') : C('state.off')} />
-        ${site && html`<${Badge} type="muted" label=${C('thisSite')} />`}
-        <${Badge} type=${ext.visibility === 'public' ? 'public' : 'muted'}
-          label=${ext.visibility === 'public' ? C('read.public') : C('read.private')} />
-      </div>
-      ${ext.description && html`<p class="adm-cx-desc">${ext.description}</p>`}
-      <p class="adm-cx-meta">${C('detail.meta', {
+      <${PageHead} title=${ext.name} sub=${ext.version || '?'} desc=${ext.description || null} marks=${[
+        html`<${Badge} type=${on ? 'success' : 'warning'} label=${on ? C('state.on') : C('state.off')} />`,
+        site ? html`<${Badge} type="muted" label=${C('thisSite')} />` : null,
+        html`<${Badge} type=${ext.visibility === 'public' ? 'public' : 'muted'}
+          label=${ext.visibility === 'public' ? C('read.public') : C('read.private')} />`,
+      ]} />
+      <${Note} kind="meta" mono>${C('detail.meta', {
         when: dt(ext.installed_at),
         who: site ? C('thisSite') : (ext.installed_by || '?'),
         space: ext.namespace || '?',
-      })}</p>
+      })}<//>
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.who')}<small>${n()}</small></h2></div>
+      <${Section} first num=${n()} title=${C('detail.who')}>
         ${apps > 0
           ? html`
-            <p class="adm-cx-big">${apps === 1 ? C('detail.loadedByOne') : C('detail.loadedBy', { n: num(apps) })}</p>
-            <p class="adm-cx-applist">${names.map((a, i) => html`${i > 0 ? ' · ' : ''}${a}`)}
-              ${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}</p>`
+            <${SubHeading} level=${3}>${apps === 1 ? C('detail.loadedByOne') : C('detail.loadedBy', { n: num(apps) })}<//>
+            <${Note} kind="meta" mono>${names.map((a, i) => html`${i > 0 ? ' · ' : ''}${a}`)}${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}<//>`
           : html`
-            <p class="adm-cx-big">${C('detail.nobody')}</p>
-            <p class="adm-cx-lead adm-cx-detail-nobody">${site ? C('detail.nobodySite') : C('detail.nobodyWhy')}</p>`}
-      </section>
+            <${SubHeading} level=${3}>${C('detail.nobody')}<//>
+            <${Note} kind="lead">${site ? C('detail.nobodySite') : C('detail.nobodyWhy')}<//>`}
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.put')}<small>${n()}</small></h2>
-          <div class="og-doors"><span class="adm-cx-note">${C('detail.pieceCount', { n: num(comps.length) })}</span></div></div>
-        ${comps.length === 0
-          ? html`<p class="adm-cx-note">${C('detail.noPieces')}</p>`
-          : comps.map((c, i) => html`
-            <div class=${'adm-cx-piece' + (i === comps.length - 1 ? ' adm-cx-piece--last' : '')}>
-              <span class="adm-cx-kind">${C('kind.' + (KIND_WORD[c.type] ?? 'other'))}</span>
-              <span><b>${pieceName(c)}</b>
-                <span class="adm-why">${pieceDetail(c, ext.activation_artifacts)}</span></span>
-            </div>`)}
-        <div class="og-box adm-cx-keeps poster-aside poster-aside--small">
-          <span class="og-box-label">${C('detail.keepsLabel')}</span>
-          ${C('detail.keeps')}
-        </div>
-      </section>
+      <${Section} num=${n()} title=${C('detail.put')}
+        doors=${html`<${Note} kind="meta" inline>${C('detail.pieceCount', { n: num(comps.length) })}<//>`}>
+        <${List} cols="tag-name" empty=${C('detail.noPieces')}>
+          ${comps.map((c, i) => html`
+            <${Row} key=${i}>
+              <${Cell} sign>${C('kind.' + (KIND_WORD[c.type] ?? 'other'))}<//>
+              <${Name} desc=${pieceDetail(c, ext.activation_artifacts)}>${pieceName(c)}<//>
+            <//>`)}
+        <//>
+        <${SettingBox} label=${C('detail.keepsLabel')}>${C('detail.keeps')}<//>
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.versions')}<small>${n()}</small></h2>
-          <div class="og-doors"><span class="adm-cx-note">${C('detail.versionCount', { n: num(versions.length) })}</span></div></div>
-        ${versions.length === 0
-          ? html`<p class="adm-cx-note">${C('detail.noVersions')}</p>`
-          : versions.map((v, i) => html`
-            <div class=${'adm-cx-vrow' + (i === versions.length - 1 ? ' adm-cx-vrow--last' : '')}>
-              <span class="adm-cx-version-name">${v.version}</span>
-              <span>${v.version === ext.version ? C('detail.thisOne') : C('detail.olderOne')}</span>
-              <span class="adm-mval">${dt(v.created_at)}</span>
-            </div>`)}
-        <p class="adm-cx-lead adm-cx-versions-note">${C('detail.versionsWhy')}</p>
-      </section>
+      <${Section} num=${n()} title=${C('detail.versions')}
+        doors=${html`<${Note} kind="meta" inline>${C('detail.versionCount', { n: num(versions.length) })}<//>`}>
+        <${List} cols="name-words-when" empty=${C('detail.noVersions')}>
+          ${versions.map((v) => html`
+            <${Row} key=${v.version}>
+              <${Name}>${v.version}<//>
+              <${Desc}>${v.version === ext.version ? C('detail.thisOne') : C('detail.olderOne')}<//>
+              <${When}>${dt(v.created_at)}<//>
+            <//>`)}
+        <//>
+        <${Note} kind="lead">${C('detail.versionsWhy')}<//>
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.can')}<small>${n()}</small></h2></div>
-        <div class="adm-cx-doers">
+      <${Section} num=${n()} title=${C('detail.can')}>
+        <${Actions}>
           ${on
-            ? html`<button type="button" class="og-slab" disabled=${busy} onClick=${onTurnOff}>${C('turnOff')}</button>`
-            : html`<button type="button" class="og-slab" disabled=${busy} onClick=${onTurnOn}>${C('turnOn')}</button>`}
-          <button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${onVisibility}>
+            ? html`<${Loud} disabled=${busy} onClick=${onTurnOff}>${C('turnOff')}<//>`
+            : html`<${Loud} disabled=${busy} onClick=${onTurnOn}>${C('turnOn')}<//>`}
+          <${Action} small soft disabled=${busy} onClick=${onVisibility}>
             ${ext.visibility === 'public' ? C('detail.makePrivate') : C('detail.makePublic')}
-          </button>
-          <button type="button" class="og-door og-door--quiet og-door--danger" disabled=${busy} onClick=${onRemove}>
-            ${C('removeForGood')}
-          </button>
-        </div>
-        <p class="adm-cx-lead adm-cx-can-note">${C('detail.canWhy')}</p>
-      </section>
-    </div>`;
+          <//>
+          <${Action} small soft tone="danger" disabled=${busy} onClick=${onRemove}>${C('removeForGood')}<//>
+        <//>
+        <${Note} kind="lead">${C('detail.canWhy')}<//>
+      <//>
+    <//>`;
 }

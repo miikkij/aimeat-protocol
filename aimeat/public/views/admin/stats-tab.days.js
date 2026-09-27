@@ -11,59 +11,45 @@
  *   the old page's three Chart.js canvases went: two of them had nothing to draw and drew axes
  *   anyway, and the third put unrelated magnitudes side by side.
  *
- *   NO CHART LIBRARY. These are bars in a flex row. The page used to pull Chart.js from a CDN on
- *   every visit to draw four canvases, one of which was always empty.
+ *   NO CHART LIBRARY. The bars are components/DayChart.js (DayChart, DaySpark). The page used to
+ *   pull Chart.js from a CDN on every visit to draw four canvases, one of which was always empty.
  *
- *   THE COLOURS ARE DATA, so they are classes here and literal values in admin-stats.css rather
- *   than theme tokens: reads and writes keep their identity when the theme flips, and a refusal
- *   wears the reserved critical red because it IS a status.
+ *   THE COLOURS ARE DATA: a counter's `role` picks the series tone of the chart component, so reads
+ *   and writes keep their identity when the theme flips, and a refusal wears the reserved critical
+ *   red because it IS a status.
  * @structure
- *   - Spark — one counter's period, thin bars, a title per day
+ *   - TONE — a counter's role as the chart's series tone
  *   - WhatMoved (02) — the catalogue read, live rows first, the untouched ones named in one line
- *   - Plot — one chart: its own axis, a legend when it has two series, a hover readout
+ *   - Numbers — the two plots as one table
  *   - TheDays (03) — the two charts, and the numbers behind them
  * @usage Imported by stats-tab.js.
  * @version-history
+ *   v2.0.0 — 2026-09-27 — Library components only: the counters are a List with the state Mark, the
+ *     Figure and the DaySpark; the charts are DayChart; the numbers a List; no class written.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose shared B1 headings; SVG data carries bar heights and readings.
  *   v1.0.0 — 2026-09-12 — Initial (the Statistics page in the poster face).
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num } from './shared.js';
 import { seriesFor } from './stats-tab.data.js';
+import { Section } from '/components/Section.js';
+import { List, Row, Name, Cell, Num } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
+import { Figure } from '/components/Figure.js';
+import { Note } from '/components/Note.js';
+import { Action } from '/components/Action.js';
+import { EmptyState } from '/components/EmptyState.js';
+import { Columns } from '/components/Layout.js';
+import { DayChart, DaySpark } from '/components/DayChart.js';
 
 const S = (key, params) => t('admin.stats.' + key, params);
 
-/** A day as the axis writes it: "09-12", which is short enough to fit thirty of them. */
-const short = (day) => String(day).slice(5);
-
-/** A bar's height as a percentage of the tallest in its own plot; never zero-height when non-zero. */
-function barHeight(value, peak) {
-  if (!value) return 0;
-  if (!peak) return 0;
-  return Math.max(3, Math.round((value / peak) * 100));
-}
-
-/** One counter's period as thin bars. The title is the hover reading for a single row. */
-function Spark({ row, days }) {
-  if (row.state !== 'live') return null;
-  return html`
-    <span class="adm-st-spark">
-      ${row.series.map((v, i) => html`
-        <svg class="adm-st-bar adm-st-bar--${row.role}"
-           height=${barHeight(v, row.peak) + '%'}><title>${`${days[i]} · ${num(v)}`}</title></svg>`)}
-    </span>`;
-}
-
-/** The value column of a row, which says what state the counter is in rather than printing a zero. */
-function CounterValue({ row }) {
-  if (row.state === 'never') return html`<span class="adm-st-num adm-st-num--none poster-stat-number poster-stat-number--small">—</span>`;
-  return html`<span class="adm-st-num poster-stat-number poster-stat-number--small">${num(row.total)}</span>`;
-}
+/** A counter's role as the series tone of the chart component (the same counter, the same colour). */
+const TONE = { critical: 'critical', reads: 'first', writes: 'second', plain: 'plain' };
 
 /** Section 02: what moved, one row per counter that has ever moved. */
 export function WhatMoved({ rows, days, onShowNumbers }) {
@@ -72,139 +58,75 @@ export function WhatMoved({ rows, days, onShowNumbers }) {
   const ordered = [...live].sort((a, b) => b.total - a.total);
 
   return html`
-    <section class="og-sec" id="adm-st-02">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('moved.title')}<small>02</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onShowNumbers}>${S('moved.numbers')}</button>
-        </div>
-      </div>
-      <p class="adm-st-lead">${S('moved.lead')}</p>
+    <${Section} id="adm-st-02" num="02" title=${S('moved.title')}
+      doors=${html`<${Action} small soft onClick=${onShowNumbers}>${S('moved.numbers')}<//>`}>
+      <${Note} kind="lead">${S('moved.lead')}<//>
 
-      ${ordered.map((row, i) => html`
-        <div class="adm-st-crow ${i === ordered.length - 1 && !never.length ? 'adm-st-crow--last' : ''}">
-          <span>
-            <b>${S('counter.' + row.name)}</b>
-            <span class="adm-why">
-              ${row.key}${row.fail && row.state === 'live' ? ' · ' + S('moved.failed', { n: num(row.failed) }) : ''}
-            </span>
-          </span>
-          <span>
-            ${row.state === 'quiet'
-    ? html`<span class="adm-st-chip adm-st-chip--muted">${S('moved.quiet')}</span>`
-    : html`<span class="adm-st-chip adm-st-chip--${row.role === 'critical' ? 'bad' : 'ok'}">${S('moved.perDay')}</span>`}
-          </span>
-          <${CounterValue} row=${row} />
-          ${row.state === 'quiet'
-    ? html`<span class="adm-st-aside">${S('moved.everInstead', { n: num(row.ever) })}</span>`
-    : html`<${Spark} row=${row} days=${days} />`}
-        </div>`)}
+      <${List} cols="name-state-n-trend">
+        ${ordered.map((row) => html`
+          <${Row} key=${row.key}>
+            <${Name} meta=${`${row.key}${row.fail && row.state === 'live' ? ' · ' + S('moved.failed', { n: num(row.failed) }) : ''}`}>
+              ${S('counter.' + row.name)}
+            <//>
+            <${Cell}>${row.state === 'quiet'
+    ? html`<${Mark} kind="status" tone="off">${S('moved.quiet')}<//>`
+    : html`<${Mark} kind="status" tone=${row.role === 'critical' ? 'danger' : 'fine'}>${S('moved.perDay')}<//>`}<//>
+            <${Num}><${Figure} small end n=${num(row.total)} /><//>
+            <${Cell}>${row.state === 'quiet'
+    ? html`<${Note} kind="meta" inline mono>${S('moved.everInstead', { n: num(row.ever) })}<//>`
+    : row.state === 'live' ? html`<${DaySpark} values=${row.series} days=${days} tone=${TONE[row.role]} />` : null}<//>
+          <//>`)}
 
-      ${never.length ? html`
-        <div class="adm-st-crow adm-st-crow--last">
-          <span>
-            <b>${S('moved.neverTitle')}</b>
-            <span class="adm-why">${never.map(r => S('counter.' + r.name)).join(' · ')}</span>
-          </span>
-          <span><span class="adm-st-chip adm-st-chip--muted">${S('moved.neverChip')}</span></span>
-          <span class="adm-st-num adm-st-num--none poster-stat-number poster-stat-number--small">—</span>
-          <span class="adm-st-aside">${S('moved.neverWhy')}</span>
-        </div>` : null}
-    </section>`;
-}
-
-/**
- * One chart. `series` is one or two entries; the axis is this chart's own, and the hint says what
- * the tallest bar is worth so a reader can put a number on any of them.
- */
-function Plot({ title, series, days, note }) {
-  const [hover, setHover] = useState(null);
-  const peak = series.reduce((m, s) => Math.max(m, ...s.values), 0);
-  const axis = S('days.axis', { n: num(peak) });
-  const reading = hover === null
-    ? axis
-    : `${days[hover]} · ` + series.map(s => `${s.label} ${num(s.values[hover])}`).join(' · ');
-
-  return html`
-    <div class="adm-st-chart">
-      <div class="adm-st-chart-h">
-        <span class="adm-st-chart-t">${title}</span>
-        ${series.length > 1 ? html`
-          <span class="adm-st-legend">
-            ${series.map(s => html`<span><i class="adm-st-key adm-st-key--${s.role}"></i>${s.label}</span>`)}
-          </span>` : html`
-          <span class="adm-st-legend">
-            <span><i class="adm-st-key adm-st-key--${series[0].role}"></i>${series[0].label}</span>
-          </span>`}
-      </div>
-      <span class="adm-st-yhint ${hover === null ? '' : 'adm-st-yhint--on'}">${reading}</span>
-      <div class="adm-st-plot">
-        ${days.map((day, i) => html`
-          <div class="adm-st-day" onMouseEnter=${() => setHover(i)} onMouseLeave=${() => setHover(null)}>
-            <div class="adm-st-pair">
-              ${series.map(s => html`
-                <svg class="adm-st-bar adm-st-bar--${s.role}"
-                   height=${barHeight(s.values[i], peak) + '%'}><title>${`${day} · ${s.label} ${num(s.values[i])}`}</title></svg>`)}
-            </div>
-          </div>`)}
-      </div>
-      <div class="adm-st-xaxis">
-        ${days.map(day => html`<span>${short(day)}</span>`)}
-      </div>
-      ${note ? html`<p class="adm-st-note">${note}</p>` : null}
-    </div>`;
+        ${never.length ? html`
+          <${Row} key="never">
+            <${Name} meta=${never.map(r => S('counter.' + r.name)).join(' · ')}>${S('moved.neverTitle')}<//>
+            <${Cell}><${Mark} kind="status" tone="off">${S('moved.neverChip')}<//><//>
+            <${Num}><${Figure} small end tone="dim" n="—" /><//>
+            <${Cell}><${Note} kind="meta" inline mono>${S('moved.neverWhy')}<//><//>
+          <//>` : null}
+      <//>
+    <//>`;
 }
 
 /** The two plots as one table, for reading an exact number or copying the lot. */
 function Numbers({ series, days }) {
   return html`
-    <div class="adm-st-scroll">
-      <table class="adm-st-tbl">
-        <thead><tr>
-          <th>${S('days.day')}</th>
-          ${series.map(s => html`<th class="num">${s.label}</th>`)}
-        </tr></thead>
-        <tbody>
-          ${days.map((day, i) => html`
-            <tr>
-              <td><b>${day}</b></td>
-              ${series.map(s => html`<td class="num">${num(s.values[i])}</td>`)}
-            </tr>`)}
-        </tbody>
-      </table>
-    </div>`;
+    <${List} cols="name-n-n-n" labels
+      head=${[S('days.day'), ...series.map(s => ({ label: s.label, num: true }))]}>
+      ${days.map((day, i) => html`
+        <${Row} key=${day}>
+          <${Name}>${day}<//>
+          ${series.map((s, k) => html`<${Num} key=${k}>${num(s.values[i])}<//>`)}
+        <//>`)}
+    <//>`;
 }
 
 /** Section 03: the days. Two charts, or the numbers behind them. */
 export function TheDays({ daily, days, showNumbers, onToggle }) {
   const memory = [
-    { label: S('counter.memRead'), role: 'reads', values: seriesFor(daily, days, 'memory_reads') },
-    { label: S('counter.memWrite'), role: 'writes', values: seriesFor(daily, days, 'memory_writes') },
+    { label: S('counter.memRead'), tone: TONE.reads, values: seriesFor(daily, days, 'memory_reads') },
+    { label: S('counter.memWrite'), tone: TONE.writes, values: seriesFor(daily, days, 'memory_writes') },
   ];
   const refused = [
-    { label: S('counter.refused'), role: 'critical', values: seriesFor(daily, days, 'auth_failures_total') },
+    { label: S('counter.refused'), tone: TONE.critical, values: seriesFor(daily, days, 'auth_failures_total') },
   ];
   const nothing = ![...memory, ...refused].some(s => s.values.some(v => v > 0));
+  // The line over each plot says what its tallest bar is worth, so a reader can put a number on any
+  // of them; the axis is that plot's own.
+  const axisOf = (series) => S('days.axis', { n: num(series.reduce((m, s) => Math.max(m, ...s.values), 0)) });
 
   return html`
-    <section class="og-sec" id="adm-st-03">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('days.title')}<small>03</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onToggle}>
-            ${showNumbers ? S('days.showCharts') : S('days.showNumbers')}
-          </button>
-        </div>
-      </div>
-      <p class="adm-st-lead">${S('days.lead')}</p>
+    <${Section} id="adm-st-03" num="03" title=${S('days.title')}
+      doors=${html`<${Action} small soft onClick=${onToggle}>${showNumbers ? S('days.showCharts') : S('days.showNumbers')}<//>`}>
+      <${Note} kind="lead">${S('days.lead')}<//>
 
-      ${nothing ? html`<div class="adm-st-empty">${S('days.empty')}</div>`
+      ${nothing ? html`<${EmptyState} text=${S('days.empty')} />`
     : showNumbers
       ? html`<${Numbers} series=${[...memory, ...refused]} days=${days} />`
       : html`
-        <div class="adm-st-charts">
-          <${Plot} title=${S('days.memory')} series=${memory} days=${days} note=${S('days.memoryNote')} />
-          <${Plot} title=${S('days.refused')} series=${refused} days=${days} note=${S('days.refusedNote')} />
-        </div>`}
-    </section>`;
+        <${Columns}>
+          <${DayChart} title=${S('days.memory')} series=${memory} days=${days} axis=${axisOf(memory)} note=${S('days.memoryNote')} />
+          <${DayChart} title=${S('days.refused')} series=${refused} days=${days} axis=${axisOf(refused)} note=${S('days.refusedNote')} />
+        <//>`}
+    <//>`;
 }

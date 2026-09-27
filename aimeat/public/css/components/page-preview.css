@@ -6,10 +6,41 @@
  *   page as it will look, the whole width of its raised box, 34rem high (24rem on a phone), on the
  *   card ground. The values of main's .pf-prev-frame (Portfolio).
  * @version-history
+ *   v1.2.0 — 2026-09-27 — The live page (PagePreview live): site-preview.css folded in under this
+ *     sheet's names, with its values (admin group G2's Portal preview); additive.
+ *   v1.1.0 — 2026-09-27 — The email tone (PagePreview email): the frame 600px wide and 420px high,
+ *     centred on the grey ground, the email itself on white as a mail reader shows it (main's admin
+ *     Email page, admin-email.css .adm-em-stage and its iframe); additive, page group G6.
  *   v1.0.0 — 2026-09-26 — Initial (page group G8), from views/portfolio-poster.css .pf-prev-frame.
  */
 .page-preview-frame { display: block; width: 100%; height: 34rem; border: 0; background: var(--card-bg); }
+/* An email: the width it is designed at, on the white a mail reader gives it (not a theme colour:
+   the email looks the same in a dark admin as in the reader's inbox). */
+.page-preview-mail { display: flex; justify-content: center; padding: 22px; background: var(--bg-surface); }
+.page-preview-frame--mail { width: 600px; max-width: 100%; height: 420px; border: 1px solid var(--border); background: #FFFFFF; }
 
 @media (max-width: 860px) {
   .page-preview-frame { height: 24rem; }
+  .page-preview-frame--mail { height: 420px; }
+  .page-preview-mail { padding: 12px; }
+}
+
+/* A live page of this site (PagePreview live): the ink frame on the card ground, the title and the
+   three ways over the page, the page on white in both themes (the page inside it is), 390px wide in
+   the phone cut; the grey note and the open link under it. Main's Portal preview (.adm-pt-pv*,
+   .adm-pt-frame*), by way of site-preview.css. */
+.page-preview-live { border: var(--shape-frame) solid var(--shape-frame-colour); background: var(--card-bg); }
+.page-preview-live-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: var(--shape-frame) solid var(--shape-frame-colour); flex-wrap: wrap; }
+.page-preview-live-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.page-preview-live-frame { display: block; width: 100%; height: 520px; border: 0; background: #FFFFFF; }
+.page-preview-live-frame--phone { width: 390px; max-width: 100%; margin: 0 auto; height: 620px; }
+.page-preview-live-empty { margin: 0; padding: 12px 14px; font-size: .75rem; line-height: 1.5; color: var(--text-dim); }
+.page-preview-live-note { margin: 10px 0 0; font-size: .75rem; line-height: 1.5; color: var(--text-dim); }
+.page-preview-live-open { margin-top: 10px; }
+@media (max-width: 1400px) {
+  .page-preview-live-frame { height: 420px; }
+}
+@media (max-width: 768px) {
+  .page-preview-live-frame { height: 360px; }
+  .page-preview-live-frame--phone { height: 480px; }
 }

@@ -7,6 +7,8 @@
  * @structure LIST_ENTRIES
  * @usage import { LIST_ENTRIES } from './entries-list.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — What the admin pages added to the List: labels, stackWide, the sortable head, the notice
+ *     rail, quietDoors, Name marks and onFollow, the menu's divider and SearchLine find.
  *   v1.1.0 — 2026-09-27 — The List (components/List.js, css/components/list.css): every export and every prop, its
  *     tones and its row states (the catalogue pass, list and conversation family).
  *   v1.0.0 — 2026-09-27 — Initial (Settings & Controls on components, the catalogue pass).
@@ -19,9 +21,9 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
         summary: 'Things in rows of columns, one thing per row, between hairlines: a mark at the start (a picture, a tick, a thumbnail or a check box), the name in bold with a small grey typewriter line under it, what it is in grey, who has it, its figures at the right, its dates, and the doors at the end with the ⋯ menu. A row can open a raised panel under it, be picked, be selected, be dragged or carry a heavy rail in a warn or a chosen colour. The list says when it is loading or empty and groups rows under headings that fold; around it stand the filters with their counts, the search line and the line that shows more.',
         module: '/components/List.js', sheet: '/css/components/list.css',
         data: {
-            shape: 'List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, id, rows, render, children }) · '
-                + 'Row({ open, onToggle, selected, faded, fine, rail, colour, picked, onPick, pickLabel, pickOff, draggable, dragOver, dragging, grip, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, hover, below, panel, panelDoors, id, children }) · '
-                + 'Name({ onOpen, href, newTab, openLabel, meta, warn, clip, desc, note, noteTone, tag, after, dot, dotTitle, asKey, code, unread, attention, end, before, blurred, title, id, nameRef, children }) · '
+            shape: 'List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, labels, stackWide, id, rows, render, children }) · '
+                + 'Row({ open, onToggle, selected, faded, fine, rail, colour, picked, onPick, pickLabel, pickOff, draggable, dragOver, dragging, grip, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, hover, quietDoors, below, panel, panelDoors, id, children }) · '
+                + 'Name({ onOpen, href, newTab, openLabel, onFollow, meta, warn, clip, desc, note, noteTone, tag, marks, after, dot, dotTitle, asKey, code, unread, attention, end, before, blurred, title, id, nameRef, children }) · '
                 + 'Desc({ sub, clip, faint, lines, marks, pre, title, children }) · Who({ sub, clip, warn, title, children }) · '
                 + 'Num({ dim, strong, quiet, sign, title, children }) · When({ at, clip, warn, title, children }) · '
                 + 'Cell({ meta, sign, dim, faint, clip, line, code, sub, subQuiet, head, headDim, title, children }) · '
@@ -30,12 +32,14 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 + 'Stats({ title, children }) · Stat({ icon, date, title, children }) · '
                 + 'Group({ title, count, folded, onFold, foldLabel, wholeHead, doors, quiet, onDragOver, onDrop, children }) · '
                 + 'Filters({ label, children }) · Filter({ on, count, onClick, attention, end, disabled, title, children }) · '
-                + 'SearchLine({ value, onInput, onEnter, onClear, clearLabel, placeholder, label, note, text, autofocus, beside, children }) · '
+                + 'SearchLine({ value, onInput, onEnter, onClear, clearLabel, placeholder, label, note, text, autofocus, beside, find, children }) · '
                 + 'More({ label, onMore, disabled, note, wrap, children })',
             fields: {
                 'List.cols': 'the cut, named by the columns it holds ("name-desc-doors" draws .listing--name-desc-doors); every cut is in listing.css, a new set of columns is a new cut there',
                 'List.keepCols': 'the columns stay on a phone (the cut\'s own narrow rules); without it the cells of a row stand under each other',
-                'List.head': 'the heading row: a string or a node per column, or { label, num: true, title } for a label over a figure column (at the right)',
+                'List.head': 'the heading row: a string or a node per column, or { label, num: true, title } for a label over a figure column (at the right); { label, onSort, sorted } makes the column\'s name the button that sorts the list by it, coral while sorted',
+                'List.labels': 'when the rows stack on a phone, each cell after the first says its column\'s name (the head\'s words) before its value, in grey',
+                'List.stackWide': 'a list of many columns stacks already under 1180px, not 860px, its labels said from there',
                 'List.empty': 'what stands in the list\'s place when there are no rows: a string (the quiet line) or a node (words and a button)',
                 'List.loading': 'true (the loading line) or the words to say, in the list\'s place',
                 'List.dense': 'a list inside a panel or under a row: less air, smaller words',
@@ -52,7 +56,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'Row.selected': 'the row the page is showing now: the grey ground',
                 'Row.faded': 'a thing that is past (retired, archived, outdated, revoked): its cells at .6',
                 'Row.fine': 'a condition that is met: its words turn green (the password rules)',
-                'Row.rail': '"warn": the heavy warn line at the row\'s start, a draft or a request that waits',
+                'Row.rail': '"warn": the heavy warn line at the row\'s start, a draft or a request that waits; "notice": the heavy coral line, a thing past its limit (a job past its deadline)',
                 'Row.colour': 'red | orange | yellow | green | blue | purple | gray: the colour a person gave the thing, as the heavy line at the start (with rail="warn", the colour outside and the warn inside)',
                 'Row.picked': 'the pick box is ticked',
                 'Row.onPick': 'makes it a pick row: a check box first and the whole row its label, grey under the pointer; with onToggle the box is its own cell',
@@ -64,13 +68,16 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'Row.grip': 'the words of the drag handle ⠿ that hangs in the gutter before the name, shown while the pointer is on the row',
                 'Row.onDragStart': 'the drag begins', 'Row.onDragOver': 'a drag moves over the row', 'Row.onDragLeave': 'a drag leaves the row',
                 'Row.onDrop': 'a row is dropped here', 'Row.onDragEnd': 'the drag ends',
-                'Row.hover': 'a row that opens nothing still answers the pointer: the name turns coral',
+                'Row.hover': 'a row that opens nothing still answers the pointer: the name turns coral, a linked name too',
+                'Row.quietDoors': 'the row\'s doors show only while the pointer or the keyboard is on the row, or it is open or selected; they stay in the tab order, and on a phone they show on the opened or selected row only',
                 'Row.below': 'what always shows under the row, across it, without a frame (the row\'s rule falls under it)',
                 'Row.panel': 'what the opened row shows, drawn in a Panel', 'Row.panelDoors': 'the actions at the foot of that panel',
                 'Row.id': 'the anchor a page scrolls to (the first cell carries it)',
                 'Row.children': 'the cells, in the order the cut names them, and a Panel',
                 'Name.onOpen': 'the name is a button into the thing', 'Name.href': 'the name is a link', 'Name.newTab': 'the link opens a new tab',
                 'Name.openLabel': 'the name of that button or link for a screen reader',
+                'Name.onFollow': 'with href: the link\'s own press, before the browser follows it; a page that opens the thing in place calls preventDefault, and the address stays for a new tab',
+                'Name.marks': 'tags in a wrapping line under the name\'s words (the parts a package carries)',
                 'Name.meta': 'the small grey typewriter line under the name (Jouni\'s decision "Meta line")', 'Name.warn': 'that line in coral',
                 'Name.clip': 'the meta line cut to one line with …; 2 keeps two lines',
                 'Name.desc': 'a sentence (or a list of them) under the name in the body\'s grey letters',
@@ -95,7 +102,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'Cell.code': 'the name code calls a thing by, typewriter in ink', 'Cell.sub': 'a grey line under a meta or code cell', 'Cell.subQuiet': 'that line in italics (code)',
                 'Cell.head': 'a bold word on its own line over a meta cell\'s words', 'Cell.headDim': 'that word in grey', 'Cell.title': 'the tooltip',
                 'Cell.children': 'any other cell; <Cell /> is an empty placeholder',
-                'Doors.menu': '[{ label, icon, onClick, danger }]: the ⋯ menu (CardMenu) at the end', 'Doors.menuLabel': 'the menu\'s name', 'Doors.title': 'the tooltip',
+                'Doors.menu': '[{ label, icon, onClick, danger }]: the ⋯ menu (CardMenu) at the end; a { divider: true } item draws a line between two groups of rows', 'Doors.menuLabel': 'the menu\'s name', 'Doors.title': 'the tooltip',
                 'Doors.children': 'the actions at the end of the row (Action, Loud, Icon, Tab, Switch, Mark)',
                 'Panel.doors': 'the row of actions at its foot', 'Panel.text': 'a long text shown as it was written (72 characters wide)', 'Panel.id': 'its id',
                 'Panel.title': 'the opened record\'s title in the poster record face', 'Panel.mark': 'its status at the right of that title', 'Panel.children': 'what the opened row shows',
@@ -122,6 +129,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
                 'SearchLine.label': 'the field\'s name (the placeholder when not given)', 'SearchLine.note': 'the small grey words after the field ("12 of 40")',
                 'SearchLine.text': 'a plain text field, not a search field', 'SearchLine.autofocus': 'the cursor starts in it',
                 'SearchLine.beside': 'one of several lines side by side, each up to 500px, under each other on a phone',
+                'SearchLine.find': 'the magnifier before the field (an operator page\'s search)',
                 'SearchLine.children': 'a button, a hint or a loading line after the field',
                 'More.label': 'the words of "show N more"', 'More.onMore': 'shows more; the action stands only while it is given', 'More.disabled': 'the action cannot be pressed now',
                 'More.note': 'how many are shown ("12 of 40")', 'More.wrap': 'the line wraps on a phone', 'More.children': 'the other doors of the list\'s foot',
@@ -130,6 +138,7 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
         useFor: [
             'Any list of things in Settings & Controls: skills, packages, agents, keys, notifications, organisms, to-dos, devices, the mail sent.',
             'A list a person filters, searches, pages through, picks from or reorders: Filters, SearchLine and More stand around it.',
+            'The operator pages\' tables: owners, agents, applications, packages, the logs, each with its own cut, its sortable heads and its column names said on a phone.',
         ],
         variants: [
             { name: 'head', prop: 'List head', when: 'the column labels over the rows; a figure column\'s label at the right' },
@@ -168,11 +177,20 @@ export const LIST_ENTRIES: UiEntryWritten[] = [
             { name: 'time warn', class: 'list-when--warn', prop: 'When warn', when: 'a time that needs a look' },
             { name: 'lines', class: 'list-lines--3', prop: 'Desc lines={3}', when: 'a long description kept to its first lines' },
             { name: 'more wraps', class: 'list-more--wrap', prop: 'More wrap', when: 'a list foot with several doors' },
+            { name: 'labels', class: 'list--labels', prop: 'List labels head', when: 'a table of many columns: stacked on a phone, each value says its column\'s name' },
+            { name: 'stacks wide', class: 'list--stack-wide', prop: 'List stackWide', when: 'so many columns that they stack already under 1180px' },
+            { name: 'sorts', class: 'list-sort', prop: 'head [{ label, onSort, sorted }]', when: 'a column\'s name that sorts the list; coral while the list is sorted by it (.is-sorted)' },
+            { name: 'notice rail', class: 'list-row--notice', prop: 'Row rail="notice"', when: 'a thing past its limit: the heavy coral line at the row\'s start' },
+            { name: 'quiet doors', class: 'list-row--quiet-doors', prop: 'Row quietDoors', when: 'a long list whose doors belong to one row at a time: they show under the pointer, in focus, open or selected' },
+            { name: 'name marks', class: 'list-marks', prop: 'Name marks', when: 'the parts a thing carries, as tags under its name' },
+            { name: 'followed link', prop: 'Name href onFollow', when: 'a name that opens the thing in place and keeps its address for a new tab' },
+            { name: 'menu divider', prop: 'Doors menu [{ divider: true }]', when: 'a ⋯ menu whose rows fall in two groups' },
+            { name: 'find', prop: 'SearchLine find', when: 'an operator page\'s search, with the magnifier before the field (.search-line-glass, search-line.css)' },
         ],
         example: {
             cols: 'name-desc-doors', head: ['Skill', 'What it teaches', ''],
             rows: [{ name: 'aimeat-writing', meta: 'v1.4.0', desc: 'How prose is written on this project.' }, { name: 'meeting-notes', meta: 'v0.2.0', desc: 'Short meeting notes, decisions first.' }],
         },
-        note: 'Built on 2026-09-26 as one component for the Listing (listing.css, whose class names the admin pages share) and the other list kinds of Settings: the organism, record, page, device, to-do, uses, tier, requirement, offer, search-hit, notification, sent-log, access-log and app-picker rows. It also wears listing.css (the cuts, the rows, the cells, the opened panel), search-line.css (SearchLine), more-line.css (More), key-name.css (Name asKey) and tab-row.css (Filters, the Tabs row\'s filter tone).',
+        note: 'Built on 2026-09-26 as one component for the Listing (listing.css, whose class names the admin pages share) and the other list kinds of Settings: the organism, record, page, device, to-do, uses, tier, requirement, offer, search-hit, notification, sent-log, access-log and app-picker rows. On 2026-09-27 the admin pages\' tables moved onto it: labels, stackWide, the sortable head, the notice rail, quietDoors, Name marks and onFollow, the menu\'s divider and SearchLine find came with them, each with the look main\'s admin sheet gave it. It also wears listing.css (the cuts, the rows, the cells, the opened panel), search-line.css (SearchLine), more-line.css (More), key-name.css (Name asKey) and tab-row.css (Filters, the Tabs row\'s filter tone).',
     },
 ];

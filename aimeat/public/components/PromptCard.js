@@ -17,11 +17,15 @@
  *   "Give it to an agent" appears only when an agent that actually drains a queue exists
  *   (services/open-items.js reachableAgents). Offering a name that will sit there forever is a
  *   graveyard, not a feature.
- * @structure PromptCard({ label, prompt, className, copyLabel, copiedLabel, onCopied,
+ * @structure PromptCard({ label, prompt, className, loud, quiet, copyLabel, copiedLabel, onCopied,
  *   saveIntent, agents, onGiveToAgent, showPrompt })
  * @usage
  *   html`<${PromptCard} label=${t('...')} prompt=${text} copyLabel=${t('...')} />`
+ *   html`<${PromptCard} loud=${!copied} quiet=${copied} label=… prompt=… copyLabel=… />`
  * @version-history
+ *   2026-09-27: `loud` and `quiet` name the copy's weight (the loud action or the action link), so a
+ *     page passes a meaning instead of a class; `className` stays for the callers that pass one
+ *     (additive, page group G9).
  *   2026-09-24: The menu's rows are the shared menu row, .poster-menu-row, with their look unchanged
  *     (Jouni's decision "Menu row").
  *   2026-09-24: More (⌄) is the small icon button (Jouni's decision "Icon button").
@@ -63,7 +67,16 @@ export function PromptCard({
   extraActions = [],
   /** Start with the prompt body visible. The four original call sites all did. */
   showPrompt = true,
+  /**
+   * The copy's weight, as a meaning rather than a class (added by page group G9): `loud` when the
+   * copy is the one thing this place is for (the loud action, .poster-slab), `quiet` when it is one
+   * way on among others or its turn has passed (the action link, .poster-action). Without either
+   * the copy keeps `className` (its old default, .btn-primary).
+   */
+  loud = false,
+  quiet = false,
 }) {
+  const copyClass = loud ? 'poster-slab' : quiet ? 'poster-action' : className;
   const [open, setOpen] = useState(false);
   const [bodyShown, setBodyShown] = useState(showPrompt);
   const [saved, setSaved] = useState(false);
@@ -90,7 +103,7 @@ export function PromptCard({
         <div class="poster-prompt-actions">
           <${CopyButton}
             text=${prompt}
-            className=${className}
+            className=${copyClass}
             label=${copyLabel}
             copiedLabel=${copiedLabel}
             onCopied=${onCopied} />

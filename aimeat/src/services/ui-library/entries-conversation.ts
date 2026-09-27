@@ -8,6 +8,8 @@
  * @structure CONVERSATION_ENTRIES
  * @usage import { CONVERSATION_ENTRIES } from './entries-conversation.js';
  * @version-history
+ *   v1.6.0 — 2026-09-27 — What the chat and the admin pages added: ConversationCopy and ConversationCap ways,
+ *     AiNotice main, Panes framed (the admin's Panes folded in).
  *   v1.5.0 — 2026-09-27 — Messages on components: Message, MessageFile, MessageQuestions, MessageComposer,
  *     ConversationList and ConversationPane; the Turn's variants are what Turn.js draws (the name line went), the Composer's are its chat row,
  *     its slash commands and its message tone (the stacked cut went).
@@ -25,18 +27,23 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         summary: 'A conversation with an agent: the rail with the threads and everything about the open one, the conversation, and on a phone one pane at a time, fixed full-screen above the keyboard.',
         module: '/components/ConversationFrame.js', sheet: '/css/components/conversation-frame.css',
         data: {
-            shape: 'ConversationFrame({ list, signin, children }) · ConversationAbout({ label, name, children }) · ConversationFoot · ConversationMain · ConversationHead({ backHref, backLabel, title, children }) · ConversationIcon({ label, onClick, children }) · ConversationScroll({ onScroll, children }) · ConversationWelcome({ title, body, trust, children }) · ConversationJump({ onClick, children }) · ConversationCap({ title, body, children })',
+            shape: 'ConversationFrame({ list, signin, children }) · ConversationAbout({ label, name, children }) · ConversationFoot · ConversationMain · ConversationHead({ backHref, backLabel, title, children }) · ConversationIcon({ label, onClick, children }) · ConversationScroll({ onScroll, children }) · ConversationWelcome({ title, body, trust, children }) · ConversationJump({ onClick, children }) · ConversationCap({ title, body, ways, children }) · ConversationCopy({ text, head, label, copiedLabel, title, ariaLabel })',
             fields: {
                 list: 'the rail is open (a phone shows it instead of the conversation)', signin: 'the signed-out page',
-                label: 'ConversationAbout: the rail heading', name: 'ConversationAbout: the conversation name',
-                backHref: 'ConversationHead: where the phone\'s back link goes', title: 'the conversation name, or a welcome or cap headline',
+                label: 'ConversationAbout: the rail heading; ConversationCopy: the copy link\'s words', name: 'ConversationAbout: the conversation name',
+                backHref: 'ConversationHead: where the phone\'s back link goes', title: 'the conversation name, or a welcome or cap headline; ConversationCopy: the tooltip',
                 body: 'the welcome or cap text', trust: 'ConversationWelcome: the line on who owns what is made',
+                ways: 'ConversationCap: [{ href, label, loud, newTab }]: the ways on once the free share is spent; loud draws the dark slab, the others the outline button',
+                text: 'ConversationCopy: the whole conversation as text, which a press copies', head: 'ConversationCopy: the copy icon in the phone\'s head row, not the rail\'s copy link',
+                copiedLabel: 'ConversationCopy: the words after copying', ariaLabel: 'ConversationCopy: the icon\'s name for a screen reader',
             },
         },
         useFor: ['The chat page. A ThreadList goes first inside it, then a ConversationMain.'],
         variants: [
             { name: 'list', class: 'poster-conversation--list', prop: 'list', when: 'on a phone, the rail is open' },
             { name: 'signin', class: 'poster-conversation--signin', prop: 'signin', when: 'nobody is signed in' },
+            { name: 'cap with ways', prop: 'ConversationCap ways', when: 'the free share is spent: the ways on as links (bring your own key, the loud one first)' },
+            { name: 'copy', prop: 'ConversationCopy', when: 'copy the whole conversation: the quiet link in the rail, or with head the icon in the phone\'s head row' },
         ],
         example: { list: false, about: { label: 'This conversation', name: 'Make me a page' }, head: { backHref: '/v1/home', backLabel: 'Back', title: 'Make me a page' } },
     },
@@ -140,11 +147,11 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         id: 'ai-notice', name: 'AiNotice', kind: 'component', status: 'active',
         summary: 'That a machine is on the other end, said where a person is looking, with a way to read more.',
         module: '/components/AiNotice.js', sheet: '/css/components/ai-notice.css',
-        data: { shape: 'AiNotice({ compact, className })', fields: { compact: 'one line instead of the full notice', className: "'poster-ai-notice--main' for the phone's copy above the conversation" } },
+        data: { shape: 'AiNotice({ compact, main, className })', fields: { compact: 'one line instead of the full notice', main: 'the copy in the conversation\'s column, shown on a phone only (the desktop reads the one in the rail)', className: 'a class of the caller\'s own, kept for older callers; a page passes main instead' } },
         useFor: ['Every conversation with an AI (EU AI Act, Article 50(1)). Never removed, only shortened.'],
         variants: [
             { name: 'compact', class: 'poster-ai-notice--compact', prop: 'compact', when: 'after the first answer' },
-            { name: 'main', class: 'poster-ai-notice--main', when: 'the phone\'s copy, above the conversation' },
+            { name: 'main', class: 'poster-ai-notice--main', prop: 'main', when: 'the phone\'s copy, above the conversation' },
         ],
         example: { compact: false },
     },
@@ -347,11 +354,13 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         summary: 'The messenger\'s frame: the list of conversations beside the open one, and on a phone one pane at a time with a way back, the open one over the whole screen. The open pane\'s head says who (a picture, the name with its presence word), the subject and "sent by your agent", with its ways on as small action links whose words go when the pane is narrow. Over the composer stand the fields and the "replying to" bar; a read-only conversation says so in the composer\'s place; a strip across the pane holds an agent\'s commands, on the grey ground for a command to fill in.',
         module: '/components/ConversationPane.js', sheet: '/css/components/conversation-pane.css',
         data: {
-            shape: 'Panes({ open, backLabel, onBack, side, children }) · Pane({ empty, page, children }) · PaneHead({ picture, name, nameTitle, presence, subject, via, address, before, children }) · '
+            shape: 'Panes({ open, backLabel, onBack, side, head, label, framed, children }) · Pane({ empty, page, children }) · PaneHead({ picture, name, nameTitle, presence, subject, via, address, before, children }) · '
                 + 'PaneDoor({ mark, label, title, pressed, onClick }) · PaneFields({ children }) · ReplyBar({ label, text, onJump, cancelLabel, onCancel }) · PaneNote({ children }) · PaneScroll({ children }) · PaneStrip({ grey, children })',
             fields: {
                 open: 'Panes: a conversation is open (on a phone the open pane over the whole screen)', backLabel: 'the phone\'s way back', onBack: 'goes back to the list',
-                side: 'Panes: the list of conversations', empty: 'Pane: nothing is open, the words say what to do', page: 'Pane: a page\'s column (its height follows its words, no head)',
+                side: 'Panes: the list of conversations; framed: the list\'s rows', empty: 'Pane: nothing is open, the words say what to do',
+                framed: 'Panes: the same two panes on a page, in one frame: a list beside the thing opened from it (the operator\'s System prompts page)',
+                head: 'Panes framed: what stands over the list (a search and its filters)', 'Panes.label': 'Panes framed: the list\'s name for a screen reader', page: 'Pane: a page\'s column (its height follows its words, no head)',
                 picture: 'PaneHead: a seed for the Avatar', name: 'who', nameTitle: 'the name\'s tooltip (the address)', presence: 'a GHII whose presence word is shown (fetched from the node)',
                 subject: 'the conversation\'s subject', via: '"sent by your agent"', address: 'the address, kept for a screen reader', before: 'what stands before the picture',
                 mark: 'PaneDoor: the mark that stays when the words go (🔊)', label: 'the words; ReplyBar: "↩ Replying to …"', title: 'the tooltip',
@@ -366,8 +375,9 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
             { name: 'empty', class: 'conversation-pane--empty', prop: 'Pane empty', when: 'nothing is open yet' },
             { name: 'page', class: 'conversation-pane--page', prop: 'Pane page', when: 'the broadcast form, tracked responses, results: a page\'s column' },
             { name: 'grey strip', class: 'conversation-strip--grey', prop: 'PaneStrip grey', when: 'a command to fill in, an agent\'s schedule' },
+            { name: 'framed', class: 'conversation-panes-framed', prop: 'Panes framed head label', when: 'a list beside the thing opened from it on a page, in one frame (the operator\'s System prompts)' },
         ],
         example: { open: true, head: { name: 'mika', subject: 'Brand colours' } },
-        note: 'Built on 2026-09-26 with the values of css/views/inbox.css and inbox-poster.css (.inbox-body, -back, -side, -panel, -thread-head, -replybar*, -announce-note, -compose-fields, -tracked-list, -results, -cmdbar, -cmdfill, -sched). The heights are measured by the page (--conversation-desk-avail, --conversation-avail).',
+        note: 'Built on 2026-09-26 with the values of css/views/inbox.css and inbox-poster.css (.inbox-body, -back, -side, -panel, -thread-head, -replybar*, -announce-note, -compose-fields, -tracked-list, -results, -cmdbar, -cmdfill, -sched). The heights are measured by the page (--conversation-desk-avail, --conversation-avail). On 2026-09-27 it folded in the admin System prompts page\'s Panes (components/Panes.js and panes.css, both gone): Panes framed, its look under this sheet\'s names (.conversation-panes-framed*).',
     },
 ];

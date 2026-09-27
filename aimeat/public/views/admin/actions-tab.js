@@ -2,13 +2,16 @@
  * @file public/views/admin/actions-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard tab that lists registered catalogue actions in a table —
+ * @description Admin dashboard tab that lists registered catalogue actions —
  *   id, name/description, provider, category, base morsel cost, and tags.
  *
  * @structure
- *   - ActionsTab({ data }): renders data.actions.actions; shows Empty state when none registered
+ *   - ActionsTab({ data }): renders data.actions.actions as a List; shows Empty state when none registered
  *
  * @version-history
+ *   v1.1.0 — 2026-09-27 — On the library components (page group G5): the table is the List with its
+ *     heading row, the id and the provider in the typewriter cell, the description the Name's line,
+ *     the tags Marks. The file writes no class and no style.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -17,38 +20,26 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { num, Badge, Empty } from './shared.js';
+import { List, Row, Name, Cell, Num } from '/components/List.js';
+import { Mark } from '/components/Mark.js';
 
 export default function ActionsTab({ data }) {
   const acts = data.actions?.actions || [];
   if (!acts.length) return html`<${Empty} text=${t('dashboard.noActionsRegistered')} />`;
 
+  const head = ['ID', t('dashboard.name'), t('dashboard.provider'), t('dashboard.category'),
+    { label: t('dashboard.baseCost'), num: true }, t('dashboard.tags')];
   return html`
-    <div class="adm-card">
-      <div class="scrollable">
-        <table>
-          <thead><tr>
-            <th>ID</th>
-            <th>${t('dashboard.name')}</th>
-            <th>${t('dashboard.provider')}</th>
-            <th>${t('dashboard.category')}</th>
-            <th>${t('dashboard.baseCost')}</th>
-            <th>${t('dashboard.tags')}</th>
-          </tr></thead>
-          <tbody>
-            ${acts.map(a => html`<tr>
-              <td class="mono">${escHtml(a.id)}</td>
-              <td>
-                <strong>${escHtml(a.name)}</strong>
-                ${a.description ? html`<div style="font-size:.75rem;color:var(--text-dim);max-width:260px">${escHtml(a.description)}</div>` : ''}
-              </td>
-              <td class="mono" style="font-size:.8rem">${escHtml(a.provider)}</td>
-              <td><${Badge} type=${a.category || 'info'} /></td>
-              <td>${num(a.base_cost)} \u2B25</td>
-              <td>${(a.tags || []).map(tag => html`<span class="tag">${escHtml(tag)}</span> `)}</td>
-            </tr>`)}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <${List} cols="id-name-who-state-n-tags" head=${head} labels>
+      ${acts.map(a => html`
+        <${Row} key=${a.id}>
+          <${Cell} meta>${escHtml(a.id)}<//>
+          <${Name} desc=${a.description ? escHtml(a.description) : null}>${escHtml(a.name)}<//>
+          <${Cell} meta>${escHtml(a.provider)}<//>
+          <${Cell}><${Badge} type=${a.category || 'info'} /><//>
+          <${Num}>${num(a.base_cost)} ⬥<//>
+          <${Cell} line>${(a.tags || []).map(tag => html`<${Mark} key=${tag}>${escHtml(tag)}<//>`)}<//>
+        <//>`)}
+    <//>
   `;
 }

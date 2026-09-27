@@ -10,6 +10,8 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.6.0 — 2026-09-27 — StartPageSetting's dialog (and its footer, named) and ToastBox's hold and role: the
+ *     home and the pop-out windows pass meanings, not classes.
  *   v1.5.1 — 2026-09-27 — AgentConsent and DisplayPrefsFields draw their own names from sheets of their
  *     own (agent-consent.css, display-prefs-fields.css; a move); the page-sheet debt note had no
  *     entry left and goes.
@@ -132,11 +134,14 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'start-page', name: 'StartPageSetting', kind: 'component', status: 'active',
-        summary: 'The start page setting: where a person lands, in words and a segmented control.',
+        summary: 'The start page setting: where a person lands after signing in (the home, the chat, or settings and controls), in words and a row of tabs, the chosen one on the sun. It reads and stores the choice on the account itself.',
         module: '/components/StartPageSetting.js', sheet: '/css/components/start-page.css',
-        data: { shape: 'StartPageSetting({ className })', fields: { className: 'the row\'s place' } },
+        data: { shape: 'StartPageSetting({ dialog, footer, className })', fields: { dialog: 'inside a settings dialog, spaced as the dialog spaces it', footer: 'at the foot of a page under the heavy rule, words and tabs on one line (the Settings overview)', className: 'a class of the caller\'s own, kept for older callers; a page passes dialog or footer instead' } },
         useFor: ['The home\'s settings dialog and the profile\'s settings.'],
-        variants: [], example: {},
+        variants: [
+            { name: 'dialog', prop: 'dialog', when: 'the home\'s settings dialog (.poster-settings-startpage, settings-stack.css)' },
+            { name: 'footer', class: 'start-page--footer', prop: 'footer', when: 'the foot of the Settings overview' },
+        ], example: {},
     },
     {
         id: 'status-dot', name: 'StatusDot', kind: 'component', status: 'active',
@@ -269,11 +274,23 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'toast', name: 'Toast', kind: 'component', status: 'active',
-        summary: 'A passing word in a box at the edge of the screen.',
+        summary: 'A passing word in a box at the foot of the screen, drawn in the poster face, above an open dialog too.',
         module: '/components/Toast.js', sheet: '/css/components/toast.css',
-        data: { shape: 'const toast = useToast(); toast.show(message, kind)', fields: { message: 'what happened', kind: 'info | success | error' } },
+        data: {
+            shape: 'const { showToast, ToastContainer } = useToast(); showToast(message, kind) · ToastBox({ toast, hold, role }) · normalizeToastType(kind)',
+            fields: {
+                message: 'what happened', kind: 'success | error | info | warning (true means error)',
+                toast: 'ToastBox: { msg, type }, for a view that keeps its own toast state', hold: 'ToastBox: the pill that stays six seconds (the home and the pop-out windows)',
+                role: 'ToastBox: what a screen reader is told (status, or alert for a failure)',
+            },
+        },
         useFor: ['A result that does not need a place on the page.'],
-        variants: [], example: {},
+        variants: [
+            { name: 'success', class: 'toast-success', prop: 'showToast(msg) | toast.type="success"', when: 'it worked' },
+            { name: 'error', class: 'toast-error', prop: 'showToast(msg, "error")', when: 'it did not work' },
+            { name: 'warn', class: 'toast-warn', prop: 'showToast(msg, "warning")', when: 'it worked, with something to look at' },
+            { name: 'hold', class: 'toast-hold', prop: 'ToastBox hold', when: 'the pill that stays six seconds' },
+        ], example: {},
     },
     {
         id: 'section-header', name: 'Section header (classic)', kind: 'component', status: 'active',

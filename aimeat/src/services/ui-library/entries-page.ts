@@ -9,6 +9,8 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.7.0 — 2026-09-27 — SettingsStack's SettingsSection and SwatchPicker's pattern (the home's settings dialog
+ *     passes meanings, not classes).
  *   v1.6.0 — 2026-09-26 — The Timeline is every list of what happened in Settings & Controls (Jouni's decision "Activity log", a unification).
  *   v1.5.0 — 2026-09-26 — A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
  *   v1.4.0 — 2026-09-26 — The Masthead takes a page's own lines under the address and a picture that opens something; the Settings overview draws it (Jouni's decision "Person head").
@@ -262,11 +264,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'settings-stack', name: 'SettingsStack', kind: 'component', status: 'active',
-        summary: 'The inside of a settings dialog: its sections in one column.',
+        summary: 'The inside of a settings dialog: its sections in one column, each under its headline slab.',
         module: '/components/SettingsStack.js', sheet: '/css/components/settings-stack.css',
-        data: { shape: 'SettingsStack({ children })', fields: { children: 'poster-section elements' } },
+        data: { shape: 'SettingsStack({ children }) · SettingsSection({ title, children })', fields: { children: 'the SettingsSections, and a SettingsDoor last', 'SettingsSection.title': 'the section\'s headline, on its slab', 'SettingsSection.children': 'what the section holds' } },
         useFor: ['Inside a Modal that holds a page\'s own settings.'],
-        variants: [],
+        variants: [{ name: 'section', prop: 'SettingsSection title', when: 'one section of the dialog under its headline slab (poster.css .poster-section)' }],
         example: one('<section class="poster-section">…</section>'),
     },
     {
@@ -283,11 +285,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         summary: 'A choice among a few named looks: a preview strip and the choices, the chosen one on the sun.',
         module: '/components/SwatchPicker.js', sheet: '/css/components/swatch-picker.css',
         data: {
-            shape: 'SwatchPicker({ title, hint, preview, emptyLabel, choices, onChoose })',
-            fields: { title: 'what is chosen', hint: 'one line of help', preview: 'the current look, drawn', emptyLabel: 'the words when nothing is chosen', choices: '[{ value, label, active }]', onChoose: 'called with the value' },
+            shape: 'SwatchPicker({ title, hint, preview, pattern, emptyLabel, choices, onChoose })',
+            fields: { title: 'what is chosen', hint: 'one line of help', preview: 'any other preview, drawn by the page', pattern: 'the margin figure\'s name (a to h, or x); the picker draws its swatch itself', emptyLabel: 'the words when nothing is chosen', choices: '[{ value, label, active }]', onChoose: 'called with the value' },
         },
         useFor: ['A pattern or colour choice with a handful of options.'],
-        variants: [],
+        variants: [{ name: 'pattern', prop: 'pattern', when: 'the margin pattern: the preview is the pattern\'s own swatch (.mp-swatch, margin-pattern.css), so the page passes a name, not a class' }],
         example: { title: 'Margin pattern', choices: [{ value: 'none', label: 'None', active: true }, { value: 'dots', label: 'Dots', active: false }] },
     },
     {

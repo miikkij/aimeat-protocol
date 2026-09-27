@@ -10,6 +10,8 @@
  *   Drawn as markup: <div class="search-line"><input class="og-input" …><small>12 of 40</small></div>.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.0 — 2026-09-27 — .search-line-glass (SearchLine find): the magnifier the admin Cortex and
+ *     Knowledge searches drew before their field; admin page group G7.
  *   v1.2.0 — 2026-09-26 — .search-line--beside (SearchLine beside): the memory list's search and
  *     filter lines side by side as main drew them (.pf .action-bar .search-bar); fix pass.
  *   v1.1.0 — 2026-09-26 — A way on and its hint after the field keep their line (the Offers page's
@@ -27,6 +29,8 @@
 /* SearchLine beside: one of several lines standing side by side in a row, each growing up to 500px
    (main's memory .pf .action-bar > .search-bar: flex 1, max-width 500px, no margin of its own). */
 .search-line--beside { flex: 1 1 16rem; max-width: 500px; margin: 0; }
+/* SearchLine find: the magnifier before the field (main's admin .adm-cx-find svg, .adm-kn-search svg). */
+.search-line-glass { width: 16px; height: 16px; flex: none; margin-right: -.4rem; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: round; }
 
 @media (max-width: 860px) {
   .search-line { flex-wrap: wrap; }

@@ -9,7 +9,9 @@
  *   names (.og-strip, .og-strip-*) the admin pages share.
  *
  *   FigureStrip({ items, loading, wrap, flush, lead })
- *   - items: [{ n, of, label, sub, tone, key }]; a falsy item is left out.
+ *   - items: [{ n, of, label, sub, tone, key, onClick, title }]; a falsy item is left out. With
+ *     `onClick` the figure is a button (a filter, a door to its page) whose word underlines under the
+ *     pointer; `title` is its tooltip.
  *     n: the figure (a number, a word, a time; '…' while it loads, '·' when there is none).
  *     of: the "of how many" after it ("/4"), smaller and grey. label: the word beside the figure.
  *     sub: the typewriter line under it; a sub of '' still draws the (empty) line, as the pages did,
@@ -28,6 +30,8 @@
  *          { n: drafts.length, tone: drafts.length ? 'coral' : undefined, label: x('stripDrafts'), sub: '' }]} />`
  *        html`<${FigureStrip} loading=${4} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — An item's `onClick` and `title`: the admin's strips whose figures are
+ *     filters and doors (Overview, Applications, Owners, Security, CORS, Compliance); additive.
  *   v1.0.0 — 2026-09-26 — Initial: the strip ~25 Settings pages wrote by hand
  *     (<div class="og-strip"><div><b>…</b><span>…</span><small>…</small></div>…) as one component, with
  *     the figure colours the pages' own rules carried kept as tones (component plan C4).
@@ -46,10 +50,11 @@ function toneClass(tone) {
 }
 
 function Figure({ item }) {
-  return html`<div>
+  const inner = html`
     <b class=${toneClass(item.tone)}>${item.n}${has(item.of) ? html`<span class="og-strip-of">${item.of}</span>` : null}</b>
-    <span>${item.label}</span>${has(item.sub) ? html`<small>${item.sub}</small>` : null}
-  </div>`;
+    <span>${item.label}</span>${has(item.sub) ? html`<small>${item.sub}</small>` : null}`;
+  if (item.onClick) return html`<button type="button" title=${item.title} onClick=${item.onClick}>${inner}</button>`;
+  return html`<div title=${item.title}>${inner}</div>`;
 }
 
 export function FigureStrip({ items = [], loading, wrap, flush, lead }) {

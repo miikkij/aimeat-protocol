@@ -16,15 +16,20 @@
  *   - ConversationScroll({ onScroll, children }) — the scrolling turns
  *   - ConversationWelcome({ title, body, trust, children }) — the empty conversation's first words
  *   - ConversationJump({ onClick, children }) — back to the latest turn
- *   - ConversationCap({ title, body, children }) — the free share is spent, and the ways on
+ *   - ConversationCap({ title, body, ways, children }) — the free share is spent, and the ways on
+ *   - ConversationCopy({ text, head, label, copiedLabel, title, ariaLabel }) — copy it all as text
  * @usage html`<${ConversationFrame} list=${open}><${ThreadList} …/><${ConversationMain}>…<//><//>`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — ConversationCopy (the rail's copy link and the head's copy icon) and
+ *     ConversationCap `ways`, so the chat page passes data and writes no class; the markup is the
+ *     chat's, unchanged (additive, page group G9).
  *   v1.1.0 — 2026-09-24 — The jump is the action link's jump tone (Jouni's decision "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat.js with its markup unchanged (UI consolidation
  *     phase 1, a move).
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
 
@@ -106,15 +111,34 @@ export function ConversationJump({ onClick, children }) {
                     </button>`;
 }
 
-export function ConversationCap({ title, body, children }) {
+/**
+ * `ways` (added by page group G9): the ways forward as data, [{ label, href, newTab, loud }]: the
+ * loud one is the dark block (.poster-slab), the others the outlined button (.btn-outline), as the
+ * chat drew them. Children still stand after them.
+ */
+export function ConversationCap({ title, body, ways = [], children }) {
     return html`
                     <div class="poster-conversation-cap">
                         <p class="poster-conversation-cap-title">${title}</p>
                         <p class="poster-conversation-cap-body">${body}</p>
                         <div class="poster-conversation-cap-actions">
+                            ${ways.filter(Boolean).map((w) => html`<a key=${w.href} class=${w.loud ? 'poster-slab' : 'btn-outline'} href=${w.href}
+                                target=${w.newTab ? '_blank' : undefined} rel=${w.newTab ? 'noopener' : undefined}>${w.label}</a>`)}
                             ${children}
                         </div>
                     </div>`;
+}
+
+/**
+ * The whole conversation copied as text (added by page group G9). In the rail it is the quiet
+ * action link under the conversation's name (.poster-rail-action); with `head` it is the square
+ * icon in the phone's head row (.poster-conversation-icon), its glyph `label` and its words in
+ * `ariaLabel` and `title`.
+ */
+export function ConversationCopy({ text, head = false, label, copiedLabel, title, ariaLabel }) {
+    return html`<${CopyButton} text=${text}
+        className=${head ? 'poster-conversation-icon poster-conversation-copy' : 'poster-action poster-action--quiet poster-rail-action'}
+        label=${label} copiedLabel=${copiedLabel} title=${title} ariaLabel=${ariaLabel} />`;
 }
 
 export default ConversationFrame;

@@ -7,6 +7,8 @@
  * @structure LIST_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { LIST_DEMOS } from './demos-list.js';
  * @version-history
+ *   v1.2.0 — 2026-09-27 — What the admin pages added, in the operator's frame: labels, a sorted head, Name
+ *     marks, the menu's divider, quietDoors on a list that stacks wide, the notice rail, a followed link, SearchLine find.
  *   v1.1.0 — 2026-09-27 — The List's demos: its cuts, tones, row states, marks, groups and what stands around it; the
  *     Listing, Search line, More line and Key demos moved here from demos-settings.js, drawn by calling the List.
  *   v1.0.0 — 2026-09-27 — Initial (Settings & Controls on components, the catalogue pass).
@@ -22,10 +24,14 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Figure } from '/components/Figure.js';
 import { BoxList, BoxLine } from '/components/Box.js';
+import { OperatorFrame } from '/components/OperatorFrame.js';
 
 const html = htm.bind(h);
 const noop = () => {};
 const MENU = [{ label: 'Rename', onClick: noop }, { label: 'Delete', onClick: noop, danger: true }];
+const APP_MENU = [{ label: 'Open', onClick: noop }, { label: 'Scan', onClick: noop }, { divider: true }, { label: 'Delete', onClick: noop, danger: true }];
+/** A part of an admin page, in the operator's frame as the page draws it. */
+const op = (title, part) => html`<${OperatorFrame} title=${title}>${part}<//>`;
 
 /** Two skills, one opened with its panel: the cut most Settings lists draw. */
 const skills = (openFirst) => html`<${List} cols="name-desc-doors" head=${['Skill', 'What it teaches', '']}>
@@ -132,6 +138,26 @@ export const LIST_DEMOS = {
         <${Desc} lines=${2}>A long description that runs on and on, so that on a narrow screen it keeps only its first two lines in the row and the opened panel shows the rest of it.<//>
         <${Doors}><${Loud} control onClick=${noop}>Open<//><//><//>
     <//><//>` },
+    // What the admin pages added (2026-09-27), drawn in the operator's frame as those pages draw it.
+    { name: 'an operator table: labels, a sorted head, marks, a menu with a divider', render: () => op('Applications', html`<${List} cols="name-who-n-n-n-when-doors" labels
+        head=${[{ label: 'Application', onSort: noop, sorted: true }, { label: 'Owner', onSort: noop }, { label: 'Visits', num: true, onSort: noop },
+          { label: 'Visitors', num: true }, { label: 'Size', num: true }, 'Published', '']}>
+      <${Row}><${Name} meta="lumo-bakery.apps.aimeat.io" marks=${['app', 'public']}>Lumo Bakery<//><${Who}>sandbox<//>
+        <${Num}>1,204<//><${Num}>310<//><${Num} dim>48 KB<//><${When} at="09:14">today<//><${Doors} menu=${APP_MENU} menuLabel="More for Lumo Bakery" /><//>
+      <${Row}><${Name} meta="nordic-ferries.apps.aimeat.io" marks=${['app']}>Nordic Ferries timetable<//><${Who}>second<//>
+        <${Num}>88<//><${Num}>40<//><${Num} dim>12 KB<//><${When}>Sep 20<//><${Doors} menu=${APP_MENU} menuLabel="More for Nordic Ferries timetable" /><//>
+    <//>`) },
+    { name: 'quiet doors on a list that stacks wide', render: () => op('Owners', html`<${List} cols="n-name-n-when-doors" labels stackWide
+        head=${['#', 'Owner', { label: 'Records', num: true }, 'Last seen', '']}>
+      <${Row} quietDoors><${Num} dim>01<//><${Name} meta="sandbox@aimeat-local-001-dev">sandbox<//><${Num}>1,204<//><${When}>today<//>
+        <${Doors}><${Action} small row onClick=${noop}>Open<//><${Action} small row tone="danger" onClick=${noop}>Disable<//><//><//>
+      <${Row} quietDoors selected><${Num} dim>02<//><${Name} meta="second@aimeat-local-001-dev">second<//><${Num}>312<//><${When}>yesterday<//>
+        <${Doors}><${Action} small row onClick=${noop}>Open<//><${Action} small row tone="danger" onClick=${noop}>Disable<//><//><//>
+    <//>`) },
+    { name: 'a notice rail and a name that opens in place', render: () => op('Work', html`<${List} cols="name-desc-doors">
+      <${Row} rail="notice"><${Name} meta="past its deadline by 2 days" warn>Draft the Lumo Bakery invoice<//><${Desc}>invoice-drafter · due Sep 25<//><${Doors} /><//>
+      <${Row} hover><${Name} href="#" onFollow=${(e) => e.preventDefault()} meta="bot#sandbox@aimeat-local-001-dev">bot<//><${Desc}>Opens here; the address stays for a new tab.<//><${Doors} /><//>
+    <//>`) },
   ] },
   listing: { variants: [
     { name: 'head, rows, one open (the List draws it)', render: () => html`<${SettingsRoot}>${skills(true)}<//>` },
@@ -139,12 +165,17 @@ export const LIST_DEMOS = {
       <${Row}><${Name} meta="v2">Harbour brand kit<//><${Who} sub="shared">sandbox<//><${Desc} sub="3 parts">Colours, fonts and the logo.<//><${Doors}><${Action} small onClick=${noop}>Install<//><//><//>
     <//><//>` },
     { name: 'meta, outside a row', render: () => html`<${SettingsRoot}><${BoxList}><${BoxLine} name="Harbour Studio" meta="an organism's board · 12 notices" /><//><//>` },
+    { name: 'an operator cut (n-name-state, keeping columns)', render: () => op('Organisation sign-in', html`<${List} cols="n-name-state" keepCols head=${['#', 'Step', 'State']}>
+      <${Row}><${Num} dim>1<//><${Name} desc="The tenant id of Harbour Studio's Entra directory.">Name the tenant<//><${Cell}><${Mark} kind="status" tone="fine">done<//><//><//>
+      <${Row}><${Num} dim>2<//><${Name} desc="Who may register: the tenant's people, or also the partners you approve.">Choose who may register<//><${Cell}><${Mark} kind="status" tone="attention">open<//><//><//>
+    <//>`) },
   ] },
   'search-line': { variants: [
     { name: 'with a count (the List\'s SearchLine)', render: () => html`<${SettingsRoot}><${SearchLine} value="" onInput=${noop} placeholder="Find a skill" note="12 of 40" /><//>` },
     { name: 'with text, the clear mark and a button', render: () => html`<${SettingsRoot}><${SearchLine} text value="ferries" onInput=${noop} onEnter=${noop} onClear=${noop} clearLabel="Clear" placeholder="Ask about the offers">
       <${Action} small onClick=${noop}>Search<//><//><//>` },
     { name: 'two side by side', render: () => html`<${SettingsRoot}><${Actions}><${SearchLine} beside value="" onInput=${noop} placeholder="Find a key" /><${SearchLine} beside value="" onInput=${noop} placeholder="Filter by prefix" /><//><//>` },
+    { name: 'find: the magnifier (an operator page)', render: () => op('Cortex', html`<${SearchLine} find text value="ferries" onInput=${noop} placeholder="Find a cortex" note="2 of 14" />`) },
   ] },
   'more-line': { variants: [
     { name: 'default (the List\'s More)', render: () => html`<${SettingsRoot}><${More} label="Show 20 more" onMore=${noop} note="20 of 55" /><//>` },

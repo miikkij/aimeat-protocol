@@ -1,0 +1,61 @@
+/**
+ * @file count-bars.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Counts grouped by what they count (components/CountBars.js), in two looks. The
+ *   default: the row label, a mono line per key with an ink bar (coral for a hot key) and the count at
+ *   the right; the groupings side by side. Values from main's views/admin-security.css
+ *   (.adm-sec-cols, .adm-sec-lbl, .adm-sec-krow, .adm-sec-key, .adm-sec-bar, .adm-sec-n); the label
+ *   is the library's row label (.poster-label). The `wide` look: the title and why at the left, the
+ *   rows at the right, each a name, a long bar on a track and the count. Values from main's
+ *   admin-knowledge.css (.adm-kn-cut, .adm-kn-part and their kin). No series colour: the warning
+ *   ink on a key the page cannot vouch for is a status, so it wears the status token.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
+ *   v1.1.0 — 2026-09-27 — facet-bars.css folded in as the `wide` look, with main's values; the warn
+ *     tone, the note and the pick button for both looks.
+ */
+
+.count-bars-set { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr)); gap: 14px 44px; align-items: start; }
+.count-bars > .poster-label--block { margin-bottom: 6px; }
+.count-bars-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: .78rem; color: var(--text); min-width: 0; }
+.count-bars-row:last-child { border-bottom: 0; }
+.count-bars-key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.count-bars-row--words > .count-bars-key { font-family: var(--font); color: var(--text-dim); }
+.count-bars-bar { height: 6px; background: var(--text); flex: 0 0 auto; }
+.count-bars-bar--hot { background: var(--accent); }
+.count-bars-bar--warn { background: var(--warn-fg); }
+.count-bars-n { margin-left: auto; color: var(--text-dim); font-size: .75rem; white-space: nowrap; }
+
+/* The title and its why line (in the default look over the rows, in the wide look at the left). */
+.count-bars-head { display: block; margin-bottom: 6px; }
+.count-bars-head > b { font-weight: 700; font-size: .9rem; color: var(--text); }
+.count-bars-why { display: block; font-size: .78rem; font-weight: 400; line-height: 1.45; color: var(--text-dim); margin-top: 2px; }
+
+/* A short word beside a name the page cannot vouch for; a name that narrows a list. */
+.count-bars-note { margin-left: 8px; font-weight: 700; font-size: .72rem; color: var(--warn-fg); white-space: nowrap; }
+.count-bars-pick { background: none; border: 0; border-bottom: 1px dotted var(--text-dim); padding: 0; cursor: pointer; font: inherit; color: var(--text); text-align: left; }
+.count-bars-pick:hover, .count-bars-pick:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* The wide look: a grouping across the section, title at the left, rows at the right. */
+.count-bars--wide { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 0 24px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.count-bars--last { border-bottom: 0; }
+.count-bars--wide > .count-bars-head { margin-bottom: 0; }
+.count-bars-rows { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.count-bars-part { display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr) 64px; gap: 0 14px; align-items: center; font-size: .84rem; color: var(--text); }
+.count-bars-part--words > .count-bars-name { grid-column: span 2; color: var(--text-dim); }
+.count-bars-name { display: flex; gap: 8px; align-items: baseline; min-width: 0; overflow-wrap: break-word; }
+.count-bars-name > .count-bars-note { margin-left: 0; }
+.count-bars-part > .count-bars-n { margin-left: 0; font-family: var(--font-mono); font-size: .78rem; text-align: right; font-variant-numeric: tabular-nums; }
+.count-bars-track { height: 11px; background: var(--bg-surface); min-width: 0; }
+.count-bars-fill { display: block; height: 100%; background: var(--text); }
+.count-bars-fill--hot { background: var(--accent); }
+.count-bars-fill--warn { background: var(--warn-fg); }
+
+@media (max-width: 1100px) {
+  .count-bars--wide { grid-template-columns: 1fr; gap: 10px 0; }
+  .count-bars-part { grid-template-columns: minmax(0, 1fr) 60px; }
+  .count-bars-part--words > .count-bars-name { grid-column: auto; }
+  .count-bars-track { grid-column: 1 / -1; }
+}

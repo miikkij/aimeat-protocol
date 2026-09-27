@@ -10,6 +10,8 @@
  *   WarningList · useOpenAtTop · versionLabel
  * @usage import { StyleMarks, CssEditor } from './themes-bits.js';
  * @version-history
+ *   v1.1.0 — 2026-09-27 — No class written any more: a long list of choices is the Select, a value
+ *     and the read-only CSS are Code (admin page group G8).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles).
  */
 import { h } from 'preact';
@@ -26,6 +28,8 @@ import { FoldButton } from '/components/FoldButton.js';
 import { ModeTabs, ModeTab } from '/components/ModeTabs.js';
 import { TagList } from '/components/TagList.js';
 import { PasteBox } from '/components/PasteBox.js';
+import { Select } from '/components/Select.js';
+import { Code } from '/components/Mark.js';
 
 const html = htm.bind(h);
 
@@ -57,10 +61,8 @@ const ROW_MAX = 6;
 export function Choice({ label, hint, value, choices, onChoose, id }) {
   if (choices.length > ROW_MAX) {
     return html`<${FormField} label=${label} hint=${hint}>
-      <select id=${id} class="input-field" aria-label=${typeof label === 'string' ? label : undefined} value=${value}
-        onChange=${(e) => onChoose(e.currentTarget.value)}>
-        ${choices.map((c) => html`<option key=${c.value} value=${c.value} selected=${c.value === value}>${c.label}</option>`)}
-      </select>
+      <${Select} id=${id} ariaLabel=${typeof label === 'string' ? label : undefined} value=${value}
+        options=${choices.map((c) => ({ value: c.value, label: c.label }))} onChange=${(v) => onChoose(v)} />
     <//>`;
   }
   return html`<${FormField} label=${label} hint=${hint}>
@@ -164,10 +166,10 @@ export function CssEditor({ id, label, value, onInput, classes = [], usual = [],
       <${TagList} tags=${classes} prefix="." onTag=${readOnly ? undefined : insert} />
     <//>`}
     ${usual.length > 0 && html`<${FormField} label=${t('themes.usual')}>
-      <div>${usual.map((u) => html`<${NamedRow} key=${u.code} label=${u.label}><code>${u.code}</code><//>`)}</div>
+      <div>${usual.map((u) => html`<${NamedRow} key=${u.code} label=${u.label}><${Code}>${u.code}<//><//>`)}</div>
     <//>`}
     ${readOnly
-      ? html`<${FormField} label=${label}><pre><code>${value || t('themes.noCss')}</code></pre><//>`
+      ? html`<${FormField} label=${label}><${Code} block>${value || t('themes.noCss')}<//><//>`
       : html`<${PasteBox} id=${id} label=${label} boxRef=${area} rows="10" value=${value}
           onInput=${(e) => onInput(/** @type {HTMLTextAreaElement} */ (e.currentTarget).value)} />`}
     ${!readOnly && html`<${Hint}>${t('themes.cssFree')}<//>`}

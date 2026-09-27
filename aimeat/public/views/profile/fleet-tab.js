@@ -23,6 +23,7 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   v1.3.1 — 2026-09-27 — The comment names the frame the fleet takes now (css/views/fleet.css went).
  *   v1.3.0 — 2026-09-26 — The page head is SettingsPage (crumb, title, words under it), the page
  *     writes no class (page group G1a); the embedded fleet's own sheet keys on .og-fleet.
  *   v1.2.0 — 2026-09-25 — The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
@@ -44,8 +45,8 @@ import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 
 export default function FleetTab({ session, showToast }) {
-  // The page's short name "fleet" roots it as .og-fleet, which css/views/fleet.css keys the embedded
-  // fleet on (no centring and no padding of its own inside the Settings column).
+  // Embedded, the fleet draws no page frame of its own: views/fleet.js wraps it in the PageFrame only
+  // when it stands alone at /v1/fleet.
   return html`
     <${SettingsPage} name="fleet"
       crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.fleet')]}
