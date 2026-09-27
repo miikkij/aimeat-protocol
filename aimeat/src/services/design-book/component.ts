@@ -36,6 +36,8 @@
  *   componentAsRead(body, bench, proposer) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.18.0 — 2026-09-26 — Beside a <ul>, <ol> or <menu>, every counter-reset names list-item and `all` is revert or
+ *     revert-layer (component-lists.ts listResetRefusal); there list-item in a counter-reset passes.
  *   v1.17.0 — 2026-09-26 — A list item stays in a list of the component (component-lists.ts): an <li> outside a
  *     <ul>, <ol> or <menu>, a display that holds list-item or is not written as words, and a counter-increment
  *     without "list-item 0" where the markup carries a <summary> are refused; "list-item 0" passes.
@@ -132,7 +134,9 @@ import {
   MAX_NESTING, nameKindOf, readMarkup, readStylesheet, type ComplexSelector, type Compound, type DeclarationRead, type MarkupElement, type MarkupProblem,
   type NameDefinition, type NameKind, type StylesheetOpen, type ValuePart,
 } from './component-scan.js';
-import { countsListItemZero, displayRefusal, listItemMarkupRefusal, summaryCounterRefusal } from './component-lists.js';
+import {
+  carriesList, countsListItemZero, displayRefusal, listItemMarkupRefusal, listResetRefusal, resetsListItem, summaryCounterRefusal,
+} from './component-lists.js';
 import { escapeHtml } from '../site-tags.js';
 
 export const COMPONENT_LIMITS = { html: 12_000, css: 12_000, use: 600, why: 400, whyMin: 20 } as const;
@@ -379,7 +383,7 @@ const NAME_PROPERTIES: Record<string, NameProperty> = {
 const RESETS = new Set(['initial', 'unset', 'revert', 'revert-layer']);
 
 /** Why a declaration names a counter, an anchor, a view transition or a timeline the whole page shares, or null when every name in it is the component's own. */
-function pageNameRefusal(d: DeclarationRead, prefix: string): string | null {
+function pageNameRefusal(d: DeclarationRead, prefix: string, lists: boolean): string | null {
   const text = `${d.property}: ${d.text}`.replace(/\s+/g, ' ').slice(0, 60);
   // `all` sets every property at once, these among them.
   if (d.property === 'all') {
@@ -399,6 +403,8 @@ function pageNameRefusal(d: DeclarationRead, prefix: string): string | null {
     if (part.type === 'number' || part.type === 'comma') continue;
     // "list-item 0" steps the page's list by nothing, and keeps a <summary> counting 0 (component-lists.ts).
     if (d.property === 'counter-increment' && countsListItemZero(parts, at)) { at++; continue; }
+    // Beside a list of the markup, a counter-reset of list-item resets the component's own numbering.
+    if (lists && d.property === 'counter-reset' && resetsListItem(part)) continue;
     if (part.type === 'word') {
       if (part.name === 'none' || RESETS.has(part.name) || p.keywords?.has(part.name) || own(part.name)) continue;
       if (part.name !== 'inherit') return pageName(part.name);
@@ -470,7 +476,7 @@ function checkStyles(css: string, prefix: string, elements: ReadonlyArray<Markup
   // Every name a declaration defines or changes for the whole page is its own too: a counter, an
   // anchor, a view transition, a timeline.
   for (const d of sheet.declarations) {
-    const pageName = pageNameRefusal(d, prefix);
+    const pageName = pageNameRefusal(d, prefix, carriesList(elements));
     if (pageName) refuse(pageName);
   }
   // A LIST ITEM STAYS IN A LIST OF THE COMPONENT, or a browser numbers it in the page's own list: no
@@ -479,8 +485,8 @@ function checkStyles(css: string, prefix: string, elements: ReadonlyArray<Markup
     const listItem = displayRefusal(d);
     if (listItem) refuse(listItem);
   }
-  const summary = summaryCounterRefusal(elements, sheet.declarations, prefix);
-  if (summary) refuse(summary);
+  const counted = summaryCounterRefusal(elements, sheet.declarations, prefix) ?? listResetRefusal(elements, sheet.declarations);
+  if (counted) refuse(counted);
   // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
   if (sheet.functions.some(loads)) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
   if (sheet.depth > MAX_NESTING) {

@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.8.9 — 2026-09-26 — At propose, beside a list of the markup a counter-reset that names list-item
+ *     passes, and one that does not and `all: unset` are refused; without a list, list-item in a
+ *     counter-reset is refused.
  *   v1.8.8 — 2026-09-26 — At propose, a list of the component with a <summary> whose counter-increment
  *     writes "list-item 0" passes, and an <li> outside a list, display: list-item, a display through
  *     var() and a counter-increment that can reach a <summary> are refused, each saying why.
@@ -802,6 +805,23 @@ const GOOD_BODY = {
             if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${JSON.stringify(patch).slice(0, 90)}: ${said(r)}`);
         }
         assert(wrong.length === 0, `the lists of the component pass, and each of the others is refused, saying why: ${wrong.join('; ')}`);
+    });
+
+    await test('beside a list of the markup every counter-reset names list-item and "all" is revert or revert-layer, and without a list list-item in a counter-reset is refused', async () => {
+        const stamp = Date.now() % 100000;
+        const wrong: string[] = [];
+        const list = '<ol class="wkgrid"><li class="wkgrid-item">a</li></ol>';
+        const kept = await proposeComponent(`comp-reset-${stamp}`, componentBody({ html: list, css: `${componentBody().css}\n.wkgrid { counter-reset: wkgrid-step list-item; }` }));
+        if (kept.status !== 201) wrong.push(`a counter-reset that names list-item passes beside a list: ${said(kept)}`);
+        for (const [patch, expected] of [
+            [{ html: list, css: `${componentBody().css}\n.wkgrid { counter-reset: wkgrid-step; }` }, 'every counter-reset also names list-item: "counter-reset: wkgrid-step list-item"'],
+            [{ html: list, css: `${componentBody().css}\n.wkgrid-item { all: unset; }` }, '"all" takes only revert or revert-layer, which keep that reset'],
+            [{ css: `${componentBody().css}\n.wkgrid { counter-reset: list-item; }` }, 'names the counter "list-item", a name the whole page shares'],
+        ] as Array<[Record<string, unknown>, string]>) {
+            const r = await proposeComponent(`comp-bad-${stamp}`, componentBody(patch));
+            if (!(r.status === 422 && String(r.body.error?.message ?? '').includes(expected))) wrong.push(`${JSON.stringify(patch).slice(0, 90)}: ${said(r)}`);
+        }
+        assert(wrong.length === 0, `a counter-reset naming list-item passes beside a list, and each of the others is refused, saying why: ${wrong.join('; ')}`);
     });
 
     // A component the second owner proposed, stored when it passed an older bench: `.wkgrid ~ p`

@@ -98,7 +98,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:de57b347de37002aa87e4716"
+      "digest": "sha256:d236654e8e4fb6823a920267"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -383,7 +383,7 @@
       "aimeat/src/services/build-atelier-prompt.ts": "15e6a237b511f813",
       "aimeat/src/services/build-atelier-layers.ts": "e85a439c2160d7dc",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940",
-      "aimeat/src/services/design-book/component.ts": "61903ee45f1cba1a"
+      "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
     "node:aimeat-phaser": {
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"

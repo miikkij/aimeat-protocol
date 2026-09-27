@@ -27256,7 +27256,12 @@ paths:
         list around the component: an `<li>` stands inside a `<ul>` or `<ol>` of the markup, no
         `display` holds `list-item` or is written through `var()`, another function or `inherit`,
         and where the markup carries a `<summary>` (which a browser makes a list item that counts 0)
-        every `counter-increment` also writes `list-item 0`. A component whose builder judged it `general`
+        every `counter-increment` also writes `list-item 0`. Where the markup carries a `<ul>`,
+        `<ol>` or `<menu>`, every `counter-reset` also names `list-item` (the word, with an integer
+        or not, or `reversed(list-item)`), because an author `counter-reset` replaces the
+        `counter-reset: list-item` that a list's default style gives it; `revert` and `revert-layer`
+        pass, and `all` takes only `revert` or `revert-layer` there. `list-item` in a
+        `counter-reset` passes only in such a component. A component whose builder judged it `general`
         and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
         PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide

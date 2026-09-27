@@ -15,10 +15,18 @@
  *     - where the markup carries a <summary>, a counter-increment without `list-item 0`. A browser
  *       makes the <summary> of a <details> a list item that counts 0, and a counter-increment that
  *       reaches it replaces that 0.
+ *   A component's own list keeps its numbering in itself: where the markup carries a <ul>, <ol> or
+ *   <menu>, every counter-reset names list-item, since an author counter-reset replaces the one the
+ *   list's default style gives it, and `all` is revert or revert-layer (listResetRefusal). There, and
+ *   only there, list-item in a counter-reset is the component's own (resetsListItem).
  * @structure listItemMarkupRefusal(elements) · displayRefusal(declaration) · summaryCounterRefusal(elements, declarations, prefix) ·
- *   countsListItemZero(parts, at)
+ *   listResetRefusal(elements, declarations) · carriesList(elements) · resetsListItem(part) · countsListItemZero(parts, at)
  * @usage const why = listItemMarkupRefusal(elements); if (why) refuse(why);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — Where the markup carries a <ul>, <ol> or <menu>, every counter-reset names
+ *     list-item (the word, with an integer or not, or reversed(list-item)), revert and revert-layer
+ *     pass, and `all` passes only as revert or revert-layer; there list-item in a counter-reset is the
+ *     component's own.
  *   v1.0.0 — 2026-09-26 — Initial: an <li> outside a list of the component, a display that holds list-item or
  *     cannot be read as words, and a counter-increment that can reach a <summary> without list-item 0.
  */
@@ -79,4 +87,48 @@ export function summaryCounterRefusal(elements: ReadonlyArray<MarkupElement>, de
   return `The markup carries a <summary>, which a browser makes a list item that counts 0, and the declaration "${quote(reaches)}" can reach it: a counter-increment replaces that 0, `
     + `so the <summary> is numbered ${AROUND}, and the page's items after it count on from it. `
     + `Where the markup carries a <summary>, every counter-increment also writes "list-item 0": "counter-increment: ${prefix}-step list-item 0".`;
+}
+
+/** Whether the markup carries a <ul>, <ol> or <menu>, a list whose items a browser numbers in it. */
+export const carriesList = (elements: ReadonlyArray<MarkupElement>): boolean => elements.some(e => LIST_PARENTS.has(e.name));
+
+/** Whether a part of a counter-reset resets list-item: the word itself, or reversed(list-item). */
+export const resetsListItem = (part: ValuePart): boolean => (part.type === 'word' && part.name === 'list-item')
+  || (part.type === 'function' && part.name === 'reversed' && part.words?.length === 1 && part.words[0] === 'list-item');
+
+/** The keywords that keep the counter-reset: list-item that a list's default style gives it. */
+const KEEPS_RESET = new Set(['revert', 'revert-layer']);
+/** The keywords of a counter-reset that name no counter, which the fix replaces with list-item. */
+const NAMES_NONE = new Set(['none', 'initial', 'unset']);
+
+/** Where a browser that numbers lists by the list-item counter numbers the items of a list whose reset is gone. */
+const AROUND_ITEMS = 'as items of the page\'s own list around the component';
+
+/**
+ * Why a declaration can drop the reset that keeps a list of the markup numbered in itself, or null. A
+ * browser starts the numbering of a list with the counter-reset: list-item its default style gives
+ * every <ul>, <ol> and <menu> (HTML rendering, 15.3.7), and an author counter-reset replaces it. The
+ * bench cannot tell which elements a rule reaches, so where the markup carries a list, every
+ * counter-reset names list-item, and `all`, which sets counter-reset with every other property, is
+ * revert or revert-layer.
+ */
+export function listResetRefusal(elements: ReadonlyArray<MarkupElement>, declarations: ReadonlyArray<DeclarationRead>): string | null {
+  const list = elements.find(e => LIST_PARENTS.has(e.name));
+  if (!list) return null;
+  const carries = `The markup carries ${list.name === 'ol' ? 'an' : 'a'} <${list.name}>`;
+  const where = 'Where the markup carries a <ul>, <ol> or <menu>';
+  for (const d of declarations) {
+    if (d.keyword !== null && KEEPS_RESET.has(d.keyword)) continue;
+    if (d.property === 'counter-reset' && !(d.parts ?? []).some(resetsListItem)) {
+      const fix = `counter-reset: ${NAMES_NONE.has(d.keyword ?? '') ? '' : `${d.text.replace(/\s+/g, ' ').slice(0, 40)} `}list-item`;
+      return `${carries}, whose items a browser numbers from the counter-reset: list-item that its default style gives every <ul>, <ol> and <menu>. `
+        + `The declaration "${quote(d)}" can reach that list and replace its reset, and a browser that numbers lists by the list-item counter then numbers the list's items ${AROUND_ITEMS}, `
+        + `whose items after them count on from them. ${where}, every counter-reset also names list-item: "${fix}".`;
+    }
+    if (d.property === 'all') {
+      return `${carries}, and the declaration "${quote(d)}" sets counter-reset to none wherever it reaches, which drops the counter-reset: list-item that a list's default style gives it: `
+        + `a browser that numbers lists by the list-item counter then numbers the list's items ${AROUND_ITEMS}. ${where}, "all" takes only revert or revert-layer, which keep that reset.`;
+    }
+  }
+  return null;
 }
