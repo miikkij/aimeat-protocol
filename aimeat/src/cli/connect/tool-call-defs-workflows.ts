@@ -7,6 +7,9 @@
  * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { workflowTools } from './tool-call-defs-workflows.js';
  * @version-history
+ *   v1.3.3 -- 2026-09-26 -- aimeat_workflow_save's description says an ai step's call holds its share
+ *     of maxCostUsd until it answers, the share is one attempt, and a step expected to cost more than
+ *     the whole cap starts alone (secaudit 2026-09, A6-11).
  *   v1.3.2 -- 2026-09-26 -- aimeat_workflow_save's description says an ai step starts only when what
  *     it is expected to cost fits in what is left of maxCostUsd (secaudit 2026-09, A6-11).
  *   v1.3.1 -- 2026-09-26 -- maxCostUsd counts the judging of a run's llm signals too (secaudit
@@ -31,7 +34,7 @@ export const workflowTools: ConnectCliToolDefinition[] = [
     // ── Agent Workflows (shell-callable parity with the MCP + connector surfaces) ──
     {
         name: 'aimeat_workflow_save',
-        description: 'Create/update a workflow. `definition` is the full descriptor (title, description, trigger, vars[], steps[], on_step_fail, llm?, maxCostUsd?); validated against the offer contract + DAG on save. maxCostUsd (US dollars, per run) caps what a run spends on AI, its ai steps and the judging of its llm signals together: an ai step starts only when what it is expected to cost fits in what is left, and otherwise waits for the running ai steps or stops the run.',
+        description: 'Create/update a workflow. `definition` is the full descriptor (title, description, trigger, vars[], steps[], on_step_fail, llm?, maxCostUsd?); validated against the offer contract + DAG on save. maxCostUsd (US dollars, per run) caps what a run spends on AI, its ai steps and the judging of its llm signals together: an ai step\'s model call starts only when what one attempt is expected to cost fits in what is left, and holds that share until the call answers, also after a timeout or a retry; otherwise the step waits for the open calls or stops the run. A step expected to cost more than the whole cap starts alone while the run has spent less.',
         input: {
             id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
             definition: { type: 'object', required: true, description: 'The workflow descriptor.' },
