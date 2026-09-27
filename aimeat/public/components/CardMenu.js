@@ -25,10 +25,19 @@
  *
  *   The card underneath is often a link. Every click here stops before the card sees it, or opening
  *   the menu would also navigate away.
- * @structure CardMenu({ state, actions, label, onOpened, inline })
+ *
+ *   A menu that opens from words (`word`, added by appcat): the same menu under a line of words drawn
+ *   as the action link (the app catalogue's "Backups and imports"), `framed` for the list in the
+ *   poster frame (ink frame, sun shadow), `disabled` while what it started runs.
+ * @structure CardMenu({ state, actions, label, onOpened, inline, word, framed, disabled })
  * @usage
  *   html`<${CardMenu} state=${'open'} actions=${[{ label: 'Copy', run: copy }]} />`
+ *   html`<${CardMenu} word=${x('action.backups')} framed actions=${[{ label: x('backup.exportAll'), run: exportAll }]} />`
  * @version-history
+ *   v1.6.1 — 2026-09-27 — The framed list stands 6px off its words (the old .backup-menu), appcat parity.
+ *   v1.6.0 — 2026-09-27 — `word` (the menu opens from words drawn as the action link, in their line),
+ *     `framed` (the list in the poster frame) and `disabled`, for appcat's "Backups and imports"
+ *     menu; additive, card-menu.css .card-menu-list--framed.
  *   v1.5.0 — 2026-09-27 — The menu is placed from the dots' rectangle (fixed) and opens upward when
  *     there is no room below, so a scrolling parent (the Messages thread) never clips it; it follows
  *     the dots while a parent scrolls. The arrow keys move between the rows, and Escape gives the
@@ -64,8 +73,19 @@ export function CardMenu({
    * null: in the card's top right corner. 'start' | 'end': in a line of words (a message's line under
    * it), the menu opening from the dots' left or right edge, so it stays on the page.
    */
-  inline = null,
+  inline: inlineGiven = null,
+  /**
+   * Words (added by appcat): the menu opens from these words, drawn as the action link, instead of
+   * the dots, in the line where they are written (a page's "Backups and imports"). The menu opens
+   * from their right edge unless `inline` says 'start'.
+   */
+  word = null,
+  /** The menu in the poster frame (added by appcat): the ink frame with the sun shadow. */
+  framed = false,
+  /** The words can not be pressed now (added by appcat): an export the menu started is running. */
+  disabled = false,
 }) {
+  const inline = inlineGiven || (word ? 'end' : null);
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState(null);
   const ref = useRef(null);
@@ -103,7 +123,8 @@ export function CardMenu({
       const list = listRef.current;
       if (!dots || !list) return;
       const b = dots.getBoundingClientRect();
-      const gap = 4;
+      // The framed list stands 6px off its words, as the old catalogue's .backup-menu (appcat parity).
+      const gap = framed ? 6 : 4;
       const h = list.offsetHeight;
       const w = list.offsetWidth;
       const vh = window.innerHeight;
@@ -124,7 +145,7 @@ export function CardMenu({
     window.addEventListener('scroll', place, true);
     window.addEventListener('resize', place);
     return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
-  }, [open, inline]);
+  }, [open, inline, framed]);
 
   const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
 
@@ -143,14 +164,18 @@ export function CardMenu({
 
   return html`
     <div class=${'card-menu' + (inline ? ` card-menu--inline card-menu--from-${inline}` : '')} ref=${ref} onClick=${stop}>
-      <button type="button" ref=${dotsRef}
-        class="poster-icon poster-icon--small card-menu-dots card-menu-dots--${state}"
-        aria-haspopup="menu" aria-expanded=${open} aria-label=${hint} title=${hint}
-        onClick=${(e) => { stop(e); if (!open) onOpened?.(); setOpen(v => !v); }}>
-        <span aria-hidden="true">⋯</span>
-      </button>
+      ${word
+        ? html`<button type="button" ref=${dotsRef} class="poster-action card-menu-word"
+            aria-haspopup="menu" aria-expanded=${open} title=${label ?? undefined} disabled=${disabled}
+            onClick=${(e) => { stop(e); if (!open) onOpened?.(); setOpen(v => !v); }}>${word}</button>`
+        : html`<button type="button" ref=${dotsRef}
+            class="poster-icon poster-icon--small card-menu-dots card-menu-dots--${state}"
+            aria-haspopup="menu" aria-expanded=${open} aria-label=${hint} title=${hint} disabled=${disabled}
+            onClick=${(e) => { stop(e); if (!open) onOpened?.(); setOpen(v => !v); }}>
+            <span aria-hidden="true">⋯</span>
+          </button>`}
       ${open && html`
-        <div class="card-menu-list" role="menu" ref=${listRef}>
+        <div class=${'card-menu-list' + (framed ? ' card-menu-list--framed' : '')} role="menu" ref=${listRef}>
           ${actions.map((a, i) => a.divider ? html`<div class="card-menu-sep" role="separator" key=${'sep' + i}></div>` : html`
             <button type="button" role="menuitem" key=${a.label} class=${'poster-menu-row card-menu-item' + (a.danger ? ' poster-menu-row--danger' : '')}
               onClick=${(e) => { stop(e); run(a, i); }}>

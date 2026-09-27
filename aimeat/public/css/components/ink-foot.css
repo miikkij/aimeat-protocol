@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.1 — 2026-09-27 — The brand word keeps the browser's line height, as the old footer drew it (appcat parity).
+ *   v1.1.0 — 2026-09-27 — .poster-foot-brand (InkFoot brand), the old app catalogue's footer word, for appcat; additive.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -20,6 +22,11 @@
 .poster-foot p { margin: 0; }
 .poster-foot a { color: var(--sun); font-weight: var(--weight-heavy); text-decoration: none; }
 .poster-foot a:hover { text-decoration: underline; }
+/* The word under the facts (InkFoot brand, appcat): the old app catalogue's footer brand. */
+.poster-foot-brand {
+  grid-column: 1 / -1; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .8rem;
+  letter-spacing: .08em; text-transform: var(--shape-case-heading); color: var(--sun); line-height: normal;
+}
 @media (max-width: 900px) { .poster-foot { margin: 3.5rem -1.1rem 0; padding: 2rem 1.1rem; grid-template-columns: 1fr; gap: 1rem; } }
 @media (max-width: 560px) {
   /* The two bleeds match the phone padding exactly; a wider bleed measured as a 1px sideways

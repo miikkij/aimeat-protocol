@@ -1,0 +1,33 @@
+/**
+ * @file day-window.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The window of days a count is read over (components/DayWindow.js): one wrapping line of
+ *   ready windows as words, the chosen one the loud slab, a coral capital label and an underlined
+ *   number field, 92px wide, and "Show". The values are the old app catalogue's visitor window
+ *   (app-catalog-visitors.css .vis-window, .vis-stat-label, .vis-days-input, and the detail's .dtl-btn
+ *   and .modal-input from app-catalog-poster.css). Reads the theme's tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-27 — Initial (appcat parity, sections-b).
+ */
+.day-window { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 0 0 22px; }
+.day-window > .poster-action { display: inline-block; padding: 0 0 1px; border-bottom-width: var(--shape-frame); font-size: .78rem; line-height: normal; }
+.day-window > .poster-action:disabled { opacity: .5; border-color: var(--text); }
+.day-window > .poster-slab { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; font-size: .78rem; line-height: normal; }
+.day-window > .poster-slab:disabled { opacity: .5; }
+.day-window-label {
+  margin: 6px 0 0 8px;
+  font-size: .72rem; font-weight: 800; line-height: normal; color: var(--accent);
+  text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label, .1em);
+}
+.day-window-days {
+  box-sizing: border-box; width: 92px; margin: 0; padding: 10px 14px;
+  border: 0; border-bottom: var(--shape-frame-heavy, 3px) solid var(--shape-field-colour, var(--text));
+  background: transparent; color: var(--text); outline: none;
+  font-family: var(--font-body); font-size: .88rem; font-weight: 700; line-height: normal;
+}
+.day-window-days:focus { border-bottom-color: var(--accent); }
+@media (max-width: 760px) {
+  .day-window-label { margin-left: 0; }
+}

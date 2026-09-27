@@ -64,7 +64,22 @@
  *   (true, or the words to say), `dense` (a list inside a panel or under a row: less air, smaller
  *   words), `under` (it belongs to the row above it: it stands indented), `small` (a checklist under a
  *   field: small grey words, no rules), `scroll` (a long pick list in a capped box that scrolls),
- *   `apart` (it stands a little apart from the label or line above it), `id`.
+ *   `apart` (it stands a little apart from the label or line above it), `id`. `tone`, the old app
+ *   catalogue's detail lists (list-tones.css): 'history' (the states a thing had, newest first: each
+ *   row one line, its number in the poster face, its facts in typewriter, its doors coral typewriter
+ *   words; the old .dtl-version-row), 'switches' (a setting per row: its name, what its state means,
+ *   the door that changes it; the old .mk-row), 'counts' (a small table of counts: the head in coral
+ *   capitals over the ink rule, plain words, the counts in typewriter at the right; the old
+ *   .vis-table), 'entries' (named entries, each a paragraph under its name, the heavy rule over the
+ *   first; the old .dtl-skill), 'log' (what was done, newest first, each entry one line that wraps:
+ *   the date and who in grey typewriter, the act in coral typewriter capitals, the name bold; the old
+ *   .mk-log), 'pages' (a page a thing ought to have per row: its name with its marks after it and why
+ *   under it, the doors beside both, the editor opened under the row; the old .lg-row), 'releases'
+ *   (the history's look for every version kept, facts a step smaller, doors plain typewriter words: the
+ *   old versions dialog, .version-row), 'tree' (a tree of plain lines, each level under its parent's row
+ *   16px further in, its state a small coloured word; `attention` on a Name marks the one the tree is
+ *   about, in bold: the old fork lineage, .lineage-node), 'checkpoints' (the history's rows for the saves a working copy
+ *   passed: the time bold, the note under it in the page's letters; the old checkpoint rows).
  *   Rows come as children, or as `rows` with `render(item, i)`.
  *
  *   Group: the group heading over the rows after it (`title`, `count`, `onFold` + `folded` +
@@ -83,6 +98,28 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.16.0 — 2026-09-27 — List tone 'checkpoints': the old detail's working-copy history rows
+ *     (.dtl-version-row with .wc-ckpt-when and .wc-ckpt-note), list-tones.css. Additive, appcat parity
+ *     (sections-a).
+ *   v1.15.0 — 2026-09-27 — List tone 'releases': the history's look in the old versions dialog (its
+ *     facts .72rem, its doors plain coral typewriter words 6px apart; .version-row), and 'tree': the old
+ *     fork lineage's plain indented lines (.lineage-node), list-tones.css. Additive, appcat parity
+ *     (dialogs).
+ *   v1.14.0 — 2026-09-27 — List tone 'log' (the old app catalogue's audit log and declarations,
+ *     .mk-log) and 'pages' (its legal pages, .lg-row), list-tones.css. Additive, appcat parity
+ *     (sections-c).
+ *   v1.13.0 — 2026-09-27 — List `tone` = 'history' | 'switches' | 'counts' | 'entries': the old app
+ *     catalogue's detail lists (versions, the visitor measurement rows, the visitor tables, the
+ *     skills of an app), drawn by css/components/list-tones.css. Additive, appcat parity (sections-b).
+ *   v1.12.0 — 2026-09-27 — List `index`: the numbered index of the app catalogue (the old page's
+ *     .cat-row and .cat-row-panel): each row its own line on the page's ground, the pointer's row on
+ *     the surface, the opened row on the sun over an ink rule, its panel a line of doors with the
+ *     words about it at the right, the last row closing on the heavy rule, the rows coming in one
+ *     after another; on a phone a row wraps (list.css .list--index). Row `order`: its place in the
+ *     list, which times its coming in. SearchLine `big` (the page's one search: the heavy underline,
+ *     bold words; the old catalogue's .cat-search, its order row as a child) and `id` (the field's id,
+ *     for a key that brings the focus to it). The cut n-mark-name-desc-state-n-arrow is in
+ *     listing.css. Additive, for appcat.
  *   v1.11.2 — 2026-09-27 — Name `onFollow`: with `href`, the link's own click (a page that opens the
  *     thing in place keeps the address for a new tab: the fleet's agent names); Row `hover` now also
  *     turns a linked name coral (list.css). Additive, admin page group G9.
@@ -202,14 +239,26 @@ function headCell(entry, i) {
   return html`<div key=${i} class=${cx('poster-label', isEntry && entry.num && 'listing-n')} title=${isEntry ? entry.title : undefined}>${words}</div>`;
 }
 
-export function List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, labels, stackWide, id, rows, render, children }) {
+/* List `tone` (added in the appcat parity pass, sections-b): the old app catalogue's detail lists.
+   'log' and 'pages' added by sections-c (the old .mk-log and .lg-row). */
+const LIST_TONES = new Set(['history', 'switches', 'counts', 'entries', 'log', 'pages', 'tree']);
+
+export function List({ cols, keepCols, head, empty, loading, dense, under, small, scroll, apart, labels, stackWide, index, tone, id, rows, render, children }) {
   if (loading) return html`<div class="list-empty"><${Note} kind="loading">${typeof loading === 'string' ? loading : null}<//></div>`;
   const items = rows ? rows.map((r, i) => (render ? render(r, i) : r)) : children;
   const none = rows ? rows.length === 0 : (Array.isArray(children) ? children.flat(Infinity).filter(Boolean).length === 0 : !children);
   if (none && empty !== undefined && empty !== null) return html`<div class="list-empty">${typeof empty === 'string' ? html`<${Note} kind="quiet">${empty}<//>` : empty}</div>`;
+  // index (added for appcat): the app catalogue's numbered index (list.css .list--index).
   const cls = cx('listing', cols && `listing--${cols}`, keepCols && 'listing--cols', dense && 'list--dense',
     under && 'list--under', small && 'list--small', scroll && 'list--scroll', scroll === 'medium' && 'list--scroll-medium',
-    apart && 'list--apart', labels && head && 'list--labels', stackWide && !keepCols && 'list--stack-wide');
+    apart && 'list--apart', labels && head && 'list--labels', stackWide && !keepCols && 'list--stack-wide', index && 'list--index',
+    LIST_TONES.has(tone) && `list--${tone}`, tone === 'releases' && 'list--history list--releases',
+    tone === 'checkpoints' && 'list--history list--checkpoints');
+  // tone 'checkpoints' (added by appcat sections-a, parity): the history's rows for the saves a
+  // working copy passed, its time bold and its note under it in the page's own letters, its loud
+  // door underlined typewriter on the slab (the old detail's checkpoint rows, list-tones.css).
+  // tone 'releases' (added by appcat's dialogs, parity): the history's look for every version kept,
+  // its facts a step smaller and its doors plain typewriter words (the old versions dialog, list-tones.css).
   // stackWide (added by page group G4, admin): a list of many columns stacks under 1180px (list.css).
   // scroll="medium" (added by the fix pass): capped at 300px rather than 17rem (main's
   // .pf-agd-event-log-scroll, an agent's usage lists).
@@ -225,8 +274,10 @@ export function List({ cols, keepCols, head, empty, loading, dense, under, small
 /* ── One row ──────────────────────────────────────────────────────────────────────────────────── */
 
 export function Row({ open, onToggle, selected, faded, fine, rail, colour, picked, onPick, pickLabel, draggable, dragOver,
-  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, grip, dragging, pickOff, hover, quietDoors, below, panel, panelDoors, id, children }) {
+  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, grip, dragging, pickOff, hover, quietDoors, below, panel, panelDoors, id, order, children }) {
   const toggles = typeof onToggle === 'function';
+  // order (added for appcat): the row's place in the list, which times its coming in (list.css .list--index).
+  const place = typeof order === 'number' ? `--list-order: ${order}` : undefined;
   // quietDoors (added by page group G4, admin): the doors show on the row under the pointer, the row
   // the keyboard is in, and the opened or selected row only (list.css .list-row--quiet-doors).
   const pick = typeof onPick === 'function';
@@ -247,7 +298,7 @@ export function Row({ open, onToggle, selected, faded, fine, rail, colour, picke
   const drag = draggable ? { onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd } : {};
   const Tag = pick && !toggles ? 'label' : 'div';
   return html`<${RowContext.Provider} value=${ctx}>
-    <${Tag} class=${cls} onClick=${onClick} ...${drag}>
+    <${Tag} class=${cls} style=${place} onClick=${onClick} ...${drag}>
       ${pick ? html`<div class="list-pick" id=${anchor ? anchor.take() : undefined}><input type="checkbox" checked=${!!picked} aria-label=${pickLabel} disabled=${pickOff} onChange=${onPick} /></div>` : null}
       ${children}
       ${below ? html`<div class="list-below">${below}</div>` : null}
@@ -456,14 +507,17 @@ export function Filter({ on, count, onClick, attention, end, disabled, title, ch
  * The search line over a list: the field, and `note` (what the search looks in, or how many it
  * shows) or other doors after it. `onEnter` runs on Enter; `onClear` adds the ✕ while there is text.
  */
-export function SearchLine({ value, onInput, onEnter, onClear, placeholder, label, note, text, autofocus, clearLabel, beside, find, children }) {
+export function SearchLine({ value, onInput, onEnter, onClear, placeholder, label, note, text, autofocus, clearLabel, beside, find, big, id, children }) {
   // beside (added by the fix pass): one of several lines side by side in a Row, each growing up to
   // 500px, under each other on a phone (main's memory list: search and filter in one .action-bar).
   // find (added by admin page group G7): the magnifier before the field, as the operator pages'
   // searches drew it (main's admin Cortex and Knowledge searches).
-  return html`<div class=${cx('search-line', beside && 'search-line--beside')}>
+  // big + id (added for appcat): the page's one search (the old catalogue's .cat-search: the heavy
+  // underline, bold words, no autocomplete, no spellcheck), the field's id for a key that focuses it.
+  return html`<div class=${cx('search-line', beside && 'search-line--beside', big && 'search-line--big')}>
     ${find ? html`<svg class="search-line-glass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.3-4.3" /></svg>` : null}
-    <input class="og-input" type=${text ? 'text' : 'search'} value=${value} placeholder=${placeholder} aria-label=${label || placeholder}
+    <input class="og-input" id=${id} type=${text ? 'text' : 'search'} value=${value} placeholder=${placeholder} aria-label=${label || placeholder}
+      autocomplete=${big ? 'off' : undefined} spellcheck=${big ? false : undefined}
       autofocus=${autofocus} onInput=${onInput} onKeyDown=${onEnter ? (e) => { if (e.key === 'Enter') onEnter(e); } : undefined} />
     ${onClear && value ? html`<button type="button" class="poster-icon poster-icon--small" title=${clearLabel} aria-label=${clearLabel} onClick=${onClear}>✕</button>` : null}
     ${children}

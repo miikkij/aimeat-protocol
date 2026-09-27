@@ -39,6 +39,7 @@
  *   // In a Preact view prefer the hook: import { useSession } from '/js/use-session.js';
  *
  * @version-history
+ *   v2.1.0 — 2026-09-27 — authLoaded(): whether the auth lib is there yet (appcat's ?add=1 waits for it).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v2.0.0 — 2026-08-07 — Becomes the single session source: subscribes to the auth lib's own
  *     post-change events (killing the stale-session race for every consumer at once), dedupes by
@@ -69,6 +70,14 @@ export function getSession() {
   if (!a || typeof a.getSession !== 'function') return null;
   const s = a.getSession();
   return (s && s.jwt) ? s : null;
+}
+
+/**
+ * Whether the auth lib has loaded (added for appcat: a deep link that opens the Add dialog waits
+ * for it, so the sign-in dialog can open first). @returns {boolean}
+ */
+export function authLoaded() {
+  return lib() !== null;
 }
 
 /** Check if a session is active. @returns {boolean} */

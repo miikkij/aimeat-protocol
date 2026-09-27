@@ -222,6 +222,15 @@ export const KNOWLEDGE_VIEW_DEMOS = {
       { key: 'apps', n: 2, label: 'Apps', onOpen: noop }, { key: 'morsels', n: 420, label: 'Morsels', fine: true, onOpen: noop },
     ]} /><//>` },
     { name: 'no numbers', render: () => html`<${SettingsRoot}><${NumberBand} items=${[]} /><//>` },
+    { name: 'fitted: numbers to read, not doors', render: () => html`<${SettingsRoot}><${NumberBand} fitted items=${[
+      { key: 'apps', n: '30', label: 'Apps' }, { key: 'listed', n: '12', label: 'Listed' },
+      { key: 'drafts', n: '2', label: 'Draft waiting' }, { key: 'opens', n: '1,480', label: 'Opens all time' },
+    ]} /><//>` },
+    { name: 'fitted, five numbers (two rows on a narrow screen)', render: () => html`<${SettingsRoot}><${NumberBand} fitted items=${[
+      { key: 'opens', n: '312', label: 'Opens' }, { key: 'versions', n: '7', label: 'Versions' }, { key: 'size', n: '48 KB', label: 'Size' },
+      { key: 'updated', n: '27.9.2026', label: 'Updated' }, { key: 'forks', n: '3', label: 'Forks' },
+    ]} /><//>` },
+    { name: 'fitted, one number', render: () => html`<${SettingsRoot}><${NumberBand} fitted items=${[{ key: 'size', n: '48 KB', label: 'Size' }]} /><//>` },
   ] },
   'open-card': { variants: [
     { name: 'an opened agent', render: () => agentCard() },

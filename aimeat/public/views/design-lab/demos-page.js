@@ -117,6 +117,8 @@ export const PAGE_DEMOS = {
   'star-toggle': { variants: [
     { name: 'on', render: (ex) => html`<${StarToggle} on=${true} title=${ex.title} onClick=${noop} />` },
     { name: 'off', render: (ex) => html`<${StarToggle} on=${false} title=${ex.title} onClick=${noop} />` },
+    { name: 'bright, on and off', render: () => html`<p><${StarToggle} bright on=${true} title="Remove from favourites" onClick=${noop} /> Lumo Bakery orders
+      <br /><${StarToggle} bright on=${false} title="Add to favourites" onClick=${noop} /> Nordic Ferries timetables</p>` },
   ] },
   'fold-button': { variants: [
     { name: 'default', render: (ex) => html`<${FoldButton} onClick=${noop}>${ex.children}<//>` },
@@ -143,6 +145,7 @@ export const PAGE_DEMOS = {
   ] },
   'ink-foot': { flush: true, variants: [
     { name: 'default', render: () => html`<${InkFoot}><p>AI-made content carries its label.</p><p>Your data is yours: export it, delete it.</p><//>` },
+    { name: 'brand', render: () => html`<${InkFoot} brand="AIMEAT"><p>Apps made on this node, by its people and their agents.</p><p>Back up your apps as a zip, and restore them the same way.</p><//>` },
   ] },
   'check-item': { variants: [
     { name: 'done', render: (ex) => html`<${CheckItem} done=${true} href=${ex.href}>${ex.children}<//>` },

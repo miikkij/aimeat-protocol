@@ -11,14 +11,21 @@
  *   - Mark kind="tag" (the default): names a kind, a version, a role or a relation. tone = 'sun' (the
  *     chosen one, the one that counts now) | 'coral' (the one to notice) | 'ink' (yours) | 'dim' (it
  *     counts nothing yet: main's .og-chip--dim, which the previous branch lost) | 'fine' (the success
- *     colour: main's .pf .badge-success, e.g. a knowledge hit, a step for an agent). `onRemove`
- *     adds the remove mark after its name.
+ *     colour: main's .pf .badge-success, e.g. a knowledge hit, a step for an agent) | 'on' (a thing
+ *     switched on, readable on the ink slab: the app catalogue's Promoted badge) | 'heavy' (the
+ *     heavier frame and capitals: a recommendation that asks to be noticed, the app catalogue's
+ *     "Recommended" legal page) | 'need' (a thing an app needs to run, a cortex or an extension, in the
+ *     ink frame on the card ground: the app catalogue's Needs) | 'name' (one name among several, grey
+ *     typewriter words in a thin grey frame on the card ground: the app catalogue's bundled agents).
+ *     `onRemove` adds the remove mark after its name.
  *   - Mark kind="status": says a state. tone = 'fine' | 'attention' | 'danger' | 'off'.
+ *   - Mark kind="word": a state said in small typewriter words without a frame, grey; tone = 'ink'
+ *     (it is there: "Markdown · 9/27/2026") | 'notice' (coral capitals: "Missing").
  *   - Mark kind="count": a small number. tone = 'waiting' (something waits for the person) | 'tally'
  *     (it only says how many); `small` for one that sits on an icon.
  *   - Mark kind="time": when a thing happened.
  *   - Label: the row label over a field, a column, a box.
- *   - Marks: a row of tags.
+ *   - Marks: a row of tags; `spread` sets them 8px apart (the app catalogue's Needs).
  *   - Code: an identifier in a line; `block` for lines of code or a prompt to copy; `block scroll` for
  *     a long one (a schema) that scrolls inside after 200px, as main's service schema did; `block tall`
  *     for a prompt to copy that scrolls only after 24rem (the MCP page's proof and organism prompts).
@@ -26,9 +33,20 @@
  *     file), "large" after 400px (a crew's try output), "page" after 32rem (a workflow's run record).
  *     `blurred` (inline): a secret shown blurred until the person asks to see it (the recovery key).
  * @structure Mark({ kind, tone, small, title, onRemove, removeLabel, presence, away, children }) · Marks({ children }) ·
- *   Label({ htmlFor, block, children }) · Code({ block, scroll, tall, blurred, change, children })
+ *   Label({ htmlFor, block, ruled, children }) · Code({ block, scroll, tall, blurred, change, children })
  * @usage html`<${Mark} tone="sun">${t('x.mine')}<//>` · html`<${Mark} kind="status" tone="fine">OK<//>`
  * @version-history
+ *   v1.17.0 — 2026-09-27 — The tag's 'name' tone: one name among several (the old app catalogue's
+ *     .aga-chip); additive, mark.css, appcat parity (sections-d).
+ *   v1.16.0 — 2026-09-27 — Label `ruled`: a block label over the ink rule (the old app catalogue's
+ *     .cx-label, .pb-preview-label), appcat parity (dialogs); additive, mark.css .poster-label--ruled.
+ *   v1.15.0 — 2026-09-27 — The tag's 'need' tone and Marks `spread` (the old app catalogue's Needs
+ *     chips, .dtl-chip in .dtl-chips); additive, poster.css, appcat parity (sections-a).
+ *   v1.14.0 — 2026-09-27 — The tag's 'heavy' tone and the kind "word" (the old app catalogue's legal
+ *     rows: .lg-rec, .lg-state); additive, mark.css, appcat parity (sections-c).
+ *   v1.13.0 — 2026-09-27 — The tag's 'on' tone: a thing switched on, green words and frame in the
+ *     success colour itself so it reads on the ink slab too (the old app catalogue's Promoted badge,
+ *     .dtl-badge-on); additive, mark.css, appcat parity (sections-d).
  *   v1.12.0 — 2026-09-26 — Code block `scroll` takes a size, "medium" (300px), "large" (400px) or
  *     "page" (32rem): main's caps for an agent's stored value and config preview (.pf-agd-memory-preview,
  *     .pf-agd-config-preview), a crew's try output (.pf-agd-crew-try-output) and a workflow's run
@@ -69,10 +87,16 @@ const cx = (...parts) => parts.filter(Boolean).join(' ');
 const SCROLL_SIZES = new Set(['medium', 'large', 'page']);
 
 const KIND = {
-    tag: { base: 'poster-chip', tones: ['sun', 'coral', 'ink', 'dim', 'fine'] },
+    // 'on' (added by appcat sections-d): a thing switched on, the old catalogue's Promoted badge.
+    // 'heavy' (added by appcat sections-c): the heavier frame and capitals, a recommendation.
+    // 'need' (added by appcat sections-a): a thing an app needs to run, the old catalogue's Needs chip.
+    // 'name' (added by appcat sections-d): one name among several, the old catalogue's agent chips.
+    tag: { base: 'poster-chip', tones: ['sun', 'coral', 'ink', 'dim', 'fine', 'on', 'heavy', 'need', 'name'] },
     status: { base: 'poster-status', tones: ['fine', 'attention', 'danger', 'off'] },
     count: { base: 'poster-count', tones: ['waiting', 'tally'] },
     time: { base: 'poster-time', tones: [] },
+    // word (added by appcat sections-c): a state said in small typewriter words without a frame.
+    word: { base: 'mark-word', tones: ['ink', 'notice'] },
 };
 
 /**
@@ -106,14 +130,20 @@ export function Mark({ kind = 'tag', tone, small, title, onRemove, removeLabel, 
         title=${what} aria-label=${what} onClick=${onRemove}>${removeGlyph}</button>` : null}</span>`;
 }
 
-export function Marks({ children }) {
-    return html`<div class="poster-chips">${children}</div>`;
+export function Marks({ spread, children }) {
+    // spread (added by appcat sections-a): the tags 8px apart (the old catalogue's .dtl-chips).
+    return html`<div class=${cx('poster-chips', spread && 'poster-chips--spread')}>${children}</div>`;
 }
 
-/** The row label. `block` stands it on a line of its own; `htmlFor` ties it to a field. */
-export function Label({ htmlFor, block, children }) {
-    if (htmlFor) return html`<label class=${cx('poster-label', block && 'poster-label--block')} for=${htmlFor}>${children}</label>`;
-    return html`<span class=${cx('poster-label', block && 'poster-label--block')}>${children}</span>`;
+/**
+ * The row label. `block` stands it on a line of its own; `htmlFor` ties it to a field. `ruled` (added
+ * by appcat's dialogs): a block label over the ink rule, heading what follows (the old app catalogue's
+ * "What your apps can use" and "Prompt preview").
+ */
+export function Label({ htmlFor, block, ruled, children }) {
+    const cls = cx('poster-label', (block || ruled) && 'poster-label--block', ruled && 'poster-label--ruled');
+    if (htmlFor) return html`<label class=${cls} for=${htmlFor}>${children}</label>`;
+    return html`<span class=${cls}>${children}</span>`;
 }
 
 export function Code({ block, scroll, tall, blurred, change, children }) {

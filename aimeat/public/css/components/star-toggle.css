@@ -7,6 +7,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — .poster-star--bright (StarToggle bright): the old app catalogue's row star, for appcat; additive.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -16,3 +17,7 @@
 }
 .poster-star:hover { color: var(--sun); }
 .poster-star--on { color: var(--sun); }
+/* The app catalogue's star (StarToggle bright, appcat; the old .fav-toggle in a row): faint until on. */
+.poster-star--bright { padding: 0; font-size: .95rem; color: var(--text); opacity: .45; transition: opacity .2s, transform .2s; }
+.poster-star--bright:hover { opacity: 1; transform: scale(1.15); color: var(--text); }
+.poster-star--bright.poster-star--on { opacity: 1; }

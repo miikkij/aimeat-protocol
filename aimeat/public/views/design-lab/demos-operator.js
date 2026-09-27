@@ -26,7 +26,7 @@ import { QuickFind } from '/components/QuickFind.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
 import { PickField } from '/components/PickField.js';
 import { StatusPagePreview } from '/components/StatusPagePreview.js';
-import { SearchResult, ShareCard } from '/components/SearchPreview.js';
+import { SearchResult, ShareCard, SearchCard } from '/components/SearchPreview.js';
 import { SaveBar } from '/components/SaveBar.js';
 import { MoveButtons } from '/components/MoveButtons.js';
 import { DayChart, DaySpark } from '/components/DayChart.js';
@@ -214,6 +214,11 @@ export const OPERATOR_DEMOS = {
       title="Lumo Bakery" desc="Bread from the harbour oven." host="lumo.bakery" />`) },
     { name: 'long', render: () => admin('Discovery', html`<${SearchResult} label="In a search" url="https://harbour-studio-sound-design-for-ferries.example.com/about/the-team"
       title=${LONG} desc="A site description long enough that a search engine cuts it after two lines, and here it wraps on a phone as well." />`) },
+    // SearchCard lives in the app catalogue's opened app, not on an admin page, so it stands bare.
+    { name: 'search card', render: () => html`<${SearchCard} image="/img/business-hero.png" noImage="No screenshot yet"
+      title="Lumo Bakery orders" desc="Take the day's bread orders and print the baking list at five." />` },
+    { name: 'search card, no picture yet', render: () => html`<${SearchCard} noImage="No screenshot yet. Publish the app once to make one."
+      title="Nordic Ferries timetables" desc="Every crossing of the week in one table your agents can read." />` },
   ] },
 
   'save-bar': { variants: [

@@ -8,6 +8,7 @@
  * @structure DEMOS · demoFor(id) · isLabOnly(id)
  * @usage import { demoFor } from './demos.js';
  * @version-history
+ *   v1.8.0 — 2026-09-27 — The catalogue family's demos (demos-catalogue.js): the parts the app catalogue brought (appcat).
  *   v1.7.0 — 2026-09-27 — The operator family's demos (demos-operator.js): the parts the admin pages brought.
  *   v1.6.0 — 2026-09-27 — The demos of Settings & Controls on components: the kit, the fields, the page parts, the
  *     list and the special views (demos-kit.js, demos-fields.js, demos-page-kit.js, demos-list.js,
@@ -32,13 +33,14 @@ import { LIST_DEMOS } from './demos-list.js';
 import { KNOWLEDGE_VIEW_DEMOS } from './demos-views-knowledge.js';
 import { WORK_VIEW_DEMOS } from './demos-views-work.js';
 import { OPERATOR_DEMOS } from './demos-operator.js';
+import { CATALOGUE_DEMOS } from './demos-catalogue.js';
 import { SAMPLES, PROPOSALS } from './decision-samples.js';
 import { THEME_SAMPLER } from './theme-sampler.js';
 
 export const DEMOS = {
   ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHELL_DEMOS, ...SETTINGS_DEMOS,
   ...KIT_DEMOS, ...FIELD_DEMOS, ...PAGE_KIT_DEMOS, ...LIST_DEMOS, ...KNOWLEDGE_VIEW_DEMOS, ...WORK_VIEW_DEMOS,
-  ...OPERATOR_DEMOS, ...SHAPE_DEMOS,
+  ...OPERATOR_DEMOS, ...CATALOGUE_DEMOS, ...SHAPE_DEMOS,
 };
 
 /**

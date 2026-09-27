@@ -12,6 +12,19 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.28.0 — 2026-09-27 — The cut name-price-delivery-doors draws the rest of the old .mz-tool: one
+ *     rule under the whole row, 14px around, the heavy rule over the list, the cells' letters, the
+ *     doors 16px apart, the blocked reason under the row, one column under 900px; appcat parity
+ *     (sections-d). The cut is appcat's alone.
+ *   v1.27.0 — 2026-09-27 — The cuts name-price-delivery-doors (a tool for sale: the old catalogue's
+ *     .mz-tool columns) and name-price-rake-budget-state (a contract an app sources); appcat, detail
+ *     builder C. Additive.
+ *   v1.26.0 — 2026-09-27 — The cut n-mark-name-desc-state-n-arrow: the app catalogue's rows (appcat,
+ *     the shell), the old .cat-row columns; drawn with List index.
+ *   v1.25.0 — 2026-09-27 — The cuts of the app catalogue's detail rows (appcat, detail builder B):
+ *     name-meaning-doors (a switch, its meaning, its action), key-desc-who (a data map's key, what it
+ *     holds, where), name-n (a count per place), when-name-who and when-kind-name-who (the audit log
+ *     and the declarations), with the old catalogue's columns. Additive.
  *   v1.24.0 — 2026-09-27 — The cuts of the operator pages' lists of admin group G1:
  *     when-state-path-where-kind-desc (Security's refusal log), state-name-who-when-doors (its
  *     refused-and-kept incidents, with main's 1100px rule) and name-state-meta-meta-doors
@@ -658,6 +671,74 @@
   .listing--state-name-who-when-doors > .listing-row > :is(:nth-child(3), :nth-child(4)) { grid-column: 2; padding-top: 0; }
   .listing--state-name-who-when-doors > .listing-row > :nth-child(5) { grid-column: 1 / -1; justify-content: flex-start; padding-top: .2rem; }
 }
+
+/* The app catalogue's detail rows (appcat), with the old catalogue's columns: a switch with its
+   meaning and its action (.mk-row: the name 220px, the meaning, the action), a data map's key with
+   what it holds and where (.dtl-dm-head: 260px, the words, 200px), a count per place (.vis-table),
+   and the two logs (.mk-log: when, the act, by whom; the declarations add the act's word). */
+.listing--name-meaning-doors { grid-template-columns: 13.75rem minmax(0, 1fr) auto; gap: 0 1.5rem; }
+.listing--key-desc-who { grid-template-columns: 16.25rem minmax(0, 1fr) 12.5rem; gap: 0 1rem; }
+.listing--key-desc-who > .listing-row > .listing-who { text-align: right; font-family: var(--font-mono); font-size: .75rem; font-weight: 400; color: var(--text-dim); }
+.listing--name-n { grid-template-columns: minmax(0, 1fr) auto; }
+.listing--when-name-who { grid-template-columns: 6rem minmax(0, 1fr) auto; }
+.listing--when-kind-name-who { grid-template-columns: 6rem auto minmax(0, 1fr) auto; }
+:is(.listing--when-name-who, .listing--when-kind-name-who) > .listing-row > .listing-who { font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); }
+/* The app catalogue's sale and cost rows (appcat, detail builder C): a tool with its price and how a
+   bought call is delivered, then its doors (the old .mz-tool: the name, 150px, 180px, the doors, 22px
+   apart), and a contract with its price, rake, budget and state (the old .dtl-status-row of cost.js). */
+.listing--name-price-delivery-doors { grid-template-columns: minmax(0, 1fr) 150px 180px auto; gap: 0 22px; }
+/* …drawn as the old .mz-tool drew it (appcat sections-d, parity): one rule under the whole row (the
+   22px between the columns is the cells' own right padding, so the rule runs on), 14px above and
+   under, everything at the row's top; the heavy rule over the list when it follows the chapter's
+   lead (the old :first-of-type); the name 1rem, what the tool does in the lighter grey; the price and
+   the delivery each a coral label 3px over its value (.mz-fact), the price bold, "in EXCHANGE" a
+   green typewriter word after it, the binding a small grey typewriter line; the doors 16px apart; a
+   reason the tool cannot be listed under the row in the warning colour (.od-blocked). */
+.listing.listing--name-price-delivery-doors { grid-template-columns: minmax(0, 1fr) 172px 202px auto; gap: 0; }
+.og-lead + .listing--name-price-delivery-doors { border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); }
+.listing--name-price-delivery-doors > .listing-row > div:not(.list-below) { display: block; padding: 14px 22px 14px 0; align-content: start; }
+.listing--name-price-delivery-doors > .listing-row > div.listing-doors { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 16px; padding-right: 0; }
+.listing--name-price-delivery-doors > .listing-row:has(> .list-below) > div:not(.list-below) { padding-bottom: 0; }
+.listing--name-price-delivery-doors > .listing-row > .list-below { padding: 12px 0 14px; border-bottom: 1px solid var(--border); font-size: .8rem; line-height: normal; color: var(--warn); }
+.listing--name-price-delivery-doors > .listing-row > .listing-name { font-size: 1rem; font-weight: 800; line-height: normal; }
+.listing--name-price-delivery-doors .listing-name > .list-desc { max-width: 60ch; margin: 3px 0 0; font-size: .88rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted); }
+.listing--name-price-delivery-doors > .listing-row > div:is(:nth-child(2), :nth-child(3)) { font-size: .95rem; font-weight: 700; line-height: normal; color: var(--text); }
+.listing--name-price-delivery-doors .poster-label--block { margin-bottom: 3px; font-size: .68rem; letter-spacing: .1em; line-height: normal; }
+.listing--name-price-delivery-doors .tinted--fine { padding-left: 6px; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--success); }
+.listing--name-price-delivery-doors .text-meta-sm { display: block; font-family: var(--font-mono); font-size: .75rem; font-weight: 400; color: var(--text-muted); overflow-wrap: anywhere; }
+.listing--name-price-delivery-doors .listing-doors > .poster-action--small { font-size: .78rem; }
+/* The row of doors under the list ("Add tool") stands 10px under its last rule. */
+.listing--name-price-delivery-doors + .og-doors { margin-top: 10px; }
+@media (max-width: 900px) {
+  .listing.listing--name-price-delivery-doors { grid-template-columns: minmax(0, 1fr); }
+  /* One column, 8px between the parts, the rule under the row's last part (.mz-tool at 900px). */
+  .listing.listing--name-price-delivery-doors > .listing-row > div:not(.list-below) { padding: 0 0 8px; border-bottom: 0; }
+  .listing.listing--name-price-delivery-doors > .listing-row > div:first-child { padding-top: 14px; }
+  .listing.listing--name-price-delivery-doors > .listing-row > div.listing-doors { justify-content: flex-start; }
+  .listing.listing--name-price-delivery-doors > .listing-row:not(:has(> .list-below)) > div.listing-doors { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .listing.listing--name-price-delivery-doors > .listing-row > .list-below { padding-top: 4px; }
+}
+.listing--name-price-rake-budget-state { grid-template-columns: minmax(0, 1fr) auto auto auto auto; gap: 0 1.5rem; }
+/* …drawn as the old cost.js drew it (appcat sections-d, parity): each contract its own wrapping line
+   of facts, no rules, 10px between the facts and 8px under the line, their middles level; the
+   capability first and widest (150px at least), its provider in the coral small capitals under it;
+   each other fact a coral label 2px over its value (1.05rem bold), "(n left)" a coral label after the
+   budget; the state (drawn by Note: a short typewriter state, or the chapter's grey line) as the old
+   .dtl-sync chips. The cut is appcat's alone. */
+.listing.listing--name-price-rake-budget-state { display: block; }
+.listing--name-price-rake-budget-state > .listing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.listing--name-price-rake-budget-state > .listing-row > div { display: block; padding: 0; border: 0; font-size: 1.05rem; font-weight: 700; line-height: normal; color: var(--text); }
+.listing--name-price-rake-budget-state > .listing-row > .listing-name { flex: 1 1 0; min-width: 150px; font-size: 1.05rem; }
+.listing--name-price-rake-budget-state .listing-name > small { margin-top: 2px; font-family: var(--font-body); font-size: .72rem; font-weight: 800; letter-spacing: var(--shape-tracking-label); text-transform: var(--shape-case-label); color: var(--accent); }
+.listing--name-price-rake-budget-state .poster-label { font-size: .72rem; font-weight: 800; letter-spacing: var(--shape-tracking-label); line-height: normal; }
+.listing--name-price-rake-budget-state .poster-label--block { margin-bottom: 2px; }@media (max-width: 860px) {
+  .listing--name-price-rake-budget-state > .listing-row > div:where(:not(.listing-open)) { padding: 0; }
+}
+
+/* The app catalogue's rows (appcat, the shell): the number, the icon, the name with its line, what
+   it does, its state, how often opened, the arrow (the old .cat-row grid: 36px 40px 5fr 7fr 170px
+   60px 28px). Drawn with List index (list.css .list--index), which also carries its phone rules. */
+.listing--n-mark-name-desc-state-n-arrow { grid-template-columns: 36px 40px minmax(0, 5fr) minmax(0, 7fr) 170px 60px 28px; }
 
 @media (max-width: 860px) {
   .listing-row--head > div { display: none; }

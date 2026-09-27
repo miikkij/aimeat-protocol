@@ -10,6 +10,11 @@
  *   numbers' own rule outranks the stat number's colour, so a style that recolours big numbers
  *   (Pebble draws them in its accent) still shows them on the band.
  * @version-history
+ *   v1.2.1 — 2026-09-27 — The fitted band's 8px above sits on the box, so it folds into the air of
+ *     what stands above it as the old .cat-band's did (it was 8px lower; appcat parity).
+ *   v1.2.0 — 2026-09-27 — .number-band--fitted (NumberBand fitted, appcat): the old app catalogue's
+ *     band (.cat-band): the stripe as tall as its numbers, the sun near its foot, a solid block in two
+ *     columns on a phone; its figures (.number-band-item--figure) are no doors. Additive.
  *   v1.1.0 — 2026-09-27 — Its own class names (number-band-*), no longer .pf-lp-stat*; the band, the
  *     stripe and the ink are theme hooks, and the numbers' own rule wins over a style's big-number
  *     colour (Pebble drew the numbers in the accent on the accent band).
@@ -53,4 +58,29 @@
   .number-band-row { margin: 1.5rem -1rem 0; padding: 3rem 1.5rem 3.5rem; gap: 20px 28px; }
   .number-band-row::before { height: 150px; }
   .number-band-row::after { transform: translateY(calc(-50% + 88px)) rotate(-3deg); }
+}
+
+/* The fitted band (NumberBand fitted): the old app catalogue's .cat-band, values unchanged. The
+   stripe spans the whole row, so a second row of numbers still stands on the coral. */
+/* The 8px above stands on the box, not the row: the box clips (overflow hidden), so a margin inside
+   it would add to the air above instead of folding into it as the old band's did. */
+.number-band--fitted { margin-top: 8px; }
+.number-band--fitted .number-band-row { margin: 0; padding: 72px 16px 68px; gap: 36px 56px; }
+.number-band--fitted .number-band-row::before { top: 0; bottom: 0; height: auto; transform: rotate(-2.5deg); }
+.number-band--fitted .number-band-row::after { top: auto; bottom: 6px; height: 20px; transform: rotate(-2.5deg); }
+.number-band--fitted .number-band-item { gap: 6px; }
+.number-band--fitted .number-band-value { font-size: 3rem; }
+.number-band--fitted .number-band-label { font-family: var(--font-body); letter-spacing: .1em; }
+.number-band-item--figure { cursor: default; }
+.number-band .number-band-item--figure:hover .number-band-value { color: var(--number-band-ink-v); }
+@media (max-width: 900px) {
+  .number-band--fitted { margin: 18px -18px 0; }
+  .number-band--fitted .number-band-row {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px;
+    margin: 0; padding: 30px 18px 34px; background: var(--number-band-ground-v);
+  }
+  .number-band--fitted .number-band-row::before { display: none; }
+  .number-band--fitted .number-band-row::after { transform: none; top: auto; bottom: 0; height: 10px; left: 0; right: 0; }
+  .number-band--fitted .number-band-value { font-size: 2.5rem; }
+  .number-band--fitted .number-band-label { font-size: .68rem; }
 }

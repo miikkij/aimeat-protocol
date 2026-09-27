@@ -9,6 +9,12 @@
  *   rendered black and unpositioned, 140px down the card instead of in its corner. A stylesheet
  *   nobody loads is not a stylesheet.
  * @version-history
+ *   v1.6.2 — 2026-09-27 — The framed list's shadow and its rows' corners read the shape tokens (the
+ *     same values in AIMEAT; check:shape-tokens), appcat parity (dialogs).
+ *   v1.6.1 — 2026-09-27 — The framed list at the old .backup-menu's size: 220px with its frame, rows
+ *     2px apart and 10px in (appcat parity).
+ *   v1.6.0 — 2026-09-27 — The poster frame, .card-menu-list--framed (CardMenu `framed`, appcat's
+ *     "Backups and imports" menu); additive.
  *   v1.5.0 — 2026-09-27 — The list is fixed on the page (CardMenu.js places it from the dots, upward
  *     when there is no room below), so a scrolling parent no longer clips it; its rows are actions in
  *     the full text colour, the accent under the pointer and on focus, Delete in its danger colour.
@@ -78,3 +84,10 @@
 /* A line between two groups of rows (an action item { divider: true }), as the Settings kebab
    menu drew it (.pj-menu-sep). */
 .card-menu-sep { height: 1px; background: var(--border); margin: 0.25rem 0.3rem; }
+/* The poster frame (CardMenu `framed`, added by appcat): the ink frame with the sun shadow on the
+   page's ground, its rows plain bold words that stand on the sun under the pointer (the old app
+   catalogue's "Backups and imports" menu, .backup-menu). */
+.card-menu-list--framed { box-sizing: border-box; gap: 2px; min-width: 220px; padding: 6px 0; background: var(--bg); border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow-action); }
+.card-menu-list--framed .card-menu-item { border: 0; border-radius: var(--shape-corner-control); background: transparent; padding: 8px 10px; font-family: var(--font-body); font-weight: var(--weight-bold); font-size: .9rem; white-space: nowrap; }
+.card-menu-list--framed .card-menu-item:hover,
+.card-menu-list--framed .card-menu-item:focus-visible { background: var(--sun); color: var(--on-sun); }

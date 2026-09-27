@@ -23,8 +23,16 @@
  *   Props: open, onClose, title, children, footer, footerStart (a side door at the footer's other
  *   end), showClose (default true), size ('sm' 440 | 'md' 560 | 'lg' 840 | 'xl' 1080), guard
  *   (default true: Escape and the page behind do not close once something has been typed),
- *   className (extra class on the <dialog>, e.g. a width modifier).
+ *   className (extra class on the <dialog>, e.g. a width modifier),
+ *   leading ('normal': the dialog reads at the browser's own line spacing instead of the site's
+ *   1.6, as the app catalogue's dialogs do; its parts inherit it, the footer keeps the site's),
+ *   titleRef (the thing the dialog is about, after its title in the typewriter face as it is
+ *   written: a filename).
  * @version-history
+ *   v2.2.0 — 2026-09-27 — `leading="normal"`: the dialog's text at the browser's own line spacing
+ *     (the old app catalogue's page had no body line height), and `titleRef`: the thing a dialog is
+ *     about after its title in the typewriter face (the old .aga-app-ref), for appcat; additive,
+ *     css/components/modal.css.
  *   v2.1.0 — 2026-09-24 — The question's Cancel is the action link and its confirm the loud action,
  *     coral when it deletes (Jouni's decision "Dialog actions").
  *   v1.0.0 — 2026-03-10 — Initial Modal component
@@ -69,7 +77,7 @@ function CloseButton({ onClose }) {
  * The open dialog itself. Mounted only while open: it calls showModal() as it mounts and close()
  * as it unmounts, so the parent's `open` flag stays the one source of truth.
  */
-function DialogFrame({ onClose, title, className, children, footer, footerStart, showClose, size, guard, bodyClass }) {
+function DialogFrame({ onClose, title, titleRef, className, children, footer, footerStart, showClose, size, guard, bodyClass, leading }) {
   const ref = useRef(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -92,12 +100,13 @@ function DialogFrame({ onClose, title, className, children, footer, footerStart,
 
   const requestClose = () => { if (onCloseRef.current) onCloseRef.current(); };
   const sizeClass = size ? `dlg--${size}` : '';
+  const leadClass = leading === 'normal' ? 'dlg--leading-normal' : '';
   return html`
-    <dialog ref=${ref} class=${`dlg modal ${sizeClass} ${className || ''}`.trim()}
+    <dialog ref=${ref} class=${`dlg modal ${sizeClass} ${leadClass} ${className || ''}`.replace(/\s+/g, ' ').trim()}
       aria-labelledby=${title ? titleId : undefined}>
       ${title
         ? html`<header class="dlg-head">
-            <h2 class="dlg-title" id=${titleId}>${title}</h2>
+            <h2 class="dlg-title" id=${titleId}>${title}${titleRef ? html` <span class="dlg-title-ref">${titleRef}</span>` : null}</h2>
             ${showClose && html`<${CloseButton} onClose=${requestClose} />`}
           </header>`
         : showClose && html`<${CloseButton} onClose=${requestClose} />`}
@@ -113,28 +122,30 @@ function DialogFrame({ onClose, title, className, children, footer, footerStart,
  * Modal — a dialog with a header (title, X), a scrolling body and an optional footer.
  * @param {{ open: boolean, onClose: () => void, title?: any, footer?: any, footerStart?: any,
  *   showClose?: boolean, size?: ''|'sm'|'md'|'lg'|'xl', guard?: boolean, className?: string,
- *   bodyClass?: string, children: any }} props
+ *   bodyClass?: string, leading?: ''|'normal', titleRef?: any, children: any }} props
  */
-export function Modal({ open, onClose, title, className = '', children, footer, footerStart, showClose = true, size = '', guard = true, bodyClass = '' }) {
+export function Modal({ open, onClose, title, titleRef, className = '', children, footer, footerStart, showClose = true, size = '', guard = true, bodyClass = '', leading = '' }) {
   if (!open) return null;
-  return html`<${DialogFrame} onClose=${onClose} title=${title} className=${className} footer=${footer}
-    footerStart=${footerStart} showClose=${showClose} size=${size} guard=${guard} bodyClass=${bodyClass}>${children}<//>`;
+  return html`<${DialogFrame} onClose=${onClose} title=${title} titleRef=${titleRef} className=${className} footer=${footer}
+    footerStart=${footerStart} showClose=${showClose} size=${size} guard=${guard} bodyClass=${bodyClass} leading=${leading}>${children}<//>`;
 }
 
 /**
  * ConfirmDialog — a question before a destructive or important action.
- * @param {{ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className? }} props
+ * @param {{ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className?, leading? }} props
  *   - danger: if true, the confirm action is the coral slab and Cancel takes the focus
  *   - className: optional extra class on the <dialog>, so one page can dress its own question
+ *   - leading: 'normal' as on Modal (the app catalogue's question reads at the browser's own spacing,
+ *     its words at .95rem)
  */
-export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className = '' }) {
+export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className = '', leading = '' }) {
   if (!open) return null;
   const footer = html`
     <button type="button" class="poster-action" autofocus=${!!danger} onClick=${() => onClose()}>${cancelLabel || t('common.cancel') || 'Cancel'}</button>
     <button type="button" class=${danger ? 'poster-slab poster-slab--control poster-slab--danger' : 'poster-slab poster-slab--control'} autofocus=${!danger} onClick=${onConfirm}>
       ${confirmLabel || t('common.confirm') || 'Confirm'}
     </button>`;
-  return html`<${DialogFrame} onClose=${onClose} title=${title} className=${className} size="sm"
+  return html`<${DialogFrame} onClose=${onClose} title=${title} className=${className} size="sm" leading=${leading}
     footer=${footer} showClose=${true} guard=${true}>
     <p class="modal-confirm-message">${message}</p>
   <//>`;

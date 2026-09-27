@@ -1,0 +1,134 @@
+/**
+ * @file overlay.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A page laid over the page (components/Overlay.js): the whole window on the page's
+ *   ground, the bar across the top, the body that alone scrolls, and with a rail the two columns of
+ *   the page and its contents rail. The values are the app catalogue's (#detail-view, .dtl-toolbar,
+ *   .dtl-body, .dtl-page, .dtl-rail; #iframe-view, .iframe-toolbar, #app-iframe in
+ *   src/static/app-catalog/styles). Colours, frames and corners read the theme's tokens.
+ *   The catalogue's own names map to the site's tokens so: its --surface is --card-bg, its --border
+ *   is --border, its --text-dim is --text-muted and its --text-muted is --text-dim.
+ * @version-history
+ *   v1.2.1 — 2026-09-27 — The way back's literal corner 0 goes (nothing under it draws a corner, so
+ *     AIMEAT is unchanged). check:shape-tokens.
+ *   v1.2.0 — 2026-09-27 — .overlay--small-words (Overlay smallWords): the small action links at the
+ *     catalogue's .78rem in the body face; additive.
+ *   v1.1.0 — 2026-09-27 — Parity with the app catalogue: the close button (.overlay-close), the
+ *     thing's glyph and the pencil in the title (.overlay-glyph, .overlay-edit), the way back
+ *     (.overlay-back), the pill link (.overlay-link), the browser's line height
+ *     (.overlay--normal-leading), the viewer's glass bar (.overlay--fill), the bar on the card ground,
+ *     the phone body without the 80px foot.
+ *   v1.0.0 — 2026-09-27 — Initial (appcat).
+ */
+
+.overlay {
+  position: fixed; inset: 0; z-index: 600;
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+}
+/* The browser's own line height, which the app catalogue's page read at (Overlay normalLeading). */
+.overlay--normal-leading { line-height: normal; }
+/* The catalogue's quiet word (Overlay smallWords): a small action link a step smaller, in the body
+   face (.dtl-btn, .78rem). The tones that set their own size keep it. */
+.overlay--small-words .poster-action--small:not(.poster-action--row):not(.poster-action--lower):not(.poster-action--text):not(.poster-action--plain):not(.poster-action--quiet) {
+  font-family: var(--font-body); font-size: .78rem;
+}
+
+.overlay-bar {
+  flex: 0 0 auto; box-sizing: border-box; height: 56px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 24px;
+  background: var(--card-bg, var(--bg));
+  border-bottom: 1px solid var(--border);
+}
+/* The close button: a thin framed square (the catalogue's .icon-btn in its detail toolbar). */
+.overlay-close {
+  flex: 0 0 auto; box-sizing: border-box; width: 36px; height: 36px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius-xs);
+  background: var(--card-bg); color: var(--text);
+  font-family: inherit; font-size: 1.2rem; line-height: inherit; cursor: pointer; user-select: none;
+  transition: transform .25s cubic-bezier(.16, 1, .3, 1);
+}
+.overlay-close:hover { transform: translateY(-1px); }
+.overlay-close:active { transform: translateY(0); }
+.overlay-title {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-body); font-weight: 800; font-size: .95rem; color: var(--text);
+}
+.overlay-glyph { font-size: 1.3rem; }
+/* The pencil into the thing's editor: a quiet mark, whole under the pointer (.rename-pencil). */
+.overlay-edit {
+  background: none; border: 0; padding: 0 2px; cursor: pointer;
+  font-family: inherit; font-size: 1rem; line-height: 1; vertical-align: middle; opacity: .5;
+  transition: opacity .25s cubic-bezier(.16, 1, .3, 1);
+}
+.overlay-edit:hover { opacity: 1; }
+.overlay-tools { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; }
+/* The pill link at the bar's end (.aimeat-cta): it opens in a new tab. */
+.overlay-link {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--radius-full);
+  font-size: .8rem; font-weight: 600; text-decoration: none; white-space: nowrap;
+  color: var(--text); background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  border: 1px solid var(--border); transition: all .15s;
+}
+.overlay-link:hover { border-color: var(--accent); color: var(--accent); }
+.overlay-link-mark { color: var(--accent); }
+
+.overlay-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 40px 44px 80px;
+  font-family: var(--font-body);
+}
+/* One thing edge to edge (the framed app): no padding, no scroll of its own. */
+.overlay-body--fill { display: flex; padding: 0; overflow: hidden; }
+/* No ground of its own: a framed page without one shows the layer's ground, as #app-iframe did. */
+.overlay-body--fill > iframe { flex: 1 1 auto; width: 100%; height: 100%; border: 0; background: transparent; }
+
+/* The viewer's bar (#iframe-view .iframe-toolbar): glass, thinner padding, the close button larger. */
+.overlay--fill .overlay-bar {
+  height: auto; padding: 10px 16px;
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+.overlay--fill .overlay-title { display: block; font-size: .85rem; font-weight: 600; }
+.overlay--fill .overlay-close {
+  width: 40px; height: 40px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  transition: border-color .25s cubic-bezier(.16, 1, .3, 1), transform .25s cubic-bezier(.16, 1, .3, 1),
+    box-shadow .25s cubic-bezier(.16, 1, .3, 1), background .25s cubic-bezier(.16, 1, .3, 1);
+}
+.overlay--fill .overlay-close:hover { border-color: var(--text-muted); box-shadow: var(--shadow-md); background: var(--bg-surface); }
+
+/* The way back at the top of the body (.dtl-back): a mono coral line under a heavy rule. */
+.overlay-back {
+  display: block; box-sizing: border-box; width: 100%;
+  border: 0; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+  padding: 14px 0 0; background: none; cursor: pointer; text-align: left;
+  font-family: var(--font-mono); font-size: .8rem; line-height: inherit; color: var(--accent);
+}
+.overlay-back:hover { text-decoration: underline; }
+
+/* The page and its contents rail. */
+.overlay-page {
+  display: grid; grid-template-columns: minmax(0, 1092px) 250px; gap: 56px;
+  justify-content: center; align-items: start;
+}
+.overlay-main { min-width: 0; }
+.overlay-side { position: sticky; top: 0; align-self: start; }
+.overlay-side .og-rail { position: static; max-height: calc(100vh - 136px); }
+
+@media (max-width: 1100px) {
+  .overlay-page { grid-template-columns: minmax(0, 1fr); }
+  .overlay-side { display: none; }
+}
+@media (max-width: 900px) {
+  .overlay-bar { padding: 8px 16px; }
+  .overlay-body { padding: 16px 18px 0; }
+  .overlay-body--fill { padding: 0; }
+  .overlay--fill .overlay-bar { padding: 10px 16px; }
+}

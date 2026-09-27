@@ -60,6 +60,12 @@ export const SHARED_DEMOS = {
     { name: 'open', render: (ex) => html`<${CardMenu} state="open" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'working', render: (ex) => html`<${CardMenu} state="working" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'inline, in a line of words', render: () => html`<div class="poster-time poster-turn-meta">10:42 <${CardMenu} inline="start" label="More" actions=${[{ label: 'Mark important', run: noop }, { label: 'Delete this message', run: noop, danger: true }]} /></div>` },
+    { name: 'word: opens from words', render: () => html`<${CardMenu} word="Backups and imports" label="Back up your apps, or bring them back"
+        actions=${[{ label: 'Export all apps as a zip', run: noop }, { label: 'Export the ones I pick', run: noop }, { divider: true }, { label: 'Import a zip', run: noop }]} />` },
+    { name: 'word, framed', render: () => html`<${CardMenu} word="Backups and imports" framed
+        actions=${[{ label: 'Export all apps as a zip', run: noop }, { label: 'Export the ones I pick', run: noop }, { divider: true }, { label: 'Import a zip', run: noop }]} />` },
+    { name: 'word, disabled while it runs', render: () => html`<${CardMenu} word="Exporting Harbour Studio's twelve apps…" framed disabled
+        actions=${[{ label: 'Export all apps as a zip', run: noop }]} />` },
   ] },
   'markdown': { variants: [{ name: 'every element', render: () => html`<${Markdown} text=${MARKDOWN} />` },
     { name: 'small', render: () => html`<${Markdown} text=${MARKDOWN} small />` }] },

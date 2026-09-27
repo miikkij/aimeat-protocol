@@ -9,6 +9,28 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.11.1 — 2026-09-27 — The page text area's corner reads var(--shape-corner-control) instead of a
+ *     literal 0 (the AIMEAT value, so AIMEAT is unchanged; a theme reaches it). check:shape-tokens.
+ *   v1.11.0 — 2026-09-27 — A chapter form's hidden field (4px over, 6px under) and the grey line right
+ *     under a chapter form (8px over the door row): the old detail's access code editor; additive,
+ *     appcat parity (sections-b).
+ *   v1.10.0 — 2026-09-27 — .og-fields--spaced (Fields `plain chapter spaced`): the old detail's About
+ *     editor; additive, appcat parity (sections-a).
+ *   v1.9.0 — 2026-09-27 — .og-fields--column and --narrow (Fields `plain column`, `narrow`): a detail's
+ *     form in one column, the old .mk-author-form and .lg-editor; .og-textarea--page (TextArea `page`):
+ *     a page's text in the framed typewriter box, the old .lg-textarea. Additive, appcat parity
+ *     (sections-c).
+ *   v1.8.1 — 2026-09-27 — .og-fields--ruled (Fields `plain chapter ruled`), a chapter form's hint and
+ *     its three-in-a-row: the old tool editor (.mz-form); additive, appcat parity (sections-d).
+ *   v1.8.0 — 2026-09-27 — .og-fields--chapter (Fields `plain chapter`): a form inside a chapter of the
+ *     old app catalogue's detail, its labels and inline fields spaced as there; additive, appcat
+ *     parity (sections-d).
+ *   v1.7.0 — 2026-09-27 — .og-fields--plain draws the rest of the old app catalogue's dialog form: the
+ *     label's spacing, the underlined fields (a many-line one too) at its padding, size and weight,
+ *     the italic placeholder, the small hint; its label note in the old grey. appcat parity; the
+ *     option is appcat's alone.
+ *   v1.6.0 — 2026-09-27 — .og-fields--plain: the labels as plain bold words in ink (appcat's dialog
+ *     forms, the old app catalogue's .modal-label); additive.
  *   v1.5.0 — 2026-09-26 — .og-fields--4: four short fields in a row, two under 1100px (an offer's price,
  *     moved from offers-poster.css .op-sell; page group G6).
  *   v1.4.0 — 2026-09-26 — .og-fields--3: three short fields in a row (the crew form's grid3, moved from agents-crew.css).
@@ -45,6 +67,123 @@
 .og-fields--3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.2rem; }
 /* Four short fields side by side, their feet level (an offer's price; formerly offers-poster.css .op-sell). */
 .og-fields--4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem 1.2rem; align-items: end; }
+/* The plain labels (Fields `plain`): a dialog form in the app catalogue's face, each label plain bold
+   words in ink and in their own case (the old page's .modal-label), its dim part (a Field's labelNote)
+   in the grey. */
+.og-fields--plain .poster-label { font-family: var(--font-body); font-size: .9rem; font-weight: var(--weight-bold); color: var(--text); text-transform: none; letter-spacing: 0; }
+.og-fields--plain .poster-label .field-label-note { font-family: inherit; font-size: inherit; font-weight: 600; color: var(--text-muted); }
+/* …and the rest of the old dialog form (appcat parity; the old page's .modal-label, .modal-input and
+   its hints): each label 14px under what stands above it and 2px over its field; the fields on the
+   page's ground with the ink line under them, 10px 14px inside, bold; the placeholder grey, italic and
+   faint; a hint 4px under its field in the small grey. The old page's --text-dim is the site's
+   --text-muted and its --text-muted the site's --text-dim, so the greys read those. */
+.og-fields.og-fields--plain { gap: 0; }
+.og-fields--plain > .og-field { gap: 2px; }
+.og-fields--plain > .og-field > .poster-label { display: block; margin: 14px 0 0; line-height: normal; }
+.og-fields--plain .poster-label .field-label-note { margin-left: .25em; }
+.og-fields.og-fields--plain .og-input.text-field--glyph { font-size: 1.6rem; }
+.og-fields.og-fields--plain :is(.og-input, .og-textarea) { padding: 10px 14px; font-family: var(--font-body); font-size: .88rem; font-weight: var(--weight-bold); line-height: normal; }
+.og-fields.og-fields--plain .og-textarea { background: transparent; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); border-radius: var(--shape-corner-control); }
+.og-fields.og-fields--plain .og-textarea:focus { border-bottom-color: var(--accent); }
+.og-fields--plain :is(.og-input, .og-textarea)::placeholder { color: var(--text-muted); font-style: italic; opacity: .7; }
+.og-fields.og-fields--plain .og-textarea--code { font-family: var(--font-mono); font-size: .8rem; line-height: 1.4; min-height: 160px; }
+.og-fields--plain > .og-field > .poster-hint { margin: 2px 0 0; font-size: .75rem; line-height: normal; color: var(--text-dim); }
+/* A many-line field keeps the 3px under it that the old page's inline text area left on its line. */
+.og-fields--plain > .og-field > .og-textarea { margin-bottom: 3px; }
+/* A choice in it is the same underlined field with a small grey arrow at its right end, drawn from two
+   gradients so it takes the theme's grey (the old select.modal-input). */
+.og-fields.og-fields--plain .select-field {
+  appearance: none; -webkit-appearance: none; width: 100%; box-sizing: border-box; cursor: pointer;
+  padding: 10px 32px 10px 14px; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); border-radius: var(--shape-corner-control);
+  background-color: transparent; color: var(--text); font-family: var(--font-body); font-size: .88rem; font-weight: var(--weight-bold); line-height: normal;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: right 16px center, right 12px center; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+.og-fields.og-fields--plain .select-field:focus { border-bottom-color: var(--accent); outline: none; }
+.og-fields--plain .select-field option { background: var(--card-bg); color: var(--text); }
+/* The eye of a hidden field is grey until pressed (the old .secret-eye). */
+.og-fields--plain .text-field-eye { color: var(--text-dim); }
+.og-fields--plain .text-field-eye:hover, .og-fields--plain .text-field-eye[aria-pressed="true"] { color: var(--text); }
+/* A form inside a chapter of the app catalogue's detail (Fields `plain chapter`, appcat sections-d):
+   the old detail's label.dtl-stat-label over its inline field. The form and its fields are blocks, so
+   a label's 14px above meets the margin of what stands before it as it did there; a field stands in
+   the line under its label (so the line's descent stays under it); in a `spaced` form a many-line one
+   stands 4px under its label and 6px over what follows (the old inline margin of the About and
+   Promote texts). Two columns stay two down to 900px, 24px apart. */
+.og-fields.og-fields--chapter:not(.og-fields--2):not(.og-fields--3) { display: block; }
+.og-fields.og-fields--chapter > .og-field { display: block; }
+.og-fields--plain.og-fields--chapter > .og-field > .poster-label { margin: 14px 0 2px; }
+.og-fields--chapter > .og-field > :is(.og-input, .og-textarea) { display: inline-block; vertical-align: baseline; }
+.og-fields--spaced > .og-field > .og-textarea { margin: 4px 0 6px; }
+.og-fields.og-fields--chapter.og-fields--2 { gap: 0 24px; }
+/* A chapter's form opened from a door row stands 14px under it; its grey lines stand 6px from what is
+   around them, and its own door row 18px under its last field (the old .od-form, .od-note,
+   .od-actions: the ODPS defaults). */
+.og-doors--chapter + .og-fields--chapter:has(> .poster-quiet--chapter:first-child) { margin-top: 14px; }
+.og-fields--chapter > .poster-quiet.poster-quiet--chapter { margin: 6px 0; }
+.og-fields--chapter > .og-doors--chapter { margin-top: 18px; }
+/* A chapter form opened in place (Fields `plain chapter ruled`, appcat sections-d): under the heavy ink
+   rule, 24px under what is above it, 4px inside; its door row 22px under its last question; a field's
+   hint 6px under it in the lighter grey; three fields in a row are two wide and a short third (the old
+   tool editor: .mz-form, .mz-actions, .mz-hint, .mz-grid--price). */
+.og-fields.og-fields--chapter.og-fields--ruled { margin-top: 24px; padding-top: 4px; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); }
+.og-fields--ruled > .og-doors--chapter { margin-top: 22px; }
+/* …where a choice among three in a row (the currency) stands 4px under its label and 8px over what
+   follows (the old currency select's own margin). */
+.og-fields--ruled .og-fields--chapter.og-fields--3 > .og-field > .select-field { margin: 4px 0 8px; }
+.og-fields--ruled :is(.og-fields--chapter > .og-field, .og-fields--chapter, .poster-step--question) > .poster-hint { display: block; max-width: 66ch; margin-top: 6px; margin-bottom: 0; font-size: .8rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted); }
+.og-fields.og-fields--chapter.og-fields--3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 120px; gap: 0 24px; }
+@media (max-width: 1100px) { .og-fields.og-fields--chapter.og-fields--3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 120px; } }
+@media (max-width: 900px) { .og-fields.og-fields--chapter.og-fields--3 { grid-template-columns: minmax(0, 1fr); } }
+/* A chapter form's hidden field stands 4px under its label and 6px over what follows, and the grey
+   line right under the form 8px over the door row (the old detail's access code editor: .dtl-ac-editor
+   .secret-field and its .dtl-sync.none; appcat sections-b). */
+.og-fields--chapter > .og-field > .text-field-secret { margin: 4px 0 6px; }
+.og-fields--chapter:not(.og-fields--spaced) + .poster-quiet.poster-quiet--chapter { margin: 0 0 8px; }
+/* A spaced chapter form (Fields `plain chapter spaced`, appcat sections-a): the old detail's About
+   editor, whose one-line fields carried 4px above and 10px under them (the last one 8px), the row of
+   doors right under the form 4px, its status line 8px under that and none above, and the grey line
+   under the form 10px. */
+.og-fields--spaced > .og-field > .og-input { margin: 4px 0 10px; }
+.og-fields--spaced > .og-field:last-child > .og-input { margin-bottom: 8px; }
+.og-fields--spaced + .og-doors { margin-bottom: 4px; }
+.og-fields--spaced + .og-doors + .note-report.note-report--chapter { margin: 0 0 8px; }
+.og-fields--spaced + .poster-quiet { margin-bottom: 10px; }
+@media (max-width: 1100px) { .og-fields.og-fields--chapter.og-fields--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .og-fields.og-fields--chapter.og-fields--2 { grid-template-columns: minmax(0, 1fr); } }
+/* The rows (Fields `beside`): each label 130px wide at the left of its field, 12px between them, 10px
+   above and under, a thin rule under the row and 10px after it (the old page's .settings-row). */
+.og-fields.og-fields--beside > .og-field { flex-direction: row; align-items: center; gap: 12px; padding: 10px 0; margin: 0 0 10px; border-bottom: 1px solid var(--border); }
+/* The label kept the old dialog label's margins (14px over, 2px under) in that row, which set it a few
+   pixels under the field's middle; kept as it looked. */
+.og-fields--beside > .og-field > .poster-label { flex: 0 0 130px; margin: 14px 0 2px; }
+/* The last row's 10px met the next part's 2rem there instead of adding to it. */
+.poster-section:has(+ .poster-section) > .og-fields--beside > .og-field:last-child { margin-bottom: 0; }
+.og-fields--beside > .og-field > :not(.poster-label) { flex: 1 1 auto; min-width: 0; }
+/* A detail's form in one column (Fields `plain column`, appcat sections-c): the old .mk-author-form
+   and .lg-editor. Every part 10px under the one above; a label 2px over its field; a hint the
+   chapter's grey line 10px under its field (the old .dtl-ai-status); a choice 260px at most, the whole
+   width on a phone. `narrow`: the reviewer's name, 520px at most, 14px of air above and 8px below. */
+.og-fields.og-fields--column { display: flex; flex-direction: column; gap: 10px; }
+.og-fields.og-fields--column > .og-field { gap: 10px; }
+.og-fields--plain.og-fields--column > .og-field > .poster-label { margin: 0 0 2px; }
+.og-fields.og-fields--column > .og-field > .poster-hint { margin: 10px 0 0; min-height: 1.1em; font-size: .82rem; line-height: normal; color: var(--text-dim); }
+.og-fields.og-fields--column .select-field { max-width: 260px; }
+.og-fields.og-fields--column > .og-field > .og-textarea { margin-bottom: 0; }
+/* In a chapter's form (not `spaced`) a many-line field stands in its line, which already leaves the
+   old inline field's room under it, so the plain form's 3px under it would count that room twice
+   (measured on the old Search wording: 3px too low from its keywords down). sections-c. */
+.og-fields.og-fields--chapter:not(.og-fields--spaced) > .og-field > .og-textarea { margin-bottom: 0; }
+.og-fields.og-fields--narrow { max-width: 520px; margin: 14px 0 8px; }
+/* A page's text written by hand (TextArea `page`, appcat sections-c): the typewriter face in a framed
+   box on the grey ground, 280px high at least (the old .lg-textarea, a legal page). */
+.og-fields .og-textarea.og-textarea--page, .og-textarea.og-textarea--page {
+  min-height: 280px; padding: 12px 14px; resize: vertical;
+  border: var(--shape-frame) solid var(--shape-field-colour); border-radius: var(--shape-corner-control); background: var(--bg-surface);
+  font-family: var(--font-mono); font-size: .85rem; font-weight: 400; line-height: 1.55;
+}
+.og-fields .og-textarea.og-textarea--page:focus, .og-textarea.og-textarea--page:focus { border-color: var(--accent); }
+@media (max-width: 900px) { .og-fields.og-fields--column .select-field { max-width: none; } }
 
 @media (max-width: 1100px) {
   .og-fields--2 { grid-template-columns: 1fr; }

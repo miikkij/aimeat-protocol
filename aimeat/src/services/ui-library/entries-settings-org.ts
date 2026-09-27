@@ -9,6 +9,8 @@
  * @structure ORG_SETTINGS_ENTRIES
  * @usage import { ORG_SETTINGS_ENTRIES } from './entries-settings-org.js';
  * @version-history
+ *   v1.10.3 — 2026-09-27 — The Sub-heading's rule, rule="readout", quiet and part, which appcat added (catalogue pass).
+ *   v1.10.2 —2026-09-27 — The Check's pill, ruled and strong, and its focus and pointer handlers, which appcat added (catalogue pass).
  *   v1.10.1 — 2026-09-27 — The Key says the List's Name asKey draws it in a list (catalogue pass).
  *   v1.10.0 — 2026-09-27 — The Sub-heading is components/SubHeading.js (SubHeading, HeadDesc), catalogue pass.
  *   v1.9.0 — 2026-09-27 — The Check line is components/Check.js; the Field row says TextField `box` draws it (catalogue pass).
@@ -83,14 +85,18 @@ export const ORG_SETTINGS_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'sub-heading', name: 'SubHeading', kind: 'component', status: 'active',
-        summary: 'A small heading over a group of fields, a card or a note inside a section: small ink headline letters, no capitals, and the grey line the classic Settings pages put under it. The coral small capitals stay for a field\'s label and the heading over a list.',
+        summary: 'A small heading over a group of fields, a card or a note inside a section: small bold ink letters of the body face, no capitals, and the grey line the classic Settings pages put under it. The coral small capitals stay for a field\'s label and the heading over a list. Three more cuts name a part of a long section: coral capitals over the ink rule, a grey heading over a strip, and bold ink at the reading size.',
         module: '/components/SubHeading.js', sheet: '/css/components/sub-heading.css',
         data: {
-            shape: 'SubHeading({ level, inline, id, desc, children }) · HeadDesc({ children })',
+            shape: 'SubHeading({ level, inline, id, desc, rule, quiet, part, children }) · HeadDesc({ children })',
             fields: {
                 level: '2 to 6: a heading of that level, which counts in the page\'s outline; without it the words stand in a block',
                 inline: 'the words stand in a line (a span)', id: 'the anchor a link scrolls to',
                 desc: 'the grey line under it (.section-desc, the classic pages\' line)', children: 'what the group, card or note is about',
+                rule: 'true: the heading of one part of a long section, in coral small capitals over the ink rule, with 2rem of air above; \'readout\': the same heading opening a part of a readout, 30px under the part before it and 12px over its own',
+                quiet: 'a grey heading, a little larger, with no air of its own, over a strip that is not the page\'s matter',
+                part: 'true: a part\'s heading in bold ink at the reading size, with no air of its own; \'apart\': the same with 30px of air above and 10px below',
+                'rule, quiet, part': 'one at a time; when more are given, rule wins, then quiet, then part',
                 HeadDesc: 'the grey line alone, under a heading it does not draw or under a field',
             },
         },
@@ -99,20 +105,30 @@ export const ORG_SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'heading', prop: 'level={3}', when: 'the words are a heading of the page\'s outline' },
             { name: 'in a line', prop: 'inline', when: 'the words stand in a line with other things' },
             { name: 'with its line', prop: 'desc', when: 'a classic page\'s heading with the grey line that explains it' },
+            { name: 'rule', class: 'sub-heading--rule', prop: 'rule', when: 'a part of a long section, such as a chapter of an app\'s detail ("What it holds", "Where people came from")' },
+            { name: 'rule, readout', class: 'sub-heading--readout', prop: 'rule="readout"', when: 'the heading that opens each part of a readout, with the air between the parts (an app\'s visitors)' },
+            { name: 'quiet', class: 'sub-heading--quiet', prop: 'quiet', when: 'a grey heading over a strip that is not the page\'s matter (the app catalogue\'s "Active Extensions")' },
+            { name: 'part', class: 'sub-heading--part', prop: 'part', when: 'a part\'s heading inside a chapter, in the words\' own face ("What people will see")' },
+            { name: 'part apart', class: 'sub-heading--apart', prop: 'part="apart"', when: 'the same heading with air above and below it ("Who answers for this app")' },
         ],
         example: { level: 3, children: 'Your own TypeSafe key', desc: 'A key of your own is used before the node\'s.' },
-        note: 'Built on 2026-09-26 from the AI page\'s sub-heading (.pf-aitr-sub): Jouni\'s decision "Sub-heading" made the coral small capitals (.card-h3, .pf-agd-section-title, .pj-section-title), the ink bold words (.card-title, .pf-bold) and the coral headline letters (.stat-panel-h4) this one look. The grey line (.section-desc) wears section-header.css and profile-poster.css.',
+        note: 'Built on 2026-09-26 from the AI page\'s sub-heading (.pf-aitr-sub): Jouni\'s decision "Sub-heading" made the coral small capitals (.card-h3, .pf-agd-section-title, .pj-section-title), the ink bold words (.card-title, .pf-bold) and the coral headline letters (.stat-panel-h4) this one look. The grey line (.section-desc) wears section-header.css and profile-poster.css. On 2026-09-27 appcat, the app catalogue rebuilt on components, added rule and rule="readout" (the old catalogue\'s .vis-h, .dtl-dm-body h4 and #detail-marks h4), quiet (its Active Extensions heading) and part with part="apart" (its detail h4).',
     },
     {
         id: 'check-line', name: 'Check', kind: 'component', status: 'active',
-        summary: 'A check box or a radio dot with its words beside it, at the size and colour of the page\'s own text: a row, the box level with the words, the whole line pressable. A grey hint can stand under the words; several checks can stand side by side in a line.',
+        summary: 'A check box or a radio dot with its words beside it, at the size and colour of the page\'s own text: a row, the box level with the words, the whole line pressable. A grey hint can stand under the words; several checks can stand side by side in a line. Three more faces: a small framed pill on the sun while ticked, a line of a list with a thin rule under it and grey words, and bold words with a larger box for the choice that decides what a form does.',
         module: '/components/Check.js', sheet: '/css/components/check-line.css',
         data: {
-            shape: 'Check({ checked, onChange, radio, name, value, hint, inline, disabled, title, id, ariaLabel, children })',
+            shape: 'Check({ checked, onChange, radio, name, value, hint, inline, pill, ruled, strong, disabled, title, id, ariaLabel, onFocus, onBlur, onMouseEnter, onMouseLeave, children })',
             fields: {
                 checked: 'the box is ticked, or the dot is picked', onChange: '(checked, event); a radio calls it only when it is picked, with true',
                 radio: 'a radio dot instead of a box; `name` (and `value`) group the dots', hint: 'a grey line under the words',
                 inline: 'several checks side by side in a line of words', disabled: 'it cannot change now: dimmed',
+                pill: 'one of several small framed choices side by side, bold words, on the sun while ticked',
+                ruled: 'one choice of a list: a thin rule under it, the words a step smaller in grey with their bold part (<strong>) in ink, the 18px box in ink at the first line',
+                strong: 'a choice that decides what a form does: bold words, an 18px ink box, 14px under what stands above it',
+                'onFocus, onBlur': 'reach the box: a page that says what the focused choice is',
+                'onMouseEnter, onMouseLeave': 'reach the whole line: a page that says what the pointed choice is',
                 'title, id': 'the tooltip, and the box\'s id when code reaches it', ariaLabel: 'its name when the words are not enough',
                 children: 'the words: what the box turns on, or what the dot picks',
             },
@@ -123,8 +139,11 @@ export const ORG_SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'inline', class: 'check--inline', prop: 'inline', when: 'several short ones side by side in a line of words' },
             { name: 'with a hint', class: 'check--hint', prop: 'hint', when: 'an answer that needs a line under it: the box stands level with the first line' },
             { name: 'disabled', class: 'check--off', prop: 'disabled', when: 'it cannot change now' },
+            { name: 'pill', class: 'check--pill', prop: 'pill', when: 'a set of small options to add to something, side by side: the capability packs of a prompt the app catalogue builds' },
+            { name: 'ruled', class: 'check--ruled', prop: 'ruled', when: 'a list of choices where each needs a sentence: an app\'s copy protection flags' },
+            { name: 'strong', class: 'check--strong', prop: 'strong', when: 'the one choice that decides what a form does: list a tool in EXCHANGE' },
         ],
         example: { checked: true, children: 'Detect on capture' },
-        note: 'Built on 2026-09-26 from the check lines drawn at the body\'s size (Packages, Companies, the account dialog): Jouni\'s decision "Check line" made the smaller grey words (.pf-nb-toggle, .sk-check, .pf-dr-check, .ap-hint and kin) this one look. Since 2026-09-26 it is components/Check.js, which lays the line out itself with the layout most Settings check lines drew (sch-check, pj-share-row, cp-check, kp-check, wp-check) and replaces the page wrappers and the radio labels (ai-radio, radio-label, pf-or-radio-label, pf-eco-recipe-radio).',
+        note: 'Built on 2026-09-26 from the check lines drawn at the body\'s size (Packages, Companies, the account dialog): Jouni\'s decision "Check line" made the smaller grey words (.pf-nb-toggle, .sk-check, .pf-dr-check, .ap-hint and kin) this one look. Since 2026-09-26 it is components/Check.js, which lays the line out itself with the layout most Settings check lines drew (sch-check, pj-share-row, cp-check, kp-check, wp-check) and replaces the page wrappers and the radio labels (ai-radio, radio-label, pf-or-radio-label, pf-eco-recipe-radio). `pill`, `ruled`, `strong` and the focus and pointer handlers came with appcat on 2026-09-27 and replace the old app catalogue\'s .pb-pack-item, .protect-row and .mz-check.',
     },
 ];

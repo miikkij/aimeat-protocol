@@ -9,6 +9,14 @@
  *   sets no margin: a place keeps its own. Drawn by components/SubHeading.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — .sub-heading--readout (SubHeading rule="readout"): the old visitors' part
+ *     heading, 30px of air above; additive, appcat parity (sections-b).
+ *   v1.4.0 — 2026-09-27 — .sub-heading--part and --apart (SubHeading `part`): a part's heading in bold
+ *     ink at the reading size, the old app catalogue's detail h4; additive, appcat parity (sections-c).
+ *   v1.3.0 — 2026-09-27 — .sub-heading--quiet (SubHeading `quiet`): the grey heading over a strip,
+ *     the old app catalogue's Active Extensions bar; additive, appcat parity.
+ *   v1.2.0 — 2026-09-27 — .sub-heading--rule (SubHeading `rule`): a part's heading in coral capitals
+ *     over the ink rule, the old app catalogue's; additive, appcat detail builder B.
  *   v1.1.0 — 2026-09-27 — The body face at 700 instead of the headline face at 600: the headline face
  *     (Fjalla One) has one weight, so the browser faked the bold and the small headings looked smudged
  *     (Security's CORS headings, Node stats' panels). The design language allows no synthesised bold.
@@ -19,3 +27,22 @@
   font-family: var(--font-body); font-size: .9rem; font-weight: 700; line-height: 1.25;
   letter-spacing: 0; text-transform: none; color: var(--text);
 }
+/* A part's heading inside a long section: the row label's coral capitals over the ink rule, with air
+   above (the old app catalogue's .vis-h, .dtl-dm-body h4 and #detail-marks h4). */
+.sub-heading--rule {
+  margin: 2rem 0 .75rem; padding-bottom: 6px; border-bottom: var(--shape-frame, 2px) solid var(--shape-rule-colour, var(--text));
+  font-size: var(--text-xs, .72rem); font-weight: var(--weight-heavy, 800); color: var(--accent);
+  text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label, .1em);
+}
+/* A grey heading over a strip that is not the page's matter, with no air of its own (the old app
+   catalogue's Active Extensions bar: .95rem in its --text-muted, which is the theme's --muted). */
+.sub-heading--quiet { margin: 0; font-size: .95rem; line-height: normal; color: var(--muted); }
+/* A part's heading in the words' own face (SubHeading `part`, appcat sections-c): bold ink at the
+   reading size, no air of its own (the old app catalogue's detail h4: "What people will see"); 'apart'
+   gives it 30px of air above and 10px below (#detail-marks h4: "Who answers for this app"). */
+.sub-heading.sub-heading--part { margin: 0; font-size: 1rem; line-height: normal; }
+.sub-heading.sub-heading--apart { margin: 30px 0 10px; }
+/* The rule heading that opens a part of a readout (SubHeading rule="readout", appcat sections-b): 30px
+   under the part before it, 12px over its own, at the reading's line height (the old visitors'
+   .vis-block and its .vis-h). */
+.sub-heading.sub-heading--readout { margin: 30px 0 12px; line-height: normal; }

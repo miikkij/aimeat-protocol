@@ -10,6 +10,10 @@
  *   Reads no colour and no shape. The hairline of the split is .og-split (page-section.css).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.9.0 — 2026-09-27 — .layout-above--part and .layout-below--part (Layout.js step 'part', 1.875rem):
+ *     the air between the parts of a readout; additive, appcat parity (sections-b).
+ *   v1.8.0 — 2026-09-27 — .layout-inset--* (Layout.js Space `inset`): a step at both sides; additive,
+ *     appcat parity (the old catalogue's Active Extensions bar).
  *   v1.7.0 — 2026-09-27 — .layout-beside--stick, the side part kept in sight while the main part
  *     scrolls, over it when one column (Layout.js Beside `stick`; formerly admin-portal.css
  *     .adm-pt-bench > .adm-pt-side; admin group G2).
@@ -53,6 +57,8 @@
 .layout-above--medium { margin-top: .75rem; }
 .layout-above--large { margin-top: 1rem; }
 .layout-above--section { margin-top: 1.5rem; }
+/* 'part' (appcat sections-b): the air between the parts of a readout, the old visitors' .vis-block. */
+.layout-above--part { margin-top: 1.875rem; }
 
 .layout-below--none { margin-bottom: 0; }
 .layout-below--tight { margin-bottom: .25rem; }
@@ -60,6 +66,14 @@
 .layout-below--medium { margin-bottom: .75rem; }
 .layout-below--large { margin-bottom: 1rem; }
 .layout-below--section { margin-bottom: 1.5rem; }
+.layout-below--part { margin-bottom: 1.875rem; }
+
+/* Space `inset` (appcat parity): the same step at both sides (the old catalogue's Active Extensions
+   bar, 24px in from the column's edges). */
+.layout-inset--small { margin-left: .5rem; margin-right: .5rem; }
+.layout-inset--medium { margin-left: .75rem; margin-right: .75rem; }
+.layout-inset--large { margin-left: 1rem; margin-right: 1rem; }
+.layout-inset--section { margin-left: 1.5rem; margin-right: 1.5rem; }
 
 .layout-pad--none { padding-top: 0; }
 .layout-pad--tight { padding-top: .25rem; }

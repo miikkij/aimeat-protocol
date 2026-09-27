@@ -1,0 +1,45 @@
+/**
+ * @file slot-bars.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Counts over a window of days as a row of stacked bars in CSS pixels: the title in the
+ *   row label's coral capitals, the peak line and the axis dates in the typewriter face, the bars in
+ *   up to three tones (ink, grey, coral) told apart by strength and not by hue alone, a key under
+ *   them. Drawn by components/SlotBars.js. The values are the old app catalogue's version chart
+ *   (.version-chart*) and visitor charts (.vis-bar-mark, .vis-keys).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 — 2026-09-27 — The greys are --text-muted (the old page's --text-dim is the site's
+ *     --text-muted); .slot-bars-summed, -summary and -caveat (SlotBars summary and caveat: the old
+ *     .version-span and .version-span-hint around the version chart). appcat parity, sections-b.
+ *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder B).
+ */
+.slot-bars { margin: 4px 0 8px; }
+.slot-bars-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.slot-bars-title {
+  font-size: var(--text-xs, .72rem); color: var(--accent); font-weight: var(--weight-heavy, 800);
+  text-transform: var(--shape-case-label, uppercase); letter-spacing: var(--shape-tracking-label, .1em);
+}
+.slot-bars-peak { font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); }
+.slot-bars-svg { display: block; width: auto; max-width: 100%; height: 96px; overflow: visible; }
+.slot-bars-base { stroke: var(--border); stroke-width: 1; }
+.slot-bars-hit { fill: transparent; }
+.slot-bars-mark--coral { fill: var(--accent); }
+.slot-bars-mark--ink { fill: var(--text); }
+.slot-bars-mark--dim { fill: var(--text-muted); }
+.slot-bars-bar:hover .slot-bars-mark { fill: var(--text); }
+.slot-bars-axis { display: flex; justify-content: space-between; margin-top: 6px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); }
+.slot-bars-keys { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: .78rem; color: var(--text-muted); }
+.slot-bars-key { display: inline-flex; align-items: center; gap: 6px; }
+.slot-bars-swatch { display: inline-block; width: 12px; height: 12px; }
+.slot-bars-swatch--coral { background: var(--accent); }
+.slot-bars-swatch--ink { background: var(--text); }
+.slot-bars-swatch--dim { background: var(--text-muted); }
+/* The chart with its line over it and its caveat under it (SlotBars summary, caveat): the old version
+   chart's .version-span, the chart 8px over the caveat, and .version-span-hint 22px over the list. */
+.slot-bars-summed > .slot-bars { margin: 0 0 8px; }
+.slot-bars-summary { margin: 0 0 14px; font-family: var(--font-mono); font-size: .8rem; color: var(--text-muted); }
+.slot-bars-caveat {
+  max-width: 70ch; margin: 0 0 22px;
+  font-size: .8rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text-muted);
+}

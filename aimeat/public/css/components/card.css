@@ -17,6 +17,8 @@
  * @version-history
  *   v1.4.1 — 2026-09-26 — The door tile's focus ring reads var(--shape-frame) (2px in AIMEAT), not a
  *     literal (check:shape-tokens; fix pass).
+ *   v1.5.0 — 2026-09-27 — .card-grid--strip (CardGrid cols 'strip'): tiles in one sideways line, for appcat; additive.
+ *   v1.5.1 — 2026-09-27 — A tile in the strip is the old catalogue's small card (.cortex-mini-card), appcat parity; strip only.
  *   v1.4.0 — 2026-09-26 —The tile's lines (.card-tile-lines, .card-tile-line: Discover's places, main's .dv-ws; G8, additive).
  *   v1.3.0 — 2026-09-26 — A hint beside a tile's door has no margin of its own (Packages' roads; G7, additive).
  *   v1.2.0 — 2026-09-26 — The section inside a list row (.card-section--in-row; G3, additive).
@@ -164,6 +166,22 @@
 .card-grid.card-grid--sections > .card-section--wide { grid-column: 1 / -1; }
 /* Figure doors in a line. */
 .card-grid--figures { display: flex; flex-wrap: wrap; gap: .6rem 1.8rem; margin-top: 1.2rem; }
+/* Tiles in one line that scrolls sideways (CardGrid cols 'strip', appcat: the old catalogue's
+   active extensions, .cortex-mini-card in #cortex-bar-grid). */
+.card-grid.card-grid--strip { display: flex; flex-wrap: nowrap; gap: .75rem; overflow-x: auto; padding-bottom: .5rem; }
+.card-grid--strip > * { flex: 0 0 auto; min-width: 160px; }
+/* A tile in the strip is the old catalogue's small card (.cortex-mini-card): a soft card on the card
+   ground with a hairline frame and the small corner, its name in semibold words, its line small and
+   grey in the body face; under the pointer the surface ground and a darker hairline. */
+.card-grid.card-grid--strip { margin-top: 0; }
+.card-grid.card-grid--strip > .card-tile { box-sizing: border-box; min-width: 160px; }
+.card-grid.card-grid--strip > .card-tile.card-tile--framed {
+  display: block; padding: .75rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-bg); box-shadow: none;
+  font-size: 1rem; line-height: normal; color: var(--text); transition: all .15s;
+}
+.card-grid.card-grid--strip > .card-tile.card-tile--framed.card-tile--door:hover { background: var(--bg-surface); border-color: color-mix(in srgb, var(--border) 70%, var(--text-muted)); }
+.card-grid.card-grid--strip > .card-tile--framed .card-tile-name { display: block; margin-bottom: .25rem; font-size: .85rem; font-weight: 600; white-space: nowrap; color: var(--text); }
+.card-grid.card-grid--strip > .card-tile--framed .card-tile-meta { font-family: inherit; font-size: .7rem; color: var(--muted); }
 
 /* The parts every tile shares. */
 .card-tile { min-width: 0; }

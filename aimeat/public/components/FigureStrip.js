@@ -25,11 +25,15 @@
  *   - wrap: the lines under the figures are read whole (they wrap instead of ending in "…").
  *   - flush: the strip opens its box, no air above. lead: the strip opens a tab's content: no air
  *     above, air under it before what follows.
- * @structure FigureStrip({ items, loading, wrap, flush, lead })
+ *   - free: the figures stand free inside a section, without the rules: each number over its word in
+ *     the row label's coral capitals, wrapping as they fit (the old app catalogue's visitor numbers).
+ * @structure FigureStrip({ items, loading, wrap, flush, lead, free })
  * @usage html`<${FigureStrip} items=${[{ n: apps.length, label: x('stripApps'), sub: x('stripAppsSub') },
  *          { n: drafts.length, tone: drafts.length ? 'coral' : undefined, label: x('stripDrafts'), sub: '' }]} />`
  *        html`<${FigureStrip} loading=${4} />`
  * @version-history
+ *   v1.2.0 — 2026-09-27 — `free`: figures without the rules, the word under the number in coral
+ *     capitals (the old app catalogue's .vis-stats); additive, appcat detail builder B.
  *   v1.1.0 — 2026-09-27 — An item's `onClick` and `title`: the admin's strips whose figures are
  *     filters and doors (Overview, Applications, Owners, Security, CORS, Compliance); additive.
  *   v1.0.0 — 2026-09-26 — Initial: the strip ~25 Settings pages wrote by hand
@@ -57,8 +61,10 @@ function Figure({ item }) {
   return html`<div title=${item.title}>${inner}</div>`;
 }
 
-export function FigureStrip({ items = [], loading, wrap, flush, lead }) {
-  const cls = cx('og-strip', wrap && 'og-strip--wrap', flush && 'og-strip--flush', lead && 'og-strip--lead');
+export function FigureStrip({ items = [], loading, wrap, flush, lead, free }) {
+  // free (added by appcat detail builder B): the figures stand free in a section, no rules, each
+  // number over its word in coral capitals (the old app catalogue's visitor numbers, .vis-stats).
+  const cls = cx('og-strip', wrap && 'og-strip--wrap', flush && 'og-strip--flush', lead && 'og-strip--lead', free && 'og-strip--free');
   if (loading) {
     return html`<div class=${cls}>${Array.from({ length: loading }, (_, i) => html`<div key=${i}><b>…</b></div>`)}</div>`;
   }
