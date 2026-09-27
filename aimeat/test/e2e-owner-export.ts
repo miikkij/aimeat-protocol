@@ -27,6 +27,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-owner-export.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-owner-export
  * @version-history
+ *   v1.3.0 — 2026-09-26 — 8b: the work the owner did and asked for in person, under their GHII, is
+ *     in the export beside the agents' work, and so is the dispute over it.
  *   v1.2.0 — 2026-09-09 — Test 14 asserts that `listings`, `purchases` and `escrow_holds` are absent:
  *     the marketplace and generic-escrow storage methods were deleted (no caller) and the export
  *     sections with them.
@@ -295,6 +297,44 @@ await test('Work delivered by another owner\'s agent, then disputed', async () =
     disputeId = dispute.body.data.dispute_id;
 });
 
+// Work the owner does and asks for IN PERSON, which is filed under their GHII rather than under an
+// agent: an action they published themselves, which the other owner asks for, and a request they
+// make themselves, delivered and then disputed.
+let ownProvidedTc = '';
+let ownRequestedTc = '';
+let ownDisputeId = '';
+
+await test('Work in person: an action the owner published is asked for, and work the owner asked for is delivered and disputed', async () => {
+    const mine = `export-own-action-${stamp}`;
+    const pub = await json('/v1/actions', {
+        method: 'POST', headers: authed(subjectToken),
+        body: JSON.stringify({ id: mine, display_name: 'Own action', description: 'an action published in person', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+    });
+    assert(pub.status === 201, `own action ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const asked = await json('/v1/work/request', {
+        method: 'POST', headers: authed(otherToken),
+        body: JSON.stringify({ action_id: mine, provider_gaii: SUBJECT_GHII, input: { text: 'for the owner' } }),
+    });
+    assert(asked.status === 201, `asked ${asked.status}: ${JSON.stringify(asked.body.error)}`);
+    ownProvidedTc = asked.body.data.tracking_code;
+
+    const req = await json('/v1/work/request', {
+        method: 'POST', headers: authed(subjectToken),
+        body: JSON.stringify({ action_id: `export-suite-action-${stamp}`, provider_gaii: providerAgent.gaii, input: { text: 'in person' } }),
+    });
+    assert(req.status === 201, `own request ${req.status}: ${JSON.stringify(req.body.error)}`);
+    ownRequestedTc = req.body.data.tracking_code;
+    for (const [step, body] of [['accept', undefined], ['deliver', { output: { result: 'done' } }]] as const) {
+        const r = await json(`/v1/work/${ownRequestedTc}/${step}`, { method: 'POST', headers: authed(providerAgent.token), ...(body ? { body: JSON.stringify(body) } : {}) });
+        assert(r.body.ok === true, `${step}: ${JSON.stringify(r.body.error)}`);
+    }
+    const dispute = await json(`/v1/work/${ownRequestedTc}/dispute`, {
+        method: 'POST', headers: authed(subjectToken), body: JSON.stringify({ reason: 'not what I asked for' }),
+    });
+    assert(dispute.status === 201, `own dispute ${dispute.status}: ${JSON.stringify(dispute.body.error)}`);
+    ownDisputeId = dispute.body.data.dispute_id;
+});
+
 await test('An anchored personal node, its push subscription and its notification preferences', async () => {
     personalNodeId = `personal-export-${stamp}`;
     const anchor = await json('/v1/personal/anchor', {
@@ -447,6 +487,16 @@ await test('8. The work the owner ordered is in it, and so is the dispute over i
     assert(dispute.status === 'open', `status: ${dispute.status}`);
     // The audit log is what makes a dispute reviewable rather than a status word.
     assert((dispute.audit_log as any[]).some(e => e.event === 'dispute_opened'), `audit_log: ${JSON.stringify(dispute.audit_log)}`);
+});
+
+await test('8b. The work the owner did and asked for in person is in it, beside the agents\' work, and so is the dispute over it', async () => {
+    const provided = ((exported.work_provided ?? []) as any[]).find(w => w.tracking_code === ownProvidedTc);
+    assert(provided?.requester_gaii === `${OTHER}@${NODE_ID}`, `work_provided: ${JSON.stringify(exported.work_provided)}`);
+    const requested = ((exported.work_requested ?? []) as any[]).find(w => w.tracking_code === ownRequestedTc);
+    assert(requested?.provider_gaii === providerAgent.gaii && requested?.status === 'disputed',
+        `work_requested: ${JSON.stringify(exported.work_requested)}`);
+    const dispute = (exported.disputes as any[]).find(d => d.id === ownDisputeId);
+    assert(dispute?.tracking_code === ownRequestedTc, `disputes: ${JSON.stringify((exported.disputes as any[]).map(d => d.id))}`);
 });
 
 await test('9. The personal node, its push rows and the saved notification preferences', async () => {
