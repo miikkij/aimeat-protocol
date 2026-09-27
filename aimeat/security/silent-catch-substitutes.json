@@ -157,7 +157,7 @@
       "count": 1,
       "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
     },
-    "src/cli/connect/api-client.ts": {
+    "src/tool-dispatch/api-client.ts": {
       "count": 1,
       "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
     },

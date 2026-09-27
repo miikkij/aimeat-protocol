@@ -32,8 +32,8 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import type { AimeatConfig } from '../config.js';
-import { CONNECT_CLI_TOOLS } from '../cli/connect/tool-call.js';
-import { AimeatClient } from '../cli/connect/api-client.js';
+import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
+import { AimeatClient } from '../tool-dispatch/api-client.js';
 import { findNodeCapability, NON_INVOKABLE, listNodeCapabilities } from './node-capabilities.js';
 import { logger } from '../utils/logger.js';
 

@@ -56,9 +56,7 @@ export function isAnonymousGaii(gaii: string): boolean {
  * bytes must be able to look them up. Anything else is hashed as its canonical JSON, which is the
  * only stable rendering of a structured value we have.
  */
-export function memoryContentBytes(value: unknown): string {
-  return typeof value === 'string' ? value : JSON.stringify(value ?? null);
-}
+export { memoryContentBytes } from '../../utils/memory-content.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
 export function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {

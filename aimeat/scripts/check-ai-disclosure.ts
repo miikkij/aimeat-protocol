@@ -57,6 +57,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
+import { createConnectorChecks, CONNECTOR_MCP_DIR, CONNECTOR_SHELL_WRAPPER } from './lib/check-ai-disclosure-connector.js';
 import { PUBLICLY_LINKED_CONTAINERS } from '../src/storage/types/ai-provenance.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -463,212 +464,6 @@ function checkMcpWriteTools(): void {
   }
 }
 
-// ── 2b. THE CONNECTOR'S SURFACES CARRY WHAT THE CATALOG PROMISES ────────────────────────────────
-// Assertion 2 scanned `src/mcp/` and reported green on the half of the estate it could not see. The
-// OTHER half — `src/cli/connect/`, what `aimeat connect serve` exposes and what every crewaimeat crew
-// calls through — carried zero references to provenance, so a declared write returned ok:true and the
-// declaration was stripped as an unknown key. A gate that passes on the surface it does not read is
-// worse than the missing wiring, because it is the thing that was supposed to prevent it.
-//
-// THE CATALOG IS THE CONTRACT, and that is what makes this checkable rather than a taste question.
-// `src/mcp/catalog/definitions/` declares `ai_provenance` on a tool; three surfaces implement those
-// tools; every one of them must carry it. When somebody adds the fifteenth tool, or the NEXT field,
-// the two that were updated pass and the one that was forgotten fails here by name.
-
-const CONNECTOR_MCP_DIR = 'src/cli/connect/mcp/tools';
-const CONNECTOR_CARRIERS = 'src/cli/connect/ai-provenance-carry.ts';
-const CONNECTOR_SHELL_WRAPPER = 'src/cli/connect/tool-call.ts';
-
-/** Tool names the canonical catalog declares `ai_provenance` on. The contract all surfaces answer to. */
-function catalogProvenanceTools(): string[] {
-  const dir = join(root, 'src', 'mcp', 'catalog', 'definitions');
-  const out: string[] = [];
-  for (const file of walk(dir)) {
-    const src = stripped(file);
-    const starts = [...src.matchAll(/name:\s*'([a-z0-9_]+)'/g)];
-    starts.forEach((m, i) => {
-      const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
-      const block = src.slice(m.index!, end);
-      if (/\.{3}aiProvenanceCatalogInput\b/.test(block) || /\bai_provenance\s*:/.test(block)) out.push(m[1]);
-    });
-  }
-  return [...new Set(out)].sort();
-}
-
-/** Tool registrations in the CONNECTOR's MCP surface, with the source of each block. */
-function connectorMcpToolBlocks(): Array<{ name: string; file: string; block: string }> {
-  const out: Array<{ name: string; file: string; block: string }> = [];
-  for (const file of walk(join(root, CONNECTOR_MCP_DIR))) {
-    const src = stripped(file);
-    const starts = [...src.matchAll(/mcp\.tool\(\s*'([a-z0-9_]+)'/g)];
-    starts.forEach((m, i) => {
-      const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
-      out.push({ name: m[1], file: rel(file), block: src.slice(m.index!, end) });
-    });
-  }
-  return out;
-}
-
-function checkConnectorSurfaces(): void {
-  const promised = catalogProvenanceTools();
-  if (promised.length === 0) {
-    fail('connector-provenance', 'the catalog declares ai_provenance on no tool at all',
-      'this check reads src/mcp/catalog/definitions/ for `...aiProvenanceCatalogInput`. If the catalog '
-      + 'stopped declaring it, assertion 2 and this one are both checking nothing.');
-    return;
-  }
-
-  // (a) The node's own surface. Same list, derived rather than hand-maintained: a tool the catalog
-  //     promises the parameter on and src/mcp/ does not carry is the Phase 4 bug returning.
-  const nodeCarrying = new Set(mcpToolBlocks().filter(b => /aiProvenanceInputs?\b/.test(b.block)).map(b => b.name));
-
-  // (b) The connector's MCP surface — the one nothing was checking.
-  const connectorBlocks = connectorMcpToolBlocks();
-  const connectorNames = new Set(connectorBlocks.map(b => b.name));
-  const connectorCarrying = new Set(connectorBlocks.filter(b => /aiProvenanceInputs?\b/.test(b.block)).map(b => b.name));
-
-  // (c) The shell-callable surface. It carries provenance through ONE wrapper over the whole dispatch
-  //     table rather than per handler, so what is checked is that the wrapper is still applied and
-  //     that the tool has a carrier decision. A tool with no entry in the carrier map falls through
-  //     `withProvenanceCarrying` untouched — which is exactly the silent strip, one layer down.
-  const shellSrc = stripComments(read(CONNECTOR_SHELL_WRAPPER));
-  if (!/\.map\(withProvenanceCarrying\)/.test(shellSrc)) {
-    fail('connector-provenance', `${CONNECTOR_SHELL_WRAPPER} no longer wraps CONNECT_CLI_TOOLS with withProvenanceCarrying()`,
-      'restore `.map(withProvenanceCarrying)` on the assembled list. Without it every shell-callable '
-      + 'write tool — `aimeat connect call` AND the serve daemon\'s POST /local/call/:tool — goes back '
-      + 'to dropping a caller\'s ai_provenance block behind an ok:true.');
-  }
-  const carrierSrc = stripComments(read(CONNECTOR_CARRIERS));
-  const declaredCarriers = new Set(
-    [...carrierSrc.matchAll(/^\s{2}(aimeat_[a-z0-9_]+):/gm)].map(m => m[1]));
-
-  for (const name of promised) {
-    if (!nodeCarrying.has(name)) {
-      fail('connector-provenance', `the catalog promises ai_provenance on ${name} but src/mcp/ does not carry it`,
-        'spread `...aiProvenanceInputs` into the node MCP registration, or stop promising it in the '
-        + 'catalog. A schema that advertises a parameter the handler discards is the failure this '
-        + 'programme exists to catch.');
-    }
-    // A tool the connector does not expose at all is not this check's business — but one it DOES
-    // expose has to honour the same contract, because that is the schema a crew reads.
-    if (connectorNames.has(name) && !connectorCarrying.has(name)) {
-      fail('connector-provenance', `connector MCP tool ${name} drops the ai_provenance the catalog promises`,
-        `spread \`...aiProvenanceInputs\` into its shape in ${CONNECTOR_MCP_DIR}/ and hand the block to `
-        + 'provenanceEchoedResult(). A zod object STRIPS unknown keys, so without this a crew declares, '
-        + 'gets ok:true, and the node records the opposite.');
-    }
-    if (!declaredCarriers.has(name)) {
-      fail('connector-provenance', `${name} has no entry in CONNECTOR_PROVENANCE_CARRIERS`,
-        `add one in ${CONNECTOR_CARRIERS}: either a carrier that records the declaration, or `
-        + '`{ kind: \'not-carried\', route }` naming the node route that would have to accept it. '
-        + 'No entry means the shell path silently ignores the block — the same bug, one layer down.');
-    }
-  }
-
-  // The two MCP surfaces must not drift APART either: a tool carrying it on the node and not on the
-  // connector is the state Phase 11 found, and the reverse would be just as invisible.
-  const nodeOnly = [...nodeCarrying].filter(n => connectorNames.has(n) && !connectorCarrying.has(n));
-  const connectorOnly = [...connectorCarrying].filter(n => !nodeCarrying.has(n));
-  for (const n of nodeOnly) {
-    fail('connector-provenance', `${n} carries ai_provenance on the node surface but not on the connector surface`,
-      `add \`...aiProvenanceInputs\` in ${CONNECTOR_MCP_DIR}/. Crews call through the connector; the `
-      + 'node surface being right does not help them.');
-  }
-  for (const n of connectorOnly) {
-    fail('connector-provenance', `${n} carries ai_provenance on the connector surface but not on the node's own`,
-      'add it in src/mcp/ too, and to the catalog definition. Two surfaces answering differently about '
-      + 'the same tool is the drift this assertion exists to stop.');
-  }
-
-  checkConnectorReadDirection(carrierSrc, connectorBlocks);
-
-  const notCarried = [...carrierSrc.matchAll(/^\s{2}(aimeat_[a-z0-9_]+):\s*\{\s*kind:\s*'not-carried'/gm)].map(m => m[1]);
-  if (notCarried.length) {
-    notes.push(`  connector declarations NOT recorded (the node route accepts none): ${notCarried.length} tool(s) — `
-      + `${notCarried.join(', ')}. Each returns ai_provenance.recorded=false with the reason.`);
-  }
-}
-
-// ── 2c. THE READ DIRECTION LOSES NOTHING ────────────────────────────────────────────────────────
-// Phase 11 fixed writes and left reads broken, which is the same mistake one layer along: a route
-// that serves its record on the ENVELOPE carrier (`meta.provenance`, the one carrier §A4 froze) hands
-// it to a connector tool that does `resp.data ?? resp` and drops the envelope. A crew reading its own
-// content back got `ai_provenance_id` — a pointer — and no statement.
-//
-// Route → tool is not statically derivable, so the routes are a LIST you have to edit. A seventh one
-// fails this check until somebody says what wraps it, which is the same shape as
-// CREATE_APP_DISTINCT_ACTS and LLM_TRANSPORT_LEGACY_CALLERS.
-
-/** Routes that serve a provenance record on `meta.provenance`, and what carries it to a caller. */
-const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
-  'src/routes/memory/key.ts':
-    'GET /v1/memory/:key (+ the public read) — connector: aimeat_memory_read, folded.',
-  'src/routes/apps/read.ts':
-    'the app detail read — connector: aimeat_app_get, folded.',
-  'src/routes/knowledge/packages-core.ts':
-    'the knowledge package manifest read — connector: aimeat_knowledge_get, folded.',
-  'src/routes/ai.ts':
-    'POST /v1/ai/complete — no connector tool wraps it; apps read it via the browser SDK, which '
-    + 'reads r.meta.provenance directly (sdk-libs/ai/index.js).',
-  'src/routes/openrouter.ts':
-    'POST /v1/openrouter/complete — owner-facing, same as ai.ts: no connector tool.',
-};
-
-/** Connector MCP read tools that MUST fold the envelope carrier onto their payload. */
-const CONNECTOR_META_READS = ['aimeat_memory_read', 'aimeat_app_get', 'aimeat_knowledge_get'];
-
-const READ_FOLD = 'readPayloadWithProvenance';
-
-function checkConnectorReadDirection(
-  carrierSrc: string, connectorBlocks: Array<{ name: string; file: string; block: string }>,
-): void {
-  // The shell surface folds UNCONDITIONALLY inside withProvenanceCarrying — no list to forget. That
-  // property is what is asserted; deleting the fold from inside the wrapper would otherwise pass the
-  // `.map(withProvenanceCarrying)` check above while losing every record on the shell path.
-  if (!carrierSrc.includes(READ_FOLD)) {
-    fail('connector-provenance', `${CONNECTOR_CARRIERS} no longer folds meta.provenance onto read payloads`,
-      `restore ${READ_FOLD}() and its use inside withProvenanceCarrying(). Without it every `
-      + 'shell-callable read drops the record the node served on the envelope, and a crew sees a '
-      + 'provenance id it cannot resolve into a statement.');
-  }
-
-  const byName = new Map(connectorBlocks.map(b => [b.name, b]));
-  for (const name of CONNECTOR_META_READS) {
-    const b = byName.get(name);
-    if (!b) {
-      fail('connector-provenance', `${name} is listed in CONNECTOR_META_READS but is not registered on the connector MCP surface`,
-        'either it was renamed — update the list — or it was removed, in which case delete the entry.');
-      continue;
-    }
-    if (!b.block.includes(READ_FOLD)) {
-      fail('connector-provenance', `connector MCP tool ${name} unwraps the envelope without folding meta.provenance`,
-        `use ${READ_FOLD}(resp) instead of \`resp.data ?? resp\`. Its node route serves the whole `
-        + 'record on meta.provenance; the plain unwrap returns the id and throws the statement away.');
-    }
-  }
-
-  const seen = new Set<string>();
-  for (const file of walk(join(root, 'src', 'routes'))) {
-    const r = rel(file);
-    if (!/\benvelopeMeta\s*\(/.test(stripped(file))) continue;
-    seen.add(r);
-    if (!(r in ENVELOPE_PROVENANCE_ROUTES)) {
-      fail('connector-provenance', `${r} serves provenance on meta.provenance and nobody has said what carries it to a caller`,
-        'add it to ENVELOPE_PROVENANCE_ROUTES in this file, naming the connector tool that folds it '
-        + `with ${READ_FOLD}() — or saying that no connector tool wraps this route. The envelope is `
-        + 'dropped by every `resp.data ?? resp` in the connector, so a new one here is a record lost '
-        + 'silently.');
-    }
-  }
-  for (const r of Object.keys(ENVELOPE_PROVENANCE_ROUTES)) {
-    if (!seen.has(r)) {
-      fail('connector-provenance', `${r} is listed as serving meta.provenance but no longer calls envelopeMeta()`,
-        'remove it from ENVELOPE_PROVENANCE_ROUTES — a stale entry makes the list read as bigger '
-        + 'coverage than it has.');
-    }
-  }
-}
-
 // ── 3. ONE PUBLISH PATH ─────────────────────────────────────────────────────────────────────────
 // Provenance went missing at a forgotten publish door in Phase 4, again in Phase 5, and Phase 8
 // found FIVE doors where the audit had counted three. One function, and a short list of acts that
@@ -870,6 +665,8 @@ function checkPubliclyLinkedContainers(): void {
   }
 }
 
+const connectorChecks = createConnectorChecks({ root, walk, stripped, rel, read, stripComments, fail, mcpToolBlocks, notes });
+
 // ── run ─────────────────────────────────────────────────────────────────────────────────────────
 
 function listProtected(): void {
@@ -878,7 +675,7 @@ function listProtected(): void {
   console.log(`     known second paths: ${Object.keys(LLM_TRANSPORT_LEGACY_CALLERS).join(', ') || 'none'}`);
   console.log(`  2. MCP write tools     — ${AI_PROVENANCE_REQUIRED.length} must carry ai_provenance, `
     + `${AI_PROVENANCE_REVIEWED_WITHOUT.length} reviewed without`);
-  const promised = catalogProvenanceTools();
+    const promised = connectorChecks.catalogProvenanceTools();
   console.log(`  2b. connector surfaces — ${promised.length} catalog tools; node MCP + ${CONNECTOR_MCP_DIR}/ + `
     + `the ${CONNECTOR_SHELL_WRAPPER} wrapper must all carry them`);
   console.log(`  3. one publish path    — ${PUBLISH_PATH}; ${Object.keys(CREATE_APP_DISTINCT_ACTS).length} distinct acts named`);
@@ -895,7 +692,7 @@ if (process.argv.includes('--list')) {
 
 checkOneLlmTransport();
 checkMcpWriteTools();
-checkConnectorSurfaces();
+connectorChecks.check();
 checkOnePublishPath();
 checkVocabularyContainment();
 checkLocaleParity();

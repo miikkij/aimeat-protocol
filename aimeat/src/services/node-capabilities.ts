@@ -31,7 +31,7 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../mcp/catalog/definitions.js';
-import { CONNECT_CLI_TOOLS } from '../cli/connect/tool-call.js';
+import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
 import type { ToolInputField } from '../mcp/catalog/definitions/types.js';
 
 /** One capability, as a caller sees it: enough to decide, and enough to call. */
