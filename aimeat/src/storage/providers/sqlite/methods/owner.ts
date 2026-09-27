@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.18.0 -- 2026-09-26 -- The ecosystem apps go through repos/eco-app-erasure.ts deleteEcosystemApps,
+ *     which the start step and the operator's decision on a held name call too.
  *   v1.17.0 -- 2026-09-26 -- deleteOwner takes the ecosystem apps the person connected, as it takes the
  *     agents: each app's identity data, its record with the pinned key, and the automation recipes
  *     set for it. The apps' identities are named to the work settlement and the ledger rule beside
@@ -69,6 +71,7 @@ import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
 import { settleErasedPartyWork } from '../repos/work-erasure.js';
 import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
 import { deleteInstalledCortexes } from '../repos/cortex-erasure.js';
+import { deleteEcosystemApps } from '../repos/eco-app-erasure.js';
 import { erasedPartyPseudonym, erasedAccountParty } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
@@ -153,12 +156,9 @@ export const ownerMethods = {
 
       // 3a. An ecosystem app goes as an agent does: what it holds, then its record with the key pinned
       // at its first connection, and the automation recipes the person set for it. Every credential of
-      // the app stops with its record (auth/middleware.ts ecosystemAppGone).
-      for (const geai of ecoGeais) {
-        this.cascadeDeleteAgentData(geai);
-      }
-      this.db.prepare('DELETE FROM ecosystem_apps WHERE owner = ?').run(name);
-      this.db.prepare('DELETE FROM eco_automation_recipes WHERE owner = ?').run(name);
+      // the app stops with its record (auth/middleware.ts ecosystemAppGone). repos/eco-app-erasure.ts,
+      // which the start step and the operator's decision on a held name call too.
+      deleteEcosystemApps(this.db, name, ecoGeais, geai => this.cascadeDeleteAgentData(geai), { everyRecipe: true });
 
       // 3b. Data owned by the GHII itself, not by an agent. cascadeDeleteAgentData above runs per
       // AGENT gaii, so everything written under the person's own identity — which is most of what a

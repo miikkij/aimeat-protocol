@@ -13,15 +13,18 @@
  *   an incident live here and are called by the HTTP route and by the MCP tool alike, so a chat and
  *   a screen cannot drift apart on what "resolved" means.
  *
- *   AN INCIDENT WITH NAMES TO DECIDE. The move to the full identity at start opens one incident for
- *   what it could not place (services/held-account-names.ts): each held name with its counts and the
- *   hook bindings that name its actions. Such an incident closes when every name is decided, so it
- *   cannot be resolved or deleted while a name is still open (CONFLICT).
+ *   AN INCIDENT WITH NAMES TO DECIDE. The move to the full identity and the start step for the
+ *   cortexes and ecosystem apps of deleted accounts open one incident for what they could not place
+ *   (services/held-account-names.ts): each held name with its counts and the hook bindings that name
+ *   its actions. Such an incident closes when every name is decided, so it cannot be resolved or
+ *   deleted while a name is still open (CONFLICT).
  * @structure recordSecurityIncident(storage, config, input) · listSecurityIncidents · findSecurityIncident ·
  *   resolveSecurityIncident · deleteSecurityIncident · saveSecurityIncident · undecidedNames ·
  *   SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-26 -- An incident names the runs of the records it was made from (`sources`), so
+ *     the start step's record joins it once.
  *   v1.2.0 -- 2026-09-26 -- An incident can carry names to decide, the hook bindings that name nothing
  *     and the ledger values nothing ties to a person (the move to the full identity). Resolving or
  *     deleting it is refused with CONFLICT while a name is undecided. recordSecurityIncident says
@@ -83,6 +86,8 @@ export interface SecurityIncidentInput {
   untied?: UntiedLedgerValue[];
   /** When the move that opened it ran, so a start never opens it twice. */
   moveAt?: string;
+  /** The runs of the records it was made from (`<key>@<at>`), so a start never takes one twice. */
+  sources?: string[];
 }
 
 /** One incident as stored and as served to the operator. */
@@ -107,6 +112,8 @@ export interface SecurityIncidentValue {
   untied?: UntiedLedgerValue[];
   /** When the move to the full identity that opened this incident ran. */
   move_at?: string;
+  /** The runs of the records this incident was made from (`<key>@<at>`): the move's and the start step's. */
+  sources?: string[];
 }
 
 type IncidentRecord = Awaited<ReturnType<Storage['listAllMemory']>>['items'][number];
@@ -144,6 +151,7 @@ export async function recordSecurityIncident(
         ...(input.bindingsLeft ? { bindings_left: input.bindingsLeft } : {}),
         ...(input.untied ? { untied: input.untied } : {}),
         ...(input.moveAt ? { move_at: input.moveAt } : {}),
+        ...(input.sources ? { sources: input.sources } : {}),
       },
       visibility: 'private', tags: ['security'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });

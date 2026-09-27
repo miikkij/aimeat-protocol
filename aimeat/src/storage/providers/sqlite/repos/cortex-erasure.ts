@@ -6,10 +6,12 @@
  *   calls it inside its own transaction, after the per-identity passes and the actions published
  *   under the bare account name. A free function over the connection, like the other erasure repos,
  *   so there is no import cycle through the provider class. The rule is ../../../erased-cortex.ts; the
- *   Postgres twin is deleteInstalledCortexesDb in its owner-cascade.ts.
- * @structure deleteInstalledCortexes(db, name, ghiis)
+ *   Postgres twin is deleteInstalledCortexesDb in its methods/identity-erasure.ts.
+ * @structure deleteInstalledCortexes(db, name, ghiis, opts)
  * @usage deleteInstalledCortexes(this.db, name, ghiiRows.map(r => r.ghii));
  * @version-history
+ *   v1.1.0 — 2026-09-26 — `names`, for the operator's decision on a held name (repos/held-names.ts);
+ *     the start step and that decision call this same function.
  *   v1.0.0 — 2026-09-26 — Initial: an account deletion takes the cortexes it installed (secaudit
  *     2026-09, R4 "found": the cortex record).
  */
@@ -29,10 +31,17 @@ import { invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
  * records go. Returns the number of records deleted.
  *
  * SQLite LIKE has no escape character unless it is named, so each pattern names the backslash.
+ *
+ * `names` limits it to those cortexes: the ones older than the account that holds the name now, when
+ * the operator decides they were a previous holder's.
  */
-export function deleteInstalledCortexes(db: Database.Database, name: string, ghiis: string[]): number {
-  const rows = db.prepare('SELECT name, activationArtifacts FROM cortex_extensions WHERE installedBy = ?')
-    .all(name) as { name: string; activationArtifacts: string }[];
+export function deleteInstalledCortexes(
+  db: Database.Database, name: string, ghiis: string[], opts: { names?: string[] } = {},
+): number {
+  if (opts.names && opts.names.length === 0) return 0;
+  const only = opts.names ? ` AND name IN (${opts.names.map(() => '?').join(', ')})` : '';
+  const rows = db.prepare(`SELECT name, activationArtifacts FROM cortex_extensions WHERE installedBy = ?${only}`)
+    .all(name, ...(opts.names ?? [])) as { name: string; activationArtifacts: string }[];
   if (rows.length === 0) return 0;
 
   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
@@ -76,7 +85,9 @@ export function deleteInstalledCortexes(db: Database.Database, name: string, ghi
     db.prepare("DELETE FROM component_versions WHERE kind = 'cortex' AND name = ?").run(row.name);
     db.prepare("DELETE FROM dependency_edges WHERE fromKind = 'cortex' AND fromRef = ?").run(row.name);
   }
-  const removed = db.prepare('DELETE FROM cortex_extensions WHERE installedBy = ?').run(name).changes;
+  const drop = db.prepare('DELETE FROM cortex_extensions WHERE installedBy = ? AND name = ?');
+  let removed = 0;
+  for (const row of rows) removed += drop.run(name, row.name).changes;
   // Every memory write reads the schema locks from a process cache, which a delete refreshes.
   if (locks > 0) invalidateSchemaLockCache();
   return removed;

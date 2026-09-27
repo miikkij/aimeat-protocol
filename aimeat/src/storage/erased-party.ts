@@ -40,11 +40,15 @@
  *   - partyIdentities(name, ghiis): every value a receipt may name this person by
  *   - isPartyIdentity(identity, name, ghiis): the same identities, as a test on one value
  *   - OPEN_WORK_STATUSES: the work statuses an erasure cancels
- *   - LeavingParty, erasedAccountParty(), deletedAgentParty(): who leaves the work, and what stays
+ *   - LeavingParty, erasedAccountParty(), deletedAgentParty(), leavingAppsParty(): who leaves the
+ *     work, and what stays
  * @usage
  *   import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
  *   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
  * @version-history
+ *   v1.5.0 — 2026-09-26 — leavingAppsParty: ecosystem apps that leave without their account (a deleted
+ *     account's, or a previous holder's of a name somebody holds now), for the start step and the
+ *     operator's decision on a held name.
  *   v1.4.0 — 2026-09-26 — The other side's ledger lines take the same pseudonym in both cascades
  *     (sqlite repos/ledger-erasure.ts, postgres pseudonymiseLedgerPartyDb). No change to the rule.
  *   v1.3.0 — 2026-09-26 — LeavingParty: the work rule serves a deleted agent too. Its owner is still
@@ -114,9 +118,10 @@ export function isPartyIdentity(identity: string, name: string, ghiis: string[])
 export const OPEN_WORK_STATUSES: readonly string[] = ['pending', 'accepted', 'in_progress'];
 
 /**
- * A party leaving the work, and what the rows that stay keep of it. One rule for the two ways a party
- * leaves: an account deleted with everything under it, and one agent its owner deletes. Both
- * providers settle the work from this (sqlite repos/work-erasure.ts, postgres owner-cascade.ts).
+ * A party leaving the work, and what the rows that stay keep of it. One rule for the three ways a
+ * party leaves: an account deleted with everything under it, one agent its owner deletes, and
+ * ecosystem apps that leave without their account. Both providers settle the work from this (sqlite
+ * repos/work-erasure.ts, postgres work-ledger-erasure.ts).
  */
 export interface LeavingParty {
   /** The values a row's party column may hold for it: exact values, and LIKE suffix patterns. */
@@ -153,4 +158,17 @@ export function erasedAccountParty(name: string, ghiis: string[], pseudonym: str
 /** One agent its owner deletes: named by its GAII alone, and kept as stored. */
 export function deletedAgentParty(gaii: string): LeavingParty {
   return { exact: [gaii], suffixPatterns: [], is: id => id === gaii, pseudonym: null, refundsItself: true };
+}
+
+/**
+ * Ecosystem apps that leave without their account: a deleted account's, or a previous holder's of a
+ * name somebody holds now. Named by their GEAIs alone, so nothing of the account that holds the name
+ * matches, and rewritten to the erasure's pseudonym on what stays. What was held for a request an app
+ * made goes back to the account it spent from, and the caller gives it back only to an account that
+ * existed when the row was written: an app of a previous holder spent that holder's morsels before
+ * the name was taken again, and the holder's after.
+ */
+export function leavingAppsParty(geais: string[], pseudonym: string): LeavingParty {
+  const exact = [...new Set(geais)];
+  return { exact, suffixPatterns: [], is: id => exact.includes(id), pseudonym, refundsItself: true };
 }

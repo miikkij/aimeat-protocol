@@ -3,9 +3,10 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an erasure takes of a cortex the erased account installed. Both storage providers
- *   call this from their owner cascade (postgres-kysely/methods/owner-cascade.ts
+ *   call this from their owner cascade (postgres-kysely/methods/identity-erasure.ts
  *   deleteInstalledCortexesDb, sqlite/repos/cortex-erasure.ts deleteInstalledCortexes), so the rule
- *   cannot drift between them; each writes its own SQL.
+ *   cannot drift between them; each writes its own SQL. The start step and the operator's decision on
+ *   a held name call the same two functions.
  *
  *   WHY THE RECORD GOES. A cortex record names the account that installed it (`installedBy`, the bare
  *   account name), and every ownership question about a cortex compares against that name. A deleted
@@ -23,6 +24,8 @@
  * @usage
  *   const parts = erasedCortexParts(row.activationArtifacts);
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The description names where the Postgres function lives now, and its other
+ *     callers. No change to the rule.
  *   v1.0.0 — 2026-09-26 — Initial: an account deletion takes the cortexes it installed (secaudit
  *     2026-09, R4 "found": the cortex record).
  */

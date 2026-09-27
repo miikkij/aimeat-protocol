@@ -12,6 +12,9 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.2.0 — 2026-09-26 — aimeat-node-operations names the start step for the cortexes and ecosystem
+ *     apps of deleted accounts, and that a held app can still act for the account until the owner
+ *     decides.
  *   v1.1.0 — 2026-09-26 — aimeat-node-operations says what an update does at start: nothing runs by
  *     hand, what a step cannot place becomes one incident, and how the operator decides its names.
  *   v1.0.0 — 2026-09-25 — Moved out of builtin-skills.ts, text unchanged, including the line that
@@ -54,13 +57,17 @@ show the owner what you found before acting.
 Every step an update brings runs by itself when the node starts: there is no script to run by hand,
 and the node starts whatever its data holds. When a step cannot place some data on evidence, it
 leaves that data as it is and opens one incident, which \`aimeat_admin_security_overview\` lists with
-the others. The move of each person's older records to their full identity is such a step. Its
-incident names each username whose records are older than the account that holds the name now,
-with the counts and the hooks bound to its actions. Show the owner each name and its counts, and
-wait for their decision on each one before you call \`aimeat_admin_incident_resolve\` with \`name\`
-and \`resolution\`: "holder" when the records belong to the account that holds the name now,
-"previous" when they were a previous holder's. The incident closes with the last name. A gate bound
-to an action that no longer exists lets everything pass until it is bound again on the Hooks page.
+the others. The move of each person's older records to their full identity is such a step. So is
+the step after it, which settles the cortexes and ecosystem apps of deleted accounts: those of a
+username that no account holds go as an account deletion takes them, and those older than the
+account that holds the name now join the same incident. Such an ecosystem app can still act for
+that account until the owner decides. The incident names each username whose records are older than
+the account that holds the name now, with the counts and the hooks bound to its actions. Show the
+owner each name and its counts, and wait for their decision on each one before you call
+\`aimeat_admin_incident_resolve\` with \`name\` and \`resolution\`: "holder" when the records belong to
+the account that holds the name now, "previous" when they were a previous holder's. The incident
+closes with the last name. A gate bound to an action that no longer exists lets everything pass
+until it is bound again on the Hooks page.
 
 ## Principles
 - Read-only tools first; never modify configuration without the owner's explicit confirmation.

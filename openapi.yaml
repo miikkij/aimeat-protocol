@@ -54344,17 +54344,24 @@ paths:
         Operator-only. Without a body, sets an incident's status to `resolved` and stamps `resolvedAt`.
 
         The move to the full identity at start leaves as they were the rows stored under a bare
-        account name that are older than the account holding that name now, and opens one incident
-        of type `held_account_names` that lists each such name (`names`), the hook bindings that name
-        nothing now (`bindings_left`) and the ledger values nothing ties to a person (`untied`). With
-        `{ name, resolution }` this endpoint decides one name: `holder` moves its actions, its work and
-        its own ledger lines to the full identity of the account that holds the name, and the hook
-        bindings to its actions with them; `previous` settles them as a deleted account's (actions
-        deleted, open work cancelled with the held morsels going back only to an account that existed
-        when the row was written, finished work, disputes and the older lines naming it under one
-        pseudonym, its own lines deleted). The incident closes when its last name is decided;
-        resolving it without a name before that answers 409. Deciding a name again the same way
-        answers what that decision did; deciding it the other way answers 409.
+        account name that are older than the account holding that name now. Right after it, once per
+        node, a start step reads the cortexes (`installedBy`, `installedAt`) and the ecosystem apps
+        (`owner`, `createdAt`): those of a name no account holds go as an account deletion takes them
+        (an app with what it holds, its recipes and every token it has), and those older than the
+        account holding the name now are left as they were; such an app can still act for that
+        account until the name is decided. Both open one incident of type `held_account_names` that
+        lists each such name (`names`, with `actions`, `work`, `own_lines`, `naming_lines`,
+        `cortexes` and `ecosystem_apps`), the hook bindings that name nothing now (`bindings_left`)
+        and the ledger values nothing ties to a person (`untied`). With `{ name, resolution }` this
+        endpoint decides one name: `holder` moves its actions, its work and its own ledger lines to
+        the full identity of the account that holds the name, and the hook bindings to its actions
+        with them, and keeps its cortexes and ecosystem apps; `previous` settles them as a deleted
+        account's (actions deleted, open work cancelled with the held morsels going back only to an
+        account that existed when the row was written, finished work, disputes and the older lines
+        naming it under one pseudonym, its own lines deleted, its cortexes and ecosystem apps deleted
+        with what they hold). The incident closes when its last name is decided; resolving it without
+        a name before that answers 409. Deciding a name again the same way answers what that decision
+        did; deciding it the other way answers 409.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
         - BearerAuth: []
@@ -54371,7 +54378,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 'An account name from the incident''s `names`.' }
-                resolution: { type: string, enum: [holder, previous], description: 'holder: the rows are the account''s that holds the name now. previous: they were a previous holder''s.' }
+                resolution: { type: string, enum: [holder, previous], description: 'holder: the rows, cortexes and ecosystem apps are the account''s that holds the name now. previous: they were a previous holder''s.' }
       responses:
         '200':
           description: Incident resolved, or one name of it decided
@@ -54405,6 +54412,8 @@ paths:
                               own_lines_moved: { type: integer }
                               own_lines_deleted: { type: integer }
                               naming_lines: { type: integer }
+                              cortexes_deleted: { type: integer, description: 'previous: the cortexes older than the account that holds the name, with what their activation made.' }
+                              ecosystem_apps_deleted: { type: integer, description: 'previous: the ecosystem apps older than that account, with what they hold; their tokens stop.' }
                           bindings_moved:
                             type: array
                             description: With a name. The hook bindings moved to the holder's full identity.
