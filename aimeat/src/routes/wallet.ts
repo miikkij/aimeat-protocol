@@ -27,6 +27,9 @@
  *     rather than repeating a two-prefix copy of it.
  *   v1.5.0 — 2026-09-26 — `in_escrow` reads the person's own GHII beside their agents': a request made
  *     in person is filed under it.
+ *   v1.6.0 — 2026-09-27 — `pacing` beside `daily_allowance`: whether this node burns morsels per metered
+ *     call (`enabled`, true when the operator's `pacingTollDefault` is above 0) and the default toll. The
+ *     MCP consent page reads it to explain morsels only on a node that paces.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -41,6 +44,7 @@ import { emitChange } from '../services/event-bus.js';
 import { cached, TTL } from '../services/cache.js';
 import { createWalletTabService } from '../services/db/wallet-tab-db-service.js';
 import { lifetimeOf } from '../services/wallet-stats.js';
+import { resolvePacingToll } from './extensions/pacing.js';
 
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -90,6 +94,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     const lifetime = lifetimeOf(transactions, balance);
 
     const isAgentSession = req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner');
+    const defaultToll = resolvePacingToll(config, null);
     res.json(success(config.nodeId, {
       '@context': DEFAULT_CONTEXT,
       '@type': 'aimeat:Wallet',
@@ -101,6 +106,13 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       daily_allowance: {
         amount: config.dailyAllowance,
         accumulation_cap: config.dailyAllowanceCap,
+      },
+      // The node-wide pacing floor, resolved the way a metered call resolves it when the capability
+      // declares no toll (routes/extensions/pacing.ts). 0 is off and is the shipped default; a
+      // capability may still declare its own toll, which this does not describe.
+      pacing: {
+        enabled: defaultToll > 0,
+        toll_default: defaultToll,
       },
       lifetime,
     }, [

@@ -10,6 +10,9 @@
  *   morsel ceiling first, and the burn is a burn: the provider is never credited by it.
  * @usage cd aimeat && pnpm exec tsx test/e2e-pacing.ts
  * @version-history
+ *   v1.1.0 — 2026-09-27 — GET /v1/wallet reports `pacing.enabled` and the default toll on a paced node;
+ *     a signed-out caller is refused (401/403) on the paced capability and on the wallet read, and no
+ *     morsels move. The suite's denial-coverage exemption is removed with it.
  *   v1.0.0 — 2026-07-25 — Initial: pacing applies to a money contract, is a burn, and spares the owner.
  */
 import { spawn } from 'node:child_process';
@@ -97,6 +100,13 @@ await test('Setup: provider lists a MONEY-priced capability that declares no tol
   offeringId = o.offeringId;
 });
 
+await test('GET /v1/wallet says this node paces, with its default toll', async () => {
+  const r = await json('/v1/wallet', { headers: auth(consumer.token) });
+  assert(r.status === 200, `wallet ${r.status}`);
+  const p = r.body.data.pacing;
+  assert(p?.enabled === true && p?.toll_default === TOLL, `pacing on at the node toll ${TOLL}: ${JSON.stringify(p)}`);
+});
+
 await test('A money contract is paced: each call burns the node toll from the CALLER', async () => {
   const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(consumer.token),
     body: JSON.stringify({ offering_id: offeringId, cap_units: 100_000_000 }) });
@@ -106,6 +116,15 @@ await test('A money contract is paced: each call burns the node toll from the CA
   assert(call.status === 200, `metered money call ${call.status}: ${JSON.stringify(call.body?.error)}`);
   const after = await balance(consumer.token);
   assert(before - after === TOLL, `caller burned exactly the toll: ${before} -> ${after} (expected -${TOLL})`);
+});
+
+await test('A signed-out caller is refused before anything burns, and cannot read the pacing flag', async () => {
+  const pBefore = await balance(provider.token);
+  const call = await json(`/v1/ext/${EXT}/run`, { method: 'POST', body: JSON.stringify({ q: 'anon' }) });
+  assert(call.status === 401 || call.status === 403, `signed-out paced call ${call.status}`);
+  assert(await balance(provider.token) === pBefore, 'a refused call moved no morsels');
+  const w = await json('/v1/wallet');
+  assert(w.status === 401, `signed-out wallet read ${w.status}`);
 });
 
 await test('The toll is a BURN: the provider is not credited by it', async () => {

@@ -8,6 +8,17 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.5.0 — 2026-09-27 — The page says what is happening in words a first-time person has. The
+        title names the connecting service by the client_name it registered with ("Connect Claude to
+        AIMEAT", "Connect Goose to AIMEAT"), or "your AI" when it gave none; the "platform" badge and
+        subtitle are gone. One lead says that the service gets its own name and permissions here and
+        that this is called an agent, and an expandable "What is an agent?" explains agents with
+        vendor-neutral examples. The operator is named from GET /v1/ai-transparency (legal name,
+        business ID, contact, privacy policy link), or the page says the operator gave no name. The
+        agentPays line was wrong under the single-balance model (agent balances are always 0 and the
+        pace belongs to the owner) and is replaced by a morsel sentence shown only when the node
+        paces (GET /v1/wallet `pacing.enabled`); the per-agent "0 morsels" and the GAII line leave
+        the agent list.
     v1.4.0 — 2026-08-24 — The name given at home is not asked twice. Home's step 2 records the
         chosen agent name (memory key `home.agent-name`); this page reads it with the owner's
         session and, when no agent carries it yet, prefills the create form with it and says
@@ -96,9 +107,14 @@
       padding:2rem; max-width:480px; width:100%; }
     h1 { font-size:1.4rem; margin-bottom:.5rem; }
     .subtitle { color:var(--muted); font-size:.9rem; margin-bottom:1.5rem; }
-    .platform-badge { background:var(--accent-soft); border:1px solid var(--accent-soft-border);
-      border-radius:.5rem; padding:.75rem 1rem; margin-bottom:1.5rem; font-size:.9rem; }
-    .platform-name { font-weight:700; color:var(--accent); }
+    .lead { font-size:.92rem; line-height:1.5; margin-bottom:.6rem; }
+    .operator-line { color:var(--muted); font-size:.8rem; line-height:1.45; margin-bottom:.9rem; }
+    .operator-line a { color:var(--accent); }
+    .agent-explainer { background:var(--surface); border-radius:.5rem; padding:.5rem .75rem;
+      margin-bottom:1.25rem; font-size:.85rem; }
+    .agent-explainer summary { cursor:pointer; color:var(--accent); font-weight:600; }
+    .agent-explainer ul { margin:.5rem 0 .15rem; padding-left:1.1rem; line-height:1.45; }
+    .agent-explainer li { margin-bottom:.35rem; }
     label { display:block; font-size:.85rem; color:var(--muted); margin-bottom:.25rem; }
     input, select { width:100%; padding:.6rem .75rem; background:var(--bg); border:1px solid var(--border);
       border-radius:.5rem; color:var(--text); font-size:.9rem; margin-bottom:.75rem; }
@@ -109,8 +125,7 @@
     .agent-option:hover { border-color:var(--border); }
     .agent-option.selected { background:var(--accent-soft-strong); border-color:var(--accent-soft-border); }
     .agent-name { font-weight:600; }
-    .agent-gaii { font-size:.75rem; color:var(--muted); font-family:monospace; overflow-wrap:anywhere; }
-    .agent-balance { font-size:.8rem; color:var(--muted); flex:none; white-space:nowrap; margin-left:.5rem; }
+    .agent-handle { font-size:.75rem; color:var(--muted); overflow-wrap:anywhere; }
     .select-agent-title { font-size:.9rem; margin-bottom:.5rem; font-weight:600; }
     .scope-section { background:var(--surface); border-radius:.5rem; padding:.75rem 1rem;
       margin:.75rem 0; font-size:.85rem; }
@@ -140,8 +155,6 @@
     .scope-exact code { font-family:'Courier New',monospace; font-size:.72rem; color:var(--muted); }
     .boundary-list { margin:.75rem 0 0; padding-left:1.1rem; font-size:.82rem; color:var(--muted); }
     .boundary-list li { margin-bottom:.3rem; }
-    .priming-line { font-size:.85rem; margin-bottom:.25rem; }
-    .priming-line--spaced { margin-bottom:.75rem; }
     .wallet-note { background:var(--wallet-bg); border:1px solid var(--wallet-border);
       border-radius:.5rem; padding:.6rem .75rem; font-size:.82rem; margin-bottom:1rem; color:var(--muted); }
     .btn-row { display:flex; gap:.75rem; margin-top:1.25rem; }
@@ -196,7 +209,7 @@
 
   <script type="module">
     import { copyToClipboard } from '/js/utils.js';
-    import { loadTranslations, t as translate } from '/js/i18n.js';
+    import { loadTranslations, t as translate, getLocale } from '/js/i18n.js';
     import { getTheme, setTheme } from '/js/theme.js';
     import { scopeSentence, areaLine, presetSummary, boundaryLines } from '/js/consent-vocab.js';
     import {
@@ -210,7 +223,10 @@
     // Parse URL params
     const params = new URLSearchParams(location.search);
     const clientId = params.get('client_id') || '';
-    const clientName = params.get('client_name') || clientId;
+    // The name the connecting service registered with (client_name is required at registration,
+    // src/mcp/oauth.ts). Self-declared: it says what the service calls itself, not who verified it.
+    const declaredName = (params.get('client_name') || '').trim();
+    const clientName = declaredName || clientId;
     const redirectUri = params.get('redirect_uri') || '';
     const state = params.get('state') || '';
     const codeChallenge = params.get('code_challenge') || '';
@@ -241,6 +257,79 @@
     // consent surface via consent-vocab.js.
     const boundaryHtml = () =>
       `<ul class="boundary-list">${boundaryLines(t).map((l) => `<li>${escHtml(l)}</li>`).join('')}</ul>`;
+
+    // What the page calls the connecting service: its registered name, or "your AI" when it gave
+    // none. `aiLabel` opens a sentence, `aiInline` sits inside one; the title has its own key for the
+    // no-name case.
+    const aiLabel = declaredName || t('yourAi');
+    const aiInline = declaredName || t('yourAiInline');
+    const titleText = () => declaredName ? t('title', { client: declaredName }) : t('titleNoName');
+
+    /** The lead and the expandable "What is an agent?", shared by the sign-in and approval views. */
+    const introHtml = () => `
+      <h1>${escHtml(titleText())}</h1>
+      <p class="lead">${escHtml(t('lead', { client: aiLabel }))}</p>
+      ${operatorHtml()}
+      <details class="agent-explainer">
+        <summary>${escHtml(t('whatIsAgent'))}</summary>
+        <ul>${['agentIs', 'agentNotAccount', 'agentPerAi', 'agentChange']
+          .map((k) => `<li>${escHtml(t(k))}</li>`).join('')}</ul>
+      </details>`;
+
+    // Who runs this service, from the node's public transparency statement (GET /v1/ai-transparency,
+    // the same operator fields the privacy policy shows). null = not loaded; {} = loaded, no name.
+    let operator = null;
+    async function fetchOperator() {
+      try {
+        const r = await fetch('/v1/ai-transparency', { headers: { Accept: 'application/json' } });
+        const d = await r.json();
+        return d.ok ? (d.data?.operator || {}) : {};
+      } catch {}
+      return {};
+    }
+
+    // The privacy policy in the page's language: /v1/privacy is English, /v1/privacy/<locale> the rest
+    // (src/routes/portal.ts generates one route per locale).
+    function privacyHref() {
+      const lang = getLocale() || 'en';
+      return lang === 'en' ? '/v1/privacy' : `/v1/privacy/${encodeURIComponent(lang)}`;
+    }
+
+    function operatorHtml() {
+      if (!operator) return '';
+      const name = operator.legal_name;
+      const by = !name
+        ? t('operatorUnknown')
+        : operator.business_id
+          ? t('operatorByWithId', { name, id: operator.business_id })
+          : t('operatorBy', { name });
+      const contact = operator.contact
+        ? ` ${escHtml(t('operatorContact'))} <a href="mailto:${escHtml(operator.contact)}">${escHtml(operator.contact)}</a> ·`
+        : '';
+      return `<p class="operator-line">${escHtml(by)}${contact} <a href="${privacyHref()}" target="_blank" rel="noopener">${escHtml(t('privacyLink'))}</a></p>`;
+    }
+
+    // Whether this node paces agents with morsels (GET /v1/wallet `pacing.enabled`, the operator's
+    // pacingTollDefault above 0). null until known; the morsel sentence shows only when true.
+    let pacingEnabled = null;
+    async function fetchPacing(jwt) {
+      try {
+        const r = await fetch('/v1/wallet', { headers: { Authorization: 'Bearer ' + jwt } });
+        const d = await r.json();
+        return d.ok ? d.data?.pacing?.enabled === true : false;
+      } catch {}
+      return false;
+    }
+    const pacingHtml = () => pacingEnabled ? `<div class="wallet-note">${escHtml(t('pacingNote'))}</div>` : '';
+
+    /** Start the pacing read without holding the render; fill the slot when it answers. */
+    function loadPacing(jwt) {
+      fetchPacing(jwt).then((on) => {
+        pacingEnabled = on;
+        const slot = document.getElementById('pacingSlot');
+        if (slot) slot.innerHTML = pacingHtml();
+      });
+    }
 
     const app = document.getElementById('app');
 
@@ -395,12 +484,7 @@
 
     function renderLogin() {
       app.innerHTML = `
-        <h1>${escHtml(t('title'))}</h1>
-        <p class="subtitle">${escHtml(t('subtitle'))}</p>
-        <div class="platform-badge">
-          ${escHtml(t('platformLabel'))} <span class="platform-name">${escHtml(clientName)}</span>
-        </div>
-        <p class="priming-line">${escHtml(t('consent.priming.oauth', { client: clientName }))}</p>
+        ${introHtml()}
         ${boundaryHtml()}
         <p class="login-prompt">${escHtml(t('loginRequired'))}</p>
         <form id="loginForm">
@@ -430,6 +514,7 @@
           );
           session = data;
           const loginOwner = typeof data.owner === 'string' ? data.owner : data.owner?.name || data.username;
+          loadPacing(data.jwt || data.token);
           [agents, homeAgentName] = await Promise.all([
             fetchAgents(loginOwner, data.jwt || data.token),
             fetchHomeAgentName(data.jwt || data.token),
@@ -445,14 +530,17 @@
       // The name given at home is filled in rather than asked again — unless an agent already
       // carries it, in which case the list above is where that name lives.
       const prefill = homeAgentName && !agents.some((a) => a.name === homeAgentName) ? homeAgentName : '';
+      // The example name follows the connecting service ("goose" → "goose-work"), never a fixed vendor.
+      const slug = declaredName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+      const exampleName = `${slug.length >= 2 ? slug : 'my-ai'}-work`;
       container.innerHTML = `
         <div class="create-agent-form">
           <label>${escHtml(t('newAgentName'))}</label>
-          <input type="text" id="newAgentName" placeholder="e.g. claude-mcp" minlength="3" maxlength="64" required value="${escHtml(prefill)}" />
+          <input type="text" id="newAgentName" placeholder="${escHtml(t('newAgentNamePlaceholder', { example: exampleName }))}" minlength="3" maxlength="64" required value="${escHtml(prefill)}" />
           ${prefill ? `<p class="name-identity-hint name-from-home">${escHtml(t('homeNamed'))}</p>` : ''}
           <p class="name-identity-hint">${escHtml(t('newAgentNameHint'))}</p>
           <label>${escHtml(t('newAgentDisplayName'))}</label>
-          <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint'))}" />
+          <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint', { client: aiInline }))}" />
           <div id="createError" class="error-msg"></div>
           <div class="btn-row">
             <button type="button" class="btn-sm btn-sm-muted" id="cancelCreate">${escHtml(t('cancelBtn'))}</button>
@@ -576,8 +664,8 @@
     function renderApproval() {
       if (agents.length === 0) {
         app.innerHTML = `
-          <h1>${escHtml(t('title'))}</h1>
-          <p class="subtitle">${escHtml(t('noAgentsCreate'))}</p>
+          ${introHtml()}
+          <p class="select-agent-title">${escHtml(t('noAgentsCreate', { client: aiInline }))}</p>
           <div id="createContainer"></div>
           <div class="btn-row">
             <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
@@ -599,30 +687,28 @@
       // "keep" so approving without touching anything changes nothing.
       customScopes = expandScopes(agentScopes(selectedAgent));
 
-      const agentListHtml = agents.map((a, i) => `
+      // One line per agent: the name a person gave it, and the short name under it only when the two
+      // differ. The GAII and the balance stay off: agent balances are always 0 (the pace is the owner's).
+      const agentListHtml = agents.map((a, i) => {
+        const shown = a.display_name || a.displayName || a.name;
+        return `
         <div class="agent-option ${i === selIdx ? 'selected' : ''}" data-idx="${i}">
           <div>
-            <div class="agent-name">${escHtml(a.display_name || a.displayName || a.name)}</div>
-            <div class="agent-gaii">${escHtml(a.gaii)}</div>
+            <div class="agent-name">${escHtml(shown)}</div>
+            ${shown !== a.name ? `<div class="agent-handle">${escHtml(a.name)}</div>` : ''}
           </div>
-          <div class="agent-balance">${escHtml(a.morsel_balance ?? a.morselBalance ?? 0)} ${escHtml(t('morsels'))}</div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
 
       app.innerHTML = `
-        <h1>${escHtml(t('title'))}</h1>
-        <p class="subtitle">${escHtml(t('subtitle'))}</p>
-        <div class="platform-badge">
-          ${escHtml(t('platformLabel'))} <span class="platform-name">${escHtml(clientName)}</span>
-        </div>
-        <p class="priming-line priming-line--spaced">${escHtml(t('consent.priming.oauth', { client: clientName }))}</p>
-        <p class="select-agent-title">${escHtml(t('selectAgent'))}</p>
+        ${introHtml()}
+        <p class="select-agent-title">${escHtml(t('selectAgent', { client: aiInline }))}</p>
         <div id="agentList">${agentListHtml}</div>
         <div class="create-agent-row" id="showCreateBtn">+ ${escHtml(t('createNewAgent'))}</div>
         <div id="inlineCreateContainer" class="hidden"></div>
         <div id="scopeArea">${scopeSectionHtml()}</div>
         ${boundaryHtml()}
-        <div class="wallet-note">${escHtml(t('agentPays'))}</div>
+        <div id="pacingSlot">${pacingHtml()}</div>
         <div id="approveError" class="error-msg"></div>
         <div class="btn-row">
           <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
@@ -746,10 +832,12 @@
       });
     }
 
-    // Boot
-    session = await checkSession();
+    // Boot. The operator statement is public and small, so it is read beside the session restore and
+    // is in place before the first view renders.
+    [session, operator] = await Promise.all([checkSession(), fetchOperator()]);
     if (session) {
       const jwt = session.jwt || session.token;
+      loadPacing(jwt);
       [agents, homeAgentName] = await Promise.all([
         fetchAgents(getOwnerName(), jwt),
         fetchHomeAgentName(jwt),

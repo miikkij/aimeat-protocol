@@ -8,6 +8,8 @@
  *   lifetime had summed four legacy row kinds and said "earned 0" over a wallet that had earned 190
  *   through extension_earn rows (aimeat.io, 2026-09-04).
  * @version-history
+ *   v1.2.0 — 2026-09-27 — `pacing` is read: off on this node (no default toll), and a signed-out read
+ *     is refused.
  *   v1.1.0 — 2026-09-14 — The web registration door's welcome bonus is read too. Both doors that
  *     create an account now have a test over the credit, which is what lets the three copies of it
  *     collapse into creditWelcomeBonus().
@@ -109,6 +111,16 @@ await test('GET /v1/wallet: the welcome bonus is received, not earned, and the l
   assert(l.by_type?.welcome_bonus?.count === (welcome > 0 ? 1 : undefined) || welcome === 0, `by_type.welcome_bonus: ${JSON.stringify(l.by_type)}`);
   assert(l.total_rows === (welcome > 0 ? 1 : 0), `total_rows ${l.total_rows}`);
   assert(w.daily_allowance?.amount > 0 && w.daily_allowance?.accumulation_cap > 0, 'the pace and its cap are served');
+  // This node sets no AIMEAT_PACING_TOLL_DEFAULT, so it does not pace: the consent page reads this
+  // flag to decide whether to explain morsels at all. The paced case is in e2e-pacing.ts.
+  assert(w.pacing?.enabled === false && w.pacing?.toll_default === 0,
+    `a node with no default toll reports pacing off: ${JSON.stringify(w.pacing)}`);
+});
+
+await test('GET /v1/wallet signed out is refused and says nothing about the node', async () => {
+  const r = await json('/v1/wallet');
+  assert(r.status === 401, `signed-out wallet read ${r.status}`);
+  assert(r.body?.data?.pacing === undefined, `no wallet data leaks on a refusal: ${JSON.stringify(r.body?.data)}`);
 });
 
 let granted = 0;

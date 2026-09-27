@@ -51,10 +51,10 @@
      "slug": "g-1-choose-permissions-when-you-connect",
      "cells": [
       "<strong>Choose permissions when you connect</strong>",
-      "The approval window for claude.ai, ChatGPT and other services lets you pick read-only, standard, full access, or exactly the permissions you tick, before the connection completes.",
-      "OAuth consent screen"
+      "The approval window for claude.ai, ChatGPT and other services lets you pick read-only, standard, full access, or exactly the permissions you tick, before the connection completes. It names the service by the name it registered with, explains in plain words that the service becomes one of your agents and what an agent is, and says who runs this server with their contact and privacy policy. A line about morsels appears only when the operator paces agents.",
+      "OAuth consent screen, <code>GET /v1/wallet</code> (<code>pacing</code>)"
      ],
-     "plain": "Choose permissions when you connect The approval window for claude.ai, ChatGPT and other services lets you pick read-only, standard, full access, or exactly the permissions you tick, before the connection completes. OAuth consent screen"
+     "plain": "Choose permissions when you connect The approval window for claude.ai, ChatGPT and other services lets you pick read-only, standard, full access, or exactly the permissions you tick, before the connection completes. It names the service by the name it registered with, explains in plain words that the service becomes one of your agents and what an agent is, and says who runs this server with their contact and privacy policy. A line about morsels appears only when the operator paces agents. OAuth consent screen, GET /v1/wallet (pacing)"
     },
     {
      "slug": "g-1-hello-mcp",

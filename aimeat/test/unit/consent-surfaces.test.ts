@@ -11,6 +11,8 @@
  *      DIFFERENT set than the SPA's (memory:*, work:*, wallet:read; no storage) for months.
  *      A copy deleted without a guard is a copy that comes back.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — The OAuth consent page carries no per-agent balance and no agentPays line;
+ *     its morsel sentence is gated on the node's pacing flag.
  *   v1.0.0 — 2026-08-17 — With the consent-surface rebuild (shared vocabulary, preset unification).
  */
 import { describe, it, expect } from 'vitest';
@@ -100,6 +102,17 @@ describe('the standalone pages keep no private copies', () => {
       const locale = JSON.parse(read(`../../locales/${lang}.json`));
       expect(locale.oauthConsent?.scopeFull, `${lang}.json still carries oauthConsent.scopeFull`).toBeUndefined();
       expect(locale.oauthConsent?.walletNote, `${lang}.json still carries oauthConsent.walletNote`).toBeUndefined();
+      // Agents hold no balance of their own (the pace is the owner's), so "paid from this agent's own
+      // morsels" was false; the morsel sentence is now pacingNote, shown only on a node that paces.
+      expect(locale.oauthConsent?.agentPays, `${lang}.json still carries oauthConsent.agentPays`).toBeUndefined();
+      expect(locale.oauthConsent?.pacingNote, `${lang}.json lacks oauthConsent.pacingNote`).toBeTruthy();
     }
+  });
+
+  it('oauth-consent.html shows no per-agent balance and gates the morsel sentence on pacing', () => {
+    const page = read('../../public/oauth-consent.html');
+    expect(page).not.toContain('a.morsel_balance');
+    expect(page).not.toContain("t('agentPays')");
+    expect(page).toContain('pacing?.enabled');
   });
 });
