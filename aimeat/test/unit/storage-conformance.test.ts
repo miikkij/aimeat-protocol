@@ -21,6 +21,10 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.13.0 -- 2026-09-26 -- The deploy migration gives the ledger lines that name an account deleted
+ *     before it, in any form and in either column, the pseudonym that account's work takes, by the
+ *     rule the work follows; a line of the name's holder now, a person of another node, a node and a
+ *     pseudonym already written stay.
  *   v1.12.0 -- 2026-09-26 -- deleteOwner keeps the other side's ledger lines on every provider, with
  *     the erased person named by the erasure's one pseudonym as counterparty and as the one who acted;
  *     a line naming somebody else or a node stays, and so do the amounts, the types and the dates.
@@ -767,6 +771,90 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect.soft(await written(), `${name}: the deploy migration run again changed what the erasure wrote`).toEqual(before);
 
             await storage.deleteOwner(p.other);
+        }
+    }, 60_000);
+
+    // An account deleted before the deploy left its name in other people's ledgers. The deploy
+    // migration settles those lines the way a deletion settles them now: every line that names the
+    // account, by its bare name, its GHII or an agent of it, as counterparty or as the one who acted,
+    // takes the pseudonym the account's work takes. The account counts as deleted by the rule the
+    // work follows: nobody holds the name now, or the line is older than the account that does. A
+    // line of the account holding the name now, a person of another node, a node, and a pseudonym
+    // already written stay as they are.
+    it('the deploy migration gives the ledger lines that name a deleted account the pseudonym its work gets', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const hour = 3_600_000;
+            const now = new Date().toISOString();
+            const earlier = new Date(Date.now() - hour).toISOString();
+            const longAgo = new Date(Date.now() - 48 * hour).toISOString();
+            const ages = new Date(Date.now() - 72 * hour).toISOString();
+            // `keeper` keeps the lines. `gone` was deleted and did work with them; `only` was deleted
+            // and appears in the ledger alone; `again` was deleted and the name registered again;
+            // `live` never left.
+            const keeper = `confledk${tag}`, gone = `confledg${tag}`, only = `confledo${tag}`, again = `confledy${tag}`, live = `confledl${tag}`;
+            for (const [n, at] of [[keeper, ages], [again, earlier], [live, ages]]) {
+                await storage.createOwner({ name: n, displayName: n, publicKey: 'pk', roles: ['owner'], createdAt: at });
+                await storage.createGHII({
+                    username: n, nodeId: node, ghii: `${n}@${node}`, displayName: n, verificationLevel: 0,
+                    ownerName: n, totpEnabled: false, morselBalance: 100, loginCount: 0, createdAt: at, updatedAt: at,
+                });
+            }
+            const kGhii = `${keeper}@${node}`;
+            const work = `tc-led-w-${tag}`;
+            await storage.createWork(workRow(work, gone, kGhii, 'accepted', { createdAt: longAgo, updatedAt: longAgo }));
+            await storage.updateWork(work, { status: 'delivered', output: { answer: 1 }, updatedAt: longAgo });
+            const pseudonymBefore = 'erased:0123456789abcdef01234567';
+            const lines: Array<[string, string, string, string, string?]> = [
+                ['bare', 'escrow_hold', gone, longAgo],
+                ['agent', 'earned', `bot#${gone}@${node}`, longAgo],
+                ['ghii', 'app_purchase', `${gone}@${node}`, longAgo],
+                ['acted', 'extension_earn', `bot#${gone}@${node}`, longAgo, `bot#${gone}@${node}`],
+                ['kept', 'escrow_return', pseudonymBefore, longAgo, `bot#${gone}@${node}`],
+                ['only', 'app_sale', `${only}@${node}`, longAgo],
+                ['again-old', 'app_sale', `${again}@${node}`, longAgo],
+                ['again-new', 'app_sale', `${again}@${node}`, now],
+                ['live', 'earned', `${live}@${node}`, now],
+                ['foreign', 'earned', `${gone}@peer-node-ledger`, longAgo],
+                ['relay', 'relay_fee', `confledn${tag}`, longAgo],
+                ['settle', 'federation_settlement', `confledn${tag}`, longAgo],
+                ['node', 'mint', node, longAgo],
+            ];
+            for (const [k, type, counterpartyGaii, timestamp, initiatorGaii] of lines) {
+                await storage.addTransaction({
+                    id: `tx-led-${k}-${randomUUID()}`, gaii: kGhii, type, amount: 1, counterpartyGaii,
+                    trackingCode: `tc-led-${k}-${tag}`, timestamp, ...(initiatorGaii ? { initiatorGaii } : {}),
+                });
+            }
+
+            await rerunIdentityMigration(name, storage);
+
+            const P = (await storage.getWork(work))?.providerGaii;
+            expect.soft(P, `${name}: the deleted account's work took no pseudonym`).toMatch(erasedRe);
+            const kept = (await storage.getTransactions(kGhii, 500)).filter(t => t.trackingCode?.startsWith('tc-led-'));
+            const of = (k: string) => kept.find(t => t.trackingCode === `tc-led-${k}-${tag}`);
+            for (const k of ['bare', 'agent', 'ghii', 'acted']) {
+                expect.soft(of(k)?.counterpartyGaii, `${name}: the ${k} line does not name the pseudonym the deleted account's work took`).toBe(P);
+            }
+            expect.soft(of('acted')?.initiatorGaii, `${name}: the line does not name that pseudonym as the one who acted`).toBe(P);
+            expect.soft([of('kept')?.counterpartyGaii, of('kept')?.initiatorGaii], `${name}: a pseudonym already written changed, or the one who acted kept the name`)
+                .toEqual([pseudonymBefore, P]);
+            const Q = of('only')?.counterpartyGaii;
+            expect.soft(Q, `${name}: an account deleted with no work of its own still names it`).toMatch(erasedRe);
+            expect.soft(Q === P, `${name}: two deleted accounts got one pseudonym`).toBe(false);
+            expect.soft(of('again-old')?.counterpartyGaii, `${name}: a line older than the name's holder now still names it`).toMatch(erasedRe);
+            expect.soft(of('again-new')?.counterpartyGaii, `${name}: a line of the name's holder now changed`).toBe(`${again}@${node}`);
+            expect.soft(of('live')?.counterpartyGaii, `${name}: a line naming a live account changed`).toBe(`${live}@${node}`);
+            expect.soft(of('foreign')?.counterpartyGaii, `${name}: a line naming a person of another node changed`).toBe(`${gone}@peer-node-ledger`);
+            expect.soft([of('relay')?.counterpartyGaii, of('settle')?.counterpartyGaii], `${name}: a line naming a node changed`)
+                .toEqual([`confledn${tag}`, `confledn${tag}`]);
+            expect.soft(of('node')?.counterpartyGaii, `${name}: a line naming this node changed`).toBe(node);
+            expect.soft(kept.map(t => `${t.type}:${t.amount}`).sort(), `${name}: the books changed with the migration`)
+                .toEqual(lines.map(([, type]) => `${type}:1`).sort());
+
+            for (const n of [keeper, again, live]) await storage.deleteOwner(n);
         }
     }, 60_000);
 
