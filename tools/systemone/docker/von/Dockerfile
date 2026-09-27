@@ -1,7 +1,7 @@
 # von (Apache 2.0) as a container: POST /v1/systemone on port 8000.
 #
 #   docker build --build-arg TORCH=cpu   -t aimeat-systemone/von:1.1.1-cpu   .
-#   docker build --build-arg TORCH=cu128 -t aimeat-systemone/von:1.1.1-cu128 .
+#   docker build --build-arg TORCH=cu130 -t aimeat-systemone/von:1.1.1-cu130 .
 #
 # The server comes from the PyPI package von-sdk (it carries `von serve`); the weights (wfzyx/von)
 # are inside the image and the hub is switched off at run time. VON_DEVICE=cuda on the CUDA image.

@@ -22,7 +22,8 @@ Two ways to run them:
 
 ## Docker
 
-Needs Docker with Compose. For the GPU: an NVIDIA card and the NVIDIA container runtime.
+Needs Docker with Compose. For the GPU: an NVIDIA card with driver 580 or newer (the images carry
+torch built for CUDA 13.0) and the NVIDIA container runtime.
 
 ```bash
 cd tools/systemone/docker
@@ -51,7 +52,7 @@ Other ports: `LAYA_PORT=9801 VON_PORT=9802 JEFF_PORT=9803 docker compose up -d`.
 listen on `127.0.0.1` only.
 
 **Versions are pinned.** The base image is pinned by digest, every Python package installs from
-a lock file with hashes (`<model>/requirements-cpu.txt`, `-cu128.txt`, `hub.txt`), and the weights
+a lock file with hashes (`<model>/requirements-cpu.txt`, `-cu130.txt`, `hub.txt`), and the weights
 are a fixed commit of each model's repository (the `revision` in its Dockerfile), so a build gets
 exactly what was measured and a changed package fails it. To move a version, edit the model's
 `requirements.in` (or the torch builds at the top of `lock.sh`), run `bash lock.sh` (needs
@@ -91,6 +92,11 @@ the content may be in another language for Laya and jeff.
 The answers are the same on the CPU and the GPU; only the time changes. jeff's CPU figure is its
 ONNX int8 arm, which compose.yaml switches on for the CPU image (`JEFF_BACKEND=onnx`); its torch arm
 takes about 1.7 s on the same 4 cores.
+
+The CUDA figures were measured with torch 2.11 built for CUDA 12.8. The CUDA images moved to torch
+2.14 built for CUDA 13.0 on 2026-09-27, because the CUDA 12.8 builds stop at 2.11 and that version
+carries a torch advisory and holds setuptools below its fix. Measure the CUDA column again on the
+next GPU build.
 
 ## Connecting a node
 
@@ -145,7 +151,7 @@ the list.
 
 From `tools/systemone` in PowerShell. Needs Python 3.12 (`py -3.12`) and Git; with an NVIDIA card it
 installs the CUDA build of torch. It installs what the images carry: every package at the version in
-the model's `docker/<model>/requirements-cu128.txt`, jeff's source at the images' commit, and the
+the model's `docker/<model>/requirements-cu130.txt`, jeff's source at the images' commit, and the
 weights at the images' commits.
 
 ```powershell
