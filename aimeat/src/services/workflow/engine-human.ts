@@ -8,6 +8,9 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   v1.3.1 — 2026-09-27 — applyHumanAnswer throws on a step id that is not an own key of run.steps,
+ *     so `__proto__` cannot make its writes land on Object.prototype (CodeQL
+ *     js/prototype-polluting-assignment).
  *   v1.3.0 — 2026-09-26 — HUMAN_TIMEOUT_MIN_DEFAULT and sweepHumanStep, the watchdog's on_timeout
  *     policy for a waiting human-input step, moved here from engine.ts unchanged (max-file-lines).
  *     engine.ts exports the constant as before.
@@ -70,6 +73,9 @@ export function validateHumanAnswer(q: WorkflowHumanQuestion, answer: { picks: s
 export async function applyHumanAnswer(
   storage: Storage, config: AimeatConfig, ownerGhii: string, run: WorkflowRun, stepId: string, ans: HumanAnswerValue,
 ): Promise<void> {
+  // The step id arrives from the answer route and the MCP tool. Only an own key of run.steps is a
+  // step: `__proto__` would otherwise resolve to Object.prototype and the writes below would land there.
+  if (!Object.hasOwn(run.steps, stepId)) throw new Error(`step "${stepId}" is not a step of run "${run.runId}"`);
   const rs = run.steps[stepId];
   const step = run.defSnapshot.steps.find(s => s.id === stepId);
   const action = step?.action?.kind === 'human-input' ? step.action : undefined;

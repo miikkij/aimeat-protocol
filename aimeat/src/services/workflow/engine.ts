@@ -104,6 +104,8 @@
  *     open, the watchdog does not end the step by its output: only the answer or the timeout ends it.
  *     With no such call open, after a restart or an engine error, it ends the step by its output or
  *     its timeout as before (secaudit 2026-09, R4).
+ *   v1.19.1 — 2026-09-27 — onHumanAnswer takes only an own key of run.steps as a step, so a step id
+ *     of `__proto__` is refused as not waiting (CodeQL js/prototype-polluting-assignment).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -756,7 +758,7 @@ export class WorkflowEngine {
       const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
       if (!rec) return { ok: false as const, code: 'NOT_FOUND' as const, error: `run "${runId}" not found` };
       const run = rec.value as WorkflowRun;
-      const rs = run.steps[stepId];
+      const rs = Object.hasOwn(run.steps, stepId) ? run.steps[stepId] : undefined;
       if (!rs || rs.state !== 'waiting-human' || !rs.human) {
         return { ok: false as const, code: 'NOT_WAITING' as const, error: `step "${stepId}" is not waiting for human input` };
       }

@@ -19,6 +19,9 @@
  *   bundleZip(files) · ZipError
  * @usage const meta = parseAppMeta(html); const html = await bundleZip(await extractZip(await file.arrayBuffer()));
  * @version-history
+ *   v1.0.1 — 2026-09-27 — bundleZip inlines a <script src> whose end tag carries spaces or
+ *     attributes (</script >) or whose body holds text, which the old pattern left pointing at a file
+ *     the bundle no longer has. CodeQL js/bad-tag-filter.
  *   v1.0.0 — 2026-09-27 — Initial (appcat): carried from the old catalogue's apps-io.js and zip.js.
  */
 
@@ -229,8 +232,9 @@ export async function bundleZip(files) {
     return '<style>/* ' + hrefMatch[1] + ' */\n' + inlineCssUrls(asText(data)) + '</style>';
   });
 
-  // Script files become inline scripts.
-  html = html.replace(/<script\s+[^>]*src\s*=\s*["']([^"']+)["'][^>]*>\s*<\/script>/gi, (tag, src) => {
+  // Script files become inline scripts. A browser ignores what sits inside a <script src> tag, so
+  // that text goes with the tag, and the end tag may carry spaces or attributes (</script >).
+  html = html.replace(/<script\s+[^>]*src\s*=\s*["']([^"']+)["'][^>]*>[^<]*<\/script[^>]*>/gi, (tag, src) => {
     const data = resolveRef(src);
     if (!data) return tag;
     return '<script>/* ' + src + ' */\n' + asText(data) + '</script>';

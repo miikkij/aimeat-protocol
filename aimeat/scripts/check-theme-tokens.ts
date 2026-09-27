@@ -15,6 +15,8 @@
  *     part missing or out of order draws differently from the SPA.
  * @usage pnpm check:theme-tokens
  * @version-history
+ *   v1.0.1 — 2026-09-27 — A line that ends an HTML comment with --!> is skipped like one that ends
+ *     it with --> (CodeQL js/bad-tag-filter).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation: theme.css holds tokens only).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -39,7 +41,7 @@ function linksAfterTheme(html: string): string[] | null {
     const out: string[] = [];
     for (const line of rest) {
         const t = line.trim();
-        if (!t || t.startsWith('<!--') || t.startsWith('-->') || /^[^<]*-->$/.test(t) || /^[A-Za-z(].*[^>]$/.test(t)) continue;
+        if (!t || t.startsWith('<!--') || /^--!?>/.test(t) || /^[^<]*--!?>$/.test(t) || /^[A-Za-z(].*[^>]$/.test(t)) continue;
         const m = /^<link rel="stylesheet" href="(\/css\/components\/[^"]+)"/.exec(t);
         if (!m) break;
         out.push(m[1]);
