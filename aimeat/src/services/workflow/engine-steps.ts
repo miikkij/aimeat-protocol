@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-26 — An extension step's write to result_to_key and a datapackage step's publish
+ *     are passed to the engine with the answer (ResultWrite, engine-answer.ts), and the engine makes
+ *     them only while the step still waits for an answer (secaudit 2026-09, R4).
  *   v1.6.0 — 2026-09-26 — The extension, datapackage and ecosystem steps report their outcome to the
  *     engine through reportOutcome (engine-answer.ts): only a failure of the step's own work fails the
  *     attempt, and an error inside the engine while it takes the answer in is logged as the engine's
@@ -65,7 +68,7 @@ import { runExtensionActionAsSystem } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
 import { templateInput, runPaged, runForEach, mapColumns, atPath } from './engine-step-rows.js';
-import { reportOutcome } from './engine-answer.js';
+import { reportOutcome, type ResultWrite } from './engine-answer.js';
 import { usd } from './run-cost.js';
 import { dispatchAiStep } from './engine-ai-step.js';
 import { dispatchInspector } from './engine-inspector.js';
@@ -86,8 +89,9 @@ export interface StepDeps {
 /** Callback into the engine's non-task terminal path for ecosystem action steps. `costUsd` is what the
  *  step's own model calls cost (an ai step), for the run's cost cap, and `call` is the attempt the
  *  answer was dispatched for: an ai step's model call holds its share of the cap until it answers,
- *  and an answer of an earlier attempt does not decide the attempt that runs now (engine.ts). */
-export type OnPushTerminal = (ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number) => void | Promise<void>;
+ *  and an answer of an earlier attempt does not decide the attempt that runs now (engine.ts). `write`
+ *  is the write the answer makes, which the engine makes only while the step waits for an answer. */
+export type OnPushTerminal = (ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number, write?: ResultWrite) => void | Promise<void>;
 
 const TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled', 'stopped']);
 const FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red', 'timed-out', 'agent-offline']);
@@ -99,7 +103,7 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
   // Every answer names the attempt it was dispatched for, so the engine tells a late answer of an
   // earlier attempt from the answer of the attempt that runs now, after the watchdog gave a retry.
   const attempt = run.steps[step.id]?.attempt ?? 0;
-  const onAnswer: OnPushTerminal = (o, w, rid, s, ok, cost, call) => onPushTerminal(o, w, rid, s, ok, cost, call ?? attempt);
+  const onAnswer: OnPushTerminal = (o, w, rid, s, ok, cost, call, write) => onPushTerminal(o, w, rid, s, ok, cost, call ?? attempt, write);
   // An extension step runs HERE, on this node, in the QuickJS sandbox — no agent to reach, no
   // tunnel to cross, no model. Completion arrives through the same onPushTerminal path as an
   // ecosystem step, so its success_signal decides green or red the same way.
@@ -266,7 +270,7 @@ export function dispatchExtensionStep(
     },
   );
 
-  const fire = async (): Promise<boolean> => {
+  const fire = async (): Promise<ResultWrite | undefined> => {
     const base = templateInput(action.input, run.vars);
     const out = action.paging
       ? await runPaged(action.paging, base, (input, page) => runOnce(input, `wf:${workflowId}:${stepId}:p${page}`))
@@ -278,25 +282,29 @@ export function dispatchExtensionStep(
     // agents and ecosystem apps). Those never intersect, so without this the step's result would be
     // invisible to its own gate and every extension step would be permanently red. The engine
     // therefore lands the return value in the owner's namespace — the same move `answer_to_key`
-    // makes for a human-input step — before the signal is asked anything.
+    // makes for a human-input step — before the signal is asked anything, and only while the step
+    // still waits for this answer: once the step has ended, a later answer writes nothing.
+    let write: ResultWrite | undefined;
     if (action.result_to_key) {
       const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
-      const existing = await deps.storage.getMemory(ownerGhii, key);
-      const now = new Date().toISOString();
-      await deps.storage.setMemory({
-        key, ownerGaii: ownerGhii, value: out.result ?? null,
-        visibility: 'private', tags: ['workflow-extension-result'], ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now, updatedAt: now,
-      });
+      write = async () => {
+        const existing = await deps.storage.getMemory(ownerGhii, key);
+        const now = new Date().toISOString();
+        await deps.storage.setMemory({
+          key, ownerGaii: ownerGhii, value: out.result ?? null,
+          visibility: 'private', tags: ['workflow-extension-result'], ttlHours: null,
+          version: existing ? existing.version + 1 : 1,
+          createdAt: existing?.createdAt ?? now, updatedAt: now,
+        });
+      };
     }
     // Reaching here means the sandbox returned rather than threw. Whether the step actually
     // DELIVERED is the success_signal's question, and onPushTerminal asks it — a script that returns
     // without producing what the signal names is a red step.
-    return true;
+    return write;
   };
   reportOutcome(fire(),
-    () => onPushTerminal(ownerGhii, workflowId, runId, stepId, true),
+    write => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, undefined, undefined, write),
     err => {
       // The reason has to survive: a red step with no message sends the owner to the run log for a
       // sentence that was thrown away here.
@@ -326,6 +334,11 @@ export function dispatchExtensionStep(
  * than green-with-nothing-produced. `recordFailure` puts the same sentence on the package's own
  * pointer, so an owner looking at the package — not at a run log — learns that the latest attempt
  * broke and which version they are still on.
+ *
+ * ONE VERSION FOR ONE STEP. The step reads and shapes the rows and passes the publish to the engine
+ * with its answer. The engine publishes under the run's lock, and only while the step still waits
+ * for an answer: an attempt that answers after the step ended publishes nothing (engine.ts
+ * onPushTerminal).
  */
 export function dispatchDataPackageStep(
   deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep,
@@ -336,7 +349,7 @@ export function dispatchDataPackageStep(
   const stepId = step.id;
   const name = template(action.name, run.vars);
 
-  const fire = async (): Promise<void> => {
+  const fire = async (): Promise<ResultWrite> => {
     const key = (run.keyPrefix ?? '') + template(action.from_key, run.vars);
     const record = await deps.storage.getMemory(ownerGhii, key);
     if (!record) {
@@ -357,8 +370,7 @@ export function dispatchDataPackageStep(
           united.push({ ...(source.set ?? {}), ...mapColumns(row, source.columns) });
         }
       }
-      await publishRows(united);
-      return;
+      return () => publishRows(united);
     }
 
     const found = atPath(record.value, action.rows_at);
@@ -372,7 +384,8 @@ export function dispatchDataPackageStep(
     // Flatten, when the step says how. A Table Schema describes scalars and a real producer answers
     // with nested objects, so this is the transformation these bindings actually need — declarative,
     // recorded in the descriptor, and with no scripting language in a workflow descriptor.
-    await publishRows((found as Array<Record<string, unknown>>).map(row => mapColumns(row, action.columns)));
+    const rows = (found as Array<Record<string, unknown>>).map(row => mapColumns(row, action.columns));
+    return () => publishRows(rows);
   };
 
   /** Publish one version from rows that are already flat, and turn a refusal into a red step. */
@@ -418,7 +431,7 @@ export function dispatchDataPackageStep(
   };
 
   reportOutcome(fire(),
-    () => onPushTerminal(ownerGhii, workflowId, runId, stepId, true),
+    write => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, undefined, undefined, write),
     err => {
       logger.warn(`workflow ${workflowId} run ${runId}: datapackage step "${stepId}" failed`, { error: String(err) });
       return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);

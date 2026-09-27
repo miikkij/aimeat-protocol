@@ -94,6 +94,9 @@
  *     engine-human.ts sweepHumanStep. This module still exports HUMAN_TIMEOUT_MIN_DEFAULT.
  *   v1.16.0 — 2026-09-26 — onTaskTerminal takes a finished task only for an agent step, and only when
  *     the task is one the engine dispatched for the step's current attempt (secaudit 2026-09, R4 row 10).
+ *   v1.17.0 — 2026-09-26 — onPushTerminal makes the write an answer carries (an ai or extension step's
+ *     result, a datapackage step's version) under the run's lock and only while the step waits for an
+ *     answer: once the step has ended, an answer settles its cost and hold (secaudit 2026-09, R4).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -115,6 +118,7 @@ import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine
 import {
   dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
 } from './engine-steps.js';
+import { writeResult, type ResultWrite } from './engine-answer.js';
 import { validateHumanAnswer, applyHumanAnswer, sweepHumanStep } from './engine-human.js';
 import {
   spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls,
@@ -375,7 +379,7 @@ export class WorkflowEngine {
         // stays pending, and after the pass the run stops if no call is open (run-cost.ts).
         if (spendsAi(step) && admitAiStep(run, step.id) === 'wait') { waiting.add(step.id); continue; }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
-        const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok, cost, call) => this.onPushTerminal(o, w, rid, s, ok, cost, call));
+        const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok, cost, call, write) => this.onPushTerminal(o, w, rid, s, ok, cost, call, write));
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
         dispatchedAny = true; mutated = true;
         // Heads-up if we just dispatched to an offline agent (the sweep fails it after the grace).
@@ -663,8 +667,11 @@ export class WorkflowEngine {
    * call held of the cap goes now, with its answer. An answer of an EARLIER attempt, while the step
    * runs again after a retry, turns the step green when it succeeded and its output is there, and
    * otherwise leaves the step to the current attempt: it never uses up a retry or turns it red.
+   * `write` is the write the answer makes. The engine makes it only while the step waits for an
+   * answer, before it asks about the output, and a write that fails fails the answer. Once the step
+   * has ended, an answer settles its cost and hold and writes nothing.
    */
-  async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number): Promise<void> {
+  async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number, call?: number, write?: ResultWrite): Promise<void> {
     await this.withLock(runId, async () => {
       const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
       if (!rec) return;
@@ -677,6 +684,8 @@ export class WorkflowEngine {
       const answered = aiCallAnswered(rs, call, costUsd);
       // The step was given a retry after this answer's attempt started, and the current attempt runs.
       const earlier = call !== undefined && call !== rs.attempt;
+      // The step waits for an answer, so the engine makes this answer's write now, under the run's lock.
+      if (ok && rs.state === 'dispatched') ok = await writeResult(write, `workflow ${workflowId} run ${runId}: step "${stepId}"`);
       if (rs.state !== 'dispatched' || (earlier && !ok)) {
         // Not awaiting this answer. A live run may now have room for an ai step that waited.
         const live = run.status === 'running' || run.status === 'waiting-step';

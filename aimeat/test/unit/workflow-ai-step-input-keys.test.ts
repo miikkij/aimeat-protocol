@@ -19,6 +19,9 @@
  *   prefixed key would pass against the defect the day the live key happened to be empty.
  * @usage pnpm test -- workflow-ai-step-input-keys
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The engine's stand-in makes the write the answer carries: the step passes
+ *     its write to result_to_key to the engine with the answer (engine-ai-step.ts v1.7.0). The setup
+ *     follows the code; the assertions are the same (secaudit 2026-09, R4).
  *   v1.0.0 — 2026-08-30 — Written for the keyPrefix fix in engine-ai-step.ts v1.2.0.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -84,13 +87,16 @@ const ACTION = {
     result_to_key: 'probability.result',
 };
 
-/** Fire the step and wait for the engine callback it finishes through. */
+/**
+ * Fire the step and wait for the engine callback it finishes through. The callback makes the write
+ * the answer carries, as the engine does while the step waits for an answer (engine.ts onPushTerminal).
+ */
 async function runStep(keyPrefix: string): Promise<{ ok: boolean; writes: Array<{ key: string; value: unknown }> }> {
     const { storage, writes } = storageWithBothKeys();
     const deps = { storage, config: { nodeId: NODE_ID } } as never;
     const done = new Promise<boolean>(resolve => {
         dispatchAiStep(deps, OWNER_GHII, runWith(keyPrefix), STEP, ACTION as never,
-            (_o, _w, _r, _s, ok) => resolve(ok));
+            async (_o, _w, _r, _s, ok, _cost, _call, write) => { await write?.(); resolve(ok); });
     });
     return { ok: await done, writes };
 }
