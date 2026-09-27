@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.6.0 — 2026-09-26 — At propose, a rule nested behind "&" passes, one nested without it is
+ *     refused with the forms that pass, and "&" at the top of the stylesheet is refused as the page.
  *   v1.5.6 — 2026-09-26 — A stylesheet holding "</" is refused at propose: a page reads it inside a
  *     <style> element, which "</style" ends.
  *   v1.5.5 — 2026-09-26 — The stylesheet is read by the CSS parser (e82c9f26d729): a string naming url(
@@ -542,6 +544,32 @@ const GOOD_BODY = {
         assert(/<html[^>]*data-theme="dark"/.test(dark) && dark.includes('class="wkgrid"'), 'asked for dark, the same component on the dark ground');
         const odd = await (await fetch(`${BASE}/v1/designbook/comp-week-${stamp}/preview?theme=%22%3E%3Cscript%3E`)).text();
         assert(/<html[^>]*data-theme="light"/.test(odd) && !odd.includes('"><script>'), 'any other value is the light page, and none of it reaches the markup');
+    });
+
+    // A component body the bench passes, and one thing changed in it at a time.
+    const componentBody = (patch: Record<string, unknown> = {}) => ({
+        prefix: 'wkgrid',
+        html: '<div class="wkgrid" role="grid"><button class="wkgrid-cell" type="button" aria-pressed="false" data-day="mon"></button></div>',
+        css: '.wkgrid { display: grid; gap: 8px; color: var(--ak-ink); }\n.wkgrid-cell { min-height: 40px; border: 1px solid var(--ak-line); background: var(--ak-surface); }',
+        use: 'One .wkgrid-cell button per day with data-day. The app toggles aria-pressed on click and saves.',
+        judgement: { reach: 'general', why: 'Any app where a person ticks days against rows uses it: habits, chores, attendance.' },
+        ...patch,
+    });
+    const proposeComponent = (id: string, b: unknown) => json('/v1/designbook', { method: 'POST', headers: auth(other.token),
+        body: JSON.stringify({ part: { id, kind: 'component', title: 'A week you tick', summary: 'Rows against seven days, every cell a button.', body: b } }) });
+    const refusedWith = (r: { status: number; body: any }, pattern: RegExp) => r.status === 422 && pattern.test(r.body.error?.message ?? '');
+    const said = (r: { status: number; body: any }) => `${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`;
+
+    await test('a rule nested behind "&" passes the bench; one nested without it is refused with the forms that pass, and "&" at the top of the stylesheet is the page', async () => {
+        const stamp = Date.now() % 100000;
+        const nested = await proposeComponent(`comp-nest-${stamp}`, componentBody({ css: '.wkgrid { display: grid; color: var(--ak-ink); & .wkgrid-cell { min-height: 40px; } &:hover { color: var(--ak-accent); } }' }));
+        assert(nested.status === 201, `a rule nested behind "&" passes: ${said(nested)}`);
+        const relaxed = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); .wkgrid-cell { min-height: 40px; } }' }));
+        assert(refusedWith(relaxed, /"& \.wkgrid-cell \{ … \}", "&:hover \{ … \}"/), `a rule nested without "&" is refused with the forms that pass: ${said(relaxed)}`);
+        const top = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid & { color: var(--ak-accent); }' }));
+        assert(refusedWith(top, /names the page itself/), `"&" at the top of the stylesheet is the page: ${said(top)}`);
+        const beside = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); & ~ p { color: var(--ak-accent); } }' }));
+        assert(refusedWith(beside, /beside it/), `a nested rule reaching beside the component is refused: ${said(beside)}`);
     });
 
     await test('a GENRE grows out of an app: a look of its own, judged general, kept by its owner AND opened for forking by its owner; it stops being offered when the app closes', async () => {

@@ -30,6 +30,10 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.6.0 — 2026-09-26 — A rule nested inside a style rule may start at "&", which is that rule's own
+ *     elements (and every selector of that rule is checked too); "&" anywhere at the top of the
+ *     stylesheet is the page. The refusal of a rule the parser keeps raw shows the nested forms that
+ *     pass.
  *   v1.5.1 — 2026-09-26 — A stylesheet carries no "</". A page reads it inside a <style> element, which
  *     "</style" ends, so with none the text every page reads is the text the bench read. Inside a
  *     string "<\/" reads the same and passes.
@@ -239,16 +243,19 @@ function checkStyles(css: string, prefix: string): void {
   // EVERY RULE STAYS INSIDE THE COMPONENT, read to the END of its selector: a rule styles what its
   // last compound names, and the first class says only where it starts. `.wkgrid ~ p` starts at the
   // component and styles every paragraph after it on the page. Every entry of every selector list,
-  // in every rule, nested rules and @media, @supports and @layer included.
-  for (const { text, selector } of sheet.selectors) {
-    const escape = selectorEscape(selector, prefix);
+  // in every rule, nested rules and @media, @supports and @layer included. In a NESTED rule "&" is
+  // the elements of the rule it stands in, whose own selectors are in this list and checked here,
+  // so a nested rule may start at "&"; at the top of the stylesheet "&" is the page.
+  for (const { text, selector, nested } of sheet.selectors) {
+    const escape = selectorEscape(selector, prefix, nested);
     if (escape) refuse(SELECTOR_REFUSAL[escape](text.slice(0, 60), prefix));
   }
   // WHAT THE PARSER CANNOT READ IS REFUSED. A browser drops what it cannot read and reads on from a
-  // place of its own choosing, so the bench vouches only for a stylesheet it reads whole.
+  // place of its own choosing, so the bench vouches only for a stylesheet it reads whole. A rule
+  // nested without "&" is such a part: the parser keeps it, and what follows it, as raw text.
   if (sheet.unreadable !== null) {
     refuse(`A component's stylesheet reads as CSS from its first character to its last, and "${sheet.unreadable}" does not. A browser drops such a part and reads on from a place of its own choosing, so the bench vouches only for a stylesheet it reads whole. `
-      + 'Write each rule as its selector and its declarations in braces, and nest a rule inside another only behind "&".');
+      + `Write each rule as its selector and its declarations in braces. A rule nested inside another starts with "&": "& .${prefix}-cell { … }", "&:hover { … }".`);
   }
 }
 
@@ -266,8 +273,8 @@ const MAX_DEPTH = 4;
 type SelectorEscape = 'anchor' | 'page' | 'beside' | 'reach' | 'unreadable';
 
 const SELECTOR_REFUSAL: Record<SelectorEscape, (sel: string, prefix: string) => string> = {
-  anchor: (sel, prefix) => `Every rule in a component's stylesheet starts at one of its own classes (".${prefix}" or ".${prefix}-…"): "${sel}" does not, so it would restyle the page it lands in.`,
-  page: sel => `"${sel}" names the page itself (html, body, :root, :scope, :host, or * at the start). A component's rules stay inside the component.`,
+  anchor: (sel, prefix) => `Every rule in a component's stylesheet starts at one of its own classes (".${prefix}" or ".${prefix}-…"), and a rule nested inside another may start at "&": "${sel}" does not, so it would restyle the page it lands in.`,
+  page: sel => `"${sel}" names the page itself (html, body, :root, :scope, :host, "&" outside a rule, or * at the start). A component's rules stay inside the component.`,
   beside: sel => `"${sel}" reaches from the component to an element beside it. After "+" or "~" the next element is one of the component's own classes too, or the rule would restyle the page around it.`,
   reach: sel => `"${sel}" reaches out of the element it styles. :is(), :where() and :not() take plain conditions on that element, and :has() looks only down into it, never beside or above it.`,
   unreadable: sel => `"${sel}" does not read as a selector the bench can follow the way a browser does. Write the component's own classes joined by spaces or ">", and "+" or "~" between two of its own classes.`,
@@ -285,27 +292,29 @@ function conditionCompounds(list: Array<ComplexSelector | null>): Compound[] | '
 }
 
 /**
- * Is this compound one of the component's own elements? Its own class written on it, or an `:is()`
- * or `:where()` every alternative of which is one: `:where(.wkgrid-cell)` keeps the specificity at
- * nothing, which is how a component loses to the page it lands in.
+ * Is this compound one of the component's own elements? Its own class written on it, "&" in a
+ * nested rule (the elements of the rule it stands in, whose selectors are checked on their own), or
+ * an `:is()` or `:where()` every alternative of which is one: `:where(.wkgrid-cell)` keeps the
+ * specificity at nothing, which is how a component loses to the page it lands in.
  */
-function isOwnCompound(c: Compound, prefix: string, depth = 0): boolean {
-  if (c.classes.some(cls => ownClass(cls, prefix))) return true;
+function isOwnCompound(c: Compound, prefix: string, nested: boolean, depth = 0): boolean {
+  if (c.classes.some(cls => ownClass(cls, prefix)) || (nested && c.nesting)) return true;
   if (depth >= MAX_DEPTH) return false;
   return c.pseudos.some(p => {
     if (p.element || p.arg?.kind !== 'list' || (p.name !== 'is' && p.name !== 'where')) return false;
     const alts = conditionCompounds(p.arg.list);
-    return Array.isArray(alts) && alts.length > 0 && alts.every(a => isOwnCompound(a, prefix, depth + 1));
+    return Array.isArray(alts) && alts.length > 0 && alts.every(a => isOwnCompound(a, prefix, nested, depth + 1));
   });
 }
 
 /**
  * Why a compound reaches the page, its functional pseudo-classes followed down, or null. A pseudo's
  * argument is what the CSS parser made of it (component-scan.ts Pseudo), so a pseudo it does not
- * know, whose argument it keeps as raw text, cannot be followed and is refused.
+ * know, whose argument it keeps as raw text, cannot be followed and is refused. "&" outside a
+ * nested rule is the page (:scope, the document's root).
  */
-function compoundEscape(c: Compound, prefix: string, first: boolean, depth = 0): SelectorEscape | null {
-  if (c.types.some(t => PAGE_TYPES.has(t)) || (first && c.types.includes('*'))) return 'page';
+function compoundEscape(c: Compound, prefix: string, first: boolean, nested: boolean, depth = 0): SelectorEscape | null {
+  if (c.types.some(t => PAGE_TYPES.has(t)) || (first && c.types.includes('*')) || (c.nesting && !nested)) return 'page';
   for (const p of c.pseudos) {
     if (PAGE_PSEUDOS.has(p.name)) return 'page';
     const arg = p.arg;
@@ -335,7 +344,7 @@ function compoundEscape(c: Compound, prefix: string, first: boolean, depth = 0):
       return 'unreadable';
     }
     for (const x of inner) {
-      const escape = compoundEscape(x, prefix, false, depth + 1);
+      const escape = compoundEscape(x, prefix, false, nested, depth + 1);
       if (escape) return escape;
     }
   }
@@ -348,18 +357,20 @@ function compoundEscape(c: Compound, prefix: string, first: boolean, depth = 0):
  * `>`) stays inside; going sideways (`+`, `~`) stays inside once the chain has gone down at least
  * once, because siblings share their parent, and otherwise only onto another of the component's own
  * elements, because the one it started at may be the component's root with the page all around it.
+ * In a nested rule "&" is one of the component's own elements, as its own class is: it stands for
+ * the elements of the rule it is nested in, and that rule's selectors are checked on their own.
  */
-function selectorEscape(x: ComplexSelector | null, prefix: string): SelectorEscape | null {
+function selectorEscape(x: ComplexSelector | null, prefix: string, nested: boolean): SelectorEscape | null {
   if (!x) return 'unreadable';
-  if (x.lead || !isOwnCompound(x.compounds[0], prefix)) return 'anchor';
+  if (x.lead || !isOwnCompound(x.compounds[0], prefix, nested)) return 'anchor';
   let below = false;
   for (const [i, c] of x.compounds.entries()) {
     if (i > 0) {
       const k = x.combinators[i - 1];
       if (k === ' ' || k === '>') below = true;
-      else if (!below && !isOwnCompound(c, prefix)) return 'beside';
+      else if (!below && !isOwnCompound(c, prefix, nested)) return 'beside';
     }
-    const escape = compoundEscape(c, prefix, i === 0);
+    const escape = compoundEscape(c, prefix, i === 0, nested);
     if (escape) return escape;
   }
   return null;

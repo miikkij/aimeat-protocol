@@ -27,6 +27,9 @@
  *   DeclarationRead · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.1.0 — 2026-09-26 — readStylesheet says of every selector whether it stands in a rule nested
+ *     inside a style rule (`nested`), at-rules between them or not: there "&" is that rule's own
+ *     elements, and at the top of the stylesheet it is the page.
  *   v2.0.0 — 2026-09-26 — The stylesheet is read by css-tree (readStylesheet, in place of cssAsRead,
  *     declarationsOf, selectorsOf, selectorListOf, complexSelectorOf and withoutVarFallbacks): its
  *     tokenizer for the at-rules, functions and addresses, with every name's escapes resolved, and
@@ -254,8 +257,12 @@ export interface StylesheetReading {
   /** How deep brackets and blocks nest. */
   depth: number;
   declarations: DeclarationRead[];
-  /** Every selector of every style rule outside @keyframes, as written, and read, or null where it does not read. */
-  selectors: Array<{ text: string; selector: ComplexSelector | null }>;
+  /**
+   * Every selector of every style rule outside @keyframes, as written, and read, or null where it
+   * does not read. `nested` when the rule stands inside another style rule, at-rules between them
+   * or not: there "&" is that rule's own elements, and at the top it is the page.
+   */
+  selectors: Array<{ text: string; selector: ComplexSelector | null; nested: boolean }>;
   /** The first part the parser could not read (a parse error, or text it kept raw), or null. */
   unreadable: string | null;
 }
@@ -326,15 +333,19 @@ export function readStylesheet(css: string): StylesheetReading {
       onParseError: (error, fallback) => { reading.unreadable ??= (fallback.type === 'Raw' ? fallback.value : css.slice(error.offset)).trim().slice(0, 60); },
     });
     let keyframes = 0;
+    // How many style rules the walk stands inside: a rule inside one is a nested rule.
+    let styleRules = 0;
     walk(ast, {
       enter(node) {
         if (node.type === 'Raw') reading.unreadable ??= node.value.trim().slice(0, 60);
         else if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes++;
-        else if (node.type === 'Rule' && keyframes === 0) reading.selectors.push(...selectorsOfRule(node, css));
+        else if (node.type === 'Rule' && keyframes === 0) reading.selectors.push(...selectorsOfRule(node, css, styleRules > 0));
         else if (node.type === 'Declaration' && !this.atrulePrelude) reading.declarations.push(declarationOf(node, css));
+        if (node.type === 'Rule') styleRules++;
       },
       leave(node) {
         if (node.type === 'Atrule' && KEYFRAMES.test(nameOf(node.name))) keyframes--;
+        if (node.type === 'Rule') styleRules--;
       },
     });
   } catch (err) {
@@ -370,9 +381,11 @@ function declarationOf(node: Declaration, css: string): DeclarationRead {
 }
 
 /** Every selector of one style rule, as written and as read. A prelude the parser kept raw is one unreadable entry. */
-function selectorsOfRule(rule: Rule, css: string): StylesheetReading['selectors'] {
-  if (rule.prelude.type === 'Raw') return [{ text: rule.prelude.value.trim(), selector: null }];
-  return rule.prelude.children.toArray().map(s => ({ text: s.type === 'Raw' ? s.value.trim() : textOf(css, s), selector: s.type === 'Selector' ? complexOf(s) : null }));
+function selectorsOfRule(rule: Rule, css: string, nested: boolean): StylesheetReading['selectors'] {
+  if (rule.prelude.type === 'Raw') return [{ text: rule.prelude.value.trim(), selector: null, nested }];
+  return rule.prelude.children.toArray().map(s => ({
+    text: s.type === 'Raw' ? s.value.trim() : textOf(css, s), selector: s.type === 'Selector' ? complexOf(s) : null, nested,
+  }));
 }
 
 const listOf = (list: SelectorList): Array<ComplexSelector | null> => list.children.toArray().map(s => (s.type === 'Selector' ? complexOf(s) : null));
