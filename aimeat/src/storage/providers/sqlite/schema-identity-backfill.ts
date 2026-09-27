@@ -24,6 +24,8 @@
  *   a person whose account is gone. That person's actions go, and their work is settled the way
  *   deleting their account settles it (repos/work-erasure.ts): open work is cancelled and the
  *   requester's held morsels go back, finished work stays for the other side under a pseudonym.
+ *   Held morsels go back only to an account that existed when the row was written: a later holder of
+ *   the requester's name is somebody else, and gets nothing (payerWhenWritten).
  *   A copy of another node's action (id `<node>:<id>`, tag `federated:<node>`) names a person of that
  *   node and is left as it is.
  * @structure
@@ -31,6 +33,8 @@
  *   - moveActionsAndWorkToFullIdentity(db): the move, once for each database
  * @usage moveActionsAndWorkToFullIdentity(db);   // from initializeSchema in schema.ts
  * @version-history
+ *   v1.2.0 — 2026-09-26 — Held morsels go back only to an account that existed when the row was
+ *     written (payerWhenWritten; secaudit 2026-09: R3 7b). Mirrors Postgres 0085.
  *   v1.1.0 — 2026-09-26 — Runs once for each database and records that it ran
  *     (IDENTITY_BACKFILL_RECORD), and a value that starts with ERASED_PARTY_PREFIX is never read as an
  *     account name (secaudit 2026-09: R3 7a). Mirrors Postgres 0085.
@@ -64,6 +68,21 @@ const heldGhii = (column: string, createdAt: string): string =>
 const LOCAL_ACTION = `instr(actions.id, ':') = 0 AND actions.tags NOT LIKE '%"federated:%'`;
 
 /**
+ * The balance a held request goes back to: the requester's GHII, found the way every balance op finds
+ * it, when that account already existed when the row was written. A name is released for reuse, so
+ * an account registered later under the requester's name is somebody else, and nothing goes back,
+ * as for a requester whose account is gone.
+ */
+function payerWhenWritten(db: Database.Database, identity: string, writtenAt: string): string | null {
+  const ghii = resolveGhiiIn(db, identity);
+  if (!ghii) return null;
+  const existed = db.prepare(
+    'SELECT 1 FROM ghiis g JOIN owners o ON o.name = g.ownerName WHERE g.ghii = ? AND o.createdAt <= ?',
+  ).get(ghii, writtenAt);
+  return existed ? ghii : null;
+}
+
+/**
  * Move bare-name actions and work to the GHII, and settle what a deleted account left, once for each
  * database. The row that says so is written in the same transaction as the move.
  */
@@ -93,7 +112,7 @@ export function moveActionsAndWorkToFullIdentity(db: Database.Database): void {
     ).all() as { name: string }[];
     for (const { name } of left) {
       const holder = db.prepare('SELECT createdAt FROM owners WHERE name = ?').get(name) as { createdAt: string } | undefined;
-      settleErasedPartyWork(db, name, [], erasedPartyPseudonym(), id => resolveGhiiIn(db, id), { createdBefore: holder?.createdAt });
+      settleErasedPartyWork(db, name, [], erasedPartyPseudonym(), (id, writtenAt) => payerWhenWritten(db, id, writtenAt), { createdBefore: holder?.createdAt });
     }
 
     db.prepare('INSERT INTO system_settings (key, value) VALUES (?, ?)').run(IDENTITY_BACKFILL_RECORD, new Date().toISOString());

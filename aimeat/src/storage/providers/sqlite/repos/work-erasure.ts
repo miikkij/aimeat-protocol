@@ -8,11 +8,15 @@
  *   per-identity cascade. A free function over the connection for the reason
  *   repos/app-purchase-erasure.ts gives: no import cycle through the provider class.
  * @structure
+ *   - PayerResolver — whose balance a held request goes back to, given the row's time
  *   - settleLeavingPartyWork(db, party, resolvePayer, opts) — the one rule
  *   - settleErasedPartyWork(db, name, ghiis, pseudonym, resolvePayer, opts, agents) — an erased account
  *   - settleDeletedAgentWork(db, gaii, resolvePayer) — one deleted agent
  * @usage settleErasedPartyWork(this.db, name, ghiis, pseudonym, id => this.resolveGhii(id));
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The payer resolver gets the time the row was written (PayerResolver), so the
+ *     boot migration gives held morsels back only to an account that existed then (secaudit 2026-09:
+ *     R3 7b). The deletions keep the resolver that debited them.
  *   v1.2.0 — 2026-09-26 — One rule for any party that leaves the work (LeavingParty in
  *     storage/erased-party.ts): an erased account, and one agent its owner deletes, whose held
  *     morsels go back to the owner and whose identity stays on what is kept. The erasure also finds
@@ -30,7 +34,14 @@ import { OPEN_WORK_STATUSES, deletedAgentParty, erasedAccountParty, type Leaving
 /** What one pass did to the work it touched. */
 export interface WorkErasureResult { cancelled: number; returned: number; kept: number; deleted: number }
 
-interface WorkRow { trackingCode: string; status: string; providerGaii: string; requesterGaii: string; cost: string }
+interface WorkRow { trackingCode: string; status: string; providerGaii: string; requesterGaii: string; cost: string; createdAt: string }
+
+/**
+ * The balance a held request goes back to, from the requester as the row stores it and the time the
+ * row was written. The deletions pass the resolver that debited it; the boot migration passes one
+ * that also asks whether that account existed when the row was written.
+ */
+export type PayerResolver = (identity: string, writtenAt: string) => string | null;
 
 /**
  * Settle every work row a leaving party is on, and keep of it on the rows that stay what `party`
@@ -54,7 +65,7 @@ interface WorkRow { trackingCode: string; status: string; providerGaii: string; 
  */
 export function settleLeavingPartyWork(
   db: Database.Database, party: LeavingParty,
-  resolvePayer: (identity: string) => string | null,
+  resolvePayer: PayerResolver,
   opts: { createdBefore?: string } = {},
 ): WorkErasureResult {
   const { exact, suffixPatterns, pseudonym } = party;
@@ -65,7 +76,7 @@ export function settleLeavingPartyWork(
   ].join(' OR ');
   const before = opts.createdBefore ? ' AND createdAt < ?' : '';
   const rows = db.prepare(
-    `SELECT trackingCode, status, providerGaii, requesterGaii, cost FROM work
+    `SELECT trackingCode, status, providerGaii, requesterGaii, cost, createdAt FROM work
      WHERE ((${matches('providerGaii')}) OR (${matches('requesterGaii')}))${before}`,
   ).all(...params, ...params, ...(opts.createdBefore ? [opts.createdBefore] : [])) as WorkRow[];
 
@@ -87,7 +98,7 @@ export function settleLeavingPartyWork(
     const requester = requesterGone && pseudonym ? pseudonym : w.requesterGaii;
     if (open && (!requesterGone || party.refundsItself)) {
       const held = Number((JSON.parse(w.cost || '{}') as { total?: number }).total ?? 0);
-      const payer = held > 0 ? resolvePayer(w.requesterGaii) : null;
+      const payer = held > 0 ? resolvePayer(w.requesterGaii, w.createdAt) : null;
       if (payer && db.prepare('UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) + ? WHERE ghii = ?').run(held, payer).changes > 0) {
         db.prepare(
           `INSERT INTO wallet_transactions (id, gaii, type, amount, counterpartyGaii, trackingCode, initiatorGaii, timestamp)
@@ -123,7 +134,7 @@ export function settleLeavingPartyWork(
  */
 export function settleErasedPartyWork(
   db: Database.Database, name: string, ghiis: string[], pseudonym: string,
-  resolvePayer: (identity: string) => string | null,
+  resolvePayer: PayerResolver,
   opts: { createdBefore?: string } = {},
   agents: string[] = [],
 ): WorkErasureResult {
@@ -132,7 +143,7 @@ export function settleErasedPartyWork(
 
 /** The work of one agent its owner deletes: settled by the same rule, the agent's identity kept. */
 export function settleDeletedAgentWork(
-  db: Database.Database, gaii: string, resolvePayer: (identity: string) => string | null,
+  db: Database.Database, gaii: string, resolvePayer: PayerResolver,
 ): WorkErasureResult {
   return settleLeavingPartyWork(db, deletedAgentParty(gaii), resolvePayer);
 }

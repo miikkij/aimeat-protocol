@@ -21,6 +21,10 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- The deploy migration gives what was held for a deleted account's open work
+ *     back only to a requester whose account existed when the row was written, in each form a
+ *     requester is stored in; the requester of the migration case is older than its oldest request
+ *     (secaudit 2026-09: R3 7b).
  *   v1.10.0 -- 2026-09-26 -- The deploy migration runs once for each database and keeps what an
  *     erasure wrote: a second start after an erasure, and the migration run again over it, leave every
  *     pseudonym, status, balance and ledger line as it was, on every provider. Running it again means
@@ -543,18 +547,22 @@ describe('storage providers agree on what they do, not just on their signatures'
             const now = new Date().toISOString();
             const earlier = new Date(Date.now() - hour).toISOString();
             const longAgo = new Date(Date.now() - 48 * hour).toISOString();
+            const ages = new Date(Date.now() - 72 * hour).toISOString();
             const owner = `confmig${tag}`, requester = `confmigr${tag}`, reused = `confmigx${tag}`, gone = `confmigg${tag}`;
+            // A name registered again after the rows below that name its previous holder as requester.
+            const again = `confmigy${tag}`;
             const ghii = `${owner}@${node}`, reqGaii = `bot#${requester}@${node}`;
-            for (const n of [owner, requester, reused]) {
-                await storage.createOwner({ name: n, displayName: n, publicKey: 'pk', roles: ['owner'], createdAt: earlier });
+            // The requester's account is older than every request it made, the oldest included.
+            for (const [n, at] of [[owner, earlier], [requester, ages], [reused, earlier], [again, earlier]]) {
+                await storage.createOwner({ name: n, displayName: n, publicKey: 'pk', roles: ['owner'], createdAt: at });
                 await storage.createGHII({
                     username: n, nodeId: node, ghii: `${n}@${node}`, displayName: n, verificationLevel: 0,
-                    ownerName: n, totpEnabled: false, morselBalance: 100, loginCount: 0, createdAt: earlier, updatedAt: earlier,
+                    ownerName: n, totpEnabled: false, morselBalance: 100, loginCount: 0, createdAt: at, updatedAt: at,
                 });
             }
             await storage.createAgent({
                 name: 'bot', owner: requester, gaii: reqGaii, publicKey: 'pk', trustScore: 50, morselBalance: 0,
-                capabilities: [], createdAt: earlier, lastSeen: earlier,
+                capabilities: [], createdAt: ages, lastSeen: ages,
             });
             const publish = (id: string, providerGaii: string, createdAt: string, tags: string[] = []) => storage.createAction({
                 id, providerGaii, displayName: id, description: 'conformance', inputSchema: {}, outputSchema: {},
@@ -600,6 +608,13 @@ describe('storage providers agree on what they do, not just on their signatures'
             await storage.debitBalance(reqGaii, 11);
             await storage.createWork(workRow(tc('x2'), reused, reqGaii, 'pending'));
             await storage.debitBalance(reqGaii, 11);
+            // Open work of a deleted account, asked for by the previous holder of a name somebody
+            // registered after the row was written, in each form a requester is stored in. What was
+            // held for it goes back to nobody: the holder of the name now did not ask.
+            const heldBefore = [['y1', `bot#${again}@${node}`], ['y2', again], ['y3', `${again}@${node}`]] as const;
+            for (const [k, requesterGaii] of heldBefore) {
+                await storage.createWork(workRow(tc(k), gone, requesterGaii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
+            }
 
             await rerunIdentityMigration(name, storage);
 
@@ -654,7 +669,16 @@ describe('storage providers agree on what they do, not just on their signatures'
                 .toEqual([`${tc('g')}:11`, `${tc('g2')}:5`, `${tc('x1')}:11`].sort());
             for (const t of returns) expect.soft(t.counterpartyGaii, `${name}: a return line names a deleted account`).toMatch(erasedRe);
 
-            for (const n of [owner, requester, reused]) await storage.deleteOwner(n);
+            for (const [k] of heldBefore) {
+                const y = await storage.getWork(tc(k));
+                expect.soft([y?.status, y?.providerGaii], `${name}: open work of a deleted account (${k})`).toEqual(['cancelled', leftover?.providerGaii]);
+            }
+            expect.soft((await storage.getGHII(`${again}@${node}`))?.morselBalance,
+                `${name}: a name registered after the rows were written got what was held for its previous holder`).toBe(100);
+            expect.soft((await storage.getTransactions(`${again}@${node}`, 500)).map(t => `${t.type}:${t.trackingCode}`),
+                `${name}: a name registered after the rows were written got a ledger line for them`).toEqual([]);
+
+            for (const n of [owner, requester, reused, again]) await storage.deleteOwner(n);
             await storage.deleteAction(federated, owner);
         }
     }, 60_000);
