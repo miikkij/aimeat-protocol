@@ -13,6 +13,8 @@
  *   operator frame's bar, 62px).
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-09-27 — A group brought to the top from the index lands under the page's bar and
+ *     the pinned search row with its headline in sight (scroll-margin-top; Jouni).
  *   v1.1.0 — 2026-09-27 — One scroller for the index (the rail inside no longer scrolls on its own),
  *     with a thin bar in a lane of its own beside the counts (Jouni: the bar lay over the numbers).
  *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
@@ -32,6 +34,9 @@
    counts so it never lies over them. */
 .settings-index-side { scrollbar-width: thin; scrollbar-color: var(--border) transparent; scrollbar-gutter: stable; padding-right: 6px; }
 .settings-index-side > .og-rail { position: static; max-height: none; overflow: visible; }
+/* A group brought to the top from the index lands under the page's bar and the pinned search row,
+   with its headline in sight. */
+.settings-index .settings-index-main .og-sec { scroll-margin-top: calc(var(--settings-index-top, 62px) + 44px); }
 .settings-index-main { min-width: 0; }
 
 /* One setting: its name, key and what it does; where its value comes from; the editor; the end. */

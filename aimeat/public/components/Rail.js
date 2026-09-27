@@ -41,6 +41,9 @@
  *          { label: x('railTitle'), items: [{ section: 'sk-own', mark: '01', label: x('secOwn'), count: 12 }] },
  *          { label: x('pages'), items: [{ tab: 'agents', label: t('profile.tabs.agents') }] }]} />`
  * @version-history
+ *   v1.3.1 — 2026-09-27 — scrollToSection keeps the section's scroll-margin-top in sight above it
+ *     (16px when it sets none): on the admin the headline no longer lands behind the bars that stay
+ *     at the top (Jouni).
  *   v1.3.0 — 2026-09-27 — `tone="light"`: the index on the page's ground, main's admin Config index
  *     (Jouni: the dark look belongs only to the operator menu); additive.
  *   v1.2.0 — 2026-09-26 — The note line (additive, page group G7: the Boards notice page's
@@ -73,7 +76,11 @@ export const scrollToSection = (id) => {
   if (!el) return;
   const box = el.closest('.page-content') || el.closest('.settings-frame-content') || null;
   if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
-  const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - 16;
+  // The section's own scroll-margin-top says how much stays in sight above it: a page with a bar
+  // that stays at the top (the admin's title bar, the Config page's search row) sets it to their
+  // height, so the section's headline lands under them instead of behind them. 16px otherwise.
+  const margin = parseFloat(getComputedStyle(el).scrollMarginTop) || 16;
+  const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - margin;
   box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 };
 
