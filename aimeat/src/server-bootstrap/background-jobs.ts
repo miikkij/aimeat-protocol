@@ -23,6 +23,10 @@
  * @version-history
  *   v1.0.0 — 2026-08-22 — Pure extraction from routes-loader.ts (which was at the line ceiling).
  *   v1.1.0 — 2026-09-03 — Boot backfills the dependency map and the kept component versions.
+ *   v1.2.0 — 2026-09-26 — The memory-write listener of the tracked responses runs as this node
+ *     (runAsNode, utils/gaii.ts), so it reacts as this node when another node in the same process
+ *     writes. What this file starts already runs as this node: createServer runs all of it inside
+ *     runAsNode. One node per process in production, so nothing there changes.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -34,6 +38,7 @@ import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js'
 import type { createPushService } from '../services/push.js';
 import type { createEmailService } from '../services/email.js';
 import { logger } from '../utils/logger.js';
+import { runAsNode } from '../utils/gaii.js';
 import { createGenesisSyncService } from '../services/genesis-sync.js';
 import { startCacheCleanupJob } from '../services/cache-cleanup.js';
 import { startSyncScheduler } from '../services/sync-scheduler.js';
@@ -122,10 +127,13 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
   // Memory Contracts — Tracked Responses: rebuild the reactive watched-key registry from live
   // contracts, react to writes on watched keys (event-driven), and run the safety-net reconciler.
   rebuildTrackRegistry(storage).catch(err => logger.error('Track registry rebuild failed', { error: String(err) }));
-  onMemoryWrittenEvent(evt => {
+  // The bus calls a listener as whoever emitted the event, which in a process that serves more than
+  // one node can be another node, so this one runs as THIS node, and so does the evaluation it starts.
+  // A production process serves one node, so nothing there changes.
+  onMemoryWrittenEvent(evt => runAsNode(config.nodeId, () => {
     if (!isTracked(evt.key)) return;   // O(1) gate — only watched keys do any work
     evaluateTrackedKey({ config, storage, peers }, evt.key)
       .catch(err => logger.warn('tracked-response reactive evaluate failed', { error: String(err) }));
-  });
+  }));
   startTrackedResponseReconciler(config, storage, peers);
 }

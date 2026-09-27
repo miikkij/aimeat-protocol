@@ -25,6 +25,8 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.2.0 -- 2026-09-26 -- The memory-write listener and the frame handler run as this node (runAsNode,
+ *     utils/gaii.ts), also in a process that serves more than one node. One node per process in production.
  *   v1.14.0 -- 2026-09-06 -- notifyScopesChanged(): tell one live identity its permissions changed,
  *     without detaching it. Deliberately not a fourth revocation predicate.
  *   v2.1.0 -- 2026-09-05 -- One heartbeat refreshes EVERY identity on its socket. The connector
@@ -109,7 +111,7 @@ import {
   onMemoryWrittenEvent, offMemoryWrittenEvent, type MemoryWriteEvent,
 } from './event-bus.js';
 import { canReadWorkspace } from './workspace-access.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, runAsNode } from '../utils/gaii.js';
 
 export const CONNECT_TUNNEL_PROTOCOL_VERSION = '1.0';
 export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
@@ -220,8 +222,10 @@ export class ConnectTunnelManager {
     // Workspace record push (P1): every memory write fires `memoryWritten` centrally (the generic
     // memory route AND the REST/MCP publish paths). We filter to keys whose (organism, ws, space)
     // has a live subscriber and push a lightweight `workspace.record` wake — so contract agents act
-    // on a record event instead of idle-polling their served spaces. No per-route hook needed.
-    this.memoryWriteHandler = (evt: MemoryWriteEvent) => { void this.onMemoryWrite(evt); };
+    // on a record event instead of idle-polling their served spaces. No per-route hook needed. It runs
+    // as THIS node: the bus calls it as whoever wrote, which can be another node in a process that
+    // serves several (the multi-node suites). A production process serves one node: no change there.
+    this.memoryWriteHandler = (evt: MemoryWriteEvent) => { runAsNode(config.nodeId, () => { void this.onMemoryWrite(evt); }); };
     onMemoryWrittenEvent(this.memoryWriteHandler);
 
     // P2: revoking a token pushes `auth_revoked` to its live socket (if any) + closes it.
@@ -293,7 +297,8 @@ export class ConnectTunnelManager {
     // Phase 2: drain queued tasks + pending messages, then live-push.
     void this.sendBacklog(conn);
 
-    ws.on('message', (data) => {
+    // A frame arrives as no node, so it runs as THIS node (runAsNode). One node per process in production.
+    ws.on('message', (data) => runAsNode(this.config.nodeId, () => {
       let frame: ConnectFrame;
       try {
         frame = JSON.parse(data.toString());
@@ -316,7 +321,7 @@ export class ConnectTunnelManager {
       }
       if (frame.type === 'detach') { this.detachIdentity(socketId, target, 'detach'); return; }
       this.handleFrame(target, frame);
-    });
+    }));
 
     ws.on('close', () => {
       // EVERY identity on this socket goes, not just the one that opened it. A shared socket can
