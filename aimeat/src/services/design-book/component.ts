@@ -30,6 +30,9 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.9.0 — 2026-09-26 — A repeated attribute, a missing space between two attributes and a "/"
+ *     ending a <div> are each refused in words of their own: a browser keeps the first of two, and
+ *     ignores the "/" and leaves the element open.
  *   v1.8.0 — 2026-09-26 — The markup closes every element it opens: one still open where the markup
  *     ends would take in whatever a page writes after the component, and it is refused by name.
  *   v1.7.0 — 2026-09-26 — A pseudo whose argument is not a selector and is only words and numbers
@@ -147,6 +150,13 @@ function markupRefusal(problem: MarkupProblem, html: string): string {
       return `A closing tag carries nothing but its name: "</${problem.element}${problem.rest.slice(0, 40)}>" does not, and a browser reads what follows the name as attributes, quotes and all. Write </${problem.element}>.`;
     case 'tag-start': return TAG_START_REFUSAL;
     case 'attribute': return ODD_ATTRIBUTE_REFUSAL(problem.element, problem.attribute);
+    case 'duplicate':
+      return `On <${problem.element}>, the attribute "${problem.attribute.slice(0, 40)}" is written twice. A browser keeps the first and drops the second. Write each attribute once.`;
+    case 'no-space':
+      return `On <${problem.element}>, the attribute "${problem.attribute.slice(0, 40)}" follows the value before it with no space between them. Put a space between one attribute and the next.`;
+    case 'slash':
+      return `A browser ignores the "/" at the end of <${problem.element} …/>, so the <${problem.element}> stays open and takes in whatever a page writes after it. `
+        + `Close every element inside the markup: <${problem.element} …></${problem.element}>. Only an element that holds nothing, such as <br> or <input>, and an SVG shape such as <path/> end with "/>".`;
     case 'open': {
       const name = problem.element || 'div';
       return `${problem.element ? `<${name}>` : 'An element'} is still open where the markup ends, so it would take in whatever a page writes after the component. `

@@ -31,6 +31,9 @@
  *   DeclarationRead · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.4.0 — 2026-09-26 — A repeated attribute (`duplicate`, named from the text before the error,
+ *     since parse5 drops it), a missing space between two attributes (`no-space`) and a "/" ending the
+ *     start tag of an element that is not empty (`slash`) are each reported as itself.
  *   v2.3.0 — 2026-09-26 — readMarkup reports an element still open where the markup ends (`open`,
  *     with the outermost one's name), read by parsing the markup with an element after it: that
  *     element stands last at the top only when every element of the markup closed. Its name is one
@@ -105,8 +108,14 @@ export type MarkupProblem =
   | { kind: 'closing'; element: string; rest: string }
   /** A "<" with no tag name straight after it, or after "</". */
   | { kind: 'tag-start' }
-  /** A quote or an angle bracket in a name or a bare value, a missing value, a repeated name. */
+  /** A quote or an angle bracket in a name or a bare value, a missing value, a stray "/" in a tag. */
   | { kind: 'attribute'; element: string; attribute: string }
+  /** The same attribute written twice on one element: a browser keeps the first. */
+  | { kind: 'duplicate'; element: string; attribute: string }
+  /** An attribute written straight after the value before it, with no space between them. */
+  | { kind: 'no-space'; element: string; attribute: string }
+  /** A "/" ending the start tag of an element that is not empty: a browser ignores it and leaves the element open. */
+  | { kind: 'slash'; element: string }
   /** Any other place the parser reports the markup as not well formed, by its WHATWG error code. */
   | { kind: 'unclean'; code: string; at: number }
   /** A "<" the parser read as no tag: text inside <textarea> or <title>, or a tag HTML drops there. */
@@ -122,7 +131,7 @@ const TAG_START_CODES = new Set([
 ]);
 const ATTRIBUTE_CODES = new Set([
   'unexpected-character-in-attribute-name', 'unexpected-character-in-unquoted-attribute-value', 'missing-attribute-value',
-  'missing-whitespace-between-attributes', 'unexpected-solidus-in-tag', 'duplicate-attribute',
+  'unexpected-solidus-in-tag',
 ]);
 
 /**
@@ -193,14 +202,25 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
     if (first.code === 'unexpected-equals-sign-before-attribute-name') return { elements, problem: { kind: 'equals', element: span?.name ?? '' } };
     if (UNCLOSED_CODES.has(first.code)) return { elements, problem: { kind: 'unclosed' } };
     if (TAG_START_CODES.has(first.code)) return { elements, problem: { kind: 'tag-start' } };
-    if (ATTRIBUTE_CODES.has(first.code) && span) {
+    if (first.code === 'non-void-html-element-start-tag-with-trailing-solidus' && span) return { elements, problem: { kind: 'slash', element: span.name } };
+    // parse5 reports a repeated attribute right after its name, and drops it from the element, so
+    // the name is read from the text just before the error, one character at a time backwards.
+    if (first.code === 'duplicate-attribute' && span) {
+      let end = first.startOffset;
+      while (end > span.start && /\s/.test(html[end - 1])) end--;
+      let start = end;
+      while (start > span.start && !/[\s"'<>/=]/.test(html[start - 1])) start--;
+      return { elements, problem: { kind: 'duplicate', element: span.name, attribute: html.slice(start, end) } };
+    }
+    if ((ATTRIBUTE_CODES.has(first.code) || first.code === 'missing-whitespace-between-attributes') && span) {
       // The attribute the error sits in, or nearest before it: parse5 gives each one's place.
       let attribute = '';
       let from = -1;
       for (const [attrName, where] of Object.entries(span.attrs)) {
         if (where.startOffset <= first.startOffset && where.startOffset > from) { attribute = attrName; from = where.startOffset; }
       }
-      return { elements, problem: { kind: 'attribute', element: span.name, attribute } };
+      const kind = first.code === 'missing-whitespace-between-attributes' ? 'no-space' : 'attribute';
+      return { elements, problem: { kind, element: span.name, attribute } };
     }
     return { elements, problem: { kind: 'unclean', code: first.code, at: first.startOffset } };
   }

@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.6.3 — 2026-09-26 — At propose, a repeated attribute and a "/" on a <div> are refused in words
+ *     of their own.
  *   v1.6.2 — 2026-09-26 — At propose, markup that leaves an element open where it ends is refused.
  *   v1.6.1 — 2026-09-26 — At propose, a pseudo whose argument is words passes (:state(on),
  *     ::part(label)), and :host() is refused as the page.
@@ -586,6 +588,14 @@ const GOOD_BODY = {
     await test('markup that leaves an element open where it ends is refused, with the element named', async () => {
         const open = await proposeComponent(`comp-bad-${Date.now() % 100000}`, componentBody({ html: '<div class="wkgrid" role="grid"><button class="wkgrid-cell" type="button"></button>' }));
         assert(refusedWith(open, /<div> is still open where the markup ends.*Close every element inside the markup/), `an element left open is refused: ${said(open)}`);
+    });
+
+    await test('a repeated attribute and a "/" on a <div> are refused, each in words of its own', async () => {
+        const stamp = Date.now() % 100000;
+        const twice = await proposeComponent(`comp-bad-${stamp}`, componentBody({ html: '<div class="wkgrid" class="wkgrid-x"></div>' }));
+        assert(refusedWith(twice, /the attribute "class" is written twice/), `a repeated attribute says so: ${said(twice)}`);
+        const slash = await proposeComponent(`comp-bad-${stamp}`, componentBody({ html: '<div class="wkgrid"/>' }));
+        assert(refusedWith(slash, /ignores the "\/" at the end of <div …\/>, so the <div> stays open/), `a "/" on a <div> says what a browser does with it: ${said(slash)}`);
     });
 
     await test('a GENRE grows out of an app: a look of its own, judged general, kept by its owner AND opened for forking by its owner; it stops being offered when the app closes', async () => {
