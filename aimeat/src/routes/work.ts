@@ -12,6 +12,9 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.4.1 — 2026-09-26 — createWorkItem refuses SAME_OWNER_WORK when the requester and the provider
+ *     have the same owner (ownerGhiiOf), whatever kind of principal each is: a person and their own
+ *     agent either way round, or two agents of one person (secaudit 2026-09, R3 7d).
  *   v1.4.0 — 2026-09-26 — Every door names the caller by its resolved identity (resolveIdentity): a
  *     person by their GHII, an agent by its GAII. A request stores it as the requester, the provider
  *     doors compare it, and a person's inbox, sent list and Work tab read their own GHII beside their
@@ -40,7 +43,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
-import { isForeignPrincipal, resolveIdentity } from '../utils/gaii.js';
+import { isForeignPrincipal, ownerGhiiOf, resolveIdentity } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow } from '../services/morsel.js';
@@ -98,11 +101,13 @@ export async function createWorkItem(
     return { error: 'Cannot create work request to yourself', status: 400, code: 'SELF_WORK' };
   }
 
-  // SECURITY: Prevent same-owner work (different agent, same human)
-  const requesterAgent = await storage.getAgent(requesterGaii);
-  const providerAgent = await storage.getAgent(provider_gaii);
-  if (requesterAgent && providerAgent && requesterAgent.owner === providerAgent.owner) {
-    return { error: 'Cannot create work request between your own agents', status: 400, code: 'SAME_OWNER_WORK' };
+  // SECURITY: no work between two principals of one owner, for the same reason as self-work: a person
+  // and their own agent, either way round, or two agents of one person. A person is a provider too
+  // (routes/actions.ts publishes their action under their GHII). ownerGhiiOf maps a GHII, a GAII and a
+  // GEAI to the owner's GHII with the node, so an account of the same name on another node is another
+  // owner. Every work door, REST and MCP, creates work here, so this is the one place the rule lives.
+  if (ownerGhiiOf(requesterGaii) === ownerGhiiOf(provider_gaii)) {
+    return { error: 'Cannot create a work request when the requester and the provider belong to the same owner', status: 400, code: 'SAME_OWNER_WORK' };
   }
 
   // Extension hook: pre_work_request

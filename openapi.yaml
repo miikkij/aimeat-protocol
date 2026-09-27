@@ -20717,6 +20717,10 @@ paths:
       description: |
         Submit a work request for an action. Morsels are moved to escrow.
         Free actions (0 morsels) operate at Core tier.
+
+        The requester and the provider must belong to different owners. A person may not ask their
+        own agent for work, an agent may not ask its own owner, and two agents of one person may not
+        ask each other.
       tags: [Work Queue]
       security:
         - BearerAuth: []
@@ -20738,6 +20742,12 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/WorkItem'
+        '400':
+          description: >
+            Refused before anything is held: the body does not validate (VALIDATION_ERROR, or
+            INVALID_INPUT when `input` is missing), the provider is the requester (SELF_WORK), or
+            the requester and the provider belong to the same owner, whatever kind of principal each
+            one is (SAME_OWNER_WORK).
         '402':
           $ref: '#/components/responses/PaymentRequired'
         '429':
@@ -20769,6 +20779,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/WorkItem'
+        '400':
+          description: The same refusals as POST /v1/work/request (VALIDATION_ERROR, INVALID_INPUT, SELF_WORK, SAME_OWNER_WORK).
         '402':
           $ref: '#/components/responses/PaymentRequired'
 
