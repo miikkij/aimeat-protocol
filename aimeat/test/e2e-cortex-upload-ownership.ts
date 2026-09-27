@@ -9,6 +9,9 @@
  *   that B's own upload still installs and can still be replaced by B.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=cortex-upload-ownership
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A ZIP redeploy of an ACTIVE cortex takes the old activation down and
+ *     activates the new manifest: the replaced action and board are gone, the record names the new
+ *     action and the uploader, and the cortex stays active.
  *   v1.1.0 — 2026-09-24 — B's re-upload of their own cortex carries a new version (secaudit 2026-09,
  *     A6-7). A kept version is immutable on this door too: the same 1.0.0 with other bytes is now
  *     refused with 409 VERSION_EXISTS, which the test asserts before it re-uploads as 1.0.1.
@@ -376,6 +379,95 @@ await test('Owner B CAN re-upload their own cortex (replace, not a duplicate-nam
     assert(status === 200, `re-upload status ${status}: ${JSON.stringify(body)}`);
 });
 
+// ── A ZIP redeploy of an ACTIVE cortex ─────────────────────────────────────────────────────────
+// A ZIP upload replaces an installed cortex the way PUT /v1/cortex/:name and aimeat_cortex_install
+// update:true do: an active one is taken down (its actions, boards, schema locks and prompts go) and
+// activated again from the new manifest, so nothing of the replaced activation stays behind with no
+// record pointing at it.
+const liveName = `c4-live-${Date.now()}`;
+const LIVE_ENC = encodeURIComponent(liveName);
+
+/** One lib, one action named `action`, and with `withBoard` a public board with one seed post. */
+function liveManifest(version: string, action: string, withBoard: boolean): string {
+    const board = withBoard ? `    - type: board-template
+      name: notes
+      title: Notes of ${liveName}
+      visibility: public
+      seed_posts:
+        - title: First
+          body: The board this cortex opened
+` : '';
+    return `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${liveName}
+  namespace: ${B.owner}
+  description: A cortex redeployed while it is active
+spec:
+  version: "${version}"
+  components:
+    - type: lib
+      name: greeter
+      filename: ${LIB}
+      exports: [hello]
+      api_surface: hello()
+    - type: action
+      name: ${action}
+      description: Handles one text
+      input_schema:
+        type: object
+${board}`;
+}
+
+/** Every provider that publishes an action with this id; a cortex action is tagged with its cortex's name. */
+async function publishedUnder(cortex: string, actionId: string): Promise<string[]> {
+    const found = await json(`/v1/actions?q=${encodeURIComponent(cortex)}&per_page=200`);
+    assert(found.status === 200, `the catalogue: ${found.status}`);
+    return ((found.body.data?.actions ?? []) as any[]).filter(a => a.id === actionId).map(a => a.provider_gaii);
+}
+
+await test('An active cortex redeployed by ZIP is taken down and activated again: no action or board of the old activation stays', async () => {
+    const oldAction = `cortex-${liveName}-proofread`, newAction = `cortex-${liveName}-summarise`;
+    const boardId = `cortex-${liveName}-notes`;
+    const posts = async () => (await json(`/v1/boards/${encodeURIComponent(boardId)}/posts`)).body.data?.total ?? 0;
+
+    const first = await putZip(await cortexUploadUrl(B), await makeZip([
+        { name: 'manifest.yaml', data: liveManifest('1.0.0', 'proofread', true) },
+        { name: `libs/${LIB}`, data: "export function hello() { return 'live v1'; }" },
+    ]));
+    assert(first.status === 200, `install ${first.status}: ${JSON.stringify(first.body)}`);
+    const on = await json(`/v1/cortex/${LIVE_ENC}/activate`, { ...asB, method: 'POST' });
+    assert(on.status === 200, `the person activates: ${on.status} ${JSON.stringify(on.body)}`);
+    const bGhii = `${B.owner}@${NODE_ID}`;
+    const before = await publishedUnder(liveName, oldAction);
+    assert(JSON.stringify(before) === JSON.stringify([bGhii]), `the activation publishes under the person's GHII: ${JSON.stringify(before)}`);
+    assert(await posts() === 1, 'the activation opened the board with its seed post');
+
+    const second = await putZip(await cortexUploadUrl(B), await makeZip([
+        { name: 'manifest.yaml', data: liveManifest('1.0.1', 'summarise', false) },
+        { name: `libs/${LIB}`, data: "export function hello() { return 'live v2'; }" },
+    ]));
+    assert(second.status === 200, `redeploy ${second.status}: ${JSON.stringify(second.body)}`);
+
+    const detail = await json(`/v1/cortex/${LIVE_ENC}`, asB);
+    const artifacts = detail.body.data?.activation_artifacts ?? {};
+    const oldLeft = await publishedUnder(liveName, oldAction);
+    const newNow = await publishedUnder(liveName, newAction);
+    const boardLeft = await posts();
+    assert(oldLeft.length === 0, `an action of the replaced activation is still published under ${JSON.stringify(oldLeft)}`);
+    assert(boardLeft === 0, `the board of the replaced activation is still there with ${boardLeft} post(s)`);
+    assert(second.body.status === 'active' && detail.body.data?.status === 'active',
+        `the redeployed cortex is active again: ${second.body.status} / ${detail.body.data?.status}`);
+    assert(JSON.stringify(artifacts.actionIds) === JSON.stringify([newAction]) && artifacts.actionProvider === B.agentGaii,
+        `the record names the new activation and who made it: ${JSON.stringify(artifacts)}`);
+    assert(JSON.stringify(newNow) === JSON.stringify([B.agentGaii]), `the new action is published under the uploader: ${JSON.stringify(newNow)}`);
+
+    const del = await json(`/v1/cortex/${LIVE_ENC}`, { ...asB, method: 'DELETE' });
+    assert(del.status === 200, `uninstall ${del.status}: ${JSON.stringify(del.body)}`);
+    const afterDelete = await publishedUnder(liveName, newAction);
+    assert(afterDelete.length === 0, `the uninstall left the action published under ${JSON.stringify(afterDelete)}`);
+});
+
 // ── The same squat, through the INLINE branch of the same tool ─────────────────────────────────
 // The presigned road was fixed on 2026-08-10 and the inline road was not, so passing the manifest
 // as a string instead of zipping it walked around the gate this whole file was written for. The
@@ -410,6 +502,7 @@ await test('Owner B CAN install an inline cortex into their own namespace (the g
 });
 
 console.log('\nCleanup');
+await json(`/v1/cortex/${LIVE_ENC}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
 await json(`/v1/cortex/${encodeURIComponent(inlineOwn)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
 await json(`/v1/cortex/${VICTIM_ENC}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } });
 await json(`/v1/cortex/${encodeURIComponent(ownName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });

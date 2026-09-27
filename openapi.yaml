@@ -19927,7 +19927,10 @@ paths:
             Upload processed successfully. A storage upload answers with key, owner_gaii, size,
             mime_type, visibility, embed_url, embed_markdown and versioned_url (see POST /v1/storage).
             An app upload answers with the publish fields, including `served_marks_removed` and
-            `served_marks_note` when the body was a served copy.
+            `served_marks_note` when the body was a served copy. A cortex ZIP under the name of a
+            cortex the uploader installed replaces it the way PUT /v1/cortex/{name} does: an active
+            one is taken down and activated again from the new manifest, and `status` says it is
+            active.
           content:
             application/json:
               schema:
@@ -19949,8 +19952,10 @@ paths:
           description: Invalid token
         '403':
           description: |
-            The target already exists and belongs to another owner (extension uploads). The token
-            subject is what identifies the uploader; ownership is always checked.
+            The target already exists and belongs to another owner (extension and cortex uploads,
+            `FORBIDDEN`), or a cortex manifest names a namespace that is not the uploader's
+            (`NAMESPACE_DENIED`). The token subject is what identifies the uploader; ownership is
+            always checked.
         '409':
           description: |
             Token already used (single-use), or — for an extension upload without `update:true` in
@@ -40579,9 +40584,12 @@ paths:
         in place WITHOUT a delete: the cortex keeps its identity and stays served for the
         whole call (lib files are swapped in place, never delete-then-recreated for files
         that persist, so GET /v1/cortex/{name}/libs/{libFile} never 404s mid-upsert). For an
-        active cortex, init is re-run so new behaviour goes live (unlike re-activate, which
-        skips init when already active). Updating an existing cortex never consumes a quota
-        slot, and an identical manifest + libs is a safe 200 no-op.
+        active cortex, the old activation is taken down (its actions, boards, schema locks,
+        prompts and ontologies go; its seed data stays) and the new manifest is activated, so new
+        behaviour goes live (unlike re-activate, which skips init when already active). Updating
+        an existing cortex never consumes a quota slot, and an identical manifest + libs is a safe
+        200 no-op. A ZIP uploaded through a presigned cortex token under the name of a cortex the
+        uploader installed replaces it the same way.
         Same scope as POST /v1/cortex (cortex:write); owner/operator bypass scope, and only the
         installing owner may update.
         Every answer (created, updated, unchanged) carries `lib_urls`, as POST /v1/cortex does. A
@@ -40685,7 +40693,7 @@ paths:
         every principal of the account that installed the cortex (its bare name, its GHII, its
         agents and its ecosystem apps) and under the caller's own. The prompts and ontologies are
         deleted under the same principals, whoever activated the cortex. Uninstall and the redeploy
-        of an active cortex do the same.
+        of an active cortex (PUT /v1/cortex/{name}, or a ZIP upload under its name) do the same.
       tags: [Cortex]
       security:
         - BearerAuth: []
