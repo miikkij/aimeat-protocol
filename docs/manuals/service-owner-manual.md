@@ -323,7 +323,8 @@ registration.
 
 ### Attaching one
 
-From the admin dashboard's **Hooks** tab, or directly:
+Publish the action first, then bind it: a hook binds only an action that is already published on
+the node. From the admin dashboard's **Hooks** tab, or directly:
 
 ```bash
 curl -X PUT https://your-node/v1/admin/hooks/pre_owner_registration \
@@ -334,9 +335,15 @@ curl https://your-node/v1/admin/hooks -H "Authorization: Bearer $OPERATOR_TOKEN"
 ```
 
 An action reference is either the action's id, or `id#providerGaii` when two providers publish the
-same id. When one provider publishes the id you bind, the node stores it as that `id#providerGaii`,
-so an action with the same id that somebody else publishes later does not change what the hook
-calls.
+same id. The node stores every reference as the `id#providerGaii` of the action it names, so an
+action with the same id that somebody else publishes later does not change what the hook calls. A
+reference that no published action answers to is refused with `400 INVALID_INPUT`, and nothing is
+written: publish the action, then bind it.
+
+A binding the node finds in its store at start is brought to the same form. A bare id that one
+provider publishes is stored as its `id#providerGaii`. A bare id that no provider publishes is taken
+off its hook, and the Hooks page says so in its list of calls: publish the action, then bind it
+again.
 
 ### A worked example: refuse throwaway domains
 

@@ -23,7 +23,16 @@
  *      providers publish" below asserts that nobody is called, that the binding is refused, and
  *      that the page does not show the squatter's host.
  *
+ *   5. A binding names an action that is already published, so no later publication decides what
+ *      it names. "a binding names an action that is already published" asserts that a reference
+ *      nothing publishes is refused before anything is written, with a sentence that says to publish
+ *      first; "bindings stored earlier, settled at start" asserts what the node does at start with a
+ *      stored bare id: pinned when one provider publishes it, taken off when nobody does.
+ *
  * @version-history
+ *   v1.3.0 — 2026-09-26 — A binding names an action that is already published: a reference nothing
+ *     publishes is refused, an unreadable actions table refuses a binding, clearing reads nothing,
+ *     and the stored bindings are settled at start (A8-3).
  *   v1.2.0 — 2026-09-26 — A bare id one provider publishes is bound with its provider, so another
  *     owner publishing the same id later cannot change what the binding names (A8-3).
  *   v1.1.0 — 2026-09-24 — A bare id two providers publish: never resolved by scan order (A8-3).
@@ -57,7 +66,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 import { executeHooks, listHooks, hookKind, HOOK_NAMES, subjectOf } from '../../src/services/hooks.js';
 import { readHookRuns, HOOK_RUNS_KEPT } from '../../src/services/hook-log.js';
-import { buildHooksOverview, setHookActions } from '../../src/services/hooks-overview.js';
+import { buildHooksOverview, setHookActions, settleStoredHookBindings } from '../../src/services/hooks-overview.js';
 import type { AimeatConfig, HookName } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { ActionRecord } from '../../src/storage/types/commerce.js';
@@ -248,6 +257,137 @@ describe('a bare id two providers publish', () => {
     const bound = overview.hooks.find(h => h.name === 'pre_owner_registration')!.actions[0];
     expect(bound).toMatchObject({ ref: 'gate', published: false, name: null, host: null });
     expect(bound.ambiguous).toEqual(['gate#bot#opr@node', 'gate#bot#mallory@node']);
+  });
+});
+
+/**
+ * Storage for the binding writes: the config rows as stored, the rows deleted, and an actions table
+ * that can be made unreadable.
+ */
+function configStorage(actions: ActionRecord[], opts: { unreadable?: boolean } = {}) {
+  const base = fakeStorage(actions);
+  const stored: Record<string, string> = {};
+  const deleted: string[] = [];
+  Object.assign(base.storage, {
+    setConfigValue: async (key: string, value: string) => { stored[key] = value; },
+    deleteConfigValue: async (key: string) => { deleted.push(key); delete stored[key]; },
+    ...(opts.unreadable ? { listActions: async () => { base.listed.push(Date.now()); throw new Error('database is away'); } } : {}),
+  });
+  return { ...base, stored, deleted };
+}
+
+describe('a binding names an action that is already published', () => {
+  const published = action({ id: 'check', providerGaii: 'bot#alice@node' });
+
+  it('an id no provider publishes is refused, says to publish it first, and nothing is written', async () => {
+    const { storage, stored, deleted } = configStorage([published]);
+    const config = cfg();
+    const out = await setHookActions(config, storage, 'pre_owner_registration', ['spam-check']);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.code).toBe('INVALID_INPUT');
+    expect(out.message).toContain('"spam-check"');
+    expect(out.message).toMatch(/publish it first, then bind it/i);
+    expect(out.message).toContain('Nothing was changed');
+    expect(config.extensionHooks.pre_owner_registration).toEqual([]);
+    expect(stored).toEqual({});
+    expect(deleted).toEqual([]);
+  });
+
+  it('the id with a provider that does not publish it is refused the same way', async () => {
+    const { storage, stored } = configStorage([published]);
+    const out = await setHookActions(cfg(), storage, 'post_settlement', ['check#bot#mallory@node']);
+    expect(out).toMatchObject({ ok: false, code: 'INVALID_INPUT' });
+    if (out.ok) return;
+    expect(out.message).toContain('"check#bot#mallory@node"');
+    expect(stored).toEqual({});
+  });
+
+  it('one reference nothing publishes refuses the whole list, and what was bound stays', async () => {
+    const { storage, stored } = configStorage([published]);
+    const config = cfg({ pre_board_post: ['check#bot#alice@node'] });
+    const out = await setHookActions(config, storage, 'pre_board_post', ['check', 'spam-check']);
+    expect(out).toMatchObject({ ok: false, code: 'INVALID_INPUT' });
+    expect(config.extensionHooks.pre_board_post).toEqual(['check#bot#alice@node']);
+    expect(stored).toEqual({});
+  });
+
+  it('when the actions cannot be read, a binding is refused rather than stored unchecked', async () => {
+    const { storage, stored } = configStorage([published], { unreadable: true });
+    const config = cfg();
+    const out = await setHookActions(config, storage, 'pre_owner_registration', ['check']);
+    expect(out).toMatchObject({ ok: false, code: 'INTERNAL_ERROR' });
+    if (out.ok) return;
+    expect(out.message).toContain('Nothing was changed');
+    expect(config.extensionHooks.pre_owner_registration).toEqual([]);
+    expect(stored).toEqual({});
+  });
+
+  it('an empty list clears the moment without reading the actions', async () => {
+    const { storage, deleted, listed } = configStorage([published], { unreadable: true });
+    const config = cfg({ pre_owner_registration: ['check#bot#alice@node'] });
+    const out = await setHookActions(config, storage, 'pre_owner_registration', []);
+    expect(out).toMatchObject({ ok: true, cleared: true, actions: [] });
+    expect(config.extensionHooks.pre_owner_registration).toEqual([]);
+    expect(deleted).toEqual(['hooks.pre_owner_registration']);
+    expect(listed).toHaveLength(0);
+  });
+});
+
+describe('bindings stored earlier, settled at start', () => {
+  const mine = action({ id: 'mine', providerGaii: 'bot#opr@node', displayName: 'Mine', webhookUrl: 'https://operator.example/mine' });
+  const bothOpr = action({ id: 'both', providerGaii: 'bot#opr@node', webhookUrl: 'https://operator.example/both' });
+  const bothOther = action({ id: 'both', providerGaii: 'bot#mallory@node', webhookUrl: 'https://attacker.example/both' });
+  const laterByOther = action({ id: 'later', providerGaii: 'bot#mallory@node', webhookUrl: 'https://attacker.example/later' });
+
+  it('pins a bare id one provider publishes, takes off one nobody publishes, and keeps the rest', async () => {
+    const { storage, stored, deleted } = configStorage([mine, bothOpr, bothOther]);
+    const config = cfg({
+      pre_owner_registration: ['mine', 'later', 'both', 'gone#bot#opr@node'],
+      post_settlement: ['later'],
+    });
+    const out = await settleStoredHookBindings(config, storage);
+
+    expect(config.extensionHooks.pre_owner_registration).toEqual(['mine#bot#opr@node', 'both', 'gone#bot#opr@node']);
+    expect(JSON.parse(stored['hooks.pre_owner_registration'])).toEqual(['mine#bot#opr@node', 'both', 'gone#bot#opr@node']);
+    expect(config.extensionHooks.post_settlement).toEqual([]);
+    expect(deleted).toEqual(['hooks.post_settlement']);
+    expect(out.pinned).toEqual([{ hook: 'pre_owner_registration', from: 'mine', to: 'mine#bot#opr@node' }]);
+    expect(out.removed).toEqual([
+      { hook: 'pre_owner_registration', ref: 'later' },
+      { hook: 'post_settlement', ref: 'later' },
+    ]);
+    // The Hooks page says what was taken off, and what to do.
+    const runs = await readHookRuns(storage);
+    const said = runs.filter((r) => r.actionRef === 'later');
+    expect(said).toHaveLength(2);
+    expect(said.every((r) => r.answer === 'missing' && /publish the action, then bind it again/i.test(r.reason ?? ''))).toBe(true);
+
+    // Another owner publishes the id that was taken off. Nothing bound to either moment calls it.
+    const { storage: afterwards } = fakeStorage([laterByOther, mine, bothOpr, bothOther]);
+    await executeHooks(config, afterwards, 'pre_owner_registration', { name: 'eve' });
+    expect(await executeHooks(config, afterwards, 'post_settlement', { amount: 1 })).toEqual({ allowed: true });
+    expect(fetched).toEqual(['https://operator.example/mine']);
+  });
+
+  it('reads nothing and changes nothing when every stored reference names its provider', async () => {
+    const { storage, stored, listed } = configStorage([mine]);
+    const config = cfg({ pre_board_post: ['mine#bot#opr@node', 'gone#bot#opr@node'] });
+    const out = await settleStoredHookBindings(config, storage);
+    expect(out).toEqual({ pinned: [], removed: [] });
+    expect(listed).toHaveLength(0);
+    expect(stored).toEqual({});
+    expect(config.extensionHooks.pre_board_post).toEqual(['mine#bot#opr@node', 'gone#bot#opr@node']);
+  });
+
+  it('changes nothing when the actions cannot be read, so the next start tries again', async () => {
+    const { storage, stored, deleted } = configStorage([mine], { unreadable: true });
+    const config = cfg({ post_settlement: ['later', 'mine'] });
+    const out = await settleStoredHookBindings(config, storage);
+    expect(out).toEqual({ pinned: [], removed: [] });
+    expect(config.extensionHooks.post_settlement).toEqual(['later', 'mine']);
+    expect(stored).toEqual({});
+    expect(deleted).toEqual([]);
   });
 });
 
