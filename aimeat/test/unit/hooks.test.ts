@@ -36,6 +36,9 @@
  *      left, so no later publication or deletion decides what a stored binding names.
  *
  * @version-history
+ *   v1.5.0 — 2026-09-26 — A binding stored as `id#<account name>` follows its action to the
+ *     account's GHII at start, once per node, and stays as it was when nothing is published there
+ *     (secaudit 2026-09: R3 row 5).
  *   v1.4.0 — 2026-09-26 — The executor resolves only id#provider references; a bare id calls nobody
  *     and a gate bound to it refuses, whatever is published. The executor cases bind id#provider,
  *     the form a binding is stored in. The stored bindings are settled once per node (A8-3).
@@ -75,7 +78,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 import { executeHooks, listHooks, hookKind, HOOK_NAMES, subjectOf } from '../../src/services/hooks.js';
 import { readHookRuns, HOOK_RUNS_KEPT } from '../../src/services/hook-log.js';
-import { buildHooksOverview, setHookActions, settleStoredHookBindings } from '../../src/services/hooks-overview.js';
+import { buildHooksOverview, setHookActions, settleStoredHookBindings, moveAccountNameHookBindings } from '../../src/services/hooks-overview.js';
 import type { AimeatConfig, HookName } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { ActionRecord } from '../../src/storage/types/commerce.js';
@@ -468,6 +471,88 @@ describe('bindings stored earlier, settled at start', () => {
     expect(stored).toEqual({});
     expect(deleted).toEqual([]);
     expect(memory.has('migrations.hook-bindings-settled')).toBe(false);
+  });
+});
+
+// An action a person published in person was stored under the bare account name, and a binding to it
+// as `id#name`. The deploy migration moves such an action to the person's GHII, and the start step
+// after it moves the binding with it, once per node.
+describe('a binding that names an action by the bare account name, at start', () => {
+  const own = action({ id: 'own', providerGaii: 'opr@node', displayName: 'Own', webhookUrl: 'https://operator.example/own' });
+  const mine = action({ id: 'mine', providerGaii: 'bot#opr@node', webhookUrl: 'https://operator.example/mine' });
+  const RECORD = 'migrations.hook-bindings-full-identity';
+
+  /** The accounts the store holds, by name, with the GHII of each. */
+  function withAccounts(storage: Storage, ghiis: Record<string, string>) {
+    Object.assign(storage, { getGHIIByOwner: async (name: string) => (ghiis[name] ? { ghii: ghiis[name] } : null) });
+  }
+
+  it('moves id#name to the id with the GHII the action is published under, and the executor calls it', async () => {
+    const { storage, stored, memory } = configStorage([own, mine]);
+    withAccounts(storage, { opr: 'opr@node' });
+    const config = cfg({ pre_agent_registration: ['own#opr', 'mine#bot#opr@node'], post_settlement: ['own#opr'] });
+    const out = await moveAccountNameHookBindings(config, storage);
+
+    expect(out.ran).toBe(true);
+    expect(out.moved).toEqual([
+      { hook: 'pre_agent_registration', from: 'own#opr', to: 'own#opr@node' },
+      { hook: 'post_settlement', from: 'own#opr', to: 'own#opr@node' },
+    ]);
+    expect(out.left).toEqual([]);
+    expect(config.extensionHooks.pre_agent_registration).toEqual(['own#opr@node', 'mine#bot#opr@node']);
+    expect(JSON.parse(stored['hooks.pre_agent_registration'])).toEqual(['own#opr@node', 'mine#bot#opr@node']);
+    expect(JSON.parse(stored['hooks.post_settlement'])).toEqual(['own#opr@node']);
+    expect(memory.has(RECORD)).toBe(true);
+
+    await executeHooks(config, storage, 'post_settlement', { amount: 1 });
+    expect(fetched).toEqual(['https://operator.example/own']);
+  });
+
+  it('leaves id#name as it is when nothing is published under that account\'s GHII, or the name has no account', async () => {
+    const { storage, stored, memory } = configStorage([mine]);
+    withAccounts(storage, { opr: 'opr@node' });
+    const config = cfg({ pre_board_post: ['own#opr', 'x#nobody'] });
+    const out = await moveAccountNameHookBindings(config, storage);
+    expect(out.ran).toBe(true);
+    expect(out.moved).toEqual([]);
+    expect(out.left).toEqual([{ hook: 'pre_board_post', ref: 'own#opr' }, { hook: 'pre_board_post', ref: 'x#nobody' }]);
+    expect(config.extensionHooks.pre_board_post).toEqual(['own#opr', 'x#nobody']);
+    expect(stored).toEqual({});
+    expect(memory.has(RECORD)).toBe(true);
+  });
+
+  it('runs once: a later start changes nothing, whatever is published by then', async () => {
+    const published = [mine];
+    const { storage, stored } = configStorage(published);
+    withAccounts(storage, { opr: 'opr@node' });
+    const config = cfg({ pre_board_post: ['own#opr'] });
+    expect((await moveAccountNameHookBindings(config, storage)).ran).toBe(true);
+    published.push(own);
+    expect(await moveAccountNameHookBindings(config, storage)).toEqual({ ran: false, moved: [], left: [] });
+    expect(config.extensionHooks.pre_board_post).toEqual(['own#opr']);
+    expect(stored).toEqual({});
+  });
+
+  it('reads nothing and records nothing when no binding names an account by its bare name', async () => {
+    const { storage, stored, listed, memory } = configStorage([own, mine]);
+    withAccounts(storage, { opr: 'opr@node' });
+    const config = cfg({ pre_board_post: ['mine#bot#opr@node', 'own#opr@node', 'bare'] });
+    const out = await moveAccountNameHookBindings(config, storage);
+    expect(out).toEqual({ ran: false, moved: [], left: [] });
+    expect(listed).toHaveLength(0);
+    expect(stored).toEqual({});
+    expect(memory.size).toBe(0);
+  });
+
+  it('changes nothing and records nothing when the store cannot be read, so the next start tries again', async () => {
+    const { storage, stored, memory } = configStorage([own], { unreadable: true });
+    withAccounts(storage, { opr: 'opr@node' });
+    const config = cfg({ post_settlement: ['own#opr'] });
+    const out = await moveAccountNameHookBindings(config, storage);
+    expect(out).toEqual({ ran: false, moved: [], left: [] });
+    expect(config.extensionHooks.post_settlement).toEqual(['own#opr']);
+    expect(stored).toEqual({});
+    expect(memory.has(RECORD)).toBe(false);
   });
 });
 

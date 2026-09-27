@@ -8,10 +8,13 @@
  * @structure
  *   - ConfigInitResult: returned { storage, provenance, consulService }
  *   - initializeConfig(config, configSources?): creates storage, records provenance sources,
- *     applies Consul + DB overrides, loads and settles the hook bindings, and initializes
- *     revocation/session auth storage
+ *     applies Consul + DB overrides, loads and settles the hook bindings (and moves the ones that
+ *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.3.0 — 2026-09-26 — After the settle, a binding stored as `id#<account name>` follows its
+ *     action to the person's GHII (services/hooks-overview.ts moveAccountNameHookBindings), once per
+ *     node (secaudit 2026-09: R3 row 5).
  *   v1.2.1 — 2026-09-26 — The comment at the settle says it runs once per node (security audit A8-3).
  *   v1.2.0 — 2026-09-26 — The stored hook bindings are settled once they are loaded
  *     (services/hooks-overview.ts settleStoredHookBindings): every reference names the one
@@ -32,7 +35,7 @@ import { createConsulConfigService, applyConsulValues } from '../services/consul
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { initRevocationStorage } from '../auth/jwt.js';
 import { initSessionAuth } from '../auth/middleware.js';
-import { settleStoredHookBindings } from '../services/hooks-overview.js';
+import { settleStoredHookBindings, moveAccountNameHookBindings } from '../services/hooks-overview.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { ConfigSources } from '../server.js';
@@ -157,6 +160,10 @@ export async function initializeConfig(
   // one provider publishes it, taken off its moment when nobody does. Reads nothing when there is
   // nothing to settle.
   await settleStoredHookBindings(config, storage);
+  // A binding that names an action by the bare account name of the person who published it
+  // (`id#name`) follows the action to the person's GHII, where the deploy migration moved it when
+  // the store opened above. Once per node; reads nothing when no binding has that form.
+  await moveAccountNameHookBindings(config, storage);
 
   // Wire storage into token revocation system for persistent revocation
   initRevocationStorage(storage);
