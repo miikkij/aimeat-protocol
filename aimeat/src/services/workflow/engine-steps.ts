@@ -6,6 +6,10 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The extension, datapackage and ecosystem steps report their outcome to the
+ *     engine through reportOutcome (engine-answer.ts): only a failure of the step's own work fails the
+ *     attempt, and an error inside the engine while it takes the answer in is logged as the engine's
+ *     (secaudit 2026-09, R4).
  *   v1.5.5 — 2026-09-26 — templateInput, runPaged, runForEach, mapColumns, setAtPath and atPath moved
  *     to engine-step-rows.ts unchanged (max-file-lines).
  *   v1.5.4 — 2026-09-26 — dispatchStep hands the answer of every step kind to the engine with the
@@ -61,6 +65,7 @@ import { runExtensionActionAsSystem } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
 import { templateInput, runPaged, runForEach, mapColumns, atPath } from './engine-step-rows.js';
+import { reportOutcome } from './engine-answer.js';
 import { usd } from './run-cost.js';
 import { dispatchAiStep } from './engine-ai-step.js';
 import { dispatchInspector } from './engine-inspector.js';
@@ -212,9 +217,10 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
     });
     return reply.ok;
   };
-  fire()
-    .then(ok => onPushTerminal(ownerGhii, workflowId, runId, stepId, ok))
-    .catch(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, false));
+  reportOutcome(fire(),
+    ok => onPushTerminal(ownerGhii, workflowId, runId, stepId, ok),
+    () => onPushTerminal(ownerGhii, workflowId, runId, stepId, false),
+    `workflow ${workflowId} run ${runId}: ecosystem step "${stepId}"`);
 }
 
 /**
@@ -289,14 +295,15 @@ export function dispatchExtensionStep(
     // without producing what the signal names is a red step.
     return true;
   };
-  fire()
-    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true))
-    .catch(err => {
+  reportOutcome(fire(),
+    () => onPushTerminal(ownerGhii, workflowId, runId, stepId, true),
+    err => {
       // The reason has to survive: a red step with no message sends the owner to the run log for a
       // sentence that was thrown away here.
       logger.warn(`workflow ${workflowId} run ${runId}: extension step "${stepId}" failed`, { error: String(err) });
       return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);
-    });
+    },
+    `workflow ${workflowId} run ${runId}: extension step "${stepId}"`);
 }
 
 /**
@@ -410,12 +417,13 @@ export function dispatchDataPackageStep(
       { contentHash: out.contentHash, unchanged: out.unchanged, rows: out.resources[0]?.rowCount });
   };
 
-  fire()
-    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true))
-    .catch(async err => {
+  reportOutcome(fire(),
+    () => onPushTerminal(ownerGhii, workflowId, runId, stepId, true),
+    err => {
       logger.warn(`workflow ${workflowId} run ${runId}: datapackage step "${stepId}" failed`, { error: String(err) });
       return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);
-    });
+    },
+    `workflow ${workflowId} run ${runId}: datapackage step "${stepId}"`);
 }
 
 /**
