@@ -30,6 +30,8 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.8.0 — 2026-09-26 — The markup closes every element it opens: one still open where the markup
+ *     ends would take in whatever a page writes after the component, and it is refused by name.
  *   v1.7.0 — 2026-09-26 — A pseudo whose argument is not a selector and is only words and numbers
  *     (::part(label), :state(on), :nth-col(2n+1)) passes: it narrows the element its compound names
  *     and changes nothing a rule reaches. A pseudo that names the page stays refused by its name.
@@ -145,6 +147,11 @@ function markupRefusal(problem: MarkupProblem, html: string): string {
       return `A closing tag carries nothing but its name: "</${problem.element}${problem.rest.slice(0, 40)}>" does not, and a browser reads what follows the name as attributes, quotes and all. Write </${problem.element}>.`;
     case 'tag-start': return TAG_START_REFUSAL;
     case 'attribute': return ODD_ATTRIBUTE_REFUSAL(problem.element, problem.attribute);
+    case 'open': {
+      const name = problem.element || 'div';
+      return `${problem.element ? `<${name}>` : 'An element'} is still open where the markup ends, so it would take in whatever a page writes after the component. `
+        + `Close every element inside the markup: <${name} …></${name}>.`;
+    }
     case 'unclean':
       return `The markup does not read cleanly as HTML at character ${problem.at} (${problem.code}). A browser mends such markup in a way of its own, and the bench vouches only for markup that reads cleanly. `
         + 'Close every tag, write every value in double quotes, and end every character reference with ";".';

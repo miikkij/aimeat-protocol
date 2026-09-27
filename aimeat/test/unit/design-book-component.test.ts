@@ -5,6 +5,8 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.10.0 — 2026-09-26 — Markup that leaves an element open where it ends is refused, with the
+ *     outermost open element named; implied end tags and self-closing SVG pass.
  *   v1.9.0 — 2026-09-26 — A pseudo whose argument is words and numbers passes (::part(label),
  *     :state(on), :nth-col(2n+1)); one whose argument is a selector the parser cannot read, and every
  *     pseudo that names the page, is refused.
@@ -403,6 +405,30 @@ describe('the component bench', () => {
     expect(bad(rule('.wkgrid-cell:root'))).toThrow(/names the page itself/);
     expect(bad(rule('p::part(label)'))).toThrow(/starts at one of its own classes/);
     expect(bad(rule('.wkgrid ~ p::part(label)'))).toThrow(/beside it/);
+  });
+
+  // An element still open where the markup ends takes in whatever the page writes after the
+  // component, so a rule of the component styles the page's own content.
+  it('refuses markup that leaves an element open where it ends, and says which', () => {
+    for (const [html, element] of [
+      ['<div class="wkgrid" role="grid"><span class="wkgrid-b">x</span>', 'div'],
+      ['<div class="wkgrid"></div><p class="wkgrid-p">a', 'p'],
+      ['<div class="wkgrid"><select class="wkgrid-s"><option>a', 'div'],
+      ['<select class="wkgrid-s"><option>a</option>', 'select'],
+      ['<svg class="wkgrid-i" viewBox="0 0 8 8"><path class="wkgrid-p" d="M0 0L8 8"/>', 'svg'],
+      ['<table class="wkgrid"><tr><td>1</td></tr>', 'table'],
+      ['<ul class="wkgrid"><li>a', 'ul'],
+    ]) {
+      expect(bad({ html }), html).toThrow(new RegExp(`<${element}> is still open where the markup ends.*Close every element inside the markup`));
+      expect(readMarkup(html).problem, html).toEqual({ kind: 'open', element });
+    }
+    // Implied end tags, and foreign content that closes itself, close inside the markup.
+    for (const html of [
+      '<ul class="wkgrid"><li>a<li>b</ul>', '<svg class="wkgrid-i" viewBox="0 0 8 8"><path class="wkgrid-p" d="M0 0L8 8"/></svg>',
+      '<div class="wkgrid"><p>a</div>', '<p class="wkgrid">a<div class="wkgrid-b">b</div>', '<div class="wkgrid"></div>text after',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, html }), html).not.toThrow();
+    }
   });
 
   it('wears the page it lands in: a literal colour is refused with the tokens named, a fallback is fine', () => {

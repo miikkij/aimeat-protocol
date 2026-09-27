@@ -9,6 +9,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.6.2 — 2026-09-26 — At propose, markup that leaves an element open where it ends is refused.
  *   v1.6.1 — 2026-09-26 — At propose, a pseudo whose argument is words passes (:state(on),
  *     ::part(label)), and :host() is refused as the page.
  *   v1.6.0 — 2026-09-26 — At propose, a rule nested behind "&" passes, one nested without it is
@@ -580,6 +581,11 @@ const GOOD_BODY = {
         assert(stated.status === 201, `:state(on) and ::part(label) pass: ${said(stated)}`);
         const hosted = await proposeComponent(`comp-bad-${stamp}`, componentBody({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid-cell:host(.page) { color: var(--ak-accent); }' }));
         assert(refusedWith(hosted, /names the page itself/), `:host() names the page: ${said(hosted)}`);
+    });
+
+    await test('markup that leaves an element open where it ends is refused, with the element named', async () => {
+        const open = await proposeComponent(`comp-bad-${Date.now() % 100000}`, componentBody({ html: '<div class="wkgrid" role="grid"><button class="wkgrid-cell" type="button"></button>' }));
+        assert(refusedWith(open, /<div> is still open where the markup ends.*Close every element inside the markup/), `an element left open is refused: ${said(open)}`);
     });
 
     await test('a GENRE grows out of an app: a look of its own, judged general, kept by its owner AND opened for forking by its owner; it stops being offered when the app closes', async () => {

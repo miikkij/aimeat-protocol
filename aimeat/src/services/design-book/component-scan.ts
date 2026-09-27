@@ -23,10 +23,19 @@
  *   reading is the one a browser follows. Both parsers cost more the deeper the text nests, so the
  *   bench hands them no more than its ceiling (COMPONENT_LIMITS in component.ts), and css-tree is not
  *   run at all on a stylesheet nesting deeper than MAX_NESTING.
+ *
+ *   THE MARKUP CLOSES EVERY ELEMENT IT OPENS. A page writes its own content after the component, and
+ *   an element still open where the markup ends takes that content in, so a rule of the component
+ *   styles it. The markup is read once more with an element after it, the way a page follows it.
  * @structure readMarkup · readStylesheet · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
  *   DeclarationRead · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.3.0 — 2026-09-26 — readMarkup reports an element still open where the markup ends (`open`,
+ *     with the outermost one's name), read by parsing the markup with an element after it: that
+ *     element stands last at the top only when every element of the markup closed. Its name is one
+ *     no rule of the parser treats apart, so an open <svg> holds it as it holds the page's own
+ *     elements, where a <br> would break out.
  *   v2.2.0 — 2026-09-26 — A pseudo whose argument is not a selector, and which the parser keeps as raw
  *     text holding only words and numbers (::part(label), :state(on), :nth-col(2n+1)), reads as
  *     `plain`, and the walk does not report that text as unreadable.
@@ -101,7 +110,9 @@ export type MarkupProblem =
   /** Any other place the parser reports the markup as not well formed, by its WHATWG error code. */
   | { kind: 'unclean'; code: string; at: number }
   /** A "<" the parser read as no tag: text inside <textarea> or <title>, or a tag HTML drops there. */
-  | { kind: 'stray'; at: number };
+  | { kind: 'stray'; at: number }
+  /** An element still open where the markup ends, by the name of the outermost one. */
+  | { kind: 'open'; element: string };
 
 /** The parse error codes that say where a tag ends, what starts one and what an attribute holds. */
 const UNCLOSED_CODES = new Set(['eof-in-tag', 'eof-before-tag-name']);
@@ -113,6 +124,15 @@ const ATTRIBUTE_CODES = new Set([
   'unexpected-character-in-attribute-name', 'unexpected-character-in-unquoted-attribute-value', 'missing-attribute-value',
   'missing-whitespace-between-attributes', 'unexpected-solidus-in-tag', 'duplicate-attribute',
 ]);
+
+/**
+ * What the markup is read again with, after it: an element a page might write next. Its name is a
+ * custom element's, which no rule of the parser treats apart and no allowlist carries: an open <p>
+ * does not close for it, an open <svg> holds it (a <br> would break out of the <svg> to the top), and
+ * <select> drops it and a <table> puts it before itself, so in neither is it last.
+ */
+const END_NAME = 'aimeat-bench-end';
+const END_MARK = `<${END_NAME}></${END_NAME}>`;
 
 /**
  * The context the markup is parsed in: the inside of a <div>, where the preview puts it. A fragment
@@ -135,6 +155,10 @@ interface TagSpan { start: number; end: number; name: string; closing: boolean; 
  *     text in another place, so every "<" has to be one of the tags the checks see.
  * Elements come in document order, the contents of a <template> included. The walk is a loop, not
  * a recursion, since a nesting depth is whatever the text says.
+ *
+ * A markup that reads cleanly is read once more with END_MARK after it, as a page follows the
+ * component with its own content: when END_MARK is not the last thing at the top, standing empty, an
+ * element of the markup is still open and would take that content in.
  */
 export function readMarkup(html: string): { elements: MarkupElement[]; problem: MarkupProblem | null } {
   const errors: ParserError[] = [];
@@ -188,6 +212,15 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
   for (let at = html.indexOf('<'); at !== -1; at = html.indexOf('<', at + 1)) {
     while (s < spans.length && spans[s].start <= at) { reach = Math.max(reach, spans[s].end); s++; }
     if (at >= reach) return { elements, problem: { kind: 'stray', at } };
+  }
+  // NOTHING IS LEFT OPEN: what a page writes next stands at the top, after the component.
+  const followed = parseFragment(CONTEXT, html + END_MARK, {}).childNodes;
+  const last = followed[followed.length - 1];
+  if (!last || last.nodeName !== END_NAME || !('childNodes' in last) || last.childNodes.length > 0) {
+    // The outermost element still open is the last one at the top: END_MARK is inside it, or it
+    // dropped END_MARK (<select>) or put it before itself (<table>).
+    const open = [...followed].reverse().find(n => 'tagName' in n);
+    return { elements, problem: { kind: 'open', element: open && 'tagName' in open ? open.tagName.toLowerCase() : '' } };
   }
   return { elements, problem: null };
 }
