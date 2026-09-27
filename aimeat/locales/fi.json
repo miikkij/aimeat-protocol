@@ -1090,17 +1090,41 @@
           "resolved": "hoidettu"
         },
         "type": {
-          "zip_import": "ZIP-tuonti hylätty"
+          "zip_import": "ZIP-tuonti hylätty",
+          "held_account_names": "Tietueet, joita päivitys ei siirtänyt"
         },
         "source": {
           "workspace_import": "työtilan tuonti",
           "organism_import": "organismin tuonti",
-          "app_backup": "sovelluksen varmuuskopio"
+          "app_backup": "sovelluksen varmuuskopio",
+          "full_identity_move": "päivitys käynnistyksessä"
         },
         "kept": "{size} säilytetty",
         "notKept": "ei säilytetty, liian suuri",
         "resolvedOn": "hoidettu {date}",
-        "payload": "Tiedosto"
+        "payload": "Tiedosto",
+        "held": {
+          "lead": "Päivitys siirsi käynnistyksessä jokaisen ihmisen vanhat tietueet hänen tililleen. Nämä tietueet ovat vanhempia kuin tili, jolla on nyt sama käyttäjätunnus. Ne voivat olla tämän ihmisen tai tunnuksen aiemman haltijan, joten ne pysyvät ennallaan, kunnes päätät kunkin tunnuksen kohdalla, kenen ne ovat.",
+          "counts": "Toimintoja: {actions} · Töitä: {work} · Rivejä omassa maksuhistoriassa: {own} · Rivejä muiden maksuhistoriassa: {naming}",
+          "holder": "Haltija {date} alkaen: {ghii}",
+          "holderNoAddress": "Haltija {date} alkaen: tili, jolla ei vielä ole täyttä osoitetta",
+          "bound": "Sen toimintoihin sidotut koukut: {list}",
+          "gateWord": "{hook} (portti)",
+          "gateOpen": "Portti {hook} on sidottu toimintoon, jota ei enää ole, joten se päästää kaiken läpi, kunnes sidot sen uudelleen Koukut-sivulla.",
+          "toDecide": "odottaa päätöstä",
+          "decidedHolder": "nykyisen haltijan",
+          "decidedPrevious": "aiemman haltijan",
+          "decideHolder": "Kuuluu nykyiselle haltijalle",
+          "decidePrevious": "Oli aiemman haltijan",
+          "confirmHolder": "Siirretäänkö tunnuksen {name} tietueet tilille {ghii}, jolla tunnus nyt on? Sen toiminnot, työt ja oman maksuhistorian rivit siirtyvät sinne, ja sen toimintoihin sidotut koukut siirtyvät mukana.",
+          "confirmPrevious": "Käsitelläänkö tunnuksen {name} tietueet poistetun tilin tietueina? Sen toiminnot poistetaan ja avoimet työt perutaan. Valmiissa töissä, kiistoissa ja muiden maksuhistorian vanhoissa riveissä on sen jälkeen tunnuksen tilalla pseudonyymi. Tätä ei voi perua.",
+          "decided": "Päätetty",
+          "bindingsLeft": "Nämä koukkujen sidonnat osoittavat toimintoihin, joita ei enää ole: {list}.",
+          "bindingsLeftGate": "Niiden joukossa oleva portti päästää kaiken läpi, kunnes sidot sen uudelleen Koukut-sivulla.",
+          "untied": "Muiden maksuhistoriaan jäävät ennalleen: {list}. Näitä nimiä ei ole millään tilillä, eikä mikään yhdistä niitä ihmiseen.",
+          "untiedOne": "{value} (1 rivi)",
+          "untiedMany": "{value} ({lines} riviä)"
+        }
       },
       "accounts": {
         "title": "Tilit ja roolit",

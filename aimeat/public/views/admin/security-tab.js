@@ -12,6 +12,8 @@
  * @structure SecurityTab({ switchPage }) — load · alertLine · RightNow · Strip · the sections from
  *   security-tab.refusals.js and security-tab.sections.js · the actions (resolve, delete, payload)
  * @version-history
+ *   v3.1.0 — 2026-09-26 — The decision on one name of the incident the update at start opens: asked
+ *     first, then POST .../incidents/:id/resolve with { name, resolution }.
  *   v3.0.0 — 2026-09-27 — Library components only: the status is the Verdict with the Readings beside
  *     it, the strip the FigureStrip whose figures are doors (the open incidents in coral), the two
  *     account sections side by side in Columns. The page writes no class, and its own sheet
@@ -33,7 +35,7 @@ import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, fmtUp, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { getSecurityOverview, resolveSecurityIncident, deleteSecurityIncident } from '/js/services/admin.js';
+import { getSecurityOverview, resolveSecurityIncident, deleteSecurityIncident, resolveHeldName } from '/js/services/admin.js';
 import { authHeaders } from '/js/services/auth.js';
 import { RefusalsSection, ipText } from './security-tab.refusals.js';
 import { IncidentsSection, AccountsSection, SettingsSection, AskAiSection } from './security-tab.sections.js';
@@ -143,6 +145,15 @@ export default function SecurityTab(props) {
     async () => { try { await deleteSecurityIncident(id); showOk(S('deleted')); load(); } catch (e) { showErr((e && e.message) || t('common.error')); } },
     { danger: true, title: S('title') },
   );
+  // One name of the incident the update at start opened: whose its records are. Both decisions move
+  // or settle rows for good, so each asks first and says what it will do.
+  const decide = (id, n, resolution) => confirm(
+    resolution === 'holder'
+      ? S('incidents.held.confirmHolder', { name: n.name, ghii: n.holder_ghii || n.name })
+      : S('incidents.held.confirmPrevious', { name: n.name }),
+    async () => { try { await resolveHeldName(id, n.name, resolution); showOk(S('incidents.held.decided')); load(); } catch (e) { showErr((e && e.message) || t('common.error')); } },
+    { danger: resolution === 'previous', title: S('title') },
+  );
   const downloadQuarantine = async (id) => {
     try {
       const res = await fetch(`/v1/admin/security/incidents/${encodeURIComponent(id)}/quarantine`, { headers: authHeaders() });
@@ -166,7 +177,7 @@ export default function SecurityTab(props) {
     <${RightNow} ov=${ov} switchPage=${switchPage} />
     <${Strip} ov=${ov} switchPage=${switchPage} />
     <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
-    <${IncidentsSection} ov=${ov} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} />
+    <${IncidentsSection} ov=${ov} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} onDecide=${decide} switchPage=${switchPage} />
     <${Columns}>
       <${AccountsSection} ov=${ov} switchPage=${switchPage} />
       <${SettingsSection} ov=${ov} switchPage=${switchPage} />

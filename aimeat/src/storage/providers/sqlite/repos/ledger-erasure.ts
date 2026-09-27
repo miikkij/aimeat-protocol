@@ -7,9 +7,11 @@
  *   cascade has deleted the person's own lines. A free function over the connection, like
  *   repos/app-purchase-erasure.ts, so the owner methods can call it without an import cycle through
  *   the provider class.
- * @structure pseudonymiseLedgerParty(db, party)
+ * @structure pseudonymiseLedgerParty(db, party, opts)
  * @usage pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiis, pseudonym, agents));
  * @version-history
+ *   v1.1.0 — 2026-09-26 — `before`: only the lines written before a time, for the operator's decision
+ *     that a held name's rows were a previous holder's (repos/held-names.ts).
  *   v1.0.0 — 2026-09-26 — Initial: the other side's ledger lines name an erased person by the
  *     erasure's pseudonym (secaudit 2026-09). The Postgres twin is pseudonymiseLedgerPartyDb in its
  *     owner-cascade.ts.
@@ -37,20 +39,24 @@ import type { LeavingParty } from '../../../erased-party.js';
  * A party with no pseudonym (a deleted agent, whose owner is still here) is kept as stored, so this
  * changes nothing for one. SQLite LIKE has no escape character unless it is named, so each pattern
  * names the backslash that partyIdentities escapes with.
+ *
+ * `before` limits it to the lines written before a time: a held name's lines older than the account
+ * that holds the name now, when the operator decides they were a previous holder's.
  */
-export function pseudonymiseLedgerParty(db: Database.Database, party: LeavingParty): number {
+export function pseudonymiseLedgerParty(db: Database.Database, party: LeavingParty, opts: { before?: string } = {}): number {
   const { exact, suffixPatterns, pseudonym } = party;
   if (!pseudonym) return 0;
-  const params = [...exact, ...suffixPatterns];
+  const params = [...exact, ...suffixPatterns, ...(opts.before ? [opts.before] : [])];
   const matches = (column: string): string => [
     `${column} IN (${exact.map(() => '?').join(', ')})`,
     ...suffixPatterns.map(() => `${column} LIKE ? ESCAPE '\\'`),
   ].join(' OR ');
+  const before = opts.before ? ' AND timestamp < ?' : '';
   const counterparty = db.prepare(
-    `UPDATE wallet_transactions SET counterpartyGaii = ? WHERE ${matches('counterpartyGaii')}`,
+    `UPDATE wallet_transactions SET counterpartyGaii = ? WHERE (${matches('counterpartyGaii')})${before}`,
   ).run(pseudonym, ...params);
   const initiator = db.prepare(
-    `UPDATE wallet_transactions SET initiatorGaii = ? WHERE ${matches('initiatorGaii')}`,
+    `UPDATE wallet_transactions SET initiatorGaii = ? WHERE (${matches('initiatorGaii')})${before}`,
   ).run(pseudonym, ...params);
   return counterparty.changes + initiator.changes;
 }

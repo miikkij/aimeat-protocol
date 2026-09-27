@@ -23,6 +23,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-26 — aimeat_admin_incident_resolve is destructive: deciding that a held name's rows were a
+ *     previous holder's deletes its actions. Still idempotent: the same decision twice does it once.
  *   2026-09-25 — aimeat_workspace_space_add and aimeat_workspace_sections_set (writes, idempotent,
  *     nothing destroyed) and aimeat_workspace_suggestions (a decision writes).
  *   2026-09-25 — aimeat_admin_federation_relay_claim_set (idempotent, nothing destroyed).
@@ -535,7 +537,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_owner_enable: { title: 'Admin: Reactivate Account', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     aimeat_admin_totp_reset: { title: 'Admin: Remove Two-Step Sign-In', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     aimeat_admin_security_overview: { title: 'Admin: Security Overview', readOnlyHint: true },
-    aimeat_admin_incident_resolve: { title: 'Admin: Resolve Security Incident', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    aimeat_admin_incident_resolve: { title: 'Admin: Resolve Security Incident', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     aimeat_admin_cors_overview: { title: 'Admin: CORS Overview', readOnlyHint: true },
     aimeat_admin_hooks: { title: 'Admin: Hooks', readOnlyHint: true },
     aimeat_admin_statistics: { title: 'Admin: Statistics', readOnlyHint: true },

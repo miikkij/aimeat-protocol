@@ -17,6 +17,10 @@
  *   v1.60.0 -- 2026-09-26 -- Add e2e-federated-visitor-names.ts to ALL_SUITES: a visitor from another
  *            node keeps its own name wherever code turns an identity into an account name (secaudit
  *            2026-09, F-1 as a class and a0ecb62eafb3).
+ *   v1.60.0 -- 2026-09-26 -- Add e2e-held-account-names.ts to ALL_SUITES: the move to the full
+ *            identity on data it cannot place, the one incident it opens and the operator's two
+ *            decisions over REST and MCP, across three boots of its own node on 40452. Not in the
+ *            guard tier.
  *   v1.59.0 -- 2026-09-26 -- Add e2e-app-frame.ts to ALL_SUITES: apps on a node several people share
  *            with no app origin run in an isolated frame (audit A7-1). It boots a node of its own on
  *            40266, with the app origin off, so it starts with one owner and adds the second itself.
@@ -565,6 +569,9 @@ const ALL_SUITES = [
     // Owns its server on 40447 and boots it three times on one database: the operator:admin
     // migration runs at boot and records that it ran, so only a restart proves it runs once.
     'test/e2e-operator-admin-migration.ts',
+    // Owns its server on 40452 and boots it three times on one database: the move to the full
+    // identity runs when the store opens, and what it cannot place becomes one incident.
+    'test/e2e-held-account-names.ts',
     'test/e2e-mcp-v2.ts',
     // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
     // way e2e-app-origin does: an app's public address only exists when that flag is set.

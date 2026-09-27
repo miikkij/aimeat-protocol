@@ -9,6 +9,8 @@
  *   read by a model, and the tool names inside it are the node's own.
  * @structure buildSecurityPrompt({ url })
  * @version-history
+ *  - 2026-09-26: the incident resolve tool also decides one name of the incident whose records the
+ *    update at start did not move (name, resolution).
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 — 2026-09-05 — Initial (the Security page in the poster face).
  */
@@ -30,6 +32,8 @@ One fingerprint repeated is a dead token being retried; many fingerprints from o
 
 == 3. Propose, then wait ==
   aimeat_admin_incident_resolve { id }      close an incident I have looked at
+  aimeat_admin_incident_resolve { id, name, resolution }
+                                            for the incident whose records the update did not move: "holder" if a name's records belong to the account that holds the name now, "previous" if they were a previous holder's
   aimeat_admin_owner_disable { name }       stop every credential in an account's name
   aimeat_admin_owner_enable { name }        let them back in
   aimeat_admin_totp_reset { name }          take a lost second factor off an account

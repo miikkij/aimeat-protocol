@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- aimeat_admin_incident_resolve forwards `name` and `resolution`, to decide
+ *     one name of the incident the move to the full identity opened.
  *   v1.16.2 -- 2026-09-26 -- aimeat_action_execute's provider_gaii says what the catalogue entry says:
  *     an agent's GAII, or a person's GHII when a person published the action.
  *   v1.16.1 -- 2026-09-26 -- aimeat_admin_hook_set's `actions` says each reference names an action
@@ -618,9 +620,12 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_admin_incident_resolve', descriptionFor('aimeat_admin_incident_resolve'), {
     agent_name: agentNameSchema,
     id: z.string().describe('The incident id, from the overview\'s incidents list.'),
-  }, annotationsFor('aimeat_admin_incident_resolve'), async ({ agent_name, id }) => {
+    name: z.string().optional().describe('To decide one name of an incident the move to the full identity opened: the account name, from the incident\'s names.'),
+    resolution: z.string().optional().describe('With `name`: "holder" (its rows are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).'),
+  }, annotationsFor('aimeat_admin_incident_resolve'), async ({ agent_name, id, name, resolution }) => {
     const { client } = pickAgent(registry, agent_name);
-    return asText(await client.post(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`));
+    const decide = name !== undefined || resolution !== undefined ? { name, resolution } : undefined;
+    return asText(await client.post(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`, decide));
   });
 
   // The CORS page in one read, and the one write it has, over the same routes the page uses. An

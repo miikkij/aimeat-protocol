@@ -8,6 +8,10 @@
  *   with a door to Settings), and the paste for the operator's own AI.
  * @structure IncidentsSection · AccountsSection · SettingsSection · AskAiSection
  * @version-history
+ *   v2.1.0 — 2026-09-26 — The incident the update at start opens lists under its row each name to
+ *     decide, with its counts, its holder and its two buttons ("It belongs to the current holder", "It
+ *     was a previous holder's"), then the hook bindings that point at actions that no longer exist and
+ *     the values left as they are. Resolve and Delete stand beside it only when no name is undecided.
  *   v2.0.0 — 2026-09-27 — Library components only: Section, the incidents a List with its own cut, the
  *     rows in words Readings with their door at the end, the paste in the SettingBox as a Code block
  *     with the copy an Action. The page writes no class.
@@ -59,7 +63,53 @@ function appsLine(apps) {
   };
 }
 
-export function IncidentsSection({ ov, onResolve, onDelete, onPayload }) {
+/** A held name's holder: since when, and under which full address when it has one. */
+function holderLine(n) {
+  return n.holder_ghii
+    ? S('incidents.held.holder', { date: fmtDate(n.holder_since), ghii: n.holder_ghii })
+    : S('incidents.held.holderNoAddress', { date: fmtDate(n.holder_since) });
+}
+
+/** The moments a name's actions are bound to, a gate marked as one. */
+const hookList = (bindings) => bindings.map(b => (b.gate ? S('incidents.held.gateWord', { hook: b.hook }) : b.hook)).join(', ');
+
+/** The line under a held name: which hooks are bound to its actions, or which gate passes everything now. */
+function boundNote(n) {
+  if (!n.bindings.length) return undefined;
+  const gates = n.bindings.filter(b => b.gate);
+  if (n.status === 'previous' && gates.length) return gates.map(b => S('incidents.held.gateOpen', { hook: b.hook })).join(' ');
+  return S('incidents.held.bound', { list: hookList(n.bindings) });
+}
+
+/**
+ * Under the incident the update at start opened: each name to decide, with its two buttons while it
+ * is open; then the hook bindings that point at actions that no longer exist, and the values left as
+ * they are. The decisions are the page's only new control, in the incident's own row pattern.
+ */
+function HeldNames({ i, onDecide }) {
+  const names = i.names || [];
+  const left = i.bindings_left || [];
+  const untied = i.untied || [];
+  const untiedItem = (u) => (u.lines === 1 ? S('incidents.held.untiedOne', { value: u.value }) : S('incidents.held.untiedMany', { value: u.value, lines: num(u.lines) }));
+  return html`
+    ${names.length ? html`
+      <${List} under dense cols="state-name-who-doors" rows=${names} render=${(n) => html`
+        <${Row} key=${n.name}>
+          <${Cell} line><${Mark} kind="status" tone=${n.status === 'open' ? 'danger' : 'fine'}>${S(n.status === 'open' ? 'incidents.held.toDecide' : n.status === 'holder' ? 'incidents.held.decidedHolder' : 'incidents.held.decidedPrevious')}<//><//>
+          <${Name} desc=${S('incidents.held.counts', { actions: num(n.actions), work: num(n.work), own: num(n.own_lines), naming: num(n.naming_lines) })}
+            note=${boundNote(n)}>${n.name}<//>
+          <${Who}>${holderLine(n)}<//>
+          <${Doors}>
+            ${n.status === 'open' ? html`
+              <${Action} small onClick=${() => onDecide(i.id, n, 'holder')}>${S('incidents.held.decideHolder')}<//>
+              <${Action} small tone="danger" onClick=${() => onDecide(i.id, n, 'previous')}>${S('incidents.held.decidePrevious')}<//>` : null}
+          <//>
+        <//>`} />` : null}
+    ${left.length ? html`<${Note} kind="quiet">${S('incidents.held.bindingsLeft', { list: left.map(b => `${b.hook} → ${b.ref}`).join(', ') })}${left.some(b => b.gate) ? ' ' + S('incidents.held.bindingsLeftGate') : ''}<//>` : null}
+    ${untied.length ? html`<${Note} kind="quiet">${S('incidents.held.untied', { list: untied.map(untiedItem).join(', ') })}<//>` : null}`;
+}
+
+export function IncidentsSection({ ov, onResolve, onDelete, onPayload, onDecide, switchPage }) {
   const { items, open } = ov.incidents;
   const lastResolved = items.map(i => i.resolvedAt).filter(Boolean).sort().pop();
   const typeWord = (type) => tOr('admin.security.incidents.type.' + type, type);
@@ -70,18 +120,27 @@ export function IncidentsSection({ ov, onResolve, onDelete, onPayload }) {
       ${items.length === 0 ? html`<${Note} kind="quiet">${S('incidents.none')}<//>` : null}
       ${items.length > 0 && open === 0 ? html`<${Note} kind="quiet">${lastResolved ? S('incidents.noneOpen', { date: fmtDate(lastResolved) }) : S('incidents.noneOpenPlain')}<//>` : null}
       ${items.length > 0 ? html`
-        <${List} cols="state-name-who-when-doors" rows=${items} render=${(i) => html`
-          <${Row} key=${i.id}>
+        <${List} cols="state-name-who-when-doors" rows=${items} render=${(i) => {
+          // The update at start opens an incident whose names are decided one by one; it closes with
+          // the last, so neither Resolve nor Delete stands beside a name still to decide.
+          const held = Array.isArray(i.names);
+          const undecided = held && i.names.some(n => n.status === 'open');
+          return html`
+          <${Row} key=${i.id} below=${held ? html`<${HeldNames} i=${i} onDecide=${onDecide} />` : undefined}>
             <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>
-            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${i.detail || undefined}>${typeWord(i.type)}<//>
-            <${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>
+            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${held ? S('incidents.held.lead') : (i.detail || undefined)}>${typeWord(i.type)}<//>
+            ${held
+              ? html`<${Who}>${sourceWord(i.source)}<//>`
+              : html`<${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>`}
             <${When}>${dt(i.createdAt)}${i.resolvedAt ? ' · ' + S('incidents.resolvedOn', { date: dt(i.resolvedAt) }) : ''}<//>
             <${Doors}>
               ${i.quarantine_key ? html`<${Action} small onClick=${() => onPayload(i.id)}>${S('incidents.payload')}<//>` : null}
-              ${i.status === 'open' ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
-              <${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>
+              ${held && (i.bindings_left || []).length ? html`<${Action} small soft onClick=${() => switchPage('hooks')}>${t('dashboard.hooks')}<//>` : null}
+              ${i.status === 'open' && !undecided ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
+              ${!undecided ? html`<${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>` : null}
             <//>
-          <//>`} />` : null}
+          <//>`;
+        }} />` : null}
     <//>`;
 }
 

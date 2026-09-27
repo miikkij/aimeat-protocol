@@ -21,6 +21,13 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- The move to the full identity (0086) on positive evidence only: a row
+ *     older than the account that holds its name now stays as it is and is recorded with its counts,
+ *     and so is a ledger value nothing ties to a person; 0085 does not run on a database that never
+ *     applied it; a database where 0085 ran gets the pseudonym its work carries on its lines, and a
+ *     second run changes nothing; the move runs once for each database; what it left opens one
+ *     incident with the hook bindings, and each decision (the holder's, a previous holder's) acts on
+ *     the rows.
  *   v1.15.0 -- 2026-09-26 -- deleteOwner takes the person's own ledger lines filed under the bare
  *     account name, on every provider.
  *   v1.14.0 -- 2026-09-26 -- deleteOwner takes the cortexes the person installed on every provider:
@@ -80,6 +87,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, WorkRecord } from '../../src/storage/interface.js';
 import { runMigrations } from '../../src/storage/providers/postgres-kysely/migrate.js';
 import { spendAssertionIdentity } from '../../src/services/assertion-spend.js';
+import type { AimeatConfig } from '../../src/config.js';
 
 const SQLITE_PATH = `./test/.conformance-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
@@ -409,6 +417,15 @@ const IDENTITY_MIGRATION = '0085_actions_work_full_identity.sql';
  */
 const SQLITE_IDENTITY_RECORD = 'migration:0085_actions_work_full_identity.sql';
 
+/** The Postgres migration that supersedes 0085: the move to the full identity on positive evidence. */
+const FULL_IDENTITY_MIGRATION = '0086_full_identity_on_evidence.sql';
+
+/** The row the SQLite half of 0086 writes into system_settings when it has moved a database. */
+const SQLITE_FULL_IDENTITY_RECORD = 'migration:0086_full_identity_on_evidence.sql';
+
+/** What the move left for the operator to decide, on either provider (system_settings / SystemSetting). */
+const HELD_RECORD = 'migration:0086:held';
+
 /** A second start of a SQLite node: the same database file opened again. */
 async function reopenSqlite(): Promise<void> {
     const again = await createStorage({ provider: 'sqlite', sqlitePath: SQLITE_PATH });
@@ -424,20 +441,48 @@ const sqliteDb = (storage: Storage): SqliteHandle => (storage as unknown as { db
 const pgPool = (storage: Storage): pg.Pool => (storage as unknown as { pool: pg.Pool }).pool;
 
 /**
- * Run the deploy migration again over what is in the database now, the way a deploy runs it on a
- * database that has not had it: forget the record that it ran, then start. SQLite moves a database
- * when it opens it and records that in system_settings; Postgres records each file it applied.
+ * Run the move to the full identity again over what is in the database now, the way a deploy runs it
+ * on a database that has not had it: forget the record that it ran, then start. SQLite moves a
+ * database when it opens it and records that in system_settings; Postgres records each file it
+ * applied. `without0085` also forgets 0085, as on a database that never applied it.
  */
-async function rerunIdentityMigration(provider: string, storage: Storage): Promise<void> {
+async function rerunIdentityMigration(provider: string, storage: Storage, opts: { without0085?: boolean } = {}): Promise<void> {
     if (provider === 'sqlite') {
-        const db = (storage as unknown as { db: { prepare(sql: string): { run(...args: unknown[]): unknown } } }).db;
-        db.prepare('DELETE FROM system_settings WHERE key = ?').run(SQLITE_IDENTITY_RECORD);
+        const db = sqliteDb(storage);
+        for (const key of [SQLITE_FULL_IDENTITY_RECORD, HELD_RECORD, ...(opts.without0085 ? [SQLITE_IDENTITY_RECORD] : [])]) {
+            db.prepare('DELETE FROM system_settings WHERE key = ?').run(key);
+        }
         await reopenSqlite();
         return;
     }
-    const pool = (storage as unknown as { pool: pg.Pool }).pool;
-    await pool.query('DELETE FROM "_kysely_migrations" WHERE name = $1', [IDENTITY_MIGRATION]);
+    const pool = pgPool(storage);
+    await pool.query('DELETE FROM "_kysely_migrations" WHERE name = ANY($1)',
+        [[FULL_IDENTITY_MIGRATION, ...(opts.without0085 ? [IDENTITY_MIGRATION] : [])]]);
+    await pool.query('DELETE FROM "SystemSetting" WHERE "key" = $1', [HELD_RECORD]);
     await runMigrations(pool);
+}
+
+/** What the move recorded for the operator, read as it is stored. */
+async function heldRecord(provider: string, storage: Storage): Promise<any> {
+    const value = provider === 'sqlite'
+        ? (sqliteDb(storage).prepare('SELECT value FROM system_settings WHERE key = ?').get(HELD_RECORD) as { value: string } | undefined)?.value
+        : (await pgPool(storage).query('SELECT "value" FROM "SystemSetting" WHERE "key" = $1', [HELD_RECORD])).rows[0]?.value;
+    return value ? JSON.parse(value) : null;
+}
+
+/** Forget the record, so the next start of an E2E node on this database opens no incident for it. */
+async function forgetHeldRecord(provider: string, storage: Storage): Promise<void> {
+    if (provider === 'sqlite') sqliteDb(storage).prepare('DELETE FROM system_settings WHERE key = ?').run(HELD_RECORD);
+    else await pgPool(storage).query('DELETE FROM "SystemSetting" WHERE "key" = $1', [HELD_RECORD]);
+}
+
+/** When the move to the full identity ran on this database, as its own record says; null when it has not. */
+async function fullIdentityRan(provider: string, storage: Storage): Promise<string | null> {
+    if (provider === 'sqlite') {
+        return (sqliteDb(storage).prepare('SELECT value FROM system_settings WHERE key = ?').get(SQLITE_FULL_IDENTITY_RECORD) as { value: string } | undefined)?.value ?? null;
+    }
+    const r = await pgPool(storage).query('SELECT applied_at FROM "_kysely_migrations" WHERE name = $1', [FULL_IDENTITY_MIGRATION]);
+    return r.rows[0] ? new Date(r.rows[0].applied_at).toISOString() : null;
 }
 
 interface LineAsStored { txId: string; gaii: string; type: string; counterpartyGaii: string | null; initiatorGaii: string | null; trackingCode: string | null }
@@ -477,6 +522,23 @@ async function linesAsStored(provider: string, storage: Storage, prefix: string)
           WHERE "txId" LIKE $1 ORDER BY "txId"`, [`${prefix}%`]);
     return r.rows as LineAsStored[];
 }
+
+/** An owner and its GHII, created at `at`, with 100 morsels. */
+async function seedAccount(s: Storage, name: string, node: string, at: string): Promise<string> {
+    const ghii = `${name}@${node}`;
+    await s.createOwner({ name, displayName: name, publicKey: 'pk', roles: ['owner'], createdAt: at });
+    await s.createGHII({
+        username: name, nodeId: node, ghii, displayName: name, verificationLevel: 0,
+        ownerName: name, totpEnabled: false, morselBalance: 100, loginCount: 0, createdAt: at, updatedAt: at,
+    });
+    return ghii;
+}
+
+/** An action published under `providerGaii` at `createdAt`, as an owner session stored it before 2026-09-26. */
+const publishAction = (s: Storage, id: string, providerGaii: string, createdAt: string) => s.createAction({
+    id, providerGaii, displayName: id, description: 'conformance', inputSchema: {}, outputSchema: {},
+    pricing: { baseMorsels: 10 }, tags: [], createdAt, updatedAt: createdAt,
+});
 
 /** Everything the cascade must leave empty, read back through the Storage interface. */
 async function leftovers(s: Storage, owner: string, ghii: string, _gaii: string) {
@@ -734,10 +796,10 @@ describe('storage providers agree on what they do, not just on their signatures'
 
     // An action a person publishes is stored under their GHII, and so is the work on it, on every
     // door. The rows written before that carry the bare account name, and the deploy migration moves
-    // them. It moves a row only to an account that already existed when the row was written: a name is
-    // released for reuse, so a row older than the account holding the name now belonged to a person
-    // whose account was deleted. That person's actions go, and their open work is settled the way a
-    // deletion settles it.
+    // them. It moves a row only to an account that already existed when the row was written. It takes
+    // a row as a deleted account's only when no account holds the name now: that person's actions go,
+    // and their open work is settled the way a deletion settles it. A row older than the account that
+    // holds its name now stays as it is, for the operator to decide (the next case).
     it('the deploy migration moves an action published under the bare name, and the work on it, to the owner\'s GHII', async () => {
         const erasedRe = /^erased:[0-9a-f]{24}$/;
         for (const { name, storage } of provs) {
@@ -772,7 +834,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             await publish(mine, owner, now);                                   // the owner's own: moves
             await publish(federated, owner, now, ['federated:peer-node']);     // another node's copy: stays
             await publish(orphan, gone, now);                                  // a name with no account: goes
-            await publish(previous, reused, longAgo);                          // the name's previous holder: goes
+            await publish(previous, reused, longAgo);                          // older than the name's holder: stays
             // Work on the owner's action, and a request the owner made, both under the bare name.
             await storage.createWork(workRow(`tc-mig-p-${tag}`, owner, reqGaii, 'pending', { actionId: mine }));
             await storage.debitBalance(reqGaii, 11);
@@ -803,7 +865,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             await storage.createWork(workRow(tc('g6'), gone, gone, 'delivered'));
             await storage.createDispute({ id: `dispute-mig6-${tag}`, trackingCode: tc('g6'), status: 'open', openedBy: gone, reason: 'x', createdAt: now, updatedAt: now });
             await storage.addDisputeAuditEntry(`dispute-mig6-${tag}`, { sequence: 1, event: 'dispute_opened', actor: gone, timestamp: now, data: {}, hash: 'e'.repeat(64), previousHash: '0'.repeat(64) });
-            // A name somebody holds again: the previous holder's open work is settled, the holder's own moves.
+            // A name somebody holds: the work older than the account stays as it is, the holder's own moves.
             await storage.createWork(workRow(tc('x1'), reused, reqGaii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
             await storage.debitBalance(reqGaii, 11);
             await storage.createWork(workRow(tc('x2'), reused, reqGaii, 'pending'));
@@ -822,8 +884,8 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect.soft((await storage.listActionsByProvider(owner)).map(a => a.id), `${name}: under the bare name, only another node's copy stays`)
                 .toEqual([federated]);
             expect.soft(await storage.listActionsByProvider(gone), `${name}: an action whose name has no account survived`).toEqual([]);
-            expect.soft(await storage.listActionsByProvider(reused), `${name}: the previous holder's action survived under the name`).toEqual([]);
-            expect.soft(await storage.listActionsByProvider(`${reused}@${node}`), `${name}: the previous holder's action moved to the new holder`).toEqual([]);
+            expect.soft((await storage.listActionsByProvider(reused)).map(a => a.id), `${name}: an action older than the name's holder did not stay as it was`).toEqual([previous]);
+            expect.soft(await storage.listActionsByProvider(`${reused}@${node}`), `${name}: an action older than the name's holder moved to the holder`).toEqual([]);
 
             const provided = await storage.getWork(`tc-mig-p-${tag}`);
             expect.soft(provided?.providerGaii, `${name}: the work on the owner's action did not move`).toBe(ghii);
@@ -859,14 +921,14 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect.soft(await storage.getDisputeAuditLog(`dispute-mig6-${tag}`), `${name}: its dispute log survived`).toEqual([]);
 
             const x1 = await storage.getWork(tc('x1')), x2 = await storage.getWork(tc('x2'));
-            expect.soft([x1?.status, x1?.providerGaii], `${name}: the previous holder's open work was not settled`).toEqual(['cancelled', expect.stringMatching(erasedRe)]);
+            expect.soft([x1?.status, x1?.providerGaii], `${name}: work older than the name's holder did not stay as it was`).toEqual(['pending', reused]);
             expect.soft([x2?.status, x2?.providerGaii], `${name}: the current holder's own work did not move`).toEqual(['pending', `${reused}@${node}`]);
 
-            // 100, less 11 + 11 + 5 + 11 + 11 held, plus the 11 + 5 + 11 held for work of deleted accounts.
-            expect.soft((await storage.getGHII(reqGhii))?.morselBalance, `${name}: the morsels held for deleted accounts' work did not come back`).toBe(78);
+            // 100, less 11 + 11 + 5 + 11 + 11 held, plus the 11 + 5 held for work of deleted accounts.
+            expect.soft((await storage.getGHII(reqGhii))?.morselBalance, `${name}: the morsels held for deleted accounts' work did not come back`).toBe(67);
             const returns = (await storage.getTransactions(reqGhii, 500)).filter(t => t.type === 'escrow_return');
             expect.soft(returns.map(t => `${t.trackingCode}:${t.amount}`).sort(), `${name}: one escrow_return line per settled request`)
-                .toEqual([`${tc('g')}:11`, `${tc('g2')}:5`, `${tc('x1')}:11`].sort());
+                .toEqual([`${tc('g')}:11`, `${tc('g2')}:5`].sort());
             for (const t of returns) expect.soft(t.counterpartyGaii, `${name}: a return line names a deleted account`).toMatch(erasedRe);
 
             for (const [k] of heldBefore) {
@@ -880,6 +942,7 @@ describe('storage providers agree on what they do, not just on their signatures'
 
             for (const n of [owner, requester, reused, again]) await storage.deleteOwner(n);
             await storage.deleteAction(federated, owner);
+            await forgetHeldRecord(name, storage);
         }
     }, 60_000);
 
@@ -921,9 +984,9 @@ describe('storage providers agree on what they do, not just on their signatures'
     // migration settles those lines the way a deletion settles them now: every line that names the
     // account, by its bare name, its GHII or an agent of it, as counterparty or as the one who acted,
     // takes the pseudonym the account's work takes. The account counts as deleted by the rule the
-    // work follows: nobody holds the name now, or the line is older than the account that does. A
-    // line of the account holding the name now, a person of another node, a node, and a pseudonym
-    // already written stay as they are.
+    // work follows: nobody holds the name now. A line older than the account that holds the name now,
+    // a line of that account, a person of another node, a node, and a pseudonym already written stay
+    // as they are.
     it('the deploy migration gives the ledger lines that name a deleted account the pseudonym its work gets', async () => {
         const erasedRe = /^erased:[0-9a-f]{24}$/;
         for (const { name, storage } of provs) {
@@ -987,7 +1050,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             const Q = of('only')?.counterpartyGaii;
             expect.soft(Q, `${name}: an account deleted with no work of its own still names it`).toMatch(erasedRe);
             expect.soft(Q === P, `${name}: two deleted accounts got one pseudonym`).toBe(false);
-            expect.soft(of('again-old')?.counterpartyGaii, `${name}: a line older than the name's holder now still names it`).toMatch(erasedRe);
+            expect.soft(of('again-old')?.counterpartyGaii, `${name}: a line older than the name's holder now did not stay as it was`).toBe(`${again}@${node}`);
             expect.soft(of('again-new')?.counterpartyGaii, `${name}: a line of the name's holder now changed`).toBe(`${again}@${node}`);
             expect.soft(of('live')?.counterpartyGaii, `${name}: a line naming a live account changed`).toBe(`${live}@${node}`);
             expect.soft(of('foreign')?.counterpartyGaii, `${name}: a line naming a person of another node changed`).toBe(`${gone}@peer-node-ledger`);
@@ -998,6 +1061,264 @@ describe('storage providers agree on what they do, not just on their signatures'
                 .toEqual(lines.map(([, type]) => `${type}:1`).sort());
 
             for (const n of [keeper, again, live]) await storage.deleteOwner(n);
+            await forgetHeldRecord(name, storage);
+        }
+    }, 60_000);
+
+    // The move acts on positive evidence only. A row under a bare account name moves to the GHII of
+    // the account that holds the name, when the row is not older than that account. It is a deleted
+    // account's only when no account holds the name now. A row older than the account that holds its
+    // name now may be that person's or a previous holder's: the move leaves it as it is, and records
+    // the name with its counts for the operator. So does a ledger value that no account holds and
+    // nothing ties to a person. On a database that never applied 0085, 0085 does not run.
+    it('the move to the full identity moves, settles or leaves each row on positive evidence only, and records what it left', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const hour = 3_600_000;
+            const now = new Date().toISOString();
+            const earlier = new Date(Date.now() - hour).toISOString();
+            const longAgo = new Date(Date.now() - 48 * hour).toISOString();
+            const ages = new Date(Date.now() - 72 * hour).toISOString();
+            // `holder` holds its name since `earlier`, with rows from before and after; `keeper` keeps
+            // the ledger lines and asks for the work; `gone` has no account; `stray` is a value in a
+            // ledger that no account holds and nothing ties to a person.
+            const holder = `confhld${tag}`, keeper = `confkep${tag}`, gone = `confgon${tag}`, stray = `confstr${tag}`;
+            const hGhii = await seedAccount(storage, holder, node, earlier);
+            const kGhii = await seedAccount(storage, keeper, node, ages);
+            await publishAction(storage, `hold-old-${tag}`, holder, longAgo);
+            await publishAction(storage, `hold-new-${tag}`, holder, now);
+            await publishAction(storage, `gone-${tag}`, gone, longAgo);
+            const tc = (k: string) => `tc-evd-${k}-${tag}`;
+            await storage.createWork(workRow(tc('h-old'), holder, kGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
+            await storage.debitBalance(kGhii, 11);
+            await storage.createWork(workRow(tc('h-new'), kGhii, holder, 'accepted'));
+            await storage.createWork(workRow(tc('g'), gone, kGhii, 'pending', { cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }));
+            await storage.debitBalance(kGhii, 5);
+            const line = (k: string, gaii: string, type: string, timestamp: string, extra: { counterpartyGaii?: string; initiatorGaii?: string; trackingCode?: string } = {}) =>
+                insertLineAsStored(name, storage, { txId: `tx-evd-${tag}-${k}`, gaii, type, amount: 1, timestamp, ...extra });
+            await line('h-own-old', holder, 'earned', longAgo);
+            await line('h-own-new', holder, 'earned', now);
+            await line('g-own', gone, 'earned', longAgo);
+            await line('k-h-bare-old', kGhii, 'escrow_hold', longAgo, { counterpartyGaii: holder });
+            await line('k-h-ghii-old', kGhii, 'app_purchase', longAgo, { counterpartyGaii: hGhii });
+            await line('k-h-acted-old', kGhii, 'extension_earn', longAgo, { counterpartyGaii: `bot#${holder}@${node}`, initiatorGaii: `bot#${holder}@${node}` });
+            await line('k-h-new', kGhii, 'earned', now, { counterpartyGaii: holder });
+            await line('k-g', kGhii, 'escrow_hold', longAgo, { counterpartyGaii: gone, trackingCode: tc('g') });
+            await line('k-stray', kGhii, 'app_sale', longAgo, { counterpartyGaii: stray });
+
+            await rerunIdentityMigration(name, storage, { without0085: true });
+
+            // The holder's own rows, not older than the account, moved to its GHII.
+            expect.soft((await storage.getAction(`hold-new-${tag}`, hGhii))?.id, `${name}: the holder's own action did not move`).toBe(`hold-new-${tag}`);
+            expect.soft((await storage.getWork(tc('h-new')))?.requesterGaii, `${name}: the holder's own request did not move`).toBe(hGhii);
+            // The rows older than the account stay exactly as they were.
+            expect.soft((await storage.listActionsByProvider(holder)).map(a => a.id), `${name}: an action older than the holder did not stay`).toEqual([`hold-old-${tag}`]);
+            const hOld = await storage.getWork(tc('h-old'));
+            expect.soft([hOld?.status, hOld?.providerGaii, hOld?.requesterGaii], `${name}: work older than the holder did not stay`).toEqual(['pending', holder, kGhii]);
+            const lines = await linesAsStored(name, storage, `tx-evd-${tag}-`);
+            const of = (k: string) => lines.find(l => l.txId === `tx-evd-${tag}-${k}`);
+            expect.soft(of('h-own-old')?.gaii, `${name}: a line older than the holder, filed under the bare name, moved`).toBe(holder);
+            expect.soft(of('h-own-new')?.gaii, `${name}: the holder's own line filed under the bare name was not filed under its GHII`).toBe(hGhii);
+            expect.soft([of('k-h-bare-old')?.counterpartyGaii, of('k-h-ghii-old')?.counterpartyGaii, of('k-h-acted-old')?.counterpartyGaii, of('k-h-acted-old')?.initiatorGaii],
+                `${name}: a line older than the holder that names it changed`).toEqual([holder, hGhii, `bot#${holder}@${node}`, `bot#${holder}@${node}`]);
+            expect.soft(of('k-h-new')?.counterpartyGaii, `${name}: a line of the holder changed`).toBe(holder);
+            // The work older than the holder stays held, and the deleted account's gives its 5 back.
+            expect.soft((await storage.getGHII(kGhii))?.morselBalance, `${name}: the keeper's balance`).toBe(89);
+            // A name no account holds is a deleted account's.
+            expect.soft(await storage.listActionsByProvider(gone), `${name}: an action whose name no account holds survived`).toEqual([]);
+            const g = await storage.getWork(tc('g'));
+            expect.soft([g?.status, g?.providerGaii], `${name}: open work of a deleted account was not settled`).toEqual(['cancelled', expect.stringMatching(erasedRe)]);
+            expect.soft(of('g-own'), `${name}: a deleted account's own line filed under the bare name survived`).toBeUndefined();
+            expect.soft(of('k-g')?.counterpartyGaii, `${name}: a line naming a deleted account does not take its work's pseudonym`).toBe(g?.providerGaii);
+            // A value nothing ties to a person stays.
+            expect.soft(of('k-stray')?.counterpartyGaii, `${name}: a value nothing ties to a person changed`).toBe(stray);
+
+            // What was left is recorded, with its counts, for the operator.
+            const record = await heldRecord(name, storage);
+            const held = record?.held?.find((h: any) => h.name === holder);
+            expect.soft(held, `${name}: the held name is not recorded with its counts`)
+                .toMatchObject({ holder_ghii: hGhii, actions: 1, work: 1, own_lines: 1, naming_lines: 3 });
+            expect.soft(Date.parse(held?.holder_since), `${name}: the record does not say since when the holder holds the name`).toBe(Date.parse(earlier));
+            expect.soft((record?.held ?? []).some((h: any) => h.name === gone || h.name === keeper), `${name}: a name that was placed is recorded as held`).toBe(false);
+            expect.soft((record?.untied ?? []).find((u: any) => u.value === stray), `${name}: the value nothing ties to a person is not recorded`).toEqual({ value: stray, lines: 1 });
+            if (name !== 'sqlite') {
+                const r = await pgPool(storage).query('SELECT superseded_by FROM "_kysely_migrations" WHERE name = $1', [IDENTITY_MIGRATION])
+                    .catch((err: Error) => ({ rows: [{ superseded_by: err.message }] }));
+                expect.soft(r.rows[0]?.superseded_by, `${name}: 0085 is not recorded as superseded by 0086`).toBe(FULL_IDENTITY_MIGRATION);
+            }
+
+            for (const n of [holder, keeper]) await storage.deleteOwner(n);
+            await forgetHeldRecord(name, storage);
+        }
+    }, 60_000);
+
+    // A database where 0085 ran in its first version keeps what that version did: a deleted account's
+    // work under a pseudonym, and the lines in other people's ledgers still naming the account. 0086
+    // brings it to the end state as far as the data allows: a line takes the pseudonym the work it is
+    // about already carries, found by its tracking code, and the other lines naming the same account
+    // take the same one. A pseudonym already written stays. A second run changes nothing.
+    it('0086 gives the lines of a database where 0085 ran the pseudonym their work carries, and a second run changes nothing', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const longAgo = new Date(Date.now() - 48 * 3_600_000).toISOString();
+            const ages = new Date(Date.now() - 72 * 3_600_000).toISOString();
+            const keeper = `conf85k${tag}`, dave = `conf85d${tag}`, erin = `conf85e${tag}`;
+            const kGhii = await seedAccount(storage, keeper, node, ages);
+            const P1 = `erased:${'1'.repeat(24)}`, P0 = `erased:${'0'.repeat(24)}`;
+            const tc = `tc-85-d-${tag}`;
+            // What 0085 left: dave's work under its pseudonym, and the lines that still name dave.
+            await storage.createWork(workRow(tc, P1, kGhii, 'cancelled', { createdAt: longAgo, updatedAt: longAgo }));
+            const line = (k: string, type: string, extra: { counterpartyGaii?: string; initiatorGaii?: string; trackingCode?: string }) =>
+                insertLineAsStored(name, storage, { txId: `tx-85-${tag}-${k}`, gaii: kGhii, type, amount: 1, timestamp: longAgo, ...extra });
+            await line('bare', 'escrow_hold', { counterpartyGaii: dave, trackingCode: tc });
+            await line('ghii', 'app_purchase', { counterpartyGaii: `${dave}@${node}` });
+            await line('acted', 'extension_earn', { counterpartyGaii: `bot#${dave}@${node}`, initiatorGaii: `bot#${dave}@${node}` });
+            await line('kept', 'escrow_return', { counterpartyGaii: P0, trackingCode: tc });
+            await line('erin', 'app_sale', { counterpartyGaii: `${erin}@${node}` });
+
+            await rerunIdentityMigration(name, storage);
+            const first = await linesAsStored(name, storage, `tx-85-${tag}-`);
+            const of = (k: string) => first.find(l => l.txId === `tx-85-${tag}-${k}`);
+            expect.soft([of('bare')?.counterpartyGaii, of('ghii')?.counterpartyGaii, of('acted')?.counterpartyGaii, of('acted')?.initiatorGaii],
+                `${name}: the lines naming the deleted account do not take the pseudonym its work carries`).toEqual([P1, P1, P1, P1]);
+            expect.soft(of('kept')?.counterpartyGaii, `${name}: a pseudonym already written changed`).toBe(P0);
+            expect.soft(of('erin')?.counterpartyGaii, `${name}: an account deleted with no work still names it`).toMatch(erasedRe);
+            expect.soft(of('erin')?.counterpartyGaii === P1, `${name}: two deleted accounts got one pseudonym`).toBe(false);
+
+            await rerunIdentityMigration(name, storage);
+            expect.soft(await linesAsStored(name, storage, `tx-85-${tag}-`), `${name}: a second run changed the lines`).toEqual(first);
+
+            await storage.deleteOwner(keeper);
+            await forgetHeldRecord(name, storage);
+        }
+    }, 60_000);
+
+    // The move runs once for each database. SQLite writes its record in the same transaction as the
+    // move, and a later start reads it and changes nothing; Postgres applies the file once.
+    it('the move to the full identity runs once for each database', async () => {
+        for (const { name, storage } of provs) {
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            await rerunIdentityMigration(name, storage);
+            const ran = await fullIdentityRan(name, storage);
+            expect.soft(ran, `${name}: the move did not record that it ran`).toBeTruthy();
+            // A row the move would settle, written after it ran: a later start leaves it.
+            const late = `conflate${tag}`;
+            await publishAction(storage, `late-${tag}`, late, new Date().toISOString());
+            if (name === 'sqlite') await reopenSqlite(); else await runMigrations(pgPool(storage));
+            expect.soft((await storage.listActionsByProvider(late)).map(a => a.id), `${name}: a later start ran the move again`).toEqual([`late-${tag}`]);
+            expect.soft(await fullIdentityRan(name, storage), `${name}: a later start rewrote the record`).toBe(ran);
+            await storage.deleteAction(`late-${tag}`, late);
+            await forgetHeldRecord(name, storage);
+        }
+    }, 60_000);
+
+    // What the move left opens ONE incident on the Security page: each name with its counts and the
+    // hook bindings that name its actions, and every other binding that names nothing now, a gate
+    // among them saying it lets everything pass. The operator decides each name. "It is the holder's"
+    // moves the rows, the person's own ledger lines and the bindings to the holder's GHII. "It was a
+    // previous holder's" settles the rows as a deletion settles them. The incident stays open until
+    // every name is decided, and closes with the last one.
+    it('the names the move left open one incident with their bindings, and each decision acts on the rows', async () => {
+        const erasedRe = /^erased:[0-9a-f]{24}$/;
+        const { openHeldNamesIncident, resolveHeldName } = await import('../../src/services/held-account-names.js');
+        const { findSecurityIncident, resolveSecurityIncident, deleteSecurityIncident } = await import('../../src/services/security-incident.js');
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const hour = 3_600_000;
+            const earlier = new Date(Date.now() - hour).toISOString();
+            const longAgo = new Date(Date.now() - 48 * hour).toISOString();
+            const ages = new Date(Date.now() - 72 * hour).toISOString();
+            const A = `confia${tag}`, B = `confib${tag}`, keeper = `confik${tag}`, gone = `config${tag}`;
+            const aGhii = await seedAccount(storage, A, node, earlier);
+            await seedAccount(storage, B, node, earlier);
+            const kGhii = await seedAccount(storage, keeper, node, ages);
+            const tc = (k: string) => `tc-inc-${k}-${tag}`;
+            await publishAction(storage, `act-a-${tag}`, A, longAgo);
+            await publishAction(storage, `act-b-${tag}`, B, longAgo);
+            await publishAction(storage, `act-g-${tag}`, gone, longAgo);
+            await storage.createWork(workRow(tc('a'), A, kGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
+            await storage.debitBalance(kGhii, 11);
+            await storage.createWork(workRow(tc('b'), B, kGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo, cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }));
+            await storage.debitBalance(kGhii, 5);
+            await storage.createWork(workRow(tc('b-done'), B, kGhii, 'accepted', { createdAt: longAgo, updatedAt: longAgo }));
+            await storage.updateWork(tc('b-done'), { status: 'delivered', output: { answer: 1 }, updatedAt: longAgo });
+            const line = (k: string, gaii: string, type: string, extra: { counterpartyGaii?: string; trackingCode?: string } = {}) =>
+                insertLineAsStored(name, storage, { txId: `tx-inc-${tag}-${k}`, gaii, type, amount: 1, timestamp: longAgo, ...extra });
+            await line('a-own', A, 'earned');
+            await line('b-own', B, 'earned');
+            await line('k-a', kGhii, 'app_purchase', { counterpartyGaii: aGhii });
+            await line('k-b', kGhii, 'escrow_hold', { counterpartyGaii: B, trackingCode: tc('b') });
+            const config = {
+                nodeId: node,
+                extensionHooks: {
+                    pre_work_request: [`act-a-${tag}#${A}`, `act-b-${tag}#${B}`, `act-g-${tag}#${gone}`],
+                    post_work_delivery: [`act-a-${tag}#${A}`],
+                },
+            } as unknown as AimeatConfig;
+
+            await rerunIdentityMigration(name, storage);
+            const opened = await openHeldNamesIncident(config, storage);
+            expect(opened.id, `${name}: no incident opened for the names the move left`).toBeTruthy();
+            const id = opened.id as string;
+            const value = (await findSecurityIncident(storage, config, id))?.value as any;
+            const entry = (n: string) => value?.names?.find((e: any) => e.name === n);
+            expect.soft(entry(A), `${name}: the first name is not listed with its counts`)
+                .toMatchObject({ status: 'open', holder_ghii: aGhii, actions: 1, work: 1, own_lines: 1, naming_lines: 1 });
+            expect.soft(entry(A)?.bindings, `${name}: the first name's bindings are not listed`).toEqual([
+                { hook: 'pre_work_request', ref: `act-a-${tag}#${A}`, gate: true },
+                { hook: 'post_work_delivery', ref: `act-a-${tag}#${A}`, gate: false },
+            ]);
+            expect.soft(entry(B)?.bindings, `${name}: the second name's binding is not listed`).toEqual([{ hook: 'pre_work_request', ref: `act-b-${tag}#${B}`, gate: true }]);
+            expect.soft(value?.bindings_left, `${name}: a binding that names nothing now is not listed as a gate that lets everything pass`)
+                .toContainEqual({ hook: 'pre_work_request', ref: `act-g-${tag}#${gone}`, gate: true });
+            expect.soft((await openHeldNamesIncident(config, storage)).id, `${name}: a second start opened a second incident`).toBeUndefined();
+            expect.soft(await resolveSecurityIncident(storage, config, id), `${name}: the incident closed with names undecided`).toEqual({ ok: false, code: 'CONFLICT' });
+            expect.soft(await deleteSecurityIncident(storage, config, id), `${name}: the incident was deleted with names undecided`).toEqual({ ok: false, code: 'CONFLICT' });
+
+            // A: it is the holder's.
+            const ra = await resolveHeldName(config, storage, { incidentId: id, name: A, resolution: 'holder' });
+            expect.soft(ra.ok, `${name}: deciding for the holder failed: ${JSON.stringify(ra)}`).toBe(true);
+            expect.soft((await storage.getAction(`act-a-${tag}`, aGhii))?.id, `${name}: the action did not move to the holder`).toBe(`act-a-${tag}`);
+            expect.soft((await storage.getWork(tc('a')))?.providerGaii, `${name}: the work did not move to the holder`).toBe(aGhii);
+            const afterA = await linesAsStored(name, storage, `tx-inc-${tag}-`);
+            const ofA = (k: string) => afterA.find(l => l.txId === `tx-inc-${tag}-${k}`);
+            expect.soft(ofA('a-own')?.gaii, `${name}: the holder's own line was not filed under its GHII`).toBe(aGhii);
+            expect.soft(ofA('k-a')?.counterpartyGaii, `${name}: a line naming the holder changed`).toBe(aGhii);
+            expect.soft(config.extensionHooks.pre_work_request, `${name}: the gate's binding did not follow the action`)
+                .toEqual([`act-a-${tag}#${aGhii}`, `act-b-${tag}#${B}`, `act-g-${tag}#${gone}`]);
+            expect.soft(config.extensionHooks.post_work_delivery, `${name}: the notify binding did not follow the action`).toEqual([`act-a-${tag}#${aGhii}`]);
+            expect.soft((await findSecurityIncident(storage, config, id))?.value, `${name}: the incident closed with a name undecided`).toMatchObject({ status: 'open' });
+
+            // B: it was a previous holder's.
+            const rb = await resolveHeldName(config, storage, { incidentId: id, name: B, resolution: 'previous' });
+            expect.soft(rb.ok, `${name}: deciding for a previous holder failed: ${JSON.stringify(rb)}`).toBe(true);
+            expect.soft(await storage.listActionsByProvider(B), `${name}: the previous holder's action survived`).toEqual([]);
+            const b = await storage.getWork(tc('b')), bDone = await storage.getWork(tc('b-done'));
+            expect.soft([b?.status, b?.providerGaii], `${name}: the previous holder's open work was not settled`).toEqual(['cancelled', expect.stringMatching(erasedRe)]);
+            expect.soft([bDone?.status, bDone?.providerGaii], `${name}: the previous holder's finished work was not kept under the pseudonym`).toEqual(['delivered', b?.providerGaii]);
+            // 100, less the 11 and 5 held, plus the 5 held for the previous holder's open work.
+            expect.soft((await storage.getGHII(kGhii))?.morselBalance, `${name}: what was held for the previous holder's work did not come back`).toBe(89);
+            const afterB = await linesAsStored(name, storage, `tx-inc-${tag}-`);
+            const ofB = (k: string) => afterB.find(l => l.txId === `tx-inc-${tag}-${k}`);
+            expect.soft(ofB('b-own'), `${name}: the previous holder's own line survived`).toBeUndefined();
+            expect.soft(ofB('k-b')?.counterpartyGaii, `${name}: a line naming the previous holder does not take the pseudonym`).toBe(b?.providerGaii);
+            expect.soft(config.extensionHooks.pre_work_request, `${name}: the binding to the previous holder's action changed`)
+                .toEqual([`act-a-${tag}#${aGhii}`, `act-b-${tag}#${B}`, `act-g-${tag}#${gone}`]);
+            const closed = (await findSecurityIncident(storage, config, id))?.value as any;
+            expect.soft([closed?.status, closed?.names?.map((e: any) => `${e.name}:${e.status}`)], `${name}: the incident did not close with the last name`)
+                .toEqual(['resolved', [`${A}:holder`, `${B}:previous`]]);
+            expect.soft(await resolveHeldName(config, storage, { incidentId: id, name: A, resolution: 'previous' }), `${name}: a decided name was decided again the other way`)
+                .toMatchObject({ ok: false, code: 'CONFLICT' });
+
+            await deleteSecurityIncident(storage, config, id);
+            for (const hook of ['pre_work_request', 'post_work_delivery']) await storage.deleteConfigValue(`hooks.${hook}`);
+            for (const n of [A, B, keeper]) await storage.deleteOwner(n);
+            await forgetHeldRecord(name, storage);
         }
     }, 60_000);
 

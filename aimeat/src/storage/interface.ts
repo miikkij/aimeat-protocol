@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   v1.7.0 — 2026-09-26 — HeldAccountNameRepository joins the Storage composite: the record of what
+ *     the move to the full identity left for the operator, and the operator's decision on one name.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Moved record/type declarations into ./types/* and re-exported them
  *     (max-file-lines); Storage interface + repository wiring stay here
@@ -51,6 +53,7 @@ export * from './types/usage.js';
 export * from './types/account-events.js';
 export * from './types/workspace-rows.js';
 export * from './types/sso.js';
+export * from './types/held-names.js';
 
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
@@ -125,6 +128,7 @@ import type { OutboundRepository } from './repositories/outbound.repository.js';
 import type { CompanyRepository } from './repositories/company.repository.js';
 import type { SsoConnectionRepository } from './repositories/sso-connection.repository.js';
 import type { McpServerRepository } from './repositories/mcp-server.repository.js';
+import type { HeldAccountNameRepository } from './repositories/held-names.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository,
@@ -167,6 +171,7 @@ export interface Storage extends
   CompanyRepository,
   SsoConnectionRepository,
   McpServerRepository,
+  HeldAccountNameRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

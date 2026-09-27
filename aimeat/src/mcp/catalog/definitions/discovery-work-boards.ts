@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.8.0 — 2026-09-26 — aimeat_admin_incident_resolve takes `name` and `resolution`, to decide one
+ *     name of the incident the move to the full identity opens at start.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.7.3 — 2026-09-26 — aimeat_action_execute and aimeat_work_inbox say a provider or a requester
  *     can be a person: an action a person publishes is listed under their GHII.
@@ -361,11 +363,13 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_incident_resolve',
-        description: 'Operator-only. Mark a refused-and-kept security incident resolved; the quarantined bytes stay until the incident is deleted. Read aimeat_admin_security_overview first to see the incidents and their ids. Returns NOT_FOUND for an unknown id and an operator-role error for non-operators.',
+        description: 'Operator-only. Mark a security incident resolved; the quarantined bytes stay until the incident is deleted. Read aimeat_admin_security_overview first to see the incidents and their ids. The incident the move to the full identity opens at start (type held_account_names) lists account names whose rows are older than the account that holds the name now, left as they were: decide each with `name` and `resolution` — "holder" moves its rows, its own ledger lines and the hook bindings to its actions to that account\'s full identity; "previous" settles them as a deleted account\'s (actions deleted, open work cancelled with what was held going back only to an account that existed when it was written, finished work and ledger lines under one pseudonym). That incident closes with its last name, and closing it before answers CONFLICT. Returns NOT_FOUND for an unknown id or name, CONFLICT for a name decided the other way, and an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
             id: { type: 'string', required: true, description: 'The incident id, from the overview\'s incidents list.' },
+            name: { type: 'string', description: 'To decide one name of an incident the move to the full identity opened: the account name, from the incident\'s names.' },
+            resolution: { type: 'string', description: 'With `name`: "holder" (its rows are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).' },
         },
     },
     {
