@@ -2,12 +2,23 @@
  * @file openrouter.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Provider-agnostic AI client for OpenAI-compatible APIs (OpenRouter, LM Studio, etc.).
+ * @description The node's own HTTP transport to OpenAI-compatible providers (OpenRouter, LM Studio,
+ *   a custom address), for what the AI SDK packages do not carry: image generation with the
+ *   moderation retry, multipart transcription, speech, the raw chat request the proxy forwards, and
+ *   the model listings. Text completions go through the gateway (services/ai/gateway.ts) since
+ *   2026-09-28. Every function here reaches the network through safeFetch.
  * @structure
- *   - complete(apiKey, model, prompt, systemPrompt?, baseUrl?) — call chat completions
+ *   - generateImage(apiKey, model, prompt, baseUrl?, opts?) — POST /images/generations
  *   - transcribe(apiKey, model, audio, baseUrl?, opts?) — call audio transcriptions (STT)
+ *   - chatCompletionRaw / speechRaw / generationCost — the proxy's and the voice stream's transport
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
  * @version-history
+ *   v4.0.0 — 2026-09-28 — complete() is gone: text completions run through the System 2 gateway on
+ *     the AI SDK (services/ai/gateway.ts), which keeps its empty-answer retry, its reasoning
+ *     pass-through and its finish reason. generateImage() and listModels() reach the provider
+ *     through safeFetch like everything else here: they were the last two plain `fetch` calls to an
+ *     address an owner chose, which on a public node reached loopback. generateImage() takes a
+ *     cancel signal, combined with its own timeout.
  *   v3.2.0 — 2026-09-09 — An empty answer is a failed call, not an answer. complete() retries it
  *     (`retries`, default 2; on OpenRouter a retry usually lands on a different provider) and then
  *     throws with the finish_reason, where it had returned '' with a warning nobody's caller read: a
@@ -48,28 +59,6 @@
  */
 import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
-
-export interface OpenRouterCompletionResult {
-  content: string;
-  model: string;
-  /** The provider's own reason for stopping (`stop`, `length`, ...), when it said one. */
-  finish_reason?: string;
-  /**
-   * Token + cost usage as reported by the provider. May be partial:
-   *  - OpenRouter returns prompt/completion tokens reliably, and `cost` when
-   *    the request asked for it.
-   *  - LM Studio / custom OpenAI-compatible providers usually report tokens
-   *    but no cost.
-   * Callers treating cost as load-bearing should fall back to a per-token
-   * estimate when `cost_usd` is undefined.
-   */
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-    cost_usd?: number;
-  };
-}
 
 export interface OpenRouterModel {
   id: string;
@@ -112,20 +101,22 @@ export async function generateImage(
   model: string,
   prompt: string,
   baseUrl: string = OPENROUTER_BASE,
-  opts?: { size?: string },
+  opts?: { size?: string; signal?: AbortSignal },
 ): Promise<ImageGenerationResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  // The caller's reason to stop, combined with the timeout rather than replacing it.
+  const signal = opts?.signal ? AbortSignal.any([controller.signal, opts.signal]) : controller.signal;
   logger.info(`[openrouter] image: model=${model}, size=${opts?.size ?? 'default'}`);
 
   try {
     let lastErr: (Error & { status?: number }) | null = null;
     for (let attempt = 1; attempt <= IMAGE_MODERATION_ATTEMPTS; attempt++) {
-      const resp = await fetch(`${baseUrl}/images/generations`, {
+      const resp = await safeFetch(`${baseUrl}/images/generations`, {
         method: 'POST',
         headers: { ...providerHeaders(apiKey, baseUrl), 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, prompt, ...(opts?.size ? { size: opts.size } : {}), usage: { include: true } }),
-        signal: controller.signal,
+        signal,
       });
 
       if (!resp.ok) {
@@ -236,8 +227,8 @@ const STT_TIMEOUT_MS = 120_000;
 /** Auth + the OpenRouter-only attribution headers (which a non-OpenRouter endpoint has no use for). */
 /**
  * The headers every outbound call to the provider carries. Exported because the chat proxy sends the
- * request itself rather than through complete(), and two places building these by hand is how the
- * attribution headers end up on one door and not the other.
+ * request itself rather than through the gateway, and two places building these by hand is how the
+ * attribution headers end up on one route and not the other.
  */
 export function providerHeaders(apiKey: string | undefined, baseUrl: string): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -250,9 +241,6 @@ export function providerHeaders(apiKey: string | undefined, baseUrl: string): Re
 }
 
 /**
- * Call an OpenAI-compatible chat completions API.
- */
-/**
  * OpenRouter's unified reasoning parameter, sent to the provider exactly as given. `enabled: false`
  * turns a reasoning model's hidden thinking off; `effort` sizes it; `max_tokens` caps it; `exclude`
  * keeps it out of the response. Nothing is sent when the caller sets nothing.
@@ -264,19 +252,11 @@ export interface CompletionReasoning {
   exclude?: boolean;
 }
 
-/** How many times an empty answer is asked again before it is an error, when nobody said. */
-export const DEFAULT_EMPTY_RETRIES = 2;
-/** The ceiling, the same one the owner's maxRetries setting has always had. */
-const MAX_EMPTY_RETRIES = 10;
-
-/** The error `complete()` throws when every attempt came back without content. */
-export interface EmptyCompletionError extends Error {
-  status: number;
-  empty: true;
-  finish_reason: string;
-  attempts: number;
-}
-
+/**
+ * The knobs of one text completion, in the provider's own spelling. The gateway
+ * (services/ai/gateway.ts) sends them since 2026-09-28; the type stays here because the notebook
+ * passes it through unchanged.
+ */
 export interface CompletionOptions {
   temperature?: number;
   top_p?: number;
@@ -285,146 +265,19 @@ export interface CompletionOptions {
   presence_penalty?: number;
   reasoning?: CompletionReasoning;
   /**
-   * How many times an answer with no content is asked again before `complete()` throws. Default
-   * DEFAULT_EMPTY_RETRIES; 0 asks once. An empty answer at HTTP 200 is what a reasoning model
-   * produces when its cap runs out mid-thought, and what a few providers produce for no reason
-   * anyone has found; on OpenRouter the next attempt usually lands on a different provider.
+   * How many times an answer with no content is asked again before the gateway fails the call.
+   * Default 2 (DEFAULT_EMPTY_RETRIES in services/ai/gateway.ts); 0 asks once. An empty answer at
+   * HTTP 200 is what a reasoning model produces when its cap runs out mid-thought, and what a few
+   * providers produce for no reason anyone has found; on OpenRouter the next attempt usually lands
+   * on a different provider.
    */
   retries?: number;
   /**
-   * An outside reason to stop waiting — a cancelled AI job, so far. It is COMBINED with this
-   * function's own timeout rather than replacing it: a caller that can cancel still gets the
-   * timeout, and a caller that cannot is unchanged. `chatCompletionRaw` below has taken a signal
-   * since it was written, so this is the pattern arriving on the other door rather than a new one.
+   * An outside reason to stop waiting — a cancelled AI job, so far. It is COMBINED with the call's
+   * own timeout rather than replacing it: a caller that can cancel still gets the timeout, and a
+   * caller that cannot is unchanged.
    */
   signal?: AbortSignal;
-}
-
-/** A user-message content part for OpenAI-compatible multimodal (vision) requests. */
-type ContentPart =
-  | { type: 'text'; text: string }
-  | { type: 'image_url'; image_url: { url: string } };
-
-export async function complete(
-  apiKey: string | undefined,
-  model: string,
-  prompt: string,
-  systemPrompt?: string,
-  baseUrl: string = OPENROUTER_BASE,
-  options?: CompletionOptions,
-  images?: string[],
-): Promise<OpenRouterCompletionResult> {
-  const messages: Array<{ role: string; content: string | ContentPart[] }> = [];
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-  // With image attachments, send the user turn as a multimodal content array (text + image_url
-  // parts). Without, keep the plain-string form so text-only callers are byte-for-byte unchanged.
-  if (Array.isArray(images) && images.length > 0) {
-    const parts: ContentPart[] = [{ type: 'text', text: prompt }];
-    for (const url of images) {
-      if (typeof url === 'string' && url) parts.push({ type: 'image_url', image_url: { url } });
-    }
-    messages.push({ role: 'user', content: parts });
-  } else {
-    messages.push({ role: 'user', content: prompt });
-  }
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...providerHeaders(apiKey, baseUrl) };
-
-  const requestBody: Record<string, unknown> = { model, messages };
-  if (options?.temperature !== undefined) requestBody.temperature = options.temperature;
-  if (options?.top_p !== undefined) requestBody.top_p = options.top_p;
-  if (options?.max_tokens !== undefined) requestBody.max_tokens = options.max_tokens;
-  if (options?.frequency_penalty !== undefined) requestBody.frequency_penalty = options.frequency_penalty;
-  if (options?.presence_penalty !== undefined) requestBody.presence_penalty = options.presence_penalty;
-  if (options?.reasoning !== undefined) requestBody.reasoning = options.reasoning;
-  const bodyStr = JSON.stringify(requestBody);
-  logger.info(`[openrouter] Sending: model=${model}, temp=${requestBody.temperature ?? 'default'}, top_p=${requestBody.top_p ?? 'default'}, max_tokens=${requestBody.max_tokens ?? 'default'}, reasoning=${requestBody.reasoning ? JSON.stringify(requestBody.reasoning) : 'default'}, bodyLen=${bodyStr.length}, userMsgLen=${messages[messages.length - 1]?.content?.length || 0}`);
-
-  // One request, one answer. Each attempt carries its own timeout controller; the caller's signal
-  // is composed in below so a cancel ends the retry loop as well as the request it interrupts.
-  const once = async (): Promise<OpenRouterCompletionResult> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    // The timeout and the caller's own reason to stop, combined rather than chosen between. Without
-    // the composition a cancellable caller would silently lose the timeout, which is the guard that
-    // stops a hung provider holding a slot for ever.
-    const signal = options?.signal
-      ? AbortSignal.any([controller.signal, options.signal])
-      : controller.signal;
-    try {
-      const resp = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers,
-        body: bodyStr,
-        signal,
-      });
-
-      if (!resp.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-        const body = await resp.text().catch(() => '');
-        const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
-        err.status = resp.status;
-        throw err;
-      }
-
-      const data = await resp.json() as {
-        choices?: Array<{ message?: { content?: string | null }; finish_reason?: string }>;
-        model?: string;
-        error?: { message?: string; code?: number };
-        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number };
-      };
-
-      logger.info(`[openrouter] Response: status=${resp.status}, model=${data.model}, choices=${data.choices?.length || 0}, finish=${data.choices?.[0]?.finish_reason}, promptTokens=${data.usage?.prompt_tokens}, completionTokens=${data.usage?.completion_tokens}, hasError=${!!data.error}`);
-
-      // Check for error in response body (OpenRouter sometimes returns 200 with error)
-      if (data.error) {
-        // Log the full error so we can diagnose model-specific issues (Owl Alpha
-        // and friends sometimes reject params silently with 200 + error body).
-        logger.warn(`[openrouter] error body: ${JSON.stringify(data.error).slice(0, 500)}`);
-        const errMsg = data.error.message || JSON.stringify(data.error);
-        const err = new Error(`OpenRouter error: ${errMsg}`) as Error & { status: number };
-        err.status = data.error.code || 502;
-        throw err;
-      }
-
-      const content = data.choices?.[0]?.message?.content ?? '';
-      const usage = data.usage ? {
-        prompt_tokens: data.usage.prompt_tokens,
-        completion_tokens: data.usage.completion_tokens,
-        total_tokens: data.usage.total_tokens,
-        cost_usd: typeof data.usage.cost === 'number' ? data.usage.cost : undefined,
-      } : undefined;
-      return { content, model: data.model ?? model, usage, finish_reason: data.choices?.[0]?.finish_reason };
-    } finally {
-      clearTimeout(timeout);
-    }
-  };
-
-  // AN EMPTY ANSWER IS A FAILED CALL. It came back as '' with a console warning until 2026-09-09,
-  // and every caller took it as the answer: a workflow ai step wrote the empty string to its key
-  // and went green, and nothing downstream could tell a blank from a decision to say nothing. A
-  // reasoning model behind a token cap does exactly this (the cap is spent on hidden thinking; the
-  // content field is null; the status is 200), and the same prompt on the next attempt, often on
-  // another provider, answers. So: ask again, a bounded number of times, then fail with the reason.
-  const retries = Math.max(0, Math.min(MAX_EMPTY_RETRIES, Math.floor(options?.retries ?? DEFAULT_EMPTY_RETRIES)));
-  for (let attempt = 1; ; attempt++) {
-    const r = await once();
-    if (r.content.trim()) return r;
-    const finish = r.finish_reason ?? 'unknown';
-    if (attempt <= retries && !options?.signal?.aborted) {
-      logger.warn(`[openrouter] empty content: model=${r.model}, finish_reason=${finish}, attempt ${attempt} of ${retries + 1}; asking again`);
-      continue;
-    }
-    const err = new Error(
-      `OpenRouter returned no content after ${attempt} attempt(s): model=${r.model}, finish_reason=${finish}`
-      + (finish === 'length' ? ' (the token cap ran out before an answer; a reasoning model spends it on hidden thinking — raise the cap or set reasoning.enabled=false)' : ''),
-    ) as EmptyCompletionError;
-    err.status = 502;
-    err.empty = true;
-    err.finish_reason = finish;
-    err.attempts = attempt;
-    throw err;
-  }
 }
 
 /**
@@ -442,8 +295,8 @@ export async function complete(
 /**
  * Send a chat-completion request exactly as given, and hand back the provider's own response.
  *
- * `complete()` above builds the request and parses the answer, which is what a caller wanting a
- * string needs. The chat proxy needs neither: it already has an OpenAI-shaped body from its caller
+ * The gateway (services/ai/gateway.ts) builds the request and parses the answer, which is what a
+ * caller wanting a string needs. The chat proxy needs neither: it already has an OpenAI-shaped body from its caller
  * and it forwards the provider's bytes untouched, streamed frames included. So this returns the raw
  * `Response`.
  *
@@ -578,7 +431,7 @@ export async function listModels(
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
   const qs = modality === 'chat' ? '' : `?output_modalities=${encodeURIComponent(modality)}`;
-  const resp = await fetch(`${baseUrl}/models${qs}`, { headers });
+  const resp = await safeFetch(`${baseUrl}/models${qs}`, { headers });
 
   if (!resp.ok) {
     const err = new Error(`OpenRouter ${resp.status}`) as Error & { status: number };

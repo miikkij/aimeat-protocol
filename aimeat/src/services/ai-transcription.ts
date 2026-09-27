@@ -2,10 +2,10 @@
  * @file ai-transcription.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Speech-to-text for a single owner, using their own encrypted provider key. The
- *   sibling of ai-completion.ts and deliberately its mirror image: same preflight (provider
- *   allowlist, app allowlist, key decrypt, daily budget), same usage record, same typed error. One
- *   call is one transcription; the caller supplies bytes and gets text plus what it actually cost.
+ * @description Speech-to-text for a single owner. It runs the node's one gate: prepareAiCall
+ *   (provider allowlist, app allowlist, model, key, daily budget), the gateway
+ *   (services/ai/gateway.ts), settleAiCall (usage, allowance, provenance). One call is one
+ *   transcription; the caller supplies bytes and gets text plus what it actually cost.
  * @structure
  *   - transcribeForOwner(storage, config, gaii, opts) — runs one transcription
  *   - STT_UNSET_MESSAGE — the one place the "no model chosen" wording lives
@@ -13,6 +13,11 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.0.0 — 2026-09-28 — Through the shared gate (System 2 plan, V1): prepareAiCall with op
+ *     'transcribe', the gateway's transcribeAudio(), settleAiCall. An agent's own key and the
+ *     node's key can pay (the node's only when the operator named a node default transcription
+ *     model), the node's allowance is drawn down, and a transcript gets a provenance record whose
+ *     content hash is the SHA-256 of its text. Refusals, their order and their wording are unchanged.
  *   v1.x — 2026-09-19 — The allowlist and cap checks take the owner, so they match an app under any
  *     of its names (services/ai-app-id.ts).
  *   v1.x — 2026-08-16 — The speech model and the language hint fall back to the node's defaults
@@ -26,18 +31,16 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { transcribe, DEFAULT_BASE_URLS, type ProviderType, type TranscriptionAudio } from './openrouter.js';
-import {
-  AiCompletionError, assertProviderAllowed, assertAppAllowed, decryptOwnerKey,
-  assertWithinBudget, recordAiUsage, todayKey, type UsageRecord,
-} from './ai-completion.js';
+import type { AiProvenanceRecordRow } from '../storage/interface.js';
+import type { TranscriptionAudio } from './openrouter.js';
+import { AiCompletionError, prepareAiCall, settleAiCall, targetOf } from './ai-completion.js';
+import { transcribeAudio } from './ai/gateway.js';
 import { logger } from '../utils/logger.js';
-import { resolveModelFor, resolveSttLanguage } from './ai-model-defaults.js';
+import { resolveSttLanguage } from './ai-model-defaults.js';
 
-/** Shown when the owner has no `sttModel`. Kept here so the route, the message route and the UI copy
- *  all point at the same instruction. */
-export const STT_UNSET_MESSAGE =
-  'No transcription model selected. Choose one in Settings → OpenRouter (for example openai/whisper-large-v3).';
+/** Shown when the owner has no `sttModel`. Lives in services/ai/unset-model.ts since the gate refuses
+ *  it; re-exported so the route, the message route and the UI copy point at the same instruction. */
+export { STT_UNSET_MESSAGE } from './ai/unset-model.js';
 
 export interface TranscribeForOwnerOptions {
   audio: TranscriptionAudio;
@@ -51,6 +54,9 @@ export interface TranscribeForOwnerOptions {
   appId?: string;
   temperature?: number;
   signal?: AbortSignal;
+  /** The owner's agent that asked, by bare name: its own key pays first and its cap applies. The
+   *  caller derives it from the principal (aiPayerOf), never from a request body. */
+  agent?: string;
 }
 
 export interface TranscribeForOwnerResult {
@@ -61,12 +67,12 @@ export interface TranscribeForOwnerResult {
   seconds: number;
   usage: { totalTokens: number; costUsd: number; costExact: boolean };
   budget: { dailyBudgetUsd: number; spentTodayUsd: number; remainingUsd: number };
+  /** The provenance record minted for this transcript (content hash = SHA-256 of the text). Absent
+   *  when provenance is off, minting failed, or the transcript is empty. */
+  provenance?: AiProvenanceRecordRow;
+  /** Which pocket paid: the agent's key, the owner's own, or the node's allowance. */
+  keySource: 'agent' | 'own' | 'node';
 }
-
-const emptyUsage = (): UsageRecord => ({
-  date: todayKey(), total_cost_usd: 0, total_calls: 0, total_tokens: 0,
-  audio_seconds: 0, per_app: {}, updated_at: new Date().toISOString(),
-});
 
 /**
  * Transcribe audio on behalf of an owner.
@@ -97,33 +103,22 @@ export async function transcribeForOwner(
       `Audio is ${(bytes.length / 1048576).toFixed(1)} MB; this node accepts up to ${config.sttMaxMb} MB for transcription.`);
   }
 
-  const [apiKeyRecord, prefsRecord, usageRecord] = await Promise.all([
-    storage.getMemory(gaii, 'openrouter.apikey'),
-    storage.getMemory(gaii, 'openrouter.settings'),
-    storage.getMemory(gaii, `ai-usage.${gaii}.${todayKey()}`),
-  ]);
-  const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
-  const provider = (prefs.provider as ProviderType) || 'openrouter';
-  const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
-
-  assertProviderAllowed(config, baseUrl);
-  assertAppAllowed(prefs, opts.appId, gaii);
-
-  // Owner setting, then the node's default, then a refusal by name. The refusal stays: handing
-  // audio to a chat model turns a clear local error into an opaque provider one.
-  const model = opts.model || resolveModelFor(config, prefs, 'stt');
-  if (!model) throw new AiCompletionError('NO_STT_MODEL', 400, STT_UNSET_MESSAGE);
-
-  const decryptedKey = decryptOwnerKey(config, apiKeyRecord?.value, provider);
-
-  const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
-  const dailyBudget = assertWithinBudget(usage, prefs, opts.appId, gaii);
-
-  const language = opts.language || resolveSttLanguage(config, prefs);
+  // Owner setting, then the node's default, then a refusal by name (the gate words it). The
+  // refusal stays: handing audio to a chat model turns a clear local error into an opaque provider one.
+  const plan = await prepareAiCall(storage, config, gaii, {
+    op: 'transcribe', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
+  });
+  const language = opts.language || resolveSttLanguage(config, plan.prefs);
 
   let result;
   try {
-    result = await transcribe(decryptedKey, model, opts.audio, baseUrl, { language, verbose: opts.verbose, temperature: opts.temperature, signal: opts.signal });
+    result = await transcribeAudio({
+      target: targetOf(plan), model: plan.model, audio: opts.audio,
+      ...(language ? { language } : {}),
+      ...(opts.verbose ? { verbose: true } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(opts.signal ? { signal: opts.signal } : {}),
+    });
   } catch (e) {
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
@@ -141,17 +136,19 @@ export async function transcribeForOwner(
   // audio was. The charge already happened, so this warns rather than throws — refusing to return
   // text the owner has paid for would waste the money twice.
   if (config.sttMaxSeconds > 0 && seconds > config.sttMaxSeconds) {
-    logger.warn(`[stt] gaii=${gaii} transcribed ${seconds}s, over the ${config.sttMaxSeconds}s guideline (model=${model})`);
+    logger.warn(`[stt] gaii=${gaii} transcribed ${seconds}s, over the ${config.sttMaxSeconds}s guideline (model=${plan.model})`);
   }
 
-  const updated = await recordAiUsage(storage, gaii, usage, {
-    costUsd, tokens: totalTok, audioSeconds: seconds, appId: opts.appId,
+  const settled = await settleAiCall(storage, config, gaii, plan, {
     // Speech-to-text is priced per second rather than per token, so the token split is whatever the
     // provider reported and the authoritative number is the cost. Named here anyway so a
     // transcription is not a hole in the per-model report.
-    model: result.model, provider, promptTokens: 0, completionTokens: totalTok,
-    source: 'ai-transcribe',
-  }, config);
+    model: result.model, promptTokens: 0, completionTokens: totalTok, totalTokens: totalTok,
+    costUsd, content: result.text, appId: opts.appId, source: 'ai-transcribe',
+    units: { seconds }, costSource: costExact ? 'provider' : 'none',
+  });
+  const updated = settled.usage;
+  const dailyBudget = plan.dailyBudgetUsd;
 
   logger.info(`[stt] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} seconds=${seconds} chars=${result.text.length} cost=$${costUsd.toFixed(6)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
 
@@ -166,5 +163,7 @@ export async function transcribeForOwner(
       spentTodayUsd: updated.total_cost_usd,
       remainingUsd: Math.max(0, dailyBudget - updated.total_cost_usd),
     },
+    ...(settled.provenance ? { provenance: settled.provenance } : {}),
+    keySource: plan.keyScope,
   };
 }

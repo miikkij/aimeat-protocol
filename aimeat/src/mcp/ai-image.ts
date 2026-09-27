@@ -15,6 +15,8 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The asking agent is named to the service, so its own key pays first and its
+ *     daily cap applies, as on /v1/ai/complete. The owner still pays and stores.
  *   v1.1.0 — 2026-08-28 — The returned url is the service's fetchUrl (anonymous /v1/pub/ for a
  *     public image), not a hand-built /v1/storage/ path that only the owner could open.
  *   v1.0.0 — 2026-08-16 — Initial.
@@ -28,6 +30,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { AiCompletionError } from '../services/ai-completion.js';
+import { aiPayerOf } from '../services/agent-ai-keys.js';
 
 export function registerAiImageTool(
     mcp: McpServer,
@@ -57,10 +60,13 @@ export function registerAiImageTool(
                 return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
             }
             const gaii = scope.ownerGhii;
+            // Who asked, for the agent's own key and cap; the owner above still pays and stores.
+            const { agent } = aiPayerOf(getAgentGaii());
             try {
                 const r = await generateForOwner(storage, config, gaii, {
                     prompt, size, storageKey: storage_key,
                     publicVisibility: isPublic === true, model, appId: app_id,
+                    ...(agent ? { agent } : {}),
                 });
                 const base = config.baseUrl.replace(/\/+$/, '');
                 // The service builds the URL that actually loads for the visibility's audience —

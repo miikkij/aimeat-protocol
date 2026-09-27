@@ -242,9 +242,15 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         }
         const controller = new AbortController();
         res.on('close', () => { if (!res.writableEnded) controller.abort(); });
-        const r = await transcribeForOwner(storage, config, gaii, {
+        // The audio was looked up under the caller above; the call is PAID by the human, in the
+        // agent's name, exactly as /v1/ai/complete does (services/agent-ai-keys.ts).
+        const { payer, agent } = aiPayerOf(gaii);
+        const r = await transcribeForOwner(storage, config, payer, {
           audio, model, language, verbose: !!verbose, appId: voiceAppId(req, app_id), temperature, signal: controller.signal,
+          ...(agent ? { agent } : {}),
         });
+        const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
+        setProvenanceHeaders(res, prov);
         res.json(success(config.nodeId, {
           text: r.text,
           model: r.model,
@@ -260,7 +266,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
             spent_today_usd: r.budget.spentTodayUsd,
             remaining_usd: r.budget.remainingUsd,
           },
-        }));
+        }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
           return res.status(e.status).json(error(config.nodeId, e.code, e.message));
@@ -284,17 +290,24 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       req.setTimeout(300_000);
       res.setTimeout(300_000);
 
-      const gaii = resolve(req);
+      // Paid by the human, in the agent's name, like /v1/ai/complete; the picture lands in the
+      // payer's storage, which is where the MCP tool has always put it.
+      const { payer: gaii, agent } = aiPayerOf(resolve(req));
       const { prompt, model, size, storage_key, public: isPublic, app_id } = req.body as {
         prompt?: string; model?: string; size?: string; storage_key?: string;
         public?: boolean; app_id?: string;
       };
 
       try {
+        // No cancel on a client disconnect: the picture is stored and billed when it arrives, as it
+        // always has been, because a provider may charge for a generation the node stopped reading.
         const r = await generateForOwner(storage, config, gaii, {
           prompt: prompt ?? '', model, size, storageKey: storage_key,
           publicVisibility: isPublic === true, appId: app_id,
+          ...(agent ? { agent } : {}),
         });
+        const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
+        setProvenanceHeaders(res, prov);
         res.json(success(config.nodeId, {
           storage_key: r.storageKey,
           mime_type: r.mime,
@@ -313,7 +326,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           },
         }, [
           { description: 'Download the image', method: 'GET', url: r.fetchUrl },
-        ]));
+        ], envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
           return res.status(e.status).json(error(config.nodeId, e.code, e.message));

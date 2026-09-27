@@ -6,6 +6,8 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.0.2 - 2026-09-28 - The fallback price of a streamed reply is estimateCostUsd() from
+ *     ai-completion.ts, not a copy of its two numbers.
  *   v1.0.1 - 2026-09-19 - The speech pre-check reads the app's spend and cap under any of its names
  *     (services/ai-app-id.ts).
  *   v1.0.0 - 2026-09-19 - Configurable voice transport with cancellation and final accounting.
@@ -13,7 +15,7 @@
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, type AiCallPlan } from './ai-completion.js';
+import { prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, estimateCostUsd, type AiCallPlan } from './ai-completion.js';
 import { chatCompletionRaw, speechRaw, generationCost, listModels } from './openrouter.js';
 import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
@@ -101,8 +103,9 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
     // A disconnected client does not erase what was already generated or paid for.
     if (!prompt) prompt = Math.ceil(options.messages.reduce((n, m) => n + m.content.length, 0) / 4);
     if (!completion) completion = Math.ceil(content.length / 4);
+    // The same fallback price every other text call uses, from one function, not a copy of its numbers.
     result = await settled(storage, config, gaii, plan, options, content,
-      cost ?? (prompt * 0.000005 + completion * 0.000015), { prompt, completion }, 'voice-complete');
+      cost ?? estimateCostUsd(prompt, completion), { prompt, completion }, 'voice-complete');
   }
   await emit({ type: 'done', model: plan.model, finish_reason: finish, truncated: finish === 'length', cost_exact: cost !== undefined, ...result });
 }

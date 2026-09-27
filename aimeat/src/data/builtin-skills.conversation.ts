@@ -34,6 +34,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   v1.2.1 — 2026-09-28 — aimeat-paying-for-the-ai: the node's key pays for a picture or a
+ *     transcript only when the operator named a node default model for it (System 2, V1).
  *   v1.2.0 — 2026-09-28 — aimeat-mail-to-data said the node reads an attached PDF on its own, and no
  *     code path did; it now says to store the attachment with aimeat_mail_read store: true.
  *   v1.1.0 — 2026-09-19 — Four corrections, the first two of which handed the reader something
@@ -420,7 +422,9 @@ stays open underneath with "or say something else", because three options are ne
 `,
     },
     // aimeat-paying-for-the-ai — as published on aimeat.io, sha256 ce6851f02c65…, plus one paragraph
-    // added here on 2026-09-20 (a key for a single agent), which the published copy does not have yet.
+    // added here on 2026-09-20 (a key for a single agent) and one on 2026-09-28 (pictures and
+    // transcripts pay from the node's key only with a node default model), which the published copy
+    // does not have yet.
     {
         name: 'aimeat-paying-for-the-ai',
         visibility: 'public',
@@ -451,6 +455,12 @@ first, a daily cap can sit beside it, and no key is ever shown to the agent: for
 its own calls on the owner's computer, the owner gives the NAME of the environment variable instead.
 Whatever key pays, an agent's call is paid from its OWNER's account: it counts against the owner's
 daily budget and allowance, under the agent's name, and the three steps above are then the owner's.
+
+**Pictures and transcripts follow the same order with one difference.** The node's key pays for an
+image or a transcription only when the operator has named a node default model for it. Without one,
+step 2 does not exist for that operation: the person's own key (or their agent's) pays, and with no
+key the answer is \`NO_API_KEY\`. There is no free model for either, so a spent allowance is a
+refusal (\`QUOTA_EXHAUSTED\`), not a weaker answer.
 
 Step 3 is the one to be honest about. The response carries \`degradedToFreeModel: true\` when it
 happens, and a person whose answers quietly got worse and was never told will conclude the system
