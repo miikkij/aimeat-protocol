@@ -29,13 +29,20 @@
  *   leaf passes as it does when the judge is unavailable. A run with no cap is not touched.
  *
  *   A HOLD BELONGS TO THE CALL, NOT TO THE STEP. The watchdog can move a step on while its call still
- *   runs: time it out, give it a retry, or find its output already there; a cancel can end the whole
- *   run. The call runs on regardless and is paid for. So each call a step starts under a cap is marked
- *   on the step (`openCalls`, one per attempt, with what it holds), and the mark goes only when that
- *   call answers (aiCallAnswered). A retry's call beside one still open holds its own share. The marks
- *   are kept on the run record, and a restart clears them on every run still in flight, because the
- *   calls ended with the process (clearOpenCalls, from engine.ts resumeInflight). On a finished run a
- *   mark changes nothing, since a finished run starts no step.
+ *   runs: time it out or give it a retry; a cancel can end the whole run. The call runs on regardless
+ *   and is paid for. So each call a step starts under a cap is marked on the step (`openCalls`, one per
+ *   attempt, with what it holds), and the mark goes only when that call answers (aiCallAnswered). A
+ *   retry's call beside one still open holds its own share. The marks are kept on the run record, and
+ *   a restart clears them on every run still in flight, because the calls ended with the process
+ *   (clearOpenCalls, from engine.ts resumeInflight). On a finished run a mark changes nothing, since a
+ *   finished run starts no step.
+ *
+ *   EVERY CALL THE ENGINE MAKES FOR A STEP IS MARKED. An ai, extension or datapackage step runs its
+ *   work on the node, and the step's answer writes its output. The call of such a step is marked open
+ *   when it starts (markCallOpen, from engine-steps.ts dispatchStep), holding nothing when the step is
+ *   not an ai step under a cap. While the call of the step's current attempt is open, the watchdog does
+ *   not end the step by its output: only the answer or the timeout ends it (engine.ts sweepRun). A mark
+ *   that holds nothing gives no room back, so a run waiting for room does not wait for it (aiCallOpen).
  *
  *   THE ESTIMATE. The most one attempt of the step cost in the workflow's last COST_HISTORY_RUNS
  *   finished runs that ran it with the same action (`attemptMaxUsd`; for a run saved before steps kept
@@ -55,13 +62,17 @@
  *   estimate, so it never holds a workflow up for good.
  * @structure spendsAi(step) · capUsd(def) · spentUsd(run) · reservedUsd(run) · aiCallOpen(run) ·
  *   recordSignalCost(run, cost) · costCapReached(run) · usd(amount) · pinCostEstimates(def, steps, past)
- *   · admitAiStep(run, stepId) · aiCallAnswered(rs, attempt, costUsd) · clearOpenCalls(run) ·
- *   stopWhenNoRoomComes(run, waitingIds, nowIso)
+ *   · admitAiStep(run, stepId) · markCallOpen(rs) · currentCallOpen(rs) · aiCallAnswered(rs, attempt,
+ *   costUsd) · clearOpenCalls(run) · stopWhenNoRoomComes(run, waitingIds, nowIso)
  * @usage
  *   if (spendsAi(step) && admitAiStep(run, step.id) === 'wait') { waiting.add(step.id); continue; }
  *   // after the pass: if (stopWhenNoRoomComes(run, [...waiting], now)) stopped = true;
  *   // when a call answers: aiCallAnswered(run.steps[stepId], attempt, costUsd);
  * @version-history
+ *   v1.5.0 — 2026-09-26 — Every call of an ai, extension or datapackage step is marked open for its
+ *     attempt (markCallOpen), holding nothing unless it is an ai step's call under a cap; the watchdog
+ *     asks currentCallOpen. aiCallOpen counts only the calls that hold part of the cap, so a run waiting
+ *     for room waits only for an answer that can give room back (secaudit 2026-09, R4).
  *   v1.4.1 — 2026-09-26 — aiCallAnswered says that every answer names its attempt, and that only an ai
  *     step's call under a cap carries a mark (secaudit 2026-09, R3 problem 2).
  *   v1.4.0 — 2026-09-26 — The estimate is what one attempt cost (attemptMaxUsd, else the step's cost
@@ -126,9 +137,12 @@ export function reservedUsd(run: Pick<WorkflowRun, 'steps'>): number {
   return sum;
 }
 
-/** Has the run a model call started and not yet answered? Its answer can give room back. */
+/**
+ * Has the run a model call started, not yet answered, that holds part of the cap? Its answer can give
+ * room back. A call marked open that holds nothing does not count.
+ */
 export function aiCallOpen(run: Pick<WorkflowRun, 'steps'>): boolean {
-  return Object.values(run.steps).some(rs => (rs.openCalls?.length ?? 0) > 0);
+  return Object.values(run.steps).some(rs => (rs.openCalls ?? []).some(call => amount(call.reservedUsd) > 0));
 }
 
 /** Add what one call of the node's `llm` judge cost to the run. Anything that is not an amount is not kept. */
@@ -216,11 +230,26 @@ export function admitAiStep(run: WorkflowRun, stepId: string): 'start' | 'wait' 
 }
 
 /**
- * A model call of the step has answered. What it cost is kept on the step (`costUsd`, and
- * `attemptMaxUsd` when it is the most one attempt has cost), and its mark goes with the hold it
- * carried, whatever became of the step while it ran. `attempt` is the attempt the answer was
- * dispatched for. Only a model call an ai step started under a cap carries a mark, so the answer of
- * any other step changes nothing here. Returns whether the step changed.
+ * The call a step starts now, for its current attempt, is open until it answers. For an ai step
+ * under a cap, admitAiStep has already marked it with its hold; any other call of an ai, extension or
+ * datapackage step is marked here, holding nothing.
+ */
+export function markCallOpen(rs: WorkflowRunStep): void {
+  if (currentCallOpen(rs)) return;
+  rs.openCalls = [...(rs.openCalls ?? []), { attempt: rs.attempt, reservedUsd: 0 }];
+}
+
+/** Is the call of the step's current attempt still open? Then only its answer or the timeout ends the step. */
+export function currentCallOpen(rs: WorkflowRunStep): boolean {
+  return (rs.openCalls ?? []).some(call => call.attempt === rs.attempt);
+}
+
+/**
+ * A call of the step has answered. What it cost is kept on the step (`costUsd`, and `attemptMaxUsd`
+ * when it is the most one attempt has cost), and its mark goes with the hold it carried, whatever
+ * became of the step while it ran. `attempt` is the attempt the answer was dispatched for. Only the
+ * calls of ai, extension and datapackage steps carry a mark, so the answer of an ecosystem step
+ * changes nothing here. Returns whether the step changed.
  */
 export function aiCallAnswered(rs: WorkflowRunStep, attempt: number | undefined, costUsd: unknown): boolean {
   let changed = false;

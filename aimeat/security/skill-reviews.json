@@ -240,7 +240,7 @@
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/lifecycle.ts"
       ],
-      "digest": "sha256:653441700d5468fbea454169"
+      "digest": "sha256:f43b419458734a5ad395cd41"
     },
     "node:configure-routing": {
       "reviewedOn": "2026-09-20",
@@ -270,7 +270,7 @@
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts"
       ],
-      "digest": "sha256:8a7dd66cb4b5683ddbd86e0a"
+      "digest": "sha256:ecebd8bad960e1e891b745ea"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -466,7 +466,7 @@
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
     },
     "node:set-up-content-pipeline": {
-      "aimeat/src/models/workflow-schemas.ts": "689c8903dfca6de9",
+      "aimeat/src/models/workflow-schemas.ts": "4e0c2165819c25dd",
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
@@ -479,8 +479,8 @@
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
     },
     "node:diagnose-a-workflow": {
-      "aimeat/src/models/workflow-schemas.ts": "689c8903dfca6de9",
-      "aimeat/src/mcp/agent-schedules.ts": "79f308cca66be79f",
+      "aimeat/src/models/workflow-schemas.ts": "4e0c2165819c25dd",
+      "aimeat/src/mcp/agent-schedules.ts": "491ce215a8732f44",
       "aimeat/src/services/scheduler.ts": "347f524fd059e4c8"
     },
     "node:aimeat-game-apps": {

@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-26 — dispatchStep marks the call of an ai, extension or datapackage step open
+ *     for its attempt (run-cost.ts markCallOpen), so the watchdog leaves the step to that call's
+ *     answer (secaudit 2026-09, R4).
  *   v1.7.0 — 2026-09-26 — An extension step's write to result_to_key and a datapackage step's publish
  *     are passed to the engine with the answer (ResultWrite, engine-answer.ts), and the engine makes
  *     them only while the step still waits for an answer (secaudit 2026-09, R4).
@@ -69,7 +72,7 @@ import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
 import { templateInput, runPaged, runForEach, mapColumns, atPath } from './engine-step-rows.js';
 import { reportOutcome, type ResultWrite } from './engine-answer.js';
-import { usd } from './run-cost.js';
+import { usd, markCallOpen } from './run-cost.js';
 import { dispatchAiStep } from './engine-ai-step.js';
 import { dispatchInspector } from './engine-inspector.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
@@ -104,6 +107,10 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
   // earlier attempt from the answer of the attempt that runs now, after the watchdog gave a retry.
   const attempt = run.steps[step.id]?.attempt ?? 0;
   const onAnswer: OnPushTerminal = (o, w, rid, s, ok, cost, call, write) => onPushTerminal(o, w, rid, s, ok, cost, call ?? attempt, write);
+  // The work of an ai, extension or datapackage step runs here, and its answer writes the step's
+  // output. Its call is open until that answer comes: the watchdog leaves the step to it (engine.ts).
+  const kind = step.action?.kind;
+  if ((kind === 'ai' || kind === 'extension' || kind === 'datapackage') && run.steps[step.id]) markCallOpen(run.steps[step.id]);
   // An extension step runs HERE, on this node, in the QuickJS sandbox — no agent to reach, no
   // tunnel to cross, no model. Completion arrives through the same onPushTerminal path as an
   // ecosystem step, so its success_signal decides green or red the same way.

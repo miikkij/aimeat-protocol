@@ -7,6 +7,9 @@
  *   and what the run says when it stops. The whole road, with the cost coming from a provider, is
  *   test/e2e-workflows.ts.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — A call of an ai, extension or datapackage step is marked open for its
+ *     attempt; a mark that holds nothing gives no room back, so the run does not wait for it
+ *     (secaudit 2026-09, R4).
  *   v1.4.0 — 2026-09-26 — The estimate is what one attempt cost, and a step expected to cost more than
  *     the whole cap starts once, alone, while the run has spent less than the cap (A6-11).
  *   v1.3.0 — 2026-09-26 — A hold belongs to the model call (A6-11): it counts while the call is open,
@@ -24,6 +27,7 @@ import { describe, it, expect } from 'vitest';
 import {
     spentUsd, spendsAi, usd, recordSignalCost, costCapReached, capUsd, reservedUsd, admitAiStep,
     stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls, COST_HISTORY_RUNS,
+    markCallOpen, currentCallOpen,
 } from '../../src/services/workflow/run-cost.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../src/models/workflow-schemas.js';
 
@@ -289,6 +293,24 @@ describe('what an ai step holds while it runs', () => {
         expect(reservedUsd(r)).toBe(0);
         expect(r.steps.a.state).toBe('dispatched');
         expect(clearOpenCalls(r)).toBe(false);
+    });
+
+    it('a call that holds nothing is marked open for its attempt, and it gives no room back, so the run does not wait for it', () => {
+        // An extension step's call, or an ai step's call with no cap: marked, holding nothing.
+        const rs = step('dispatched', undefined, { attempt: 1 });
+        markCallOpen(rs);
+        markCallOpen(rs);
+        expect(rs.openCalls).toEqual([{ attempt: 1, reservedUsd: 0 }]);
+        expect(currentCallOpen(rs)).toBe(true);
+        expect(aiCallOpen({ steps: { a: rs } })).toBe(false);
+        // A capped ai step's call keeps the one mark admitAiStep gave it, with its hold.
+        const held = step('dispatched', undefined, holding(0.02));
+        markCallOpen(held);
+        expect(held.openCalls).toEqual([{ attempt: 0, reservedUsd: 0.02 }]);
+        expect(aiCallOpen({ steps: { a: held } })).toBe(true);
+        // The answer of the attempt takes the mark away.
+        aiCallAnswered(rs, 1, undefined);
+        expect(currentCallOpen(rs)).toBe(false);
     });
 });
 

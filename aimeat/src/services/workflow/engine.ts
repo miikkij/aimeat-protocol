@@ -100,6 +100,10 @@
  *   v1.18.0 — 2026-09-26 — When the engine fails while onPushTerminal takes an answer in, the answer's
  *     cost and the release of its hold are saved on their own from the run as last saved, and the
  *     error goes on to the caller (engine-answer.ts settleAnswer; secaudit 2026-09, R4).
+ *   v1.19.0 — 2026-09-26 — While the call of an ai, extension or datapackage step's current attempt is
+ *     open, the watchdog does not end the step by its output: only the answer or the timeout ends it.
+ *     With no such call open, after a restart or an engine error, it ends the step by its output or
+ *     its timeout as before (secaudit 2026-09, R4).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -125,6 +129,7 @@ import { writeResult, settleAnswer, type ResultWrite } from './engine-answer.js'
 import { validateHumanAnswer, applyHumanAnswer, sweepHumanStep } from './engine-human.js';
 import {
   spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls,
+  currentCallOpen,
 } from './run-cost.js';
 import { refuseTriggerStart, clearRefusal } from './trigger-authority.js';
 import type {
@@ -511,7 +516,9 @@ export class WorkflowEngine {
         const increased = recordProgress(rs, output.observed);
         if (increased) changed = true;
 
-        if (output.ok) {
+        // While the call of the step's current attempt is open (an ai, extension or datapackage step),
+        // the output belongs to that call's answer: only the answer or the timeout below ends the step.
+        if (output.ok && !currentCallOpen(rs)) {
           // Recovered: the deliverable is present. Green retroactively; tick un-blocks dependents so a
           // slow edition's downstream (features/editorial) runs instead of being skipped.
           rs.state = 'green'; rs.endedAt = nowIso; rs.outputObserved = output.observed;
