@@ -5,6 +5,8 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.3.0 -- 2026-09-27 -- Authenticate session close after K01 bound every request to its caller.
+ *     The old lifecycle test's setup changes; its close and closed-session assertions stay intact.
  *   v1.2.0 -- 2026-09-26 -- Test 13: a re-spelled copy of the revoked access token (the signature's
  *     unread last bits changed) works before the revocation and is refused after it, on MCP and on
  *     REST (secaudit 2026-09, N4).
@@ -853,6 +855,7 @@ await test('31. Close MCP session', async () => {
     const res = await fetch(`${BASE}/v1/mcp`, {
         method: 'DELETE',
         headers: {
+            Authorization: `Bearer ${mcpToken}`,
             'mcp-session-id': sessionId,
             'mcp-protocol-version': '2025-03-26',
         },

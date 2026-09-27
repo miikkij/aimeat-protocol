@@ -12,6 +12,8 @@
  *   and a signed-in one must read the same thing.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ui-components
  * @version-history
+ *   v1.2.0 -- 2026-09-27 -- The chip is active after its adoption. Check status filters against the
+ *     complete catalogue, including a non-empty active result (September full-run UI finding).
  *   v1.1.0 — 2026-09-23 — The design lab's preview page is served as the app (phase 2).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
@@ -87,8 +89,13 @@ await test('kind, status and q narrow the list', async () => {
     const shapes = (await json('/v1/ui/components?kind=shape')).body.data.components;
     assert(shapes.length > 0 && shapes.every((c: any) => c.kind === 'shape' && c.module === null), 'only shapes, none with a module');
     const unused = (await json('/v1/ui/components?status=unused')).body.data.components;
-    assert(unused.some((c: any) => c.id === 'chip'), 'the chip, kept for the design lab\'s decision, is listed as unused');
+    const ids = (rows: any[]) => rows.map(c => c.id).sort();
+    assert(JSON.stringify(ids(unused)) === JSON.stringify(ids(listed.filter(c => c.status === 'unused'))), 'unused returns exactly the unused catalogue entries');
+    assert(!unused.some((c: any) => c.id === 'chip'), 'the active chip is absent from unused results');
     assert(unused.every((c: any) => c.status === 'unused' && c.pages.length === 0), 'unused parts name no page');
+    const active = (await json('/v1/ui/components?status=active')).body.data.components;
+    assert(active.length > 0 && active.some((c: any) => c.id === 'chip'), 'active returns the chip now used by the interface');
+    assert(JSON.stringify(ids(active)) === JSON.stringify(ids(listed.filter(c => c.status === 'active'))), 'active returns exactly the active catalogue entries');
     const found = (await json('/v1/ui/components?q=' + encodeURIComponent('tool call'))).body.data.components;
     assert(found.some((c: any) => c.id === 'work-log'), `q finds the work log: ${found.map((c: any) => c.id)}`);
 });

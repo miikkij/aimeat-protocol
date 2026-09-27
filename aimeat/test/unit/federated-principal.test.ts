@@ -15,6 +15,9 @@
  *   owner: no owner role, and a name (its home GHII) that no local account can have.
  * @usage cd aimeat && pnpm exec vitest run test/unit/federated-principal.test.ts
  * @version-history
+ *   v1.3.0 — 2026-09-26 — runAsNode: in a process that serves two nodes, a request is answered for
+ *     the node that serves it, through what it awaits, and code outside a request for the node
+ *     registered at boot.
  *   v1.2.0 — 2026-09-26 — localAccountOf: an account of this node, or none (secaudit 2026-09, F-1 as a
  *     class).
  *   v1.1.0 — 2026-09-26 — localAccountName: this node's identities, another node's, and a visitor
@@ -33,7 +36,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 import { initNodeKeys, issueJWT, verifyJWT, type VerifiedToken } from '../../src/auth/jwt.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { isOwnerPrincipal, requireRole, requireScope } from '../../src/auth/middleware.js';
-import { homeIdentityOf, isForeignPrincipal, localAccountName, localAccountOf, resolveIdentity, setThisNodeId } from '../../src/utils/gaii.js';
+import { homeIdentityOf, isForeignPrincipal, localAccountName, localAccountOf, resolveIdentity, runAsNode, setThisNodeId } from '../../src/utils/gaii.js';
 
 const NODE = 'aimeat-local-001-dev';
 const HOME = 'aimeat-peer-home-001';
@@ -189,5 +192,44 @@ describe('localAccountOf', () => {
         expect(localAccountOf(`bot#alice@${HOME}`)).toBeNull();
         expect(localAccountOf(`alice@${HOME}@${NODE}`)).toBeNull();
         expect(localAccountOf('')).toBeNull();
+    });
+});
+
+// The multi-node E2E suites (federation-messages, federation-multinode, federation-support) boot two or
+// three nodes in one process, and the node registered at boot is the one that booted last. A message that reaches the
+// other node names its own owner, `alice@${NODE}`, and that owner must be found; an identity of the
+// node that booted last is another node's there, and must stay whole.
+describe('a process that serves two nodes', () => {
+    beforeAll(() => setThisNodeId(HOME)); // HOME booted last
+    afterAll(() => setThisNodeId(null));
+
+    it('cuts the identities of the node that serves the request', () => {
+        runAsNode(NODE, () => {
+            expect(localAccountName(`alice@${NODE}`)).toBe('alice');
+            expect(localAccountName(`bot#alice@${NODE}`)).toBe('alice');
+            expect(localAccountOf(`alice@${NODE}`)).toBe('alice');
+        });
+    });
+
+    it('keeps the identities of the node that booted last whole in that request', () => {
+        runAsNode(NODE, () => {
+            expect(localAccountName(`alice@${HOME}`)).toBe(`alice@${HOME}`);
+            expect(localAccountOf(`alice@${HOME}`)).toBeNull();
+            expect(localAccountOf(`bot#alice@${HOME}`)).toBeNull();
+        });
+    });
+
+    it('keeps the serving node through what the request awaits and schedules', async () => {
+        const later = await runAsNode(NODE, async () => {
+            await new Promise((r) => setTimeout(r, 5));
+            return new Promise<string>((r) => setImmediate(() => r(localAccountName(`alice@${NODE}`))));
+        });
+        expect(later).toBe('alice');
+    });
+
+    it('answers for the node registered at boot outside a request', () => {
+        expect(localAccountName(`alice@${HOME}`)).toBe('alice');
+        expect(localAccountName(`alice@${NODE}`)).toBe(`alice@${NODE}`);
+        expect(localAccountOf(`alice@${NODE}`)).toBeNull();
     });
 });
