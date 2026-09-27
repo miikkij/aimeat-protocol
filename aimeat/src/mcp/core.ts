@@ -576,7 +576,7 @@ export function registerCoreTools(
         } },
         async ({ prefix, visibility, tags, owner_scope, limit, response_format }) => {
             const cap = Math.min(limit ?? MEMORY_LIST_DEFAULT_LIMIT, MEMORY_LIST_MAX_LIMIT);
-            let entries: Awaited<ReturnType<Storage['listMemory']>>;
+            let entries: Awaited<ReturnType<Storage['listMemoryMeta']>>;
             let truncated = false;
             if (owner_scope) {
                 const parsed = parseGAII(agentGaii);
@@ -590,15 +590,15 @@ export function registerCoreTools(
                 }
                 const ownerGhii = `${localAccountName(agentGaii)}@${config.nodeId}`;
                 const agents = await storage.getAgentsByOwner(localAccountName(agentGaii));
-                entries = [...await storage.listMemory(ownerGhii, { prefix, visibility, tags })];
+                entries = [...await storage.listMemoryMeta(ownerGhii, { prefix, visibility, tags })];
                 // Stop accumulating once we exceed the cap — owner-scope can otherwise aggregate
                 // every agent's memory unbounded.
                 for (const agent of agents) {
                     if (entries.length > cap) break;
-                    entries.push(...await storage.listMemory(agent.gaii, { prefix, visibility, tags }));
+                    entries.push(...await storage.listMemoryMeta(agent.gaii, { prefix, visibility, tags }));
                 }
             } else {
-                entries = await storage.listMemory(agentGaii, { prefix, visibility, tags });
+                entries = await storage.listMemoryMeta(agentGaii, { prefix, visibility, tags });
             }
             if (entries.length > cap) { entries = entries.slice(0, cap); truncated = true; }
             const items = entries.map(e => ({
