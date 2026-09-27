@@ -15,7 +15,7 @@
  *   Level 3 (`readStylesheet`). It reads twice. Its TOKENIZER sees every at-rule, function and
  *   address wherever it stands, a string being one token whatever it holds, and every name is read
  *   with its escapes resolved (`u\72 l(` is `url(`), since a browser resolves them before it matches
- *   a name. Its PARSER gives the declarations and the selectors, each selector read to its end
+ *   a name, and in ASCII lower case, the only case a browser folds (asciiLower). Its PARSER gives the declarations and the selectors, each selector read to its end
  *   (`ComplexSelector`), since its end is what a rule styles.
  *
  *   WHAT THE PARSERS CANNOT READ CLEANLY IS REFUSED: a parse error, or a part css-tree keeps as raw
@@ -31,10 +31,13 @@
  *   THE STYLESHEET ENDS AT ITS TOP LEVEL. An app pastes it into a page before the page's own rules,
  *   and a block, a bracket, a comment, a string or a rule still open where it ends takes those rules
  *   in. The tokens say what is open (`open`).
- * @structure readMarkup · readStylesheet · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
+ * @structure readMarkup · readStylesheet · asciiLower · MAX_NESTING · MarkupElement · MarkupProblem · StylesheetReading ·
  *   StylesheetOpen · NameKind · NameDefinition · nameKindOf · DeclarationRead · ValuePart · ComplexSelector · Compound · Pseudo
  * @usage const { elements, problem } = readMarkup(html); const sheet = readStylesheet(css);
  * @version-history
+ *   v2.9.0 — 2026-09-26 — Every name, in the markup and in the stylesheet, is read in ASCII lower case
+ *     (asciiLower), the way CSS and HTML match names: A to Z become a to z and nothing else changes,
+ *     so a Kelvin sign (U+212A) stays itself and `@\212a eyframes` reads as the at-rule no browser knows.
  *   v2.8.0 — 2026-09-26 — Every declaration carries the parts of its value at the top level (`parts`):
  *     a word, a number, a comma, a function with the words it holds, or anything else as written, for
  *     the check that reads the names a declaration gives counters, anchors and timelines.
@@ -103,6 +106,13 @@ import {
 
 type ChildNode = DefaultTreeAdapterTypes.ChildNode;
 type Template = DefaultTreeAdapterTypes.Template;
+
+/**
+ * A name in lower case the way CSS and HTML match names: A to Z become a to z, and nothing else
+ * changes. A Kelvin sign (U+212A) stays itself, so `@\212a eyframes` is an at-rule no browser knows,
+ * not @keyframes, and a tag spelled "mar" and a Kelvin sign is an element no browser knows, not <mark>.
+ */
+export const asciiLower = (text: string): string => text.replace(/[A-Z]+/g, capitals => capitals.toLowerCase());
 
 /** One element as the HTML parser built it. */
 export interface MarkupElement {
@@ -203,8 +213,8 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
     if (loc?.startTag) spans.push({ start: loc.startTag.startOffset, end: loc.startTag.endOffset, name: node.tagName, closing: false, attrs: attrLocs });
     if (loc?.endTag) spans.push({ start: loc.endTag.startOffset, end: loc.endTag.endOffset, name: node.tagName, closing: true, attrs: {} });
     elements.push({
-      name: node.tagName.toLowerCase(),
-      attrs: node.attrs.map(a => ({ name: (a.prefix ? `${a.prefix}:${a.name}` : a.name).toLowerCase(), value: a.value })),
+      name: asciiLower(node.tagName),
+      attrs: node.attrs.map(a => ({ name: asciiLower(a.prefix ? `${a.prefix}:${a.name}` : a.name), value: a.value })),
     });
     const children = node.tagName === 'template' ? (node as Template).content.childNodes : node.childNodes;
     for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
@@ -258,7 +268,7 @@ export function readMarkup(html: string): { elements: MarkupElement[]; problem: 
     // The outermost element still open is the last one at the top: END_MARK is inside it, or it
     // dropped END_MARK (<select>) or put it before itself (<table>).
     const open = [...followed].reverse().find(n => 'tagName' in n);
-    return { elements, problem: { kind: 'open', element: open && 'tagName' in open ? open.tagName.toLowerCase() : '' } };
+    return { elements, problem: { kind: 'open', element: open && 'tagName' in open ? asciiLower(open.tagName) : '' } };
   }
   return { elements, problem: null };
 }
@@ -404,8 +414,8 @@ const COLOUR_FUNCTIONS = new Set(['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'l
 const HEX_COLOUR = /^[0-9a-f]{3,8}$/i;
 const T = tokenTypes;
 
-/** A name as the text spells it, escapes resolved and lower-cased: `U\72 L` is `url`, as a browser matches it. */
-const nameOf = (raw: string): string => ident.decode(raw).toLowerCase();
+/** A name as the text spells it, escapes resolved and in ASCII lower case: `U\72 L` is `url`, as a browser matches it. */
+const nameOf = (raw: string): string => asciiLower(ident.decode(raw));
 
 /** One token as css-tree's tokenizer gives it: its type and where it stands in the text. */
 type Token = { type: number; start: number; end: number };
@@ -466,7 +476,7 @@ function definitionAt(tokens: ReadonlyArray<{ type: number; start: number; end: 
   if (kind === 'function') {
     if (first?.type === T.Function) name = nameOf(css.slice(first.start, first.end - 1));
   } else if (parts.length === 1 && first.type === T.Ident) name = nameOf(css.slice(first.start, first.end));
-  else if (parts.length === 1 && first.type === T.String) name = cssString.decode(css.slice(first.start, first.end)).toLowerCase();
+  else if (parts.length === 1 && first.type === T.String) name = asciiLower(cssString.decode(css.slice(first.start, first.end)));
   return { kind, atRule, name, text };
 }
 

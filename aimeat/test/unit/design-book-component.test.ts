@@ -5,6 +5,9 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.18.0 — 2026-09-26 — Every name is read in ASCII lower case: an at-rule, a defined name, a counter,
+ *     an element and an attribute spelled with a Kelvin sign read as a browser reads them, and ASCII
+ *     capitals still read as their lower case.
  *   v1.17.0 — 2026-09-26 — A declaration that names a counter, an anchor, a view transition or a
  *     timeline the page shares is refused with the prefixed form, as is one that names it through
  *     var(), a function or inherit, and `all` other than a reset; names of its own, none, and a page's
@@ -584,6 +587,23 @@ describe('the component bench', () => {
     expect(readStylesheet('.a { counter-reset: reversed(b) 2, --c; d: var(--e) "f" }').declarations.map(d => d.parts)).toEqual([
       [{ type: 'function', name: 'reversed', words: ['b'] }, { type: 'number' }, { type: 'comma' }, { type: 'word', name: '--c' }],
       [{ type: 'function', name: 'var', words: ['--e'] }, { type: 'other', text: '"f"' }],
+    ]);
+  });
+
+  // CSS and HTML match a name in ASCII lower case: A to Z become a to z and nothing else changes. To a
+  // browser a Kelvin sign (U+212A) is not a "k", so `@\212a eyframes` is an at-rule it does not know.
+  it('reads every name in ASCII lower case, as a browser matches it', () => {
+    expect(readStylesheet('@\\212a eyframes wkgrid-a { from { opacity: 0 } }').atRules).toEqual([{ name: 'Keyframes', within: null }]);
+    expect(bad({ css: `${WEEK_GRID.css}\n@\\212a eyframes wkgrid-a { from { opacity: 0; } }` })).toThrow(/carries no @Keyframes: it uses only @media/);
+    expect(bad({ css: `${WEEK_GRID.css}\n@keyframes w\\212a grid-a { from { opacity: 0; } }` })).toThrow(/defines the animation "wKgrid-a" with @keyframes/);
+    expect(bad({ css: `${WEEK_GRID.css}\n@keyframes "WKGRID-X" { from { opacity: 0; } }` })).toThrow(/defines the animation "wKgrid-x" with @keyframes/);
+    expect(bad({ css: `${WEEK_GRID.css}\n.wkgrid-row { counter-increment: w\\212a grid-step; }` })).toThrow(/names the counter "wKgrid-step"/);
+    expect(bad({ html: '<div class="wkgrid"><marK class="wkgrid-m">x</marK></div>' })).toThrow(/may not carry <marK>/);
+    expect(bad({ html: '<div class="wkgrid" stroKe="x"></div>' })).toThrow(/may not carry the attribute "stroKe"/);
+    // A name in ASCII capitals reads as its lower case.
+    expect(readStylesheet('@MEDIA print { .A { COLOR: RED } }')).toMatchObject({ atRules: [{ name: 'media', within: null }], declarations: [{ property: 'color', keyword: 'red' }] });
+    expect(readMarkup('<DIV CLASS="x"><SVG VIEWBOX="0 0 1 1"></SVG></DIV>').elements).toEqual([
+      { name: 'div', attrs: [{ name: 'class', value: 'x' }] }, { name: 'svg', attrs: [{ name: 'viewbox', value: '0 0 1 1' }] },
     ]);
   });
 
