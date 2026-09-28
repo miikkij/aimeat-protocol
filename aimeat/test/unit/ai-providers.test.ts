@@ -10,6 +10,8 @@
  *   own machine.
  * @usage pnpm test -- ai-providers
  * @version-history
+ *   v1.0.1 — 2026-09-28 — An address ending in a long run of slashes is parsed in one pass (CodeQL
+ *     js/polynomial-redos, alert 1673).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
 import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
@@ -59,6 +61,15 @@ describe('an owner\'s provider record', () => {
     const ok = owner({ type: 'anthropic' });
     expect(ok.provider?.baseUrl).toBe('https://api.anthropic.com/v1');
     expect(ok.provider?.auth.type).toBe('key');
+  });
+
+  it('an address loses its trailing slashes, and a long run of slashes costs one pass (alert 1673)', () => {
+    expect(owner({ type: 'anthropic', baseUrl: 'https://api.anthropic.com/v1///', auth: { type: 'key' } }).problems.join(' ')).not.toMatch(/baseUrl/);
+    expect(owner({ type: 'openai-compatible', baseUrl: 'https://x.example/v1///' }).provider?.baseUrl).toBe('https://x.example/v1');
+    const started = Date.now();
+    const r = owner({ type: 'anthropic', baseUrl: `https://api.anthropic.com/v1${'/'.repeat(100_000)}x` });
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(r.problems.join(' ')).toMatch(/baseUrl/);
   });
 
   it('a capability its type does not serve is refused, naming the types that do', () => {
