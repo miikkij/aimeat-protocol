@@ -23,6 +23,7 @@
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The `beta` status: a version on a repository's beta channel only.
  *   v1.1.0 — 2026-09-12 — PackageCreateCaller loses `sub`. Its own comment said the field existed
  *     only as the fallback resolveGhii took, and that fallback was the bare account name on an owner
  *     session; the helper composes the GHII from the node now, so five doors and two MCP tools stop
@@ -54,8 +55,13 @@ import { emitChange } from './event-bus.js';
 /** The per-author ceiling when config carries none. config.packageMaxPerAuthor normally wins. */
 const MAX_PACKAGES_PER_AUTHOR = 100;
 
-/** The only statuses and visibilities a package may hold. One list, read by every door. */
-export const VALID_STATUSES = ['draft', 'published', 'archived'] as const;
+/**
+ * The only statuses and visibilities a package may hold. One list, read by every door.
+ * `beta` is a version released on a repository's beta channel only (package-entitlements.ts): it is
+ * served to the nodes whose entitlement follows beta, and to nobody else, until the author sets it
+ * `published`.
+ */
+export const VALID_STATUSES = ['draft', 'published', 'beta', 'archived'] as const;
 export const VALID_VISIBILITIES = ['private', 'public'] as const;
 
 export type PackageStatus = (typeof VALID_STATUSES)[number];

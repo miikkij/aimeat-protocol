@@ -27,6 +27,10 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   v1.1.0 — 2026-09-28 — Release channels (Jouni, 2026-09-28): an entitlement follows `stable` (published
+ *     versions) or `beta` (beta versions too); the listing names the channel. UPDATES_ENDED only when a
+ *     version on the node's channel was made after its cutoff; anything else a held node cannot have is
+ *     NOT_FOUND. Channels apply to private packages, the ones served by entitlement.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
  */
 import type { Storage, PackageRecord } from '../storage/interface.js';
@@ -35,10 +39,17 @@ import { verifyPackageNode } from './package-node-auth.js';
 
 export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
 
+export type PackageChannel = 'stable' | 'beta';
+
 export interface PackageEntitlement {
     nodeId: string;
     /** Versions published after this instant are not served to the node. Null: the updates run on. */
     updatesUntil: string | null;
+    /**
+     * `stable` (the default, and what a grant written before channels existed reads as): published
+     * versions only. `beta`: `beta` versions too, the newest of either. Jouni, 2026-09-28.
+     */
+    channel?: PackageChannel;
     note?: string;
     grantedAt: string;
     grantedBy: string;
@@ -91,11 +102,14 @@ const NODE_RE = /^[a-z0-9][a-z0-9.-]{2,127}$/i;
 export async function grantEntitlement(
     storage: Storage,
     caller: { owner: string; isOperator: boolean },
-    input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown },
+    input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown },
 ): Promise<EntitlementResult> {
     const refused = await mayManage(storage, input.groupId, caller);
     if (refused) return refused;
     if (!NODE_RE.test(input.nodeId)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node_id is a node id such as "aimeat-customer-001".' };
+    if (input.channel !== undefined && input.channel !== 'stable' && input.channel !== 'beta') {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'channel is "stable" or "beta".' };
+    }
     let updatesUntil: string | null = null;
     if (input.updatesUntil !== undefined && input.updatesUntil !== null) {
         const t = typeof input.updatesUntil === 'string' ? Date.parse(input.updatesUntil) : NaN;
@@ -108,6 +122,7 @@ export async function grantEntitlement(
     const entitlement: PackageEntitlement = {
         nodeId: input.nodeId,
         updatesUntil,
+        channel: (input.channel as PackageChannel | undefined) ?? prev?.channel ?? 'stable',
         ...(typeof input.note === 'string' && input.note ? { note: input.note.slice(0, 500) } : prev?.note ? { note: prev.note } : {}),
         grantedAt: prev?.grantedAt ?? now,
         grantedBy: prev?.grantedBy ?? caller.owner,
@@ -138,7 +153,7 @@ export async function listEntitlements(
 }
 
 /**
- * The version of a private package this node may have: the newest published one made up to its
+ * The version of a private package this node may have: the newest one on its channel made up to its
  * `updatesUntil`, or the one it names if that one is within its entitlement. Null when the node holds
  * no entitlement, or the version it names was made after its updates ended.
  */
@@ -148,12 +163,32 @@ export async function entitledVersion(
     const ent = (await readEntitlements(storage, groupId)).find(e => e.nodeId === nodeId);
     if (!ent) return null;
     const until = ent.updatesUntil ? Date.parse(ent.updatesUntil) : Infinity;
-    const { versions } = await storage.listVersions(groupId, 200, 0);
-    const allowed = versions
-        .filter(v => v.status === 'published' && Date.parse(v.createdAt) <= until)
-        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-    if (version) return allowed.find(v => v.version === version) ?? null;
+    const allowed = (await channelVersions(storage, groupId, ent, version))
+        .filter(v => Date.parse(v.createdAt) <= until);
     return allowed[0] ?? null;
+}
+
+/** The versions on the entitlement's channel, newest first; only `version` when it names one. */
+async function channelVersions(
+    storage: Storage, groupId: string, ent: PackageEntitlement, version?: string,
+): Promise<PackageRecord[]> {
+    const statuses = ent.channel === 'beta' ? ['published', 'beta'] : ['published'];
+    const { versions } = await storage.listVersions(groupId, 200, 0);
+    return versions
+        .filter(v => statuses.includes(v.status) && (!version || v.version === version))
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
+/**
+ * Whether the node holds an entitlement and was refused only because its updates ended: a version on
+ * its channel exists and was made after `updatesUntil`. A beta version asked for on the stable
+ * channel is not that case, and the endpoint answers it as not found.
+ */
+async function updatesEndedFor(storage: Storage, groupId: string, nodeId: string, version?: string): Promise<boolean> {
+    const ent = (await readEntitlements(storage, groupId)).find(e => e.nodeId === nodeId);
+    if (!ent?.updatesUntil) return false;
+    const until = Date.parse(ent.updatesUntil);
+    return (await channelVersions(storage, groupId, ent, version)).some(v => Date.parse(v.createdAt) > until);
 }
 
 export type NodeRead =
@@ -178,8 +213,7 @@ export async function resolveNodeRead(
     if (!latest || latest.visibility === 'public') return { kind: 'unsigned' };
     const pkg = await entitledVersion(storage, groupId, who.nodeId, version);
     if (!pkg) {
-        const held = (await readEntitlements(storage, groupId)).some(e => e.nodeId === who.nodeId);
-        return held
+        return await updatesEndedFor(storage, groupId, who.nodeId, version)
             ? { kind: 'refused', status: 403, code: 'UPDATES_ENDED', message: `${who.nodeId}'s updates for ${groupId} ended before that version was published. Buying the package again brings them back.` }
             : { kind: 'refused', status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
     }
@@ -195,6 +229,7 @@ export interface RepositoryListingEntry {
     category: string;
     visibility: 'public' | 'private';
     updates_until: string | null;
+    channel: PackageChannel;
 }
 
 /**
@@ -210,7 +245,7 @@ export async function repositoryListing(storage: Storage, nodeId: string): Promi
         seen.add(p.packageGroupId);
         out.push({
             group_id: p.packageGroupId, name: p.name, version: p.version, published_at: p.createdAt,
-            description: p.description, category: p.category, visibility: 'public', updates_until: null,
+            description: p.description, category: p.category, visibility: 'public', updates_until: null, channel: 'stable',
         });
     }
     for (const { groupId, entitlement } of await entitledGroupsOf(storage, nodeId)) {
@@ -219,6 +254,7 @@ export async function repositoryListing(storage: Storage, nodeId: string): Promi
         out.push({
             group_id: groupId, name: pkg.name, version: pkg.version, published_at: pkg.createdAt,
             description: pkg.description, category: pkg.category, visibility: 'private', updates_until: entitlement.updatesUntil,
+            channel: entitlement.channel ?? 'stable',
         });
     }
     return out;

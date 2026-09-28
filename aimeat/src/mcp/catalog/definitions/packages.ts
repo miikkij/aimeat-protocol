@@ -119,13 +119,13 @@ export const packagesTools: AimeatToolDefinition[] = [
         // could author a package and then neither see it (the list and get doors read published) nor
         // install it (install refuses anything else).
         name: 'aimeat_package_status_set',
-        description: 'Move one package version between draft, published and archived. Only the author may.',
+        description: 'Move one package version between draft, published, beta and archived. Only the author may. A beta version is served only to the customer nodes whose entitlement follows the beta channel (aimeat_package_entitlements).',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier.' },
             version: { type: 'string', description: 'Which version. Defaults to the latest one.' },
-            status: { type: 'string', required: true, enum: ['draft', 'published', 'archived'], description: 'The status to set.' },
+            status: { type: 'string', required: true, enum: ['draft', 'published', 'beta', 'archived'], description: 'The status to set.' },
         },
     },
     {
@@ -224,6 +224,7 @@ export const packagesTools: AimeatToolDefinition[] = [
             action: { type: 'string', required: true, enum: ['list', 'grant', 'revoke'], description: 'list the nodes, grant (or change) one, or revoke one.' },
             node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
             updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node. Omit for updates that run on.' },
+            channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.' },
             note: { type: 'string', description: 'For grant: why, e.g. the order it came from.' },
         },
     },

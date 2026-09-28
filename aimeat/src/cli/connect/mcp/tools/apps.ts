@@ -185,8 +185,9 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     action: z.enum(['list', 'grant', 'revoke']).describe('list the nodes, grant (or change) one, or revoke one'),
     node_id: z.string().optional().describe('For grant and revoke: the customer node'),
     updates_until: z.string().optional().describe('For grant: versions published after this ISO date-time are not served to the node'),
+    channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable (published versions, the default) or beta (beta versions too)'),
     note: z.string().optional().describe('For grant: why'),
-  }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, note }) => {
+  }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note }) => {
     const base = `/v1/packages/${encodeURIComponent(group_id)}/entitlements`;
     if (action === 'list') return out(await client.get(base));
     if (!node_id) return { content: [{ type: 'text' as const, text: `INVALID_INPUT: action "${action}" needs node_id.` }], isError: true };
@@ -194,6 +195,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (action === 'revoke') return out(await client.delete(node));
     const body: Record<string, unknown> = {};
     if (updates_until !== undefined) body.updates_until = updates_until;
+    if (channel !== undefined) body.channel = channel;
     if (note !== undefined) body.note = note;
     return out(await client.put(node, body));
   });
@@ -333,7 +335,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
     group_id: z.string().describe('Package group identifier'),
     version: z.string().optional().describe('Which version. Defaults to the newest one.'),
-    status: z.enum(['draft', 'published', 'archived']).describe('The status to set'),
+    status: z.enum(['draft', 'published', 'beta', 'archived']).describe('The status to set'),
   }, annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
     const body: Record<string, unknown> = { status };
     if (version !== undefined) body.version = version;

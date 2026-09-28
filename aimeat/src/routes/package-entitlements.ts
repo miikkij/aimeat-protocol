@@ -42,6 +42,7 @@ export function registerPackageEntitlementRoutes(
             nodeId: req.params.nodeId as string,
             updatesUntil: body.updates_until,
             note: body.note,
+            channel: body.channel,
         });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entitlement: out.entitlement, repository_role: config.packageRepository }));
