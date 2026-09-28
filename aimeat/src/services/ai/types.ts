@@ -14,6 +14,7 @@
  *   - adapterTypeOf() — the owner's legacy provider setting mapped to an adapter type
  *   - CostSource — where the cost recorded for a call came from
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The `extension` adapter type and ExtensionOpRunner on the target (V6).
  *   v1.1.1 — 2026-09-28 — CostSource comment: `catalog` and `table` are in use (V4).
  *   v1.1.0 — 2026-09-28 — The provider types of V3 (openai, anthropic, mistral, xai), their fixed
  *     addresses, and `allowOrigins` on a target.
@@ -34,9 +35,18 @@ export type AiCapability = 'text' | 'vision' | 'files' | 'image' | 'speech' | 't
  * Which adapter builds the model for a provider, which is the provider's type. `local` and
  * `openai-compatible` speak the same protocol; they differ in whether data leaves the machine. The
  * five fixed types are reached only at their official address (FIXED_BASE_URLS), which is what makes
- * the type's name true: "anthropic" means Anthropic. `extension` arrives in V6.
+ * the type's name true: "anthropic" means Anthropic. `extension` (V6) is an installed extension of the
+ * owner's whose `ai.<op>` actions serve the calls; it has no address of its own (baseUrl is
+ * `extension://<name>`) and its target carries a runner instead.
  */
-export type AiAdapterType = 'openrouter' | 'openai' | 'anthropic' | 'mistral' | 'xai' | 'local' | 'openai-compatible';
+export type AiAdapterType = 'openrouter' | 'openai' | 'anthropic' | 'mistral' | 'xai' | 'local' | 'openai-compatible' | 'extension';
+
+/**
+ * Runs one operation on an extension provider (services/ai/extension-provider.ts): the extension, its
+ * owner and the key are bound in when the target is built, so the gateway, which receives no identity,
+ * holds only this function.
+ */
+export type ExtensionOpRunner = (op: AiOp, input: Record<string, unknown>, signal?: AbortSignal) => Promise<Record<string, unknown>>;
 
 /** The types whose address is fixed, and the address. The values are the provider packages' own defaults. */
 export const FIXED_BASE_URLS = {
@@ -62,6 +72,8 @@ export interface AiTarget {
    * AIMEAT_AI_PROVIDER_EGRESS. Never set for an owner's provider (services/ai/providers.ts).
    */
   allowOrigins?: readonly string[];
+  /** An extension provider only: runs its `ai.<op>` actions, with the key injected outside the sandbox. */
+  runExtension?: ExtensionOpRunner;
 }
 
 /** True when a URL names this machine, which is what `local` means. */

@@ -77,6 +77,10 @@ guest receives is missing from that table, so change the table in the same commi
   schedule and a workflow step. For a synchronous paid answer, call the provider through `ctx.fetch`
   with a `type: secret` config or a `{{secret:NAME}}` header. A secret nobody set is `undefined` in
   `ctx.config` (until 2026-09-13 it read as the descriptor object or the mask, both truthy).
+- An extension can itself be an AI provider: `provides.ai_provider` in the manifest and one `ai.<op>`
+  action per op, in the node's fixed shapes (the extension-building prompt lists them). Run as a
+  provider, `ctx.fetch` reaches only the declared hosts and the node adds the owner's key there, over
+  https only; the script never reads a key.
 - `ctx.memory` is the extension's own sovereign `ext:{name}` namespace, and a key is **public unless
   the write passes `{ visibility: 'private' }`**. The flag belongs on every write that holds personal
   data (a write without it stores the key public again), and a code fix does not re-secure rows

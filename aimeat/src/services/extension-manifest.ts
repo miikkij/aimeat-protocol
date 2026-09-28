@@ -5,6 +5,11 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-28 — System 2 plan, V6: a manifest may declare `provides: { ai_provider: … }`
+ *                         (ops, models, data_statement, hosts, auth_header). Every op needs an action
+ *                         with the id `ai.<op>`; hosts are bare hostnames only. Stored as
+ *                         `config.__aiProvider` (services/extension-ai-provider-declaration.ts), a key
+ *                         the manifest's own `config:` cannot set.
  *   v1.7.2 -- 2026-09-27 -- Move the shared builder out of the route layer; behavior unchanged.
  *   v1.7.1 — 2026-09-26 — The installer named in the config.app check comes from localAccountName
  *                         (utils/gaii.ts), which keeps an identity of another node whole, so it never
@@ -40,6 +45,10 @@ import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValue
 import { MONEY_CURRENCIES } from '../commerce/money.js';
 import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import { localAccountName } from '../utils/gaii.js';
+import {
+  AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
+  type ExtensionAiOp, type ExtensionAiProviderDeclaration,
+} from './extension-ai-provider-declaration.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
 export type ExtBuildResult =
@@ -175,6 +184,158 @@ function validateManifestShape(
     }
   }
   return null;
+}
+
+/** Headers the provider key may never be written to: each one changes how the request is framed or
+ *  routed, or carries another credential, so a manifest naming one is refused at install. */
+const FORBIDDEN_AUTH_HEADERS = ['host', 'cookie', 'content-length', 'transfer-encoding', 'connection', 'set-cookie'];
+/** An HTTP header name (RFC 9110 token). */
+const HEADER_NAME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,100}$/;
+/** One hostname label: letters, digits and inner hyphens, 1 to 63 characters. */
+const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const PRICE_FIELDS = { in_per_mtok: 'inPerMtok', out_per_mtok: 'outPerMtok', per_image: 'perImage', per_second: 'perSecond' } as const;
+
+/**
+ * Why a declared host is not a bare hostname, or null when it is. The provider key is added to a
+ * request only when the hostname matches one of these EXACTLY, so each refused form is one where an
+ * exact match would mean something other than what the author wrote.
+ */
+function hostRefusal(host: string): string | null {
+  if (host.includes('://')) return 'a host is a bare hostname without a scheme: write api.example.com, not https://api.example.com';
+  if (host.includes('/')) return 'a host is a bare hostname without a path: the key is added to every path on that host';
+  if (host.includes('*')) return 'wildcards are not accepted: the key is added only to a host named exactly, so every host must be listed';
+  if (host.includes('[') || host.includes(':')) {
+    return 'a host is a bare hostname without a port and never an IPv6 address: ctx.fetch compares the hostname only';
+  }
+  if (host.length > 253) return 'a hostname is at most 253 characters';
+  const labels = host.split('.');
+  // A top-level label is never all digits, so this refuses every IPv4 literal and its decimal,
+  // octal and hex spellings that DNS resolvers also accept.
+  if (/^[0-9]+$/.test(labels[labels.length - 1] ?? '') || /^0x[0-9a-f]+$/.test(labels[labels.length - 1] ?? '')) {
+    return 'an IP address is not accepted: name the service by its hostname, which is what the owner reads before adding the provider';
+  }
+  if (!labels.every(l => HOST_LABEL.test(l))) {
+    return 'a hostname has only lowercase letters, digits, hyphens and dots between non-empty labels';
+  }
+  return null;
+}
+
+/**
+ * Validate `provides:` and build the AI provider declaration it carries (System 2 plan V6). Returns
+ * the declaration (or undefined when the manifest declares none), or a refusal naming the field.
+ * `provides` holds only `ai_provider` for now, and an unknown key is refused so a misspelling does
+ * not install as an extension that quietly provides nothing.
+ */
+function validateProvides(
+  provides: unknown,
+  actions: Array<Record<string, unknown>>,
+): { decl: ExtensionAiProviderDeclaration | undefined } | ExtBuildResult {
+  if (provides === undefined) return { decl: undefined };
+  if (typeof provides !== 'object' || provides === null || Array.isArray(provides)) {
+    return fail(`provides must be a map, e.g. provides: { ai_provider: { … } }, got ${describeYamlValue(provides)}`);
+  }
+  const p = provides as Record<string, unknown>;
+  const unknownTop = Object.keys(p).filter(k => k !== 'ai_provider');
+  if (unknownTop.length) return fail(`provides declares unknown field(s) ${unknownTop.join(', ')}; only ai_provider exists`);
+  if (p.ai_provider === undefined) return { decl: undefined };
+  const a = p.ai_provider;
+  if (typeof a !== 'object' || a === null || Array.isArray(a)) {
+    return fail(`provides.ai_provider must be a map with ops, models, data_statement and hosts, got ${describeYamlValue(a)}`);
+  }
+  const ap = a as Record<string, unknown>;
+  const known = ['ops', 'models', 'data_statement', 'hosts', 'auth_header'];
+  const unknownAp = Object.keys(ap).filter(k => !known.includes(k));
+  if (unknownAp.length) {
+    return fail(`provides.ai_provider declares unknown field(s) ${unknownAp.join(', ')}; the fields are ${known.join(', ')}`);
+  }
+
+  // ops: each one of the five, once, and each served by the action `ai.<op>`.
+  if (!Array.isArray(ap.ops) || ap.ops.length === 0) {
+    return fail(`provides.ai_provider.ops must be a non-empty list of ${EXTENSION_AI_OPS.join(', ')}, got ${describeYamlValue(ap.ops)}`);
+  }
+  const ops: ExtensionAiOp[] = [];
+  for (const op of ap.ops as unknown[]) {
+    if (typeof op !== 'string' || !(EXTENSION_AI_OPS as readonly string[]).includes(op)) {
+      return fail(`provides.ai_provider.ops: ${describeYamlValue(op)} is not an op; the ops are ${EXTENSION_AI_OPS.join(', ')}`);
+    }
+    if (ops.includes(op as ExtensionAiOp)) return fail(`provides.ai_provider.ops lists "${op}" twice`);
+    ops.push(op as ExtensionAiOp);
+  }
+  const actionIds = new Set(actions.map(x => x.id as string));
+  for (const op of ops) {
+    const id = `${AI_OP_ACTION_PREFIX}${op}`;
+    if (!actionIds.has(id)) {
+      return fail(`provides.ai_provider.ops declares "${op}", and no action has the id "${id}". Add an action with id: ${id}, which serves that op`);
+    }
+  }
+
+  // models: at least one, each with an id and a name, optional boolean caps and non-negative prices.
+  if (!Array.isArray(ap.models) || ap.models.length === 0) {
+    return fail(`provides.ai_provider.models must be a non-empty list of { id, name }, got ${describeYamlValue(ap.models)}`);
+  }
+  if (ap.models.length > 100) return fail(`provides.ai_provider.models lists ${ap.models.length} models; the most is 100`);
+  const models: ExtensionAiProviderDeclaration['models'] = [];
+  for (const [i, raw] of (ap.models as unknown[]).entries()) {
+    const at = `provides.ai_provider.models[${i}]`;
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return fail(`${at} must be a map with id and name, got ${describeYamlValue(raw)}`);
+    const m = raw as Record<string, unknown>;
+    const unknownM = Object.keys(m).filter(k => !['id', 'name', 'caps', 'price'].includes(k));
+    if (unknownM.length) return fail(`${at} declares unknown field(s) ${unknownM.join(', ')}; the fields are id, name, caps, price`);
+    for (const f of ['id', 'name'] as const) {
+      if (!isNonEmptyString(m[f]) || m[f].length > 200) {
+        return fail(`${at}.${f} must be a non-empty string of at most 200 characters, got ${describeYamlValue(m[f])}`);
+      }
+    }
+    if (models.some(x => x.id === m.id)) return fail(`${at}.id "${m.id as string}" is listed twice`);
+    const model: ExtensionAiProviderDeclaration['models'][number] = { id: m.id as string, name: m.name as string };
+    if (m.caps !== undefined) {
+      if (typeof m.caps !== 'object' || m.caps === null || Array.isArray(m.caps)) return fail(`${at}.caps must be a map of booleans, got ${describeYamlValue(m.caps)}`);
+      for (const [k, v] of Object.entries(m.caps)) {
+        if (typeof v !== 'boolean') return fail(`${at}.caps.${k} must be a boolean, got ${describeYamlValue(v)}`);
+      }
+      model.caps = { ...(m.caps as Record<string, boolean>) };
+    }
+    if (m.price !== undefined) {
+      if (typeof m.price !== 'object' || m.price === null || Array.isArray(m.price)) return fail(`${at}.price must be a map, got ${describeYamlValue(m.price)}`);
+      const price: NonNullable<typeof model.price> = {};
+      for (const [k, v] of Object.entries(m.price)) {
+        if (!(k in PRICE_FIELDS)) return fail(`${at}.price declares unknown field ${k}; the fields are ${Object.keys(PRICE_FIELDS).join(', ')}`);
+        if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return fail(`${at}.price.${k} must be a non-negative number, got ${describeYamlValue(v)}`);
+        price[PRICE_FIELDS[k as keyof typeof PRICE_FIELDS]] = v;
+      }
+      model.price = price;
+    }
+    models.push(model);
+  }
+
+  if (!isNonEmptyString(ap.data_statement) || ap.data_statement.length > 500) {
+    return fail(`provides.ai_provider.data_statement must be a non-empty string of at most 500 characters, got ${describeYamlValue(ap.data_statement)}`);
+  }
+
+  if (!Array.isArray(ap.hosts) || ap.hosts.length === 0 || ap.hosts.length > 20) {
+    return fail(`provides.ai_provider.hosts must be a list of 1 to 20 hostnames, got ${describeYamlValue(ap.hosts)}`);
+  }
+  const hosts: string[] = [];
+  for (const h of ap.hosts as unknown[]) {
+    if (!isNonEmptyString(h)) return fail(`provides.ai_provider.hosts: each host must be a non-empty string, got ${describeYamlValue(h)}`);
+    const host = h.trim().toLowerCase();
+    const why = hostRefusal(host);
+    if (why) return fail(`provides.ai_provider.hosts: "${h}" is refused, ${why}`);
+    if (!hosts.includes(host)) hosts.push(host);
+  }
+
+  let authHeader: string | undefined;
+  if (ap.auth_header !== undefined) {
+    if (typeof ap.auth_header !== 'string' || !HEADER_NAME_TOKEN.test(ap.auth_header)) {
+      return fail(`provides.ai_provider.auth_header must be an HTTP header name such as x-api-key, got ${describeYamlValue(ap.auth_header)}`);
+    }
+    if (FORBIDDEN_AUTH_HEADERS.includes(ap.auth_header.toLowerCase())) {
+      return fail(`provides.ai_provider.auth_header "${ap.auth_header}" is refused: the key is never written to ${FORBIDDEN_AUTH_HEADERS.join(', ')}`);
+    }
+    authHeader = ap.auth_header;
+  }
+
+  return { decl: { ops, models, dataStatement: ap.data_statement.trim(), hosts, ...(authHeader ? { authHeader } : {}) } };
 }
 
 /**
@@ -413,6 +574,13 @@ export function buildExtensionRecordFromManifest(
     if (decl.read === true || decl.write === true) workspaceDecl = { read: decl.read === true, write: decl.write === true };
   }
 
+  // `provides: { ai_provider: … }` makes this extension usable as an AI provider (System 2 plan V6).
+  // Declared at the top level and stored under a __-prefixed key, like `workspace`, so a config
+  // block cannot declare hosts the owner's provider key would then be sent to.
+  const provided = validateProvides(manifest.provides, actions);
+  if ('ok' in provided) return provided;
+  const aiProviderDecl = provided.decl;
+
   for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
     const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
     if (sizeKb > config.extensionMaxCodeSizeKb) {
@@ -530,6 +698,7 @@ export function buildExtensionRecordFromManifest(
         : {}),
       ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
       ...(workspaceDecl ? { [WORKSPACE_DECLARATION_KEY]: workspaceDecl } : {}),
+      ...(aiProviderDecl ? { [AI_PROVIDER_DECLARATION_KEY]: aiProviderDecl } : {}),
       // Record which config fields are `type: 'secret'` so the route can encrypt their values
       // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
       // lost by the flatten above). See services/extension-secrets.ts.

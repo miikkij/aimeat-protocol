@@ -8,6 +8,12 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.10.0 — 2026-09-28 — System 2 plan, V6: executeExtensionAction takes an optional
+ *     `opts.signal`. On abort the run rejects at once with `Extension run aborted`
+ *     (EXTENSION_RUN_ABORTED), in-flight host calls are aborted through the fetch bridge's signal,
+ *     the interrupt handler stops the guest, and the teardown finishes behind the rejection. The
+ *     sandbox body moved into runInSandbox unchanged apart from the signal; a run without a signal
+ *     behaves as before.
  *   v2.9.0 — 2026-09-13 — The bridge REFUSES an undefined or null argument to any host call, naming
  *     the ctx method and the position, instead of reading it with getString() as the string
  *     "undefined". A script that forgot `input.key` wrote a real file under that name and returned
@@ -351,24 +357,66 @@ export function isEngineAbort(err: unknown): boolean {
     return msg.includes('Aborted(') || msg.includes('JS_FreeRuntime') || msg.includes('gc_obj_list');
 }
 
+/** The message a run rejects with when its caller's signal aborts. */
+export const EXTENSION_RUN_ABORTED = 'Extension run aborted';
+
+/**
+ * Run one action in a fresh sandbox. `opts.signal` is the caller's cancellation (System 2 plan V6:
+ * an AI job's signal stops an extension serving as its provider). When it aborts, the run rejects at
+ * once with `Extension run aborted`; in-flight host calls are aborted, the guest is interrupted at
+ * its next instruction, and the sandbox is torn down behind the rejection, after its host calls
+ * settle, exactly as on the ordinary path. A run without a signal behaves as it always has.
+ */
 export async function executeExtensionAction(
     scriptContent: string,
     ctx: ExtensionCtx,
     input: Record<string, unknown>,
     limits: ExtensionLimits,
+    opts?: { signal?: AbortSignal },
+): Promise<Record<string, unknown>> {
+    const signal = opts?.signal;
+    if (signal?.aborted) throw new Error(EXTENSION_RUN_ABORTED);
+    // Aborted on teardown to cancel any in-flight host I/O (e.g. slow fetches)
+    // so cleanup doesn't block on the network. Also aborted when the caller's signal aborts.
+    const teardown = new AbortController();
+    const run = runInSandbox(scriptContent, ctx, input, limits, teardown, signal);
+    if (!signal) return run;
+
+    // The rejection is not held back until the teardown finishes: a host call that ignores the
+    // abort (a slow database read) would otherwise decide how long the caller waits. Promise.race
+    // attaches a handler to `run`, so its own later rejection ('interrupted') is not unhandled.
+    let onAbort: () => void = () => {};
+    const aborted = new Promise<never>((_, reject) => {
+        onAbort = () => { teardown.abort(); reject(new Error(EXTENSION_RUN_ABORTED)); };
+        signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+        return await Promise.race([run, aborted]);
+    } finally {
+        signal.removeEventListener('abort', onAbort);
+    }
+}
+
+async function runInSandbox(
+    scriptContent: string,
+    ctx: ExtensionCtx,
+    input: Record<string, unknown>,
+    limits: ExtensionLimits,
+    teardown: AbortController,
+    signal: AbortSignal | undefined,
 ): Promise<Record<string, unknown>> {
     const QuickJS = await newQuickJSModuleForExecution();
 
     const runtime = QuickJS.newRuntime();
     runtime.setMemoryLimit(limits.memoryMb * 1024 * 1024);
     runtime.setMaxStackSize(1024 * 1024);
-    runtime.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + limits.timeoutMs));
+    const deadline = shouldInterruptAfterDeadline(Date.now() + limits.timeoutMs);
+    // With a caller's signal, an abort also interrupts the guest, so a script that catches the
+    // aborted host call cannot go on running in a sandbox nobody waits for.
+    runtime.setInterruptHandler(signal ? (rt) => signal.aborted || deadline(rt) : deadline);
 
     const vm = runtime.newContext();
 
-    // Aborted on teardown to cancel any in-flight host I/O (e.g. slow fetches)
-    // so cleanup doesn't block on the network.
-    const teardown = new AbortController();
     // In-flight host calls whose guest promises have not settled yet. Disposing
     // the runtime while any are live trips the QuickJS JS_FreeRuntime gc
     // assertion (a hard WASM abort that poisons the shared engine singleton).
@@ -441,8 +489,12 @@ export async function executeExtensionAction(
                 // (min(timeout_ms, 30s), which the manifest documents as BOTH ceilings) and the
                 // teardown signal, so a fetch cannot outlive the VM that started it. The guest
                 // cannot supply it — the bridge crosses JSON, and a signal does not.
+                // The caller's own signal joins them when it has one (System 2 plan V6).
                 return ctx.fetch(url, opts, {
-                    signal: AbortSignal.any([teardown.signal, AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000))]),
+                    signal: AbortSignal.any([
+                        teardown.signal, AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000)),
+                        ...(signal ? [signal] : []),
+                    ]),
                 });
             },
             counter, limits.maxApiCalls, inflight);

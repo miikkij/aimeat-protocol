@@ -7,6 +7,9 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.11.1 — 2026-09-28 — A sandbox timeout answers EXTENSION_TIMEOUT again: QuickJS reports it as
+ *     `interrupted`, which the old match missed, so it came back as EXTENSION_ERROR (found in V6 of
+ *     the System 2 plan).
  *   v1.11.0 — 2026-09-06 — Both handlers pass the session's scopes into ctx.caller, so a script can
  *     hold a permission word the way a route holds one. Nothing reads it unless a script asks.
  *   v1.10.0 — 2026-09-05 — Both handlers attach ctx.workspace when the manifest declares it
@@ -68,6 +71,14 @@ import { getEncryptionKey } from '../../services/encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from '../../services/extension-secrets.js';
 import type { EmailService } from '../../services/email.js';
 import { resolveExtensionForCall } from '../../services/component-versions.js';
+
+/**
+ * Whether a sandbox run ended by running out of time. QuickJS reports its interrupt as
+ * `interrupted`; the older wording is kept so neither form falls through to EXTENSION_ERROR.
+ */
+function isSandboxTimeout(message: string): boolean {
+  return message.includes('Script execution timed out') || /\binterrupted\b/.test(message);
+}
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
   // ── GET /v1/ext-hash — the node's published ctx.hash, as source ──
@@ -273,7 +284,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       if (wsRefusal) {
         res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
           `Action "${actionId}" refused: ${wsRefusal.message}`));
-      } else if (message.includes('Script execution timed out')) {
+      } else if (isSandboxTimeout(message)) {
         res.status(500).json(error(config.nodeId, 'EXTENSION_TIMEOUT',
           `Action "${actionId}" timed out`));
       } else if (message.includes('API call limit exceeded')) {
@@ -455,7 +466,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       if (wsRefusal) {
         res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
           `Action "${actionId}" refused: ${wsRefusal.message}`));
-      } else if (message.includes('Script execution timed out')) {
+      } else if (isSandboxTimeout(message)) {
         res.status(500).json(error(config.nodeId, 'EXTENSION_TIMEOUT',
           `Action "${actionId}" timed out`));
       } else if (message.includes('API call limit exceeded')) {

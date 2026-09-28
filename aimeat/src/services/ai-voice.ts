@@ -10,6 +10,7 @@
  *     V5): the model is the speech role's (NO_TTS_MODEL without one), the voice the provider's, the
  *     owner's or the node's (NO_TTS_VOICE without one). The speech `done` event carries cost_usd, and
  *     the reply and the speech take `provider` (an id or a type, no fallback then).
+ *   v1.5.0 - 2026-09-28 - Speech on an extension provider runs its ai.speak action (System 2 plan, V6).
  *   v1.3.0 - 2026-09-28 - A reply the provider did not price is priced from the model catalogue
  *     (services/ai/catalog/price.ts), as every other text call is (System 2 plan, V4).
  *   v1.2.0 - 2026-09-28 - Providers (System 2 plan, V3): the reply tries the owner's candidates before
@@ -201,16 +202,28 @@ export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii:
     throw new AiCompletionError('QUOTA_EXHAUSTED', 402, 'This speech segment would exceed your AI budget.');
   }
   signal.throwIfAborted();
-  const response = await speechRaw(plan.key, plan.baseUrl, { model: plan.model, input: options.input,
-    voice, response_format: options.response_format, speed: options.speed,
-    ...(options.instructions ? { provider: { options: { openai: { instructions: options.instructions } } } } : {}) }, signal);
+  // An extension provider (V6) answers its ai.speak action with the whole audio; it becomes a
+  // Response here, so the streaming, the size cap, the hash and the settlement below apply unchanged.
+  let extCost: number | undefined;
+  const response = plan.providerType === 'extension' && plan.target.runExtension
+    ? await (async () => {
+      const r = await plan.target.runExtension!('speak', { model: plan.model, text: options.input, voice,
+        format: options.response_format, speed: options.speed, ...(options.instructions ? { instructions: options.instructions } : {}) }, signal);
+      if (typeof r.audio !== 'string' || !r.audio) throw new AiCompletionError('PROVIDER_ERROR', 502, 'The extension answered ai.speak without `audio`.');
+      extCost = typeof r.costUsd === 'number' && r.costUsd >= 0 ? r.costUsd : undefined;
+      const mime = typeof r.mimeType === 'string' && r.mimeType.startsWith('audio/') ? r.mimeType : options.response_format === 'mp3' ? 'audio/mpeg' : 'audio/pcm';
+      return new Response(new Uint8Array(Buffer.from(r.audio, 'base64')), { headers: { 'content-type': mime } });
+    })()
+    : await speechRaw(plan.key, plan.baseUrl, { model: plan.model, input: options.input,
+      voice, response_format: options.response_format, speed: options.speed,
+      ...(options.instructions ? { provider: { options: { openai: { instructions: options.instructions } } } } : {}) }, signal);
   await checkResponse(response);
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.startsWith('audio/') && !contentType.startsWith('application/octet-stream')) {
     await response.body!.cancel(); throw new Error('Speech provider did not return audio');
   }
   const generation = response.headers.get('x-generation-id');
-  const reader = response.body!.getReader(); let size = 0, cost: number | undefined, result;
+  const reader = response.body!.getReader(); let size = 0, cost: number | undefined = extCost, result;
   const audioHash = createHash('sha256');
   try {
     await emit({ type: 'start', model: plan.model, format: options.response_format, syntheticAudio: true });

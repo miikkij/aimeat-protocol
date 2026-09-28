@@ -29,6 +29,8 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.3.0 — 2026-09-28 — An extension provider (V6): its target carries the runner of its `ai.<op>`
+ *     actions, and the address allowlist does not apply (its manifest's hosts do, in the runner).
  *   v1.2.0 — 2026-09-28 — Capabilities for apps and agents (V5): the app's prefer.* orders the owner's
  *     candidates (byAppPreference, chosenBy 'app-prefer'); an embedding falls back only to the same
  *     model, and speech only when speechVoiceMayChange; files only on a model that reads them, or on
@@ -54,6 +56,7 @@ import { UNSET_MODEL } from './unset-model.js';
 import { catalogModel } from './catalog/store.js';
 import { textPricePerMtok } from './catalog/price.js';
 import { canonicalModelKey, equivalentModels } from './catalog/equivalence.js';
+import { extensionRunner } from './extension-provider.js';
 
 export type ChosenBy = 'call-model' | 'call-provider' | 'app-prefer' | 'agent-default' | 'owner-default' | 'pool' | 'node-default';
 
@@ -275,7 +278,8 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     if (!typeAllowed(config, p.type)) { reject(p, 'type-not-allowed', `This node does not allow ${p.type} providers.`); continue; }
     if (!serves(p, capability)) { reject(p, 'capability-off', `${p.title} does not serve ${capability}.`); continue; }
     if (input.requires?.local && p.leaves) { reject(p, 'requires-local', `${p.title} is not on this machine.`); continue; }
-    if (!isFixedType(p.type) && config.aiProviderAllowlist.length && !config.aiProviderAllowlist.includes(new URL(p.baseUrl).hostname.toLowerCase())) {
+    // An extension provider has no address: its manifest's hosts meet the allowlist in its runner.
+    if (!isFixedType(p.type) && p.type !== 'extension' && config.aiProviderAllowlist.length && !config.aiProviderAllowlist.includes(new URL(p.baseUrl).hostname.toLowerCase())) {
       reject(p, 'host-not-allowed', `AI provider host "${new URL(p.baseUrl).hostname}" is not in this node's allowlist. Ask the operator to allow it.`);
       continue;
     }
@@ -390,7 +394,11 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     }
 
     const candidate: AiCandidate = {
-      provider: p, model, target: providerTarget(p, config, key), keyScope, chosenBy: by,
+      provider: p, model, keyScope, chosenBy: by,
+      // An extension provider's target carries the runner bound to the owner and the key (V6).
+      target: p.type === 'extension'
+        ? { ...providerTarget(p, config, key), runExtension: extensionRunner(storage, config, gaii, p, key) }
+        : providerTarget(p, config, key),
       policyChoseModel: chosen.policyChoseModel && !degradedToFree,
       ...(allowanceRemainingUsd !== undefined ? { allowanceRemainingUsd } : {}),
       ...(degradedToFree ? { degradedToFree } : {}),

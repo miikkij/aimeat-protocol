@@ -11,6 +11,8 @@
  *   still the signal when no caller signal is given at all.
  * @usage pnpm test -- ai-gateway-abort-signal
  * @version-history
+ *   v2.0.1 — 2026-09-28 — The held-call case waits until the request arrives instead of a fixed
+ *     100 ms, which failed under the gate's load (the source was not broken; the test's timing was).
  *   v2.0.0 — 2026-09-28 — Moved from openrouter-abort-signal.test.ts with the behaviour it proves:
  *     the transport's complete() is gone and the gateway (services/ai/gateway.ts) does the same
  *     work. The four cases are unchanged; the call is text() on an OpenAI-compatible target.
@@ -67,8 +69,9 @@ describe('text() abort signal', () => {
     it('an outside abort tears down a call the provider is holding open', async () => {
         const controller = new AbortController();
         const call = ask('/hold', controller.signal);
-        // Let the request actually reach the server before pulling the plug.
-        await new Promise(r => setTimeout(r, 100));
+        // Let the request actually reach the server before aborting. Waited for, not timed: a fixed
+        // 100 ms missed it under the load of `pnpm gate`, where the checks run side by side.
+        for (let waited = 0; held.length === 0 && waited < 5000; waited += 20) await new Promise(r => setTimeout(r, 20));
         expect(held.length).toBeGreaterThan(0);
         controller.abort();
         await expect(call).rejects.toThrow();

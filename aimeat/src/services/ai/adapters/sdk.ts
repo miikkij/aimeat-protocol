@@ -80,6 +80,9 @@ export function languageModel(target: AiTarget, modelId: string): LanguageModelV
         // A self-hosted server legitimately has no key; the factory then sends no Authorization at all.
         ...(target.key ? { apiKey: target.key } : {}),
       }).chatModel(modelId) as LanguageModelV4;
+    case 'extension':
+      // An extension has no package: adapters/extension.ts builds its model (adapterFor('extension')).
+      throw Object.assign(new Error('An extension provider has no AI SDK package; use adapters/extension.ts.'), { status: 500 });
   }
 }
 

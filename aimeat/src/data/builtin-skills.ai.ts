@@ -9,6 +9,7 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   v1.3.0 — 2026-09-28 — configure-routing names the extension provider type (System 2 plan, V6).
  *   v1.2.0 — 2026-09-28 — configure-routing and aimeat-ai-model-policy point to the model catalogue
  *     (GET /v1/ai/models) and say what it decides (System 2 plan, V4).
  *   v1.1.0 — 2026-09-28 — aimeat-ai-model-policy: the owner's model policy for an AI (System 2 plan,
@@ -172,7 +173,10 @@ Three separate "routing" layers — identify which one the owner means:
    \`GET /v1/ai/usage/history\`, where each failed attempt before a fallback is a line of its own.
    The operator's side: \`AIMEAT_AI_PROVIDERS\`, \`AIMEAT_AI_BUILTIN_PROVIDERS\`,
    \`AIMEAT_AI_PROVIDER_EGRESS\` and \`AIMEAT_AI_PROVIDER_TYPES\` on the Config tab; the node's own
-   key is the provider \`node-openrouter\` and answers only an owner whose list is empty.
+   key is the provider \`node-openrouter\` and answers only an owner whose list is empty. A service the
+   node has no type for is a provider of type \`extension\`: an extension of the owner's own whose
+   manifest declares \`provides.ai_provider\` and \`ai.<op>\` actions; the node adds the key to its
+   requests, only for the hosts the manifest lists.
    **Which models exist**, what each serves and what it costs: \`GET /v1/ai/models\` (the model
    catalogue; \`?capability=image&allowed=true\` gives what this caller can use). A retiring or
    retired model shows on its provider in \`aimeat_ai_providers\`: propose another. The operator
