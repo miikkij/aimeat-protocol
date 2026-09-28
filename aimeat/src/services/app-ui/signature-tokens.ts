@@ -7,10 +7,13 @@
  *   stood at 798 lines against the 800 cap); registry.ts re-exports the name, so every importer
  *   keeps the address it had. The list is append-only, and the words beside each token are what
  *   the catalogue hands an AI.
- * @structure SIGNATURE_TOKENS · SERVED_FONT_FAMILIES · unservedFirstFamily()
+ * @structure SIGNATURE_TOKENS · SPRING_BOUNDS · SERVED_FONT_FAMILIES · unservedFirstFamily()
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The spring hand joins the signature: --ak-spring-stiffness, -damping and
+ *     -mass, each a plain number inside SPRING_BOUNDS, so a layout and a Design Book motion part
+ *     can say how the kit's springs feel (the ten motion parts).
  *   v1.1.0 — 2026-09-20 — The two font tokens name the faces this node serves, and
  *     unservedFirstFamily() is what the token bench refuses with.
  *   v1.0.0 — 2026-09-05 — Pure extraction from registry.ts v1.20.0
@@ -71,4 +74,17 @@ export const SIGNATURE_TOKENS: Record<string, string> = {
   '--ak-enter-distance': 'How far content travels on entry, e.g. "0px" turns reveals off.',
   '--ak-enter-stagger': 'The gap between one entering element and the next, e.g. "0ms" lands everything at once, "90ms" deals them like cards.',
   '--ak-blur': 'The glass blur of the chrome, e.g. "0px" for solid chrome.',
+  '--ak-spring-stiffness': 'How hard the look\'s spring pulls toward where a thing is going, a plain number from 60 to 600: higher is snappier, 170 is the house hand. The tab ink, the switch, the menus, the island and every spring() read it.',
+  '--ak-spring-damping': 'How quickly the spring stops swinging, a plain number from 8 to 60: with stiffness 170, 26 lands without overshoot, 20 overshoots a little, 12 bounces.',
+  '--ak-spring-mass': 'How heavy the moving thing feels, a plain number from 0.5 to 3: 1 is the house hand, 1.6 is slow and weighty, 0.8 is light.',
+};
+
+/**
+ * The bounds a spring token's number must sit in. Outside them a control either crawls, rings
+ * for seconds or jumps; inside them every combination settles within the kit's own time budget.
+ */
+export const SPRING_BOUNDS: Readonly<Record<string, readonly [number, number]>> = {
+  '--ak-spring-stiffness': [60, 600],
+  '--ak-spring-damping': [8, 60],
+  '--ak-spring-mass': [0.5, 3],
 };

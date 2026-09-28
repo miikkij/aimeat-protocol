@@ -1,0 +1,97 @@
+/*
+ * @file aimeat-atelier/menu.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The things that open from something (atelier/menu.js): the menu and the context
+ *   menu, the popover and the tooltip. They float above the page at a fixed position the script
+ *   computes; the entrance and the exit are the script's, on the look's spring.
+ *
+ *   The menu's highlight is the ink (controls.css), in the accent with the accent's own ink on
+ *   it. Until the script has placed it, the highlighted row paints its own fill.
+ * @structure .ak-menu/.ak-menu__item · .ak-popover · .ak-tooltip
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.55.0 — 2026-09-28 — Initial (the ten motion parts).
+ */
+
+/* ── The menu ──────────────────────────────────────────────────────────────────────────────── */
+.ak-menu {
+  position: fixed;
+  z-index: 96;
+  isolation: isolate;
+  box-sizing: border-box;
+  min-width: var(--ak-menu-min-w);
+  max-width: min(22rem, calc(100vw - 16px));
+  max-height: min(60vh, 28rem);
+  overflow: auto;
+  padding: 5px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  box-shadow: var(--ak-elev-2);
+  outline: none;
+}
+.ak-menu__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--ak-touch-min);
+  padding: 0 var(--ak-menu-row-pad);
+  border: 0;
+  border-radius: calc(var(--ak-radius-sm) - 3px);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: color calc(var(--ak-motion) * 0.5) var(--ak-ease);
+}
+.ak-menu__item--on { color: var(--ak-accent-ink); }
+/* The highlight IS the focus mark in a menu (focus and highlight always sit on the same row), so
+ * the kit's general focus ring would draw a second one around it. */
+.ak-root .ak-menu__item:focus-visible { outline: none; }
+.ak-menu:not([data-ak-ink]) .ak-menu__item--on { background: var(--ak-accent); }
+.ak-menu__item--danger { color: var(--ak-err-text); }
+.ak-menu__item--danger.ak-menu__item--on { color: var(--ak-accent-ink); }
+.ak-menu__item[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+.ak-menu__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ak-menu__hint { flex: none; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-menu__item--on .ak-menu__hint { color: inherit; }
+.ak-menu__sep { height: var(--ak-line-w); margin: 4px 6px; background: var(--ak-line); }
+.ak-menu .ak-ink { border-radius: calc(var(--ak-radius-sm) - 3px); }
+
+/* ── The popover ───────────────────────────────────────────────────────────────────────────── */
+.ak-popover {
+  position: fixed;
+  z-index: 96;
+  box-sizing: border-box;
+  max-width: min(24rem, calc(100vw - 16px));
+  padding: var(--ak-pad);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  box-shadow: var(--ak-elev-2);
+  outline: none;
+}
+
+/* ── The tooltip: the page's own ink turned around ─────────────────────────────────────────── */
+.ak-tooltip {
+  position: fixed;
+  z-index: 97;
+  max-width: 16rem;
+  padding: 6px 10px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-ink);
+  color: var(--ak-bg);
+  font-size: var(--ak-text-fine);
+  line-height: 1.4;
+  box-shadow: var(--ak-elev-2);
+  pointer-events: none;
+}

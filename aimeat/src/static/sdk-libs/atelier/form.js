@@ -33,6 +33,9 @@
  * @tokens form --ak-range-track · --ak-range-thumb
  * @fork form Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.
  * @version-history
+ *   v0.55.0 — 2026-09-28 — A `toggle` field is the kit's switch (role="switch", the knob stretches
+ *     when pressed and travels on two edge springs) and a `range` field shows its filled share
+ *     and stretches when pulled past an end (controls.js switchMotion and rangeMotion).
  *   v0.54.0 — 2026-09-28 — A field's `width` (short, date, medium, long, full) caps the control at
  *     the width its content needs; the settings-page layout rule in the Atelier spec names it.
  *   v0.53.0 — 2026-09-05 — `type: 'range'` (min, max, step, unit, the live reading beside the
@@ -44,6 +47,7 @@
  */
 import { el, clear, resolve, uid, enter, whileBusy, attention } from './dom.js';
 import { t } from './i18n.js';
+import { switchMotion, rangeMotion } from './controls.js';
 
 /**
  * @typedef {object} FormField
@@ -85,7 +89,7 @@ const NUMERIC = ['number', 'range'];
  * }}
  */
 export function form(spec) {
-  /** @type {Map<string, { field: FormField, input: HTMLElement, error: HTMLElement, wrap: HTMLElement, readout: HTMLElement|null }>} */
+  /** @type {Map<string, { field: FormField, input: HTMLElement, error: HTMLElement, wrap: HTMLElement, readout: HTMLElement|null, motion?: { sync: () => void } }>} */
   const controls = new Map();
   const root = el('form', { class: 'ak-root ak-form', 'data-ak-part': 'root', novalidate: true });
   if (spec.target) resolve(spec.target).appendChild(root);
@@ -197,6 +201,10 @@ export function form(spec) {
       if (field.onChange) field.onChange(valueOf(field.name), field);
     });
     refreshReadout(field.name);
+    // The switch's knob travel and the range's fill and stretch are the same as the standalone
+    // controls' (controls.js), so a declared field and a hand-placed control move alike.
+    if (type === 'toggle') controls.get(field.name).motion = switchMotion(/** @type {HTMLInputElement} */ (input));
+    if (type === 'range') controls.get(field.name).motion = rangeMotion(/** @type {HTMLInputElement} */ (input));
     return wrap;
   }
 
@@ -306,6 +314,7 @@ export function form(spec) {
         if (type === 'checkbox' || type === 'toggle') /** @type {HTMLInputElement} */ (c.input).checked = !!next[name];
         else /** @type {HTMLInputElement} */ (c.input).value = next[name] == null ? '' : String(next[name]);
         refreshReadout(name);
+        if (c.motion) c.motion.sync();
       }
     },
     setError: setError,

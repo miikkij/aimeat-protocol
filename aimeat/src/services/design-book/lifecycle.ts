@@ -24,6 +24,8 @@
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.5.0 — 2026-09-28 — The three spring hands (snappy, soft, heavy) are seeded published as
+ *     `motion` parts from src/data/atelier-motions.ts.
  *   v1.4.0 — 2026-09-26 — The aging round reads the components that no longer pass the bench too, which
  *     every listing leaves out, so they fade like any part nobody takes; and it tells their proposers
  *     once (component-notice.ts).
@@ -47,6 +49,7 @@ import { systemGhiiFor } from '../compliance-register.js';
 import { UI_LAYOUT_PRESETS } from '../app-ui/layouts.js';
 import { AMBIENTS, type AtelierAmbient } from '../../data/atelier-ambients.js';
 import { EFFECTS, type AtelierEffect } from '../../data/atelier-effects.js';
+import { MOTION_RECIPES } from '../../data/atelier-motions.js';
 import { defaultEffectTarget } from './validate.js';
 import { DesignBookService, type DesignBookPart } from './service.js';
 import { DesignBookError, validatePartInput, type PartKind } from './validate.js';
@@ -78,6 +81,11 @@ export async function seedDesignBook(storage: Storage, config: AimeatConfig): Pr
   // The nine effects, each at its defaults where the registry says it lands (the hero band, the
   // figure, or the layer) on the first look it fits: the bench proves the target and the knobs.
   await seedParts(book, system, EFFECTS.map(effectSeed));
+  // The three spring hands: how the kit's live controls feel, one adopt away.
+  await seedParts(book, system, MOTION_RECIPES.map((m) => ({
+    id: m.id, kind: 'motion', title: m.title, summary: m.summary,
+    body: { tokens: { ...m.tokens } }, tags: ['motion', 'spring', 'seed'],
+  })));
 }
 
 /** A part the node seeds: the same shape a proposal carries. */

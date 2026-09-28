@@ -13,6 +13,7 @@
  *   ak-input/ak-input--range/ak-check/ak-toggle · ak-table · ak-search
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.11.0 — 2026-09-28 — .ak-toggle leaves this sheet: it is the switch, drawn in controls.css.
  *   v0.10.0 — 2026-09-05 — The range field: .ak-form__field--range, the .ak-form__range row and
  *     its .ak-form__readout, and .ak-input--range — a track that meets --ak-touch at every size
  *     with a thumb wide enough for a fingertip, both sized by their own tokens
@@ -122,13 +123,13 @@
 }
 .ak-input--range:focus-visible { outline: 2px solid var(--ak-accent); outline-offset: 2px; }
 
-.ak-check, .ak-toggle {
+.ak-check {
   width: 20px;
   height: 20px;
   flex: none;
   accent-color: var(--ak-accent);
 }
-.ak-toggle { width: 36px; }
+/* .ak-toggle is the switch now, drawn in controls.css. */
 
 /* ── Table: real semantics, scrolls in its own box ────────────────────────────────────────── */
 .ak-table {

@@ -49,6 +49,11 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.55.0 — 2026-09-28 — THE MOTION PARTS: controls.css (the travelling ink and the tab row
+ *     that wears it, the switch, the segmented control, the slider's fill, the chart's reading),
+ *     menu.css (menu, popover, tooltip) and island.css (the island and the state button) join
+ *     the imports, and eight per-component tokens join the base block (the switch's knob is
+ *     re-declared for dark so it stays light on a dark track).
  *   v0.54.0 — 2026-09-28 — THE WORKBENCH: workbench.css joins the imports (the side-navigation
  *     frame, the brand cluster, sideNav, statusBand, checkGrid, choiceCards, settingsGroup,
  *     progressFigure, callout and the form's per-field widths), and nine per-component tokens
@@ -352,6 +357,9 @@
 @import url('./aimeat-atelier/ambient.css');
 @import url('./aimeat-atelier/effects.css');
 @import url('./aimeat-atelier/workbench.css');
+@import url('./aimeat-atelier/controls.css');
+@import url('./aimeat-atelier/menu.css');
+@import url('./aimeat-atelier/island.css');
 /* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
 @import url('./aimeat-atelier/looks.css');
 
@@ -587,6 +595,15 @@
   --ak-setgroup-measure:  32.5rem;              /* the cap on its controls column            */
   --ak-progress-figure:   3.5rem;               /* "3 / 10"                                  */
   --ak-callout-pad:       14px;
+  /* The motion parts (0.55.0). */
+  --ak-switch-w:          46px;                 /* the switch's track                        */
+  --ak-switch-h:          28px;
+  --ak-switch-pad:        3px;                  /* between the track's edge and the knob     */
+  --ak-switch-knob:       var(--ak-surface);    /* the knob; the dark block keeps it light   */
+  --ak-menu-min-w:        12rem;
+  --ak-menu-row-pad:      10px;
+  --ak-island-pad:        18px;                 /* a pill island's sides                     */
+  --ak-island-radius:     var(--ak-radius);     /* the card island's corners                 */
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
@@ -608,6 +625,8 @@
   --ak-ok:          var(--color-success, #43c98a);
   --ak-warn:        var(--color-warning, #e0a33a);
   --ak-err:         var(--color-error, #f2695c);
+  /* The switch's knob stays light in the dark: a dark knob on a dark track disappears. */
+  --ak-switch-knob: color-mix(in oklab, var(--ak-ink) 90%, var(--ak-surface));
   /* Dark raises the scrim so one image survives both modes with readable text. */
   --ak-scrim:       color-mix(in oklab, var(--ak-bg) 62%, transparent);
   --ak-elev-1:      var(--elev-card, 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35));

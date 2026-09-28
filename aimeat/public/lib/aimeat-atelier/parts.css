@@ -9,6 +9,7 @@
  * @structure .ak-toasts/.ak-toast · .ak-palette · .ak-compare · .ak-ring · .ak-crew ·
  *   .ak-dropzone · .ak-tour · .ak-poll · .ak-keys/.ak-kbd
  * @version-history
+ *   v0.44.0 — 2026-09-28 — The palette's highlight is the travelling ink.
  *   v0.43.0 — 2026-09-05 — The measured review: the tour's own buttons and a poll option reach
  *     40px of hit area (they were 34 and 38).
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
@@ -67,6 +68,12 @@
   cursor: pointer;
 }
 .ak-palette__item[aria-selected='true'] { background: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface)); }
+/* The highlight travels: the list is its own stacking context and the ink (controls.css) takes
+ * over the selected row's fill once the script has placed it. */
+.ak-palette__list { position: relative; isolation: isolate; }
+.ak-palette__item { position: relative; }
+.ak-palette__list[data-ak-ink] .ak-palette__item[aria-selected='true'] { background: none; }
+.ak-palette__list .ak-palette__ink { border-radius: var(--ak-radius-sm); background: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface)); }
 .ak-palette__hint { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); white-space: nowrap; }
 .ak-palette__empty { padding: 14px 10px; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 

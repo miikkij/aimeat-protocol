@@ -2007,10 +2007,10 @@
      "slug": "g-11-motion",
      "cells": [
       "<strong>Motion</strong>",
-      "Springs, staggered entrances, scroll effects, dragging and a scroll-story director, on motion.dev, anime.js and Lenis. A Less-motion switch and the system setting still all of it.",
-      "Atelier motion, <code>motion</code>, <code>anime</code>, <code>lenis</code>"
+      "Springs, staggered entrances, scroll effects, dragging and a scroll-story director, on motion.dev, anime.js and Lenis. Controls answer a press with visible motion: the chosen tab's marker slides to the next tab, a switch's knob stretches and travels, a menu grows from its button and blinks the chosen row, a slider stretches when pulled past its end, one shape turns from &quot;Agent is writing…&quot; into a card with the result, and a Save button becomes a spinner and then a check mark. How it all feels is three numbers, and the Design Book offers them ready as snappy, soft and heavy. A Less-motion switch and the system setting still all of it.",
+      "Atelier motion, <code>motion</code>, <code>anime</code>, <code>lenis</code>, Design Book <code>motion-spring-*</code>"
      ],
-     "plain": "Motion Springs, staggered entrances, scroll effects, dragging and a scroll-story director, on motion.dev, anime.js and Lenis. A Less-motion switch and the system setting still all of it. Atelier motion, motion, anime, lenis"
+     "plain": "Motion Springs, staggered entrances, scroll effects, dragging and a scroll-story director, on motion.dev, anime.js and Lenis. Controls answer a press with visible motion: the chosen tab's marker slides to the next tab, a switch's knob stretches and travels, a menu grows from its button and blinks the chosen row, a slider stretches when pulled past its end, one shape turns from \"Agent is writing…\" into a card with the result, and a Save button becomes a spinner and then a check mark. How it all feels is three numbers, and the Design Book offers them ready as snappy, soft and heavy. A Less-motion switch and the system setting still all of it. Atelier motion, motion, anime, lenis, Design Book motion-spring-*"
     },
     {
      "slug": "g-11-vendored-libraries",
