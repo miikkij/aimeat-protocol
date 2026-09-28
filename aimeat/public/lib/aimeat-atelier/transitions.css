@@ -26,6 +26,8 @@
  * @structure ::view-transition rules per kind · .ak-curtain and its three shapes · .ak-swap--flip
  *   (the perspective a panel flip turns in) · reduced motion
  * @version-history
+ *   v0.47.0 — 2026-09-28 — The fade names its plus-lighter blend: the kit's `animation` shorthand
+ *     had dropped Chromium's own, and every tab change flashed the page light at its midpoint.
  *   v0.46.0 — 2026-09-02 — The kit's own less-motion switch joins the reduced-motion lock: a
  *     root marked data-ak-motion="less" stops an in-flight move the same way the operating
  *     system's setting does.
@@ -61,14 +63,20 @@
   mix-blend-mode: normal;
 }
 
-/* FADE: the two screens cross. */
+/* FADE: the two screens cross. The blend is NAMED here, not inherited: Chromium gives the two
+   snapshots their plus-lighter blend through a UA animation in the same `animation` list, so the
+   shorthand below had replaced it, the screens were laid over each other at normal blend, and at
+   the midpoint a quarter of the backdrop showed through as a light flash over the whole page
+   (Jouni saw it on the tab row on 2026-09-28; measured: mix-blend-mode "normal" mid-cross). */
 @keyframes ak-vt-out { to { opacity: 0; } }
 @keyframes ak-vt-in { from { opacity: 0; } }
 :root[data-ak-transition='fade']::view-transition-old(root) {
   animation: ak-vt-out var(--ak-transition-span) var(--ak-ease, ease) both;
+  mix-blend-mode: plus-lighter;
 }
 :root[data-ak-transition='fade']::view-transition-new(root) {
   animation: ak-vt-in var(--ak-transition-span) var(--ak-ease, ease) both;
+  mix-blend-mode: plus-lighter;
 }
 
 /* WIPE: the old screen stands still and the new one is clipped in from an edge. The direction
