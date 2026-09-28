@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.17.0 — 2026-09-29 — aimeat-refinery joins after aimeat-decide, from library-packs/sdk-refinery.ts.
  *   v1.16.3 — 2026-09-28 — aimeat-data's aiDoc names the aimeat-config block and AIMEAT.data.appConfig().
  *   v1.16.2 — 2026-09-28 — aimeat-ai moved to library-packs/sdk-ai.ts (max-file-lines) and is spread
  *     back in at the same place; its aiDoc gained the AI roles paragraph there.
@@ -101,6 +102,7 @@ import { SDK_UI_PACKS } from './sdk-ui.js';
 import { LIVING_PACKS } from './sdk-living.js';
 import { PROMPT_PACKS } from './sdk-prompt.js';
 import { DECIDE_PACKS } from './sdk-decide.js';
+import { REFINERY_PACKS } from './sdk-refinery.js';
 import { WORKFLOWS_PACKS } from './sdk-workflows.js';
 import { WEBHOOK_PACKS } from './sdk-webhook.js';
 import { AI_PACKS } from './sdk-ai.js';
@@ -272,6 +274,7 @@ export const SDK_PACKS: LibraryPack[] = [
   },
   ...AI_PACKS,
   ...DECIDE_PACKS,
+  ...REFINERY_PACKS,
   {
     id: 'aimeat-datapackage',
     kind: 'sdk',

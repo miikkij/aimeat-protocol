@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.13.0 — 2026-09-29 — Register aimeat-refinery (an app's side of the mail refinery the node runs).
  *   v1.12.0 — 2026-09-28 — Register aimeat-webhook (an app sends to or reads an owner-allowlisted URL).
  *   v1.11.0 - 2026-09-18 - Register the calendar and print libraries.
  *   v1.10.0 — 2026-09-15 — Register aimeat-push (an installed app receives notifications on its own
@@ -68,6 +69,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'wallet', entry: 'wallet/index.js' },
   { name: 'ai', entry: 'ai/index.js' },
   { name: 'decide', entry: 'decide/index.js' },
+  { name: 'refinery', entry: 'refinery/index.js' },
   { name: 'capabilities', entry: 'capabilities/index.js' },
   { name: 'agents', entry: 'agents/index.js' },
   { name: 'agentface', entry: 'agentface/index.js' },

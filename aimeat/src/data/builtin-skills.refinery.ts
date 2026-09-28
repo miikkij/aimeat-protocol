@@ -16,6 +16,7 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — "In an app": aimeat-refinery.js and its console.
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -111,6 +112,17 @@ key or a reconnect), then run again.
 \`aimeat_schedule_create { kind: "refinery", cron: "0 6 * * *", timezone, display_name, input: { prefix } }\`
 runs one batch each fire, as you: the definition's mailbox must be one you connected, and your four
 permissions are checked again at every fire.
+
+## In an app
+
+An app does not read mail or ask the models itself: \`/v1/libs/aimeat-refinery.js\` (after aimeat-auth)
+starts the node's batch and follows it (\`AIMEAT.refinery.run(prefix, { onProgress })\`), reads the
+queues (\`rows\`, \`counts\`, \`log\`), moves and corrects rows (\`move\`, \`update\`), teaches (\`teach\`),
+and puts the refinery on the node's clock (\`schedule\`, which runs with the page closed; reading the
+schedules needs \`workflow:read\`). With aimeat-atelier.js on the page, \`AIMEAT.refinery.console({
+target, prefix })\` draws the batch figure, the steps, the tallies and the batch rows from kit parts.
+The app asks for \`connections:read-through ai:use organism:rows memory:write\`, its data map names
+TypeSafe and the model provider under \`leaves\`, and the workspace's two row spaces name the app.
 
 ## Teaching it
 

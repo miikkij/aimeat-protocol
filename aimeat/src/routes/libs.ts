@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.11.0 - 2026-09-29 - Serve aimeat-refinery.js: an app's side of the mail refinery the node runs.
  * v2.10.0 - 2026-09-28 - Serve aimeat-webhook.js: an app sends to or reads an owner-allowlisted URL.
  * v2.9.0 - 2026-09-18 - Serve calendar computation and paged printing libraries.
  * v2.8.0 - 2026-09-15 - aimeat-push.js joins SDK_LIB_NAMES: an installed app turns on notifications
@@ -196,6 +197,8 @@ const SDK_LIB_NAMES = [
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
   'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage', 'events',
   'atelier', 'living', 'phaser', 'assets',
+  // aimeat-refinery.js — an app's side of the mail refinery the node runs (2026-09-29).
+  'refinery',
   // aimeat-rows.js — an app's door to an organism row space (the two-hand rule). Built by
   // scripts/build-sdk-libs.ts since 2026-08-29; this list is the second place a lib is named,
   // and a lib missing here is a 404 that the publish gate turns into APP_ARTIFACT_BROKEN.
