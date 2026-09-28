@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-28 — PATCH refuses `cortex` (the bundled crew-defs) on an app a managed package
+ *     install owns, 409 MANAGED_BY_PACKAGE (services/package-managed.ts); the settings stay open.
  *   v1.7.0 — 2026-09-27 — PATCH writes name, description, descriptions, access_code, parked,
  *     forkable and protection through services/app-settings.ts (applyOwnerSettingsUpdate), and
  *     patchRefusal validates them with its parseOwnerSettingsInput, so the MCP tool
@@ -49,6 +51,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
+import { managedChangeRefusal } from '../../services/package-managed.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import {
     applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput,
@@ -306,6 +309,16 @@ export function registerForkManageRoutes(
             if (legalRefusal) {
                 const code = legalRefusal.status === 403 ? 'ACCESS_DENIED' : 'INVALID_INPUT';
                 res.status(legalRefusal.status).json(error(config.nodeId, code, legalRefusal.error, legalRefusal.status, legalRefusal.details));
+                return;
+            }
+        }
+        // The bundled crew-defs are code. On an app a managed package install owns they come from
+        // the package, and everything else in this PATCH is a setting the owner keeps
+        // (services/package-managed.ts). Asked before the first write, like the refusals above.
+        if ('cortex' in body) {
+            const managed = await managedChangeRefusal(storage, owner, 'app', filename, 'code');
+            if (managed) {
+                res.status(managed.status).json(error(config.nodeId, managed.code, managed.message, managed.status, managed.details));
                 return;
             }
         }

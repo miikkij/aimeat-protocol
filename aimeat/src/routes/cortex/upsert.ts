@@ -9,6 +9,8 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.5.0 — 2026-09-28 — A cortex a managed package install owns is refused a redeploy, 409
+ *     MANAGED_BY_PACKAGE (services/package-managed.ts).
  *   v1.4.0 — 2026-09-26 — The presigned cortex upload replaces an installed cortex through
  *     upsertCortex, with mayReplaceOthers false (secaudit 2026-09, R4 4b).
  *   v1.3.0 — 2026-09-26 — The redeploy of an active cortex tears down and re-activates as the caller
@@ -33,6 +35,7 @@ import {
 } from '../../services/cortex-lifecycle.js';
 import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
 import { refreshCortexDependencies } from '../../services/dependency-map.js';
+import { managedChangeRefusal } from '../../services/package-managed.js';
 import {
   snapshotCortexVersion, keptVersionRefusal, cortexCodeOf, cortexLibsAfterDeploy,
 } from '../../services/component-versions.js';
@@ -156,6 +159,10 @@ export async function upsertCortex(
   if (existing.installedBy !== ownerName && !mayReplaceOthers) {
     return upsertRefusal(403, 'FORBIDDEN', 'Not your extension');
   }
+  // A library a managed package install owns is its code, and it changes with the package
+  // (services/package-managed.ts). Asked of the installing owner's instances, whoever calls.
+  const managed = await managedChangeRefusal(storage, existing.installedBy, 'cortex', name, 'code');
+  if (managed) return upsertRefusal(managed.status, managed.code, managed.message, managed.details);
 
   // Idempotency — identical manifest + identical lib bytes ⇒ no-op (no churn, no re-init).
   const currentLibs: Record<string, string> = {};

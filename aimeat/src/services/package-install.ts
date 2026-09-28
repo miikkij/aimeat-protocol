@@ -20,6 +20,8 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.4.0 — 2026-09-28 — `mode`: a managed install locks the code and layout of its components to
+ *     the package (package-managed.ts). Editable stays the default.
  *   v1.3.0 — 2026-09-25 — A SCOPE_DENIED refusal names the words the caller lacks (`missing`) and the
  *     version it would have installed (`target`), so the doors can turn it into a request for the
  *     owner (package-install-requests.ts). A dry run by such a caller answers the preview with
@@ -82,6 +84,11 @@ export interface PackageInstallInput {
     label?: unknown;
     version?: unknown;
     dryRun?: boolean;
+    /**
+     * `managed` locks the code and layout of every component to the package (package-managed.ts);
+     * `editable`, the default, leaves them the owner's to edit. Anything else is refused.
+     */
+    mode?: unknown;
 }
 
 export interface PackageInstallPreview {
@@ -99,6 +106,7 @@ export interface PackageInstallPreview {
         dependencies: string[];
     }>;
     label: string;
+    mode: 'managed' | 'editable';
     /** Present when this caller lacks words the install needs: the real call files a request. */
     status?: 'would_await_owner';
     missing?: string[];
@@ -188,6 +196,14 @@ export async function installPackage(
     const ownerGaii = ownerGhii;
     const { groupId, label, version } = input;
     const isDryRun = input.dryRun === true;
+
+    if (input.mode !== undefined && input.mode !== 'managed' && input.mode !== 'editable') {
+        return {
+            ok: false, status: 400, code: 'INVALID_INPUT',
+            message: 'mode must be "managed" (the package owns the code and layout) or "editable" (you may edit everything)',
+        };
+    }
+    const mode: 'managed' | 'editable' = input.mode === 'managed' ? 'managed' : 'editable';
 
     // Resolve the target PackageRecord
     let pkg: PackageRecord | null;
@@ -293,6 +309,7 @@ export async function installPackage(
                 installOrder: componentOrder,
                 components: validationResults,
                 label: instanceLabel,
+                mode,
                 ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
             },
         };
@@ -403,6 +420,7 @@ export async function installPackage(
         label: instanceLabel,
         installedComponents: plannedComponents,
         status: 'installed',
+        mode,
         installedAt: now,
         updatedAt: now,
     };

@@ -793,6 +793,9 @@ const ALL_SUITES = [
     'test/e2e-mcp-install.ts',
     'test/e2e-packages.ts',
     'test/e2e-package-compose.ts',
+    // A managed install: the package owns the code and layout, the owner keeps the settings, an
+    // update replaces everything, and a fork gives the code back and ends the updates.
+    'test/e2e-package-managed.ts',
     // The msm and memory component types through compose, install, status, and uninstall: the arms
     // of component-registrar no package in the sweep had ever carried.
     'test/e2e-package-components.ts',

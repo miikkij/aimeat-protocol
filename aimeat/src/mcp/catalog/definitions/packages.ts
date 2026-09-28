@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-28 -- aimeat_package_install takes `mode` (managed | editable);
+ *     aimeat_package_instances lists the installed copies and aimeat_package_fork releases a managed one.
  *   v1.4.0 -- 2026-09-25 -- aimeat_package_install_requests: list, read, approve or decline the
  *     owner's package install requests; install and update say that lacking the memory words makes
  *     a request instead of a refusal.
@@ -154,7 +156,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -162,6 +164,29 @@ export const packagesTools: AimeatToolDefinition[] = [
             label: { type: 'string', description: 'What to call this copy, e.g. the company it is for.' },
             version: { type: 'string', description: 'A specific version. Defaults to the latest published one.' },
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
+            mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
+        },
+    },
+    {
+        // The installed copies, which update and fork both address by id.
+        name: 'aimeat_package_instances',
+        description: 'List your owner\'s installed package copies: each one\'s instance_id, package, version, whether it is managed (the package owns the code and layout) or editable, when it was forked, and the names its components were registered under.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', description: 'Only the copies of this package.' },
+            status: { type: 'string', enum: ['installed', 'paused', 'removed'], description: 'Only copies in this state.' },
+        },
+    },
+    {
+        // Releasing a managed install. It is the one act that lets the owner change code the
+        // package owns, and it costs the package's updates, so the description says both.
+        name: 'aimeat_package_fork',
+        description: 'Fork a managed package install: it becomes your own editable copy in place, keeping every address, every record and every schedule, and it receives no further updates from its package. Use it when your owner wants to change the code or layout of a managed install. It cannot be undone; to get the package\'s updates again, install the package again beside it.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            instance_id: { type: 'string', required: true, description: 'The managed copy, from aimeat_package_instances.' },
         },
     },
     {

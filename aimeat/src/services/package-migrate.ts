@@ -29,6 +29,8 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.4.0 — 2026-09-28 — A forked install is refused (409 FORKED). A managed one takes only
+ *     `replace` and `install_new`: `custom` and `skip` would leave code the package did not ship.
  *   v1.3.0 — 2026-09-25 — The words a caller lacks for a memory component are gathered through the
  *     whole pre-flight and refused once at its end, carrying `missing`, the target version and the
  *     instance, so a door can file a request for the owner that the node would then carry out.
@@ -50,6 +52,7 @@ import {
 import { registeredNameFor } from './package-install.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { planInstanceUpdate } from './package-update-plan.js';
+import { forkedUpdateRefusal } from './package-managed.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 
@@ -227,6 +230,21 @@ export async function applyInstanceMigration(
     }
     if (instance.owner !== owner) {
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the instance owner can apply migrations' };
+    }
+    const forked = forkedUpdateRefusal(instance);
+    if (forked) return forked;
+    // A managed install takes the package's version of every component: `custom` would put the
+    // owner's bytes in, and `skip` would leave an older component under the new version number.
+    if (instance.mode === 'managed') {
+        const off = actions.find(a => a && (a.action === 'custom' || a.action === 'skip'));
+        if (off) {
+            return {
+                ok: false, status: 409, code: 'MANAGED_BY_PACKAGE',
+                message: `Component "${off.componentId}": a managed install takes the package's version of every component, `
+                    + 'so only "replace" and "install_new" apply. To keep your own version, fork the install first: '
+                    + `POST /v1/instances/${instanceId}/fork.`,
+            };
+        }
     }
 
     const targetPkg = await storage.getPackageByGroupAndVersion(instance.packageGroupId, targetVersion);

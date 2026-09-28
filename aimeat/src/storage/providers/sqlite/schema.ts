@@ -677,6 +677,12 @@ export function initializeSchema(db: Database.Database): void {
   // column rather than eight scalars, because nothing queries inside it. Mirrors Postgres 0070.
   safeAddColumn('packages', 'upstream', 'TEXT');
 
+  // A managed install takes its code and layout from the package and refuses local edits; an
+  // editable one is every install made before this column existed. `forkedAt` is when the owner
+  // turned a managed install into their own editable copy. Mirrors Postgres 0087.
+  safeAddColumn('package_instances', 'mode', "TEXT DEFAULT 'editable'");
+  safeAddColumn('package_instances', 'forkedAt', 'TEXT');
+
   // The language a person chose to be written to in. Postgres has had this column since the feature
   // shipped; SQLite never did, and `upsertNotificationPreferences` returned the CALLER's object, so
   // the write looked like it took and every push and email from a SQLite node went out in English

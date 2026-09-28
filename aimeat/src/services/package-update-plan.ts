@@ -19,12 +19,15 @@
  *   import { planInstanceUpdate } from '../services/package-update-plan.js';
  *   const out = await planInstanceUpdate({ storage }, caller, instanceId);
  * @version-history
+ *   v1.1.0 — 2026-09-28 — A forked install is refused (409 FORKED); a managed one overwrites every
+ *     changed component, since no edit can be held there (services/package-managed.ts).
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/instances/manage.ts, plus the live-hash fix.
  */
 import type {
     Storage, PackageComponentType, PackageInstanceRecord, PackageRecord,
 } from '../storage/interface.js';
 import { fetchComponentContent, computeHash } from './component-registrar.js';
+import { forkedUpdateRefusal } from './package-managed.js';
 
 export interface ComponentDiff {
     componentId: string;
@@ -70,6 +73,11 @@ export async function planInstanceUpdate(
     if (instance.owner !== caller.owner) {
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the instance owner can check for updates' };
     }
+    const forked = forkedUpdateRefusal(instance);
+    if (forked) return forked;
+    // A managed install cannot hold an owner's edit (services/package-managed.ts refuses every one),
+    // so every changed component is a plain overwrite and nothing waits for a merge.
+    const managed = instance.mode === 'managed';
 
     const latest = await storage.getLatestPublished(instance.packageGroupId);
     if (!latest) {
@@ -111,8 +119,8 @@ export async function planInstanceUpdate(
 
         // The upstream bytes changed, so whether the owner also changed theirs decides between an
         // overwrite and a migration. Read it live rather than from the stored flag.
-        let isCustomized = installed?.customized ?? false;
-        if (installed) {
+        let isCustomized = managed ? false : (installed?.customized ?? false);
+        if (installed && !managed) {
             const live = await fetchComponentContent(storage, installed.type, installed.registeredAs, caller.ownerGhii);
             // A component whose content cannot be read back tells us nothing; the stored flag stands,
             // and the migration path is the safe side of that uncertainty.

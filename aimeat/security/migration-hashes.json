@@ -88,6 +88,7 @@
     "0083_federation_peer_relay_claim_policy.sql": "a047a86242ebcfbc05f0f49419af77b6ddd599a47c1d5a0fcc27e004318c3e05",
     "0084_app_grant_owner_added_scopes.sql": "626be21354bb473c9d9364eeaba263e179fa0cd048b6a7d3bae4ffaa20753069",
     "0085_actions_work_full_identity.sql": "376a414314fabba39a53d319148a5ee0b17157be4eb42c5b2025a02e1fdd4419",
-    "0086_full_identity_on_evidence.sql": "7935ac1975263f68b90a2fc4d35824f90ec594dd8acf03c43326741d0264c26f"
+    "0086_full_identity_on_evidence.sql": "7935ac1975263f68b90a2fc4d35824f90ec594dd8acf03c43326741d0264c26f",
+    "0087_package_instance_mode.sql": "fb585ed05f397fc1cf63c55fc8f6ededb92e3bba7249eff1015bb0a67d59629f"
   }
 }

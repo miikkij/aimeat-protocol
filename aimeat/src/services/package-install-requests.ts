@@ -31,6 +31,7 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
+ *   v1.1.0 — 2026-09-28 — An install request keeps the `mode` it asked for, and the approval installs with it.
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  */
 import { createHash } from 'node:crypto';
@@ -154,8 +155,11 @@ export async function installOrRequest(
     if (out.ok || !out.missing?.length || !out.target) return out;
     const requester = requesterOf(caller, deps.config.nodeId);
     if (!requester) return out;
-    const label = typeof input.label === 'string' && input.label ? { label: input.label } : {};
-    return fileFrom(deps, caller, 'install', requester, out.missing, out.target, null, label, memoryIdsOf(out.target));
+    const options: PackageInstallRequest['options'] = {
+        ...(typeof input.label === 'string' && input.label ? { label: input.label } : {}),
+        ...(input.mode === 'managed' ? { mode: 'managed' as const } : {}),
+    };
+    return fileFrom(deps, caller, 'install', requester, out.missing, out.target, null, options, memoryIdsOf(out.target));
 }
 
 /** Update a whole installed copy, or file a request when the new version needs words the caller lacks. */
@@ -260,6 +264,7 @@ async function perform(deps: RequestDeps, owner: string, ownerGhii: string, requ
     if (request.act === 'install') {
         const out = await installPackage(deps, caller, {
             groupId: request.package.group_id, version: request.package.version, ...(request.options.label ? { label: request.options.label } : {}),
+            ...(request.options.mode ? { mode: request.options.mode } : {}),
         });
         if (!out.ok) return fail(out.status, out.code, out.message);
         if (out.kind !== 'installed') return fail(500, 'INSTALL_FAILED', 'The install answered a preview instead of installing.');

@@ -33,6 +33,7 @@
  *   const filed = await fileInstallRequest({ storage, config }, ownerGhii, draft);
  *   await settleInstallRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   v1.1.0 — 2026-09-28 — `options.mode`: a request for a managed install says so, and its summary shows it.
  *   v1.0.1 — 2026-09-26 — The key builder is installRequestKey: check:trusted-keys resolves a builder by
  *     its name across the tree, and read `requestKey` as app-members.ts's `appmemreq.` builder.
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
@@ -88,7 +89,8 @@ export interface PackageInstallRequest {
     package: { group_id: string; name: string; version: string; record_id: string; digest: string };
     /** The installed copy an update or a migration moves, as it stood when it was asked. */
     instance: { id: string; version: string; record_id: string; content_digest: string | null } | null;
-    options: { label?: string; actions?: MigrationRequest[] };
+    /** `mode` is what the install asked for (package-managed.ts); absent means editable. */
+    options: { label?: string; actions?: MigrationRequest[]; mode?: 'managed' | 'editable' };
     /** The components that write into the owner's memory: what the owner is asked about. */
     memory_parts: string[];
     requested_by: InstallRequester;
@@ -162,6 +164,7 @@ export function summarizeRequest(request: PackageInstallRequest, now = Date.now(
         package: { group_id: request.package.group_id, name: request.package.name, version: request.package.version },
         instance_id: request.instance?.id ?? null,
         label: request.options.label ?? null,
+        mode: request.options.mode ?? 'editable',
         actions: request.options.actions?.map(a => ({ componentId: a.componentId, action: a.action, has_content: typeof a.content === 'string' })) ?? null,
         memory_parts: request.memory_parts,
         requested_by: {

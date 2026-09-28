@@ -3974,6 +3974,17 @@ components:
         status:
           type: string
           enum: [installed, paused, removed]
+        mode:
+          type: string
+          enum: [managed, editable]
+          description: >-
+            `managed`: the package owns the code and layout of every component, a local change to them
+            is refused with 409 MANAGED_BY_PACKAGE, and an update replaces them. `editable`: the owner
+            may edit everything, and an update keeps what they edited.
+        forkedAt:
+          type: string
+          format: date-time
+          description: When the owner forked this managed install. A forked install receives no updates.
         installedAt:
           type: string
           format: date-time
@@ -43843,7 +43854,11 @@ paths:
         /v1/package-install-requests/{id}/decision. A dry run by such a caller answers the preview
         with `status: would_await_owner` and `missing`. A translation component writes only the
         installed copy's own `i18n.<registered name>` record and costs nothing beyond packages:write.
-        An ecosystem app is refused. The owner in person passes.
+        An ecosystem app is refused. The owner in person passes. With `mode: managed` the package owns
+        the code and layout of every component: a local change to them is refused with 409
+        MANAGED_BY_PACKAGE, an update replaces them, and the owner changes only the settings (name,
+        description, access code, parking, search visibility, legal texts) until they fork the install
+        at POST /v1/instances/{id}/fork. `editable`, the default, leaves everything the owner's to edit.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -43862,6 +43877,12 @@ paths:
               properties:
                 label: { type: string }
                 version: { type: string, description: 'Specific version to install; defaults to latest published.' }
+                dry_run: { type: boolean, description: 'Report what would be registered and register nothing.' }
+                mode:
+                  type: string
+                  enum: [managed, editable]
+                  default: editable
+                  description: '`managed`: the package owns the code and layout. `editable`: the owner may edit everything.'
       responses:
         '201':
           description: Package installed
@@ -44038,6 +44059,9 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [installed, paused, removed] }
+        - name: packageGroupId
+          in: query
+          schema: { type: string }
         - name: limit
           in: query
           schema: { type: integer, default: 50 }
@@ -44105,6 +44129,49 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Instance not found
+
+  /v1/instances/{id}/fork:
+    post:
+      operationId: forkInstance
+      summary: Fork a managed install
+      description: >-
+        A managed install becomes the owner's own editable copy in place: every address, every record
+        and every schedule stays, `mode` becomes `editable` and `forkedAt` records when. It receives no
+        further updates from its package: check-update, update and apply-migration answer 409 FORKED.
+        Only the instance's owner may fork it (403 FORBIDDEN otherwise). An install that is not managed
+        answers 409 NOT_MANAGED. Requires packages:write (an owner session passes).
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The forked instance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageInstanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Instance not found
+        '409':
+          description: '`NOT_MANAGED`: the install is already editable.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/instances/{id}/status:
     get:

@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-28 — aimeat_package_install sends `mode` (managed | editable), as the node's own tool does;
+ *     aimeat_package_instances and aimeat_package_fork over GET /v1/instances and POST /v1/instances/:id/fork.
  *   2026-09-28 — aimeat_image_generate takes `role`, the AI role the call runs as, sent to POST /v1/ai/image.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.10.0 -- 2026-09-27 -- The versions, screenshot, seo, marks, visitors, visitors_measure, legal and
@@ -115,11 +117,13 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     label: z.string().optional().describe('What to call this copy, e.g. the company it is for'),
     version: z.string().optional().describe('A specific version (default: the latest published one)'),
     dry_run: z.boolean().optional().describe('Report what would be registered and register nothing'),
-  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run }) => {
+    mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout. "editable" (default): you may edit everything'),
+  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode }) => {
     const body: Record<string, unknown> = {};
     if (label !== undefined) body.label = label;
     if (version !== undefined) body.version = version;
     if (dry_run !== undefined) body.dry_run = dry_run;
+    if (mode !== undefined) body.mode = mode;
     return out(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/install`, body));
   });
 
@@ -138,6 +142,24 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (request_id) return out(await client.get(`/v1/package-install-requests/${encodeURIComponent(request_id)}`));
     return out(await client.get('/v1/package-install-requests'));
   });
+
+  // The installed copies, which update and fork both address by id.
+  mcp.tool('aimeat_package_instances', descriptionFor('aimeat_package_instances'), {
+    group_id: z.string().optional().describe('Only the copies of this package'),
+    status: z.enum(['installed', 'paused', 'removed']).optional().describe('Only copies in this state'),
+  }, annotationsFor('aimeat_package_instances'), async ({ group_id, status }) => {
+    const qs = new URLSearchParams();
+    if (group_id !== undefined) qs.set('packageGroupId', group_id);
+    if (status !== undefined) qs.set('status', status);
+    const q = qs.toString();
+    return out(await client.get(`/v1/instances${q ? `?${q}` : ''}`));
+  });
+
+  // Releasing a managed install: it becomes editable in place and its updates stop.
+  mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), {
+    instance_id: z.string().describe('The managed copy, from aimeat_package_instances'),
+  }, annotationsFor('aimeat_package_fork'), async ({ instance_id }) =>
+    out(await client.post(`/v1/instances/${encodeURIComponent(instance_id)}/fork`, {})));
 
   // ───────────────────────────────────────────────────────────────────────────────────────────────
   // THE APP TOOLS TALK ABOUT APPS. Until 2026-08-16 the four below pointed at /v1/packages, a

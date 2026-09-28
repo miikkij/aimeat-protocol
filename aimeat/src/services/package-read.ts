@@ -14,15 +14,17 @@
  *   THE CALLER IS AN OWNER NAME OR NOTHING. Anonymous reads pass `undefined`, which is the same
  *   thing the routes do when there is no session; nothing here reads a request.
  * @structure PackageReadCaller · listPackagesFor · getPackageFor · getPackageVersionFor ·
- *   listPackageVersionsFor
+ *   listPackageVersionsFor · listInstancesFor
  * @usage
  *   import { getPackageFor } from '../services/package-read.js';
  *   const pkg = await getPackageFor(storage, groupId, req.auth?.owner);
  * @version-history
+ *   v1.1.0 — 2026-09-28 — listInstancesFor: the owner's installed copies, for GET /v1/instances and
+ *     the aimeat_package_instances MCP tool.
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/packages.ts (four read routes). Behaviour
  *     unchanged; the node MCP surface gains list and get through it.
  */
-import type { Storage, PackageRecord, PackageFilter } from '../storage/interface.js';
+import type { Storage, PackageRecord, PackageFilter, PackageInstanceRecord } from '../storage/interface.js';
 
 /** The owner name reading, or undefined when nobody is signed in. */
 export type PackageReadCaller = string | undefined;
@@ -114,4 +116,20 @@ export async function listPackageVersionsFor(
         versions: result.versions.filter(v => v.visibility === 'public' || v.author === caller),
         total: result.total,
     };
+}
+
+/**
+ * The owner's installed copies of packages. Only ever the caller's own: an install is filed under
+ * the bare account name that installed it (package-install.ts), and nothing here takes another.
+ * GET /v1/instances and the aimeat_package_instances MCP tool both read through this.
+ */
+export async function listInstancesFor(
+    storage: Storage, owner: string,
+    query: { packageGroupId?: string; status?: string; limit?: number; offset?: number } = {},
+): Promise<{ instances: PackageInstanceRecord[]; total: number }> {
+    const limit = Math.min(200, Math.max(1, query.limit ?? 50));
+    const offset = Math.max(0, query.offset ?? 0);
+    return storage.listInstances({
+        owner, packageGroupId: query.packageGroupId, status: query.status, limit, offset,
+    });
 }

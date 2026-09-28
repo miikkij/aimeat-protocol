@@ -6,6 +6,8 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-28 — POST /v1/instances/:id/fork: a managed install becomes editable in place and
+ *     stops receiving updates (services/package-managed.ts).
  *   v1.2.0 — 2026-09-14 — requireLocalSession on every door. Each one compares `instance.owner`
  *     against `req.auth.owner`, and a federated login mints that as the local part of the visitor's
  *     HOME name — so a visitor read, updated and removed the instances of whoever here shares it.
@@ -32,6 +34,8 @@ import {
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
 import { planInstanceUpdate } from '../../services/package-update-plan.js';
+import { forkPackageInstance } from '../../services/package-managed.js';
+import { listInstancesFor } from '../../services/package-read.js';
 
 // ── Register instance management routes ───────────────────────────────
 
@@ -45,16 +49,10 @@ export function registerManageRoutes(
     const owner = req.auth!.owner;
     const status = req.query.status as string | undefined;
     const packageGroupId = req.query.packageGroupId as string | undefined;
-    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string ?? '50', 10)));
-    const offset = Math.max(0, parseInt(req.query.offset as string ?? '0', 10));
+    const limit = parseInt(req.query.limit as string ?? '50', 10) || 50;
+    const offset = parseInt(req.query.offset as string ?? '0', 10) || 0;
 
-    const result = await storage.listInstances({
-      owner,
-      packageGroupId,
-      status,
-      limit,
-      offset,
-    });
+    const result = await listInstancesFor(storage, owner, { packageGroupId, status, limit, offset });
 
     res.json(success(config.nodeId, { instances: result.instances, total: result.total }));
   });
@@ -163,6 +161,20 @@ export function registerManageRoutes(
     res.json(success(config.nodeId, instance, [
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${id}/status` },
       { description: 'Check for updates', method: 'GET', url: `/v1/instances/${id}/check-update` },
+    ]));
+  });
+
+  // POST /v1/instances/:id/fork — A managed install becomes the owner's own editable copy, in place.
+  // Every address and record stays; the package's updates stop (services/package-managed.ts).
+  router.post('/v1/instances/:id/fork', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
+    const id = req.params.id as string;
+    const out = await forkPackageInstance(storage, { owner: req.auth!.owner }, id);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.json(success(config.nodeId, out.instance, [
+      { description: 'View instance', method: 'GET', url: `/v1/instances/${id}` },
     ]));
   });
 

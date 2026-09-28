@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-09-28 — An app a managed package install owns is refused a new version (409
+ *     MANAGED_BY_PACKAGE, services/package-managed.ts) unless the package itself registers it.
  *   2026-09-28 — A declared model the catalogue does not know is a hint (app-ai-model-hints.ts; System 2 plan, V5).
  *   2026-09-26 — A provenance declaration the caller may not make (no provenance:write) is refused
  *     above the dry-run return, 403 SCOPE_DENIED with the held scopes (bbfbeca149de): the mint threw
@@ -126,6 +128,7 @@ import { appSeoIndexable } from './app-seo.js';
 import { announceApp } from './indexnow.js';
 import { logger } from '../utils/logger.js';
 import { refreshAppDependencies } from './dependency-map.js';
+import { managedChangeRefusal } from './package-managed.js';
 
 /**
  * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
@@ -324,6 +327,13 @@ export async function publishApp(
 
   const live = isUpdate ? await storage.getApp(ownerGhii, filename) : null;
   const prev = live?.manifest;
+  // AN APP A MANAGED INSTALL OWNS changes only through its package (services/package-managed.ts).
+  // The package's own update registers through here with source `package-install`, which is the one
+  // publish the lock lets through. Above the dry run, so a dry run answers what the publish would.
+  if (isUpdate && input.source !== 'package-install') {
+    const managed = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
+    if (managed) return { refusal: managed };
+  }
   if (delegated) {
     const forbidden = (requested.priceMorsels !== undefined && requested.priceMorsels !== (prev?.priceMorsels ?? 0))
       || (requested.licenseType !== undefined && requested.licenseType !== prev?.licenseType)
