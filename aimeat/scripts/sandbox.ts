@@ -202,6 +202,22 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         AIMEAT_CONNECTIONS_ENABLED: 'true',
         AIMEAT_CONNECT_FAKE_BASE_URL: `http://127.0.0.1:${port + MAIL_PORT_OFFSET}`,
         AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
+        // THE DECISION MODEL is the same local server's stand-in, which answers each sample message
+        // with the class a person would give it. The key is made up; it goes to 127.0.0.1 only.
+        AIMEAT_DECIDE_ENABLED: 'true',
+        AIMEAT_DECIDE_BASE_URL: `http://127.0.0.1:${port + MAIL_PORT_OFFSET}/v1/systemone`,
+        AIMEAT_TYPESAFE_INSTANCE_KEY: 'sandbox-decide-key',
+        // THE COMPLETION MODEL too: the node's OpenRouter address is the same server's stand-in, which
+        // answers an extraction with the sample's known fields, files (a scanned PDF) included. The
+        // override is refused on a public node; the sandbox is not one.
+        AIMEAT_AI_FIXED_BASEURL_OVERRIDES: JSON.stringify({ openrouter: `http://127.0.0.1:${port + MAIL_PORT_OFFSET}/ai/v1` }),
+        AIMEAT_OPENROUTER_INSTANCE_KEY: 'sandbox-ai-key',
+        // A model name the catalogue does not know, so a files call is not refused for a model that
+        // cannot read PDFs (openrouter/free, the default, cannot).
+        AIMEAT_MODEL_DEFAULT_CHAT: 'sandbox/refinery-model', AIMEAT_MODEL_DEFAULT_EXECUTION: 'sandbox/refinery-model',
+        AIMEAT_MODEL_DEFAULT_VISION: 'sandbox/refinery-model', AIMEAT_MODEL_FREE_FALLBACK: 'sandbox/refinery-model',
+        // A node key is spent from each owner's allowance; the stand-ins cost nothing, so give some.
+        AIMEAT_CHAT_FREE_ALLOWANCE_USD: '5',
         AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false', AIMEAT_PORTFOLIO_HOST: '',
         AIMEAT_CO_ORIGIN_ENABLED: 'false',
     };

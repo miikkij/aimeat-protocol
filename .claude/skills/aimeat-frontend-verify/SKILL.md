@@ -13,6 +13,8 @@ Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and pas
 
 **A published app is checked signed in, in the sandbox, before anyone sees it in production.** Publish it to the sandbox (`POST /v1/apps` with an owner token from `.sandbox.json`) and open `<baseUrl>/v1/apps/<owner>/<file>?mode=inline`: it redirects to the app's own origin, `<name>.apps.localhost:<port>`, where the pill's Sign In opens the same grant window as on aimeat.io; sign in there with a sandbox owner. Until 2026-09-29 the sandbox ran apps in an opaque frame whose sign-in the browser refused, and Postinjalostamo's corrections were found by Jouni in production instead.
 
+**An app that reads mail or asks a model is checked on the sandbox's stand-ins.** The first owner is connected to a test mailbox (18 sample messages, a PDF invoice with a text layer and a scanned one; the connection id is `mailbox` in `.sandbox.json`), and the node's decision model and completion model are local stand-ins that answer each sample with the class and fields a person would give it. A batch, a classification or an extraction therefore runs in the sandbox with no paid key, and its result is known before you look.
+
 If you could not drive the browser (MCP unavailable, server down, no credentials), say so. Do not report it as working.
 
 ## A change to the look is one of two kinds, and says which
