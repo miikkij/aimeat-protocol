@@ -539,6 +539,10 @@ const ALL_SUITES = [
     // operator sets it, and the OpenAI-compatible stub on an ephemeral port, so the model the node
     // sent is read from what arrived. Follows the runner's backend.
     'test/e2e-ai-model-policy.ts',
+    // AI providers and routing (System 2, V3): its own node on 40439 with the fixed provider types
+    // pointed at one stub (each at its own path) and a node key, so which provider a request reached,
+    // with which key, is read from what arrived. Follows the runner's backend.
+    'test/e2e-ai-providers.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
     // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.

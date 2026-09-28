@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-28 — `ai.providers.`, `ai.apikey.` and `ai.routing.` make twenty: the owner's AI
+ *     providers, their keys and the routing (System 2, V3).
  *   v1.x — 2026-09-28 — `ai.policy.` is the seventeenth: the owner's model policy, by its own name, so an
  *     app's own `ai.summary` stays user data.
  *   v1.x — 2026-09-25 — `workflows.` is the sixteenth: a trigger runs a saved definition on the
@@ -56,7 +58,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all seventeen, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all twenty, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -83,8 +85,11 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // `workflows.` (2026-09-25): a trigger runs the saved definition on the authority of the
         // principal it names as its saver, and the engine advances a run from its record. Written
         // past the workflow doors, either could name its own saver and its own steps.
+        // `ai.providers.`, `ai.apikey.` and `ai.routing.` (2026-09-28, System 2 V3): where the owner's
+        // AI calls go and with which key, and which provider answers first. An app that could write a
+        // provider record could send the owner's prompts and key to an address of its own.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'ai.policy.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.routing.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
         );
     });
 

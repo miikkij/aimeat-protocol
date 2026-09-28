@@ -21,6 +21,8 @@
  * @structure SECRET_RECORD_KEYS · isSecretRecordKey · shownMemoryValue · secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.3.0 — 2026-09-28 — System 2's provider keys: `ai.apikey.provider.<id>` and
+ *     `ai.apikey.agent.<agent>.<id>`, matched by the `ai.apikey.` prefix.
  *   v1.2.0 — 2026-09-23 — The key of an owner's own decision provider (`decide.apikey.provider.<id>`).
  *   v1.1.0 — 2026-09-20 — `decide.apikey` joins the list (it had been readable as ciphertext through
  *     the generic doors since 2026-09-19), and so do the per-agent key records of both models,
@@ -35,6 +37,9 @@ export const OPENROUTER_KEY_RECORD = 'openrouter.apikey';
  *  module stays a leaf the memory doors can import without pulling the decide service in. */
 export const DECIDE_KEY_RECORD_KEY = 'decide.apikey';
 
+/** System 2's AI provider keys, named here so this module stays a leaf. */
+export const AI_KEY_PREFIX = 'ai.apikey.';
+
 /** The memory keys whose value holds a credential. Matched exactly: a key is an address. */
 export const SECRET_RECORD_KEYS: ReadonlySet<string> = new Set([OPENROUTER_KEY_RECORD, DECIDE_KEY_RECORD_KEY, PSP_RECORD_KEY]);
 
@@ -46,6 +51,9 @@ export const AGENT_KEY_PREFIXES: readonly string[] = [
   `${OPENROUTER_KEY_RECORD}.agent.`, `${DECIDE_KEY_RECORD_KEY}.agent.`,
   // The key of an owner's own decision provider (services/decide/providers.ts): its id is the tail.
   `${DECIDE_KEY_RECORD_KEY}.provider.`,
+  // System 2's provider keys (services/ai/provider-store.ts): the owner's `ai.apikey.provider.<id>`
+  // and an agent's `ai.apikey.agent.<agent>.<id>`. One prefix covers both.
+  AI_KEY_PREFIX,
 ];
 
 export function isSecretRecordKey(key: unknown): boolean {
@@ -70,6 +78,10 @@ export function shownMemoryValue(key: string, value: unknown): unknown {
 export function secretRecordWriteRefusal(key: string): { code: string; message: string } {
   const door = key.startsWith(`${DECIDE_KEY_RECORD_KEY}.provider.`)
     ? 'PUT /v1/ai/decide/providers/{id} (the owner in person)'
+    : key.startsWith(`${AI_KEY_PREFIX}provider.`)
+    ? 'PUT /v1/ai/providers/{id}/key (the AI settings page, the owner in person)'
+    : key.startsWith(`${AI_KEY_PREFIX}agent.`)
+    ? 'PUT /v1/agents/{name}/ai-keys with a provider (the agent\'s page)'
     : AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
     ? 'PUT /v1/agents/{name}/ai-keys (the agent\'s page)'
     : key === OPENROUTER_KEY_RECORD

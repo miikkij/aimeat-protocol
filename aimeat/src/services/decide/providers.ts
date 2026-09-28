@@ -40,6 +40,9 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   v1.4.0 — 2026-09-28 — The id rule, isObj, the loopback test and the egress list parser moved to
+ *     services/ai-provider-common.ts (a pure move, System 2 plan V3), so System 2's provider records
+ *     share them. Behaviour unchanged.
  *   v1.3.0 — 2026-09-24 — The built-in laya and von send AIMEAT_DECIDE_LAYA_KEY and
  *     AIMEAT_DECIDE_VON_KEY as their bearer, as jeff sends AIMEAT_DECIDE_JEFF_KEY. The two are
  *     `optional`: unset, the call carries no key, so a model started without one still answers.
@@ -66,7 +69,9 @@ import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { isLinkLocalHost } from '../../utils/url-validator.js';
+import {
+  isObj, isLoopbackHost as LOOPBACK, PROVIDER_ID_RE, PROVIDER_ID_PROBLEM as ID_PROBLEM, providerIdOf, egressOriginsOf,
+} from '../ai-provider-common.js';
 import { DecideError } from './errors.js';
 import { estimateTokens, type JevQuestion, type LimitViolation } from './limits.js';
 import { SYSTEMONE_ADAPTERS } from './systemone-client.js';
@@ -121,8 +126,6 @@ export interface DecisionProvider {
   adapter?: string;
 }
 
-const PROVIDER_ID_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
-const ID_PROBLEM = "id: lower-case letters, digits and '-', 2 to 63 characters.";
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const ENV_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 export const PROVIDER_PREFIX = 'decide.providers.';
@@ -168,8 +171,6 @@ export const BUILTIN_PROVIDERS: Readonly<Record<string, Omit<DecisionProvider, '
   },
 });
 
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
-
 /**
  * The key a provider with `env` auth sends: its variable's value on this node, trimmed. Null when it
  * sends none: any other auth, or an `optional` variable left unset. A required variable left unset is
@@ -209,28 +210,12 @@ function configuredProvider(config: AimeatConfig): DecisionProvider {
   };
 }
 
-/** This machine, for the one word that decides whether the data leaves it. */
-const LOOPBACK = (host: string): boolean => host === 'localhost' || host === '::1' || host === '[::1]' || /^127\./.test(host);
-
 /**
  * The operator's egress list, as origins. An entry that is not an http(s) address, carries a path or
  * credentials, or names a link-local address is left out and logged, so a typo cannot widen the list.
  */
 export function providerEgressOrigins(config: AimeatConfig): string[] {
-  const out: string[] = [];
-  for (const entry of (config.decideProviderEgress ?? '').split(',').map(s => s.trim()).filter(Boolean)) {
-    const u = URL.canParse(entry) ? new URL(entry) : null;
-    const ok = u && (u.protocol === 'http:' || u.protocol === 'https:') && !u.username && !u.password
-      && (u.pathname === '/' || u.pathname === '') && !u.search && !isLinkLocalHost(u.hostname);
-    if (!ok) {
-      logger.error('[decide] an AIMEAT_DECIDE_PROVIDER_EGRESS entry was refused', {
-        entry, fix: 'scheme, host and port only, e.g. http://127.0.0.1:8801 or http://laya:8000; never a link-local address',
-      });
-      continue;
-    }
-    if (!out.includes(u.origin)) out.push(u.origin);
-  }
-  return out;
+  return egressOriginsOf(config.decideProviderEgress, 'decide', 'AIMEAT_DECIDE_PROVIDER_EGRESS');
 }
 
 /**
@@ -243,16 +228,8 @@ export function providerAllowOrigins(provider: DecisionProvider, config: AimeatC
   return providerEgressOrigins(config).includes(origin) ? [origin] : [];
 }
 
-/**
- * A provider id as every door reads it: trimmed, then held to PROVIDER_ID_RE, or null. ONE reading
- * for the record, the taken-id guard, the key it is stored under and delete (invariant 13): the
- * guard once read the path id as sent while the record held it trimmed, so " typesafe" passed the
- * guard and was stored as an owner provider under the node's own id, where delete never found it.
- */
-function providerIdOf(raw: unknown): string | null {
-  const id = typeof raw === 'string' ? raw.trim() : '';
-  return PROVIDER_ID_RE.test(id) ? id : null;
-}
+// providerIdOf, the id rule, isObj, the loopback test and the egress list parser live in
+// services/ai-provider-common.ts since v1.4.0: System 2's provider records use the same ones.
 
 /**
  * Read one provider record from untrusted input: the operator's JSON or an owner's request body.

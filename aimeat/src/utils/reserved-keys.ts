@@ -19,6 +19,8 @@
  *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.16.0 — 2026-09-28 — `ai.providers.`, `ai.apikey.` and `ai.routing.` join the list: the owner's
+ *     AI providers, their keys and the routing (System 2 plan, V3).
  *   v1.15.0 — 2026-09-28 — `ai.policy.` joins the list: the owner's model policy (System 2 plan, V2).
  *   v1.14.0 — 2026-09-25 — `workflows.` joins the list: a trigger runs a saved definition on the
  *     authority of the saver it names, and the engine advances a run from its record.
@@ -187,6 +189,16 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // each server-read record of the AI layer joins here by its own prefix, as it arrives. Searched
   // 2026-09-28: nothing writes `ai.policy.` through the memory API; it is new.
   'ai.policy.',
+  // 2026-09-28: the provider layer of System 2 (plan 04 and 11), each by its own prefix for the same
+  // reason. `ai.providers.` says where the owner's AI calls go and with which model: an app that
+  // could write one could point the owner's key at its own address. `ai.apikey.` holds the keys
+  // (also on the credential list, services/secret-records.ts). `ai.routing.` holds which provider
+  // answers first and whether a fallback may send data off this machine. The owner's routes
+  // (/v1/ai/providers, /v1/ai/routing) and the propose-and-confirm tool are the writers. Searched
+  // 2026-09-28: nothing writes any of the three through the memory API; they are new.
+  'ai.providers.',
+  'ai.apikey.',
+  'ai.routing.',
 ] as const;
 
 /**

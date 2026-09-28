@@ -22,6 +22,9 @@
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
  *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
+ *   v2.1.0 — 2026-09-28 — Providers (System 2 plan, V3): the owner's candidates are tried by their
+ *     rules (services/ai/route-run.ts), a call may name a `provider` and turn `fallback` off, the
+ *     attempts that failed before a fallback are usage rows of their own, and the result has `route`.
  *   v2.0.0 — 2026-09-28 — Through the shared gate (System 2 plan, V1): prepareAiCall with op
  *     `image`, the gateway's image(), settleAiCall. What changes for a person: an agent's own key and
  *     the node's key can pay for a picture the way they pay for text (the node's only when the
@@ -40,8 +43,12 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
-import { AiCompletionError, prepareAiCall, settleAiCall, targetOf } from './ai-completion.js';
+import {
+  AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
+} from './ai-completion.js';
 import { image as gatewayImage } from './ai/gateway.js';
+import { runRoute, type AiRoute } from './ai/route-run.js';
+import type { AiCandidate } from './ai/route-plan.js';
 import { contentHashOf } from './ai-provenance.js';
 import type { CallerClass } from './ai/policy.js';
 import { logger } from '../utils/logger.js';
@@ -75,6 +82,9 @@ export interface GenerateForOwnerOptions {
   /** Whose call this is and the app its grant names, for the owner's model policy. */
   caller?: CallerClass;
   verifiedApp?: string;
+  /** A provider the call names (an id or a type), and the call's word on fallback. */
+  provider?: string;
+  fallback?: boolean;
 }
 
 export interface GenerateForOwnerResult {
@@ -96,6 +106,8 @@ export interface GenerateForOwnerResult {
   provenance?: AiProvenanceRecordRow;
   /** Which pocket paid: the agent's key, the owner's own, or the node's allowance. */
   keySource: 'agent' | 'own' | 'node';
+  /** Who chose the provider, who answered, and every attempt (services/ai/route-run.ts). */
+  route: AiRoute;
 }
 
 /** `image/png` -> `png`, defaulting to png rather than guessing something exotic. */
@@ -140,16 +152,28 @@ export async function generateForOwner(
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'image', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
   });
 
   let result;
+  let answered: AiCallPlan;
+  let route: AiRoute;
   try {
-    result = await gatewayImage({
-      target: targetOf(plan), model: plan.model, prompt,
+    const run = await runRoute({
+      storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
+      allowFallback: plan.allowFallback, rules: plan.rules, ...(opts.signal ? { signal: opts.signal } : {}),
+    }, (c) => gatewayImage({
+      target: c.target, model: c.model, prompt,
       ...(opts.size ? { size: opts.size } : {}),
       ...(opts.signal ? { signal: opts.signal } : {}),
-    });
+    }));
+    result = run.result;
+    answered = planFor(plan, run.candidate);
+    route = run.route;
+    if (route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: opts.appId, source: 'ai-image' });
   } catch (e) {
+    const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
+    if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-image' });
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
     if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
@@ -172,7 +196,7 @@ export async function generateForOwner(
     createdAt: new Date().toISOString(),
   });
 
-  const settled = await settleAiCall(storage, config, gaii, plan, {
+  const settled = await settleAiCall(storage, config, gaii, answered, {
     model: result.model,
     // Image models are priced per image rather than per token, so the authoritative number is the
     // cost. Zero tokens is the honest report, not a gap.
@@ -203,6 +227,7 @@ export async function generateForOwner(
       remainingUsd: Math.max(0, dailyBudget - spent),
     },
     ...(settled.provenance ? { provenance: settled.provenance } : {}),
-    keySource: plan.keyScope,
+    keySource: answered.keyScope,
+    route: { ...route, attempts: route.attempts.map(a => a.ok ? { ...a, costUsd } : a) },
   };
 }

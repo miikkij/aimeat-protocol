@@ -24,19 +24,24 @@
  * @structure
  *   - text() — one completion, with the empty-answer retry
  *   - image() — one picture, through the image adapter
- *   - transcribeAudio() — one transcript, through the audio adapter
+ *   - transcribeAudio() — one transcript, through the audio adapter or a provider package's model
+ *   - openAiChat() / speaksOpenAiChat — an OpenAI chat answer from a provider that does not speak it
  *   - GatewayError — the error shape callers map to their own codes
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The direct providers (System 2 plan, V3): a transcription from a provider's
+ *     own package (openai, xai, mistral) is read from the AI SDK's result, an empty one included;
+ *     openAiChat() answers the proxy and the voice stream for an Anthropic provider.
  *   v1.0.0 — 2026-09-28 — Initial (V1 of the System 2 plan, docs/internal/llmproviderintegrations/).
  */
-import { generateText, generateImage, transcribe, APICallError } from 'ai';
+import { generateText, generateImage, transcribe, APICallError, NoTranscriptGeneratedError } from 'ai';
 import type { ImageModelV4, LanguageModelV4, TranscriptionModelV4 } from '@ai-sdk/provider';
 import { logger } from '../../utils/logger.js';
 import type { AiTarget } from './types.js';
-import { adapterFor } from './adapters/index.js';
+import { adapterFor, openAiChat as adapterOpenAiChat, speaksOpenAiChat } from './adapters/index.js';
 import { COMPATIBLE_OPTIONS_KEY } from './adapters/sdk.js';
 import type { AimeatImageMetadata } from './adapters/image.js';
-import type { AimeatTranscriptionOptions } from './adapters/audio.js';
+import type { AimeatTranscriptionOptions, AimeatTranscriptionModel } from './adapters/audio.js';
+import type { OpenAiChatBody } from './adapters/openai-chat.js';
 import type {
   CompletionReasoning, ImageGenerationResult, TranscriptionAudio, TranscriptionResult,
 } from '../openrouter.js';
@@ -280,19 +285,52 @@ export async function transcribeAudio(req: TranscribeRequest): Promise<Transcrip
     ...(req.verbose ? { verbose: true } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
   };
+  // The node's own adapter keeps the transport's whole answer; a provider package's model does not.
+  const own = model.provider.startsWith('aimeat.');
+  let r;
   try {
-    await transcribe({
+    r = await transcribe({
       model,
       audio: new Uint8Array(req.audio.data),
-      providerOptions: { aimeat: { ...options } },
+      providerOptions: {
+        aimeat: { ...options },
+        // A direct provider's package reads the language from its own options key.
+        ...(req.language ? { [req.target.type]: { language: req.language } } : {}),
+      },
       maxRetries: 0,
       abortSignal: attemptSignal(STT_TIMEOUT_MS, req.signal),
     });
   } catch (e) {
     // The AI SDK throws on an empty transcript. A silent recording has one, the provider was paid
     // for it, and the node has always answered it: when the adapter holds the answer, it stands.
-    if (!model.last) throw providerError(e);
+    if (own && (model as AimeatTranscriptionModel).last) return (model as AimeatTranscriptionModel).last!;
+    if (!own && NoTranscriptGeneratedError.isInstance(e)) return { text: '', model: req.model };
+    throw providerError(e);
   }
-  if (!model.last) throw gatewayError(502, 'The transcription returned no result.');
-  return model.last;
+  if (own) {
+    const last = (model as AimeatTranscriptionModel).last;
+    if (!last) throw gatewayError(502, 'The transcription returned no result.');
+    return last;
+  }
+  // A direct provider reports no charge for audio; the seconds are what the record keeps.
+  return {
+    text: r.text, model: r.responses[0]?.modelId ?? req.model,
+    ...(r.language ? { language: r.language } : {}),
+    ...(typeof r.durationInSeconds === 'number' ? { usage: { seconds: r.durationInSeconds } } : {}),
+  };
 }
+
+// ── OpenAI chat for the proxy and the voice stream ────────────────────────────────────────────────
+
+/**
+ * An OpenAI chat-completions Response from a provider that does not speak that dialect (Anthropic).
+ * The proxy and the voice stream pass an OpenAI-dialect provider's own bytes on (services/
+ * openrouter.ts chatCompletionRaw); for the others this is their answer in the same shape, JSON or
+ * SSE, so neither caller needs a second code path.
+ */
+export function openAiChat(target: AiTarget, model: string, body: OpenAiChatBody, signal?: AbortSignal): Promise<Response> {
+  return adapterOpenAiChat(target, model, body, signal);
+}
+
+export { speaksOpenAiChat };
+export type { OpenAiChatBody };

@@ -14,6 +14,10 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.14.0 — 2026-09-28 — DEPRECATED (System 2 plan, V3): the settings, models and test routes carry
+ *     Deprecation, a successor Link and X-AIMEAT-Removed-In: 4.0.0, and answer 410 when the operator
+ *     sets AIMEAT_AI_LEGACY_SETTINGS_ROUTES=false (legacyAiSettingsRoute). What they write still
+ *     reaches every call through the owner's migrated provider. /complete is not deprecated.
  *   v1.13.0 — 2026-09-13 — The operator's AI provider allowlist reaches both doors here. The model
  *     picker (GET /v1/openrouter/models) sends the decrypted key in an Authorization header just as
  *     a completion does, and it was the one path that never asked assertProviderAllowed, so on a
@@ -70,7 +74,7 @@
  */
 
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
@@ -135,6 +139,28 @@ function completionError(e: AiCompletionError): { status: number; code: string; 
   };
 }
 
+/**
+ * The AI settings routes from before providers, DEPRECATED with a flag, a default and a removal version
+ * (security-development-dna.md, "Deprecated is not removed"): AIMEAT_AI_LEGACY_SETTINGS_ROUTES, on by
+ * default, removed in 4.0.0. Every answer says so in its headers; with the flag off the route answers
+ * 410 naming its successor. What they write still reaches every call: the owner's migrated provider
+ * follows the legacy records (services/ai/provider-store.ts).
+ */
+export function legacyAiSettingsRoute(config: AimeatConfig): RequestHandler {
+  return (_req, res, next) => {
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '</v1/ai/providers>; rel="successor-version"');
+    res.setHeader('X-AIMEAT-Removed-In', '4.0.0');
+    if (!config.aiLegacySettingsRoutes) {
+      res.status(410).json(error(config.nodeId, 'GONE',
+        'This older way to change your AI settings is switched off on this server. Your AI providers have their own settings now.', 410,
+        { successor: '/v1/ai/providers', next: { description: 'Your AI providers', method: 'GET', url: '/v1/ai/providers' } }));
+      return;
+    }
+    next();
+  };
+}
+
 function validateProviderUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -152,6 +178,7 @@ const MODEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export function openrouterRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const legacy = legacyAiSettingsRoute(config);
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
   const orRateLimit = rateLimit(config.rateLimits.openrouter);
 
@@ -185,7 +212,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── PUT /v1/openrouter/settings ──
   router.put('/v1/openrouter/settings',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('owner'), legacy,
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const { apiKey, model, reasoningModel, executionModel, visionModel, sttModel, sttLanguage, imageModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens, reasoning } = req.body as {
@@ -315,7 +342,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── GET /v1/openrouter/settings ──
   router.get('/v1/openrouter/settings',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('owner'), legacy,
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
 
@@ -356,7 +383,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── DELETE /v1/openrouter/settings ──
   router.delete('/v1/openrouter/settings',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('owner'), legacy,
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       await Promise.all([
@@ -372,7 +399,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── GET /v1/openrouter/models ──
   router.get('/v1/openrouter/models',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('owner'), legacy,
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
 
@@ -439,7 +466,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── POST /v1/openrouter/test ──
   router.post('/v1/openrouter/test',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('owner'), legacy,
     async (req: Request, res: Response) => {
       req.setTimeout(1_800_000);
       res.setTimeout(1_800_000);

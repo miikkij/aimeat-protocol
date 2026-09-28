@@ -445,7 +445,11 @@ grant, not a monthly one. Nothing renews it. The order is always the same and th
 not you:
 
 1. **The person's own key**, if they have set one. No allowance applies and no limit here touches it.
-2. **The node's key**, while their allowance has something left.
+   It can be any provider of theirs, not only OpenRouter: their own OpenAI, Anthropic, Mistral or
+   xAI account, or a model on their own machine (\`aimeat_ai_providers\` lists them).
+2. **The node's key**, while their allowance has something left, and only when the person has no
+   provider of their own for what the call asks for. A person whose own provider cannot answer is
+   told why; the node's key does not quietly step in.
 3. **A free model** once the allowance is spent — \`openrouter/free\` by default. The answer still
    comes; it comes from a weaker model. Unless the owner's model policy leaves the free model out:
    then the call is refused (\`QUOTA_EXHAUSTED\`, saying so), because the owner ruled weaker models out.

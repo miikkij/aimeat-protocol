@@ -15043,6 +15043,16 @@ paths:
         `AI_MODEL_POLICY_EMPTY`. Without a `model`, the node takes the first allowed model and says so
         with `data.policy_chose_model: true`. A reference is `<type>:<model id>`
         (`openrouter:anthropic/claude-opus-5.5`) or the bare id on the owner's own provider.
+
+
+        PROVIDERS AND ROUTING. The call names at least the capability; `model` or `provider` narrow
+        it. With neither, the node tries the agent's list, the owner's list and the owner's providers
+        marked for the pool (`/v1/ai/routing`), and the node's own provider only when the owner has
+        none; a provider that fails with a timeout, a rate limit, a server error, an unavailable
+        provider or a refused key moves the call to the next one, by the owner's rules. A named
+        `model` falls back only to the same model; a named `provider` never falls back. `data.route`
+        says who chose, who answered and every attempt. When no provider can answer, 400
+        `AI_CAPABILITY_UNAVAILABLE` lists each provider with the reason it was left out.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15083,14 +15093,21 @@ paths:
                     a vision-capable model. At most 8 per request.
                   items:
                     type: string
+                provider:
+                  type: string
+                  description: One of the caller's provider ids (GET /v1/ai/providers), or a type (anthropic). No fallback then.
+                fallback:
+                  type: boolean
+                  description: false keeps the call on its first provider; omitted, the owner's rules decide.
       responses:
         '200':
           description: >-
             data.content, data.model, data.usage and data.budget, plus data.finish_reason (why the
             provider stopped: stop, length, content_filter…, or null when it did not say) and
             data.truncated (true when finish_reason is length: the answer was cut at a token limit).
-            data.policy_chose_model is true when the owner's model policy chose the model. The
-            provenance record rides in meta.provenance.
+            data.policy_chose_model is true when the owner's model policy chose the model. data.route
+            is { capability, chosenBy, answeredBy: { provider, model }, attempts: [{ provider, model,
+            ok | error, costUsd }], fellBack }. The provenance record rides in meta.provenance.
           content:
             application/json:
               schema:
@@ -15228,6 +15245,264 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '401':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/providers:
+    get:
+      operationId: listAiProviders
+      summary: The AI providers the owner's calls can use, and the routing
+      description: >
+        The owner's own providers (types openrouter, openai, anthropic, mistral, xai, local,
+        openai-compatible) and the node's (`node-openrouter` holds the node's own key, at OpenRouter's
+        fixed address). For each: its type, source, address, which capabilities it serves with which
+        model and whether the node may pick it by capability alone (`pool`), the health of each
+        capability, where the data goes, and whether a key is set (never the key). A provider migrated
+        from the settings of before says `migrated_from`; one that cannot be used as it is says
+        `problem`. Also the routing: ordered provider ids per capability and the rules. An owner, an
+        agent or an app holding `ai:use` may read it.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/providers/{id}:
+    put:
+      operationId: putAiProvider
+      summary: Add or change one of the owner's AI providers (the owner in person)
+      description: >
+        The five fixed types are reached only at their official address; any other address is type
+        `openai-compatible`. `local` is accepted only at a loopback address, and never on a public
+        node. The key is set separately (`PUT /v1/ai/providers/{id}/key`). At most 20 providers. An id
+        the node uses is refused. Writing takes over a provider migrated from the settings of before.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                type: { type: string, enum: [openrouter, openai, anthropic, mistral, xai, local, openai-compatible] }
+                baseUrl: { type: string, description: 'Only for local and openai-compatible.' }
+                auth:
+                  type: object
+                  properties:
+                    type: { type: string, enum: [key, none] }
+                capabilities:
+                  type: object
+                  description: '{ "<capability>": { enabled, model?, pool?, voice?, language?, parser? } }. Capabilities: text, vision, files, image, speech, transcription, embed.'
+                  additionalProperties: true
+      responses:
+        '200':
+          description: data.provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: INVALID_PROVIDER, with every problem in error.details.problems.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: Not the owner in person, PROVIDER_NOT_ALLOWED (the operator's host list), or AI_PROVIDER_TYPE_NOT_ALLOWED.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+    delete:
+      operationId: deleteAiProvider
+      summary: Remove one of the owner's AI providers, its key and its agents' keys for it
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: data.deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/providers/{id}/key:
+    put:
+      operationId: setAiProviderKey
+      summary: Set a provider's key (the owner in person, on the web page)
+      description: >
+        Stored encrypted under the reserved `ai.apikey.` prefix and never shown again by any endpoint.
+        There is no MCP tool for this on purpose: a key typed into a chat stays in that chat's history.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key: { type: string }
+      responses:
+        '200':
+          description: data.saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+    delete:
+      operationId: deleteAiProviderKey
+      summary: Remove a provider's key
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: data.deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/providers/{id}/test:
+    post:
+      operationId: testAiProvider
+      summary: Test that a provider serves one capability, with the smallest real call
+      description: >
+        Through the same gate every call runs, with the provider named and no fallback, so it is billed
+        and budgeted like a call. A pass marks the capability tested and working, which the node needs
+        before it picks the provider by capability alone. Capabilities text, vision, files and
+        transcription (one second of silence); image makes one small picture and needs
+        `accept_cost: true`. The owner, or an agent of theirs holding `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                capability: { type: string, enum: [text, vision, files, transcription, image] }
+                accept_cost: { type: boolean }
+      responses:
+        '200':
+          description: data { ok, provider, capability, model, latency_ms, cost_usd, key_source }.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: AI_TEST_COSTS_MONEY, AI_CAPABILITY_TEST_UNAVAILABLE, AI_PROVIDER_NOT_CONFIGURED, or the provider's own refusal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/routing:
+    get:
+      operationId: getAiRouting
+      summary: Which provider answers each capability, and the rules for moving to the next
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: data.routing { defaults, rules, agent_defaults? }, data.providers (id, type, capabilities).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+    put:
+      operationId: setAiRouting
+      summary: Change the routing (the owner; or an agent proposing, then confirming)
+      description: >
+        `defaults` lists provider ids per capability, first is the default and the rest are fallbacks;
+        a capability named replaces its list. `rules` (the owner's alone): fallback, maxAttempts (1-5),
+        onlyTested, extendToPool, poolOrder, fallbackOn (timeout, rate_limit, server_error,
+        unavailable, auth), fallbackMayLeaveMachine, speechVoiceMayChange, maxCostPerCallUsd. `agent`
+        sets that agent's own defaults instead. The owner applies at once; an agent holding
+        `memory:write-reserved` gets a proposal with a `confirm_token` bound to the exact change; an
+        app is refused.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [routing]
+              properties:
+                routing:
+                  type: object
+                  properties:
+                    defaults: { type: object, additionalProperties: { type: array, items: { type: string } } }
+                    rules: { type: object, additionalProperties: true }
+                    agent: { type: string }
+                confirm_token: { type: string }
+      responses:
+        '200':
+          description: data.mode applied (data.routing) or proposal (data.current, data.proposed, data.confirm_token).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: AI_ROUTING_INVALID, with every problem in error.details.problems.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
           $ref: '#/components/responses/AimeatError'
 
   /v1/ai/jobs:
@@ -16054,6 +16329,14 @@ paths:
                   properties:
                     api_key: { type: string, nullable: true }
                     key_env: { type: string, nullable: true, pattern: '^[A-Z][A-Z0-9_]{1,63}$' }
+                providers:
+                  type: object
+                  description: 'A key per AI provider, `{ "<provider id>": { "api_key": "..." } | null }`, stored as `ai.apikey.agent.<name>.<id>`; it pays for this agent''s calls to that provider before the owner''s key. null forgets it.'
+                  additionalProperties:
+                    type: object
+                    nullable: true
+                    properties:
+                      api_key: { type: string }
                 daily_usd: { type: number, nullable: true, minimum: 0, maximum: 10000, description: null removes the agent's own cap. }
                 gate: { type: string, nullable: true, enum: ['on', 'off', 'rule'] }
       responses:
@@ -16436,9 +16719,15 @@ paths:
                 app_id:
                   type: string
                   description: Attribution for the per-app quota and the spend report.
+                provider:
+                  type: string
+                  description: One of the caller's provider ids, or a type. No fallback then.
+                fallback:
+                  type: boolean
+                  description: false keeps the call on its first provider; omitted, the owner's rules decide.
       responses:
         '200':
-          description: The image was generated and stored
+          description: The image was generated and stored. data.route says who answered and every attempt.
           content:
             application/json:
               schema:
@@ -16668,9 +16957,15 @@ paths:
                 app_id:
                   type: string
                   description: Attribution for the per-app quota and the spend breakdown.
+                provider:
+                  type: string
+                  description: One of the caller's provider ids, or a type. No fallback then.
+                fallback:
+                  type: boolean
+                  description: false keeps the call on its first provider; omitted, the owner's rules decide.
       responses:
         '200':
-          description: Transcription
+          description: Transcription. data.route says who answered and every attempt.
           content:
             application/json:
               schema:
@@ -44036,6 +44331,7 @@ paths:
   /v1/openrouter/settings:
     put:
       operationId: saveOpenRouterSettings
+      deprecated: true
       summary: Save OpenRouter API key and preferences
       description: Save API key and preferences for OpenRouter integration. Owner-only.
       tags: [OpenRouter]
@@ -44150,6 +44446,7 @@ paths:
 
     get:
       operationId: getOpenRouterSettings
+      deprecated: true
       summary: Get OpenRouter settings (API key not returned)
       description: Get current OpenRouter settings. The API key is never returned for security. Owner-only.
       tags: [OpenRouter]
@@ -44238,6 +44535,7 @@ paths:
 
     delete:
       operationId: deleteOpenRouterSettings
+      deprecated: true
       summary: Remove OpenRouter API key and settings
       description: Permanently removes the stored API key and all OpenRouter settings. Owner-only.
       tags: [OpenRouter]
@@ -44263,6 +44561,7 @@ paths:
   /v1/openrouter/models:
     get:
       operationId: listOpenRouterModels
+      deprecated: true
       summary: List available OpenRouter models
       description: >
         Fetches available models from the configured provider using the stored API key. Owner-only.
@@ -44370,6 +44669,7 @@ paths:
   /v1/openrouter/test:
     post:
       operationId: testOpenRouterKey
+      deprecated: true
       summary: Test OpenRouter API key validity
       description: >
         Sends a minimal test completion to verify the stored API key works. Owner-only. This is a
@@ -58802,6 +59102,7 @@ paths:
   /v1/ai/settings:
     get:
       operationId: getAiSettings
+      deprecated: true
       tags: [OpenRouter]
       summary: Get the owner's AI (OpenRouter) budget settings
       description: |
@@ -58833,6 +59134,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
     post:
       operationId: updateAiSettings
+      deprecated: true
       tags: [OpenRouter]
       summary: Update the owner's AI (OpenRouter) budget settings
       description: |

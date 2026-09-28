@@ -14,6 +14,8 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   v1.1.0 — 2026-09-28 — AIMEAT_AI_FIXED_BASEURL_OVERRIDES is reported as refused on a public node
+ *     (System 2 plan, V3).
  *   v1.0.0 — 2026-08-10 — Extracted from config.ts (max-file-lines), no behaviour change.
  */
 import type { AimeatConfig } from './config-types.js';
@@ -37,6 +39,11 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   // reports a coercion rather than a risk, so an operator who set it never believes it took effect.
   if (process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase() === 'off') {
     w.push('AIMEAT_AI_LABEL_PUBLIC=off was REFUSED and reset to `strict` — a publicly reachable node may not hide the visible AI label (EU AI Act Art. 50). Use `light` to label only what the law requires.');
+  }
+  // The same kind: a coercion. A fixed provider type's address is why a key sent to it cannot leak,
+  // so a public node ignores the override (services/ai/providers.ts fixedBaseUrlOf).
+  if (config.aiFixedBaseUrlOverrides?.trim()) {
+    w.push('AIMEAT_AI_FIXED_BASEURL_OVERRIDES was REFUSED — on a public node openrouter, openai, anthropic, mistral and xai are reached only at their official addresses. Use an openai-compatible provider for any other address.');
   }
   return w;
 }

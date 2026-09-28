@@ -27,6 +27,10 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.3.0 — 2026-09-28 — Providers (System 2 plan, V3): the owner's candidates are tried in order
+ *     before the first byte, by the owner's rules; an Anthropic provider answers through the
+ *     gateway's OpenAI chat converter, byte-compatible with the others; the attempts that failed
+ *     before a fallback are usage rows of their own.
  *   v1.2.0 — 2026-09-28 — The model policy: the caller goes to the gate, a refusal carries its details, and
  *     GET /v1/llm/models lists only the models the owner's policy allows.
  *   v1.1.0 — 2026-09-20 — An agent's call is paid by its OWNER, in the agent's name (aiPayerOf): the
@@ -45,9 +49,11 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOf } from './ai-policy.js';
 import {
-    prepareAiCall, settleAiCall, estimateCostUsd, AiCompletionError, type AiCallPlan,
+    prepareAiCall, settleAiCall, estimateCostUsd, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
 } from '../services/ai-completion.js';
 import { chatCompletionRaw, listModels } from '../services/openrouter.js';
+import { openAiChat, speaksOpenAiChat, type OpenAiChatBody } from '../services/ai/gateway.js';
+import { runRoute } from '../services/ai/route-run.js';
 import { logger } from '../utils/logger.js';
 
 /** A turn can take minutes when the model is reasoning; the default socket timeout is not enough. */
@@ -84,7 +90,11 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
         try {
             const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) });
-            const models = await listModels(plan.key, plan.baseUrl, 'chat');
+            // A provider that does not speak this dialect has no OpenAI-shaped list: the model the
+            // node would use is the one it lists.
+            const models = speaksOpenAiChat(plan.providerType)
+                ? await listModels(plan.key, plan.baseUrl, 'chat')
+                : [{ id: plan.model }];
             // OpenAI's shape, because that is what a client asking this URL parses.
             res.json({
                 object: 'list',
@@ -156,29 +166,45 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         const controller = new AbortController();
         req.on('close', () => controller.abort());
 
+        // The owner's candidates in order, moving on only BEFORE the first byte: a provider that
+        // refused or did not answer (services/ai/route-run.ts). Once a stream has started, the
+        // client has part of an answer and a second provider would be a different text.
         let provider: globalThis.Response;
+        let answered: AiCallPlan;
         try {
-            // Through the openrouter service, never straight out of this file. That file is the
-            // node's only HTTP transport to a model provider, checked by `pnpm check:llm-transport`,
-            // and a second place speaking to a provider is a second place that can forget to meter.
-            provider = await chatCompletionRaw(plan.key, plan.baseUrl, upstream, controller.signal);
+            const run = await runRoute({
+                storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
+                allowFallback: plan.allowFallback, rules: plan.rules, signal: controller.signal,
+            }, async (c) => {
+                // Through the openrouter service or the gateway, never straight out of this file:
+                // `pnpm check:llm-transport` holds that, because a second place speaking to a provider
+                // is a second place that can forget to meter. An Anthropic provider does not speak
+                // this dialect, so the gateway answers for it in the same shape.
+                const r = speaksOpenAiChat(c.provider.type)
+                    ? await chatCompletionRaw(c.target.key, c.target.baseUrl, { ...upstream, model: c.model }, controller.signal)
+                    : await openAiChat(c.target, c.model, { ...upstream, model: c.model } as OpenAiChatBody, controller.signal);
+                if (r.ok) return r;
+                // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable one is honestly reported as empty
+                const detail = await r.text().catch(() => '');
+                throw Object.assign(new Error(detail || `The provider answered ${r.status}.`), { status: r.status, detail });
+            });
+            provider = run.result;
+            answered = planFor(plan, run.candidate);
+            if (run.route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: 'llm-proxy', source: 'llm-proxy' });
         } catch (err) {
-            sendError(res, config.nodeId, new AiCompletionError('PROVIDER_ERROR', 502, (err as Error).message));
-            return;
-        }
-
-        if (!provider.ok) {
-            // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable one is honestly reported as empty
-            const detail = await provider.text().catch(() => '');
-            sendError(res, config.nodeId, providerFailure(provider.status, detail));
+            const e = err as { status?: number; detail?: string; route?: { fellBack: boolean }; failed?: Parameters<typeof recordFailedAttempts>[4] };
+            if (e.route?.fellBack && e.failed) await recordFailedAttempts(storage, config, gaii, plan, e.failed, { appId: 'llm-proxy', source: 'llm-proxy' });
+            sendError(res, config.nodeId, typeof e.status === 'number'
+                ? providerFailure(e.status, e.detail ?? '')
+                : new AiCompletionError('PROVIDER_ERROR', 502, (err as Error).message));
             return;
         }
 
         try {
             const outcome = body.stream
-                ? await pipeStream(provider, res, plan)
-                : await passWhole(provider, res, plan);
-            await settleAiCall(storage, config, gaii, plan, {
+                ? await pipeStream(provider, res, answered)
+                : await passWhole(provider, res, answered);
+            await settleAiCall(storage, config, gaii, answered, {
                 ...outcome, appId: 'llm-proxy', source: 'llm-proxy',
             });
         } catch (err) {

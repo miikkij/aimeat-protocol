@@ -15,6 +15,9 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The operator's AI providers (System 2 plan, V3): aiProviders,
+ *     aiBuiltinProviders, aiProviderEgress, aiProviderTypes and aiFixedBaseUrlOverrides; and
+ *     aiLegacySettingsRoutes, the flag of the deprecated settings routes.
  *   v1.1.0 — 2026-09-28 — aiRecommendedModels (AIMEAT_AI_RECOMMENDED_MODELS), System 2 plan V2.
  *   v1.0.0 — 2026-09-28 — Extracted from config.ts (pure extraction; no behaviour change), ahead of
  *     the recommended-models setting of the System 2 plan.
@@ -25,7 +28,8 @@ type AiModelSettings = Pick<AiCapabilityConfig,
   'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback'
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
-  | 'aiRecommendedModels'>;
+  | 'aiRecommendedModels' | 'aiProviders' | 'aiBuiltinProviders' | 'aiProviderEgress'
+  | 'aiProviderTypes' | 'aiFixedBaseUrlOverrides' | 'aiLegacySettingsRoutes'>;
 
 /** The node's AI key and model defaults, from the environment. */
 export function aiModelDefaults(): AiModelSettings {
@@ -41,5 +45,11 @@ export function aiModelDefaults(): AiModelSettings {
     modelDefaultImage: process.env.AIMEAT_MODEL_DEFAULT_IMAGE ?? '',
     sttLanguageDefault: process.env.AIMEAT_STT_LANGUAGE_DEFAULT ?? '',
     aiRecommendedModels: process.env.AIMEAT_AI_RECOMMENDED_MODELS ?? '',
+    aiProviders: process.env.AIMEAT_AI_PROVIDERS ?? '',
+    aiBuiltinProviders: process.env.AIMEAT_AI_BUILTIN_PROVIDERS ?? '',
+    aiProviderEgress: process.env.AIMEAT_AI_PROVIDER_EGRESS ?? '',
+    aiProviderTypes: process.env.AIMEAT_AI_PROVIDER_TYPES ?? '',
+    aiFixedBaseUrlOverrides: process.env.AIMEAT_AI_FIXED_BASEURL_OVERRIDES ?? '',
+    aiLegacySettingsRoutes: process.env.AIMEAT_AI_LEGACY_SETTINGS_ROUTES !== 'false',
   };
 }

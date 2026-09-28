@@ -564,6 +564,13 @@ metadata:
    (\`savedBy\`) is disconnected or lost a permission its steps need, and \`refusal.missing\` names
    it. The owner either runs it once as themselves from the notification, approves the
    permission again, or saves the workflow in person so the trigger runs on their authority.
+7. **An ai step that failed on its provider:** the error names the refusal. 400
+   \`AI_CAPABILITY_UNAVAILABLE\` lists each provider with the reason it was left out (\`untested\`,
+   \`failing\`, \`no-key\`, \`no-model\`, \`capability-off\`, \`leaves-machine\`); \`aimeat_ai_providers\`
+   shows each provider's health, and \`aimeat_ai_provider_test\` checks one again. A provider that
+   failed three times in a row is gone round for five minutes while another can answer, and one
+   whose key was refused waits for the owner's test or a new key. An answer that did come carries
+   \`route\`: when \`fellBack\` is true, the first provider failed and the attempts say why.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.

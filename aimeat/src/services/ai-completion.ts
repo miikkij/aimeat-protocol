@@ -21,6 +21,17 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.7.0 — 2026-09-28 — Providers and routing (System 2 plan, V3). prepareAiCall reads the owner's
+ *     provider records (the legacy setting migrated on the first read, services/ai/provider-store.ts),
+ *     their routing and the policy, and plans an ordered candidate list with a reason for every
+ *     provider left out (services/ai/route-plan.ts); the plan's own fields are the first candidate's.
+ *     The key is per candidate: an agent's own key for that provider, the owner's key for it, and the
+ *     node's key only on the node's own OpenRouter provider. completeForOwner tries the candidates
+ *     by the owner's rules (services/ai/route-run.ts), records the attempts that failed before a
+ *     fallback as usage rows of their own, and returns the `route`. The refusals for the situations
+ *     that existed before keep their code and wording. nodeKeyPaysFor() moved into the node's
+ *     provider record (image and transcription enabled only with a node default model, J4);
+ *     the host allowlist is checked per candidate.
  *   v3.6.0 — 2026-09-28 — The owner's model policy (System 2 plan, V2; services/ai/policy-gate.ts): the
  *     model is chosen under it BEFORE the key, a named model the rules leave out is refused 403
  *     AI_MODEL_NOT_ALLOWED, lists with nothing in common 403 AI_MODEL_POLICY_EMPTY, a model the
@@ -103,21 +114,24 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { decrypt, getEncryptionKey } from './encryption.js';
-import { DEFAULT_BASE_URLS, type ProviderType, type CompletionReasoning } from './openrouter.js';
+import type { ProviderType, CompletionReasoning } from './openrouter.js';
 import { text as gatewayText } from './ai/gateway.js';
-import { adapterTypeOf, type AiAdapterType, type AiCapability, type AiOp, type AiTarget, type CostSource } from './ai/types.js';
-import { loadPolicyDecision, chooseModel, freeModelAllowed, type PolicyCallContext } from './ai/policy-gate.js';
+import type { AiAdapterType, AiCapability, AiOp, AiTarget, CostSource } from './ai/types.js';
+import { loadPolicyDecision } from './ai/policy-gate.js';
 import type { CallerClass } from './ai/policy.js';
-import { UNSET_MODEL } from './ai/unset-model.js';
 import { AiCompletionError } from './ai/errors.js';
+import { providersForOwner } from './ai/provider-store.js';
+import { readRouting, rulesFor, type RoutingRules } from './ai/routing.js';
+import { planRoute, refusalFor, type AiCandidate, type ChosenBy, type RejectedCandidate } from './ai/route-plan.js';
+import { runRoute, type AiRoute } from './ai/route-run.js';
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
-import { resolveAiKey, debitAllowance, type AiKeyChoice } from './ai-allowance.js';
+import { debitAllowance, readAllowance, remainingOf } from './ai-allowance.js';
 import { appSpentToday, appQuotaFor, appAllowlisted } from './ai-app-id.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './ai-usage-record.js';
-import { readAgentKey, agentCapRefusal } from './agent-ai-keys.js';
+import { agentCapRefusal } from './agent-ai-keys.js';
 import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './ai-daily-budget.js';
 export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
 
@@ -241,6 +255,11 @@ export interface CompleteForOwnerOptions {
   /** Whose call this is and the app the node identified, for the model policy (PrepareAiCallOptions). */
   caller?: CallerClass;
   verifiedApp?: string;
+  /** A provider the call names (an id of the caller's, or a type), and the call's word on fallback. */
+  provider?: string;
+  fallback?: boolean;
+  /** The capability, when the prompt alone does not say it (a provider test of `files`). */
+  capability?: AiCapability;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
   /**
@@ -316,6 +335,8 @@ export interface CompleteForOwnerResult {
    * allowed, or nobody chose one. Surfaced like degradedToFreeModel, so an app can say so.
    */
   policyChoseModel?: boolean;
+  /** Who chose the provider, who answered, and every attempt (services/ai/route-run.ts). */
+  route: AiRoute;
 }
 
 /**
@@ -336,7 +357,8 @@ export interface CompleteForOwnerResult {
  */
 export interface AiCallPlan {
   prefs: Record<string, unknown>;
-  provider: ProviderType;
+  /** The id of the provider the first candidate calls (services/ai/providers.ts). */
+  provider: string;
   baseUrl: string;
   /** The decrypted key that will pay. Never logged, never returned to a caller. */
   key: string | undefined;
@@ -361,26 +383,36 @@ export interface AiCallPlan {
   /** The references this call's policy allows, or 'any'. A model list shown to the caller is
    *  filtered by it, so nobody picks a model the node would then refuse. */
   allowedModels: string[] | 'any';
+  /** The first candidate's destination; the plan's own fields mirror it. */
+  target: AiTarget;
+  /** What the call asks for. */
+  capability: AiCapability;
+  /** Every provider that may answer, in order, and the ones that may not with their reason. */
+  candidates: AiCandidate[];
+  rejected: RejectedCandidate[];
+  chosenBy: ChosenBy;
+  /** Whether a failure may move to the next candidate (the owner's rules and the call's own word). */
+  allowFallback: boolean;
+  rules: RoutingRules;
 }
 
 /** Where the gateway sends a planned call: the adapter, the address and the key that pays. */
 export function targetOf(plan: AiCallPlan): AiTarget {
-  return { type: plan.providerType, baseUrl: plan.baseUrl, key: plan.key };
+  return plan.target;
+}
+
+/** The plan as the candidate that answered it: its provider, key, model and pocket. */
+export function planFor(plan: AiCallPlan, c: AiCandidate): AiCallPlan {
+  return {
+    ...plan, provider: c.provider.id, providerType: c.provider.type, baseUrl: c.target.baseUrl, key: c.target.key,
+    keyScope: c.keyScope, model: c.model, degradedToFree: !!c.degradedToFree, policyChoseModel: c.policyChoseModel,
+    target: c.target,
+    ...(c.allowanceRemainingUsd !== undefined ? { allowanceRemainingUsd: c.allowanceRemainingUsd } : { allowanceRemainingUsd: undefined }),
+  };
 }
 
 /** The operations whose model is a role of its own, and never the text model. */
 const OP_ROLE: Partial<Record<AiOp, ModelRole>> = { image: 'image', transcribe: 'stt' };
-
-/**
- * May the node's own key pay for this operation? Text: yes, as it always has. Any other operation:
- * only when the operator named a node default model for it (Jouni, 2026-09-28), because naming one
- * is the operator saying the node pays for that capability. Otherwise the person's own key does.
- */
-export function nodeKeyPaysFor(config: AimeatConfig, op: AiOp): boolean {
-  const role = OP_ROLE[op];
-  if (!role) return op === 'text';
-  return !!resolveModelFor(config, undefined, role);
-}
 
 export interface PrepareAiCallOptions {
   /** What the call does. Default `text`. */
@@ -401,6 +433,12 @@ export interface PrepareAiCallOptions {
   caller?: CallerClass;
   /** The app the node identified from an app grant (`owner/file.html`), never a body field. */
   verifiedApp?: string;
+  /** A provider the call names: one of the caller's provider ids, or a type. No fallback then. */
+  provider?: string;
+  /** The call's own word on moving to the next provider; the owner's rules decide when it says nothing. */
+  fallback?: boolean;
+  /** Only a provider on this machine. */
+  requires?: { local?: boolean };
 }
 
 /**
@@ -422,100 +460,94 @@ export async function prepareAiCall(
     storage.getMemory(gaii, `ai-usage.${gaii}.${todayKey()}`),
   ]);
   const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
-  const provider = (prefs.provider as ProviderType) || 'openrouter';
-  const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
   const op: AiOp = opts.op ?? 'text';
   const roleModel = (role: ModelRole) => resolveModelFor(config, prefs, role);
-
-  assertProviderAllowed(config, baseUrl);
   assertAppAllowed(prefs, opts.appId, gaii);
 
-  // ── The model, under the owner's model policy ──
-  // Chosen BEFORE the key, so every refusal about the model (a model the policy does not allow, rules
-  // with nothing in common, an image or a transcription with no model at all) comes before anything
-  // is decided about money. The policy is services/ai/policy-gate.ts; with no policy anywhere it
-  // leaves every choice below exactly as it was.
-  const providerType = adapterTypeOf(provider, baseUrl);
   const capability: AiCapability = opts.capability
     ?? (op === 'image' ? 'image' : op === 'transcribe' ? 'transcription' : opts.hasImages ? 'vision' : 'text');
-  const policyCtx: PolicyCallContext = {
-    capability, caller: opts.caller ?? (opts.agent ? 'agent' : 'owner'), providerType,
+  const requested = typeof opts.model === 'string' && opts.model ? opts.model : undefined;
+  const policyCtx = {
+    capability, caller: opts.caller ?? (opts.agent ? 'agent' : 'owner') as CallerClass,
     ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.appId ? { appId: opts.appId } : {}),
   };
-  const policy = await loadPolicyDecision(storage, config, gaii, policyCtx);
-  const requested = typeof opts.model === 'string' && opts.model ? opts.model : undefined;
+  // The owner's providers (the legacy setting migrated on the first read), their routing and their
+  // model policy. The legacy records were read above, so the migration reads nothing twice.
+  const [providers, routing, policy] = await Promise.all([
+    providersForOwner(storage, config, gaii, { settings: prefsRecord, key: apiKeyRecord }),
+    readRouting(storage, gaii, opts.agent),
+    loadPolicyDecision(storage, config, gaii, policyCtx),
+  ]);
+  const rules = rulesFor({ capability, ...(opts.agent ? { agent: opts.agent } : {}), ...(opts.appId ? { app: opts.appId } : {}) }, routing);
 
-  // An image or a transcription has a model of its own or no answer at all: the refusal names the
-  // setting to fill in rather than handing the request to a chat model.
-  const opRole = OP_ROLE[op];
-  // Text: each role asks the owner first and the node second (services/ai-model-defaults.ts), and
-  // with nothing chosen anywhere, OpenRouter's free-models router (no specific vendor hardcoded).
-  // Image inputs need a vision-capable model, whatever the owner's text default is.
-  const textFallback = (opts.hasImages && roleModel('vision'))
-    || (opts.modelRole === 'reasoning' && roleModel('reasoning'))
+  // The model each role gave before providers existed: the owner's setting, then the node's default
+  // (services/ai-model-defaults.ts), and for text, with nothing chosen anywhere, OpenRouter's
+  // free-models router. It is what the migrated provider and the node's own provider use when a call
+  // names no model, so an owner who set nothing new sees nothing change.
+  const textModel = (opts.modelRole === 'reasoning' && roleModel('reasoning'))
     || (opts.modelRole === 'execution' && roleModel('execution'))
     || roleModel('chat') || roleModel('execution') || roleModel('reasoning')
     || 'openrouter/free';
-  const chosen = chooseModel(policy, policyCtx, requested, opRole ? roleModel(opRole) : textFallback);
-  if (!chosen) {
-    const unset = UNSET_MODEL[op];
-    throw new AiCompletionError(unset?.code ?? 'NO_MODEL', 400, unset?.message ?? 'No model is configured for this call.');
-  }
+  const legacyModel = (cap: AiCapability): string | undefined => {
+    if (cap === 'image') return roleModel('image');
+    if (cap === 'transcription') return roleModel('stt');
+    if (cap === 'embed') return undefined;
+    if (cap === 'vision') return roleModel('vision') || textModel;
+    return textModel;
+  };
 
-  // Whose key pays is one decision and it lives in services/ai-allowance.ts: the person's own key,
-  // then the node's if they have allowance left. An own key is never metered here — it is their
-  // money and their provider account, which is the whole reason bringing one is recommended.
-  // An agent's own key comes before both (services/agent-ai-keys.ts): the owner pinned that agent's
-  // spend to it. It is the owner's money on the owner's chosen address, like their own key.
-  const agentKey = opts.agent ? await readAgentKey(storage, config, gaii, opts.agent, 'openrouter') : null;
-  const keyChoice: Omit<AiKeyChoice, 'scope'> & { scope: 'agent' | 'own' | 'node' } = agentKey
-    ? { key: agentKey, scope: 'agent', exhausted: false, remainingUsd: 0 }
-    : await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl,
-      { nodeKey: nodeKeyPaysFor(config, op) });
+  // ── Candidates: the model, the policy and the key, per provider, before anything is spent ──
+  // services/ai/route-plan.ts. Every refusal about the model and the key comes before the budget,
+  // as it always did (Refuse before you write).
+  const route = await planRoute({
+    storage, config, gaii, op, capability, providers, routing, rules, policy, policyCtx,
+    ...(requested ? { requested } : {}),
+    ...(opts.provider ? { namedProvider: opts.provider } : {}),
+    ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
+    ...(opts.requires ? { requires: opts.requires } : {}),
+    ...(opts.agent ? { agent: opts.agent } : {}),
+    legacyModel,
+    nodeAllowance: async () => ({ remainingUsd: remainingOf(await readAllowance(storage, config, gaii)) }),
+  });
+  const opRole = OP_ROLE[op];
+  if (!route.candidates.length) throw refusalFor(route, op, capability, opRole ? roleModel(opRole) : textModel);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
   const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId, gaii);
   const overCap = await agentCapRefusal(storage, gaii, opts.agent);
   if (overCap) throw new AiCompletionError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
-  const planOf = (model: string, degradedToFree: boolean, policyChoseModel: boolean): AiCallPlan => ({
-    prefs, provider, baseUrl,
-    key: keyChoice.key,
-    keyScope: keyChoice.scope,
+  const first = route.candidates[0];
+  return planFor({
+    prefs, provider: first.provider.id, baseUrl: first.target.baseUrl, key: first.target.key, keyScope: first.keyScope,
     ...(opts.agent ? { agent: opts.agent } : {}),
-    ...(keyChoice.scope === 'node' ? { allowanceRemainingUsd: keyChoice.remainingUsd } : {}),
-    usage, dailyBudgetUsd, model, degradedToFree,
-    op, providerType, policyChoseModel, allowedModels: policy.decision.allowed,
-  });
+    usage, dailyBudgetUsd, model: first.model, degradedToFree: false,
+    op, providerType: first.provider.type, policyChoseModel: false, allowedModels: policy.decision.allowed,
+    target: first.target, capability, candidates: route.candidates, rejected: route.rejected,
+    chosenBy: route.chosenBy, allowFallback: route.allowFallback, rules,
+  }, first);
+}
 
-  const spent = keyChoice.scope === 'node' && keyChoice.exhausted;
-  if (opRole) {
-    // No free model makes a picture or a transcript: a spent allowance is a refusal here.
-    if (spent) {
-      throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
-        'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.');
-    }
-    return planOf(chosen.model, false, chosen.policyChoseModel);
+/**
+ * The attempts that failed before an answer, or before the final failure, as usage rows of their
+ * own (plan 11, section 7): a provider may bill a timed-out picture, and a fallback the owner cannot
+ * see in their records is a fallback they cannot judge. The caller writes them only when the route
+ * moved on (`route.fellBack`), so a single failed call records what it always did: nothing.
+ */
+export async function recordFailedAttempts(
+  storage: Storage, config: AimeatConfig, gaii: string, plan: AiCallPlan,
+  failed: Array<{ candidate: AiCandidate; error: string; costUsd: number }>,
+  call: { appId?: string; source: string },
+): Promise<void> {
+  for (const f of failed) {
+    await recordAiUsage(storage, gaii, plan.usage, {
+      costUsd: f.costUsd, tokens: 0, appId: call.appId, model: f.candidate.model, provider: f.candidate.provider.id,
+      source: `${call.source}:failed-${f.error}`, apiKeyScope: f.candidate.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
+    }, config);
+    if (f.candidate.keyScope === 'node' && f.costUsd > 0) await debitAllowance(storage, config, gaii, f.costUsd);
   }
-
-  // Allowance spent, on the node's key: answer on a free model rather than stopping, and say so.
-  // A refusal is a dead end; a weaker answer with an honest label is not. An explicit model override
-  // is left alone — a caller that named one is not asking the node to choose. And the free model is
-  // a model like any other: when the owner's policy does not allow it, the answer is a refusal, never
-  // a weaker model the owner ruled out (05, section 4).
-  if (spent && !requested) {
-    if (!config.modelFreeFallback || !freeModelAllowed(policy, config.modelFreeFallback, providerType)) {
-      throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
-        config.modelFreeFallback
-          ? 'Your allowance on this node is used up, and your model policy does not allow the free model. Add your own key or more allowance.'
-          : 'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.');
-    }
-    return planOf(config.modelFreeFallback, true, false);
-  }
-
-  return planOf(chosen.model, false, chosen.policyChoseModel);
 }
 
 export interface AiCallOutcome {
@@ -645,6 +677,9 @@ export async function completeForOwner(
     model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent,
     ...(opts.caller ? { caller: opts.caller } : {}),
     ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    ...(opts.provider ? { provider: opts.provider } : {}),
+    ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
+    ...(opts.capability ? { capability: opts.capability } : {}),
   });
   const { prefs } = plan;
 
@@ -662,10 +697,15 @@ export async function completeForOwner(
     : prefs.autoRetry === false ? 0
       : (typeof prefs.maxRetries === 'number' ? (prefs.maxRetries as number) : undefined);
   let result;
+  let answered: AiCallPlan;
+  let route: AiRoute;
   try {
-    result = await gatewayText({
-      target: targetOf(plan),
-      model: plan.model,
+    const run = await runRoute({
+      storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
+      allowFallback: plan.allowFallback, rules: plan.rules, ...(opts.signal ? { signal: opts.signal } : {}),
+    }, (c) => gatewayText({
+      target: c.target,
+      model: c.model,
       prompt: opts.prompt,
       ...(opts.systemPrompt ? { system: opts.systemPrompt } : {}),
       ...(opts.images ? { images: opts.images } : {}),
@@ -677,8 +717,14 @@ export async function completeForOwner(
       ...(reasoning ? { reasoning } : {}),
       ...(retries !== undefined ? { retries } : {}),
       ...(opts.signal ? { signal: opts.signal } : {}),
-    });
+    }));
+    result = run.result;
+    answered = planFor(plan, run.candidate);
+    route = run.route;
+    if (route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: opts.appId, source: 'ai-complete' });
   } catch (e) {
+    const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
+    if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
     if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
@@ -694,12 +740,13 @@ export async function completeForOwner(
   const costExact = typeof result.usage.costUsd === 'number';
   const costUsd = costExact ? result.usage.costUsd! : estimateCostUsd(promptTok, completionTok);
 
-  const settled = await settleAiCall(storage, config, gaii, plan, {
+  const settled = await settleAiCall(storage, config, gaii, answered, {
     model: result.model,
     promptTokens: promptTok, completionTokens: completionTok, totalTokens: totalTok,
     costUsd, content: result.content, appId: opts.appId, source: 'ai-complete',
     costSource: costExact ? 'provider' : 'estimate',
   });
+  route.attempts[route.attempts.length - 1].costUsd = costUsd;
 
   return {
     content: result.content,
@@ -713,11 +760,12 @@ export async function completeForOwner(
       remainingUsd: Math.max(0, plan.dailyBudgetUsd - settled.usage.total_cost_usd),
     },
     provenance: settled.provenance,
-    keySource: plan.keyScope,
+    keySource: answered.keyScope,
     ...(settled.allowanceRemainingUsd !== undefined
       ? { allowanceRemainingUsd: settled.allowanceRemainingUsd }
       : {}),
-    ...(plan.degradedToFree ? { degradedToFreeModel: true } : {}),
-    ...(plan.policyChoseModel ? { policyChoseModel: true } : {}),
+    ...(answered.degradedToFree ? { degradedToFreeModel: true } : {}),
+    ...(answered.policyChoseModel ? { policyChoseModel: true } : {}),
+    route,
   };
 }

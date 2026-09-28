@@ -1,0 +1,25 @@
+/**
+ * @file src/server-bootstrap/routes-loader-ai.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The System 2 AI routers, mounted in the order routes-loader.ts always mounted them.
+ *   A pure move out of routes-loader.ts (max-file-lines): the one call there stands where the four
+ *   mounts stood, so what matches first is unchanged.
+ * @structure mountAiRouters(app, config, storage)
+ * @version-history
+ *   v1.0.0 — 2026-09-28 — Moved from routes-loader.ts, unchanged.
+ */
+import type express from 'express';
+import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import { openrouterRouter } from '../routes/openrouter.js';
+import { aiRouter } from '../routes/ai.js';
+import { aiPolicyRouter } from '../routes/ai-policy.js';
+import { aiProvidersRouter } from '../routes/ai-providers.js';
+
+export function mountAiRouters(app: express.Express, config: AimeatConfig, storage: Storage): void {
+  app.use(openrouterRouter(config, storage));   // OpenRouter AI autopilot
+  app.use(aiRouter(config, storage));            // App-level AI completion (user's key, budget-gated)
+  app.use(aiPolicyRouter(config, storage));      // The owner's model policy and the node's recommended models
+  app.use(aiProvidersRouter(config, storage));   // The owner's AI providers and routing (System 2 V3)
+}

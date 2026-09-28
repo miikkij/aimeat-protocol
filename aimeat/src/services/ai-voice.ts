@@ -6,6 +6,9 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.2.0 - 2026-09-28 - Providers (System 2 plan, V3): the reply tries the owner's candidates before
+ *     the first byte and an Anthropic provider answers through the gateway's converter; the spoken
+ *     audio uses the first candidate, whose type speaks OpenAI's /audio/speech (providers.ts).
  *   v1.1.0 - 2026-09-28 - The owner's model policy covers voice: the reply runs under the text list,
  *     the spoken audio under the speech list, and the caller (owner, agent, verified app) is passed on.
  *   v1.0.2 - 2026-09-28 - The fallback price of a streamed reply is estimateCostUsd() from
@@ -17,8 +20,12 @@
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, estimateCostUsd, type AiCallPlan } from './ai-completion.js';
+import {
+  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, estimateCostUsd, planFor, recordFailedAttempts, type AiCallPlan,
+} from './ai-completion.js';
 import { chatCompletionRaw, speechRaw, generationCost, listModels } from './openrouter.js';
+import { openAiChat, speaksOpenAiChat } from './ai/gateway.js';
+import { runRoute } from './ai/route-run.js';
 import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
@@ -83,10 +90,33 @@ async function settled(storage: Storage, config: AimeatConfig, gaii: string, pla
 }
 
 export async function streamReply(storage: Storage, config: AimeatConfig, gaii: string, options: ReplyOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
-  const plan = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id, ...policyCallerOf(options) });
-  const response = await chatCompletionRaw(plan.key, plan.baseUrl, { model: plan.model, messages: options.messages,
-    temperature: options.temperature, top_p: options.top_p, max_tokens: options.max_tokens,
-    ...(options.reasoning ? { reasoning: options.reasoning } : {}), stream: true, stream_options: { include_usage: true } }, signal);
+  const first = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id, ...policyCallerOf(options) });
+  // The owner's candidates in order, moving on only before the first byte (services/ai/route-run.ts);
+  // an Anthropic provider answers through the gateway's converter, in the same SSE shape.
+  let plan: AiCallPlan;
+  let response: Response;
+  try {
+    const run = await runRoute({
+      storage, gaii, capability: first.capability, candidates: first.candidates, chosenBy: first.chosenBy,
+      allowFallback: first.allowFallback, rules: first.rules, signal,
+    }, async (c) => {
+      const body = { model: c.model, messages: options.messages,
+        temperature: options.temperature, top_p: options.top_p, max_tokens: options.max_tokens,
+        ...(options.reasoning ? { reasoning: options.reasoning } : {}), stream: true, stream_options: { include_usage: true } };
+      const r = speaksOpenAiChat(c.provider.type)
+        ? await chatCompletionRaw(c.target.key, c.target.baseUrl, body, signal)
+        : await openAiChat(c.target, c.model, body, signal);
+      if (!r.ok) { await r.body?.cancel(); throw Object.assign(new Error(`Speech provider returned HTTP ${r.status}.`), { status: r.status }); }
+      return r;
+    });
+    plan = planFor(first, run.candidate);
+    response = run.result;
+    if (run.route.fellBack) await recordFailedAttempts(storage, config, gaii, first, run.failed, { appId: options.app_id, source: 'voice-complete' });
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (typeof status !== 'number') throw e;
+    throw new AiCompletionError('PROVIDER_ERROR', status === 401 ? 401 : status === 429 ? 429 : 502, `Speech provider returned HTTP ${status}.`);
+  }
   await checkResponse(response);
   let content = '', prompt = 0, completion = 0, cost: number | undefined, finish: string | null = null;
   let result;

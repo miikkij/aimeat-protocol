@@ -20,6 +20,9 @@
  * @structure agentAiKeysRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.1.0 — 2026-09-28 — A key per provider (System 2 plan, V3): PUT takes `providers`
+ *     { "<provider id>": { api_key } | null }, stored as `ai.apikey.agent.<agent>.<id>`, and the read
+ *     lists which providers the agent has a key for, never the key.
  *   v1.0.0 — 2026-09-20 — Initial: a key per agent.
  */
 import { Router, type Request, type Response } from 'express';
@@ -35,6 +38,7 @@ import {
   agentAiView, writeAgentKey, clearAgentKey, writeAgentCap, AgentAiKeyError, type AgentAiModel,
 } from '../services/agent-ai-keys.js';
 import { gateSettingOf, writeAgentGate } from '../services/decide/gate.js';
+import { setAgentProviderKey, agentProviderKeys } from '../services/ai/provider-store.js';
 import { testDecideKey } from '../services/decide/key-test.js';
 import { decisionStats, DecideError } from '../services/decide/service.js';
 
@@ -62,16 +66,17 @@ export function agentAiKeysRouter(config: AimeatConfig, storage: Storage): Route
   };
 
   const view = async (t: { ownerGhii: string; agent: string; agentGaii: string }) => {
-    const [ai, gate, mine, perRule] = await Promise.all([
+    const [ai, gate, mine, perRule, providers] = await Promise.all([
       agentAiView(storage, t.ownerGhii, t.agent),
       gateSettingOf(storage, t.ownerGhii, t.agent),
       decisionStats(storage, t.ownerGhii, { principal: t.agentGaii, groupBy: 'principal' }),
       decisionStats(storage, t.ownerGhii, { principal: t.agentGaii, groupBy: 'rule' }),
+      agentProviderKeys(storage, t.ownerGhii, t.agent),
     ]);
     const none = { decisions: 0, outcomes: { act: 0, ask: 0, stop: 0 }, gateStops: 0, overridden: 0, confirmed: 0, costUsd: 0, lastAt: null };
     const unkeyed = ({ key, ...g }: (typeof perRule)[number]) => [key, g] as const;
     return {
-      agent: t.agent, ...ai, gate,
+      agent: t.agent, ...ai, providers, gate,
       quality: mine[0] ? unkeyed(mine[0])[1] : none,
       quality_by_rule: Object.fromEntries(perRule.map(unkeyed)),
     };
@@ -104,6 +109,16 @@ export function agentAiKeysRouter(config: AimeatConfig, storage: Storage): Route
           throw new AgentAiKeyError('INVALID_BODY', 400, `${model} is an object: { api_key, key_env }.`);
         }
         await writeAgentKey(storage, config, t.ownerGhii, t.agent, model, { apiKey: part.api_key, env: part.key_env });
+      }
+      // A key per provider (System 2, V3): { "<provider id>": { api_key } | null }.
+      if (body.providers !== undefined) {
+        if (!body.providers || typeof body.providers !== 'object' || Array.isArray(body.providers)) {
+          throw new AgentAiKeyError('INVALID_BODY', 400, 'providers is an object: { "<provider id>": { "api_key": "..." } | null }.');
+        }
+        for (const [id, part] of Object.entries(body.providers as Record<string, unknown>)) {
+          const apiKey = part === null ? null : (part as { api_key?: unknown } | undefined)?.api_key;
+          await setAgentProviderKey(storage, config, t.ownerGhii, t.agent, id, apiKey);
+        }
       }
       if (body.daily_usd !== undefined) await writeAgentCap(storage, t.ownerGhii, t.agent, body.daily_usd);
       if (body.gate !== undefined) await writeAgentGate(storage, t.ownerGhii, t.agent, body.gate);

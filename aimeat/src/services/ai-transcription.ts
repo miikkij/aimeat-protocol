@@ -14,6 +14,9 @@
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
  *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
+ *   v2.1.0 — 2026-09-28 — Providers (System 2 plan, V3): the owner's candidates are tried by their
+ *     rules, a call may name a `provider`, the provider's own transcription language comes after the
+ *     call's, the attempts that failed before a fallback are usage rows, and the result has `route`.
  *   v2.0.0 — 2026-09-28 — Through the shared gate (System 2 plan, V1): prepareAiCall with op
  *     'transcribe', the gateway's transcribeAudio(), settleAiCall. An agent's own key and the
  *     node's key can pay (the node's only when the operator named a node default transcription
@@ -34,8 +37,12 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import type { TranscriptionAudio } from './openrouter.js';
-import { AiCompletionError, prepareAiCall, settleAiCall, targetOf } from './ai-completion.js';
+import {
+  AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
+} from './ai-completion.js';
 import { transcribeAudio } from './ai/gateway.js';
+import { runRoute, type AiRoute } from './ai/route-run.js';
+import type { AiCandidate } from './ai/route-plan.js';
 import { logger } from '../utils/logger.js';
 import { resolveSttLanguage } from './ai-model-defaults.js';
 import type { CallerClass } from './ai/policy.js';
@@ -62,6 +69,9 @@ export interface TranscribeForOwnerOptions {
   /** Whose call this is and the app its grant names, for the owner's model policy. */
   caller?: CallerClass;
   verifiedApp?: string;
+  /** A provider the call names (an id or a type), and the call's word on fallback. */
+  provider?: string;
+  fallback?: boolean;
 }
 
 export interface TranscribeForOwnerResult {
@@ -77,6 +87,8 @@ export interface TranscribeForOwnerResult {
   provenance?: AiProvenanceRecordRow;
   /** Which pocket paid: the agent's key, the owner's own, or the node's allowance. */
   keySource: 'agent' | 'own' | 'node';
+  /** Who chose the provider, who answered, and every attempt (services/ai/route-run.ts). */
+  route: AiRoute;
 }
 
 /**
@@ -113,19 +125,33 @@ export async function transcribeForOwner(
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'transcribe', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
   });
-  const language = opts.language || resolveSttLanguage(config, plan.prefs);
-
   let result;
+  let answered: AiCallPlan;
+  let route: AiRoute;
   try {
-    result = await transcribeAudio({
-      target: targetOf(plan), model: plan.model, audio: opts.audio,
-      ...(language ? { language } : {}),
-      ...(opts.verbose ? { verbose: true } : {}),
-      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
-      ...(opts.signal ? { signal: opts.signal } : {}),
+    const run = await runRoute({
+      storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
+      allowFallback: plan.allowFallback, rules: plan.rules, ...(opts.signal ? { signal: opts.signal } : {}),
+    }, (c) => {
+      // The call's language, then the provider's own for transcription, then the owner's, then the node's.
+      const language = opts.language || c.provider.capabilities.transcription?.language || resolveSttLanguage(config, plan.prefs);
+      return transcribeAudio({
+        target: c.target, model: c.model, audio: opts.audio,
+        ...(language ? { language } : {}),
+        ...(opts.verbose ? { verbose: true } : {}),
+        ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+        ...(opts.signal ? { signal: opts.signal } : {}),
+      });
     });
+    result = run.result;
+    answered = planFor(plan, run.candidate);
+    route = run.route;
+    if (route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: opts.appId, source: 'ai-transcribe' });
   } catch (e) {
+    const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
+    if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-transcribe' });
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
     if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
@@ -142,10 +168,10 @@ export async function transcribeForOwner(
   // audio was. The charge already happened, so this warns rather than throws — refusing to return
   // text the owner has paid for would waste the money twice.
   if (config.sttMaxSeconds > 0 && seconds > config.sttMaxSeconds) {
-    logger.warn(`[stt] gaii=${gaii} transcribed ${seconds}s, over the ${config.sttMaxSeconds}s guideline (model=${plan.model})`);
+    logger.warn(`[stt] gaii=${gaii} transcribed ${seconds}s, over the ${config.sttMaxSeconds}s guideline (model=${answered.model})`);
   }
 
-  const settled = await settleAiCall(storage, config, gaii, plan, {
+  const settled = await settleAiCall(storage, config, gaii, answered, {
     // Speech-to-text is priced per second rather than per token, so the token split is whatever the
     // provider reported and the authoritative number is the cost. Named here anyway so a
     // transcription is not a hole in the per-model report.
@@ -170,6 +196,7 @@ export async function transcribeForOwner(
       remainingUsd: Math.max(0, dailyBudget - updated.total_cost_usd),
     },
     ...(settled.provenance ? { provenance: settled.provenance } : {}),
-    keySource: plan.keyScope,
+    keySource: answered.keyScope,
+    route: { ...route, attempts: route.attempts.map(a => a.ok ? { ...a, costUsd } : a) },
   };
 }
