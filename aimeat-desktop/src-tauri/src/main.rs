@@ -10,8 +10,6 @@ mod node_manager;
 mod opener;
 mod ai_connector;
 mod connectors;
-mod chat;
-mod agent_runtime;
 mod updater;
 mod tray;
 #[cfg(test)]
@@ -35,31 +33,9 @@ fn main() {
             connectors::disconnect_connector,
             connectors::connector_snippet,
             ai_connector::detect_ai_services,
-            ai_connector::connect_ai_service,
             ai_connector::node_login,
-            ai_connector::node_login_at,
-            ai_connector::node_register,
-            ai_connector::queue_agent_task,
-            ai_connector::get_agent_task,
-            ai_connector::get_agent_memory,
-            ai_connector::get_task_deliverable,
             ai_connector::save_ai_endpoint,
             ai_connector::get_ai_settings,
-            chat::get_chat_agent,
-            chat::register_chat_agent,
-            chat::get_chat_session,
-            chat::list_chat_sessions,
-            chat::delete_chat_session,
-            chat::chat_start,
-            chat::chat_send,
-            chat::chat_approve,
-            chat::chat_set_auto_approve,
-            chat::chat_clear,
-            chat::chat_stop,
-            agent_runtime::agent_provision,
-            agent_runtime::agent_start,
-            agent_runtime::agent_stop,
-            agent_runtime::agent_status,
             updater::check_update,
             updater::install_update,
         ])
@@ -70,13 +46,12 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("error while building AIMEAT Desktop")
-        .run(|app_handle, event| {
-            // On quit, reap EVERY sidecar we spawned (node server, agent supervisor + crew tree,
-            // detached serve daemon). Otherwise they linger and lock node.exe / the .venv, which
-            // breaks the next install ("Error opening file for writing") and corrupts provisioning.
+        .run(|_app_handle, event| {
+            // On quit, stop the server this app started. Otherwise it lingers and keeps node.exe
+            // locked, which breaks the next install ("Error opening file for writing"). The local
+            // agent runtime that also had to be reaped here was removed on 2026-09-29.
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 node_manager::kill_node();
-                agent_runtime::shutdown(app_handle);
             }
         });
 }

@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<!--
+  AIMEAT Desktop — the machine room: an AIMEAT of the person's own, running on this computer.
+
+  Four things live here and nothing else: start and stop it, the AI that runs on this computer and
+  which one it uses, its settings, and its log. The front door (index.html) is where a person
+  attaches their AI tools; this page is only for someone who wants their AIMEAT on their own
+  machine rather than on aimeat.io.
+
+  IT REPLACES legacy.html (2026-09-29). That window had grown a home screen of prompt cards, a chat
+  and a local agent runner that all did, worse, what the AIMEAT's own web pages do, plus a local
+  CrewAI path that needed git, uv, Ollama and an npm command on the person's machine: exactly the
+  terminal the front door exists to remove. Those went, with their Rust behind them, and what
+  remained was small enough to write again cleanly rather than carve out of three thousand lines.
+
+  THE CONTRACT WITH THE RUST SIDE is the one legacy.html used, checked against the signatures in
+  node_manager.rs and ai_connector.rs: get_node_status, start_node, stop_node { pid },
+  open_portal, read_config, write_config { config }, node_login { port, username, password },
+  get_ai_settings { port, token }, detect_ai_services, save_ai_endpoint { port, token, baseUrl,
+  model }, read_node_logs { lines }, clear_node_logs, open_external { url }. The update check is
+  the front door's, not this page's.
+
+  NO INLINE HANDLER AND NO STYLE ATTRIBUTE. Every listener is attached from the script and every
+  look comes from house.css or the sheet below, so the page asks less of the content security
+  policy than the one it replaces (src-tauri/src/webview_policy.rs holds the two together).
+
+  The words are English and Finnish, and neither says `node` or `solmu` (skill `aimeat-writing`).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIMEAT</title>
+  <link rel="stylesheet" href="house.css" />
+  <style>
+    /* This page's own layout. The faces, the tokens and the shapes are in house.css. */
+    .back { margin-bottom: 1.6rem; }
+    .state-line { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; font-size: 1.05rem; }
+    .service { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .service .name { font-weight: var(--font-poster-strong-weight); flex: 0 0 8rem; }
+    .service .where { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); flex: 1; min-width: 10rem; }
+    .service select {
+      background: transparent; color: var(--text); border: 0; border-bottom: 3px solid var(--text);
+      border-radius: 0; font-family: var(--font-mono); font-size: .85rem; padding: .2rem 0; max-width: 16rem;
+    }
+    .service select:focus { outline: none; border-color: var(--accent); }
+    .service select option { background: var(--card-bg); color: var(--text); }
+    .danger { color: var(--accent); border-bottom-color: var(--accent); }
+    .acts .spacer { flex: 1; }
+    .checks { display: flex; gap: 1.4rem; flex-wrap: wrap; font-size: .85rem; color: var(--text-dim); }
+    .checks input { accent-color: var(--accent); margin-right: .35rem; }
+    .log {
+      border: 2px solid var(--text); background: var(--card-bg); padding: .8rem 1rem; margin-top: 1rem;
+      font-family: var(--font-mono); font-size: .75rem; line-height: 1.5;
+      white-space: pre-wrap; word-break: break-all; max-height: 26rem; overflow: auto;
+    }
+    .toast {
+      position: fixed; right: 1.2rem; bottom: 1.2rem; max-width: 26rem; z-index: 10;
+      border: 2px solid var(--text); background: var(--card-bg); color: var(--text);
+      box-shadow: 4px 4px 0 var(--sun); padding: .8rem 1rem; font-size: .9rem;
+    }
+    .toast.error { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <a class="wordmark" href="index.html">AIME<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C5 16 2 12.5 2 8.8 2 6.1 4.1 4 6.8 4c1.7 0 3.3.8 4.2 2.1L12 7.2l1-1.1C13.9 4.8 15.5 4 17.2 4 19.9 4 22 6.1 22 8.8c0 3.7-3 7.2-10 12.2z"/></svg><span class="at">AT</span></a>
+      <span class="poster-crumb" id="crumb"></span>
+      <span class="spacer"></span>
+      <span class="version" id="version"></span>
+      <select class="lang" id="lang" aria-label="Language">
+        <option value="en">EN</option>
+        <option value="fi">FI</option>
+      </select>
+    </header>
+
+    <main>
+      <p class="back"><a class="poster-action" href="index.html" id="t-back"></a></p>
+      <h1 class="poster-page-title" id="t-title"></h1>
+      <p class="lead" id="t-lead"></p>
+
+      <!-- ── Running it ─────────────────────────────────────────────────── -->
+      <section class="poster-section">
+        <h2 class="poster-section-title" id="t-stateTitle"></h2>
+        <div class="state-line">
+          <span class="poster-chip" id="stateChip"></span>
+          <span id="stateText"></span>
+        </div>
+        <div class="acts below">
+          <button class="poster-slab" id="toggle"></button>
+          <button class="poster-action" id="openBrowser" disabled></button>
+        </div>
+        <dl class="info below">
+          <dt id="t-infoAddress"></dt><dd id="infoAddress">--</dd>
+          <dt id="t-infoId"></dt><dd id="infoId">--</dd>
+          <dt id="t-infoData"></dt><dd id="infoData">--</dd>
+          <dt id="t-infoStorage"></dt><dd id="infoStorage">SQLite</dd>
+        </dl>
+        <p class="dim below" id="t-backup"></p>
+      </section>
+
+      <!-- ── The AI on this computer ────────────────────────────────────── -->
+      <section class="poster-section">
+        <h2 class="poster-section-title" id="t-aiTitle"></h2>
+        <p class="lead" id="t-aiLead"></p>
+
+        <div id="signedOut">
+          <div class="field">
+            <label class="poster-label" for="aiUser" id="t-user"></label>
+            <input id="aiUser" type="text" spellcheck="false" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="poster-label" for="aiPass" id="t-pass"></label>
+            <input id="aiPass" type="password" autocomplete="off" />
+            <p class="hint" id="t-signInHint"></p>
+          </div>
+          <p class="below"><button class="poster-action" id="signIn"></button></p>
+        </div>
+
+        <div id="signedIn" hidden>
+          <div class="state-line">
+            <span class="poster-chip poster-chip--on" id="signedInAs"></span>
+            <button class="poster-action" id="signOut"></button>
+          </div>
+          <dl class="info poster-box" id="currentAi" hidden>
+            <dt id="t-curService"></dt><dd id="curService">--</dd>
+            <dt id="t-curModel"></dt><dd id="curModel">--</dd>
+            <dt id="t-curAddress"></dt><dd id="curAddress">--</dd>
+          </dl>
+        </div>
+
+        <h3 class="poster-label below" id="t-foundTitle"></h3>
+        <div id="services"></div>
+        <p class="below"><button class="poster-action" id="scan"></button></p>
+
+        <div class="poster-aside" id="t-ollama"></div>
+        <p class="below"><button class="poster-action" id="getOllama"></button></p>
+
+        <h3 class="poster-label below" id="t-customTitle"></h3>
+        <div class="field">
+          <label class="poster-label" for="customUrl" id="t-customUrl"></label>
+          <input id="customUrl" type="url" spellcheck="false" placeholder="http://localhost:1234/v1" />
+          <p class="hint" id="t-customUrlHint"></p>
+        </div>
+        <div class="field">
+          <label class="poster-label" for="customModel" id="t-customModel"></label>
+          <input id="customModel" type="text" spellcheck="false" placeholder="qwen2.5:7b" />
+        </div>
+        <p class="below"><button class="poster-action" id="saveCustom"></button></p>
+      </section>
+
+      <!-- ── Settings ───────────────────────────────────────────────────── -->
+      <section class="poster-section">
+        <h2 class="poster-section-title" id="t-setTitle"></h2>
+        <div class="field">
+          <label class="poster-label" for="setId" id="t-setId"></label>
+          <input id="setId" type="text" readonly />
+          <p class="hint" id="t-setIdHint"></p>
+        </div>
+        <div class="field">
+          <label class="poster-label" for="setPort" id="t-setPort"></label>
+          <input id="setPort" type="number" min="1024" max="65535" />
+          <p class="hint" id="t-setPortHint"></p>
+        </div>
+        <div class="field">
+          <label class="poster-label" for="setRole" id="t-setRole"></label>
+          <select id="setRole">
+            <option value="standalone" id="t-roleStandalone"></option>
+            <option value="personal" id="t-rolePersonal"></option>
+            <option value="contributor" id="t-roleContributor"></option>
+            <option value="operator" id="t-roleOperator"></option>
+          </select>
+          <p class="hint" id="t-setRoleHint"></p>
+        </div>
+        <div class="field">
+          <label class="poster-label" for="setGenesis" id="t-setGenesis"></label>
+          <input id="setGenesis" type="url" spellcheck="false" placeholder="https://aimeat.io" />
+          <p class="hint" id="t-setGenesisHint"></p>
+        </div>
+        <dl class="info below">
+          <dt id="t-setEnc"></dt><dd id="setEnc">--</dd>
+        </dl>
+        <div class="acts below">
+          <button class="poster-action" id="saveSettings"></button>
+          <button class="poster-action" id="resetSettings"></button>
+        </div>
+      </section>
+
+      <!-- ── Log ────────────────────────────────────────────────────────── -->
+      <section class="poster-section">
+        <h2 class="poster-section-title" id="t-logTitle"></h2>
+        <div class="acts">
+          <div class="checks">
+            <label><input type="checkbox" id="logFollow" checked /><span id="t-logFollow"></span></label>
+            <label><input type="checkbox" id="logRefresh" checked /><span id="t-logRefresh"></span></label>
+          </div>
+          <span class="spacer"></span>
+          <button class="poster-action" id="logReload"></button>
+          <button class="poster-action danger" id="logClear"></button>
+        </div>
+        <div class="log" id="log"></div>
+      </section>
+
+      <div class="foot">
+        <a class="poster-action" href="index.html" id="t-footBack"></a>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script>
+    // Tauri v2 exposes the invoke API at window.__TAURI__.core.invoke. Opened in a plain browser
+    // there is no backend, and the page says so rather than failing silently.
+    const TAURI = window.__TAURI__ && window.__TAURI__.core;
+    const invoke = TAURI ? TAURI.invoke : null;
+
+    const STRINGS = {
+      en: {
+        back: '← Your AI tools',
+        title: 'Your AIMEAT on this computer',
+        lead: 'Run an AIMEAT of your own here instead of on aimeat.io. Your data stays on this computer, and nobody reaches it unless you let them.',
+        stateTitle: 'Running it',
+        stOn: '✓ running',
+        stOff: 'stopped',
+        runningOn: 'It answers at {address}. Running for {m} min {s} s.',
+        stopped: 'It is not running. Start it to use it.',
+        start: 'Start',
+        stop: 'Stop',
+        openBrowser: 'Open it in your browser',
+        infoAddress: 'Address',
+        infoId: 'Identifier',
+        infoData: 'Your data',
+        infoStorage: 'Stored as',
+        backup: 'To back it up, stop it and copy the whole data folder.',
+        aiTitle: 'The AI on this computer',
+        aiLead: 'Your AIMEAT can use an AI that runs on this computer, such as LM Studio or Ollama. It is free, and nothing leaves the computer. Sign in first: the choice is saved to your account on this AIMEAT.',
+        user: 'Username',
+        pass: 'Password',
+        signInHint: 'The account you use on this AIMEAT. No account yet? Open it in your browser and register.',
+        signIn: 'Sign in',
+        signOut: 'Sign out',
+        signedInAs: 'signed in as {user}',
+        curService: 'Service',
+        curModel: 'Model',
+        curAddress: 'Address',
+        providerDefault: 'the service default',
+        providerCustom: 'an address you gave',
+        none: 'none',
+        foundTitle: 'Found on this computer',
+        scan: 'Look again',
+        scanning: 'Looking…',
+        nothingFound: 'No AI found running on this computer.',
+        models: '{n} models',
+        use: 'Use this',
+        inUse: '✓ in use',
+        notRunning: 'not running',
+        noModels: 'no models',
+        ollama: 'No AI on this computer yet? Install Ollama, which is free, open it and download a model there. Then come back and look again.',
+        getOllama: 'Get Ollama',
+        customTitle: 'Another AI',
+        customUrl: 'Address',
+        customUrlHint: 'An OpenAI-compatible address, ending in /v1.',
+        customModel: 'Model',
+        saveCustom: 'Use this AI',
+        setTitle: 'Settings',
+        setId: 'Identifier',
+        setIdHint: 'Given when it was set up. It does not change.',
+        setPort: 'Port',
+        setPortHint: 'The port it answers on. 41050 unless something else already uses it. A change takes effect the next time you start it.',
+        setRole: 'Its place among others',
+        roleStandalone: 'On its own',
+        rolePersonal: 'Anchored to another AIMEAT',
+        roleContributor: 'Contributes to a federation',
+        roleOperator: 'Runs a federation',
+        setRoleHint: 'On its own is right unless you join an AIMEAT someone else runs.',
+        setGenesis: 'The AIMEAT you join',
+        setGenesisHint: 'Its address. Needed only when this one is anchored or contributes.',
+        setEnc: 'Key encryption',
+        encOn: '✓ ready',
+        encOff: 'made the first time it starts',
+        saveSettings: 'Save settings',
+        resetSettings: 'Undo changes',
+        logTitle: 'Log',
+        logFollow: 'Follow the newest line',
+        logRefresh: 'Refresh every 2 seconds',
+        logReload: 'Refresh',
+        logClear: 'Clear the log',
+        logEmpty: 'Nothing here yet. Start it to see what it writes.',
+        logCleared: 'The log is empty.',
+        footBack: '← Your AI tools',
+        saved: 'Saved.',
+        aiSaved: 'Your AIMEAT now uses {model}.',
+        needSignIn: 'Sign in first, above.',
+        needBoth: 'Give the username and the password.',
+        needUrl: 'Give the address.',
+        needModel: 'Pick a model first.',
+        signedOutExpired: 'Your sign-in expired. Sign in again.',
+        failed: 'Did not work: {why}',
+        noBackend: 'This page is open in a plain browser, so it cannot run anything on this computer.',
+      },
+      fi: {
+        back: '← Tekoälysi',
+        title: 'Oma AIMEAT tällä koneella',
+        lead: 'Aja omaa AIMEATia täällä aimeat.ion sijaan. Tietosi pysyvät tällä koneella, eikä kukaan pääse niihin ilman lupaasi.',
+        stateTitle: 'Käynnissä',
+        stOn: '✓ käynnissä',
+        stOff: 'pysäytetty',
+        runningOn: 'Se vastaa osoitteessa {address}. Käynnissä {m} min {s} s.',
+        stopped: 'Se ei ole käynnissä. Käynnistä se, niin voit käyttää sitä.',
+        start: 'Käynnistä',
+        stop: 'Pysäytä',
+        openBrowser: 'Avaa se selaimessa',
+        infoAddress: 'Osoite',
+        infoId: 'Tunniste',
+        infoData: 'Tietosi',
+        infoStorage: 'Tallennus',
+        backup: 'Varmuuskopioi pysäyttämällä se ja kopioimalla koko tietokansio.',
+        aiTitle: 'Tekoäly tällä koneella',
+        aiLead: 'AIMEATisi voi käyttää tällä koneella toimivaa tekoälyä, esimerkiksi LM Studiota tai Ollamaa. Se on ilmaista, eikä mikään lähde koneelta. Kirjaudu ensin: valinta tallentuu tiliisi tässä AIMEATissa.',
+        user: 'Käyttäjätunnus',
+        pass: 'Salasana',
+        signInHint: 'Tili, jota käytät tässä AIMEATissa. Ei vielä tiliä? Avaa se selaimessa ja rekisteröidy.',
+        signIn: 'Kirjaudu',
+        signOut: 'Kirjaudu ulos',
+        signedInAs: 'kirjautuneena: {user}',
+        curService: 'Palvelu',
+        curModel: 'Malli',
+        curAddress: 'Osoite',
+        providerDefault: 'palvelun oletus',
+        providerCustom: 'antamasi osoite',
+        none: 'ei mitään',
+        foundTitle: 'Löytyi tältä koneelta',
+        scan: 'Etsi uudelleen',
+        scanning: 'Etsin…',
+        nothingFound: 'Tältä koneelta ei löytynyt käynnissä olevaa tekoälyä.',
+        models: '{n} mallia',
+        use: 'Käytä tätä',
+        inUse: '✓ käytössä',
+        notRunning: 'ei käynnissä',
+        noModels: 'ei malleja',
+        ollama: 'Ei vielä tekoälyä tällä koneella? Asenna ilmainen Ollama, avaa se ja lataa siinä malli. Palaa sitten tähän ja etsi uudelleen.',
+        getOllama: 'Hae Ollama',
+        customTitle: 'Muu tekoäly',
+        customUrl: 'Osoite',
+        customUrlHint: 'OpenAI-yhteensopiva osoite, joka päättyy /v1.',
+        customModel: 'Malli',
+        saveCustom: 'Käytä tätä tekoälyä',
+        setTitle: 'Asetukset',
+        setId: 'Tunniste',
+        setIdHint: 'Annettu käyttöönotossa. Se ei muutu.',
+        setPort: 'Portti',
+        setPortHint: 'Portti, jossa se vastaa. 41050, ellei jokin muu jo käytä sitä. Muutos tulee voimaan, kun käynnistät sen seuraavan kerran.',
+        setRole: 'Suhde muihin AIMEATeihin',
+        roleStandalone: 'Yksin',
+        rolePersonal: 'Ankkuroitu toiseen AIMEATiin',
+        roleContributor: 'Osallistuu federaatioon',
+        roleOperator: 'Ylläpitää federaatiota',
+        setRoleHint: 'Yksin on oikea valinta, ellet liity jonkun toisen ylläpitämään AIMEATiin.',
+        setGenesis: 'AIMEAT, johon liityt',
+        setGenesisHint: 'Sen osoite. Tarvitaan vain, kun tämä on ankkuroitu tai osallistuu.',
+        setEnc: 'Avainten salaus',
+        encOn: '✓ valmis',
+        encOff: 'syntyy ensimmäisellä käynnistyksellä',
+        saveSettings: 'Tallenna asetukset',
+        resetSettings: 'Peru muutokset',
+        logTitle: 'Loki',
+        logFollow: 'Seuraa uusinta riviä',
+        logRefresh: 'Päivitä 2 sekunnin välein',
+        logReload: 'Päivitä',
+        logClear: 'Tyhjennä loki',
+        logEmpty: 'Täällä ei ole vielä mitään. Käynnistä se, niin näet mitä se kirjoittaa.',
+        logCleared: 'Loki on tyhjä.',
+        footBack: '← Tekoälysi',
+        saved: 'Tallennettu.',
+        aiSaved: 'AIMEATisi käyttää nyt mallia {model}.',
+        needSignIn: 'Kirjaudu ensin, yllä.',
+        needBoth: 'Anna käyttäjätunnus ja salasana.',
+        needUrl: 'Anna osoite.',
+        needModel: 'Valitse ensin malli.',
+        signedOutExpired: 'Kirjautumisesi vanheni. Kirjaudu uudelleen.',
+        failed: 'Ei onnistunut: {why}',
+        noBackend: 'Tämä sivu on auki tavallisessa selaimessa, joten se ei voi ajaa mitään tällä koneella.',
+      },
+    };
+
+    let lang = pickLang();
+    let port = 41050;
+    let running = false;
+    let pid = null;
+    let loadedConfig = null;
+    let jwt = null;
+    let owner = null;
+    let currentAi = null;
+    let services = [];
+    let logTimer = null;
+
+    function pickLang() {
+      try {
+        const saved = localStorage.getItem('aimeat.lang');
+        if (saved && STRINGS[saved]) return saved;
+      } catch (e) { /* private mode: fall through to the browser's own language */ }
+      const os = (navigator.language || 'en').slice(0, 2).toLowerCase();
+      return STRINGS[os] ? os : 'en';
+    }
+
+    function t(key, vars) {
+      let s = (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key] || key;
+      if (vars) for (const k of Object.keys(vars)) s = s.split('{' + k + '}').join(vars[k]);
+      return s;
+    }
+
+    function $(id) { return document.getElementById(id); }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    let toastTimer = null;
+    function toast(message, kind) {
+      const box = $('toast');
+      box.textContent = message;
+      box.className = 'toast' + (kind === 'error' ? ' error' : '');
+      box.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { box.hidden = true; }, kind === 'error' ? 6000 : 3000);
+    }
+
+    function localAddress() { return 'http://localhost:' + port; }
+
+    // Every element whose id is `t-<key>` takes the string `<key>`, so the markup and the words
+    // cannot drift apart silently: a missing key shows as its own name.
+    function applyLanguage() {
+      document.documentElement.lang = lang;
+      for (const node of document.querySelectorAll('[id^="t-"]')) {
+        node.textContent = t(node.id.slice(2));
+      }
+      $('lang').value = lang;
+      $('openBrowser').textContent = t('openBrowser');
+      $('signIn').textContent = t('signIn');
+      $('signOut').textContent = t('signOut');
+      $('scan').textContent = t('scan');
+      $('getOllama').textContent = t('getOllama');
+      $('saveCustom').textContent = t('saveCustom');
+      $('saveSettings').textContent = t('saveSettings');
+      $('resetSettings').textContent = t('resetSettings');
+      $('logReload').textContent = t('logReload');
+      $('logClear').textContent = t('logClear');
+      if (owner) $('signedInAs').textContent = t('signedInAs', { user: owner });
+      showState({ running, uptime: lastUptime });
+      showConfig();
+      renderServices();
+    }
+
+    // ── Running it ────────────────────────────────────────────────────
+    let lastUptime = null;
+
+    function showState(s) {
+      running = !!s.running;
+      $('crumb').textContent = 'localhost:' + port;
+      $('stateChip').textContent = running ? t('stOn') : t('stOff');
+      $('stateChip').className = 'poster-chip' + (running ? ' poster-chip--on' : ' poster-chip--dim');
+      if (running) {
+        const up = s.uptime || 0;
+        $('stateText').textContent = t('runningOn', {
+          address: localAddress(), m: Math.floor(up / 60), s: up % 60,
+        });
+      } else {
+        $('stateText').textContent = t('stopped');
+      }
+      $('toggle').textContent = running ? t('stop') : t('start');
+      $('openBrowser').disabled = !running;
+      $('infoAddress').textContent = localAddress();
+    }
+
+    async function checkStatus() {
+      if (!invoke) return;
+      try {
+        const status = await invoke('get_node_status');
+        port = status.port || port;
+        pid = status.pid;
+        lastUptime = status.uptime_seconds;
+        showState({ running: status.running, uptime: status.uptime_seconds });
+      } catch (e) {
+        console.error('status check failed: ' + e);
+      }
+    }
+
+    async function toggle() {
+      const button = $('toggle');
+      button.disabled = true;
+      try {
+        const status = await invoke('get_node_status');
+        if (status.running) {
+          await invoke('stop_node', { pid: status.pid });
+        } else {
+          await invoke('start_node');
+        }
+      } catch (e) {
+        toast(t('failed', { why: String(e) }), 'error');
+      } finally {
+        // Starting takes a few seconds, so look again soon and once more after that.
+        setTimeout(checkStatus, 1000);
+        setTimeout(() => { checkStatus(); button.disabled = false; }, 3500);
+      }
+    }
+
+    async function openBrowser() {
+      try { await invoke('open_portal'); } catch (e) { toast(t('failed', { why: String(e) }), 'error'); }
+    }
+
+    // ── Settings and the readout above ────────────────────────────────
+    function showConfig() {
+      const c = loadedConfig;
+      if (!c) return;
+      $('infoId').textContent = c.node_id || '--';
+      $('infoData').textContent = c.data_dir || '--';
+      $('infoStorage').textContent = c.storage === 'sqlite' || !c.storage ? 'SQLite' : c.storage;
+      $('setId').value = c.node_id || '';
+      $('setPort').value = c.port || 41050;
+      $('setRole').value = c.federation_role || 'standalone';
+      $('setGenesis').value = c.genesis_url || '';
+      $('setEnc').textContent = c.encryption_configured ? t('encOn') : t('encOff');
+    }
+
+    async function loadConfig() {
+      if (!invoke) return;
+      try {
+        loadedConfig = await invoke('read_config');
+        port = loadedConfig.port || port;
+        showConfig();
+        showState({ running, uptime: lastUptime });
+      } catch (e) {
+        toast(t('failed', { why: String(e) }), 'error');
+      }
+    }
+
+    async function saveSettings() {
+      // The AI endpoint in the configuration file is not shown here, because the AI a person
+      // chooses is saved to their account above; it is written back exactly as it was read, so
+      // saving the settings can never wipe it.
+      const config = {
+        node_id: $('setId').value,
+        port: parseInt($('setPort').value, 10) || 41050,
+        federation_role: $('setRole').value,
+        genesis_url: $('setGenesis').value.trim() || null,
+        ai_endpoint: loadedConfig ? (loadedConfig.ai_endpoint || null) : null,
+      };
+      try {
+        await invoke('write_config', { config });
+        toast(t('saved'));
+        await loadConfig();
+      } catch (e) {
+        toast(t('failed', { why: String(e) }), 'error');
+      }
+    }
+
+    // ── The AI on this computer ───────────────────────────────────────
+    async function signIn() {
+      const username = $('aiUser').value.trim();
+      const password = $('aiPass').value;
+      if (!username || !password) { toast(t('needBoth'), 'error'); return; }
+      try {
+        jwt = await invoke('node_login', { port, username, password });
+        owner = username;
+        $('aiPass').value = '';
+        $('signedOut').hidden = true;
+        $('signedIn').hidden = false;
+        $('signedInAs').textContent = t('signedInAs', { user: owner });
+        await refreshCurrentAi();
+        detectAI();
+      } catch (e) {
+        toast(t('failed', { why: String(e) }), 'error');
+      }
+    }
+
+    function signOut() {
+      jwt = null;
+      owner = null;
+      currentAi = null;
+      $('signedOut').hidden = false;
+      $('signedIn').hidden = true;
+      $('currentAi').hidden = true;
+      renderServices();
+    }
+
+    async function refreshCurrentAi() {
+      if (!jwt) { currentAi = null; $('currentAi').hidden = true; return; }
+      try {
+        currentAi = await invoke('get_ai_settings', { port, token: jwt });
+        $('curService').textContent = providerName(currentAi.provider);
+        $('curModel').textContent = currentAi.model || t('none');
+        $('curAddress').textContent = currentAi.base_url || t('providerDefault');
+        $('currentAi').hidden = false;
+      } catch (e) {
+        currentAi = null;
+        $('currentAi').hidden = true;
+      }
+    }
+
+    function serviceBase(s) { return s.url.replace(/\/+$/, '') + '/v1'; }
+
+    // The Rust side names a service by its id; a person reads the product's own name.
+    const SERVICE_NAMES = { 'lm-studio': 'LM Studio', ollama: 'Ollama', 'openai-compatible': 'OpenAI-compatible' };
+    function serviceName(id) { return SERVICE_NAMES[id] || id; }
+
+    // The provider stored on the account, in words. `custom` is an address the person gave.
+    function providerName(id) {
+      if (!id) return t('providerDefault');
+      if (id === 'custom') return t('providerCustom');
+      if (id === 'openrouter') return 'OpenRouter';
+      return id;
+    }
+
+    function renderServices() {
+      const box = $('services');
+      box.innerHTML = '';
+      if (!services.length) return;
+      const available = services.filter((s) => s.status === 'available');
+      if (!available.length) box.appendChild(el('p', 'dim', t('nothingFound')));
+
+      services.forEach((s, i) => {
+        const row = el('div', 'poster-row service');
+        row.appendChild(el('span', 'name', serviceName(s.service_type)));
+        const up = s.status === 'available';
+        const models = s.models || [];
+        row.appendChild(el('span', 'where', s.url + (up ? '  ·  ' + t('models', { n: models.length }) : '')));
+        if (!up) {
+          row.appendChild(el('span', 'poster-chip poster-chip--dim', t('notRunning')));
+          box.appendChild(row);
+          return;
+        }
+        const inUse = currentAi && currentAi.base_url === serviceBase(s);
+        if (inUse) row.appendChild(el('span', 'poster-chip poster-chip--on', t('inUse')));
+        const pick = document.createElement('select');
+        pick.id = 'model-' + i;
+        if (models.length) {
+          for (const m of models) {
+            const option = el('option', '', m);
+            option.value = m;
+            if (inUse && currentAi.model === m) option.selected = true;
+            pick.appendChild(option);
+          }
+        } else {
+          const option = el('option', '', t('noModels'));
+          option.value = '';
+          pick.appendChild(option);
+        }
+        row.appendChild(pick);
+        const use = el('button', 'poster-action', t('use'));
+        use.addEventListener('click', () => saveAi(serviceBase(s), pick.value));
+        row.appendChild(use);
+        box.appendChild(row);
+      });
+    }
+
+    async function detectAI() {
+      if (!invoke) return;
+      $('services').textContent = t('scanning');
+      try {
+        services = await invoke('detect_ai_services');
+      } catch (e) {
+        services = [];
+        toast(t('failed', { why: String(e) }), 'error');
+      }
+      renderServices();
+    }
+
+    async function saveAi(baseUrl, model) {
+      if (!jwt) { toast(t('needSignIn'), 'error'); $('aiUser').focus(); return; }
+      if (!model) { toast(t('needModel'), 'error'); return; }
+      try {
+        await invoke('save_ai_endpoint', { port, token: jwt, baseUrl, model });
+        toast(t('aiSaved', { model }));
+        await refreshCurrentAi();
+        renderServices();
+      } catch (e) {
+        // A refused token means the sign-in ran out: drop it so the person signs in again.
+        if (/401|auth/i.test(String(e))) { signOut(); toast(t('signedOutExpired'), 'error'); return; }
+        toast(t('failed', { why: String(e) }), 'error');
+      }
+    }
+
+    function saveCustom() {
+      const url = $('customUrl').value.trim();
+      const model = $('customModel').value.trim();
+      if (!url) { toast(t('needUrl'), 'error'); return; }
+      saveAi(url, model);
+    }
+
+    async function openExternal(url) {
+      try { await invoke('open_external', { url }); } catch (e) { toast(t('failed', { why: String(e) }), 'error'); }
+    }
+
+    // ── Log ───────────────────────────────────────────────────────────
+    async function refreshLog() {
+      if (!invoke) return;
+      const box = $('log');
+      try {
+        const lines = await invoke('read_node_logs', { lines: 500 });
+        box.textContent = lines.length ? lines.join('\n') : t('logEmpty');
+      } catch (e) {
+        // No log file before the first start: that is the empty state, not an error.
+        box.textContent = t('logEmpty');
+      }
+      if ($('logFollow').checked) box.scrollTop = box.scrollHeight;
+    }
+
+    async function clearLog() {
+      try {
+        await invoke('clear_node_logs');
+        $('log').textContent = t('logCleared');
+      } catch (e) {
+        toast(t('failed', { why: String(e) }), 'error');
+      }
+    }
+
+    function pollLog() {
+      clearInterval(logTimer);
+      logTimer = $('logRefresh').checked ? setInterval(refreshLog, 2000) : null;
+    }
+
+    // ── Version ───────────────────────────────────────────────────────
+    async function showVersion() {
+      const app = window.__TAURI__ && window.__TAURI__.app;
+      if (!app || !app.getVersion) return;
+      try { $('version').textContent = 'v' + (await app.getVersion()); } catch (e) { /* a nicety */ }
+    }
+
+    // ── Wiring ────────────────────────────────────────────────────────
+    $('lang').addEventListener('change', (e) => {
+      lang = e.target.value;
+      try { localStorage.setItem('aimeat.lang', lang); } catch (err) { /* private mode */ }
+      applyLanguage();
+      if (!services.length) $('services').textContent = '';
+      refreshLog();
+    });
+    $('toggle').addEventListener('click', toggle);
+    $('openBrowser').addEventListener('click', openBrowser);
+    $('signIn').addEventListener('click', signIn);
+    $('aiPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
+    $('signOut').addEventListener('click', signOut);
+    $('scan').addEventListener('click', detectAI);
+    $('getOllama').addEventListener('click', () => openExternal('https://ollama.com/download'));
+    $('saveCustom').addEventListener('click', saveCustom);
+    $('saveSettings').addEventListener('click', saveSettings);
+    $('resetSettings').addEventListener('click', showConfig);
+    $('logReload').addEventListener('click', refreshLog);
+    $('logClear').addEventListener('click', clearLog);
+    $('logRefresh').addEventListener('change', pollLog);
+
+    applyLanguage();
+    if (!invoke) {
+      toast(t('noBackend'), 'error');
+    } else {
+      loadConfig().then(checkStatus);
+      setInterval(checkStatus, 5000);
+      detectAI();
+      refreshLog();
+      pollLog();
+      showVersion();
+    }
+  </script>
+</body>
+</html>

@@ -10,12 +10,16 @@ can do. Two things, in this order:
    run anything. The work is in [src-tauri/src/connectors.rs](src-tauri/src/connectors.rs), which reads and
    edits each tool's own config file; nothing it writes holds a secret, because the node authenticates MCP
    over OAuth 2.1 with dynamic client registration.
-2. **The machine room ([src/legacy.html](src/legacy.html)).** Run their **own AIMEAT server** on this computer
-   without a terminal: start and stop it, see its status and logs, configure it, open its web pages. Data is
-   stored in **persistent SQLite** and survives restarts.
+2. **The machine room ([src/server.html](src/server.html)).** Run an AIMEAT of their own on this computer
+   without a terminal: start and stop it, choose the AI that runs on this computer (LM Studio, Ollama or an
+   address of their own), change its settings and read its log. Data is stored in **persistent SQLite** and
+   survives restarts.
 
-> The desktop window is the front door and the control panel. The product itself is the web interface the
-> server carries at `http://localhost:41050/v1/portal` — use **Open Dashboard in Browser** once it is running.
+> Everything else a person does with their AIMEAT happens in its own web pages, which the machine room opens
+> in the browser (`http://localhost:41050/v1/portal`). The app does not copy them. Until 2026-09-29 it did:
+> a home screen of prompt cards, a chat and a local agent runner, plus a local CrewAI path that needed git,
+> uv, Ollama and an npm command on the person's machine. All of it was removed on that date, by decision,
+> because it rebuilt the terminal wall the front door takes down and duplicated pages that already exist.
 
 The direction, the use cases behind it and what this app deliberately does not do are in the wish bucket on
 the node: wish `wish-ty-p-yt-sovellus-uusiksi-liitin-etuovena-kaikki-k-ytt-j-rjes` and its brief
@@ -151,7 +155,8 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
 | Path | Purpose |
 |------|---------|
 | [src/index.html](src/index.html) | The front door: which AI tools on this computer are attached, and the two verbs |
-| [src/legacy.html](src/legacy.html) | The older control panel (Home / Dashboard / Connections / AI Setup / Agents / Chat / Settings / Logs) |
+| [src/server.html](src/server.html) | The machine room: run an AIMEAT on this computer, its AI, its settings and its log |
+| [src/house.css](src/house.css) | The house poster face both pages share: faces, tokens and shapes, as literal values |
 | [src/fonts/](src/fonts/) | The three design-language faces, self-hosted (SIL OFL, see `fonts/LICENSE.md`); nothing here fetches a font |
 | [src-tauri/src/main.rs](src-tauri/src/main.rs) | Tauri entry point + command registration |
 | [src-tauri/src/connectors.rs](src-tauri/src/connectors.rs) | Detect the AI tools on this machine; attach and detach by editing their config files |

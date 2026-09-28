@@ -7,196 +7,25 @@
   src-tauri/src/connectors.rs, which reads and edits each tool's own config file; this page shows
   the state and offers the two verbs, connect and disconnect.
 
-  THE LOOK IS THE HOUSE POSTER FACE, carried as literal values. The app runs outside the node, so
-  it cannot read theme.css; skill `aimeat-design-language` says such code carries the values from
-  its tables, and the shapes below are copied from aimeat/public/css/poster.css. The three faces
-  are vendored beside this file (fonts/, SIL OFL, see fonts/LICENSE.md) because nothing here may
-  fetch a font from a CDN and the app must look right offline.
+  THE LOOK IS THE HOUSE POSTER FACE, from house.css, which this page shares with the machine room.
 
   THE WORDS ARE THE PAGE'S OWN, in English and Finnish. The Rust side returns ids and state, never
   sentences: a refusal there is a safety net in English, and what a person reads is here, in their
   language. `node` and `solmu` never appear in what a person reads (skill `aimeat-writing`).
 
-  The older control panel (start and stop the server, settings, logs) lives on at legacy.html and
-  is reached from the link at the foot of this page.
+  The machine room (server.html: run an AIMEAT on this computer, the AI on this computer, its
+  settings and its log) is reached from the link at the foot of this page.
 -->
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AIMEAT</title>
+  <link rel="stylesheet" href="house.css" />
   <style>
-    /* ── The three faces of the design language, self-hosted (SIL OFL 1.1) ── */
-    @font-face {
-      font-family: 'Fjalla One'; font-style: normal; font-weight: 400; font-display: swap;
-      src: url('fonts/fjalla-one-latin.woff2') format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'Fjalla One'; font-style: normal; font-weight: 400; font-display: swap;
-      src: url('fonts/fjalla-one-latin-ext.woff2') format('woff2');
-      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-    }
-    @font-face {
-      font-family: 'Archivo'; font-style: normal; font-weight: 100 900; font-display: swap;
-      src: url('fonts/archivo-var-latin.woff2') format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'Archivo'; font-style: normal; font-weight: 100 900; font-display: swap;
-      src: url('fonts/archivo-var-latin-ext.woff2') format('woff2');
-      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-    }
-    @font-face {
-      font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap;
-      src: url('fonts/archivo-black-latin.woff2') format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap;
-      src: url('fonts/archivo-black-latin-ext.woff2') format('woff2');
-      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-    }
-    @font-face {
-      font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
-      src: url('fonts/jetbrains-mono-var-latin.woff2') format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
-      src: url('fonts/jetbrains-mono-var-latin-ext.woff2') format('woff2');
-      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-    }
-
-    /* ── The tokens, carried from theme.css because this runs outside the node ── */
-    :root {
-      --font-poster: 'Fjalla One', 'Arial Narrow', sans-serif;
-      --font-body: 'Archivo', system-ui, sans-serif;
-      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-      --font-wordmark: 'Archivo Black', system-ui, sans-serif;
-      --font-poster-weight: 400;
-      --font-poster-tracking: .01em;
-      --font-poster-leading: 1;
-      --font-poster-strong-weight: 600;
-
-      --text: #1A1A2E;
-      --bg: #FAFAF8;
-      --card-bg: #FFFFFF;
-      --text-dim: #6B7280;
-      --border: #E5E7EB;
-      --accent: #E8564A;
-      --sun: #FFB52E;
-      --on-sun: #1A1A2E;
-      --success-fg: #047857;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --text: #EDEEF2;
-        --bg: #14151A;
-        --card-bg: #1C1E26;
-        --text-dim: #A4A9B6;
-        --border: #33363F;
-        --accent: #FF6F62;
-        --success-fg: #6EE7B7;
-      }
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    /* The shapes below set `display`, which would otherwise beat the `hidden` attribute's own
-       UA rule and show a hidden control. */
-    [hidden] { display: none !important; }
-    body {
-      background: var(--bg); color: var(--text);
-      font-family: var(--font-body); font-size: 1rem; line-height: 1.6;
-      min-height: 100vh;
-    }
-    .wrap { max-width: 880px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
-
-    /* ── The shapes, copied from poster.css ── */
-    .poster-page-title {
-      font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-      font-size: 2.8rem; line-height: var(--font-poster-leading);
-      letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
-      color: var(--text); margin-bottom: .6rem;
-    }
-    .poster-section { margin-top: 3rem; }
-    .poster-section-title {
-      font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-      font-size: 1.9rem; line-height: var(--font-poster-leading);
-      letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
-      background: var(--text); color: var(--bg);
-      padding: .55rem 1rem .5rem; border-bottom: 6px solid var(--sun);
-      margin: 0 0 1.4rem;
-    }
-    .poster-row { border-block: 1px solid var(--border); padding-block: 1rem; }
-    .poster-row + .poster-row { border-top: 0; }
-    .poster-label {
-      font-size: .72rem; color: var(--accent); text-transform: uppercase;
-      letter-spacing: .1em; font-weight: 800; line-height: 1.3;
-    }
-    .poster-action {
-      display: inline-flex; align-items: center; gap: .4rem;
-      background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
-      padding: 0 0 2px; cursor: pointer;
-      font: inherit; font-weight: 800; font-size: .9rem; text-transform: uppercase; letter-spacing: .04em;
-      color: var(--text); text-decoration: none; white-space: nowrap;
-    }
-    .poster-action:hover { border-color: var(--accent); color: var(--accent); }
-    .poster-action[disabled] { opacity: .45; cursor: default; }
-    .poster-action[disabled]:hover { border-color: var(--text); color: var(--text); }
-    .poster-slab {
-      display: inline-block;
-      background: var(--text); color: var(--bg);
-      border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
-      padding: 10px 16px; cursor: pointer;
-      font-family: var(--font-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem;
-      text-transform: uppercase; letter-spacing: .04em; text-decoration: none;
-      transition: transform 120ms ease, box-shadow 120ms ease;
-    }
-    .poster-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); color: var(--sun); }
-    .poster-aside {
-      padding: 1rem 1.25rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg);
-      font-family: var(--font-body); font-size: .95rem; line-height: 1.6; color: var(--text);
-      margin-top: 1.5rem;
-    }
-    .poster-chip {
-      display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;
-      font-family: var(--font-mono); font-size: .68rem; font-weight: 500; letter-spacing: .04em;
-      color: var(--text); background: transparent; white-space: nowrap;
-    }
-    .poster-chip--on { border-color: var(--success-fg); color: var(--success-fg); }
-    .poster-chip--dim { border-color: var(--border); color: var(--text-dim); }
-    .poster-crumb {
-      font-family: var(--font-mono); font-weight: 400; font-size: .8rem;
-      letter-spacing: 0; text-transform: none; color: var(--accent);
-    }
-
-    /* ── This page's own layout ── */
-    .head { display: flex; align-items: center; gap: 1rem; margin-bottom: 2.5rem; }
-    .wordmark {
-      font-family: var(--font-wordmark); font-size: 1.15rem; letter-spacing: -.01em;
-      color: var(--text); display: inline-flex; align-items: center; gap: .1em;
-    }
-    .wordmark .at { color: var(--accent); }
-    .wordmark svg { width: .85em; height: .85em; fill: var(--accent); }
-    .head .spacer { flex: 1; }
-    .version { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+    /* This page's own layout. The faces, the tokens and the shapes are in house.css. */
     .update { margin-bottom: 2rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
-    .lang {
-      font-family: var(--font-mono); font-size: .75rem; color: var(--text);
-      background: transparent; border: 1px solid var(--text); border-radius: 0; padding: .15rem .35rem;
-    }
-    .lead { color: var(--text-dim); max-width: 58ch; margin-bottom: .5rem; }
-
-    .field { margin-top: 2.5rem; max-width: 34rem; }
-    .field input {
-      width: 100%; background: transparent; color: var(--text);
-      border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
-      font-family: var(--font-mono); font-size: 1rem; padding: .4rem 0;
-    }
-    .field input:focus { outline: none; border-color: var(--accent); }
-    .field .hint { color: var(--text-dim); font-size: .85rem; margin-top: .4rem; min-height: 1.3em; }
-
+    .field { margin-top: 2.5rem; }
     .tool { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
     .tool .name { font-weight: var(--font-poster-strong-weight); font-size: 1.05rem; flex: 0 0 9.5rem; }
     .tool .state { flex: 1; min-width: 12rem; }
@@ -206,8 +35,7 @@
       border: 2px solid var(--text); background: var(--card-bg); padding: .8rem 1rem; margin-top: .6rem;
       font-family: var(--font-mono); font-size: .75rem; white-space: pre; overflow-x: auto;
     }
-    .acts { display: flex; gap: 1.2rem; align-items: center; }
-    .foot { margin-top: 3.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem; }
+    .acts { gap: 1.2rem; }
   </style>
 </head>
 <body>
@@ -243,7 +71,7 @@
       </section>
 
       <div class="foot">
-        <a class="poster-action" href="legacy.html" id="t-legacy"></a>
+        <a class="poster-action" href="server.html" id="t-legacy"></a>
       </div>
     </main>
   </div>
@@ -280,7 +108,7 @@
         copied: 'Copied. Paste it where {tool} asks for it, then restart {tool}.',
         failed: 'Did not work: {why}',
         noBackend: 'This page is open in a plain browser, so it cannot see the tools on this computer.',
-        legacy: 'Server, settings and logs',
+        legacy: 'Run an AIMEAT of your own on this computer',
         updateFound: 'Version {version} is out. You have {current}.',
         updateInstall: 'Install it',
         updateWorking: 'Installing. The app closes and opens again by itself.',
@@ -312,7 +140,7 @@
         copied: 'Kopioitu. Liitä se siihen mihin {tool} sitä pyytää ja käynnistä {tool} uudelleen.',
         failed: 'Ei onnistunut: {why}',
         noBackend: 'Tämä sivu on auki tavallisessa selaimessa, joten se ei näe tämän koneen ohjelmia.',
-        legacy: 'Palvelin, asetukset ja lokit',
+        legacy: 'Oma AIMEAT tällä koneella',
         updateFound: 'Versio {version} on julkaistu. Sinulla on {current}.',
         updateInstall: 'Asenna se',
         updateWorking: 'Asennan. Sovellus sulkeutuu ja avautuu itse uudelleen.',
