@@ -152,6 +152,26 @@ mod tests {
         }
     }
 
+    /// The three files release-desktop.yml signs, one per platform, as their names come out of the
+    /// build. The Windows and Linux names are Tauri's own; the macOS archive is named by the
+    /// workflow, and has to carry the version the same way or every macOS update is refused.
+    #[test]
+    fn every_platform_file_the_release_signs_names_its_version() {
+        let signed = |file: &str| {
+            encode(format!("untrusted comment: x\nRUQ=\ntrusted comment: timestamp:1\tfile:{}\nAAAA\n", file).as_bytes())
+        };
+        for file in [
+            "AIMEAT Personal Node_0.6.0_x64-setup.exe",
+            "AIMEAT.Personal.Node_0.6.0_aarch64.app.tar.gz",
+            "AIMEAT Personal Node_0.6.0_amd64.AppImage",
+        ] {
+            assert_eq!(offered_version("0.6.0", &signed(file)), Ok("0.6.0".to_string()), "{}", file);
+        }
+        // The name Tauri would give the macOS archive itself carries no version, which is why the
+        // workflow does not use it.
+        assert!(offered_version("0.6.0", &signed("AIMEAT Personal Node.app.tar.gz")).is_err());
+    }
+
     #[test]
     fn only_the_comment_minisign_verifies_is_read() {
         let signed = |text: &str| encode(text.as_bytes());

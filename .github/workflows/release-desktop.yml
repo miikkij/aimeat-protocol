@@ -1,18 +1,27 @@
-# Builds the AIMEAT Personal Node desktop installer (Tauri, Windows) and publishes it
-# as a downloadable GitHub Release. Triggered by a `desktop-v*.*.*` tag whose numeric part
-# must match aimeat-desktop/src-tauri/tauri.conf.json `version` (mirrors the Python publish
-# workflow's tag-vs-manifest gate). workflow_dispatch builds only (no release) for smoke tests.
+# Builds the AIMEAT Personal Node desktop app for Windows, macOS and Linux and publishes the
+# installers as a GitHub Release. Triggered by a `desktop-v*.*.*` tag whose numeric part must match
+# aimeat-desktop/src-tauri/tauri.conf.json `version` (mirrors the Python publish workflow's
+# tag-vs-manifest gate). workflow_dispatch builds and signs only (no release), which is how a change
+# to this file is proven before a tag depends on it.
 #
-# The installer is what the landing "Get your own →" button links to
-# (https://github.com/miikkij/aimeat-protocol/releases/latest).
+# WHAT SHIPS, per platform:
+#   Windows  NSIS installer (-setup.exe) and MSI. The updater installs the -setup.exe.
+#   macOS    a .dmg for Apple silicon, and <app>.app.tar.gz, which is what the updater installs.
+#            Intel Macs are not built: GitHub's macOS runners are Apple silicon, and a universal
+#            build would need both a universal Node sidecar and the native SQLite module twice.
+#   Linux    an .AppImage, which the updater installs, and a .deb, which it does not.
+# Nothing is code-signed for the operating systems, by decision (2026-09-18): no signing until the
+# app has been judged good. Windows shows SmartScreen, macOS asks the person to allow the app in
+# System Settings > Privacy & Security, and the macOS bundle is signed ad hoc ("-" in
+# tauri.macos.conf.json) so it is refused as unverified rather than reported as damaged.
 #
-# THREE JOBS, EACH HOLDING ONLY WHAT IT NEEDS. The build installs and runs the whole dependency
-# tree (npm packages, crates and their build scripts), so it holds no secret and a token that can
-# only read. The sign job holds the updater signing key and runs nothing but the Tauri CLI's
-# signer, a fixed release checked by its sha256, over the installer the build made. The publish
-# job holds the token that writes releases and runs nothing but a copy: it downloads what the two
-# jobs made and uploads it. The file names, the release assets, latest.json and the
-# `desktop-latest` release are the ones this workflow published when it was one job.
+# THREE JOBS, EACH HOLDING ONLY WHAT IT NEEDS, as before macOS and Linux joined. The build runs the
+# whole dependency tree (npm packages, crates and their build scripts), once per platform, so it
+# holds no secret and a token that can only read. The sign job holds the updater signing key and
+# runs nothing but the Tauri CLI's signer, a fixed release checked by its sha256, over the three
+# files the updater installs. The publish job holds the token that writes releases and runs nothing
+# but a copy. `sign` needs every build, so a platform that fails to build publishes nothing at all:
+# a release that updates two platforms and strands the third is worse than no release.
 name: Release Desktop Installer
 
 on:
@@ -25,8 +34,21 @@ permissions:
   contents: read
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      # Every platform runs to the end even when another fails, so one run shows every failure.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+          - platform: macos
+            os: macos-latest
+          # 22.04 rather than the newest: an AppImage runs on systems at least as new as the one
+          # it was built on, so the older glibc reaches more of the people who download it.
+          - platform: linux
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
@@ -62,6 +84,19 @@ jobs:
         with:
           workspaces: aimeat-desktop/src-tauri
 
+      # What Tauri v2 builds against on Linux: WebKitGTK 4.1 with GTK 3 and libsoup 3, librsvg
+      # for the icons and the app indicator for the tray icon, libxdo for the menus and OpenSSL,
+      # which reqwest uses there; the same list desktop-check.yml installs. patchelf and file are
+      # what the AppImage bundler runs.
+      - name: System packages for Tauri (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config libssl-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
+            librsvg2-dev libayatana-appindicator3-dev patchelf file
+
       - name: Install server deps (for stage-server build)
         run: pnpm install --frozen-lockfile
         working-directory: aimeat
@@ -70,65 +105,89 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: aimeat-desktop
 
-      # `pnpm stage` runs stage-node + stage-webview2 + stage-server. The local agent runtime
-      # (resources/agent-runtime/*.mjs + llm_providers.default.json) ships as static bundle
-      # resources (tauri.conf.json), so it needs no staging — Python/uv/Ollama are provisioned
-      # at first run on the user's machine (D1), not baked into the installer.
+      # `pnpm stage` runs stage-node, stage-webview2, stage-server and stage-licenses. On macOS and
+      # Linux stage-webview2 says there is nothing to stage and leaves: WebView2 is Windows only, and
+      # only tauri.windows.conf.json names its loader as a resource. stage-server builds the native
+      # SQLite module for the runner it is on, which is why every platform stages on its own runner.
       - name: Stage sidecars + server
         run: pnpm stage
         working-directory: aimeat-desktop
 
-      # No updater artifacts in this build, so it needs no signing key: sign-windows below signs
-      # the installer. With Tauri v2 and createUpdaterArtifacts true, the NSIS updater artifact is
-      # the -setup.exe itself and `tauri build` only adds its .sig, so the installers come out the
-      # same (tauri-cli 2.11.2: sign_updaters in bundle.rs returns at once when the setting is
-      # false, and the bundler builds NSIS and MSI the same way either way).
-      - name: Build installers (NSIS + MSI)
+      # No updater artifacts in this build, so it needs no signing key: the sign job signs the
+      # files the updater installs. With Tauri v2 and createUpdaterArtifacts false the installers
+      # come out the same (tauri-cli 2.11.2: sign_updaters in bundle.rs returns at once when the
+      # setting is false). On macOS the one thing that setting would add is the .app.tar.gz, which
+      # the next step makes itself. APPIMAGE_EXTRACT_AND_RUN lets the AppImage tooling run without
+      # FUSE, which a CI runner does not have; it means nothing on the other two.
+      - name: Build installers
+        shell: bash
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
-          Set-Content -Path "$env:RUNNER_TEMP\no-updater-artifacts.json" -Value '{"bundle":{"createUpdaterArtifacts":false}}' -NoNewline -Encoding ascii
-          pnpm tauri build --config "$env:RUNNER_TEMP\no-updater-artifacts.json"
+          printf '%s' '{"bundle":{"createUpdaterArtifacts":false}}' > "$RUNNER_TEMP/no-updater-artifacts.json"
+          pnpm tauri build --config "$RUNNER_TEMP/no-updater-artifacts.json"
         working-directory: aimeat-desktop
 
       - name: List built bundles
         shell: bash
         run: ls -R aimeat-desktop/src-tauri/target/release/bundle || true
 
-      # ── Code signing ────────────────────────────────────────────────────
-      # Installers currently ship UNSIGNED (Windows SmartScreen will warn).
-      # A free Authenticode signing method is being evaluated; the signing
-      # step will be added back here once one is chosen.
+      # The names GitHub gives the assets replace spaces with dots, so a file is named that way here
+      # already where this workflow chooses the name (the macOS updater archive), and the manifest
+      # step turns the rest the same way.
       - name: Assemble release files
         shell: bash
         run: |
+          B=aimeat-desktop/src-tauri/target/release/bundle
           mkdir -p dist
-          cp aimeat-desktop/src-tauri/target/release/bundle/nsis/*-setup.exe dist/
-          cp aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi dist/
+          case "${{ matrix.platform }}" in
+            windows)
+              cp "$B"/nsis/*-setup.exe dist/
+              cp "$B"/msi/*.msi dist/
+              ;;
+            macos)
+              cp "$B"/dmg/*.dmg dist/
+              # The updater offers an update only when the SIGNED file name holds the version it
+              # announces, between underscores (offered_version in src-tauri/src/updater.rs). The
+              # Windows and Linux bundles are named <product>_<version>_<arch> by Tauri already;
+              # this archive is named here, so it is named the same way. A name without the version
+              # would make every macOS update refused.
+              APP="$(ls -d "$B"/macos/*.app | head -1)"
+              VERSION="$(node -p "require('./aimeat-desktop/src-tauri/tauri.conf.json').version")"
+              NAME="$(basename "$APP" .app | tr ' ' '.')_${VERSION}_aarch64.app.tar.gz"
+              tar -czf "dist/$NAME" -C "$(dirname "$APP")" "$(basename "$APP")"
+              ;;
+            linux)
+              cp "$B"/deb/*.deb dist/
+              cp "$B"/appimage/*.AppImage dist/
+              ;;
+          esac
           ls -la dist
 
-      # The run's copy of the installers, and what sign-windows and publish-windows download.
       - name: Upload build artifacts (run copy)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: aimeat-desktop-windows
+          name: aimeat-desktop-${{ matrix.platform }}
           path: dist/*
           if-no-files-found: error
 
-  # THE UPDATER SIGNING KEY IS USED HERE AND NOWHERE ELSE. The job downloads the installers the
-  # build made, puts the Tauri CLI on the runner and signs the installer the updater verifies. The
-  # CLI is tauri-cli 2.11.2, the version aimeat-desktop/pnpm-lock.yaml pins, from the release
-  # tauri-apps publishes it in; the sha256 is GitHub's digest of that asset. `tauri signer sign` is
-  # the routine `tauri build` signs updater artifacts with (sign_file in the CLI's
-  # helpers/updater_signature.rs) and writes <file>.sig beside the file. No checkout, no package
-  # install and no build script runs in this job.
-  sign-windows:
-    needs: build-windows
+  # THE UPDATER SIGNING KEY IS USED HERE AND NOWHERE ELSE. The job downloads what the three builds
+  # made, puts the Tauri CLI on the runner and signs the three files the updater installs. The CLI
+  # is tauri-cli 2.11.2, the version aimeat-desktop/pnpm-lock.yaml pins, from the release tauri-apps
+  # publishes it in; the sha256 is GitHub's digest of that asset. `tauri signer sign` is the routine
+  # `tauri build` signs updater artifacts with (sign_file in the CLI's helpers/updater_signature.rs)
+  # and writes <file>.sig beside the file; a minisign signature is over the bytes, so one signer on
+  # Windows signs the macOS and Linux files the same way. No checkout, no package install and no
+  # build script runs in this job.
+  sign:
+    needs: build
     runs-on: windows-latest
     permissions: {}
     steps:
       - name: Download the installers
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: aimeat-desktop-windows
+          pattern: aimeat-desktop-*
           path: dist
 
       - name: Install the Tauri CLI (the signer only)
@@ -141,64 +200,62 @@ jobs:
           Expand-Archive -Path tauri-cli/cargo-tauri.zip -DestinationPath tauri-cli
           ./tauri-cli/cargo-tauri.exe --version
 
-      - name: Sign the installer the updater verifies
+      - name: Sign the three files the updater installs
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: ./tauri-cli/cargo-tauri.exe signer sign "$(ls dist/*-setup.exe | head -1)"
+        run: |
+          ./tauri-cli/cargo-tauri.exe signer sign "$(ls dist/aimeat-desktop-windows/*-setup.exe | head -1)"
+          ./tauri-cli/cargo-tauri.exe signer sign "$(ls dist/aimeat-desktop-macos/*.app.tar.gz | head -1)"
+          ./tauri-cli/cargo-tauri.exe signer sign "$(ls dist/aimeat-desktop-linux/*.AppImage | head -1)"
 
-      # Build the updater manifest the app polls (tauri.conf.json endpoint). The .sig is the
-      # minisign signature the step above made over the SAME .exe we publish. NOTE: GitHub
-      # replaces spaces in asset names with dots, so the URL uses the dotted name.
+      # The updater manifest the app polls (tauri.conf.json endpoint), one entry per platform. Each
+      # signature is the one the step above made over the SAME file this run publishes, and each URL
+      # names the asset as GitHub stores it (spaces become dots).
       - name: Generate update manifest (latest.json)
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          NSIS=dist
-          EXE="$(ls $NSIS/*-setup.exe | head -1)"
-          SIG="$(ls $NSIS/*-setup.exe.sig 2>/dev/null | head -1 || true)"
-          if [ -z "$SIG" ]; then echo "No .sig (updater artifacts not built) — skipping latest.json"; exit 0; fi
-          ASSET="$(basename "$EXE" | tr ' ' '.')"
-          VERSION="${GITHUB_REF_NAME#desktop-v}"
-          PUBDATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          URL="https://github.com/miikkij/aimeat-protocol/releases/download/${GITHUB_REF_NAME}/${ASSET}"
-          jq -n --arg v "$VERSION" --arg d "$PUBDATE" --arg s "$(cat "$SIG")" --arg u "$URL" \
-            '{version:$v, pub_date:$d, platforms:{"windows-x86_64":{signature:$s, url:$u}}}' > dist/latest.json
-          echo "latest.json:"; cat dist/latest.json
+          base="https://github.com/miikkij/aimeat-protocol/releases/download/${GITHUB_REF_NAME}"
+          entry() {
+            local file="$1"
+            jq -n --arg s "$(cat "$file.sig")" --arg u "$base/$(basename "$file" | tr ' ' '.')" '{signature:$s, url:$u}'
+          }
+          WIN="$(ls dist/aimeat-desktop-windows/*-setup.exe | head -1)"
+          MAC="$(ls dist/aimeat-desktop-macos/*.app.tar.gz | head -1)"
+          LIN="$(ls dist/aimeat-desktop-linux/*.AppImage | head -1)"
+          jq -n --arg v "${GITHUB_REF_NAME#desktop-v}" --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson w "$(entry "$WIN")" --argjson m "$(entry "$MAC")" --argjson l "$(entry "$LIN")" \
+            '{version:$v, pub_date:$d, platforms:{"windows-x86_64":$w, "darwin-aarch64":$m, "linux-x86_64":$l}}' \
+            > latest.json
+          echo "latest.json:"; cat latest.json
 
       - name: Hand the manifest to the publish job
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: aimeat-desktop-update-manifest
-          path: dist/latest.json
+          path: latest.json
           if-no-files-found: error
 
   # THE TOKEN THAT WRITES RELEASES IS HERE, and the job runs nothing but a copy: it downloads the
-  # installers from build-windows and the manifest from sign-windows, and uploads them.
-  publish-windows:
-    needs: [build-windows, sign-windows]
+  # installers from the builds and the manifest from the sign job, and uploads them.
+  publish:
+    needs: [build, sign]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub Release and upload installer assets
     steps:
-      - name: Download the installers
+      - name: Download the installers and the manifest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: aimeat-desktop-windows
+          pattern: aimeat-desktop-*
           path: dist
+          merge-multiple: true
 
-      - name: Download the update manifest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: aimeat-desktop-update-manifest
-          path: dist
-
-      # Publish the downloadable GitHub Release only for real tags.
       - name: Create / update GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           name: AIMEAT Personal Node ${{ github.ref_name }}
@@ -211,34 +268,42 @@ jobs:
       # THE MANIFEST ALSO GOES TO A FIXED ADDRESS, and this is what makes auto-update work at all.
       # The app cannot poll `releases/latest`: this repository releases the node under `v*` far
       # more often than the desktop app under `desktop-v*`, so "latest" stopped being a desktop
-      # release in June and the updater has answered 404 ever since (measured 2026-09-18). The
-      # tag `desktop-latest` never moves, so tauri.conf.json can name one address forever, and
-      # the manifest inside it keeps pointing at the versioned release's own installer and
-      # signature. It is marked prerelease so it never takes the repository's "Latest" label
-      # away from a real release, and its name does not match the `desktop-v*.*.*` trigger
-      # above, so publishing it cannot start this workflow again.
+      # release in June and the updater answered 404 until 2026-09-18. The tag `desktop-latest`
+      # never moves, so tauri.conf.json can name one address forever, and the manifest inside it
+      # keeps pointing at the versioned release's own files and signatures. It is marked
+      # prerelease so it never takes the repository's "Latest" label away from a real release, and
+      # its name does not match the `desktop-v*.*.*` trigger above, so publishing it cannot start
+      # this workflow again.
       # A DOWNLOAD LINK CANNOT CARRY A VERSION, or every release breaks the page that points at it.
-      # The installer is copied to a name that never changes, beside the manifest, so aimeat.io has
-      # one address to give a person for as long as this app exists.
-      - name: Copy the installer to its fixed name
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: cp "$(ls dist/*-setup.exe | head -1)" "dist/AIMEAT-Personal-Node-setup.exe"
+      # Each installer is copied to a name that never changes, beside the manifest, so aimeat.io has
+      # one address per platform to give a person for as long as this app exists.
+      - name: Copy the installers to their fixed names
+        run: |
+          cp "$(ls dist/*-setup.exe | head -1)" "dist/AIMEAT-Personal-Node-setup.exe"
+          cp "$(ls dist/*.dmg | head -1)" "dist/AIMEAT-Personal-Node.dmg"
+          cp "$(ls dist/*.AppImage | head -1)" "dist/AIMEAT-Personal-Node.AppImage"
+          cp "$(ls dist/*.deb | head -1)" "dist/AIMEAT-Personal-Node.deb"
 
       - name: Point the fixed address at this release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           name: AIMEAT Personal Node (newest)
           tag_name: desktop-latest
           body: |
-            The newest Windows installer, at an address that never changes, and the manifest the
-            installed app polls for updates. Both are rewritten by CI on every `desktop-v*`
-            release, so a link to this page or to the installer below keeps working.
+            The newest installers, at addresses that never change, and the manifest the installed
+            app polls for updates. All are rewritten by CI on every `desktop-v*` release, so a link
+            to this page or to an installer below keeps working.
+
+            Windows: AIMEAT-Personal-Node-setup.exe
+            macOS, Apple silicon: AIMEAT-Personal-Node.dmg
+            Linux: AIMEAT-Personal-Node.AppImage, or AIMEAT-Personal-Node.deb on Debian and Ubuntu
 
             The release notes for each version are on its own `desktop-v*` release.
           draft: false
           prerelease: true
           files: |
             dist/AIMEAT-Personal-Node-setup.exe
+            dist/AIMEAT-Personal-Node.dmg
+            dist/AIMEAT-Personal-Node.AppImage
+            dist/AIMEAT-Personal-Node.deb
             dist/latest.json

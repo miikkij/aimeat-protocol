@@ -22,6 +22,8 @@
  *   four documents, failing loudly if the Node licence cannot be found
  * @usage  node scripts/stage-licenses.mjs   (run via `pnpm stage`)
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The WebView2 notice is written on Windows only; the macOS and Linux
+ *     installers ship no WebView2 loader, so they carry three documents.
  *   v1.0.0 — 2026-08-31 — Initial: AIMEAT LICENSE, third-party notices, Node LICENSE, WebView2 notice.
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
@@ -100,9 +102,14 @@ function main() {
   }
   copyFileSync(nodeLicense, join(outDir, 'NODEJS-LICENSE.txt'));
 
-  writeFileSync(join(outDir, 'WEBVIEW2-NOTICE.txt'), WEBVIEW2_NOTICE(webview2CrateVersion()), 'utf-8');
+  // The WebView2 loader ships only in the Windows installer, so only that installer names it.
+  let staged = 3;
+  if (process.platform === 'win32') {
+    writeFileSync(join(outDir, 'WEBVIEW2-NOTICE.txt'), WEBVIEW2_NOTICE(webview2CrateVersion()), 'utf-8');
+    staged += 1;
+  }
 
-  console.log(`[stage-licenses] staged 4 documents into ${outDir}`);
+  console.log(`[stage-licenses] staged ${staged} documents into ${outDir}`);
   console.log(`[stage-licenses] Node LICENSE taken from ${nodeLicense}`);
 }
 

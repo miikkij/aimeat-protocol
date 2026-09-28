@@ -38,8 +38,7 @@
     ],
     "resources": [
       "resources/server/**/*",
-      "resources/licenses/**/*",
-      "WebView2Loader.*"
+      "resources/licenses/**/*"
     ],
     "createUpdaterArtifacts": true
   },
