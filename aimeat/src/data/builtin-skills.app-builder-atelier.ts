@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.23.0 — 2026-09-29 — Step 2 fixes the order after an approved drawing: genre first, the owner
+ *     approves it running, then the app is forked from it. Step 3 names promptPanel and queueRow.
  *   v1.22.0 — 2026-09-28 — Step 3 names the controls that answer a press (toggle, segmented, slider,
  *     menu, contextMenu, popover, tooltip, stateButton, island), and the motion rule says the
  *     spring is the look's too, with the Design Book's three spring parts as the way to change it.
@@ -194,6 +196,12 @@ moved under you says so.
    Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take
    nothing, because <what you looked at and why none fits>". Taking nothing is allowed; taking
    nothing in silence is not. An app built without looking there makes again what is already made.
+   **When the owner approved a drawn design** (a design canvas, a mock, screenshots), the order is
+   fixed and has three steps: turn the drawing into a GENRE first (its screens as one page on sample
+   data, the kit's parts where they fit, the drawing's measures where they do not), let the owner
+   look at that genre running and approve it, and only then fork the app from it. An app built
+   straight from a drawing drifts from it screen by screen, and the owner is the one who finds each
+   difference (Postinjalostamo, 2026-09-28: three rounds of corrections).
 3. **Build** — start from a GENRE, never from the bare shell: pick the register the page belongs
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
    and keep its \`<meta name="aimeat-register">\` line (or name your own register with
@@ -202,7 +210,8 @@ moved under you says so.
    statRow, figure, searchBar, timeline, tabs, and the designed \`emptyState\` and \`skeleton\`
    rather than a bare string or a grey box, and for a tool someone works in every day the
    workbench pieces: sideNav through \`app({ nav: 'side' })\`, statusBand, checkGrid,
-   choiceCards, settingsGroup, progressFigure and callout, and for anything a hand presses the
+   choiceCards, settingsGroup, progressFigure, callout, promptPanel for the person's own AI (copy
+   the prompt, paste the answer) and queueRow as a queue list's row part, and for anything a hand presses the
    controls that answer it: toggle, segmented, slider, menu, contextMenu, popover, tooltip,
    stateButton, and island for showing an agent's work where the person is looking) where the
    page needs them; the \`section\`

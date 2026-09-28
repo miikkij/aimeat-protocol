@@ -52,7 +52,7 @@ describe('the Atelier specification in parts', () => {
     const parts = ATELIER_PARTS.map(p => atelierPiece(full, p.id, config.baseUrl)!.text);
     const holding = parts.filter(t => t.includes('A SETTINGS PAGE AND A QUEUE PAGE HAVE RULES'));
     expect(holding.length).toBe(1);
-    for (const fact of ['60ch', '840 px', '`settingsGroup`', '`width`', "nav: 'side'", '"3 / 10"', 'genre `workbench`']) {
+    for (const fact of ['60ch', '840 px', '`settingsGroup`', '`width`', "nav: 'side'", '"3 / 10"', 'genre `workbench`', 'becomes a GENRE first']) {
       expect(holding[0], fact).toContain(fact);
     }
   });
@@ -64,6 +64,10 @@ describe('the Atelier specification in parts', () => {
     for (const id of ['sideNav', 'statusBand', 'checkGrid', 'choiceCards', 'settingsGroup', 'progressFigure', 'callout']) {
       expect(ids, id).toContain(id);
       expect(kit, id).toMatch(new RegExp('\\b' + id + '\\b[^\\n]*from \'\\./workbench\\.js\''));
+    }
+    for (const id of ['promptPanel', 'queueRow']) {
+      expect(ids, id).toContain(id);
+      expect(kit, id).toMatch(new RegExp('\\b' + id + '\\b[^\\n]*from \'\\./workbench-parts\\.js\''));
     }
   });
 
