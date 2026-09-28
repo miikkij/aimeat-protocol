@@ -24,6 +24,8 @@
  *     two tests first (does it fit one prompt, does word search find it), and the three conditions
  *     that make them truly needed (Jouni: "embeddings should be used rarely and only when user
  *     decides so and is really really needed").
+ *   v1.2.1 — 2026-09-28 — Section 2b: role.<name>.context= passes a model over, a connection needs every
+ *     capability, and AIMEAT.ai.roles() answers an app with its own roles only.
  *   v1.2.0 — 2026-09-28 — Section 2b, AI roles: an app declares what each kind of AI work is for, the
  *     owner connects it before it runs, and an AI proposes a connection the owner confirms.
  */
@@ -108,10 +110,15 @@ with \`+\` (\`role.illustrator=text+image\`), and its fine-tuning (\`temperature
 \`reasoning\`) overrides the provider's default.
 
 - **A role says what the work needs, never a model.** The owner connects it to one of their roles, which
-  names the providers and models in order, so the app works on any owner's providers.
+  names the providers and models in order, so the app works on any owner's providers. The owner's role
+  must have a provider for every capability yours needs, or the connection is refused.
+- **Say how much text the role reads**: \`role.<name>.context=100000\` (tokens). A model the catalogue
+  says reads less is passed over, and the owner's AI page says so on the role.
 - **Nothing runs until the owner connects it.** An unconnected role is refused with AI_ROLE_NOT_BOUND
   (409) and the owner sees the request on the AI page. \`capabilities()\` answers \`roles\`, each with
   \`bound\` and a \`fix\`: show it beside the control, as for a capability that is off.
+- **As an app:** \`AIMEAT.ai.roles()\` answers the app's own roles only, each with \`boundTo\` (null while
+  it waits). It never shows the owner's other apps.
 - **As the owner's AI:** \`aimeat_ai_roles\` lists the owner's roles and the app roles waiting;
   \`aimeat_ai_role_set\` proposes a role or a connection, and the owner confirms it. Never connect a role
   the owner has not seen: connecting it is their approval of what that app may run.

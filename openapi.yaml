@@ -15922,6 +15922,8 @@ paths:
         always listed (while the owner has not set one, it shows the legacy setting it replaces, with
         `legacy: true`), then the owner's own. For each capability a role needs, it lists the
         providers and models to try, in order. An AI call names the role it runs as with `role`.
+        An app (an app-grant token) gets its own declared roles only: `roles` is empty and `apps`
+        holds its own entry, never the owner's other apps.
 
 
         `apps` lists the apps that declare roles (the owner's own, the ones with a binding, and the

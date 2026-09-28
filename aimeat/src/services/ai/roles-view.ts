@@ -6,8 +6,10 @@
  *   with when each was last used, and the AI roles apps declare, each with the owner's binding (or
  *   none yet) and whether the app has already asked for it. The apps are the owner's own that declare
  *   roles, the ones they have bound, and the ones that asked for an unbound role.
- * @structure aiRolesView · knownRoleProviders
+ * @structure aiRolesView · appRolesView · knownRoleProviders
  * @version-history
+ *   v1.2.0 — 2026-09-28 — appRolesView: an app sees only its own roles, not the owner's roles nor
+ *     other apps' bindings (it had seen them all through GET /v1/ai/roles).
  *   v1.1.0 — 2026-09-28 — The lifecycle and the fit: an app no longer published is `gone`; a role or a
  *     binding not used for STALE_DAYS is `stale`; a bound app role whose owner role misses a capability
  *     or has a model too small for its context carries `fit` (roles-fit.ts).
@@ -113,6 +115,15 @@ async function appExists(storage: Storage, app: string): Promise<boolean> {
     logger.warn('[ai] could not read an app for its AI roles', { app, error: String(err) });
     return true;
   }
+}
+
+/**
+ * The view an app gets: its own declared roles and their bindings, and nothing about the owner's other
+ * apps or the owner's roles. An app holds `ai:use` on the owner's account, which does not make the
+ * owner's configuration for every other app its business.
+ */
+export function appRolesView(view: AiRolesView, app: string): AiRolesView {
+  return { roles: [], apps: view.apps.filter((a) => a.app === app) };
 }
 
 /** The provider ids a role may name: every provider the owner can use. */

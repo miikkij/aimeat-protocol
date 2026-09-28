@@ -6,8 +6,9 @@
  *   in services/ai/roles.ts and roles-view.ts; this file checks who is asking and shapes the answers.
  *
  *   WHO MAY DO WHAT.
- *     read   the owner, and an agent or app holding ai:use: an AI that knows the roles can run as one
- *            or tell the owner which role an app is waiting for. Nothing here is a key.
+ *     read   the owner, and an agent holding ai:use: an AI that knows the roles can run as one or tell
+ *            the owner which role an app is waiting for. An app sees its own roles only. Nothing here
+ *            is a key.
  *     change the roles, bind or unbind an app's role   the owner applies at once; an agent with
  *            memory:write-reserved proposes and confirms with the token (the routing's pattern); an
  *            app never. Binding is the owner's approval of what an app may run.
@@ -16,6 +17,7 @@
  *     GET /v1/ai/roles
  *     PUT /v1/ai/roles
  * @version-history
+ *   v1.1.0 — 2026-09-28 — GET answers an app with its own roles only (it had seen every app's).
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { Router, type Request, type Response } from 'express';
@@ -30,7 +32,8 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { setRoles } from '../services/ai/roles.js';
-import { aiRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
+import { aiRolesView, appRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
+import { aiCallerOf } from './ai-policy.js';
 
 /** The scope an agent needs to propose a change to the roles. Outside the `*` bundle, as for the routing. */
 const ROLES_WRITE_SCOPE = 'memory:write-reserved';
@@ -49,7 +52,10 @@ export function aiRolesRouter(config: AimeatConfig, storage: Storage): Router {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
       const { payer } = aiPayerOf(owner(req));
-      res.json(success(config.nodeId, await aiRolesView(storage, config, payer), [
+      const view = await aiRolesView(storage, config, payer);
+      // An app sees its own roles only (appRolesView): the app the node identified from its grant.
+      const { caller, verifiedApp } = aiCallerOf(req, config.nodeId);
+      res.json(success(config.nodeId, caller === 'app' ? appRolesView(view, verifiedApp ?? '') : view, [
         { description: 'Change your roles or bind an app\'s role (the owner, or an agent proposing)', method: 'PUT', url: '/v1/ai/roles' },
         { description: 'Your AI providers, which a role names', method: 'GET', url: '/v1/ai/providers' },
       ]));

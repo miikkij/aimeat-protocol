@@ -336,6 +336,17 @@ const APP_HTML = `<!doctype html><html><head><title>Recipes</title>
       assert((await putRoles(a.token, { bindings: { [readerKey('longreader')]: null } })).status === 200, 'remove the binding');
       assert(!(await roles(a.token)).body.data.apps.some((x: any) => x.app === `${a.name}/reader.html`), 'the removed app is gone from the list');
     });
+
+    await test('14. an app sees its own roles only, never the owner\'s roles nor another app\'s', async () => {
+      await publishApp(a, 'other.html', NEEDS_HTML.replace('<title>Reader</title>', '<title>Other</title>'));
+      const owner = (await roles(a.token)).body.data;
+      assert(owner.apps.some((x: any) => x.app === `${a.name}/other.html`) && owner.roles.length > 0, 'the owner sees everything');
+      const r = await roles(appToken);
+      assert(r.status === 200, `app GET roles ${r.status}`);
+      assert(Array.isArray(r.body.data.roles) && r.body.data.roles.length === 0, `no owner roles: ${JSON.stringify(r.body.data.roles)}`);
+      const apps = r.body.data.apps.map((x: any) => x.app);
+      assert(apps.length === 1 && apps[0] === `${a.name}/recipes.html`, `only its own app: ${JSON.stringify(apps)}`);
+    });
   } finally {
     await stopServer(server);
     await stub.close();
