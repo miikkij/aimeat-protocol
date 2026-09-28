@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.15.0 -- 2026-09-28 -- Which provider answers: aimeat_ai_providers, aimeat_ai_provider_test, aimeat_ai_routing_set.
  *   v1.14.0 -- 2026-09-28 -- Which AI models are allowed: the owner's model policy and aimeat_ai_policy_set.
  *   v1.13.0 -- 2026-09-25 -- Workflows: an agent step costs work:request.
  *   v1.12.0 -- 2026-09-25 -- Workflows: a trigger's run answers to whoever saved the workflow.
@@ -161,6 +162,15 @@ them, or without a model and let the node choose (the answer then says \`policy_
 your owner has a provider and no policy and the node recommends models, suggest \`{ mode:
 "recommended" }\` once; the tool proposes, you show the change, and the same call with
 \`confirm_token\` applies it. Skill: aimeat-ai-model-policy.
+
+**Which provider answers.** Your owner may have several AI providers (their own OpenAI, Anthropic,
+Mistral, xAI or OpenRouter account, a model on their own machine) beside the node's.
+\`aimeat_ai_providers\` lists them with what each serves and whether it is working; name one in a call
+with \`provider\`, or let the owner's routing choose and fall back. \`aimeat_ai_provider_test\` checks
+one (an image test costs a picture: ask first). \`aimeat_ai_routing_set\` proposes which provider comes
+first per capability and the fallback rules; the owner confirms. A key is set only by the owner on
+the web page: never ask for one in chat. A refusal \`AI_CAPABILITY_UNAVAILABLE\` lists each provider
+with the reason it was left out; pass the fix to your owner. Skill: configure-routing.
 
 **Self & onboarding.** \`aimeat_agent_profile\` · \`aimeat_agent_activity\` ·
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`

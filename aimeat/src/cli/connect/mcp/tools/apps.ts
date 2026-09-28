@@ -397,13 +397,17 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     public: z.boolean().optional().describe('Make it publicly readable so a model or page can fetch it.'),
     model: z.string().optional().describe('Override the image model.'),
     app_id: z.string().optional().describe('Attribution for the per-app quota and the spend report.'),
-  }, annotationsFor('aimeat_image_generate'), async ({ prompt, size, storage_key, public: isPublic, model, app_id }) => {
+    provider: z.string().optional().describe('One of the owner\'s AI providers, or a type. No fallback then.'),
+    fallback: z.boolean().optional().describe('false keeps the call on its first provider.'),
+  }, annotationsFor('aimeat_image_generate'), async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback }) => {
     const body: Record<string, unknown> = { prompt };
     if (size) body.size = size;
     if (storage_key) body.storage_key = storage_key;
     if (isPublic) body.public = true;
     if (model) body.model = model;
     if (app_id) body.app_id = app_id;
+    if (provider) body.provider = provider;
+    if (fallback !== undefined) body.fallback = fallback;
     return out(await client.post('/v1/ai/image', body));
   });
 

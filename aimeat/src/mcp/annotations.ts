@@ -23,6 +23,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-28 — aimeat_ai_routing_set (propose-then-confirm), aimeat_ai_providers (read only) and
+ *     aimeat_ai_provider_test (a real, billed call to an outside provider).
  *   2026-09-28 — aimeat_ai_policy_set: propose-then-confirm, idempotent, not destructive.
  *   2026-09-26 — aimeat_admin_incident_resolve is destructive: deciding that a held name's rows were a
  *     previous holder's deletes its actions. Still idempotent: the same decision twice does it once.
@@ -123,6 +125,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_operator_agent_configure: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_operator_ai_config: { title: 'Configure AI Routing & Budget (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_ai_policy_set: { title: 'Set the AI Model Policy (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_ai_routing_set: { title: 'Set the AI Routing (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_ai_providers: { title: 'List AI Providers', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_ai_provider_test: { title: 'Test an AI Provider', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },

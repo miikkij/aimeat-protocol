@@ -21,18 +21,29 @@
  *
  *   Every request is recorded whole — method, path, query, headers and body — so a suite can assert
  *   what the node actually sent rather than only what it did with the answer.
+ *
+ *   THE ANTHROPIC ROUTE. A POST whose path ends in `/messages` is Anthropic's Messages API, which
+ *   the direct Anthropic provider (`@ai-sdk/anthropic`) calls at `{baseURL}/messages`, so the
+ *   package takes `baseUrl` unchanged (it already ends in `/v1`). It is recorded like every other
+ *   request, so a suite can read the `x-api-key` header the node sent. The `anthropic*` builders
+ *   produce the JSON body, the named-event SSE stream and the error body in the shapes that package
+ *   validates; an unscripted request answers `anthropicJson('ok')`.
  * @structure
  *   - RecordedRequest / StubReply / Reply — what is recorded, and what may be answered
  *   - startFakeAiProvider() — bind on 127.0.0.1 and return the handle
  *   - FakeAiProvider — queue/setDefault/requestsFor/releaseHeld/reset/close
  *   - chatJson / chatErrorBody / sseChat / modelsJson / transcriptionJson / imageJson /
  *     providerStatus — the reply shapes, so a suite states intent rather than JSON
+ *   - anthropicJson / anthropicSse / anthropicTextStream / anthropicToolCallStream /
+ *     anthropicError — the Anthropic Messages reply shapes, for the `messages` route
  * @usage
  *   const provider = await startFakeAiProvider(40315);   // or 0: any free port, read back from `port`
  *   provider.queue('chat', chatJson('hello'));
  *   // … point the node at provider.baseUrl and drive it …
  *   await provider.close();
  * @version-history
+ *   v1.2.0 — 2026-09-28 — An Anthropic Messages route (POST …/messages) and its reply builders, for the
+ *     direct Anthropic provider (System 2 plan, V3).
  *   v1.1.0 — 2026-09-25 — Port 0 takes any free port, and `port` and `baseUrl` name the one bound. A
  *     suite on the shared node reads the stub's address from the owner's settings at call time, so it
  *     needs no fixed port that another session's run could already hold.
@@ -42,7 +53,7 @@ import { createServer, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 /** Which door of the provider a request arrived at. `other` is anything else, recorded not refused. */
-export type StubRoute = 'chat' | 'models' | 'transcriptions' | 'images' | 'other';
+export type StubRoute = 'chat' | 'models' | 'transcriptions' | 'images' | 'messages' | 'other';
 
 /** One request as the provider saw it. `bytes` is the body untouched; `body` is it as UTF-8, which
  *  is what the multipart assertions read (the field markers are ASCII either way). */
@@ -93,11 +104,12 @@ export interface FakeAiProvider {
     close(): Promise<void>;
 }
 
-function routeOf(pathname: string): StubRoute {
+function routeOf(pathname: string, method = 'GET'): StubRoute {
     if (pathname.endsWith('/chat/completions')) return 'chat';
     if (pathname.endsWith('/models')) return 'models';
     if (pathname.endsWith('/audio/transcriptions')) return 'transcriptions';
     if (pathname.endsWith('/images/generations')) return 'images';
+    if (method === 'POST' && pathname.endsWith('/messages')) return 'messages';
     return 'other';
 }
 
@@ -112,6 +124,8 @@ export function chatJson(
         kind: 'json',
         body: {
             id: 'chatcmpl-stub',
+            // Every real provider sends it, and @ai-sdk/mistral refuses an answer without it.
+            object: 'chat.completion',
             model: opts.model ?? 'stub/test-model',
             choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: opts.finishReason ?? 'stop' }],
             usage: opts.usage ?? { prompt_tokens: 7, completion_tokens: 11, total_tokens: 18, cost: 0.0003 },
@@ -184,6 +198,115 @@ export function providerStatus(status: number, body: string, contentType = 'appl
     return { kind: 'text', status, body, contentType };
 }
 
+// ── the Anthropic Messages reply shapes ──────────────────────────────────────
+// Field names follow the response and chunk schemas that @ai-sdk/anthropic validates
+// (anthropicResponseSchema / anthropicChunkSchema in its dist/index.js).
+
+const ANTHROPIC_MODEL = 'claude-stub';
+
+/** A whole (non-streamed) Messages API response: one text block, optionally followed by one
+ *  tool_use block. `stopReason` defaults to `tool_use` when a tool call is present, else `end_turn`. */
+export function anthropicJson(
+    text: string,
+    opts: {
+        model?: string;
+        inputTokens?: number;
+        outputTokens?: number;
+        stopReason?: string;
+        toolUse?: { id: string; name: string; input: unknown };
+    } = {},
+): StubReply {
+    const content: Array<Record<string, unknown>> = [{ type: 'text', text }];
+    if (opts.toolUse) {
+        content.push({ type: 'tool_use', id: opts.toolUse.id, name: opts.toolUse.name, input: opts.toolUse.input });
+    }
+    return {
+        kind: 'json',
+        body: {
+            id: 'msg_stub',
+            type: 'message',
+            role: 'assistant',
+            model: opts.model ?? ANTHROPIC_MODEL,
+            content,
+            stop_reason: opts.stopReason ?? (opts.toolUse ? 'tool_use' : 'end_turn'),
+            stop_sequence: null,
+            usage: { input_tokens: opts.inputTokens ?? 7, output_tokens: opts.outputTokens ?? 11 },
+        },
+    };
+}
+
+/**
+ * Anthropic server-sent events as they go on the wire: `event: <type>` then `data: <json>` per
+ * event, each frame closed by a blank line. The event name is the `type` field of the event.
+ */
+export function anthropicSse(events: Array<Record<string, unknown>>): { reply: StubReply; body: string } {
+    const body = events
+        .map(e => `event: ${String(e.type)}\ndata: ${JSON.stringify(e)}\n\n`)
+        .join('');
+    return { reply: { kind: 'sse', body }, body };
+}
+
+type AnthropicStreamOpts = { model?: string; inputTokens?: number; outputTokens?: number };
+
+/** The message_start event that opens every Anthropic stream. */
+function anthropicMessageStart(opts: AnthropicStreamOpts): Record<string, unknown> {
+    return {
+        type: 'message_start',
+        message: {
+            id: 'msg_stub', type: 'message', role: 'assistant', model: opts.model ?? ANTHROPIC_MODEL,
+            content: [], stop_reason: null, stop_sequence: null,
+            usage: { input_tokens: opts.inputTokens ?? 5, output_tokens: 1 },
+        },
+    };
+}
+
+/** The message_delta and message_stop events that close every Anthropic stream. */
+function anthropicMessageEnd(stopReason: string, opts: AnthropicStreamOpts): Array<Record<string, unknown>> {
+    return [
+        {
+            type: 'message_delta',
+            delta: { stop_reason: stopReason, stop_sequence: null },
+            usage: { output_tokens: opts.outputTokens ?? 9 },
+        },
+        { type: 'message_stop' },
+    ];
+}
+
+/** A streamed text answer: one text block at index 0, one text_delta per element, stop `end_turn`. */
+export function anthropicTextStream(
+    text: string[],
+    opts: AnthropicStreamOpts & { stopReason?: string } = {},
+): { reply: StubReply; body: string } {
+    return anthropicSse([
+        anthropicMessageStart(opts),
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        ...text.map(t => ({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } })),
+        { type: 'content_block_stop', index: 0 },
+        ...anthropicMessageEnd(opts.stopReason ?? 'end_turn', opts),
+    ]);
+}
+
+/** A streamed tool call: one tool_use block at index 0 whose input arrives as input_json_delta
+ *  fragments (`argsChunks`, concatenated into the JSON arguments), stop `tool_use`. */
+export function anthropicToolCallStream(
+    opts: AnthropicStreamOpts & { id: string; name: string; argsChunks: string[] },
+): { reply: StubReply; body: string } {
+    return anthropicSse([
+        anthropicMessageStart(opts),
+        { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: opts.id, name: opts.name, input: {} } },
+        ...opts.argsChunks.map(c => ({
+            type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: c },
+        })),
+        { type: 'content_block_stop', index: 0 },
+        ...anthropicMessageEnd('tool_use', opts),
+    ]);
+}
+
+/** An Anthropic API failure: `{ type: 'error', error: { type, message } }` with that HTTP status. */
+export function anthropicError(status: number, type: string, message: string): StubReply {
+    return { kind: 'json', status, body: { type: 'error', error: { type, message } } };
+}
+
 // ── the server ───────────────────────────────────────────────────────────────
 
 const BUILT_IN_DEFAULTS: Record<StubRoute, Reply> = {
@@ -193,13 +316,14 @@ const BUILT_IN_DEFAULTS: Record<StubRoute, Reply> = {
     // Unscripted image and unknown calls answer a NAMED failure rather than something plausible, so
     // a missing line of script reads as a missing line of script.
     images: providerStatus(500, '{"error":{"message":"fake-ai-provider: no image reply was scripted"}}'),
+    messages: anthropicJson('ok'),
     other: providerStatus(404, '{"error":{"message":"fake-ai-provider: no such route"}}'),
 };
 
 export async function startFakeAiProvider(port: number): Promise<FakeAiProvider> {
     const requests: RecordedRequest[] = [];
     const scripted: Record<StubRoute, Scripted[]> = {
-        chat: [], models: [], transcriptions: [], images: [], other: [],
+        chat: [], models: [], transcriptions: [], images: [], messages: [], other: [],
     };
     const defaults: Record<StubRoute, Reply> = { ...BUILT_IN_DEFAULTS };
     const held: Array<{ route: StubRoute; req: RecordedRequest; res: ServerResponse }> = [];
@@ -246,7 +370,7 @@ export async function startFakeAiProvider(port: number): Promise<FakeAiProvider>
                 try { json = JSON.parse(body) as Record<string, unknown>; } catch { json = null; }
             }
             const req: RecordedRequest = {
-                route: routeOf(parsed.pathname),
+                route: routeOf(parsed.pathname, raw.method ?? 'GET'),
                 method: raw.method ?? 'GET',
                 url,
                 pathname: parsed.pathname,

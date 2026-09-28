@@ -97,6 +97,10 @@ everywhere at once, and say so in the Changes section.
 | the text a transcription produces | the result, kept or shown | transcript | transkriptio | transcripción |
 | text turned into numbers for search by meaning | a vector a model makes from text, so search finds what means the same; first use says so in the same sentence | embedding (model: embedding model) | upotus; malli: upotusmalli | incrustación |
 | a model reading text aloud | text to spoken audio | speech | puhe | voz |
+| which provider answers each capability | the owner's ordered list of providers per capability, the first is the default, and the rules for moving to the next | routing | reititys | enrutamiento |
+| trying the next provider when one does not answer | a timeout, a rate limit, a server error or a refused key moves the call on; a bad request or a refused content never does | fallback (verb: fall back) | varalle siirtyminen; verbi siirtyä varalle; varalla oleva tarjoaja | respaldo; verbo pasar al respaldo |
+| a provider type whose address cannot change | OpenRouter, OpenAI, Anthropic, Mistral, xAI: reached only at the vendor's own address, so a key sent to one cannot leak | fixed provider type | kiinteä tarjoajatyyppi | tipo fijo de proveedor |
+| an AI model server on the node's own machine | LM Studio, Ollama or llama.cpp on the machine the node runs on; the data does not leave it | local AI server | paikallinen tekoälypalvelin | servidor de IA local |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
@@ -328,3 +332,8 @@ service, the directory, the token, the identifier and the username: the test nam
   *Litteroi*; *upotus* and *upotusmalli* follow Microsoft Learn in Finnish. Ruled by the developer on
   2026-09-28. *Tarjoaja* alone is kept for sentences about AI, so it never collides with the decision
   model's *päätösmallin tarjoaja*.
+- **2026-09-28, same day** — routing, fallback, fixed provider type and local AI server, with the
+  provider layer of System 2 (docs/internal/llmproviderintegrations/04 and 11). *Reititys* is the
+  plan's own word ("kykyreititys"). *Varalle* follows the plan's "varalla oleva tarjoaja" and
+  "siirtyä varalle", a common Finnish phrase, over the anglicism *fallback*. *Palvelin* for the node
+  follows the Config tab's existing strings, so a local AI server is *paikallinen tekoälypalvelin*.

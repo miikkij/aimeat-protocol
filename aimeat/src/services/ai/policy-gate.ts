@@ -52,7 +52,7 @@ const POLICY_NEXT = { description: 'Read the models your policy allows', method:
 
 /** The decision for one call. Throws AI_MODEL_POLICY_EMPTY when the layers leave no model at all. */
 export async function loadPolicyDecision(
-  storage: Storage, config: AimeatConfig, gaii: string, ctx: PolicyCallContext,
+  storage: Storage, config: AimeatConfig, gaii: string, ctx: Omit<PolicyCallContext, 'providerType'>,
 ): Promise<LoadedPolicy> {
   const recommended = recommendedModelsOf(config);
   const [owner, appModels] = await Promise.all([

@@ -11,6 +11,8 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   v1.3.0 — 2026-09-28 — The operator's AI providers (System 2 plan, V3): aiProviders,
+ *     aiBuiltinProviders, aiProviderEgress, aiProviderTypes, aiFixedBaseUrlOverrides.
  *   v1.2.0 — 2026-09-28 — aiRecommendedModels: the operator's recommended models per capability
  *     (System 2 plan, V2).
  *   v1.1.0 — 2026-09-19 — Extends DecideConfig (config-decide.ts): the decision provider's settings,
@@ -102,6 +104,40 @@ export interface AiCapabilityConfig extends DecideConfig {
    * an owner chooses it as their model policy (`ai.policy.models` mode `recommended`).
    */
   aiRecommendedModels: string;
+  /**
+   * More AI providers of the operator's, as a JSON array of provider records (services/ai/
+   * providers.ts, System 2 plan V3). `auth` is `none` or the NAME of an environment variable, never a
+   * key, the rule System 1's AIMEAT_DECIDE_PROVIDERS has.
+   */
+  aiProviders: string;
+  /** Built-in local examples the operator switches on, comma separated: lmstudio, ollama, llamacpp. */
+  aiBuiltinProviders: string;
+  /**
+   * Exact origins (scheme, host, port) of the operator's own local AI servers. Only the operator's
+   * providers at a listed origin may reach it although it is private; an owner's provider never
+   * uses the list.
+   */
+  aiProviderEgress: string;
+  /**
+   * Which fixed provider types (openrouter, openai, anthropic, mistral, xai) this node allows, comma
+   * separated. Empty allows all five at their official addresses, whatever the host allowlist says
+   * (Jouni, 2026-09-28): the address of a fixed type cannot be changed, so a key cannot leak through
+   * it. Set, only the listed types are allowed.
+   */
+  aiProviderTypes: string;
+  /**
+   * JSON `{ "<fixed type>": "<address>" }` that points a fixed type somewhere else, for a test stub or
+   * a development proxy. Refused on a public node (the posture check says so), because the fixed
+   * address is the reason a key sent to a fixed type cannot leak.
+   */
+  aiFixedBaseUrlOverrides: string;
+  /**
+   * DEPRECATED ROUTES, NAMED WITH THEIR FLAG, DEFAULT AND REMOVAL (security-development-dna.md,
+   * "Deprecated is not removed"): the AI settings routes from before providers (/v1/openrouter/
+   * settings, /models, /test, /v1/ai/settings). True (the default) keeps them answering; false makes
+   * them 410 Gone naming /v1/ai/providers. They are removed in 4.0.0.
+   */
+  aiLegacySettingsRoutes: boolean;
   /** How many on-demand app screenshots one owner may ask for per hour. Rendering is the most
    *  expensive thing this node does per request, and an unthrottled render is a denial-of-service
    *  shape, which is why the batch job never had a request path at all until this existed. */

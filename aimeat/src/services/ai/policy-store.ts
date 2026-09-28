@@ -9,7 +9,7 @@
  *
  *   ONE WRITER. writeOwnerAiPolicy() is what the owner's route (PUT /v1/ai/policy) and the confirmed
  *   proposal of `aimeat_ai_policy_set` both call, so the validation and the record shape are written
- *   once. The key is under the reserved `ai.` prefix, so no app and no delegated write reaches it
+ *   once. The key is under the reserved `ai.policy.` prefix, so no app and no delegated write reaches it
  *   through the memory API.
  * @structure
  *   - POLICY_KEY — the owner's record

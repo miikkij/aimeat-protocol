@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.3.0 — 2026-09-28 — `provider` and `fallback`, forwarded as on POST /v1/ai/image (System 2, V3).
  *   v1.2.0 — 2026-09-28 — The asking agent is named to the service, so its own key pays first and its
  *     daily cap applies, as on /v1/ai/complete. The owner still pays and stores.
  *   v1.1.0 — 2026-08-28 — The returned url is the service's fetchUrl (anonymous /v1/pub/ for a
@@ -48,9 +49,11 @@ export function registerAiImageTool(
             public: z.boolean().optional().describe('Make it publicly readable. Needed when a model has to fetch the image back by URL. Default false.'),
             model: z.string().optional().describe('Override the image model. Omit to use the configured one.'),
             app_id: z.string().optional().describe('Attribution for the per-app quota and the spend report.'),
+            provider: z.string().optional().describe('One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.'),
+            fallback: z.boolean().optional().describe('false keeps the call on its first provider; omitted, the owner\'s rules decide.'),
         },
         annotationsFor('aimeat_image_generate'),
-        async ({ prompt, size, storage_key, public: isPublic, model, app_id }) => {
+        async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback }) => {
             // The OWNER's identity, not the agent's. The API key, the daily budget and the spend
             // record all live under the owner — an agent has no key of its own and its balance is
             // always zero — so an agent making a picture spends the person's allowance, which is
@@ -67,6 +70,8 @@ export function registerAiImageTool(
                     prompt, size, storageKey: storage_key,
                     publicVisibility: isPublic === true, model, appId: app_id,
                     ...(agent ? { agent } : {}),
+                    ...(provider ? { provider } : {}),
+                    ...(fallback !== undefined ? { fallback } : {}),
                 });
                 const base = config.baseUrl.replace(/\/+$/, '');
                 // The service builds the URL that actually loads for the visibility's audience —

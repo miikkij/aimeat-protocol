@@ -708,6 +708,8 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             public: { type: 'boolean', description: 'Make it publicly readable so a model or page can fetch it. Default false.' },
             model: { type: 'string', description: 'Override the image model.' },
             app_id: { type: 'string', description: 'Attribution for the per-app quota and the spend report.' },
+            provider: { type: 'string', description: 'One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.' },
+            fallback: { type: 'boolean', description: 'false keeps the call on its first provider; omitted, the owner\'s rules decide.' },
         },
     },
     {

@@ -21,6 +21,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-28 — Providers (System 2, V3): /complete, /transcribe and /image take `provider` (an id or a
+ *     type) and `fallback`, and answer the `route`; GET and POST /v1/ai/settings are deprecated (legacyAiSettingsRoute).
  *   v1.x — 2026-09-28 — The model policy (System 2, V2): the three AI routes pass who is calling (owner, agent,
  *     verified app) to the gate, return a policy refusal's details, and /v1/ai/complete says policy_chose_model.
  *   v1.x — 2026-09-20 — POST /v1/ai/complete and GET /v1/ai/available resolve the payer with
@@ -81,6 +83,7 @@ import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { upsertPrivateRecord } from '../services/private-record.js';
+import { legacyAiSettingsRoute } from './openrouter.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
  *  JSON body limit; anything real goes through storage. */
@@ -88,6 +91,8 @@ const INLINE_AUDIO_MAX_CHARS = 8_000_000;
 
 export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  // The deprecated settings routes below (routes/openrouter.ts legacyAiSettingsRoute).
+  const legacy = legacyAiSettingsRoute(config);
   registerVoiceRoutes(router, config, storage);
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
   // Reuse the openrouter rate limit bucket — same provider, same spend concerns.
@@ -121,12 +126,12 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
       const {
         prompt, systemPrompt, model: modelOverride, modelRole,
-        temperature, top_p, max_tokens, app_id, images,
+        temperature, top_p, max_tokens, app_id, images, provider, fallback,
       } = req.body as {
         prompt?: string; systemPrompt?: string; model?: string;
         modelRole?: 'reasoning' | 'execution';
         temperature?: number; top_p?: number; max_tokens?: number;
-        app_id?: string; images?: string[];
+        app_id?: string; images?: string[]; provider?: string; fallback?: boolean;
       };
 
       // Bound the image payload (vision attachments) — keep a runaway request from ballooning.
@@ -149,6 +154,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           ...(agent ? { agent } : {}),
           // Whose call it is and which app the grant names, for the owner's model policy.
           ...aiCallerOf(req, config.nodeId),
+          // A provider the call names (an id of the owner's, or a type) and its word on fallback.
+          ...(typeof provider === 'string' && provider ? { provider } : {}),
+          ...(typeof fallback === 'boolean' ? { fallback } : {}),
         });
         // TARGET-058: the provenance of the bytes we are about to hand back, on the ONE envelope
         // carrier. `meta`, never `data` — the `data` shape is what every published app reads, and it
@@ -169,6 +177,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           // Additive: the owner's model policy chose the model, because the one that would have
           // answered is not allowed or nobody chose one. Absent otherwise.
           ...(r.policyChoseModel ? { policy_chose_model: true } : {}),
+          // Additive: who chose the provider, who answered, and every attempt (System 2, V3).
+          route: r.route,
           usage: {
             prompt_tokens: r.usage.promptTokens,
             completion_tokens: r.usage.completionTokens,
@@ -209,9 +219,10 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       res.setTimeout(180_000);
 
       const gaii = resolve(req);
-      const { storage_key, audio_base64, mime, filename, model, language, verbose, app_id, temperature } = req.body as {
+      const { storage_key, audio_base64, mime, filename, model, language, verbose, app_id, temperature, provider, fallback } = req.body as {
         storage_key?: string; audio_base64?: string; mime?: string; filename?: string;
         model?: string; language?: string; verbose?: boolean; app_id?: string; temperature?: number;
+        provider?: string; fallback?: boolean;
       };
 
       let audio: { data: Buffer; mime: string; filename: string };
@@ -256,6 +267,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const r = await transcribeForOwner(storage, config, payer, {
           audio, model, language, verbose: !!verbose, appId: voiceAppId(req, app_id), temperature, signal: controller.signal,
           ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
+          ...(typeof provider === 'string' && provider ? { provider } : {}),
+          ...(typeof fallback === 'boolean' ? { fallback } : {}),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
@@ -264,6 +277,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           model: r.model,
           language: r.language ?? null,
           seconds: r.seconds,
+          route: r.route,
           usage: {
             total_tokens: r.usage.totalTokens,
             cost_usd: r.usage.costUsd,
@@ -301,9 +315,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       // Paid by the human, in the agent's name, like /v1/ai/complete; the picture lands in the
       // payer's storage, which is where the MCP tool has always put it.
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
-      const { prompt, model, size, storage_key, public: isPublic, app_id } = req.body as {
+      const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback } = req.body as {
         prompt?: string; model?: string; size?: string; storage_key?: string;
-        public?: boolean; app_id?: string;
+        public?: boolean; app_id?: string; provider?: string; fallback?: boolean;
       };
 
       try {
@@ -313,6 +327,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           prompt: prompt ?? '', model, size, storageKey: storage_key,
           publicVisibility: isPublic === true, appId: app_id,
           ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
+          ...(typeof provider === 'string' && provider ? { provider } : {}),
+          ...(typeof fallback === 'boolean' ? { fallback } : {}),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
@@ -326,6 +342,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           // once. A public image handed back as /v1/storage/ answered 401 to everyone but the
           // owner, discovered by the first imagery-pipeline demo.
           url: r.fetchUrl,
+          route: r.route,
           usage: { cost_usd: r.usage.costUsd, cost_exact: r.usage.costExact },
           budget: {
             daily_budget_usd: r.budget.dailyBudgetUsd,
@@ -422,7 +439,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET /v1/ai/settings ──
   router.get('/v1/ai/settings',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('owner'), legacy,
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
@@ -442,7 +459,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── POST /v1/ai/settings ── update budget/quotas/allowlist
   router.post('/v1/ai/settings',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('owner'), legacy,
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const { daily_budget_usd, app_quotas, app_allowlist } = req.body as {

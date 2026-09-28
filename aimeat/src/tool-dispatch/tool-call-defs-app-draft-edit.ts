@@ -115,6 +115,8 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             public: { type: 'boolean', description: 'Make it publicly readable so a model or page can fetch it.' },
             model: { type: 'string', description: 'Override the image model.' },
             app_id: { type: 'string', description: 'Attribution for the per-app quota and the spend report.' },
+            provider: { type: 'string', description: 'One of the owner\'s AI providers, or a type. No fallback then.' },
+            fallback: { type: 'boolean', description: 'false keeps the call on its first provider.' },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = { prompt: requiredString(input, 'prompt') };
@@ -123,6 +125,8 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             if (optionalBoolean(input, 'public')) body.public = true;
             const model = optionalString(input, 'model'); if (model) body.model = model;
             const appId = optionalString(input, 'app_id'); if (appId) body.app_id = appId;
+            const provider = optionalString(input, 'provider'); if (provider) body.provider = provider;
+            const fallback = optionalBoolean(input, 'fallback'); if (fallback !== undefined) body.fallback = fallback;
             return client.post('/v1/ai/image', body);
         },
     },

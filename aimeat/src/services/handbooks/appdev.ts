@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-28 — AI providers: the owner's routing picks the provider; AI_CAPABILITY_UNAVAILABLE; route.
  *   2026-09-28 — AI models in an app: the owner's model policy and the app's own models= list.
  *   2026-09-25 — A contributor's change to a workspace: aimeat_workspace_space_add,
  *     aimeat_workspace_sections_set and aimeat_workspace_suggestions, under the workspace's rule.
@@ -77,7 +78,10 @@ what the owner allows. The owner's model policy may refuse a named model with 40
 the app truly needs certain models, declare them in the head,
 \`<meta name="aimeat-ai" content="generates=text; discloses=yes; models=openrouter:anthropic/claude-opus-5.5">\`
 (each \`<type>:<model id>\`); the app then uses only those, and a malformed entry comes back in
-\`ai_hints\`. Skill: aimeat-ai-model-policy.
+\`ai_hints\`. Skill: aimeat-ai-model-policy. The owner's providers and routing decide which provider
+answers; an app never names a provider id (it cannot know the owner's), and a refusal
+\`AI_CAPABILITY_UNAVAILABLE\` means the owner has no working provider for that capability: show its
+message, which names what to set up. Every answer carries \`route\` (who answered).
 
 **Reference.** \`aimeat_handbook_get\` — read the appdev / generator directives.
 

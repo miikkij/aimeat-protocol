@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.20.0 — 2026-09-28 — Mounts aiProvidersRouter (/v1/ai/providers, /v1/ai/routing), System 2 plan V3.
+ *     The four System 2 AI mounts moved to routes-loader-ai.ts in their order (a pure move, max-file-lines).
  *   v1.19.0 — 2026-09-28 — Mounts aiPolicyRouter (/v1/ai/policy, /v1/ai/recommended), System 2 plan V2.
  *   v1.18.0 — 2026-09-23 — Mounts uiComponentsRouter (/v1/ui/components, public, read-only; storage since 09-24).
  *   v1.17.1 — 2026-09-16 — stripePaymentHandler(config): the handler opens the sealed Stripe key.
@@ -197,9 +199,7 @@ import { adminExtensionsRouter } from '../routes/admin-extensions.js';
 import { adminPromptsRouter } from '../routes/admin-prompts.js';
 import { statsRouter } from '../routes/stats.js';
 import { calibratorRouter } from '../routes/calibrator.js';
-import { openrouterRouter } from '../routes/openrouter.js';
-import { aiRouter } from '../routes/ai.js';
-import { aiPolicyRouter } from '../routes/ai-policy.js';
+import { mountAiRouters } from './routes-loader-ai.js';
 import { aiJobsRouter } from '../routes/ai-jobs.js';
 import { decideRouter } from '../routes/ai-decide.js';
 import { decideRulesRouter } from '../routes/ai-decide-rules.js';
@@ -513,9 +513,7 @@ export async function mountRoutes(
   if (config.calibratorEnabled) {
     app.use(calibratorRouter(config, storage));  // Prompt calibration tool
   }
-  app.use(openrouterRouter(config, storage));   // OpenRouter AI autopilot
-  app.use(aiRouter(config, storage));            // App-level AI completion (user's key, budget-gated)
-  app.use(aiPolicyRouter(config, storage));      // The owner's model policy and the node's recommended models
+  mountAiRouters(app, config, storage);          // openrouter, ai, ai-policy, ai-providers (routes-loader-ai.ts)
   // The same key and the same budget, with a handle instead of a held request: a model call that
   // may take half an hour cannot be an HTTP request anybody waits on.
   app.use(aiJobsRouter(config, storage, aiJobService));

@@ -158,10 +158,19 @@ metadata:
 
 Three separate "routing" layers — identify which one the owner means:
 
-1. **AI provider/model routing** (whose key, which models): configured per-owner in
-   profile → AI. Inspect availability via \`GET /v1/ai/available\`;
-   spend history via \`GET /v1/ai/usage/history\` (surfaced on the Home usage card and the
-   admin AI-usage tab). Changing the provider/key is an owner UI action — guide, don't do.
+1. **AI providers and routing** (whose key, which provider answers which capability):
+   \`aimeat_ai_providers\` (or \`GET /v1/ai/providers\`) lists the owner's providers and the node's,
+   what each serves with which model, whether each capability is tested and working, and the
+   routing. A provider is added and its key set by the owner on the web page, never through a tool:
+   guide, don't do. What you do: test a provider (\`aimeat_ai_provider_test\`; an image test costs
+   one picture, so ask first) and propose the routing (\`aimeat_ai_routing_set\`, propose-then-
+   confirm): the ordered providers per capability, and the rules (fallback on or off, at most how
+   many attempts, only tested providers, never away from this machine when the first was local).
+   Every answer carries \`route\`: who chose, who answered, each attempt. Spend history is
+   \`GET /v1/ai/usage/history\`, where each failed attempt before a fallback is a line of its own.
+   The operator's side: \`AIMEAT_AI_PROVIDERS\`, \`AIMEAT_AI_BUILTIN_PROVIDERS\`,
+   \`AIMEAT_AI_PROVIDER_EGRESS\` and \`AIMEAT_AI_PROVIDER_TYPES\` on the Config tab; the node's own
+   key is the provider \`node-openrouter\` and answers only an owner whose list is empty.
 2. **Work routing** (which agent does what): driven by agent capabilities, tags, and offers.
    Inspect with \`aimeat_agents_list\` + \`aimeat_agent_profile\`; adjust tags/mode via
    \`aimeat_operator_agent_configure\` (propose-then-confirm) and teach specialization by
@@ -212,8 +221,10 @@ Three lists, and a call may use only a model that every list with something in i
    restrict nobody until the owner chooses \`recommended\`.
 3. **The app's own list**: \`models=\` in its \`<meta name="aimeat-ai">\`. It binds that app only.
 
-A model is written \`<type>:<model id>\`, for example \`openrouter:anthropic/claude-opus-5.5\`. A bare
-id means the owner's own provider.
+A model is written \`<type>:<model id>\`, for example \`openrouter:anthropic/claude-opus-5.5\`. The
+type picks the owner's providers of that type (\`aimeat_ai_providers\` lists them); a bare id goes to
+the provider that answers the call. Naming a type the owner has no provider for is 400
+\`AI_PROVIDER_NOT_CONFIGURED\`.
 
 ## When a call is refused
 

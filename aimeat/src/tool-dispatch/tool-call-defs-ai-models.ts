@@ -7,10 +7,12 @@
  *   test/unit/cli-tool-param-forwarding.test.ts proves each one leaves the process.
  * @structure aiModelCliTools[] — registered by tool-dispatch/index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-28 — aimeat_ai_providers, aimeat_ai_provider_test and aimeat_ai_routing_set
+ *     (System 2 plan, V3).
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V2).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { optionalRecord, optionalString } from './tool-call-helpers.js';
+import { optionalBoolean, optionalRecord, optionalString, requiredString } from './tool-call-helpers.js';
 import { aiModelTools as catalog } from '../mcp/catalog/definitions/ai-models.js';
 
 const def = (name: string) => catalog.find((t) => t.name === name)!;
@@ -25,6 +27,29 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
       // without a policy with the reason rather than this door dropping it.
       if (!policy && token === undefined) return client.get('/v1/ai/policy');
       return client.put('/v1/ai/policy', { ...(policy ? { policy } : {}), ...(token !== undefined ? { confirm_token: token } : {}) });
+    },
+  },
+  {
+    ...def('aimeat_ai_providers'),
+    handler: ({ client }) => client.get('/v1/ai/providers'),
+  },
+  {
+    ...def('aimeat_ai_provider_test'),
+    handler: ({ client }, input) => {
+      const capability = optionalString(input, 'capability');
+      const accept = optionalBoolean(input, 'accept_cost');
+      return client.post(`/v1/ai/providers/${encodeURIComponent(requiredString(input, 'provider'))}/test`, {
+        ...(capability !== undefined ? { capability } : {}), ...(accept !== undefined ? { accept_cost: accept } : {}),
+      });
+    },
+  },
+  {
+    ...def('aimeat_ai_routing_set'),
+    handler: ({ client }, input) => {
+      const routing = optionalRecord(input, 'routing');
+      const token = optionalString(input, 'confirm_token');
+      if (!routing && token === undefined) return client.get('/v1/ai/routing');
+      return client.put('/v1/ai/routing', { ...(routing ? { routing } : {}), ...(token !== undefined ? { confirm_token: token } : {}) });
     },
   },
 ];

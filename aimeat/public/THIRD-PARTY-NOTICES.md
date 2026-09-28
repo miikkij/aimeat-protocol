@@ -99,7 +99,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 477 npm packages that travel inside the `aimeat` package. Build and test
+The 481 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -107,10 +107,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@a2a-js/sdk](https://github.com/a2aproject/a2a-js#readme) | 1.2.0 | Apache-2.0 |
 | [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 1.0.0 | MIT |
 | [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 1.4.0 | Apache-2.0 |
+| [@ai-sdk/anthropic](https://ai-sdk.dev/docs) | 4.0.65 | Apache-2.0 |
 | [@ai-sdk/gateway](https://ai-sdk.dev/docs) | 4.0.96 | Apache-2.0 |
+| [@ai-sdk/mistral](https://ai-sdk.dev/docs) | 4.0.52 | Apache-2.0 |
 | [@ai-sdk/openai-compatible](https://ai-sdk.dev/docs) | 3.0.57 | Apache-2.0 |
+| [@ai-sdk/openai](https://ai-sdk.dev/docs) | 4.0.78 | Apache-2.0 |
 | [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.49 | Apache-2.0 |
 | [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.18 | Apache-2.0 |
+| [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.10 | Apache-2.0 |
 | [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.5.1 | MIT |
 | [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.8.1 | MIT |
 | [@colors/colors](https://github.com/DABH/colors.js) | 1.6.0 | MIT |
@@ -808,7 +812,7 @@ Apache License
    limitations under the License.
 ```
 
-### @ai-sdk/gateway 4.0.96, @ai-sdk/openai-compatible 3.0.57, @ai-sdk/provider 4.0.18, ai 7.0.118
+### @ai-sdk/anthropic 4.0.65, @ai-sdk/gateway 4.0.96, @ai-sdk/mistral 4.0.52, @ai-sdk/openai-compatible 3.0.57, @ai-sdk/openai 4.0.78, @ai-sdk/provider 4.0.18, @ai-sdk/xai 5.0.10, ai 7.0.118
 
 ```text
 Copyright 2023 Vercel, Inc.

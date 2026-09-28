@@ -22,6 +22,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.32.0 -- 2026-09-28 -- aimeat_ai_providers and aimeat_ai_provider_test need ai:use; aimeat_ai_routing_set needs
+ *     memory:write-reserved (System 2 plan, V3).
  *   v1.31.0 -- 2026-09-28 -- aimeat_ai_policy_set needs memory:write-reserved, like aimeat_operator_ai_config.
  *   v1.30.1 -- 2026-09-26 -- MCP_SCOPE_PROFILES and scopesForProfile() move unchanged to
  *     ./scope-profiles.ts and are re-exported here: the file had passed the 800-line limit.
@@ -338,6 +340,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_operator_ai_config:                'memory:write-reserved',
     // Which models every AI call of the owner may use: a rule the owner set over their own apps and agents.
     aimeat_ai_policy_set:                     'memory:write-reserved',
+    // Which provider answers first and whether a fallback may leave this machine: the owner's rule.
+    aimeat_ai_routing_set:                    'memory:write-reserved',
+    // Reading the providers shows no key; a test spends like a call.
+    aimeat_ai_providers:                      'ai:use',
+    aimeat_ai_provider_test:                  'ai:use',
 
     // Changes WHO ELSE can read the owner's knowledge. A different promise than changing
     // the knowledge, which is why it is not organism:write.
