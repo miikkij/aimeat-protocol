@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.6.0 — 2026-09-28 — aimeat_package_entitlements takes `node` and registers an unknown node as a
+ *     packages-only peer with the grant (install packages, phase 5).
  *   v1.5.0 — 2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates,
  *     aimeat_package_repository and aimeat_package_entitlements: the package repository, both sides.
  *   v1.4.1 — 2026-09-28 — install takes `config`, each part's config (services/package-config.ts).
@@ -363,7 +365,8 @@ export function registerPackageTools(
         updates_until: z.string().nullable().optional().describe('For grant: versions published after this ISO date-time are not served to the node. null or omitted: the updates run on.'),
         channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.'),
         note: z.string().optional().describe('For grant: why, e.g. the order it came from.'),
-    }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note }) => {
+        node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For grant: a node this repository does not know yet, registered with the grant as a packages-only peer: its address and the public key its /.well-known/aimeat publishes.'),
+    }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
         const caller = { owner: ownerOf(), isOperator: false };
         if (action === 'list') {
             const out = await listEntitlements(storage, caller, group_id);
@@ -376,9 +379,9 @@ export function registerPackageTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }, null, 2) }] };
         }
-        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel });
+        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers);
         if (!out.ok) return { ...toolError(out.code, out.message) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, repository_role: config.packageRepository }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, repository_role: config.packageRepository }, null, 2) }] };
     });
 
     // Releasing a managed install: the same service POST /v1/instances/:id/fork calls.

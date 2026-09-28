@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.6.0 -- 2026-09-28 -- aimeat_package_entitlements forwards `node` (packages-only peer registered with a grant).
  *   v1.5.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
  *     aimeat_package_repository and aimeat_package_entitlements (the package repository).
  *   v1.4.1 -- 2026-09-28 -- aimeat_package_install sends `config`.
@@ -287,6 +288,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node.' },
             channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable (published versions, the default) or beta (beta versions too).' },
             note: { type: 'string', description: 'For grant: why.' },
+            node: { type: 'object', description: 'For grant: { url, public_key } of a node registered with the grant as a packages-only peer.' },
         },
         handler: ({ client }, input) => {
             const base = `/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/entitlements`;
@@ -299,6 +301,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             if (until !== undefined) body.updates_until = until;
             const channel = optionalString(input, 'channel');
             if (channel !== undefined) body.channel = channel;
+            if (input.node !== undefined) body.node = input.node as JsonObject;
             const note = optionalString(input, 'note');
             if (note !== undefined) body.note = note;
             return client.put(node, body);

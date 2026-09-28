@@ -14,12 +14,17 @@
  *   WHAT IS SIGNED. `{ source_node, timestamp, purpose: 'package', group_id }`, so a signature taken
  *   for one package cannot be replayed for another, and the timestamp holds it to five minutes.
  *   The customer node must be an active peer of the repository with the catalogue shared: that is
- *   how a repository operator says which nodes it serves at all, before any entitlement.
+ *   how a repository operator says which nodes it serves at all, before any entitlement. A peer that
+ *   shares no catalogue is heard when it holds an entitlement here (the `entitled` callback), which is
+ *   the packages-only peer a grant registers.
  * @structure signedPackageHeaders() · verifyPackageNode()
  * @usage
  *   const headers = await signedPackageHeaders(storage, config, groupId);
  *   const who = await verifyPackageNode(req.headers, peers, groupId);   // null when unsigned
  * @version-history
+ *   v1.1.0 — 2026-09-28 — `entitled`: a packages-only peer (catalogue not shared) is heard for what it
+ *     holds an entitlement to. Jouni approved the packages-only peer on 2026-09-28 (install packages,
+ *     phase 5: the shop's automation registers the customer node with its grant).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -60,6 +65,13 @@ export async function verifyPackageNode(
     peers: Map<string, PeerInfo>,
     groupId: string,
     now = Date.now(),
+    /**
+     * Whether the node holds an entitlement here. An entitlement is itself the permission to read
+     * what it names, so a peer that shares no catalogue (a packages-only peer registered with its
+     * grant, package-entitlements.ts) is still heard when this answers yes. The peer must still be
+     * active and its key must still verify the signature.
+     */
+    entitled?: (nodeId: string) => Promise<boolean>,
 ): Promise<PackageNodeCheck | null> {
     const pick = (h: string): string | undefined => {
         const v = headers[h];
@@ -73,12 +85,23 @@ export async function verifyPackageNode(
         return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'A node request needs x-source-node, x-timestamp and x-signature.' };
     }
     const gate = gatePeer(peers, sourceNode, 'shareCatalogue');
-    if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+    let peer: PeerInfo;
+    if (gate.ok) peer = gate.peer;
+    else {
+        // Only the catalogue flag may be answered by an entitlement: an unknown node, an inactive
+        // peer or one without a key is refused as before.
+        const known = peers.get(sourceNode);
+        const onlyCatalogue = gate.code === 'POLICY_DENIED' && known?.status === 'active' && !!known.publicKey;
+        if (!onlyCatalogue || !entitled ||!(await entitled(sourceNode))) {
+            return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+        }
+        peer = known!;
+    }
     const ts = Date.parse(timestamp);
     if (!Number.isFinite(ts) || Math.abs(now - ts) > WINDOW_MS) {
         return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
     }
-    if (!await verify(gate.peer.publicKey, message(sourceNode, timestamp, groupId), signature)) {
+    if (!await verify(peer.publicKey, message(sourceNode, timestamp, groupId), signature)) {
         return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The node signature on this package request does not check out.' };
     }
     return { ok: true, nodeId: sourceNode };

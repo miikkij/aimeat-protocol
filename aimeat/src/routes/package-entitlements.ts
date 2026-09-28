@@ -10,6 +10,8 @@
  *   GET /v1/packages/:groupId/entitlements · PUT and DELETE /v1/packages/:groupId/entitlements/:nodeId
  *   GET /v1/federation/packages (signed by the calling node)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The grant takes `node` ({ url, public_key }) and registers an unknown node as
+ *     a packages-only peer; the listing serves such a peer only what it holds (install packages, phase 5).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
  */
 import type { Router } from 'express';
@@ -19,7 +21,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import {
-    listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing,
+    listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing, entitledGroupsOf,
 } from '../services/package-entitlements.js';
 import { verifyPackageNode } from '../services/package-node-auth.js';
 
@@ -43,9 +45,10 @@ export function registerPackageEntitlementRoutes(
             updatesUntil: body.updates_until,
             note: body.note,
             channel: body.channel,
-        });
+            node: body.node,
+        }, peers);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
-        res.json(success(config.nodeId, { entitlement: out.entitlement, repository_role: config.packageRepository }));
+        res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, repository_role: config.packageRepository }));
     });
 
     router.delete('/v1/packages/:groupId/entitlements/:nodeId', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
@@ -62,9 +65,13 @@ export function registerPackageEntitlementRoutes(
             res.status(404).json(error(config.nodeId, 'NOT_A_REPOSITORY', 'This node does not serve packages as a repository.'));
             return;
         }
-        const who = await verifyPackageNode(req.headers, peers, '*');
+        // A packages-only peer (catalogue not shared, registered with its grant) is heard for what it
+        // holds, and its listing carries only that: the public catalogue is what the flag withholds.
+        const who = await verifyPackageNode(req.headers, peers, '*', Date.now(),
+            async nodeId => (await entitledGroupsOf(storage, nodeId)).length > 0);
         if (!who) { res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The listing is for peer nodes: sign the request as your node.')); return; }
         if (!who.ok) { res.status(who.status).json(error(config.nodeId, who.code, who.message)); return; }
-        res.json(success(config.nodeId, { node: config.nodeId, packages: await repositoryListing(storage, who.nodeId) }));
+        const includePublic = peers.get(who.nodeId)?.shareCatalogue !== false;
+        res.json(success(config.nodeId, { node: config.nodeId, packages: await repositoryListing(storage, who.nodeId, { includePublic }) }));
     });
 }

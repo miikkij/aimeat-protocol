@@ -16,7 +16,8 @@
  *   - Phase 5: a set whose owner has no account creates the account
  *   - Phase 6: the operator's agent, holding operator:admin, plans and lists over MCP
  *   - Phase 7: a new node started with AIMEAT_INSTALL_SET links the repository, is refused until it
- *     is entitled, tries again and applies the set; a repository key that differs is refused
+ *     is entitled, tries again and applies the set; the shop's agent grants the bundle and registers
+ *     the node as a packages-only peer in one call; a key that differs is refused on both sides
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
@@ -412,13 +413,20 @@ await test('A new node started with an install set links the repository, waits f
     vendorToken = await mintToken(R, `vendor${ts}`);
     opsToken = await mintToken(C, `ops${ts}`);
     const dToken = await setupOwner(D, `dops${ts}`);
-    // The repository learns the new node's key only now that the node exists, and grants it the
-    // bundle; until then the start-up apply is refused and tries again.
-    await peer(R, vendorToken, D);
+    // The repository learns the new node's key only now that the node exists. The shop's automation,
+    // an agent of the bundle's author holding packages:write, grants the bundle and registers the
+    // node in one call; until then the start-up apply is refused and tries again.
+    const shopAgent = await registerAgent(R, vendorToken, `vendor${ts}`, 'shopsale', 'interactive', ['packages:write']);
+    const dCard = await D.json('/.well-known/aimeat');
     const g = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements/${D.nodeId}`, {
-        method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ note: 'order 2' }),
+        method: 'PUT', headers: auth(shopAgent),
+        body: JSON.stringify({ note: 'order 2', node: { url: D.baseUrl, public_key: dCard.body.data.public_key } }),
     });
-    assert(g.status === 200, `grant D: ${g.status} ${JSON.stringify(g.body)}`);
+    assert(g.status === 200 && g.body.data.peer_registered === true, `grant D with its node: ${g.status} ${JSON.stringify(g.body)}`);
+    const onR = await R.json('/v1/federation/peers', { headers: auth(vendorToken) });
+    const dOnR = (onR.body.data?.peers as any[] ?? []).find((p) => p.node_id === D!.nodeId);
+    assert(dOnR?.status === 'active' && dOnR?.tier === 'contact' && dOnR?.share_catalogue === false,
+        `D is a packages-only peer on R: ${JSON.stringify(dOnR)}`);
     let sets: any[] = [];
     for (let i = 0; i < 40 && sets.length === 0; i++) {
         await new Promise(r => setTimeout(r, 500));
@@ -429,6 +437,17 @@ await test('A new node started with an install set links the repository, waits f
     const peers = await D.json('/v1/federation/peers', { headers: auth(dToken) });
     const link = (peers.body.data?.peers as any[] ?? []).find((p) => p.node_id === R.nodeId);
     assert(link?.status === 'active', `D links R as an active peer: ${JSON.stringify(peers.body.data).slice(0, 300)}`);
+});
+
+await test('A grant naming a known peer under another key is refused, and grants nothing', async () => {
+    const r = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements/${C.nodeId}`, {
+        method: 'PUT', headers: auth(vendorToken),
+        body: JSON.stringify({ note: 'wrong key', node: { url: C.baseUrl, public_key: 'AAAAnotthekey' } }),
+    });
+    assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `expected 409 PEER_KEY_MISMATCH: ${r.status} ${JSON.stringify(r.body)}`);
+    const list = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements`, { headers: auth(vendorToken) });
+    const cEnt = (list.body.data.entitlements as any[]).find((e) => e.nodeId === C.nodeId);
+    assert(cEnt?.note === 'order 1', `C's grant is unchanged: ${JSON.stringify(cEnt)}`);
 });
 
 await test('A set naming the repository under another key than the linked peer is refused', async () => {

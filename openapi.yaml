@@ -43492,9 +43492,20 @@ paths:
                 updates_until: { type: string, format: date-time, nullable: true }
                 channel: { type: string, enum: [stable, beta], default: stable }
                 note: { type: string, maxLength: 500 }
+                node:
+                  type: object
+                  description: >-
+                    A node this repository does not know yet, registered with the grant as a
+                    packages-only peer (active, contact tier, messages off): it can pull only what it
+                    holds an entitlement to. 409 PEER_KEY_MISMATCH when a peer of that id has another
+                    key, 409 PEER_NOT_ACTIVE when it is switched off; nothing is granted then.
+                  required: [url, public_key]
+                  properties:
+                    url: { type: string }
+                    public_key: { type: string }
       responses:
         '200':
-          description: '`data` is `{ entitlement, repository_role }`.'
+          description: '`data` is `{ entitlement, peer_registered, repository_role }`.'
           content:
             application/json:
               schema:
