@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.2.0 -- 2026-09-28 -- aiModelCliTools: aimeat_ai_policy_set on the shell dispatch.
  *   v1.1.0 -- 2026-09-27 -- Integrate the published app-manage tool into the shared dispatch table.
  *   v1.0.0 -- 2026-09-27 -- Extracted unchanged from the CLI shell adapter.
  */
@@ -23,6 +24,7 @@ import { workflowTools } from './tool-call-defs-workflows.js';
 import { aiJobTools } from './tool-call-defs-ai-jobs.js';
 import { decideTools } from './tool-call-defs-decide.js';
 import { voiceTools } from './tool-call-defs-ai-voice.js';
+import { aiModelCliTools } from './tool-call-defs-ai-models.js';
 import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { appManageCliTools } from './tool-call-defs-app-manage.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
@@ -53,6 +55,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...aiJobTools,
     ...decideTools,
     ...voiceTools,
+    ...aiModelCliTools,
     ...appDraftEditTools,
     ...appManageCliTools,
     ...exchangeTools,

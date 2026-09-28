@@ -6,6 +6,8 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.1.0 - 2026-09-28 - The owner's model policy covers voice: the reply runs under the text list,
+ *     the spoken audio under the speech list, and the caller (owner, agent, verified app) is passed on.
  *   v1.0.2 - 2026-09-28 - The fallback price of a streamed reply is estimateCostUsd() from
  *     ai-completion.ts, not a copy of its two numbers.
  *   v1.0.1 - 2026-09-19 - The speech pre-check reads the app's spend and cap under any of its names
@@ -21,14 +23,21 @@ import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import { appSpentToday, appQuotaFor } from './ai-app-id.js';
+import type { CallerClass } from './ai/policy.js';
+
+function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
+  return { ...(o.caller ? { caller: o.caller } : {}), ...(o.verifiedApp ? { verifiedApp: o.verifiedApp } : {}) };
+}
 
 export type VoiceEmit = (event: Record<string, unknown>) => Promise<void>;
-export interface ReplyOptions {
+/** Whose call this is and the app its grant names, for the owner's model policy (routes/ai-policy.ts). */
+export interface VoicePolicyCaller { caller?: CallerClass; verifiedApp?: string }
+export interface ReplyOptions extends VoicePolicyCaller {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   model?: string; app_id: string; temperature?: number; top_p?: number; max_tokens?: number;
   reasoning?: { enabled?: boolean; effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean } | null;
 }
-export interface SpeakOptions {
+export interface SpeakOptions extends VoicePolicyCaller {
   input: string; model: string; app_id: string; voice: string; response_format: 'pcm' | 'mp3'; speed: number; instructions?: string;
 }
 
@@ -74,7 +83,7 @@ async function settled(storage: Storage, config: AimeatConfig, gaii: string, pla
 }
 
 export async function streamReply(storage: Storage, config: AimeatConfig, gaii: string, options: ReplyOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
-  const plan = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id });
+  const plan = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id, ...policyCallerOf(options) });
   const response = await chatCompletionRaw(plan.key, plan.baseUrl, { model: plan.model, messages: options.messages,
     temperature: options.temperature, top_p: options.top_p, max_tokens: options.max_tokens,
     ...(options.reasoning ? { reasoning: options.reasoning } : {}), stream: true, stream_options: { include_usage: true } }, signal);
@@ -124,7 +133,8 @@ async function speechPrice(plan: AiCallPlan): Promise<number | undefined> {
 }
 
 export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii: string, options: SpeakOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
-  const plan = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id });
+  // A spoken reply asks for the speech capability: the owner's policy list for speech applies to it.
+  const plan = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id, capability: 'speech', ...policyCallerOf(options) });
   const unitPrice = await speechPrice(plan);
   const estimate = (unitPrice ?? 0) * Array.from(options.input).length;
   const usage = await getTodayUsage(storage, gaii);

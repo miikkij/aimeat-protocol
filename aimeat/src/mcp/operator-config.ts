@@ -16,6 +16,7 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-28 -- aimeat_operator_ai_config shows the node's recommended models (read-only) and points to aimeat_ai_policy_set.
  *   v1.3.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 -- 2026-08-11 -- aimeat_operator_agent_configure writes through
@@ -58,6 +59,7 @@ import { logger } from '../utils/logger.js';
 import { uncoveredScopes } from '../utils/scope-coverage.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { recommendedModelsOf } from '../services/ai/policy-store.js';
 import {
     normaliseAgentProfile, resolveAgentTarget, setAgentProfile,
     type AgentProfileFields,
@@ -280,7 +282,10 @@ export function registerOperatorConfigTools(
                         reasoning_model: settings.reasoningModel ?? null,
                         execution_model: settings.executionModel ?? null,
                     },
-                    note: 'Nothing proposed — pass the fields to change.',
+                    // The node's recommended models, read-only here: which models the owner's calls may
+                    // use at all is the model policy (aimeat_ai_policy_set), not this record.
+                    recommended_models: recommendedModelsOf(config),
+                    note: 'Nothing proposed — pass the fields to change. Which models are allowed at all is the model policy: aimeat_ai_policy_set.',
                 });
             }
 

@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-28 — aimeat_ai_policy_set: propose-then-confirm, idempotent, not destructive.
  *   2026-09-26 — aimeat_admin_incident_resolve is destructive: deciding that a held name's rows were a
  *     previous holder's deletes its actions. Still idempotent: the same decision twice does it once.
  *   2026-09-25 — aimeat_workspace_space_add and aimeat_workspace_sections_set (writes, idempotent,
@@ -121,6 +122,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Operator config enactment ──
     aimeat_operator_agent_configure: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_operator_ai_config: { title: 'Configure AI Routing & Budget (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_ai_policy_set: { title: 'Set the AI Model Policy (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },

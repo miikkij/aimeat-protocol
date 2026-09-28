@@ -15034,6 +15034,15 @@ paths:
         agent's own key (`/v1/agents/{name}/ai-keys`), the owner's own key, the server's key. The
         agent's daily cap, when the owner set one, refuses with 402 `AGENT_QUOTA_EXHAUSTED`. The
         same holds for `/v1/llm/chat/completions` and `POST /v1/ai/jobs`.
+
+
+        MODEL POLICY. The owner may limit which models their calls use (`GET/PUT /v1/ai/policy`), and
+        an app may limit itself with `models=` in its `<meta name="aimeat-ai">`. A `model` the rules
+        leave out is refused with 403 `AI_MODEL_NOT_ALLOWED`, and `error.details` names the layer that
+        refused and the `allowed` models; rules with nothing in common answer 403
+        `AI_MODEL_POLICY_EMPTY`. Without a `model`, the node takes the first allowed model and says so
+        with `data.policy_chose_model: true`. A reference is `<type>:<model id>`
+        (`openrouter:anthropic/claude-opus-5.5`) or the bare id on the owner's own provider.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15080,7 +15089,8 @@ paths:
             data.content, data.model, data.usage and data.budget, plus data.finish_reason (why the
             provider stopped: stop, length, content_filter…, or null when it did not say) and
             data.truncated (true when finish_reason is length: the answer was cut at a token limit).
-            The provenance record rides in meta.provenance.
+            data.policy_chose_model is true when the owner's model policy chose the model. The
+            provenance record rides in meta.provenance.
           content:
             application/json:
               schema:
@@ -15090,6 +15100,134 @@ paths:
         '402':
           $ref: '#/components/responses/AimeatError'
         '403':
+          description: >
+            Refused: the caller lacks `ai:use`, the app is not on the owner's allowlist, or the model
+            policy refused (`AI_MODEL_NOT_ALLOWED` with `error.details.allowed`, `layer`, `source`;
+            `AI_MODEL_POLICY_EMPTY` with `error.details.layers`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/ai/policy:
+    get:
+      operationId: getAiModelPolicy
+      summary: The owner's model policy and the node's recommended models
+      description: >
+        Which models this owner's AI calls may use, the node's recommended models per capability, and
+        whether the policy covers the caller (`applies_to_caller`). Never a key, so an owner, an agent
+        or an app holding `ai:use` may read what binds it.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: data.policy (mode open | recommended | custom, allow, appliesTo, apps, agents), data.recommended, data.applies_to_caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+    put:
+      operationId: setAiModelPolicy
+      summary: Set the owner's model policy (the owner; or an agent proposing, then confirming)
+      description: >
+        Every layer can only tighten: the policy is the intersection of the owner's list (`recommended`
+        follows the node's list per capability, `custom` is the owner's own), the owner's tighter list
+        for one agent or one app (an app identified from its app grant, never a self-declared app_id),
+        and the app's own `models=` list. `appliesTo` switches say whose calls the owner's list covers:
+        the owner's own, the node's chat, the owner's agents, apps. All are on unless set off.
+
+
+        The owner in person applies the change at once. An agent of the owner holding
+        `memory:write-reserved` gets `mode: proposal` with a `confirm_token` bound to the exact
+        policy; the same call with `confirm_token` applies it within ten minutes. An app is refused.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [policy]
+              properties:
+                policy:
+                  type: object
+                  description: The policy.
+                  properties:
+                    mode: { type: string, enum: [open, recommended, custom] }
+                    allow:
+                      type: array
+                      items: { type: string }
+                      description: Only for custom. `<type>:<model id>` references.
+                    appliesTo:
+                      type: object
+                      properties:
+                        owner: { type: boolean }
+                        chat: { type: boolean }
+                        agents: { type: boolean }
+                        apps: { type: boolean }
+                    apps:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          allow: { type: array, items: { type: string } }
+                    agents:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          allow: { type: array, items: { type: string } }
+                confirm_token:
+                  type: string
+                  description: An agent's token from the proposal step.
+      responses:
+        '200':
+          description: data.mode applied (data.policy) or proposal (data.current, data.proposed, data.confirm_token).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: AI_POLICY_INVALID, with every problem in error.details.problems.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          description: OWNER_ONLY (an app, or a visitor), SCOPE_DENIED (an agent without memory:write-reserved), or a confirm token that does not match.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/ai/recommended:
+    get:
+      operationId: getAiRecommendedModels
+      summary: The node's recommended models per capability
+      description: >
+        The operator's list (`AIMEAT_AI_RECOMMENDED_MODELS`, editable on the admin Config tab), in order
+        per capability. It restricts nobody until an owner chooses it as their policy. Empty on a node
+        whose operator recommends nothing.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: data.recommended, capability → ordered `<type>:<model id>` references.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
           $ref: '#/components/responses/AimeatError'
 
   /v1/ai/jobs:

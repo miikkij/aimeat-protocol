@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-28 — aimeat_ai_policy_set joins the agent and admin surfaces beside aimeat_operator_ai_config.
  *   2026-09-25 — aimeat_workspace_space_add, aimeat_workspace_sections_set and
  *     aimeat_workspace_suggestions beside the document tools on appdev, agent and service.
  *   2026-09-25 — aimeat_admin_federation_relay_claim_set beside aimeat_admin_federation.
@@ -229,7 +230,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
         'aimeat_appdev_proof_attach',
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink', 'aimeat_skill_update',
-        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
+        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config', 'aimeat_ai_policy_set',
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invite_email', 'aimeat_organism_invitations_email', 'aimeat_organism_invitation_email_cancel', 'aimeat_organism_member_add', 'aimeat_organism_member_remove', 'aimeat_organism_owner_add', 'aimeat_organism_owner_remove', 'aimeat_organism_invitation_update', 'aimeat_organism_invitation_cancel', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments',
@@ -357,7 +358,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_crew_menu', 'aimeat_crew_llm_set',
-        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
+        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config', 'aimeat_ai_policy_set',
     ],
     // The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take
     // payment for it and read what came in — credentials for the seller's own rails, priced tool

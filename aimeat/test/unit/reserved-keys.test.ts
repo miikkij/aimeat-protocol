@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-28 — `ai.policy.` is the seventeenth: the owner's model policy, by its own name, so an
+ *     app's own `ai.summary` stays user data.
  *   v1.x — 2026-09-25 — `workflows.` is the sixteenth: a trigger runs a saved definition on the
  *     authority of the saver it names, and the engine advances a run from its record.
  *   v1.x — 2026-09-25 — `packages.install-requests.` is the fifteenth: an install request the
@@ -54,7 +56,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all sixteen, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all seventeen, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -82,7 +84,7 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // principal it names as its saver, and the engine advances a run from its record. Written
         // past the workflow doors, either could name its own saver and its own steps.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'ai.policy.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
         );
     });
 
@@ -142,6 +144,9 @@ describe('the list holds every prefix the server reads and acts on', () => {
         expect(isReservedServerKey('ai.jobs.log.2026-08-31')).toBe(true);
         // The dot matters here as much as anywhere: an app's own `ai.summary` is user data.
         expect(isReservedServerKey('ai.summary')).toBe(false);
+        // 2026-09-28: the owner's model policy is the server's, by its own name; ai.summary stays the app's.
+        expect(isReservedServerKey('ai.policy.models')).toBe(true);
+        expect(appMayWriteKey(['app'], 'ai.policy.models')).toBe(false);
         expect(appMayWriteKey(['app'], 'ai.jobs.7f3c')).toBe(false);
         expect(appMayWriteKey(['owner'], 'ai.jobs.7f3c')).toBe(true);
     });

@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.10.0 — 2026-09-28 — registerAiPolicyTools (aimeat_ai_policy_set).
  *   v1.9.0 — 2026-09-27 — registerAppManageTool (aimeat_app_manage, with the session's scopes) replaces
  *     the screenshot, marks, visitors, legal and ui registrations.
  *   v1.8.0 — 2026-09-25 — registerPackageInstallRequestTools: an agent of the owner lists, approves
@@ -89,6 +90,7 @@ import { registerWorkflowTools } from './workflows.js';
 import { registerAiJobTools } from './ai-jobs.js';
 import { registerDecideTools } from './decide.js';
 import { registerAiVoiceTools } from './ai-voice.js';
+import { registerAiPolicyTools } from './ai-policy.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerAgentV2MessagingTools } from './agent-v2-messaging.js';
@@ -193,6 +195,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAiJobTools(mcp, storage, config, agentGaii);
     registerDecideTools(mcp, storage, config, agentGaii);
     registerAiVoiceTools(mcp, storage, config, agentGaii);
+    registerAiPolicyTools(mcp, storage, config, agentGaii);
     registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     // The v2 turn, beside the dashboard thread above it and the federated DM below. A session

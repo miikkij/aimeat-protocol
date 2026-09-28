@@ -19,6 +19,7 @@
  *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.15.0 — 2026-09-28 — `ai.policy.` joins the list: the owner's model policy (System 2 plan, V2).
  *   v1.14.0 — 2026-09-25 — `workflows.` joins the list: a trigger runs a saved definition on the
  *     authority of the saver it names, and the engine advances a run from its record.
  *   v1.13.0 — 2026-09-25 — `packages.install-requests.` joins the list: an install request is an
@@ -178,6 +179,14 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // through the memory API (searched 2026-09-25). A step key under it is refused as well
   // (services/workflow/store.ts reservedStepKeys), so no step writes a definition either.
   'workflows.',
+  // 2026-09-28: `ai.policy.`, the owner's model policy (`ai.policy.models`) (System 2 AI layer,
+  // docs/internal/llmproviderintegrations/05): which models every AI call of this owner may use. An
+  // app that could write it could loosen the quality rule the owner set on it. The owner's route
+  // (PUT /v1/ai/policy) and the propose-and-confirm tool are the writers. By name rather than `ai.`
+  // as a whole: an app's own `ai.summary` is user data (the `ai.jobs.` entry above says why), so
+  // each server-read record of the AI layer joins here by its own prefix, as it arrives. Searched
+  // 2026-09-28: nothing writes `ai.policy.` through the memory API; it is new.
+  'ai.policy.',
 ] as const;
 
 /**

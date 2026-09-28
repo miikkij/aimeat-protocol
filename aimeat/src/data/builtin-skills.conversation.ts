@@ -447,7 +447,8 @@ not you:
 1. **The person's own key**, if they have set one. No allowance applies and no limit here touches it.
 2. **The node's key**, while their allowance has something left.
 3. **A free model** once the allowance is spent — \`openrouter/free\` by default. The answer still
-   comes; it comes from a weaker model.
+   comes; it comes from a weaker model. Unless the owner's model policy leaves the free model out:
+   then the call is refused (\`QUOTA_EXHAUSTED\`, saying so), because the owner ruled weaker models out.
 
 **One step can come before all three: a key for a single agent.** The owner may give one agent a key
 of its own on that agent's page (AI keys, cap and gate). That key then pays for that agent's calls

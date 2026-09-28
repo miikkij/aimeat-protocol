@@ -89,6 +89,14 @@ everywhere at once, and say so in the Changes section.
 | the two cuts on a decision rule's result | at or over the first the caller acts, at or over the second a person is asked, under it the caller stops | band | kaista | banda |
 | who answers the decision model's questions | one service that takes the same closed questions and answers them: TypeSafe's Jev is one, an open model on the owner's own machine is another; the owner, an agent or a rule picks which | decision provider | päätösmallin tarjoaja | proveedor del modelo de decisión |
 | a decision model on the owner's own machine | a decision provider that runs where the node runs: no key, no price, and the content does not leave the machine | local decision model | paikallinen päätösmalli | modelo de decisión local |
+| a service that runs text, image and speech models | OpenRouter, OpenAI, Anthropic, Mistral, xAI, the owner's own machine, or an extension; the owner adds one and gives it a key | AI provider | tekoälyn tarjoaja (tarjoaja when the sentence is about AI) | proveedor de IA |
+| something an AI call can do | write text, read an image, read a file, make an image, speak, transcribe, make an embedding; an app asks for this, not for a model | capability | kyky | capacidad |
+| which models the owner's calls may use | open, the node's recommended models, or the owner's own list; every layer only tightens | model policy | mallirajaus | restricción de modelos |
+| the models the operator recommends | a list per capability, set by whoever runs this AIMEAT; it restricts nobody until the owner chooses it | recommended models | suositellut mallit | modelos recomendados |
+| turning speech into text (the act) | what a model does to a recording; the verb is transcribe | transcription | litterointi; verbi litteroida | transcripción |
+| the text a transcription produces | the result, kept or shown | transcript | transkriptio | transcripción |
+| text turned into numbers for search by meaning | a vector a model makes from text, so search finds what means the same; first use says so in the same sentence | embedding (model: embedding model) | upotus; malli: upotusmalli | incrustación |
+| a model reading text aloud | text to spoken audio | speech | puhe | voz |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
@@ -313,3 +321,10 @@ service, the directory, the token, the identifier and the username: the test nam
   group are *Shapes*, and one row is named by what it shapes ("Corner of a box"), never by its
   token. *Muoto* over *tyyli* or *ulkoasu*, which already name a style and the whole look. The main
   button (the design language's slab) is *pääpainike* / *el botón principal* on these screens.
+- **2026-09-28** — AI provider, capability, model policy, recommended models, transcription,
+  transcript, embedding and speech, with the System 2 AI layer (docs/internal/llmproviderintegrations/
+  07, section 9). *Litterointi* for the act and *transkriptio* for the text follow Microsoft Teams in
+  Finnish ("Tallenna ja litteroi", "Näytä transkriptio"), and the node's screens already said
+  *Litteroi*; *upotus* and *upotusmalli* follow Microsoft Learn in Finnish. Ruled by the developer on
+  2026-09-28. *Tarjoaja* alone is kept for sentences about AI, so it never collides with the decision
+  model's *päätösmallin tarjoaja*.

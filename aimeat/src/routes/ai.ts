@@ -21,6 +21,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-28 — The model policy (System 2, V2): the three AI routes pass who is calling (owner, agent,
+ *     verified app) to the gate, return a policy refusal's details, and /v1/ai/complete says policy_chose_model.
  *   v1.x — 2026-09-20 — POST /v1/ai/complete and GET /v1/ai/available resolve the payer with
  *     aiPayerOf: an agent's call is paid by its owner, in the agent's name. Ruled by the developer;
  *     until now an agent paid from its own namespace, and its owner's key never paid for it.
@@ -62,6 +64,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
+import { aiCallerOf } from './ai-policy.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -144,6 +147,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
           // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
           ...(agent ? { agent } : {}),
+          // Whose call it is and which app the grant names, for the owner's model policy.
+          ...aiCallerOf(req, config.nodeId),
         });
         // TARGET-058: the provenance of the bytes we are about to hand back, on the ONE envelope
         // carrier. `meta`, never `data` — the `data` shape is what every published app reads, and it
@@ -161,6 +166,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           // to arrive exactly like a finished one.
           finish_reason: r.finishReason,
           truncated: r.truncated,
+          // Additive: the owner's model policy chose the model, because the one that would have
+          // answered is not allowed or nobody chose one. Absent otherwise.
+          ...(r.policyChoseModel ? { policy_chose_model: true } : {}),
           usage: {
             prompt_tokens: r.usage.promptTokens,
             completion_tokens: r.usage.completionTokens,
@@ -176,7 +184,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
-          return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+          return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
         }
         return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
       }
@@ -247,7 +255,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const { payer, agent } = aiPayerOf(gaii);
         const r = await transcribeForOwner(storage, config, payer, {
           audio, model, language, verbose: !!verbose, appId: voiceAppId(req, app_id), temperature, signal: controller.signal,
-          ...(agent ? { agent } : {}),
+          ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
@@ -269,7 +277,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
-          return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+          return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
         }
         return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
       }
@@ -304,7 +312,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const r = await generateForOwner(storage, config, gaii, {
           prompt: prompt ?? '', model, size, storageKey: storage_key,
           publicVisibility: isPublic === true, appId: app_id,
-          ...(agent ? { agent } : {}),
+          ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
@@ -329,7 +337,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         ], envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
-          return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+          return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
         }
         return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
       }
