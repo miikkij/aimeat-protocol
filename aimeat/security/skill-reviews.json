@@ -292,7 +292,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:63f9d0c69d7c3d1afdf5f69a"
+      "digest": "sha256:620ccf0ddca63de29e689754"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -341,7 +341,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:caaedbb6315edffdc9126831"
+      "digest": "sha256:b6802d215efdfa8add312092"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -506,7 +506,7 @@
       "aimeat/src/models/workflow-schemas.ts": "2ea7b5cbb26bcb4d",
       "aimeat/src/mcp/agent-schedules.ts": "79f308cca66be79f",
       "aimeat/src/services/scheduler.ts": "b11960580fbf96e6",
-      "aimeat/src/services/ai/route-plan.ts": "9f6834b7f065a8fe"
+      "aimeat/src/services/ai/route-plan.ts": "5e2b2a66bda7f456"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "d4c59f171eb2fb20",
@@ -530,7 +530,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "f93fad5d9aa0231a",
       ".githooks/pre-commit": "e8840eb33aa805c0",
-      "aimeat/src/services/build-extension-prompt.ts": "1721203c09decb5b"
+      "aimeat/src/services/build-extension-prompt.ts": "3ea304e53b128d76"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {

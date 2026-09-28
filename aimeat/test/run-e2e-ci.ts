@@ -552,6 +552,9 @@ const ALL_SUITES = [
     // be made to happen; and embeddings on its own node on 40442. Both follow the runner's backend.
     'test/e2e-ai-capabilities.ts',
     'test/e2e-ai-embed.ts',
+    // An extension as an AI provider (System 2, V6): its own node on 40443 and a recording service on
+    // this machine, so where the owner's key went, and where it did not, is read from what arrived.
+    'test/e2e-ai-extension-provider.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
     // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.

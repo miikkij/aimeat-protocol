@@ -19,6 +19,7 @@
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
+ *   v1.0.1 — 2026-09-28 — An extension of the owner's can be a provider (V6).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
  *  with builtin-skills.ts, which imports it; the compiler checks the two agree where it is listed. */
@@ -38,7 +39,8 @@ metadata:
 # The node's AI capabilities
 
 The owner's AI providers (their own OpenAI, Anthropic, Mistral, xAI or OpenRouter account, a model
-on their own machine, the node's own) serve seven capabilities. Each is on or off for each caller:
+on their own machine, an extension of theirs that serves AI calls, the node's own) serve seven
+capabilities. Each is on or off for each caller:
 
 | Capability | What a person gets |
 |---|---|

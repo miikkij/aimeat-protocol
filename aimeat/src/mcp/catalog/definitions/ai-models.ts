@@ -38,7 +38,7 @@ export const aiModelTools: AimeatToolDefinition[] = [
     caller: 'agent',
     visibility: agentEverywhere,
     description: 'List the AI providers the owner\'s calls can use: the owner\'s own (OpenAI, Anthropic, Mistral, xAI, '
-      + 'OpenRouter, a local server or any OpenAI-compatible address), and the node\'s. For each: its type, which '
+      + 'OpenRouter, a local server, any OpenAI-compatible address, or an installed extension of theirs), and the node\'s. For each: its type, which '
       + 'capabilities it serves (text, vision, files, image, speech, transcription, embed) with which model, whether the '
       + 'node may pick it by capability alone (pool), whether it is tested and working (health), where the data goes, and '
       + 'whether a key is set (never the key). Also the owner\'s routing: the ordered providers per capability and the '

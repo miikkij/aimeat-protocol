@@ -15501,6 +15501,12 @@ paths:
         `openai-compatible`. `local` is accepted only at a loopback address, and never on a public
         node. The key is set separately (`PUT /v1/ai/providers/{id}/key`). At most 20 providers. An id
         the node uses is refused. Writing takes over a provider migrated from the settings of before.
+        Type `extension` names one of the owner's own installed extensions whose manifest declares
+        `provides.ai_provider`: its `ai.<op>` actions serve the calls in the sandbox, and the key is added
+        by the node, outside the sandbox, only to the hosts the manifest lists. Refused 404
+        EXTENSION_NOT_FOUND, 403 FORBIDDEN for another owner's extension, 400 INVALID_PROVIDER when a
+        capability turned on has no declared op, 403 PROVIDER_NOT_ALLOWED when the operator's allowlist
+        leaves out one of its hosts.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15514,8 +15520,9 @@ paths:
               type: object
               properties:
                 title: { type: string }
-                type: { type: string, enum: [openrouter, openai, anthropic, mistral, xai, local, openai-compatible] }
+                type: { type: string, enum: [openrouter, openai, anthropic, mistral, xai, local, openai-compatible, extension] }
                 baseUrl: { type: string, description: 'Only for local and openai-compatible.' }
+                extension: { type: string, description: 'Only for type extension: the name of your installed extension.' }
                 auth:
                   type: object
                   properties:

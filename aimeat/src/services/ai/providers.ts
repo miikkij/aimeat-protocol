@@ -38,6 +38,8 @@
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — ownerProviderRecords answers in id order, the same on every backend (V5).
+ *   v1.1.0 — 2026-09-28 — Type `extension` (V6): a record names the owner's extension instead of an
+ *     address (baseUrl `extension://<name>`), is the owner's only, and states where the data goes.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -90,8 +92,11 @@ export interface AiProvider {
   title: string;
   type: AiAdapterType;
   source: AiProviderSource;
-  /** The API root. For a fixed type always FIXED_BASE_URLS (or the override on a node that is not public). */
+  /** The API root. For a fixed type always FIXED_BASE_URLS (or the override on a node that is not public).
+   *  For an extension provider `extension://<name>`, which no request is ever sent to. */
   baseUrl: string;
+  /** An extension provider only: the name of the owner's installed extension that serves it (V6). */
+  extension?: string;
   auth: ProviderAuth;
   /** Whether the data leaves this machine. False only for a checked `local` provider. */
   leaves: boolean;
@@ -123,7 +128,13 @@ export const TYPE_CAPABILITIES: Readonly<Record<AiAdapterType, readonly AiCapabi
   xai: ['text', 'vision', 'image', 'transcription'],
   local: ['text', 'vision', 'image', 'speech', 'transcription', 'embed'],
   'openai-compatible': ['text', 'vision', 'image', 'speech', 'transcription', 'embed'],
+  // Every capability; which ones this extension serves is its manifest's answer (V6), checked when
+  // the owner saves the provider.
+  extension: ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'],
 };
+
+/** An extension's name, as the extension manifest allows it (services/extension-manifest.ts). */
+const EXTENSION_NAME_RE = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 
 const PROVIDER_TYPES = Object.keys(TYPE_CAPABILITIES) as AiAdapterType[];
 const ALL_CAPABILITIES: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
@@ -184,6 +195,9 @@ export function typeAllowed(config: AimeatConfig, type: AiAdapterType): boolean 
 /** Where the data goes, for a record's type and address. */
 function statementOf(type: AiAdapterType, baseUrl: string): string {
   if (type === 'local') return LOCAL_STATEMENT;
+  if (type === 'extension') {
+    return `The prompt goes to the extension ${baseUrl.replace(/^extension:\/\//, '')}, which sends it only to the hosts its manifest names, outside this machine.`;
+  }
   const host = URL.canParse(baseUrl) ? new URL(baseUrl).host : baseUrl;
   return isFixedType(type)
     ? `The prompt goes to ${VENDOR_NAMES[type]} (${host}), outside this machine.`
@@ -283,7 +297,15 @@ export function parseAiProvider(
   const addressProblems: string[] = [];
 
   let baseUrl = '';
-  if (type && isFixedType(type)) {
+  let extension: string | undefined;
+  if (type === 'extension') {
+    // An installed extension of the owner's serves it (V6): no address, a name. Whose extension it
+    // is, and which ops it declares, is checked where the owner saves it (provider-store.ts).
+    extension = typeof raw.extension === 'string' && EXTENSION_NAME_RE.test(raw.extension) ? raw.extension : undefined;
+    if (!extension) problems.push('extension: the name of one of your installed extensions whose manifest declares provides.ai_provider.');
+    if (source !== 'owner') problems.push('type extension: an extension provider is added by its owner, not configured by the operator.');
+    baseUrl = extension ? `extension://${extension}` : '';
+  } else if (type && isFixedType(type)) {
     // The address of a fixed type is not the record's to choose: a record that names another one is
     // told so, rather than having it silently replaced.
     const given = typeof raw.baseUrl === 'string' ? raw.baseUrl.trim().replace(/\/+$/, '') : '';
@@ -311,7 +333,8 @@ export function parseAiProvider(
 
   const a = isObj(raw.auth) ? raw.auth : { type: raw.auth };
   let auth: ProviderAuth = { type: 'none' };
-  if (a.type === 'none' || (a.type === undefined && type && !isFixedType(type))) auth = { type: 'none' };
+  // With no auth named, a self-hosted address needs none; an extension provider holds the owner's key.
+  if (a.type === 'none' || (a.type === undefined && type && !isFixedType(type) && type !== 'extension')) auth = { type: 'none' };
   else if ((a.type === 'key' || a.type === undefined) && source === 'owner') auth = { type: 'key' };
   else if (a.type === 'env' && opts.allowEnv && typeof a.env === 'string' && ENV_RE.test(a.env)) {
     auth = { type: 'env', env: a.env, ...(a.optional === true ? { optional: true } : {}) };
@@ -328,6 +351,7 @@ export function parseAiProvider(
   return {
     provider: {
       id, title, type, source, baseUrl, auth, leaves,
+      ...(extension ? { extension } : {}),
       dataStatement: statementOf(type, baseUrl),
       capabilities,
       health: parseHealth(raw.health),
@@ -445,6 +469,7 @@ export function providerTarget(p: AiProvider, config: AimeatConfig, key: string 
 export function providerView(p: AiProvider, hasKey?: boolean): Record<string, unknown> {
   return {
     id: p.id, title: p.title, type: p.type, source: p.source, base_url: p.baseUrl,
+    ...(p.extension ? { extension: p.extension } : {}),
     auth: {
       type: p.auth.type, ...(p.auth.env ? { env: p.auth.env } : {}),
       ...(p.source === 'owner' && p.auth.type === 'key' ? { has_key: !!hasKey } : {}),

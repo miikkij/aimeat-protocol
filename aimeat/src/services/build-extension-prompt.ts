@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.4 — 2026-09-28 — ADDITIVE: an extension as an AI provider, provides.ai_provider and the ai.<op> shapes (V6).
  *   v1.5.3 — 2026-09-28 — ADDITIVE: ctx.ai.start takes op, provider, audio_key, language, size (System 2 plan, V5).
  *   v1.5.2 — 2026-09-26 — ADDITIVE: ctx.fetch reads at most 4 MB of one answer and throws
  *     RESPONSE_TOO_LARGE past it (utils/read-capped.ts OUTBOUND_READ_MAX_BYTES; secaudit 2026-09, N3).
@@ -194,6 +195,17 @@ function sandboxSection(): string {
     'thrown `CODE: message`. Let it propagate and the caller gets the service\'s status and code; catch',
     'it and answer in your own words. A scheduled run never has it. Every call costs one API call. A',
     'record written this way carries provenance naming your extension, because a script produced it.',
+    '',
+    '**An extension as an AI provider.** Declare `provides: { ai_provider: { ops: [text, embed], models:',
+    '[{ id, name, price? }], data_statement, hosts: [api.example.com], auth_header? } }` and one action',
+    'per op with the id `ai.<op>` (ai.text, ai.image, ai.speak, ai.transcribe, ai.embed), in the node\'s',
+    'fixed shapes: ai.text gets `{ model, messages, maxTokens, temperature }` and answers `{ text,',
+    'finishReason, usage: { inputTokens, outputTokens, costUsd? } }`; ai.embed `{ model, input: [texts] }` →',
+    '`{ embeddings }`; ai.image `{ model, prompt, size }` → `{ images: [{ data (base64), mimeType }] }`;',
+    'ai.transcribe `{ model, audio (base64), mimeType }` → `{ text }`; ai.speak `{ model, text, voice }` →',
+    '`{ audio (base64), mimeType }`. The owner then adds a provider of type `extension` naming it. Run',
+    'as a provider, ctx.fetch reaches only the listed hosts and the node adds the owner\'s key there',
+    'itself: never read or ask for a key. One run lasts at most the node\'s extension timeout.',
     '',
     '`ctx.notify` without `to` reaches the CALLER\'s owner. Read literally: "notify the owner" means',
     'the owner of whoever just invoked this action, not the owner who installed the extension (only an',

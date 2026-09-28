@@ -11,6 +11,8 @@
  *   - openAiChat() — an OpenAI chat-completions answer from a type that does not speak that dialect
  *   - speaksOpenAiChat() — whether a type's own API is OpenAI chat completions, byte for byte
  * @version-history
+ *   v1.3.0 — 2026-09-28 — The extension type (V6): text, image, transcription and embeddings through
+ *     the extension's `ai.<op>` actions; it does not speak OpenAI chat, so the proxy converts.
  *   v1.2.0 — 2026-09-28 — Embeddings (System 2 plan, V5): openrouter, openai, mistral, local and
  *     openai-compatible, through their AI SDK packages.
  *   v1.1.0 — 2026-09-28 — The direct types of V3: openai (text, image, transcription), anthropic
@@ -26,6 +28,9 @@ import { embeddingModel, languageModel, sdkImageModel, sdkTranscriptionModel } f
 import { imageModel } from './image.js';
 import { transcriptionModel, type AimeatTranscriptionModel } from './audio.js';
 import { openAiChatResponse, type OpenAiChatBody } from './openai-chat.js';
+import {
+  extensionEmbeddingModel, extensionImageModel, extensionLanguageModel, extensionTranscriptionModel,
+} from './extension.js';
 
 export interface AiAdapter {
   type: AiAdapterType;
@@ -57,6 +62,13 @@ const ADAPTERS: Record<AiAdapterType, AiAdapter> = {
   anthropic: { type: 'anthropic', ops: new Set<AiOp>(['text']), language: languageModel },
   xai: { type: 'xai', ops: new Set<AiOp>(['text', 'image', 'transcribe']), language: languageModel, image: sdkImageModel, transcription: sdkTranscriptionModel },
   mistral: { type: 'mistral', ops: new Set<AiOp>(['text', 'transcribe', 'embed']), language: languageModel, transcription: sdkTranscriptionModel, embedding: embeddingModel },
+  // An installed extension's `ai.<op>` actions (V6). Which ops it has is its manifest's answer,
+  // checked by the runner; speech runs in services/ai-voice.ts, as for every type.
+  extension: {
+    type: 'extension', ops: new Set<AiOp>(['text', 'image', 'transcribe', 'embed']),
+    language: extensionLanguageModel, image: extensionImageModel,
+    transcription: extensionTranscriptionModel, embedding: extensionEmbeddingModel,
+  },
 };
 
 export function adapterFor(type: AiAdapterType): AiAdapter {
@@ -69,10 +81,11 @@ export function adapterFor(type: AiAdapterType): AiAdapter {
  * is not; openAiChat() answers for it.
  */
 export function speaksOpenAiChat(type: AiAdapterType): boolean {
-  return type !== 'anthropic';
+  return type !== 'anthropic' && type !== 'extension';
 }
 
 /** An OpenAI chat-completions Response (JSON or SSE) from this target, through its AI SDK model. */
 export function openAiChat(target: AiTarget, modelId: string, body: OpenAiChatBody, signal?: AbortSignal): Promise<Response> {
-  return openAiChatResponse(languageModel(target, modelId), body, signal);
+  const build = ADAPTERS[target.type].language ?? languageModel;
+  return openAiChatResponse(build(target, modelId), body, signal);
 }

@@ -29,6 +29,12 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.7.0 — 2026-09-28 — System 2 plan, V6: `providerCall` in ExtensionCtxDeps. Set when the
+ *     extension runs as an AI provider: ctx.fetch refuses a hostname that is not exactly one of the
+ *     declared hosts (`Fetch blocked: …`), and adds the owner's provider key header to a request to a
+ *     listed host on the host side, after removing the script's own copy of that header name. The
+ *     name joins sensitiveHeaders, so safeFetch drops it on a redirect to another origin. The key goes
+ *     only over https, or http to localhost; a plain http request that would carry it is refused.
  *   v1.6.7 — 2026-09-26 — ctx.memory.getPublic refuses a Design Book part with `DESIGN_BOOK_PART: …`,
  *     naming GET /v1/designbook/:id, the one door that reads a part (utils/own-door-keys.ts).
  *   v1.6.6 — 2026-09-26 — RESPONSE_TOO_LARGE names the host the script called, with its port, so an
@@ -123,6 +129,45 @@ export interface ExtensionCtxDeps {
     /** The caller's organism workspace (services/extension-workspace.ts). Only a road with a real
      *  caller and a manifest that declares it can offer this. */
     workspace?: ExtensionCtx['workspace'];
+
+    /** Set when the extension runs as an AI provider (System 2 plan V6): ctx.fetch reaches only these
+     *  hosts, and `inject` is added to a request to exactly one of them, outside the sandbox. */
+    providerCall?: { hosts: readonly string[]; inject?: { name: string; value: string } };
+}
+
+/**
+ * In a provider run (System 2 plan V6), refuse an address whose hostname is not EXACTLY one of the
+ * declared hosts, compared in lowercase, with no suffix match: `api.example.com` does not admit
+ * `evil.api.example.com`. The refusal starts `Fetch blocked:`, the prefix of every other ctx.fetch
+ * refusal, and names the host and the list, which the manifest publishes anyway.
+ */
+function assertProviderHost(providerCall: NonNullable<ExtensionCtxDeps['providerCall']>, url: string): void {
+    // An address that does not parse has no hostname, and is refused just below with the list.
+    const hostname = URL.canParse(url) ? new URL(url).hostname.toLowerCase() : null;
+    const allowed = providerCall.hosts.map(h => h.toLowerCase());
+    if (!hostname || !allowed.includes(hostname)) {
+        throw new Error(`Fetch blocked: ${hostname ? `host ${hostname}` : 'this address'} is not one of the hosts this AI `
+            + `provider declared (${allowed.join(', ')}). In a provider run ctx.fetch reaches only those hosts.`);
+    }
+}
+
+/**
+ * Add the owner's provider key header to a request whose host assertProviderHost accepted. It is set
+ * here, on the host side of the bridge, so its value never enters the VM. Every case variant of its
+ * name the script wrote is removed first, so the script cannot send a value of its own beside the
+ * key. Nothing here returns request headers to the script: it receives only the response.
+ */
+function injectProviderHeader(
+    inject: { name: string; value: string },
+    headers: Record<string, string> | undefined,
+): Record<string, string> {
+    const name = inject.name.toLowerCase();
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(headers ?? {})) {
+        if (k.toLowerCase() !== name) out[k] = v;
+    }
+    out[inject.name] = inject.value;
+    return out;
 }
 
 /** Does the buffer contain a well-formed UTF-8 multibyte sequence? Used to overrule a charset label
@@ -581,16 +626,28 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
         // the script and a stranger open the document it renders. Header VALUES only: a placeholder
         // in a URL, a body or a header NAME is left exactly as it arrived, because substituting into
         // any of those puts the value somewhere the script or the far end can read it back.
+        //
+        // GUARD (2026-09-28, System 2 plan V6): in a provider run the host is checked against the
+        // declared list BEFORE any secret is resolved, and the owner's provider key is added last,
+        // after the vault placeholders, so nothing the script wrote can override it.
         fetch: async (url, opts, host) => {
+            if (deps.providerCall) assertProviderHost(deps.providerCall, url);
             const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);
+            const inject = deps.providerCall?.inject;
+            // The owner's key never travels in clear text: over https only, or http to localhost on
+            // this machine (a provider's own test service). Refused, not sent without the key, so
+            // the extension's author learns why.
+            if (inject && URL.canParse(url) && new URL(url).protocol !== 'https:' && new URL(url).hostname.toLowerCase() !== 'localhost') {
+                throw new Error(`Fetch blocked: the owner's key is sent only over https; ${new URL(url).origin} is not.`);
+            }
             const resp = await safeFetch(url, {
                 method: opts?.method || 'GET',
-                headers: outbound.values,
+                headers: inject ? injectProviderHeader(inject, outbound.values) : outbound.values,
                 body: opts?.body,
                 // The headers a secret went into are dropped if a redirect leaves the origin the
                 // script aimed at. The hop is re-validated for SSRF, which says nothing about
                 // whether the new host should be handed somebody's key.
-                sensitiveHeaders: outbound.sensitive,
+                sensitiveHeaders: inject ? [...outbound.sensitive, inject.name] : outbound.sensitive,
                 // The caller's deadline when it has one — the sandbox road hands over the run's own
                 // timeout and its teardown signal — and this file's ceiling when it does not.
                 signal: host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS),

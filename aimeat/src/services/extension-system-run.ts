@@ -33,6 +33,9 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.3.0 -- 2026-09-28 -- System 2 plan, V6: `providerCall` (passed to buildExtensionCtx) and
+ *     `signal` (passed to executeExtensionAction), so the AI gateway can run an extension as a
+ *     provider. The owner check below is unchanged and is what refuses another owner's extension.
  *   v1.2.0 -- 2026-09-05 -- Says, where the context is built, that no ctx.workspace is attached
  *     here: an unattended run has no caller whose workspace it could act on.
  *   v1.1.0 -- 2026-08-31 -- Optional `ai`, so a job's on_done callback can start the next job in its
@@ -47,6 +50,7 @@ import { executeExtensionAction } from './extension-runtime.js';
 import { trackMemoryAccess } from './extension-runtime-tracking.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from './extension-ctx.js';
+import type { ExtensionCtxDeps } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
 import { getEncryptionKey } from './encryption.js';
@@ -99,6 +103,15 @@ export interface SystemRunArgs {
      * of that job, and only the caller knows which job it is continuing.
      */
     ai?: ExtensionCtx['ai'];
+    /**
+     * Set when the extension runs as an AI provider (System 2 plan V6): ctx.fetch reaches only the
+     * declared hosts, and the owner's provider key header is added outside the sandbox. Passed
+     * through to buildExtensionCtx unchanged; see ExtensionCtxDeps.providerCall.
+     */
+    providerCall?: ExtensionCtxDeps['providerCall'];
+    /** The caller's cancellation. When it aborts, the run rejects with `Extension run aborted`
+     *  (services/extension-runtime.ts). */
+    signal?: AbortSignal;
 }
 
 export interface SystemRunResult {
@@ -190,6 +203,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
             storage, config, extName: ext.name, extConfig: ext.config,
             ownerName, emailService,
         }),
+        ...(args.providerCall ? { providerCall: args.providerCall } : {}),
     });
 
     const tracked = args.trackMemory ? trackMemoryAccess(baseCtx) : null;
@@ -204,7 +218,8 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         throw new Error(`Extension run "${extensionName}/${actionId}" has non-serializable input`);
     }
 
-    const result = await executeExtensionAction(action.scriptContent, ctx, input, sandboxLimits(ext.limits, config));
+    const result = await executeExtensionAction(action.scriptContent, ctx, input, sandboxLimits(ext.limits, config),
+        args.signal ? { signal: args.signal } : undefined);
     return {
         result,
         reads: tracked?.accessLog.reads ?? [],

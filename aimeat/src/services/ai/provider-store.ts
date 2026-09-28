@@ -30,6 +30,8 @@
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
+ *   v1.1.0 — 2026-09-28 — catalogCheck and model_status from the model catalogue (V4); an extension
+ *     provider is checked against its extension when saved (assertOwnExtensionProvider, V6).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -51,6 +53,8 @@ import {
 import { readRouting, type RoutingDefaults, type RoutingRules } from './routing.js';
 import { catalogModel, catalogModels } from './catalog/store.js';
 import { servesCapability } from './catalog/price.js';
+import { assertOwnExtensionProvider } from './extension-provider.js';
+import { aiProviderDeclarationOf } from '../extension-ai-provider-declaration.js';
 import { FIXED_BASE_URLS, isFixedType, type AiCapability } from './types.js';
 
 export const PROVIDER_KEY_PREFIX = 'ai.apikey.provider.';
@@ -231,7 +235,8 @@ export async function providersForOwner(
 
 /** The host allowlist for an address that is not a fixed type's. */
 function assertHostAllowed(config: AimeatConfig, p: AiProvider): void {
-  if (isFixedType(p.type) || config.aiProviderAllowlist.length === 0) return;
+  // An extension provider has no address; its manifest's hosts are checked by assertOwnExtensionProvider.
+  if (isFixedType(p.type) || p.type === 'extension' || config.aiProviderAllowlist.length === 0) return;
   const host = new URL(p.baseUrl).hostname.toLowerCase();
   if (!config.aiProviderAllowlist.includes(host)) {
     throw new AiCompletionError('PROVIDER_NOT_ALLOWED', 403, `AI provider host "${host}" is not in this node's allowlist. Ask the operator to allow it.`);
@@ -282,6 +287,10 @@ export async function putOwnerAiProvider(
   if (!typeAllowed(config, p.provider.type)) {
     throw new AiCompletionError('AI_PROVIDER_TYPE_NOT_ALLOWED', 403, `This node does not allow ${p.provider.type} providers. Ask the operator (AIMEAT_AI_PROVIDER_TYPES).`);
   }
+  // An extension provider (V6): the owner's own extension, declaring the ops its capabilities need,
+  // with hosts the operator's allowlist covers. Its models are the manifest's; catalogCheck reads
+  // only the fixed types.
+  if (p.provider.type === 'extension') await assertOwnExtensionProvider(storage, config, ownerGhii, p.provider);
   const checked = catalogCheck(p.provider);
   if (checked.problems.length) {
     throw new AiCompletionError('INVALID_PROVIDER', 400, checked.problems.join(' '), { problems: checked.problems });
@@ -429,8 +438,19 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
     }
     return { ...v, capabilities: caps };
   };
+  // An extension provider shows its manifest's own statement of where the data goes, its hosts, its
+  // ops and its models (plan 08, section 5): the owner reads them before relying on it.
+  const views = await Promise.all([...owner, ...node].map(async (p) => {
+    const v = withStatus(p);
+    if (p.type !== 'extension' || !p.extension) return v;
+    const ext = await storage.getExtension(p.extension);
+    const decl = ext ? aiProviderDeclarationOf(ext) : null;
+    return decl
+      ? { ...v, data_statement: decl.dataStatement, extension_provider: { hosts: decl.hosts, ops: decl.ops, models: decl.models } }
+      : { ...v, problem: `The extension '${p.extension}' is not installed or no longer declares provides.ai_provider.` };
+  }));
   return {
-    providers: [...owner, ...node].map(withStatus),
+    providers: views,
     routing: { defaults: routing.owner.defaults, rules: routing.owner.rules, ...(routing.agent ? { agent_defaults: routing.agent } : {}) },
     limits: { max_owner_providers: MAX_OWNER_PROVIDERS },
   };
