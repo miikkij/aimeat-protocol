@@ -10,7 +10,7 @@ use serde_json::Value;
 const CONF: &str = include_str!("../tauri.conf.json");
 const PAGES: [(&str, &str); 2] = [
     ("index.html", include_str!("../../src/index.html")),
-    ("legacy.html", include_str!("../../src/legacy.html")),
+    ("server.html", include_str!("../../src/server.html")),
 ];
 
 fn security() -> Value {

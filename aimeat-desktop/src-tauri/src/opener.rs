@@ -329,7 +329,7 @@ mod tests {
                 "https://fi.wikipedia.org/wiki/Äänestys",
                 "https://fi.wikipedia.org/wiki/%C3%84%C3%A4nestys",
             ),
-            // The signed-in hand-off legacy.html builds: base64 through encodeURIComponent.
+            // A signed-in hand-off address: base64 through encodeURIComponent in the fragment.
             (
                 "http://localhost:41050/v1/profile?tab=agents#handoff=eyJvIjoiYSJ9%2B%2F%3D",
                 "http://localhost:41050/v1/profile?tab=agents#handoff=eyJvIjoiYSJ9%2B%2F%3D",
