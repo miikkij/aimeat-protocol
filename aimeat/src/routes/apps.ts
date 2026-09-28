@@ -97,6 +97,7 @@
  *   v1.20.0 -- 2026-07-16 -- Agent-Bundled Apps Slice 1: apps/agents-deploy.ts — deploy/undeploy/
  *     status for crew-defs declared under manifest.cortex.agents (owner-scoped pointer tasks).
  *   2026-08-29 -- registerLegalRoutes: the app's own legal pages and its audit log (apps/legal.ts).
+ *   2026-09-28 -- registerAppConfigRoutes: the config an app declares and its owner's values (apps/app-config.ts).
  *   2026-09-08 -- canonicalOwner resolves the bucket through services/app-dev-grant.ts
  *     (ownAppScope), the one place that answers "whose app does this write land in". Pure move:
  *     this door still extracts the owner from its own `owner` claim, and with nobody else's app
@@ -121,6 +122,7 @@ import { registerForkManageRoutes } from './apps/fork-manage.js';
 import { registerLegalRoutes } from './apps/legal.js';
 import { registerRoadmapRoutes } from './apps/roadmap.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
+import { registerAppConfigRoutes } from './apps/app-config.js';
 import { registerAdminSeoRoutes } from './admin-seo.js';
 
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -184,6 +186,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerLegalRoutes(router, config, storage, canonicalOwner);
     registerRoadmapRoutes(router, config, storage, appTarget);
     registerAppAgentRoutes(router, config, storage);
+    registerAppConfigRoutes(router, config, storage);
     // The operator's search-visibility surface: the node's own status, and the per-app block and
     // approval. Registered here rather than in its own mount so it reuses this router's
     // canonicalOwner closure, which is what turns an authenticated operator into a name for the

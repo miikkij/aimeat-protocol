@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.1.0 — 2026-09-28 — config_get and config_set, and the `values` field.
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -43,7 +44,7 @@ const VALUE: Record<string, unknown> = {
     layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, parked: true,
     forkable: true, access_code: 'zqxcode', protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
     subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, bundled_agent: 'zqxagent',
-    runner_agent: 'zqxrunner', organism_id: 'zqxorg',
+    runner_agent: 'zqxrunner', organism_id: 'zqxorg', values: { zqxfield: 'zqxvalue' },
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -64,6 +65,8 @@ const EXPECT: Record<string, [string, string]> = {
     ui_get: ['GET', '/v1/apps/me-owner/shop.html/ui?catalogue=index&detail=zqxdetail'],
     ui_set: ['PUT', '/v1/apps/me-owner/shop.html/ui'],
     ui_restore: ['POST', '/v1/apps/me-owner/shop.html/ui/restore'],
+    config_get: ['GET', '/v1/apps/alice/shop.html/config'],
+    config_set: ['PUT', '/v1/apps/me-owner/shop.html/config'],
     cost: ['GET', '/v1/apps/cost?app_id=alice%2Fshop.html'],
     agent_deploy: ['POST', '/v1/apps/alice/shop.html/agents/zqxagent/deploy'],
     agent_undeploy: ['POST', '/v1/apps/alice/shop.html/agents/zqxagent/undeploy'],

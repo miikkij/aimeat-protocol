@@ -20,6 +20,24 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
+  // src/static/sdk-libs/_core/app-ref.js
+  function appRef() {
+    try {
+      const node = document.getElementById("aimeat-app-ref");
+      if (!node) return null;
+      const raw = node.textContent || "";
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+      }
+      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
+    } catch {
+      return null;
+    }
+  }
+
   // src/static/sdk-libs/_core/session.js
   function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
@@ -340,6 +358,25 @@
     async getPublicEntry(gaii, key) {
       const res = await publicEntryResponse(gaii, key);
       return res === null ? null : withProvenance(res);
+    },
+    /**
+     * This app's config: the values its owner set for the fields the app declares in its
+     * `<script type="application/json" id="aimeat-config">` block, with the declared defaults filled
+     * in. The OWNER's values, whoever opened the app, signed in or not, which is why a config field
+     * is never a secret. Resolves null on a page that is not a served app, or when the read fails.
+     * @returns {Promise<Record<string, string|number|boolean>|null>}
+     */
+    async appConfig() {
+      const ref = appRef();
+      if (!ref) return null;
+      try {
+        const res = await fetch((APEX_URL || "") + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/config");
+        if (!res.ok) return null;
+        const body = await res.json();
+        return body && body.data && body.data.values || null;
+      } catch {
+        return null;
+      }
     }
   };
   attach("data", data);

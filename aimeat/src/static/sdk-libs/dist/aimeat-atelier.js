@@ -7430,7 +7430,7 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/mosaic-layout.js
+  // src/static/sdk-libs/_core/app-ref.js
   function appRef() {
     try {
       const node = document.getElementById("aimeat-app-ref");
@@ -7447,6 +7447,8 @@
       return null;
     }
   }
+
+  // src/static/sdk-libs/atelier/mosaic-layout.js
   async function loadLayout(owner, filename) {
     try {
       const base = APEX_URL || "";

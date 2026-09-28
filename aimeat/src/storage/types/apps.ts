@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-09-28 — AppManifest gains `configSchema`: the config an app declares it needs.
  *   v1.11.0 — 2026-09-28 — The package, template-listing and package-instance types moved unchanged
  *     to src/storage/types/packages.ts (max-file-lines).
  *   v1.10.0 — 2026-09-11 — AppSeo gains `announcedAt`: when IndexNow was last told about the app,
@@ -141,6 +142,12 @@ export interface AppManifest {
   authorDisplay: string;
   usesCortex: string[];         // cortex extension names used
   cortex?: AppManifestCortex;   // agent-bundled apps: declarative crew-defs (see above)
+  /**
+   * The config the app declares it needs (services/app-config.ts), parsed from its
+   * `<script type="application/json" id="aimeat-config">` block at every publish. The bytes are the
+   * source, so it is never carried forward: a version without the block has no config.
+   */
+  configSchema?: Record<string, unknown>;
   priceMorsels?: number;        // 0 or absent = free
   licenseType?: 'single' | 'lifetime';
   // Provenance: when this app was created by forking another app, this records the

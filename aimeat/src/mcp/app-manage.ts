@@ -17,6 +17,7 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — config_get and config_set call services/app-config.ts, as the REST routes do.
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -50,6 +51,7 @@ import { buildUiCatalogueView } from '../services/app-ui/catalogue-index.js';
 import { AppUiService } from '../services/app-ui/service.js';
 import { AppUiError } from '../services/app-ui/validate.js';
 import { appCostView } from '../services/app-cost.js';
+import { getAppConfig, setAppConfig } from '../services/app-config.js';
 import { deployAppAgent, appAgentInstances, appAgentStatus } from '../services/app-agent-deploy.js';
 import { listActiveAppGrants } from '../services/app-grant-list.js';
 import { exportAppsBackupToStorage } from '../services/apps-backup-export.js';
@@ -237,6 +239,14 @@ export function registerAppManageTool(
             case 'ui_restore': {
                 const app = await ui.ownApp(callerGaii, filename);
                 return answer(await ui.restore(app.ownerGaii, filename, Number(args.version), { principal: callerGaii }));
+            }
+            case 'config_get': {
+                const out = await getAppConfig(storage, appOwner, filename);
+                return out.ok ? answer(out.view) : toolError(out.code, out.message);
+            }
+            case 'config_set': {
+                const out = await setAppConfig(storage, { callerOwnerGhii: ownerGhii, ownerName: appOwner, filename, values: args.values });
+                return out.ok ? answer(out.view) : toolError(out.code, out.message);
             }
             case 'cost': {
                 const out = await appCostView(storage, config, { owner: callerOwner, ownerGhii, appId: `${localAccountName(appOwner)}/${filename}` });

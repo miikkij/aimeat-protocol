@@ -24,6 +24,8 @@
  *     metadata produces the same manifest bytes as before; read only when it is a plain object.
  *   v1.3.0 — 2026-09-13 — A manifest.yaml that does not parse answers with the parser's line and
  *     column (yamlErrorText, shared with the extension manifest builder) instead of "not valid YAML".
+ *   v1.4.0 — 2026-09-28 — `expects` travels in manifest.yaml (package-expects.ts), written only when
+ *     there is some; a ZIP had dropped what the package needs the installing node to have.
  */
 
 import { createHash } from 'node:crypto';
@@ -33,6 +35,7 @@ import YAML from 'yaml';
 import type { PackageRecord, PackageComponentType } from '../storage/interface.js';
 import { isUnsafeName } from './safe-zip.js';
 import { yamlErrorText } from './extension-manifest.js';
+import { expectsOf, type PackageExpects } from './package-expects.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,6 +88,8 @@ export interface ParsedPackage {
   tags: string[];
   blueprint?: Record<string, unknown>;
   changelog?: string;
+  /** What the installing node must have already (package-expects.ts). Empty lists when none. */
+  expects?: PackageExpects;
   components: ParsedComponent[];
   /** The serving node's signed statement, if the ZIP carried one. Read, never verified here. */
   attestation?: unknown;
@@ -124,6 +129,7 @@ export async function buildZip(pkg: PackageRecord, attestation?: unknown): Promi
     archive.on('error', reject);
 
     // Build manifest object
+    const pkgExpects = expectsOf(pkg.manifest);
     const manifest: Record<string, unknown> = {
       'aimeat-package': '1.0',
       name: pkg.name,
@@ -144,6 +150,9 @@ export async function buildZip(pkg: PackageRecord, attestation?: unknown): Promi
         ...(c.meta && Object.keys(c.meta).length > 0 ? { meta: c.meta } : {}),
       })),
       changelog: pkg.changelog,
+      // What the installing node must have already (package-expects.ts); only when there is some,
+      // so a package without expectations produces the same manifest bytes as before.
+      ...(pkgExpects.cortex.length + pkgExpects.extensions.length + pkgExpects.packs.length > 0 ? { expects: pkgExpects } : {}),
     };
 
     // Append manifest.yaml
@@ -401,6 +410,7 @@ export async function parseZip(buffer: Buffer, options: ZipOptions): Promise<Par
     tags: (manifest.tags as string[]) ?? [],
     blueprint: manifest.blueprint as Record<string, unknown> | undefined,
     changelog: manifest.changelog as string | undefined,
+    expects: expectsOf({ expects: manifest.expects }),
     components,
     attestation,
   };

@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-09-28 — config_get and config_set, with the `values` field: the config an app declares
+ *     (services/app-config.ts).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
@@ -87,6 +89,8 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     bundled_agent: { type: 'string', description: 'For agent_*: the name of an agent the app declares in its manifest.' },
     runner_agent: { type: 'string', description: 'For agent_deploy, agent_undeploy and agent_status: which of your agents runs it. Omit to use your task runner.' },
     organism_id: { type: 'string', description: 'For agent_deploy: the organism the deployed agent works in, when the app needs one.' },
+    // config
+    values: { type: 'object', description: 'For config_set: the fields to change, { "<field>": value }. A null puts a field back to its default; fields not named keep their values.' },
 };
 
 /** One action: its fields (true = required), its permission word (null = none), and one line. */
@@ -138,6 +142,10 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'replace the WHOLE layout (read it first); the answer names the version it replaced' },
     ui_restore: { fields: F(['filename', 'version'], []), scope: 'memory:write',
         summary: 'put a replaced layout version back' },
+    config_get: { fields: F(['filename'], ['owner']), scope: null,
+        summary: 'the config the app declares it needs: each field, its value (defaults filled in) and which required ones are still empty' },
+    config_set: { fields: F(['filename', 'values'], []), scope: 'app:write',
+        summary: 'change the app\'s config values, checked against what it declares; a managed package install allows it, since config is a setting' },
     cost: { fields: F(['filename'], ['owner']), scope: 'exchange:read',
         summary: 'what the app\'s contracts for other people\'s tools cost: per contract, and totals' },
     agent_deploy: { fields: F(['filename', 'bundled_agent'], ['owner', 'runner_agent', 'organism_id']), scope: 'task:write',
