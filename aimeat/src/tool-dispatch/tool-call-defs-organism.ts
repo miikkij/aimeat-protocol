@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-09-28 — aimeat_organism_update passes agent_access.
  *   2026-09-27 -- aimeat_schedule_list forwards detail (GET /v1/schedules?detail=true); aimeat_schedule_update forwards prompt with the rest.
  *   v1.6.0 -- 2026-09-25 -- aimeat_workspace_space_add, _sections_set and _suggestions reach the node's
  *     member change doors; _update forwards `member_changes`; _write files a document under a section,
@@ -73,6 +74,7 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const interests = optionalArray(input, 'interests'); if (interests) body.interests = interests;
             const joinPolicy = optionalString(input, 'join_policy'); if (joinPolicy) body.join_policy = joinPolicy;
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
+            const agentAccess = optionalString(input, 'agent_access'); if (agentAccess) body.agent_access = agentAccess;
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}`, body);
         },
     },

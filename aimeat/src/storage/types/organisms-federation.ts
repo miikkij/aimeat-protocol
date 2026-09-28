@@ -92,6 +92,10 @@ export interface OrganismRecord {
    *  and operators/admins always see the full roster. Presentation-layer privacy: content
    *  ATTRIBUTION (comments, versions, activity) is a separate concern and unaffected. */
   memberVisibility?: 'public' | 'authenticated' | 'members' | 'admins';
+  /** Which of its members' agents this organism admits. 'all' (the default when unset): every
+   *  member's agents act with their owner's rights. 'listed': only the agents on `agentGaiis` do, and
+   *  any other agent is treated as a non-member (services/organism-agent-access.ts). */
+  agentAccess?: 'all' | 'listed';
   moderationConfig: {
     flagsEnabled: boolean;
     autoHideThreshold: number;

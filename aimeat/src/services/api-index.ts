@@ -17,12 +17,13 @@
  * @usage
  *   const index = apiIndexHtml();
  * @version-history
+ *   2026-09-28 — openapi.yaml is found by services/openapi-file.ts, which knows the packaged location.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { logger } from '../utils/logger.js';
+import { findOpenApiFile } from './openapi-file.js';
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
@@ -38,7 +39,7 @@ let cached: string | null = null;
 export function apiIndexHtml(): string {
   if (cached !== null) return cached;
   cached = '';
-  const path = [join(process.cwd(), 'openapi.yaml'), join(process.cwd(), '..', 'openapi.yaml')].find(existsSync);
+  const path = findOpenApiFile();
   if (!path) return cached;
   try {
     const doc = parse(readFileSync(path, 'utf-8')) as {

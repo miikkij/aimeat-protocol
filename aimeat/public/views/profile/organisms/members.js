@@ -10,6 +10,7 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   2026-09-28 — The agents tooltip says when the organism admits only listed agents (the list then names only those).
  *   v2.14.1 -- 2026-09-26 -- The owner tag in the roster and the workspace creator in the access
  *     editor are green again, as main drew them (.badge-success: Mark tone="fine"; fix pass).
  *   v2.14.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the head is a Row of the description with the count and the Loud action; the join requests, the roster and the blocked members are the List (a request waits on the warn rail, a member's access editor opens as the row's panel, its ⋯ menu the row's menu), the access editor a Field group of Selects. The owner tag is the ink tone, where main drew it green; the dashed line on top is the Split's hairline. The page writes no class.
@@ -113,6 +114,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
   const toGhii = (id) => (id && !id.includes('@')) ? (myNode ? `${id}@${myNode}` : '') : (id || '');
   const [requests, setRequests] = useState(null);
   const [members, setMembers] = useState(null);
+  const [agentAccess, setAgentAccess] = useState('all'); // which agents the organism admits (the server lists only those)
   const [banned, setBanned] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [showInvite, setShowInvite] = useState(false);
@@ -134,6 +136,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
     }
     const [mb, rq, bn, inv, eminv] = await Promise.all(tasks);
     setMembers(mb?.data?.members || []);
+    setAgentAccess(mb?.data?.agent_access === 'listed' ? 'listed' : 'all');
     if (canManage) {
       setRequests(rq?.data?.join_requests || []);
       setBanned(bn?.data?.members || []);
@@ -295,7 +298,9 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
             ? `${acc ? `${t('organisms.accessLabel') || 'Access'}: ${acc}` : ''}${acc && m.joinedAt ? ' · ' : ''}${m.joinedAt ? (t('organisms.joinedDate') || 'joined {date}').replace('{date}', fmtDate(m.joinedAt)) : ''}`
             : null;
           const agentsLine = (m.agents || []).length
-            ? html`<span title=${t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism"}>${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${m.agents.map(a => a.name || a.gaii).join(', ')}</span>`
+            ? html`<span title=${agentAccess === 'listed'
+              ? (t('organisms.memberAgentsHintListed') || "This member's agents that the organism admits. They act with the member's rights.")
+              : (t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism")}>${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${m.agents.map(a => a.name || a.gaii).join(', ')}</span>`
             : null;
           const accessOpen = canManage && accessEditFor === bare;
           return html`

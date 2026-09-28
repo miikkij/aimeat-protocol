@@ -24,6 +24,7 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-09-28 — SendInput.principal: the company check knows which agent is sending.
  *   v1.6.1 — 2026-09-26 — openPixelUrl takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-24 — The inbox channel's message does not count against the account's message
  *     limit (services/message-send-limit.ts): this door has its own per-sender limit, and one send
@@ -299,6 +300,8 @@ async function openPixelUrl(
 }
 
 export interface SendInput {
+  /** Who is sending, when it is not the owner in person (an agent's GAII); an organism's company checks it. */
+  principal?: string;
   contactId: string;
   kind: OutboundKind;
   subject?: string;
@@ -458,7 +461,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // scope and fall through to the shared sender, which meant a caller could believe they had sent
   // as a company they may not speak for. Naming something you are not allowed to name is an error.
   const sender = input.companyId
-    ? await resolveSendingCompany(storage, ownerGhii, input.companyId)
+    ? await resolveSendingCompany(storage, ownerGhii, input.companyId, input.principal ?? ownerGhii)
     : null;
   if (input.companyId && !sender) {
     throw new OutboundError('NOT_FOUND', 404, 'Company not found');

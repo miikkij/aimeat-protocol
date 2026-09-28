@@ -13,6 +13,7 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-09-28 — /sendable leaves out a company whose organism does not admit the calling agent.
  *   v1.3.0 — 2026-08-31 — GET /v1/companies/:id/front-page/check: does the public face answer,
  *     probed server-side through safeFetch because the SPA's CSP cannot ask a foreign origin.
  *   v1.2.0 — 2026-08-08 — GET/PUT/DELETE /v1/companies/:id/portfolio: the company's own page.
@@ -40,6 +41,7 @@ import {
   publishCompanyPortfolio, getCompanyPortfolio, deleteCompanyPortfolio,
 } from '../services/company/company-portfolio.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 const IdentitySchema = {
   description: z.string().max(500).nullish(),
@@ -193,7 +195,7 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
    * Registered before /v1/companies/:id, or Express reads "sendable" as an id.
    */
   router.get('/v1/companies/sendable', requireAuth(), requireScope('company:read'), async (req, res) => {
-    const rows = await listSendableCompanies(storage, resolve(req));
+    const rows = await listSendableCompanies(storage, resolve(req), resolveIdentity(req.auth!, config.nodeId));
     const companies = await Promise.all(rows.map(async ({ company, via }) => {
       const smtp = await storage.getCompanySmtp(company.id);
       return {

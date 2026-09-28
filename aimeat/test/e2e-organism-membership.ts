@@ -5,6 +5,8 @@
  *   and creator/admin revoking (removing) a member → removed-member notification. Also covers the
  *   guardrails: the creator cannot be removed, and a non-admin cannot review or remove.
  * @version-history
+ *   2026-09-28 — Test 22 registers the agent it attaches: the setup no longer matched the code, which now
+ *     refuses a local agent nobody holds (404).
  *   v1.0.0 — 2026-06-09 — Initial: join-request notify + review + remove-member (revoke) flow.
  *   v1.1.0 — 2026-07-10 — Tests 25-27: invitee normalization/validation (nonexistent → 404, remote
  *     identity → 400, UPPERCASE/@node/whitespace forms land on the real lowercase owner).
@@ -245,7 +247,11 @@ await test('21. A transfers ownership to B → B creator, A demoted to admin', a
 await test('22. Old creator A can no longer transfer; new creator B can attach + detach an agent', async () => {
     const denied = await json(`/v1/organisms/${org2}/transfer`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ to: A.name }) });
     assert(denied.status === 403, `A (no longer creator) should be 403, got ${denied.status}`);
-    const gaii = `helper#${B.name}@${NODE_ID}`;
+    // A real agent: attaching a name nobody holds is refused with 404 since 2026-09-28, because in an
+    // organism that admits only listed agents it would admit whatever agent is created under it later.
+    const reg = await json('/v1/agents', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'helper', owner: B.name, capabilities: ['social'], model: 'gpt-4o' }) });
+    assert(reg.status === 201, `agent ${reg.status}: ${JSON.stringify(reg.body.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
     const att = await json(`/v1/organisms/${org2}/agents`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ agent_gaii: gaii }) });
     assert(att.status === 201 && att.body.data.attached === gaii, `attach ${att.status}: ${JSON.stringify(att.body.error)}`);
     const org = await json(`/v1/organisms/${org2}`, { headers: auth(B.token) });

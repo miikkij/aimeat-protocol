@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-09-28 — PUT takes agent_access (which members' agents the organism admits).
  *   v1.9.1 -- 2026-09-26 -- The member filter's account comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -48,6 +49,7 @@ import { revokeDepartedMemberAccess } from '../../services/invitations.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { isOwnerPrincipal } from '../../auth/account-security.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -283,13 +285,14 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility } = req.body ?? {};
+    const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility, agent_access } = req.body ?? {};
 
     // Field validation, the update itself and the README memory key live in
     // services/organism-lifecycle.ts, shared with aimeat_organism_update.
     const result = await updateOrganismRecord({ storage, config }, organism, {
       name, description, type, location, interests, readme,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
+      agentAccess: agent_access, callerIsPerson: isOwnerPrincipal(req.auth),
     });
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));

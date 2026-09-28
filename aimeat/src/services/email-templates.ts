@@ -9,6 +9,7 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-09-28 — The invitation email names each workspace by its name, not its id.
  *   v1.6.0 — 2026-09-08 — Remove matchSuggestionEmailHtml, the MatchSuggestion type, the six `match*`
  *     strings in all three languages and the five `.match-*` CSS rules. Nothing in src/ has ever
  *     called it: the only caller was EmailService.sendMatchSuggestion(), which no route, service or
@@ -367,7 +368,7 @@ export interface InviteEmailArgs {
   orgName: string;
   inviterName: string;
   acceptUrl: string;
-  workspaces: { ws: string; role: string }[];
+  workspaces: { ws: string; name?: string; role: string }[]; // name: the workspace's display name, ws its id
   message?: string | null;
   expiresLabel?: string; // preformatted date string for display
 }
@@ -386,7 +387,7 @@ export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html:
   const wsHtml = args.workspaces.length > 0
     ? `<p style="margin-top:16px;">${t(locale, 'inviteWorkspacesLabel')}</p>
        <ul style="color:#555;font-size:14px;line-height:1.6;">
-         ${args.workspaces.map(w => `<li>${esc(w.ws)} — ${roleLabel(w.role)}</li>`).join('\n')}
+         ${args.workspaces.map(w => `<li>${esc(w.name || w.ws)} — ${roleLabel(w.role)}</li>`).join('\n')}
        </ul>`
     : '';
   const messageHtml = args.message
@@ -417,7 +418,7 @@ export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html:
     '',
     t(locale, 'inviteNewAccount'),
     '',
-    ...(args.workspaces.length ? [t(locale, 'inviteWorkspacesLabel'), ...args.workspaces.map(w => `  - ${w.ws} (${roleLabel(w.role)})`), ''] : []),
+    ...(args.workspaces.length ? [t(locale, 'inviteWorkspacesLabel'), ...args.workspaces.map(w => `  - ${w.name || w.ws} (${roleLabel(w.role)})`), ''] : []),
     ...(args.message ? [`${t(locale, 'inviteMessageLabel')} ${args.message}`, ''] : []),
     args.acceptUrl,
     '',

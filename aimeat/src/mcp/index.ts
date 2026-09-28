@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-09-28 — Every tool that takes organism_id refuses an agent the organism does not admit
+ *     (mcp/organism-agent-gate.ts).
  *   2026-09-27 — answerMovedTools(): a call to one of the ten tools aimeat_app_manage replaced answers TOOL_MOVED.
  *   v1.28.0 -- 2026-09-27 -- Bind every session request to its verified principal and read scopes
  *     from the current request, including discovery and concurrent tool calls (A01/A02).
@@ -124,6 +126,7 @@ import { registerAllServerTools } from './register-all.js';
 import { registerRemoteTools } from './remote-tools.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
+import { withOrganismAgentGate } from './organism-agent-gate.js';
 import { withErrorNextStep } from './error-next-step.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 import { instructionsFor } from './instructions.js';
@@ -282,8 +285,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // tool's author to remember. See mcp/tool-usage-wrap.ts.
         // A failing tool says what to do next (mcp/error-next-step.ts). It sits OUTSIDE the
         // measurement, so what is measured is what the tool itself returned.
-        const measuredTool = wrapToolHandler(withErrorNextStep(originalTool), () => agentGaii);
-        const measuredRegisterTool = wrapToolHandler(withErrorNextStep(originalRegisterTool), () => agentGaii);
+        // An organism that admits only listed agents refuses the others on every tool that names it
+        // (mcp/organism-agent-gate.ts). Innermost, so the refusal is measured and carries a next step.
+        const measuredTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(originalTool), () => agentGaii), () => agentGaii, storage);
+        const measuredRegisterTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(originalRegisterTool), () => agentGaii), () => agentGaii, storage);
         // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
         // list/call time, so a removed permission affects discovery without rebuilding a session.
         // Newly granted tools outside that initial surface still require re-initialization.

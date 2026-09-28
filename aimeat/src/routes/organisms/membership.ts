@@ -7,6 +7,9 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-09-28 — The member list names only the agents the organism admits (agentAccess), and says which
+ *     setting is in force; an owner or admin can attach any active member's agent, and where only listed
+ *     agents are admitted, only a person signed in can attach one.
  *   v1.5.1 — 2026-09-26 — The member and agent owner names come from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -43,6 +46,8 @@ import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
   acceptNameInvitation, declineNameInvitation, addOrganismMember,
 } from '../../services/invitations.js';
+import { agentAccessOf, agentBarred } from '../../services/organism-agent-access.js';
+import { isOwnerPrincipal } from '../../auth/account-security.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/members — List members ── */
@@ -85,11 +90,15 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       // ONE `owner IN (…)` query for every member's agents, not one getAgentsByOwner per member.
       const ownerNames = members.map(m => localAccountName(m.ghii));
       const agentsByOwner = await storage.getAgentsByOwners([...new Set(ownerNames)]);
+      // Where the organism admits only listed agents, the others have no access, so they are not
+      // listed: the roster names who can act here, and a customer invited in reads it.
       const enriched = members.map((m, i) => ({
         ...m,
-        agents: (agentsByOwner[ownerNames[i]] || []).map(a => ({ gaii: a.gaii, name: a.name })),
+        agents: (agentsByOwner[ownerNames[i]] || [])
+          .filter(a => !agentBarred(organism, a.gaii))
+          .map(a => ({ gaii: a.gaii, name: a.name })),
       }));
-      res.json(success(config.nodeId, { members: enriched, total: enriched.length, agents_included: true }));
+      res.json(success(config.nodeId, { members: enriched, total: enriched.length, agents_included: true, agent_access: agentAccessOf(organism) }));
       return;
     }
 
@@ -603,9 +612,12 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
 
   /* ── Agent attachment (manage organism.agentGaiis) ──
    * An owner attaches one of their OWN agents to an organism they belong to, so the agent shows
-   * as an organism participant and passes the workspace membership gate in its own right. */
+   * as an organism participant and passes the workspace membership gate in its own right. An owner
+   * or admin of the organism may also attach an agent of any active member. Where the organism admits
+   * only listed agents (agentAccess 'listed'), this list is who gets in, so adding to it is a grant
+   * and only a person signed in makes it: an agent could otherwise list itself and its siblings. */
 
-  /* POST /v1/organisms/:id/agents — attach an agent GAII (caller must own it + be a member) */
+  /* POST /v1/organisms/:id/agents — attach an agent GAII (the agent's owner as a member, or an organism owner/admin) */
   router.post('/v1/organisms/:id/agents', requireAuth(), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
@@ -615,8 +627,8 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
     const parsed = parseGaiiLoose(agent_gaii);
-    if (!parsed.agent || localAccountName(agent_gaii) !== callerGhii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach your own agents'));
+    if (!parsed.agent) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach an agent (name#owner@node)'));
       return;
     }
 
@@ -625,10 +637,31 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
       return;
     }
-    const membership = await storage.getMembership(id, callerGhii);
-    const isMember = !!membership && membership.status === 'active';
-    if (!isMember && !isOrganismOwner(organism, callerGhii)) {
-      res.status(403).json(error(config.nodeId, 'NOT_MEMBER', 'You must be a member to attach an agent'));
+    const agentOwner = localAccountName(agent_gaii);
+    const ownAgent = agentOwner === callerGhii;
+    const isManager = isOrganismOwner(organism, callerGhii) || organism.admins.includes(callerGhii);
+    if (!ownAgent && !isManager) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach your own agents'));
+      return;
+    }
+    if (agentAccessOf(organism) === 'listed' && !isOwnerPrincipal(req.auth)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'This organism admits only the agents on its list, so adding one is done by a person signed in, in the Agents section of the organism\'s page.'));
+      return;
+    }
+    // The agent's owner must be an active member: an agent is admitted as its owner's, never alone.
+    const ownerMembership = await storage.getMembership(id, agentOwner);
+    const ownerIsMember = !!ownerMembership && ownerMembership.status === 'active';
+    if (!ownerIsMember && !(ownAgent && isOrganismOwner(organism, callerGhii))) {
+      res.status(403).json(error(config.nodeId, 'NOT_MEMBER', ownAgent
+        ? 'You must be a member to attach an agent'
+        : `${agentOwner} is not an active member of this organism, so their agent cannot be attached`));
+      return;
+    }
+    // An agent of this node must exist: listing a name nobody holds yet would admit whatever agent is
+    // later created under it, without anyone listing that one. An agent of another node cannot be
+    // looked up here, and is listed as given.
+    if (parsed.node === config.nodeId && !(await storage.getAgent(agent_gaii))) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No agent ${agent_gaii} on this node`));
       return;
     }
     if (organism.agentGaiis.includes(agent_gaii)) {

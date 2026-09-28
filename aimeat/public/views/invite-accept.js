@@ -32,13 +32,15 @@
  *     card is AskPage (the tag, the question, the ways to answer, and the other ways in under "or"),
  *     the invitation's summary the dim Box named by the organism, the fields TextFields in Fields,
  *     a refusal the error message, the answers Loud and Action. css/views/invite-accept.css is gone.
+ *   v1.3.1 — 2026-09-28 — No escHtml() on text: preact escapes every text child and attribute itself,
+ *     so the page showed `&quot;` and `&amp;` in the organism's name, description, workspace names and
+ *     the invitation message (reported from a live invitation on originalmiskate.com).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
-import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, logout } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
@@ -144,7 +146,7 @@ export default function InviteAccept() {
     return html`
       <${AskPage} title=${tr('invite.errorTitle', 'Invitation unavailable')}
         doors=${html`<${Action} href="/v1/profile">${tr('common.back', 'Back')}<//>`}>
-        <${Note} kind="lead">${escHtml(state.error)}<//>
+        <${Note} kind="lead">${state.error}<//>
       <//>`;
   }
 
@@ -155,15 +157,15 @@ export default function InviteAccept() {
   const tag = html`<${Mark} tone="coral">${tr('invite.badge', 'Invitation')}<//>`;
   // What the invitation is to, by whom and as what, in the dim box: the organism by name.
   const summary = html`
-    <${Box} tone="dim" name=${escHtml(org.name || '')}>
-      ${org.description ? html`<${Note}>${escHtml(org.description)}<//>` : null}
-      <${Note} kind="lead">${tr('invite.invitedBy', 'Invited by')} <strong>${escHtml(inv.invited_by || '')}</strong> ${tr('invite.asRole', 'as')} <strong>${escHtml(inv.org_role || 'member')}</strong>.<//>
+    <${Box} tone="dim" name=${org.name || ''}>
+      ${org.description ? html`<${Note}>${org.description}<//>` : null}
+      <${Note} kind="lead">${tr('invite.invitedBy', 'Invited by')} <strong>${inv.invited_by || ''}</strong> ${tr('invite.asRole', 'as')} <strong>${inv.org_role || 'member'}</strong>.<//>
       ${workspaces.length ? html`
         <${Label} block>${tr('invite.workspacesLabel', "You'll get access to:")}<//>
         <${Stack} list gap="tight">
-          ${workspaces.map((w) => html`<span key=${w.ws}>${escHtml(w.name || w.ws)} — ${escHtml(w.role)}</span>`)}
+          ${workspaces.map((w) => html`<span key=${w.ws}>${w.name || w.ws} — ${w.role}</span>`)}
         <//>` : null}
-      ${inv.message ? html`<${Note} kind="quiet">“${escHtml(inv.message)}”<//>` : null}
+      ${inv.message ? html`<${Note} kind="quiet">“${inv.message}”<//>` : null}
     <//>`;
 
   // Signed in, but this account is NOT the invited party (verified email doesn't match) — OR the
@@ -194,7 +196,7 @@ export default function InviteAccept() {
             ${submitting ? tr('invite.joining', 'Joining…') : tr('invite.acceptCta', 'Accept & join')}
           <//>`}>
         ${summary}
-        ${formError ? html`<${Note} kind="message" error>${escHtml(formError)}<//>` : null}
+        ${formError ? html`<${Note} kind="message" error>${formError}<//>` : null}
       <//>`;
   }
 
@@ -224,6 +226,6 @@ export default function InviteAccept() {
         <${TextField} label=${tr('invite.displayNameLabel', 'Display name (optional)')} value=${form.display_name}
           onInput=${(v) => setForm((f) => ({ ...f, display_name: v }))} />
       <//>
-      ${formError ? html`<${Note} kind="message" error>${escHtml(formError)}<//>` : null}
+      ${formError ? html`<${Note} kind="message" error>${formError}<//>` : null}
     <//>`;
 }

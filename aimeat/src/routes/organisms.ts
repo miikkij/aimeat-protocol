@@ -95,6 +95,8 @@
  *   v1.21.0 -- 2026-07-11 -- publishDraft normalizes embedded document image URLs (raw /v1/storage →
  *     owner-addressed /v1/pub) and scopes those files to the workspace (members-only) via
  *     services/doc-images, so a published doc's images load for members without going public.
+ *   v1.23.0 -- 2026-09-28 -- One guard in front of every /v1/organisms/:id route refuses an agent the
+ *     organism does not admit (agentAccess 'listed', services/organism-agent-access.ts).
  *   v1.22.0 -- 2026-09-25 -- Mounts the member change doors (organisms/workspace-member-changes.ts):
  *     POST /:id/workspace/spaces, PUT /:id/workspace/sections/:space, GET /:id/workspace/suggestions
  *     and POST /:id/workspace/suggestions/:sid.
@@ -115,10 +117,26 @@ import { registerOrganismWorkspaceDocumentRoutes } from './organisms/workspace-d
 import { registerOrganismWorkspaceMemberChangeRoutes } from './organisms/workspace-member-changes.js';
 import { registerOrganismGateRoutes } from './organisms/gates.js';
 import { registerOrganismIntakeRoutes } from './organisms/intake.js';
+import { error } from '../middleware/envelope.js';
+import { barredAgentFor, agentBarredMessage } from '../services/organism-agent-access.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const H = createOrganismHelpers(config, storage);
+
+  // An organism that admits only listed agents (agentAccess 'listed') refuses every other agent on
+  // every route under /v1/organisms/:id, here, once. The routes below resolve the caller's OWNER and
+  // ask about the owner's membership, in some forty places, so an agent passes wherever its owner
+  // does; one refusal in front of all of them is what keeps a route added later from forgetting it.
+  // Authentication is global (optionalAuth in server.ts), so req.auth is already set here.
+  router.use('/v1/organisms/:id', async (req, res, next) => {
+    if (!req.auth) { next(); return; }
+    const principal = resolveIdentity(req.auth, config.nodeId);
+    const organism = await barredAgentFor(storage, String(req.params.id), principal);
+    if (!organism) { next(); return; }
+    res.status(403).json(error(config.nodeId, 'AGENT_NOT_ADMITTED', agentBarredMessage(organism, principal)));
+  });
 
   // Registration order is load-bearing (Express matches top-to-bottom) — keep these calls in the
   // exact sequence the handlers were originally declared in the monolithic organisms.ts.

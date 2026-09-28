@@ -6,6 +6,7 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-09-28 — Both organism routes refuse an agent the organism does not admit (agentAccess 'listed').
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — organism-packages + reputation batch the per-agent scans (listConsentsForAgents / listMemoryForOwners)
  */
@@ -17,6 +18,8 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
+import { agentBarred, agentBarredMessage, barredAgentFor } from '../../services/organism-agent-access.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 
 export function registerOrganismRoutes(
   router: Router,
@@ -48,6 +51,11 @@ export function registerOrganismRoutes(
     const membership = await storage.getMembership(organism_id, ghii);
     if (!membership) {
       res.status(403).json(error(config.nodeId, 'NOT_MEMBER', 'You are not a member of this organism'));
+      return;
+    }
+    const principal = resolveIdentity(req.auth!, config.nodeId);
+    if (agentBarred(organism, principal)) {
+      res.status(403).json(error(config.nodeId, 'AGENT_NOT_ADMITTED', agentBarredMessage(organism, principal)));
       return;
     }
 
@@ -101,6 +109,12 @@ export function registerOrganismRoutes(
     const membership = await storage.getMembership(organismId, ghii);
     if (!membership) {
       res.status(403).json(error(config.nodeId, 'NOT_MEMBER', 'You are not a member of this organism'));
+      return;
+    }
+    const principal = resolveIdentity(req.auth!, config.nodeId);
+    const barred = await barredAgentFor(storage, organismId, principal);
+    if (barred) {
+      res.status(403).json(error(config.nodeId, 'AGENT_NOT_ADMITTED', agentBarredMessage(barred, principal)));
       return;
     }
 

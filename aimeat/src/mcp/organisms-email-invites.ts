@@ -9,6 +9,9 @@
  *   aimeat_organism_invitations_email, aimeat_organism_invitation_email_cancel.
  * @usage registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
  * @version-history
+ *   v1.2.0 — 2026-09-28 — aimeat_organism_invite_email takes return_url, as the REST route does, and
+ *     answers with the return target it kept. Without it an invitation sent over MCP always landed the
+ *     invitee on the profile page instead of in the app they were invited to work in.
  *   v1.1.0 — 2026-08-11 — invitation_email_cancel calls cancelEmailInvitation() instead of flipping
  *     the record itself, so it and the REST cancel route share one write (August 2026 MCP audit
  *     step 8).
@@ -55,9 +58,10 @@ export function registerOrganismEmailInviteTools(
             workspaces: z.array(z.object({ ws: z.string(), role: z.enum(['viewer', 'contributor']) })).optional().describe('Optional per-workspace grants'),
             message: z.string().optional().describe('Optional personal note included in the email'),
             expires_in_days: z.number().optional().describe('Days until the invitation expires (1–30, default 7)'),
+            return_url: z.string().optional().describe('Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.'),
         },
         annotationsFor('aimeat_organism_invite_email'),
-        async ({ organism_id, email, org_role, workspaces, message, expires_in_days }) => {
+        async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url }) => {
             const gate = await orgForAdmin(organism_id);
             if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };
             try {
@@ -72,8 +76,9 @@ export function registerOrganismEmailInviteTools(
                     workspaces: normalizeWorkspaceGrants(workspaces),
                     message,
                     expiresInDays: expires_in_days,
+                    returnUrl: return_url, // allowlisted in createEmailInvitation, as on the REST route
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl, return_url: invitation.returnUrl ?? null }, null, 2) }] };
             } catch (e) {
                 if (e instanceof InvitationError) return { content: [{ type: 'text' as const, text: e.message }], isError: true };
                 throw e;

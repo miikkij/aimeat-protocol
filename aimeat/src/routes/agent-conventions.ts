@@ -25,6 +25,7 @@
  *   - GET /.well-known/x402.json    — machine-payment discovery, derived from the network registry
  * @usage app.use(agentConventionsRouter(config, storage));
  * @version-history
+ *   2026-09-28 — openapi.yaml is found by services/openapi-file.ts, which knows the packaged location.
  *   2026-09-18 - skill.md: Installation is the shared first steps (services/first-steps.ts), and the
  *     envelope is described from what the node sends (it said `success`, `node_id`, `next_actions`).
  *   2026-09-04 - /.well-known/x402.json names the seller. It carried the network, the assets and
@@ -33,26 +34,17 @@
  *   v1.0.0 — 2026-07-29 — Initial (agent-readability phase 14)
  */
 import { Router } from 'express';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
 import type { AimeatConfig } from '../config.js';
 import { getX402Network } from '../commerce/x402-facilitator.js';
 import { apexOnly } from './agent-docs.js';
 import { firstStepsMarkdown } from '../services/first-steps.js';
 import { envelopeShape } from '../middleware/envelope.js';
+import { findOpenApiFile } from '../services/openapi-file.js';
 
 /** Locate openapi.yaml the same way specRouter does — the file moves with the deployment layout. */
-function findSpecFile(): string | null {
-  for (const c of [
-    join(process.cwd(), 'openapi.yaml'),
-    join(process.cwd(), '..', 'openapi.yaml'),
-    join(process.cwd(), 'aimeat', '..', 'openapi.yaml'),
-  ]) {
-    if (existsSync(c)) return c;
-  }
-  return null;
-}
+const findSpecFile = findOpenApiFile;
 
 /** The node as a single agent skill: what it is, when to reach for it, how to call it. */
 function buildSkillMd(config: AimeatConfig): string {

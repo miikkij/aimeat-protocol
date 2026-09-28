@@ -35,6 +35,7 @@
  * @usage
  *   const r = await decideSuggestion({ storage, config }, caller, { orgId, id, decision: 'approve' });
  * @version-history
+ *   2026-09-28 — An agent listed by an organism that admits only listed agents is a member's agent here, not an attached participant.
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
 import { v4 as uuidv4 } from 'uuid';
@@ -54,6 +55,7 @@ import { applySectionOps, summarizeSectionOps, validateSectionOps, MAX_SECTION_O
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { logger } from '../utils/logger.js';
+import { attachedAsParticipant } from './organism-agent-access.js';
 
 /** The two approval actions a member change files. The generic approval route refuses both. */
 export { MEMBER_CHANGE_ACTIONS, isMemberChangeAction };
@@ -256,7 +258,7 @@ export async function listSuggestions(
     const organism = await storage.getOrganism(orgId);
     if (!organism) return refusal(404, 'NOT_FOUND', 'Organism not found. Check the id with aimeat_organism_list.');
     const membership = await storage.getMembership(orgId, caller.owner);
-    if (!membership || membership.status !== 'active' || organism.agentGaiis.includes(caller.principal)) {
+    if (!membership || membership.status !== 'active' || attachedAsParticipant(organism, caller.principal)) {
         return refusal(403, 'ACCESS_DENIED', 'You are not an active member of this organism. Join it first.');
     }
     await expireOverdueApprovals(storage, nowOf(deps).toISOString());

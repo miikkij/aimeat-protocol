@@ -1737,6 +1737,7 @@ export interface Organism {
   members: string[] | null;
   owners: string[] | null;
   memberVisibility: string | null;
+  agentAccess: string | null;
   memoryNamespace: string;
   moderationConfig: Json;
   name: string;

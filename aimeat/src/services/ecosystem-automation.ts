@@ -21,6 +21,7 @@
  *   - matchesKeyGlob(glob, key) — the tiny prefix/`*` matcher (reuses the workflow globToRegExp)
  * @usage import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
  * @version-history
+ *   2026-09-28 — An organism that admits only listed agents is not auto-attached to; the owner lists the agent.
  *   v1.0.0 — 2026-06-15 — Created for ecosystem-app automation recipes (feature B4): data-published →
  *     materialise an agent task per configured agent.
  *   v1.1.0 — 2026-06-15 — B5 organism routing: resolve the recipe organism, grant the agent access,
@@ -34,6 +35,7 @@ import { globToRegExp } from './workflow/signal-eval.js';
 import { getActiveScheduler } from './scheduler.js';
 import { localAccountOf, buildGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { agentAccessOf } from './organism-agent-access.js';
 
 /** A recipe's keyGlob matches a written key using the same glob grammar the event plane uses. */
 export function matchesKeyGlob(glob: string, key: string): boolean {
@@ -93,6 +95,13 @@ async function resolveAndGrantOrganism(
     }
     if (!controlled) {
       logger.warn('automation recipe organism not owned/joined by the recipe owner — not attaching the agent', { organism: org.id, owner: ownerName });
+      return org;
+    }
+    // Where the organism admits only listed agents, the list is a grant only a person makes, in the
+    // Agents section; an automation recipe does not add to it. The task still names the organism, and
+    // the agent's writes there are refused until the owner lists it.
+    if (!org.agentGaiis.includes(agentGaii) && agentAccessOf(org) === 'listed') {
+      logger.warn('automation recipe organism admits only listed agents — not attaching the agent', { organism: org.id, agentGaii });
       return org;
     }
     if (!org.agentGaiis.includes(agentGaii)) {

@@ -10,6 +10,8 @@
  *   - specRouter(): mounts GET /v1/spec (locates + serves openapi.yaml) and GET /v1/docs (Swagger UI)
  *
  * @version-history
+ *   v1.3.0 — 2026-09-28 — The file is found by services/openapi-file.ts, which also looks where a
+ *     packaged install keeps it (dist/openapi.yaml); every packaged node answered 404 here.
  *   v1.2.0 — 2026-09-24 — /v1/docs carries the operation index as HTML (services/api-index.ts) until
  *     Swagger UI has drawn; Bingbot read 25 words on this page.
  *   v1.1.0 — 2026-07-28 — The /v1/docs shell carries the head metadata every other public page has
@@ -19,31 +21,23 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import type { AimeatConfig } from '../config.js';
 import { findPublicPage } from '../data/public-pages.js';
 import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
 import { apiIndexHtml } from '../services/api-index.js';
+import { findOpenApiFile } from '../services/openapi-file.js';
 
 export function specRouter(config: AimeatConfig): Router {
   const router = Router();
 
   // GET /v1/spec — serve the OpenAPI spec
   router.get('/v1/spec', (_req, res) => {
-    // Try to find openapi.yaml relative to the project
-    const candidates = [
-      join(process.cwd(), 'openapi.yaml'),
-      join(process.cwd(), '..', 'openapi.yaml'),
-    ];
-
-    for (const path of candidates) {
-      if (existsSync(path)) {
-        const content = readFileSync(path, 'utf-8');
-        res.type('text/yaml').send(content);
-        return;
-      }
+    const path = findOpenApiFile();
+    if (path) {
+      res.type('text/yaml').send(readFileSync(path, 'utf-8'));
+      return;
     }
 
     res.status(404).json({

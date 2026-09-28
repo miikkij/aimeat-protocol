@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-28 — aimeat_organism_invite_email takes `return_url`, where the invitee lands after accepting;
+ *     aimeat_organism_update takes `agent_access`.
  *   2026-09-28 — aimeat_image_generate takes `role`, the AI role the call runs as.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.9.0 — 2026-09-27 — aimeat_app_versions, _screenshot, _seo_set, _marks_set, _legal_set and _audit
@@ -212,6 +214,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             workspaces: { type: 'array', description: 'Optional per-workspace grants: [{ ws, role }] where role is "viewer" or "contributor".' },
             message: { type: 'string', description: 'Optional personal note included in the invitation email.' },
             expires_in_days: { type: 'number', description: 'Days until the invitation expires (1–30, default 7).' },
+            return_url: { type: 'string', description: 'Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.' },
         },
     },
     {
@@ -406,6 +409,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             interests: { type: 'array', required: false, description: 'Interest tags.' },
             join_policy: { type: 'string', required: false, description: 'open | approval_required | invite_only.' },
             visibility: { type: 'string', required: false, description: 'public | listed | private.' },
+            agent_access: { type: 'string', required: false, enum: ['all', 'listed'], description: 'Which members\' agents may act here: "all" (every member\'s agents, the default) or "listed" (only the agents in the Agents section of the organism\'s page; any other agent is refused as a non-member). An agent can set "listed"; only the owner signed in can set "all" again.' },
         },
     },
     {

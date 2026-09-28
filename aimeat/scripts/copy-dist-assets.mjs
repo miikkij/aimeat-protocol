@@ -18,6 +18,8 @@
  * @structure noDistributePaths() → the deny list from the manifest; copy() → cpSync with a filter
  * @usage  node scripts/copy-dist-assets.mjs   (run by `pnpm build`)
  * @version-history
+ *   v1.2.0 — 2026-09-28 — Copies the repo-root openapi.yaml to dist/openapi.yaml, so /v1/spec answers
+ *     on a packaged node.
  *   v1.1.0 — 2026-09-28 — Copies the model catalogue's seed, src/data/ai-catalog (System 2 plan, V4).
  *   v1.0.0 — 2026-08-31 — Extracted from the inline build one-liner; skips non-distributable assets.
  */
@@ -74,6 +76,10 @@ copy('docs', 'dist/docs', { recursive: true });
 // src/routes/admin-extensions.ts.
 copy('../docs/msm-examples', 'dist/docs/msm-examples', { recursive: true });
 copy('../docs/extensions', 'dist/docs/extensions', { recursive: true });
+// The API contract, for the same reason: it sits at the repo root, and GET /v1/spec, GET /openapi.json
+// and the /v1/docs index read it (src/services/openapi-file.ts). Without it every packaged node
+// answered /v1/spec with 404 while its Link header advertised that address.
+copy('../openapi.yaml', 'dist/openapi.yaml');
 copy(
   'src/storage/providers/postgres-kysely/migrations',
   'dist/src/storage/providers/postgres-kysely/migrations',
