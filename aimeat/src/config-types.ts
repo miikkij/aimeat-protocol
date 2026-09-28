@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.10.0 — 2026-09-28 — The packages and templates fields moved to config-types-packages.ts
+ *     unchanged (PackagesConfig mixed in), to stay under the line ceiling.
  *   v1.9.0 — 2026-09-28 — packageRepository: the package repository role.
  *   v1.8.1 — 2026-09-25 — federationRelayClaim names 3.20.0 (default required) and 4.0.0 (optional gone).
  *   v1.8.0 — 2026-09-24 — ThemesConfig mixed in (config-themes.ts); the capability fields moved to
@@ -152,8 +154,9 @@ import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
 import type { AccountSecurityConfig } from './config-types-account-security.js';
 import type { CapabilitiesConfig } from './config-types-capabilities.js';
 import type { ThemesConfig } from './config-themes.js';
+import type { PackagesConfig } from './config-types-packages.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig {
   port: number;
   baseUrl: string;
   /**
@@ -714,20 +717,6 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   cortexEnabled: boolean;
   cortexMaxInstalled: number;
   cortexMaxLibSizeKb: number;
-
-  // Packages & Templates
-  packagesEnabled: boolean;
-  packageCreateRole: 'operator' | 'owner';
-  packageMaxSizeMb: number;
-  packageMaxComponents: number;
-  packageMaxPerAuthor: number;
-  templatesEnabled: boolean;
-  templateReviewsEnabled: boolean;
-  templateDiscussionsEnabled: boolean;
-  packageFederationEnabled: boolean;
-  packageFederationAutoAccept: boolean;
-  /** Package repository role: a private package also reaches entitled peer nodes (package-entitlements.ts). */
-  packageRepository: boolean;
 
   /**
    * Whether this node has a store to send people to: true exactly when `siteLinks.store` is set.

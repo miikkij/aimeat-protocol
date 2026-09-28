@@ -139,6 +139,13 @@ everywhere at once, and say so in the Changes section.
 | a chain of steps one trigger runs | agents, the owner's own model, extensions and questions to the person, each step checked for whether it produced | workflow | työnkulku | flujo de trabajo (flujo in a title that names it) |
 | the most one workflow run may spend on AI | US dollars per run; what its AI steps cost and what the node's model costs judging its worded signals both count, and an AI step starts only while its expected cost still fits, except that a step expected to cost more than the whole limit starts once, alone | spending limit | kulukatto | límite de gasto |
 | an app's own address | `<name>.apps.<domain>`, where the sign-in of the person who opens the app does not exist | an address of its own | oma osoite | su propia dirección / dirección propia |
+| a versioned set of parts installed together | apps, extensions, cortexes, records and translations, signed and versioned as one | package | paketti | paquete |
+| the product a customer buys once | which packages, which organisms with their workspaces, which crew agents, and default settings; the same for every customer | install package | asennuspaketti | paquete de instalación |
+| one customer's own part of it | the owner, the other users and their roles, the organism names, the settings | install set | asennussetti | conjunto de instalación |
+| the AIMEAT that sells and updates packages | serves each customer the packages they bought, and their updates while the monthly service runs | package repository | pakettirepository | repositorio de paquetes |
+| an install the customer cannot edit | code and look come from the package and its updates; the settings are the owner's | managed install | hallittu asennus | instalación gestionada |
+| the customer's own copy of a managed install | free to change, and gets no more updates | fork | fork (oma kopio) | copia propia |
+| who gets a new version first | stable: published versions; beta: beta versions too | release channel | julkaisukanava | canal de publicación |
 | where an app runs on a shared server with no app addresses | a frame on the server's own address whose origin is opaque: the app reads nobody's sign-in and gets only its own permissions | isolated frame | eristetty kehys | marco aislado |
 
 ## Never translated, in any language
@@ -344,3 +351,9 @@ service, the directory, the token, the identifier and the username: the test nam
 - **2026-09-28, later** — AI role and binding (wish-tekoalyn-roolit). *Rooli* is the developer's own
   word ("roolittaa ne"); *kytkeä* is the word the plan used with him ("kytkee sovelluksen roolin").
   Spanish *vincular* for bind, the usual word for linking an account or a device.
+- **2026-09-28, later** — package, install package, install set, package repository, managed install,
+  fork and release channel (wish-asennuspaketit-uusille-nodeille-ja-keskitetty-pakettireposit).
+  *Asennuspaketti*, *asennussetti*, *pakettirepository*, *fork* and *julkaisukanava* are the
+  developer's own words. The code and the API say *install bundle* for the install package; a
+  person reads *install package*. Spanish *copia propia* for fork, because *bifurcación* reads as
+  a road splitting.

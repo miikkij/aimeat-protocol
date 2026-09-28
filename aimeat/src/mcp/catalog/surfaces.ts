@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-28 — aimeat_admin_install_set on the operator surface.
  *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository and
  *     aimeat_package_entitlements on `appdev` and `agent`, beside update.
  *   2026-09-28 — aimeat_package_instances and aimeat_package_fork on `appdev` and `agent`, beside update.
@@ -346,6 +347,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // The Federation page in one read: the peers, what waits on a person, and the book's age.
         // And one write beside it: a peer kept on its own relay-claim setting.
         'aimeat_admin_federation', 'aimeat_admin_federation_relay_claim_set',
+        // Setting this node up from an install set: owner, packages, organisms, users, crew agents.
+        'aimeat_admin_install_set',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // ...and the parts those pages are drawn from, and the themes they wear.

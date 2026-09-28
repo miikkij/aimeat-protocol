@@ -809,6 +809,9 @@ const ALL_SUITES = [
     // A package repository and a customer node: a private package served only on an entitlement,
     // the update check that applies a newer version, and the end of updates.
     'test/e2e-package-repository.ts',
+    // An install set applied to a customer node: a bundle from a repository, the owner, the members
+    // (an account now or an email invitation), the organism, the config, and the crew agent.
+    'test/e2e-install-sets.ts',
     'test/e2e-businesslauncher.ts',
     'test/e2e-company-brain.ts',
     'test/e2e-personal-node.ts',

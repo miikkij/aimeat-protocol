@@ -1308,6 +1308,15 @@
      "plain": "Cortex Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. /v1/cortex, aimeat_cortex_*"
     },
     {
+     "slug": "g-8-install-sets",
+     "cells": [
+      "<strong>Install sets</strong>",
+      "Set up a customer's node in one step from an install bundle bought from a package repository: the owner user, the bundle's packages with their config, its organisms and workspaces under the customer's names, the other users and the crew agents. Each user has an email, and either gets an account now (signing in by login link, Google or Entra) or an email invitation. A plan lists what would be made and what is missing before anything is created, and applying again creates nothing twice. Entitlement to the bundle also serves the packages it lists. A new node can apply its set at start-up from a file, and link the repository the set names; it tries again until the repository serves it. Limits: operator only; a crew agent waits until the owner connects a runner agent, and applying again then deploys it; no screen yet.",
+      "<code>/v1/install-sets/apply</code>, <code>/v1/install-sets</code>, <code>aimeat_admin_install_set</code>, <code>AIMEAT_INSTALL_SET</code>"
+     ],
+     "plain": "Install sets Set up a customer's node in one step from an install bundle bought from a package repository: the owner user, the bundle's packages with their config, its organisms and workspaces under the customer's names, the other users and the crew agents. Each user has an email, and either gets an account now (signing in by login link, Google or Entra) or an email invitation. A plan lists what would be made and what is missing before anything is created, and applying again creates nothing twice. Entitlement to the bundle also serves the packages it lists. A new node can apply its set at start-up from a file, and link the repository the set names; it tries again until the repository serves it. Limits: operator only; a crew agent waits until the owner connects a runner agent, and applying again then deploys it; no screen yet. /v1/install-sets/apply, /v1/install-sets, aimeat_admin_install_set, AIMEAT_INSTALL_SET"
+    },
+    {
      "slug": "g-8-package-repository",
      "cells": [
       "<strong>Package repository</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
@@ -3452,6 +3461,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 343
+  "rows": 344
  }
 }

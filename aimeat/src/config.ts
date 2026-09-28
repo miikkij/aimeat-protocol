@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.16.2 — 2026-09-28 — installSetPath and installSetSecretsPath from AIMEAT_INSTALL_SET and
+ *     AIMEAT_INSTALL_SET_SECRETS (default none).
  *   v1.16.1 — 2026-09-28 — packageRepository from AIMEAT_PACKAGE_REPOSITORY (default off).
  *   v1.16.0 — 2026-09-28 — aiModelDefaults(): the node's AI key and model defaults, config-ai-models.ts. A pure move.
  *   v1.15.0 — 2026-09-24 — themesDefaults(): the operator's theme choices (Themes & Styles), config-themes.ts.
@@ -661,6 +663,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     packageFederationEnabled: process.env.AIMEAT_PACKAGE_FEDERATION_ENABLED === 'true',
     packageFederationAutoAccept: process.env.AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT === 'true',
     packageRepository: process.env.AIMEAT_PACKAGE_REPOSITORY === 'true',
+    installSetPath: process.env.AIMEAT_INSTALL_SET || null,
+    installSetSecretsPath: process.env.AIMEAT_INSTALL_SET_SECRETS || null,
 
     // Portfolio
     portfolioEnabled: process.env.AIMEAT_PORTFOLIO !== 'false',

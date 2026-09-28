@@ -123,6 +123,9 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // A decision is made ON a request, so `decision` alone is refused before the wire. With a
     // request named it goes to the decision door, which is the branch that carries it.
     aimeat_package_install_requests: { always: { request_id: 'zqxrequest_idzqx' } },
+    // action='list' (the enum sentinel) reads the records and takes no set; plan and apply post the
+    // set and the secrets, so the probe holds action at plan for the other two.
+    aimeat_admin_install_set: { always: { action: 'plan' } },
     // include_source reads the source of ONE cortex, so it only travels beside `name`.
     aimeat_cortex_list: { always: { name: 'zqxnamezqx' } },
     // store, filename, mime_type and key are about ONE attachment: without attachment_id the call is

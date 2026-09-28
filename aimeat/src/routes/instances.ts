@@ -15,6 +15,7 @@
  *   - ./instances/migration.ts — POST /:id/migration-prompt, POST /:id/apply-migration
  *   - ./instances/install-requests.ts — the install requests an agent or an app files, and the
  *     decision door the owner and their agents answer them on
+ *   - ./instances/install-sets.ts — POST /v1/install-sets/apply, GET /v1/install-sets
  * @usage
  *   import { instancesRouter } from '../routes/instances.js';
  *   app.use(instancesRouter(config, storage));
@@ -27,6 +28,7 @@
  *   v2.2.0 — 2026-07-13 — extract handler groups to ./instances/{install,manage,migration}.ts (max-file-lines)
  *   v2.3.0 — 2026-09-25 — ./instances/install-requests.ts: the package install requests and their decision door
  *   v2.4.0 — 2026-09-28 — The router takes the federation peers, for POST /v1/instances/check-updates.
+ *   v2.5.0 — 2026-09-28 — ./instances/install-sets.ts: applying an install set (install packages, phase 4).
  */
 
 import { Router } from 'express';
@@ -38,6 +40,7 @@ import { registerInstallRoutes } from './instances/install.js';
 import { registerManageRoutes } from './instances/manage.js';
 import { registerMigrationRoutes } from './instances/migration.js';
 import { registerInstallRequestRoutes } from './instances/install-requests.js';
+import { registerInstallSetRoutes } from './instances/install-sets.js';
 
 // ── Router factory ────────────────────────────────────────────────────
 
@@ -69,6 +72,9 @@ export function instancesRouter(
 
   // GET /v1/package-install-requests(/:id), POST /v1/package-install-requests/:id/decision
   registerInstallRequestRoutes(router, config, storage, scheduler);
+
+  // POST /v1/install-sets/apply, GET /v1/install-sets: the operator sets up this node from an install set
+  registerInstallSetRoutes(router, config, storage, peers, scheduler);
 
   return router;
 }

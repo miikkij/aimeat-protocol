@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.13.0 — 2026-09-28 — registerAdminInstallSetTools (aimeat_admin_install_set).
  *   v1.12.0 — 2026-09-28 — registerAiCapabilityTools (aimeat_ai_capabilities, aimeat_ai_models,
  *     aimeat_ai_transcribe, aimeat_ai_embed).
  *   v1.11.0 — 2026-09-28 — registerAiProviderTools (aimeat_ai_providers, aimeat_ai_provider_test,
@@ -108,6 +109,7 @@ import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
 import { registerPackageTools } from './packages.js';
 import { registerPackageInstallRequestTools } from './package-install-requests.js';
+import { registerAdminInstallSetTools } from './admin-install-sets.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerDesignbookTools } from './designbook.js';
@@ -221,6 +223,8 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerPackageTools(mcp, storage, config, agentGaii, peers, scopes);
     // The requests an install that lacked the words became, answered from a chat.
     registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes);
+    // The operator sets up this node from an install set: owner, packages, organisms, users, agents.
+    registerAdminInstallSetTools(mcp, storage, config, peers, agentGaii, scopes);
     registerPortfolioTools(mcp, storage, config, agentGaii);
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes);
     registerDesignbookTools(mcp, storage, config, agentGaii);

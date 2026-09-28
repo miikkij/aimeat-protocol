@@ -8,6 +8,7 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   v1.5.0 -- 2026-09-28 -- Register aimeat_admin_install_set.
  *   v1.4.0 -- 2026-09-28 -- Register aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and aimeat_ai_embed.
  *   v1.3.0 -- 2026-09-28 -- Register aimeat_ai_providers, aimeat_ai_provider_test and aimeat_ai_routing_set.
  *   v1.2.0 -- 2026-09-28 -- Register aimeat_ai_policy_set (the owner's model policy).
@@ -76,6 +77,7 @@ import { registerUiLibraryTools } from './ui-library.js';
 import { registerThemeTools } from './themes.js';
 import { registerOperatorTools } from './operator.js';
 import { registerComplianceTools } from './compliance.js';
+import { registerInstallSetTools } from './install-sets.js';
 import { registerDataMapTools } from './data-map.js';
 
 export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -131,5 +133,6 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerThemeTools(mcp, registry);
   registerOperatorTools(mcp, registry);
   registerComplianceTools(mcp, registry);
+  registerInstallSetTools(mcp, registry);
   registerDataMapTools(mcp, registry);
 }

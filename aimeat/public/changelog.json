@@ -5,6 +5,18 @@
       "date": "2026-09-28",
       "kind": "feature",
       "title": {
+        "en": "Install packages: your AIMEAT in use from the first day",
+        "fi": "Asennuspaketti: AIMEAT on käytössä ensimmäisestä päivästä alkaen"
+      },
+      "body": {
+        "en": "An install package puts everything your own AIMEAT needs in place at once: the apps and their settings, the organisms and their workspaces, the users, and the AI agents the apps bring with them. Every user needs an email address. A user can get an account at once and sign in with a link sent by email, a Google account or Microsoft Entra ID, or get an invitation by email. Before anything is created, your own AI makes a plan and asks you for the settings that are missing. The code and look of the apps come from the package, and updates come from the package repository, the package maker's service. You choose whether the updates install by themselves, and you decide the settings. If you fork the install, you get a copy of your own to change freely, and it gets no more updates. The package maker can release a new version first to the customers on the beta channel. If the monthly fee for the update service ends, your AIMEAT keeps working and gets no newer versions.",
+        "fi": "Asennuspaketti asentaa kerralla kaiken, mitä omaan AIMEATiisi tarvitaan: sovellukset ja niiden asetukset, organismit ja niiden työtilat, käyttäjät sekä sovellusten tekoälyagentit. Jokaisesta käyttäjästä tarvitaan sähköpostiosoite. Käyttäjälle voi luoda tunnuksen heti, ja silloin hän kirjautuu sähköpostiin tulevalla linkillä, Google-tilillä tai Microsoft Entra ID -tunnuksilla. Toinen tapa on lähettää hänelle kutsu sähköpostiin. Ennen kuin mitään luodaan, oma tekoälysi tekee suunnitelman ja kysyy sinulta ne asetukset, jotka puuttuvat. Sovellusten koodi ja ulkoasu tulevat paketista, ja päivitykset tulevat pakettirepositorysta eli paketin tekijän palvelusta. Sinä valitset, asentuvatko päivitykset automaattisesti, ja sinä päätät asetuksista. Jos teet asennuksesta forkin, saat oman kopion, jota voit muuttaa vapaasti. Siihen ei kuitenkaan enää tule päivityksiä. Paketin tekijä voi julkaista uuden version ensin niille asiakkaille, jotka ovat beetakanavalla. Jos päivityspalvelun kuukausimaksu päättyy, AIMEAT toimii edelleen, mutta uusia versioita ei enää tule."
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "kind": "feature",
+      "title": {
         "en": "The AI page: your providers, which one answers what, and which models are allowed",
         "fi": "Tekoälysivu: tarjoajasi, mikä niistä vastaa mihinkin ja mitkä mallit ovat sallittuja"
       },
