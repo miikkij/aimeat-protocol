@@ -13,8 +13,14 @@
  * @structure AiJobState · AiJobRecord · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.1.0 — 2026-09-28 — System 2 plan, V5: `op` (text, image, transcribe), `audio_key` and
+ *     `language` for a transcription, `size` for an image, and `provider` for every operation, on the
+ *     record and on the start input.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
+import type { AiOp } from './op.js';
+
+export type { AiOp as AiJobOp } from './op.js';
 
 export type AiJobState = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -44,11 +50,22 @@ export interface AiJobRecord {
     input_keys?: string[];
     model?: string;
     system_prompt?: string;
+    /** Which model call the job makes. Absent on a record written before V5, which means `text`. */
+    op?: AiOp;
+    /** A provider the job names, an id or a type. Naming one turns fallback off (route-plan.ts). */
+    provider?: string;
+    /** For `transcribe`: the storage key of the audio, in the job owner's own storage. */
+    audio_key?: string;
+    /** For `transcribe`: an ISO-639-1 hint. */
+    language?: string;
+    /** For `image`: a provider-specific size string, e.g. '1024x1024'. */
+    size?: string;
 
     result_key: string;
     result_visibility: 'private' | 'owner' | 'public';
     /** Parse the answer as JSON before storing it, so a malformed answer fails HERE rather than
-     *  becoming a string every downstream reader has to re-parse and none of them validates. */
+     *  becoming a string every downstream reader has to re-parse and none of them validates. For a
+     *  transcription it stores `{ text, language, seconds, model }` in place of the bare text. */
     json?: boolean;
 
     on_done?: AiJobOnDone;
@@ -91,6 +108,12 @@ export interface StartAiJobInput {
     json?: boolean;
     app_id?: string;
     on_done?: AiJobOnDone;
+    /** Any string here: the start checks it against AI_OPS (op.ts) and refuses an unknown one. */
+    op?: AiOp | string;
+    provider?: string;
+    audio_key?: string;
+    language?: string;
+    size?: string;
 }
 
 /**

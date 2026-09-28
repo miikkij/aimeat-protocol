@@ -16,6 +16,8 @@
  *   const { job_id } = await AIMEAT.ai.job.start({ prompt, result_key: 'report.latest' });
  *   const done = await AIMEAT.ai.job.waitFor(job_id);
  * @version-history
+ *   v1.1.0 — 2026-09-28 — start() sends op (text | image | transcribe), provider, audio_key, language
+ *     and size (System 2 plan, V5).
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import { makeSession } from '../_core/session.js';
@@ -66,8 +68,14 @@ export const job = {
   async start(opts) {
     if (!opts || typeof opts !== 'object') throw new Error('opts object required');
     if (!opts.result_key) throw new Error('opts.result_key required');
-    if (!opts.prompt && !opts.prompt_key) throw new Error('opts.prompt or opts.prompt_key required');
+    if (opts.op !== 'transcribe' && !opts.prompt && !opts.prompt_key) throw new Error('opts.prompt or opts.prompt_key required');
+    if (opts.op === 'transcribe' && !opts.audio_key) throw new Error('opts.audio_key required for op transcribe');
     const body = {
+      op: opts.op,
+      provider: opts.provider,
+      audio_key: opts.audio_key,
+      language: opts.language,
+      size: opts.size,
       prompt: opts.prompt,
       prompt_key: opts.prompt_key,
       input_keys: opts.input_keys,

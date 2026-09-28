@@ -20,7 +20,9 @@
  *   test, where the entry is src/index.ts and this module does nothing at all.
  *
  *   WHAT THE TURN DOES IS DRIVEN BY THE PROMPT TEXT, so one peer serves every case: STALL waits to
- *   be cancelled, DIENOW dies mid-turn. Everything else gets the full script.
+ *   be cancelled, DIENOW dies mid-turn, LLMCALL makes one model call the way goose's OpenAI provider
+ *   does (POST <OPENAI_HOST>/<OPENAI_BASE_PATH>, `Authorization: Bearer <OPENAI_API_KEY>`) and answers
+ *   with what came back. Everything else gets the full script.
  *
  *   EVERY MESSAGE IS WRITTEN DOWN. FAKE_GOOSE_LOG names a JSONL file, and the suite asserts against
  *   what the node actually sent: the capabilities it declared, the MCP server and token it handed
@@ -35,6 +37,8 @@
  *   NODE_OPTIONS="--import tsx --import file:///…/test/helpers/fake-goose-acp.ts"
  *   FAKE_GOOSE_LOG=<path to a JSONL file>
  * @version-history
+ *   v1.2.0 — 2026-09-28 — System 2 plan, V5: every record carries the process id, the started record
+ *     carries the OPENAI_* settings, and an LLMCALL turn calls the node's /v1/llm with them.
  *   v1.1.0 — 2026-09-16 — The started record lists any AIMEAT_* or DATABASE_URL it was given.
  *   v1.0.0 — 2026-09-08 — Initial, with test/e2e-chat-agent.ts.
  */
@@ -75,7 +79,9 @@ function out(line: string): void {
 
 function record(entry: Record<string, unknown>): void {
     if (!LOG) return;
-    appendFileSync(LOG, `${JSON.stringify({ at: Date.now(), ...entry })}\n`, 'utf8');
+    // The process id, because on the node route one node runs a process per person and the suite
+    // asserts which process ran whose turn.
+    appendFileSync(LOG, `${JSON.stringify({ at: Date.now(), pid: process.pid, ...entry })}\n`, 'utf8');
 }
 
 function send(msg: unknown): void {
@@ -114,6 +120,9 @@ async function runPeer(): Promise<void> {
             GOOSE_PROVIDER: process.env.GOOSE_PROVIDER ?? null,
             GOOSE_PATH_ROOT: process.env.GOOSE_PATH_ROOT ?? null,
             OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? null,
+            OPENAI_HOST: process.env.OPENAI_HOST ?? null,
+            OPENAI_BASE_PATH: process.env.OPENAI_BASE_PATH ?? null,
+            OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? null,
         },
         // Every name the node handed over that it must not: its own configuration and its database.
         leaked: Object.keys(process.env).filter(k => /^AIMEAT_|^DATABASE_URL$/i.test(k)),
@@ -176,6 +185,33 @@ async function runPeer(): Promise<void> {
             if (beat) clearInterval(beat);
             cancels.delete(sessionId);
             send({ jsonrpc: '2.0', id: requestId, result: { stopReason: stopped ? 'cancelled' : 'end_turn' } });
+            return;
+        }
+
+        // One model call, sent where goose's OpenAI provider sends it and with the key it sends: the
+        // URL is OPENAI_BASE_PATH resolved against OPENAI_HOST, as goose resolves it.
+        if (text.includes('LLMCALL')) {
+            const host = process.env.OPENAI_HOST ?? '';
+            const url = new URL(process.env.OPENAI_BASE_PATH ?? 'v1/chat/completions', host.endsWith('/') ? host : `${host}/`);
+            let status = 0;
+            let body: any;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ''}` },
+                    body: JSON.stringify({ model: process.env.GOOSE_MODEL, messages: [{ role: 'user', content: text }] }),
+                });
+                status = res.status;
+                body = await res.json().catch(() => null);
+            } catch (err) {
+                body = { transportError: (err as Error).message };
+            }
+            record({ kind: 'llm-call', sessionId, url: url.href, status, body });
+            const said = status === 200
+                ? String(body?.choices?.[0]?.message?.content ?? '')
+                : `refused: ${String(body?.error?.code ?? status)}`;
+            update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: said } });
+            send({ jsonrpc: '2.0', id: requestId, result: { stopReason: 'end_turn' } });
             return;
         }
 

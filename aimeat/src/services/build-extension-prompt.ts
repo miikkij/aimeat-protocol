@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.3 — 2026-09-28 — ADDITIVE: ctx.ai.start takes op, provider, audio_key, language, size (System 2 plan, V5).
  *   v1.5.2 — 2026-09-26 — ADDITIVE: ctx.fetch reads at most 4 MB of one answer and throws
  *     RESPONSE_TOO_LARGE past it (utils/read-capped.ts OUTBOUND_READ_MAX_BYTES; secaudit 2026-09, N3).
  *   v1.5.1 — 2026-09-13 — ADDITIVE: an action always needs a signed-in caller (public_access does
@@ -106,7 +107,7 @@ function sandboxSection(): string {
     '| `ctx.workspace.write(orgId, ws, space, id, value, {ifVersion})` | A schema-validated DRAFT record, as the caller. `ifVersion: 0` = only if no draft yet |',
     '| `ctx.workspace.writeDoc(orgId, ws, space, {title, markdown}, {id, section})` | A DRAFT document in a document space |',
     '| `ctx.workspace.publish(orgId, ws, namespace, id, {expectedVersion})` | Publish the draft; `.latest` lands under the member |',
-    '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
+    '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
     '| `ctx.buy(appRef, tool, input)` | Buy one call of another owner\'s app tool, billed to this extension\'s owner. Needs a contract they already hold, else `{ok: false, code: \'NO_CONTRACT\'}` |',
     '| `ctx.wallet.consume(amount, reason)` | Spend the CALLER\'s morsels; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
     '| `ctx.wallet.getBalance()` | The caller\'s morsel balance |',

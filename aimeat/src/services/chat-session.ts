@@ -5,23 +5,35 @@
  * @description One turn of the chat, end to end: the person's identity, the agent process, the
  *   conversation record, and what came back.
  *
- *   The node runs ONE agent process and gives each conversation a session inside it. That is the
- *   shape goose supports and the one that scales here: sessions are created on first use and each
- *   carries its own MCP server list, so a session speaks to this node as the person who owns it and
- *   the tool surface refuses everything they may not do. Fifty people with five talking at once is
- *   one process, not fifty.
+ *   WHICH PROCESS RUNS A TURN (services/goose-env.ts, services/chat-agent-pool.ts).
+ *   - The node route, the default (no AIMEAT_GOOSE_PROVIDER_API_KEY): each person has an agent
+ *     process of their own, started on their first turn and closed when idle. Its model calls go to
+ *     this node's /v1/llm with that person's chat token, so the owner's model policy, budget and
+ *     allowance apply and the usage is recorded to them. A process never runs another person's turn,
+ *     because its token would spend the wrong person's budget.
+ *   - The shared key, the operator's special case: ONE process for everybody, on the operator's key,
+ *     with no per-person metering. This is how every node ran before 2026-09-28.
+ *   In both, each conversation gets a goose session inside the process, with its own MCP server list,
+ *   so a session speaks to this node as the person who owns it and the tool surface refuses
+ *   everything they may not do.
  *
- *   Session ids belong to a running process. When the agent restarts, every id it handed out means
- *   nothing, so they are stamped with the generation that issued them and a stale one is silently
- *   replaced rather than used. The conversation itself is unaffected: it lives in the person's
- *   memory, and goose's own store is a cache.
+ *   Session ids belong to a running process. When a process is replaced, every id it handed out
+ *   means nothing, so they are stamped with the generation that issued them and a stale one is
+ *   silently replaced rather than used. The conversation itself is unaffected: it lives in the
+ *   person's memory, and goose's own store is a cache.
  * @structure
  *   - chatEnabled() — whether this node has an agent at all
+ *   - chatPayer() — who pays for this person's turns, and on which model, as the node decides it
  *   - runChatTurn() — the whole turn, yielding updates as they happen and persisting both sides
- *   - shutdownChat() — stop the agent process
+ *   - shutdownChat() — stop every agent process
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.6.0 — 2026-09-28 — System 2 plan, V5: without the shared key each person's turns run in a
+ *     process of their own whose model calls go through /v1/llm with their chat token, so the model
+ *     policy, the budget and the metering apply to the chat (Jouni's ruling J6). chatPayer() answers
+ *     who pays. The model a turn records is the operator's only on the shared key, because /v1/llm
+ *     chooses the model per call.
  *   v1.5.1 — 2026-09-12 — resolveGhii takes the node; the composed GHII moved into the helper.
  *     wish-identity-gate-sees-resolveghii.
  *   v1.5.0 — 2026-09-08 — An agent process that exited is replaced on the next turn instead of
@@ -46,7 +58,10 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { GooseAcpClient, aimeatMcpServer, type SessionUpdate } from './goose-acp.js';
-import { ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
+import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
+import { AgentPool, type AgentLease, type PoolStart } from './chat-agent-pool.js';
+import { chatUsesSharedKey } from './goose-env.js';
+import { prepareAiCall } from './ai-completion.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
@@ -54,10 +69,20 @@ import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
 
-/** The single agent process, and which generation it is. */
-let client: GooseAcpClient | null = null;
-let generation = 0;
-let starting: Promise<GooseAcpClient> | null = null;
+/** How long a person's own agent process stays up with no turn in flight. */
+export const CHAT_AGENT_IDLE_MS = 15 * 60_000;
+/** The most agent processes this node runs at once on the node route. */
+export const CHAT_AGENT_MAX_LIVE = 20;
+/** A turn may run 15 minutes (goose-acp TURN_TIMEOUT_MS); a process whose token expires sooner than
+ *  this is replaced before the next turn, so the key does not expire in the middle of one. */
+const TOKEN_RENEW_BEFORE_MS = 20 * 60_000;
+/** The pool key of the one shared process. An owner name never contains `*`. */
+const SHARED_KEY = '*';
+
+/** The running agent processes: one per person on the node route, one on the shared key. */
+const pool = new AgentPool<GooseAcpClient>({
+    idleMs: CHAT_AGENT_IDLE_MS, maxLive: CHAT_AGENT_MAX_LIVE, renewBeforeMs: TOKEN_RENEW_BEFORE_MS,
+});
 
 /** Whether this node has a chat agent configured at all. */
 export function chatEnabled(config: AimeatConfig): boolean {
@@ -65,48 +90,84 @@ export function chatEnabled(config: AimeatConfig): boolean {
 }
 
 /**
- * The agent process, started on first use.
+ * The process that runs this person's turn, held for the length of the turn.
  *
- * Concurrent first turns share one start rather than racing into two processes, which is the same
- * reason goose's own session manager holds a per-session creation lock.
+ * A process that died is dropped and the next turn starts a fresh one (until 2026-09-08 a dead one
+ * was kept, and chat answered "goose agent is not running" until the node restarted); the generation
+ * stamp then retires every session the old one issued. Concurrent first turns share one start.
  */
-async function agent(config: AimeatConfig): Promise<GooseAcpClient> {
-    // A process that died stays dead; the client wrapping it refuses every call. Until 2026-09-08
-    // it was kept anyway, so one crash left chat answering "goose agent is not running" until the
-    // node restarted (found by e2e-chat-agent). A dead one is dropped and the next turn starts a
-    // fresh process; the generation stamp then retires every session the old one issued.
-    if (client?.isClosed) {
-        logger.warn(`[chat] agent process is gone (generation ${generation}); the next turn starts another`);
-        client = null;
+async function agentFor(deps: ChatDeps, ownerName: string): Promise<AgentLease<GooseAcpClient>> {
+    const { storage, config } = deps;
+    if (chatUsesSharedKey(config)) {
+        // The operator changed the route while per-person processes ran: they go once idle.
+        pool.retireAllExcept((key) => key === SHARED_KEY);
+        return pool.acquire(SHARED_KEY, async () => ({ client: await GooseAcpClient.start(config) }), { evictIdle: false });
     }
-    if (client) return client;
-    if (starting) return starting;
-
-    starting = GooseAcpClient.start(config)
-        .then((c) => {
-            client = c;
-            generation++;
-            logger.info(`[chat] agent process started (generation ${generation})`);
-            return c;
-        })
-        .finally(() => { starting = null; });
-    return starting;
+    pool.retireAllExcept((key) => key !== SHARED_KEY);
+    return pool.acquire(ownerName, () => startPersonalAgent(storage, config, ownerName), { evictIdle: true });
 }
 
-/** Stop the agent. Called from the node's shutdown hook. */
+/**
+ * Start one person's own agent process on the node route.
+ *
+ * Its /v1/llm key is a chat agent token of its own, minted for this process and revoked when the
+ * process closes, so the credential lives exactly as long as the process that holds it.
+ */
+async function startPersonalAgent(
+    storage: Storage, config: AimeatConfig, ownerName: string,
+): Promise<PoolStart<GooseAcpClient>> {
+    const identity = await ensureChatAgent(storage, config, ownerName);
+    const { token, sessionId, expiresAt } = await mintChatAgentToken(storage, config, identity);
+    const revoke = () => {
+        storage.revokeSession(sessionId).catch((e: Error) => {
+            logger.warn(`[chat] could not revoke the model-call token of ${identity.gaii}: ${e.message}`);
+        });
+    };
+    try {
+        const client = await GooseAcpClient.start(config, { token });
+        return { client, expiresAt: Date.parse(expiresAt), onClose: revoke };
+    } catch (err) {
+        revoke();
+        throw err;
+    }
+}
+
+/** Stop every agent process. Called from the node's shutdown hook. */
 export function shutdownChat(): void {
-    client?.close();
-    client = null;
+    pool.closeAll();
 }
 
 /** A goose session id is only meaningful for the process that issued it. */
-function stamp(sessionId: string): string {
+function stamp(generation: number, sessionId: string): string {
     return `${generation}:${sessionId}`;
 }
-function unstamp(stamped: string | undefined): string | null {
+function unstamp(stamped: string | undefined, generation: number): string | null {
     if (!stamped) return null;
     const [gen, ...rest] = stamped.split(':');
     return Number(gen) === generation ? rest.join(':') : null;
+}
+
+/**
+ * Who pays for this person's chat turns, and on which model, as the node decides it.
+ *
+ * On the shared key the operator's key pays for every turn: 'node'. On the node route each model
+ * call is decided by prepareAiCall in /v1/llm, so the same decision is asked here with the same
+ * inputs: 'own' when the person's own key (or their chat agent's) pays, 'allowance' when the node's
+ * key pays from their allowance. A call the gate would refuse has no payer, and the answer is null:
+ * the turn itself then says why.
+ */
+export async function chatPayer(
+    deps: ChatDeps, gaii: string,
+): Promise<{ pays: 'node' | 'own' | 'allowance' | null; model?: string }> {
+    const { storage, config } = deps;
+    if (chatUsesSharedKey(config)) return { pays: 'node', ...(config.gooseModel ? { model: config.gooseModel } : {}) };
+    try {
+        const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', agent: CHAT_AGENT_NAME, caller: 'chat' });
+        return { pays: plan.keyScope === 'node' ? 'allowance' : 'own', model: plan.model };
+    } catch (err) {
+        logger.info(`[chat] no payer for ${gaii}'s chat: ${(err as Error).message}`);
+        return { pays: null };
+    }
 }
 
 /**
@@ -116,21 +177,20 @@ function unstamp(stamped: string | undefined): string | null {
  * the person's tool surface, and it should live exactly as long as the session that carries it.
  */
 async function sessionFor(
-    deps: ChatDeps, ownerName: string, gaii: string, threadId: string,
+    deps: ChatDeps, lease: AgentLease<GooseAcpClient>, ownerName: string, gaii: string, threadId: string,
 ): Promise<string> {
     const { storage, config } = deps;
     const thread = await readThread(storage, gaii, threadId);
-    const existing = unstamp(thread?.gooseSessionId);
+    const existing = unstamp(thread?.gooseSessionId, lease.generation);
     if (existing) return existing;
 
     const identity = await ensureChatAgent(storage, config, ownerName);
     const { token } = await mintChatAgentToken(storage, config, identity);
-    const acp = await agent(config);
 
-    const sessionId = await acp.newSession({
+    const sessionId = await lease.client.newSession({
         mcpServers: [aimeatMcpServer(config.baseUrl, token)],
     });
-    await setGooseSession(storage, gaii, threadId, stamp(sessionId));
+    await setGooseSession(storage, gaii, threadId, stamp(lease.generation, sessionId));
     logger.info(`[chat] ${identity.gaii} -> goose session ${sessionId} for thread ${threadId}`);
     return sessionId;
 }
@@ -182,17 +242,29 @@ export async function* runChatTurn(
         ...(attachmentKeys.length ? { attachments: attachmentKeys.slice(0, MAX_ATTACHMENTS_PER_TURN) } : {}),
     });
 
+    // The process is held for the whole turn: the pool neither closes it as idle nor counts it free
+    // until release() runs in the finally block below.
+    let lease: AgentLease<GooseAcpClient>;
     let sessionId: string;
     try {
-        sessionId = await sessionFor(deps, ownerName, gaii, threadId);
+        lease = await agentFor(deps, ownerName);
     } catch (err) {
+        const message = (err as Error).message;
+        logger.warn(`[chat] could not start an agent for ${ownerName}: ${message}`);
+        yield { kind: 'error', message };
+        return;
+    }
+    try {
+        sessionId = await sessionFor(deps, lease, ownerName, gaii, threadId);
+    } catch (err) {
+        lease.release();
         const message = (err as Error).message;
         logger.warn(`[chat] could not open a session for ${ownerName}: ${message}`);
         yield { kind: 'error', message };
         return;
     }
 
-    const acp = await agent(config);
+    const acp = lease.client;
 
     // STOPPING HAS TO REACH THE AGENT. Closing the stream only stops the node LISTENING: goose is a
     // separate process that was told to answer, and it keeps answering — spending the node's key on
@@ -234,6 +306,7 @@ export async function* runChatTurn(
         }
     } finally {
         signal?.removeEventListener('abort', onAbort);
+        lease.release();
         // Written even when the turn ended badly: half an answer and the tools that ran is a truer
         // record than nothing, and it is what the person saw on screen.
         const turn: ChatTurn = {
@@ -245,7 +318,9 @@ export async function* runChatTurn(
             // Only what the node itself chose. ACP's `done` update carries a stop reason and a token
             // count and no model name, so a node that leaves the model to goose's own configuration
             // genuinely does not know which one answered — and says nothing rather than guessing.
-            ...(config.gooseModel ? { model: config.gooseModel } : {}),
+            // On the node route /v1/llm chooses the model per call and GOOSE_MODEL is not what
+            // answered, so only the shared key's model is written down.
+            ...(config.gooseModel && chatUsesSharedKey(config) ? { model: config.gooseModel } : {}),
         };
         await appendTurn(storage, gaii, threadId, turn).catch((e: Error) => {
             logger.warn(`[chat] could not save the agent turn: ${e.message}`);

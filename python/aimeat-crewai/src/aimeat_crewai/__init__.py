@@ -26,9 +26,23 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.30.0 -- 2026-09-28 -- `node_llm()` returns a CrewAI LLM that calls the node's /v1/llm route with
+    the agent's token, so the owner's model policy, key order and budget apply to the crew's calls;
+    `capabilities()` reads GET /v1/ai/capabilities (what is on, which model, and why one is off).
   0.29.0 -- 2026-09-24 -- `serve_auth_headers` is exported: the header carrying the serve daemon's
     per-start secret, for a client that builds its own session against the daemon.
 """
+from .ai import (
+    CAPABILITIES as AI_CAPABILITIES,
+)
+from .ai import (
+    NODE_CHOOSES_MODEL,
+    AiError,
+    AiRefused,
+    AiUnreachable,
+    capabilities,
+    node_llm,
+)
 from .daemon import (
     DAEMON_DEFAULT_TOOL_FILTER,
     BuildCrewCallback,
@@ -159,7 +173,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.29.0"
+__version__ = "0.30.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
@@ -197,6 +211,14 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "offers_check",
     "offers_publish",
     "offers_tools",
+    # The node's AI for a crew (0.30.0): an LLM on the node's /v1/llm route, and what is on
+    "node_llm",
+    "capabilities",
+    "NODE_CHOOSES_MODEL",
+    "AI_CAPABILITIES",
+    "AiError",
+    "AiRefused",
+    "AiUnreachable",
     # Decision rules — the owner's questions, thresholds and bands, as tools (0.27.0).
     # The QUESTIONS, THRESHOLDS AND BANDS ARE THE OWNER'S: a caller that names a rule sends only
     # the state, and there is deliberately no export here for overriding any of the three.

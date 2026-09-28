@@ -26,6 +26,9 @@
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.1.0 — 2026-09-28 — System 2 plan, V5: `start` passes on `op`, `provider`, `audio_key`,
+ *     `language` and `size`. A transcription reads the audio from the extension owner's storage,
+ *     the namespace the job belongs to.
  *   v1.0.1 — 2026-09-05 — ExtensionCtx comes from extension-ctx-contract.ts, the leaf the runtime
  *     re-exports it from; a type import of the runtime itself is an edge the dependency cruiser
  *     counts.
@@ -104,6 +107,13 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                 // Per app, so the existing charts and the existing per-app quota already cover it.
                 app_id: `ext:${extName}`,
                 ...(opts?.on_done ? { on_done: { extension: String(opts.on_done.extension), action: String(opts.on_done.action) } } : {}),
+                // The fields of POST /v1/ai/jobs, passed on as strings; the start refuses an op it
+                // does not know and a field that does not go with the op (op.ts).
+                ...(opts?.op !== undefined ? { op: String(opts.op) } : {}),
+                ...(typeof opts?.provider === 'string' ? { provider: opts.provider } : {}),
+                ...(typeof opts?.audio_key === 'string' ? { audio_key: opts.audio_key } : {}),
+                ...(typeof opts?.language === 'string' ? { language: opts.language } : {}),
+                ...(typeof opts?.size === 'string' ? { size: opts.size } : {}),
             };
 
             try {

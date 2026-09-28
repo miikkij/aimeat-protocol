@@ -43,6 +43,9 @@
  * @structure aiJobsRouter(config, storage, service)
  * @usage app.use(aiJobsRouter(config, storage, aiJobService));
  * @version-history
+ *   v1.2.0 — 2026-09-28 — System 2 plan, V5: POST /v1/ai/jobs takes `op` (text, image, transcribe),
+ *     `provider`, `audio_key` and `language` for a transcription, and `size` for an image. The route
+ *     passes them on; the service refuses a field that does not apply to the op, before it writes.
  *   v1.1.1 — 2026-09-05 — `created_by` is the resolved principal, not the raw `sub`: on an owner
  *     session the two differ (bare name against GHII), and the identity ratchet main grew while
  *     this branch waited refuses a route that reads `sub` and never resolves it.
@@ -91,6 +94,7 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
                 result_key?: string; result_visibility?: 'private' | 'owner' | 'public';
                 model?: string; system_prompt?: string; json?: boolean; app_id?: string;
                 on_done?: { extension?: string; action?: string };
+                op?: string; provider?: string; audio_key?: string; language?: string; size?: string;
             };
 
             if (body.input_keys !== undefined
@@ -118,6 +122,13 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
                     ...(body.json ? { json: true } : {}),
                     ...(body.app_id !== undefined ? { app_id: String(body.app_id) } : {}),
                     ...(body.on_done ? { on_done: { extension: body.on_done.extension as string, action: body.on_done.action as string } } : {}),
+                    // Passed on as strings; the service checks the op and which fields go with it
+                    // (services/ai-jobs/op.ts), so every code path refuses the same combinations.
+                    ...(body.op !== undefined ? { op: String(body.op) } : {}),
+                    ...(body.provider !== undefined ? { provider: String(body.provider) } : {}),
+                    ...(body.audio_key !== undefined ? { audio_key: String(body.audio_key) } : {}),
+                    ...(body.language !== undefined ? { language: String(body.language) } : {}),
+                    ...(body.size !== undefined ? { size: String(body.size) } : {}),
                 }, {
                     // Never from the body. `owner` decides whose key pays and whose namespace the
                     // answer lands in; `created_by` is the audit trail and carries no authority.

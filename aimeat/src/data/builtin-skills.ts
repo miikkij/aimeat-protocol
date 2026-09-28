@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.17.0 -- 2026-09-28 -- aimeat-ai-capabilities (builtin-skills.ai-capabilities.ts), System 2 plan V5;
+ *            set-up-content-pipeline names the ai step's op (image, transcribe).
  *   v1.16.11 -- 2026-09-28 -- diagnose-a-workflow names the refusal reason too-costly (model catalogue, V4).
  *   v1.16.10 -- 2026-09-28 -- ai-transparency and configure-routing move to builtin-skills.ai.ts, unchanged
  *            and in the same places of BUILTIN_SKILLS (pure move; the file was at 800 lines).
@@ -126,6 +128,7 @@ import { GAME_SKILL_ENTRIES } from './builtin-skills-games.js';
 import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
 import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
 import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY } from './builtin-skills.ai.js';
+import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -350,7 +353,8 @@ validate and a new agent has none.
 
 **Scopes and modes.** Name each scope, never \`*\`, and never more than you hold yourself. An agent
 that reads and writes the owner's memory needs \`memory:read\` and \`memory:write\`; one that takes
-queued work also needs \`work:read\` and \`work:accept\`. \`mode: "task-runner"\` lets a queued task
+queued work also needs \`work:read\` and \`work:accept\`; one that uses the owner's AI (text, pictures,
+transcription, embeddings, or the node's \`/v1/llm\` through \`node_llm()\`) needs \`ai:use\`. \`mode: "task-runner"\` lets a queued task
 start without asking the owner each time, so say that in the purpose. \`run_mode: "spawn"\` starts
 a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and suits a front door.
 
@@ -427,7 +431,9 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
 - When steps call the owner's own model (\`action.kind: "ai"\`), set \`maxCostUsd\` on the
   definition: an ai step then starts only when what one attempt is expected to cost fits in what
   is left, so a run that goes wrong stops at a known cost, and says so on the run. A step expected
-  to cost more than the whole limit still runs once, alone.
+  to cost more than the whole limit still runs once, alone. An ai step can also make a picture
+  (\`op: "image"\`) or transcribe a stored recording (\`op: "transcribe"\`, \`audio_key\`); check the
+  capability with \`aimeat_ai_capabilities\` before saving, because one that is off stops the step.
 - The schedule runs on the saver's permissions. The agent that saves the workflow must keep every
   permission its steps need; if the owner later takes one away, the scheduled run is refused and
   the owner is asked, once. Chaining agents is giving them work, so a step that dispatches to an
@@ -436,6 +442,7 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   },
   CONFIGURE_ROUTING_SKILL_ENTRY,
   AI_MODEL_POLICY_SKILL_ENTRY,
+  AI_CAPABILITIES_SKILL_ENTRY,
   {
     name: 'use-app-bound-skills',
     skillMd: `---

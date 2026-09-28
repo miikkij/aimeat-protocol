@@ -37,10 +37,18 @@
  *   v1.7.0 — 2026-09-26 — The write of the answer to result_to_key is passed to the engine with the
  *     answer (ResultWrite, engine-answer.ts), and the engine makes it only while the step still waits
  *     for an answer (secaudit 2026-09, R4).
+ *   v1.8.0 — 2026-09-28 — System 2 plan, V5: `op`. 'image' calls generateForOwner with the assembled
+ *     prompt and writes { storage_key, url, mime_type, model }; 'transcribe' calls transcribeForOwner
+ *     on the file at audio_key in the owner's storage and writes the transcript, or
+ *     { text, language, seconds, model } with `json`. `provider` reaches every call. Each op's cost
+ *     counts toward the run's cost cap as a text call's does.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
 import { completeForOwner } from '../ai-completion.js';
+import { generateForOwner } from '../ai-image.js';
+import { transcribeForOwner } from '../ai-transcription.js';
+import { aiOpOf, aiOpRefusal } from '../ai-jobs/op.js';
 import { getOwnerScopeMemory } from '../owner-memory.js';
 import { template } from './engine-util.js';
 import { reportOutcome, type ResultWrite } from './engine-answer.js';
@@ -74,8 +82,56 @@ export function dispatchAiStep(
   // What this step's model calls cost, as the node recorded each: the run's cost cap adds it up. A
   // JSON retry is a second call, and a step that fails after the provider answered has still spent.
   let spentUsd = 0;
+  const addSpend = (cost: unknown): void => {
+    if (typeof cost === 'number' && Number.isFinite(cost) && cost > 0) spentUsd += cost;
+  };
+  const appId = `workflow:${workflowId}`;
+
+  // The write of the step's answer to result_to_key. The engine makes it, and only while the step
+  // still waits for the answer: once the step has ended, a later answer writes nothing (engine.ts
+  // onPushTerminal). No result_to_key, no write: the step's own success_signal decides.
+  const landValue = (value: unknown): ResultWrite | undefined => {
+    if (!action.result_to_key) return undefined;
+    const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
+    return async () => {
+      const existing = await deps.storage.getMemory(ownerGhii, key);
+      const now = new Date().toISOString();
+      await deps.storage.setMemory({
+        key, ownerGaii: ownerGhii, value,
+        visibility: 'owner', tags: ['workflow-ai-result'], ttlHours: null,
+        version: existing ? existing.version + 1 : 1,
+        createdAt: existing?.createdAt ?? now, updatedAt: now,
+      });
+    };
+  };
+
+  // op 'transcribe': the audio file at audio_key, in the owner's own storage, becomes text. No
+  // prompt. A storage key, so the run's keyPrefix (a memory-key prefix) does not apply to it.
+  const transcribe = async (): Promise<ResultWrite | undefined> => {
+    const audioKey = template(action.audio_key ?? '', run.vars);
+    const file = await deps.storage.getStorageFile(ownerGhii, audioKey);
+    if (!file) throw new Error(`audio_key "${audioKey}" is not a file in the owner's storage`);
+    const r = await transcribeForOwner(deps.storage, deps.config, ownerGhii, {
+      audio: { data: file.data, mime: file.mimeType || 'application/octet-stream', filename: audioKey.split('/').pop() || 'audio' },
+      ...(action.model ? { model: action.model } : {}),
+      ...(action.language ? { language: action.language } : {}),
+      ...(action.provider ? { provider: action.provider } : {}),
+      appId,
+    });
+    addSpend(r.usage.costUsd);
+    return landValue(action.json
+      ? { text: r.text, language: r.language ?? null, seconds: r.seconds, model: r.model }
+      : r.text);
+  };
 
   const fire = async (): Promise<ResultWrite | undefined> => {
+    // The fields go with the op. The save refuses any other combination (workflow-ai-step.ts); a
+    // definition stored before that rule is held to it here, and fails the step with the reason.
+    const refusal = aiOpRefusal(action);
+    if (refusal) throw new Error(refusal);
+    const op = aiOpOf(action.op);
+    if (op === 'transcribe') return transcribe();
+
     // The prompt comes from a record when one is named, so changing it is a memory write. The
     // record's own text is templated too: a prompt that names {ref} means the same thing here as a
     // key that does.
@@ -112,6 +168,20 @@ export function dispatchAiStep(
       prompt += `\n\n---\nINPUT DATA. This is the whole of what you have been given; anything not\nstated here is unknown, and unknown is reported, never filled in.\n\n${parts.join('\n\n')}\n`;
     }
 
+    // op 'image': one picture from the assembled prompt, stored in the owner's storage (private);
+    // the answer is the record that names it. The service builds the URL, once.
+    if (op === 'image') {
+      const r = await generateForOwner(deps.storage, deps.config, ownerGhii, {
+        prompt,
+        ...(action.model ? { model: action.model } : {}),
+        ...(action.size ? { size: action.size } : {}),
+        ...(action.provider ? { provider: action.provider } : {}),
+        appId,
+      });
+      addSpend(r.usage.costUsd);
+      return landValue({ storage_key: r.storageKey, url: r.fetchUrl, mime_type: r.mime, model: r.model });
+    }
+
     // An empty answer never reaches here: the transport asks again and then throws with the
     // provider's finish_reason, and that throw is this step's red. `reasoning` goes to the provider
     // as the action wrote it; `uncapped` keeps the owner's max_tokens preference off this call.
@@ -120,46 +190,32 @@ export function dispatchAiStep(
         prompt,
         ...(action.model ? { model: action.model } : {}),
         ...(action.reasoning ? { reasoning: action.reasoning } : {}),
+        ...(action.provider ? { provider: action.provider } : {}),
         uncapped: true,
-        appId: `workflow:${workflowId}`,
+        appId,
       });
-      const cost = answer.usage?.costUsd;
-      if (typeof cost === 'number' && Number.isFinite(cost) && cost > 0) spentUsd += cost;
+      addSpend(answer.usage?.costUsd);
       return answer;
     };
     let r = await ask();
 
-    if (action.result_to_key) {
-      const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
-      // Parsed when the step asks for JSON, so a malformed answer fails HERE rather than becoming a
-      // string that every downstream reader has to re-parse and none of them validates.
-      let value: unknown = r.content;
-      if (action.json) {
-        // Prose where JSON was asked for is the empty answer's sibling: the model produced something,
-        // and none of it is usable. Asked again, bounded, then red with the count.
-        let m = JSON_RE.exec(r.content);
-        for (let attempt = 1; !m && attempt <= JSON_RETRIES; attempt++) {
-          logger.warn(`workflow ${workflowId} run ${runId}: ai step "${stepId}" asked for json and got none; attempt ${attempt + 1} of ${JSON_RETRIES + 1}`);
-          r = await ask();
-          m = JSON_RE.exec(r.content);
-        }
-        if (!m) throw new Error(`ai step asked for json and the answer contained none, ${JSON_RETRIES + 1} attempts`);
-        value = JSON.parse(m[0]);
+    if (!action.result_to_key) return undefined;
+    // Parsed when the step asks for JSON, so a malformed answer fails HERE rather than becoming a
+    // string that every downstream reader has to re-parse and none of them validates.
+    let value: unknown = r.content;
+    if (action.json) {
+      // Prose where JSON was asked for is the empty answer's sibling: the model produced something,
+      // and none of it is usable. Asked again, bounded, then red with the count.
+      let m = JSON_RE.exec(r.content);
+      for (let attempt = 1; !m && attempt <= JSON_RETRIES; attempt++) {
+        logger.warn(`workflow ${workflowId} run ${runId}: ai step "${stepId}" asked for json and got none; attempt ${attempt + 1} of ${JSON_RETRIES + 1}`);
+        r = await ask();
+        m = JSON_RE.exec(r.content);
       }
-      // The engine makes this write, and only while the step still waits for the answer: once the
-      // step has ended, a later answer writes nothing (engine.ts onPushTerminal).
-      return async () => {
-        const existing = await deps.storage.getMemory(ownerGhii, key);
-        const now = new Date().toISOString();
-        await deps.storage.setMemory({
-          key, ownerGaii: ownerGhii, value,
-          visibility: 'owner', tags: ['workflow-ai-result'], ttlHours: null,
-          version: existing ? existing.version + 1 : 1,
-          createdAt: existing?.createdAt ?? now, updatedAt: now,
-        });
-      };
+      if (!m) throw new Error(`ai step asked for json and the answer contained none, ${JSON_RETRIES + 1} attempts`);
+      value = JSON.parse(m[0]);
     }
-    return undefined;
+    return landValue(value);
   };
 
   reportOutcome(fire(),

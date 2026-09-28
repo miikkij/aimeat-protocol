@@ -42,6 +42,8 @@
  *   // … point the node at provider.baseUrl and drive it …
  *   await provider.close();
  * @version-history
+ *   v1.3.0 — 2026-09-28 — Embeddings (POST …/embeddings, embeddingsJson) and speech (POST
+ *     …/audio/speech, speechAudio) routes (System 2 plan, V5).
  *   v1.2.0 — 2026-09-28 — An Anthropic Messages route (POST …/messages) and its reply builders, for the
  *     direct Anthropic provider (System 2 plan, V3).
  *   v1.1.0 — 2026-09-25 — Port 0 takes any free port, and `port` and `baseUrl` name the one bound. A
@@ -53,7 +55,7 @@ import { createServer, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 /** Which door of the provider a request arrived at. `other` is anything else, recorded not refused. */
-export type StubRoute = 'chat' | 'models' | 'transcriptions' | 'images' | 'messages' | 'other';
+export type StubRoute = 'chat' | 'models' | 'transcriptions' | 'images' | 'messages' | 'embeddings' | 'speech' | 'other';
 
 /** One request as the provider saw it. `bytes` is the body untouched; `body` is it as UTF-8, which
  *  is what the multipart assertions read (the field markers are ASCII either way). */
@@ -110,6 +112,8 @@ function routeOf(pathname: string, method = 'GET'): StubRoute {
     if (pathname.endsWith('/audio/transcriptions')) return 'transcriptions';
     if (pathname.endsWith('/images/generations')) return 'images';
     if (method === 'POST' && pathname.endsWith('/messages')) return 'messages';
+    if (method === 'POST' && pathname.endsWith('/embeddings')) return 'embeddings';
+    if (method === 'POST' && pathname.endsWith('/audio/speech')) return 'speech';
     return 'other';
 }
 
@@ -191,6 +195,32 @@ export function imageJson(v: { b64?: string; dataUrl?: string; cost?: number; er
             ...(typeof v.cost === 'number' ? { usage: { cost: v.cost } } : {}),
         },
     };
+}
+
+/**
+ * An OpenAI embeddings answer: one vector per input, in order. Without `vectors`, each input of the
+ * request gets a small vector derived from its position, so a suite can tell them apart.
+ */
+export function embeddingsJson(v: { vectors?: number[][]; model?: string; tokens?: number; cost?: number } = {}): Reply {
+    return (req: RecordedRequest) => {
+        const input = req.json?.input;
+        const count = Array.isArray(input) ? input.length : 1;
+        const vectors = v.vectors ?? Array.from({ length: count }, (_, i) => [i + 0.25, 0.5, 0.75]);
+        return {
+            kind: 'json',
+            body: {
+                object: 'list',
+                model: v.model ?? String(req.json?.model ?? 'stub/embed'),
+                data: vectors.map((embedding, index) => ({ object: 'embedding', index, embedding })),
+                usage: { prompt_tokens: v.tokens ?? 4 * count, total_tokens: v.tokens ?? 4 * count, ...(typeof v.cost === 'number' ? { cost: v.cost } : {}) },
+            },
+        };
+    };
+}
+
+/** Spoken audio: a few bytes of `audio/mpeg`, which is all the node checks and streams on. */
+export function speechAudio(bytes = 'ID3-stub-audio'): StubReply {
+    return { kind: 'text', status: 200, body: bytes, contentType: 'audio/mpeg' };
 }
 
 /** A provider failure with a status and a body, which is how the node learns the reason. */
@@ -317,13 +347,15 @@ const BUILT_IN_DEFAULTS: Record<StubRoute, Reply> = {
     // a missing line of script reads as a missing line of script.
     images: providerStatus(500, '{"error":{"message":"fake-ai-provider: no image reply was scripted"}}'),
     messages: anthropicJson('ok'),
+    embeddings: embeddingsJson(),
+    speech: speechAudio(),
     other: providerStatus(404, '{"error":{"message":"fake-ai-provider: no such route"}}'),
 };
 
 export async function startFakeAiProvider(port: number): Promise<FakeAiProvider> {
     const requests: RecordedRequest[] = [];
     const scripted: Record<StubRoute, Scripted[]> = {
-        chat: [], models: [], transcriptions: [], images: [], messages: [], other: [],
+        chat: [], models: [], transcriptions: [], images: [], messages: [], embeddings: [], speech: [], other: [],
     };
     const defaults: Record<StubRoute, Reply> = { ...BUILT_IN_DEFAULTS };
     const held: Array<{ route: StubRoute; req: RecordedRequest; res: ServerResponse }> = [];

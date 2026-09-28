@@ -11,6 +11,7 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   v1.5.0 — 2026-09-28 — modelDefaultTts, modelDefaultEmbed, ttsVoiceDefault (System 2 plan, V5).
  *   v1.4.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): aiCatalogRefresh, aiPriceOverrides,
  *     aiCatalogSources.
  *   v1.3.0 — 2026-09-28 — The operator's AI providers (System 2 plan, V3): aiProviders,
@@ -97,6 +98,12 @@ export interface AiCapabilityConfig extends DecideConfig {
   modelDefaultVision: string;
   modelDefaultStt: string;
   modelDefaultImage: string;
+  /** Speech (text to speech) and embeddings, the two roles V5 of the System 2 plan adds. The node's
+   *  key pays for either only when the operator named its model here (ruling J4). */
+  modelDefaultTts: string;
+  modelDefaultEmbed: string;
+  /** The voice a speech call gets when neither the call nor the owner named one. Empty = the call names it. */
+  ttsVoiceDefault: string;
   /** ISO-639-1 hint for speech-to-text when the owner has set none. Empty = let the model detect. */
   sttLanguageDefault: string;
   /**

@@ -29,6 +29,10 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.2.0 — 2026-09-28 — Capabilities for apps and agents (V5): the app's prefer.* orders the owner's
+ *     candidates (byAppPreference, chosenBy 'app-prefer'); an embedding falls back only to the same
+ *     model, and speech only when speechVoiceMayChange; files only on a model that reads them, or on
+ *     OpenRouter with a PDF engine.
  *   v1.1.0 — 2026-09-28 — With the model catalogue (V4): a named model falls back to the same model at
  *     another type (catalog/equivalence.ts); poolOrder `cheapest` orders the pool by the catalogue's
  *     text price; the owner's maxCostPerCallUsd skips a candidate the catalogue prices above it.
@@ -109,6 +113,9 @@ export interface RoutePlanInput {
   /** What the call will use, for the owner's price ceiling: the prompt's tokens (a quarter of its
    *  length) and the answer's cap. Absent, a text call is estimated at 1024 tokens each way. */
   estimate?: { promptTokens?: number; maxTokens?: number };
+  /** The app's order of preference for this capability, from `prefer.<capability>` in its meta:
+   *  provider types and model references. It orders the owner's candidates and adds none. */
+  appPrefer?: string[];
 }
 
 /** The capabilities whose price is per token, so the pool can be ordered by it. */
@@ -220,14 +227,39 @@ function rawOrder(input: RoutePlanInput): { list: RawEntry[]; chosenBy: ChosenBy
   if (!ownerListed) {
     for (const p of providers.node) if (serves(p, capability) && modelOf(p, capability, input)) push(p, 'node-default');
   }
-  return { list: out, chosenBy: out[0]?.[1] ?? 'node-default', ownerListed };
+  const list = input.appPrefer?.length ? byAppPreference(out, input.appPrefer) : out;
+  return { list, chosenBy: list[0]?.[1] ?? 'node-default', ownerListed };
+}
+
+/**
+ * The owner's candidates in the app's order of preference (plan 11, section 9): each preferred type
+ * or model reference in turn takes the candidates of that type, and every other candidate follows in
+ * the owner's order. A preferred model reference is the model that candidate uses. Nothing is added
+ * and nothing is left out, so a preference the owner cannot meet never refuses a call.
+ */
+function byAppPreference(list: RawEntry[], prefer: string[]): RawEntry[] {
+  const out: RawEntry[] = [];
+  const taken = new Set<string>();
+  for (const pref of prefer) {
+    const ref = pref.includes(':') ? parseModelRef(pref) : null;
+    const type = ref?.type ?? pref;
+    for (const [p] of list) {
+      if (taken.has(p.id) || p.type !== type) continue;
+      taken.add(p.id);
+      out.push(ref ? [p, 'app-prefer', pref] : [p, 'app-prefer']);
+    }
+  }
+  for (const entry of list) if (!taken.has(entry[0].id)) out.push(entry);
+  return out;
 }
 
 /** Plan the call: the candidates in order and every rejection with its reason. */
 export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
   const { storage, config, gaii, capability, rules } = input;
   const { list, chosenBy, ownerListed } = rawOrder(input);
-  const allowFallback = rules.fallback && input.fallback !== false && chosenBy !== 'call-provider';
+  // Speech moves to another provider only when the owner allows another voice (plan 11, section 7).
+  const allowFallback = rules.fallback && input.fallback !== false && chosenBy !== 'call-provider'
+    && (capability !== 'speech' || rules.speechVoiceMayChange);
   const wanted = allowFallback ? rules.maxAttempts : 1;
   const candidates: AiCandidate[] = [];
   const rejected: RejectedCandidate[] = [];
@@ -267,8 +299,20 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     }
     if (!chosen) { reject(p, 'no-model', `${p.title} has no model set for ${capability}.`); continue; }
     // A named model falls back only to the same model: every candidate after the first carries it,
-    // by the catalogue's key for one model across types (catalog/equivalence.ts).
-    if (input.requested && candidates.length && canonicalModelKey(chosen.model) !== canonicalModelKey(candidates[0].model)) continue;
+    // by the catalogue's key for one model across types (catalog/equivalence.ts). So does an
+    // embedding, always: another model's vectors cannot be compared with the first one's (plan 11,
+    // section 7).
+    if ((input.requested || capability === 'embed') && candidates.length && canonicalModelKey(chosen.model) !== canonicalModelKey(candidates[0].model)) continue;
+    // Files: only a model that reads them itself, unless OpenRouter converts the PDF for it with the
+    // engine the owner chose (plan 11, section 3b). The node converts nothing. A model the catalogue
+    // does not know is given the benefit of the doubt, as the owner turned the capability on.
+    if (capability === 'files' && catalogModel(p.type, chosen.model)?.caps.fileIn === false) {
+      const parser = p.capabilities.files?.parser;
+      if (!(p.type === 'openrouter' && parser && parser !== 'native')) {
+        reject(p, 'capability-off', `${p.title}'s ${chosen.model} does not read files itself. Choose a model that does, or for OpenRouter a PDF engine.`);
+        continue;
+      }
+    }
 
     // ── the price ceiling (the owner's rule), from the catalogue; an unpriced model passes ──
     if (rules.maxCostPerCallUsd !== null) {

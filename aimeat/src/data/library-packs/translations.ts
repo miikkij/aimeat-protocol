@@ -10,6 +10,8 @@
  * @structure TRANSLATIONS[lang][packId] = { title?, description }
  * @usage import { TRANSLATIONS } from './library-packs/translations.js'; (getLibraryPackIndex(lang))
  * @version-history
+ *   v1.2.0 - 2026-09-28 - System 2 plan, V5: aimeat-ai in Finnish and Spanish names the user's own
+ *     AI providers, the capabilities and the check an app makes first, not an OpenRouter key.
  *   v1.1.0 - 2026-09-18 - Calendar and print descriptions in Finnish and Spanish.
  *   v1.0.0 — 2026-09-03 — Moved out of library-packs.ts (8 Finnish entries) and completed: every
  *     node pack in Finnish and Spanish, for the Libraries page (design canvas "AIMEAT Kirjastot-sivu").
@@ -25,7 +27,7 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     'aimeat-events': { description: 'Tapahtumat: kirjaa, mitä sovelluksessa tapahtui, tilinhaltijan omalle syötteelle, ja lue se takaisin.' },
     'aimeat-storage': { description: 'Tiedostot: lataus ylös ja alas, iso tiedosto paloina ja raahaa-ja-pudota-apuri.' },
     'aimeat-organism': { description: 'Organismit ja työtilat: listaus, työtilan yhtenäinen luku, jossa julkaistut ja luonnokset yhdistyvät, luonnosten kirjoitus, julkaisu, palautus luonnokseksi, poisto, README ja haku.' },
-    'aimeat-ai': { description: 'Tekoälykutsu käyttäjän omalla OpenRouter-avaimella. Päiväbudjetti ja sovelluskohtainen kiintiö pitävät kulut kurissa.' },
+    'aimeat-ai': { description: 'Tekoäly käyttäjän omien tekoälyn tarjoajien kautta: teksti, kuvan teko, puhe, litterointi ja upotukset, joilla haku löytää samaa tarkoittavan tekstin. Sovellus tarkistaa ensin tekoälyn kyvyt ja näyttää korjausohjeen, kun jokin kyky ei ole käytössä. Päiväbudjetti, sovelluskohtainen kiintiö ja omistajan mallirajaus pitävät kulut kurissa.' },
     'aimeat-datapackage': { description: 'Julkaise taulukko Frictionless-datapakettina AIMEAT-alkuperätiedoin: skeema päätellään, rivit ja sarakkeet tarkistetaan, versio lukitaan sisällön tiivisteeseen, ja pysyvä julkinen CSV-osoite avautuu suoraan DuckDB:llä, pandasilla ja Excelillä.' },
     'aimeat-iam': { description: 'Sovelluksen omat jäsenet ja roolit: kuka on hyväksytty, mitä rooli sallii, ja omistajan paneeli päätöksiin.' },
     'aimeat-wallet': { description: 'Morselit: saldo, tapahtumat, morselien pyytäminen ja saldomerkki käyttöliittymään.' },
@@ -95,7 +97,7 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     'aimeat-events': { description: 'Eventos: registra lo que pasó en la app en el propio feed del titular de la cuenta, y léelo de vuelta.' },
     'aimeat-storage': { description: 'Archivos: subida y descarga, subida por partes de un archivo grande y ayudante de arrastrar y soltar.' },
     'aimeat-organism': { description: 'Organismos y espacios de trabajo: listado, lectura unificada del espacio donde lo publicado y los borradores se combinan, escritura de borradores, publicación, vuelta a borrador, borrado de objetos, README y búsqueda.' },
-    'aimeat-ai': { description: 'Llamada a la IA con la clave de OpenRouter del usuario. El presupuesto diario y la cuota por app mantienen el gasto a raya.' },
+    'aimeat-ai': { description: 'IA con los proveedores de IA del propio usuario: texto, creación de imágenes, voz, transcripción e incrustaciones, que permiten buscar por significado. La app consulta primero las capacidades de la IA y, si alguna no está disponible, muestra cómo activarla. El presupuesto diario, la cuota por app y la restricción de modelos del propietario mantienen el gasto a raya.' },
     'aimeat-datapackage': { description: 'Publica una tabla como paquete de datos Frictionless con procedencia AIMEAT: el esquema se infiere, filas y columnas se comprueban, la versión se fija al hash del contenido y una dirección CSV pública permanente que DuckDB, pandas y Excel leen directamente.' },
     'aimeat-iam': { description: 'Los miembros y roles propios de la app: quién está aprobado, qué permite su rol, y el panel del dueño para decidirlo.' },
     'aimeat-wallet': { description: 'Morsels: saldo, movimientos, solicitud de morsels y la insignia de saldo para la interfaz.' },

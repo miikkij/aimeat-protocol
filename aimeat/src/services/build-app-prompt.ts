@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-28 — The aimeat-ai line: the user's own AI providers, capabilities() for any capability
+ *     but text, and ask for the capability, not a model (System 2 plan, V5). One line, in place.
  *   2026-09-19 — ADDITIVE, a new section after the aimeat-ai one: the decision model, checked for
  *     availability before building (build-app-prompt-decide.ts, TARGET-080).
  *   2026-09-18 — ADDITIVE, a new section before the aimeat-ai one: the prompt-driven workflow with
@@ -418,7 +420,7 @@ function composeAppPrompt(
 
   // AI
   body += '### AI (prompt-driven)\n';
-  body += "aimeat-ai runs an LLM on the LOGGED-IN USER's own OpenRouter key — free for the app, and the user controls spend. Load aimeat-auth first, then gate every \"Use AI\" control on isAvailable().\n";
+  body += "aimeat-ai runs AI on the LOGGED-IN USER's own AI providers (text, pictures, speech, transcription, embeddings) — free for the app, and the user controls spend. Load aimeat-auth first; for text gate the control on isAvailable(), for any other capability check `(await AIMEAT.ai.capabilities()).capabilities.<capability>.on` and show its `fix` when off. Ask for the capability, not a model.\n";
   body += '```html\n';
   body += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
   body += '<script src="' + nodeUrl + '/v1/libs/aimeat-ai.js"></' + 'script>\n';

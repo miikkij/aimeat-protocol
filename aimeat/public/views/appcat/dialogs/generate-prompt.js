@@ -13,6 +13,8 @@
  * @structure buildPrompt(opts) · classicFallback(nodeUrl, isImprove) · PB_LANGS
  * @usage buildPrompt({ track, app, description, lang, core, coreAtelier, template, packs, atelierLoading })
  * @version-history
+ *   v1.0.1 — 2026-09-28 — The aimeat-ai line says the user's own AI providers and capabilities() first
+ *     (System 2 plan, V5), as the library pack's promptLine does.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, dialogs builder 2), moved from the old cortex.js with its
  *     words unchanged; Spanish joins the language line because appcat shows Spanish.
  */
@@ -33,7 +35,7 @@ export function classicFallback(nodeUrl, isImprove) {
   prompt += '- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n';
   prompt += '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.\n\n';
   prompt += 'AI (prompt-driven — see the AI section below):\n';
-  prompt += '- aimeat-ai.js — LLM completions on the USER\'s own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n';
+  prompt += '- aimeat-ai.js — AI on the USER\'s own AI providers: text, pictures, speech, transcription, embeddings. Check `AIMEAT.ai.capabilities()` first and show the fix of one that is off. Requires aimeat-auth.\n\n';
   prompt += 'Economy & agents:\n';
   prompt += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
   prompt += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';

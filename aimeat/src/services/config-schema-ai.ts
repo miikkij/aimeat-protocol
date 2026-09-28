@@ -7,6 +7,7 @@
  *   CONFIG_FIELDS spreads these rows where they stood, so the Config tab lists them in the same order.
  * @structure SYSTEM2_AI_CONFIG_FIELDS
  * @version-history
+ *   v1.2.0 — 2026-09-28 — ai.model_default_tts, ai.tts_voice_default, ai.model_default_embed (V5).
  *   v1.1.1 — 2026-09-28 — Typed by AiCapabilityConfig, not AimeatConfig, which closed an import cycle.
  *   v1.1.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): ai.catalog_refresh,
  *     ai.price_overrides, ai.catalog_sources.
@@ -20,6 +21,11 @@ import { parseRecommendedModels } from './ai/policy.js';
 import { isJsonObject } from './config-schema-validators.js';
 
 export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig>[] = [
+  // The two roles V5 adds (services/ai-model-defaults.ts), after the six in config-schema.ts. The
+  // node's key pays for speech or embeddings only when the operator names the model here (J4).
+  { key: 'modelDefaultTts', dotPath: 'ai.model_default_tts', envVar: 'AIMEAT_MODEL_DEFAULT_TTS', type: 'string', validate: () => true, immutable: false, description: 'Default model for speech (text to speech), when the owner has not set one. Empty: the server\'s own key makes no speech' },
+  { key: 'ttsVoiceDefault', dotPath: 'ai.tts_voice_default', envVar: 'AIMEAT_TTS_VOICE_DEFAULT', type: 'string', validate: () => true, immutable: false, description: 'The voice a speech call gets when neither the call nor the owner named one. The voice names depend on the model' },
+  { key: 'modelDefaultEmbed', dotPath: 'ai.model_default_embed', envVar: 'AIMEAT_MODEL_DEFAULT_EMBED', type: 'string', validate: () => true, immutable: false, description: 'Default embedding model, when the owner has not set one. Empty: the server\'s own key makes no embeddings. Changing it makes every stored vector incomparable with new ones' },
   // The operator's AI providers (System 2 plan, V3; services/ai/providers.ts). Immutable where an
   // address or a key name is at stake, as System 1's decide.providers and decide.provider_egress are.
   { key: 'aiProviders', dotPath: 'ai.providers', envVar: 'AIMEAT_AI_PROVIDERS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'More AI providers of the node, as a JSON array of provider records (id, title, type, baseUrl, auth, capabilities). Auth is none or the NAME of an environment variable, never a key' },

@@ -25,16 +25,22 @@
  *   - text() — one completion, with the empty-answer retry
  *   - image() — one picture, through the image adapter
  *   - transcribeAudio() — one transcript, through the audio adapter or a provider package's model
+ *   - embed() — vectors for a list of texts, through a provider package's embedding model
  *   - openAiChat() / speaksOpenAiChat — an OpenAI chat answer from a provider that does not speak it
  *   - GatewayError — the error shape callers map to their own codes
  * @version-history
+ *   v1.2.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): embed(); files (a PDF
+ *     among them) as file parts of a text call, and OpenRouter's file-parser plugin when the owner
+ *     chose an engine for a model that does not read PDFs itself.
  *   v1.1.0 — 2026-09-28 — The direct providers (System 2 plan, V3): a transcription from a provider's
  *     own package (openai, xai, mistral) is read from the AI SDK's result, an empty one included;
  *     openAiChat() answers the proxy and the voice stream for an Anthropic provider.
  *   v1.0.0 — 2026-09-28 — Initial (V1 of the System 2 plan, docs/internal/llmproviderintegrations/).
  */
-import { generateText, generateImage, transcribe, APICallError, NoTranscriptGeneratedError } from 'ai';
-import type { ImageModelV4, LanguageModelV4, TranscriptionModelV4 } from '@ai-sdk/provider';
+import { generateText, generateImage, transcribe, embedMany, APICallError, NoTranscriptGeneratedError } from 'ai';
+import type {
+  EmbeddingModelV4, ImageModelV4, JSONObject, LanguageModelV4, SharedV4ProviderOptions, TranscriptionModelV4,
+} from '@ai-sdk/provider';
 import { logger } from '../../utils/logger.js';
 import type { AiTarget } from './types.js';
 import { adapterFor, openAiChat as adapterOpenAiChat, speaksOpenAiChat } from './adapters/index.js';
@@ -83,7 +89,7 @@ function providerError(e: unknown): GatewayError {
 }
 
 /** Refuse a string model id at run time; see the file header for why. */
-function assertModelInstance<M extends LanguageModelV4 | ImageModelV4 | TranscriptionModelV4>(model: M | string): M {
+function assertModelInstance<M extends LanguageModelV4 | ImageModelV4 | TranscriptionModelV4 | EmbeddingModelV4>(model: M | string): M {
   if (typeof model === 'string' || !model || typeof model !== 'object') {
     throw gatewayError(500, 'A model id reached the AI SDK as a string. Build it through the adapter registry.');
   }
@@ -120,9 +126,21 @@ export interface TextRequest {
   frequencyPenalty?: number;
   presencePenalty?: number;
   reasoning?: CompletionReasoning;
+  /** Files (a PDF among them) sent as file parts of the user turn, for a model that reads them itself. */
+  files?: TextFile[];
+  /** OpenRouter only: the engine its file-parser plugin converts a PDF with, for a model that does
+   *  not read one (plan 11, section 3b). The node converts nothing itself. */
+  pdfEngine?: string;
   /** How many times an empty answer is asked again. Default DEFAULT_EMPTY_RETRIES; 0 asks once. */
   retries?: number;
   signal?: AbortSignal;
+}
+
+/** One file of a text call: its bytes, or an https URL the provider fetches itself. */
+export interface TextFile {
+  data: Uint8Array | URL;
+  mediaType: string;
+  filename?: string;
 }
 
 export interface TextResult {
@@ -134,16 +152,33 @@ export interface TextResult {
   usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number; costUsd?: number };
 }
 
-/** The user turn: a plain string, or text plus image parts when there are images. */
-function userContent(prompt: string, images?: string[]) {
+type UserPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; image: URL }
+  | { type: 'file'; data: Uint8Array | URL; mediaType: string; filename?: string };
+
+/** The user turn: a plain string, or text plus image and file parts when there are any. */
+function userContent(prompt: string, images?: string[], files?: TextFile[]) {
   const urls = (images ?? []).filter((u): u is string => typeof u === 'string' && u.length > 0);
-  if (urls.length === 0) return prompt;
-  const parts: Array<{ type: 'text'; text: string } | { type: 'image'; image: URL }> = [{ type: 'text', text: prompt }];
+  if (urls.length === 0 && !files?.length) return prompt;
+  const parts: UserPart[] = [{ type: 'text', text: prompt }];
   for (const u of urls) {
     if (URL.canParse(u)) parts.push({ type: 'image', image: new URL(u) });
     else logger.warn('[ai] an image attachment that is not a URL was left out', { length: u.length });
   }
+  for (const f of files ?? []) parts.push({ type: 'file', data: f.data, mediaType: f.mediaType, ...(f.filename ? { filename: f.filename } : {}) });
   return parts;
+}
+
+/** What goes to the provider beside the messages: OpenRouter's reasoning and file-parser plugin. */
+function textProviderOptions(req: TextRequest): SharedV4ProviderOptions | undefined {
+  const key = req.target.type === 'openrouter' ? 'openrouter' : COMPATIBLE_OPTIONS_KEY;
+  const opts: JSONObject = {};
+  if (req.reasoning) opts.reasoning = { ...req.reasoning } as JSONObject;
+  if (req.pdfEngine && req.target.type === 'openrouter' && req.files?.length) {
+    opts.plugins = [{ id: 'file-parser', pdf: { engine: req.pdfEngine } }];
+  }
+  return Object.keys(opts).length ? { [key]: opts } : undefined;
 }
 
 /** The charge the provider reported: OpenRouter's package files it in its metadata; an
@@ -159,10 +194,8 @@ export async function text(req: TextRequest): Promise<TextResult> {
   const adapter = adapterFor(req.target.type);
   if (!adapter.language) throw gatewayError(400, `A ${req.target.type} provider does not produce text.`);
   const model = assertModelInstance(adapter.language(req.target, req.model));
-  const content = userContent(req.prompt, req.images);
-  const providerOptions = req.reasoning
-    ? { [req.target.type === 'openrouter' ? 'openrouter' : COMPATIBLE_OPTIONS_KEY]: { reasoning: { ...req.reasoning } } }
-    : undefined;
+  const content = userContent(req.prompt, req.images, req.files);
+  const providerOptions = textProviderOptions(req);
 
   const once = async (): Promise<TextResult> => {
     let r;
@@ -318,6 +351,50 @@ export async function transcribeAudio(req: TranscribeRequest): Promise<Transcrip
     ...(r.language ? { language: r.language } : {}),
     ...(typeof r.durationInSeconds === 'number' ? { usage: { seconds: r.durationInSeconds } } : {}),
   };
+}
+
+// ── embeddings ────────────────────────────────────────────────────────────────────────────────────
+
+export interface EmbedRequest {
+  target: AiTarget;
+  model: string;
+  /** The texts, one vector each, in this order. */
+  input: string[];
+  signal?: AbortSignal;
+}
+
+export interface EmbedResult {
+  embeddings: number[][];
+  model: string;
+  usage: { promptTokens?: number; costUsd?: number };
+}
+
+/** How long one embedding call may take: bounded work, like a transcription. */
+const EMBED_TIMEOUT_MS = 120_000;
+
+export async function embed(req: EmbedRequest): Promise<EmbedResult> {
+  const adapter = adapterFor(req.target.type);
+  if (!adapter.embedding) throw gatewayError(400, `A ${req.target.type} provider does not make embeddings.`);
+  const model = assertModelInstance(adapter.embedding(req.target, req.model));
+  let r;
+  try {
+    r = await embedMany({
+      model,
+      values: req.input,
+      maxRetries: 0,
+      abortSignal: attemptSignal(EMBED_TIMEOUT_MS, req.signal),
+    });
+  } catch (e) {
+    throw providerError(e);
+  }
+  const body = r.responses?.[0]?.body;
+  const out: EmbedResult = {
+    embeddings: r.embeddings,
+    model: req.model,
+    usage: { promptTokens: r.usage?.tokens, costUsd: reportedCost(r.providerMetadata, body) },
+  };
+  logger.info(`[ai] embed: type=${req.target.type} model=${out.model} values=${req.input.length} tokens=${out.usage.promptTokens}`);
+  return out;
 }
 
 // ── OpenAI chat for the proxy and the voice stream ────────────────────────────────────────────────

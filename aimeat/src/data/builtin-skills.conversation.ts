@@ -34,6 +34,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   v1.2.2 — 2026-09-28 — aimeat-paying-for-the-ai: the chat is paid like every other call, per person,
+ *     except on an operator's shared chat key (System 2, V5).
  *   v1.2.1 — 2026-09-28 — aimeat-paying-for-the-ai: the node's key pays for a picture or a
  *     transcript only when the operator named a node default model for it (System 2, V1).
  *   v1.2.0 — 2026-09-28 — aimeat-mail-to-data said the node reads an attached PDF on its own, and no
@@ -475,8 +477,10 @@ on a page is enough until it is actually spent.
 
 Two things this does NOT cover, and you should not imply otherwise:
 
-- **The chat on this node is not metered by the allowance.** It runs on the node's own agent key, so
-  a spent allowance does not stop it and does not change its model.
+- **The chat on this node follows the same order**, one turn at a time: it runs on the person's own
+  providers, or the node's key from their allowance, under their model policy and budget. Only when
+  the operator gave the chat a shared key of its own is it not metered per person: then a spent
+  allowance neither stops it nor changes its model. \`GET /v1/chat/status\` says which (\`pays\`).
 - **A person's own OpenRouter account running out of credit is their account's business.** The node
   cannot see it and has no fallback for it; the provider's error is what surfaces.
 

@@ -547,6 +547,11 @@ const ALL_SUITES = [
     // local stub serving the sample files, so a refresh, a source that fails, a retirement and a
     // catalogue price are read from what the node wrote. Follows the runner's backend.
     'test/e2e-ai-catalog.ts',
+    // Capabilities for apps and agents (System 2, V5): its own node on 40441 with the fixed types on
+    // the stub and the catalogue sources on a second stub, so every reason a capability is off can
+    // be made to happen; and embeddings on its own node on 40442. Both follow the runner's backend.
+    'test/e2e-ai-capabilities.ts',
+    'test/e2e-ai-embed.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
     // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.

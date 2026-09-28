@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.16.0 -- 2026-09-28 -- AI capabilities: aimeat_ai_capabilities first, aimeat_ai_models, aimeat_ai_transcribe, aimeat_ai_embed.
  *   v1.15.0 -- 2026-09-28 -- Which provider answers: aimeat_ai_providers, aimeat_ai_provider_test, aimeat_ai_routing_set.
  *   v1.14.0 -- 2026-09-28 -- Which AI models are allowed: the owner's model policy and aimeat_ai_policy_set.
  *   v1.13.0 -- 2026-09-25 -- Workflows: an agent step costs work:request.
@@ -171,6 +172,14 @@ one (an image test costs a picture: ask first). \`aimeat_ai_routing_set\` propos
 first per capability and the fallback rules; the owner confirms. A key is set only by the owner on
 the web page: never ask for one in chat. A refusal \`AI_CAPABILITY_UNAVAILABLE\` lists each provider
 with the reason it was left out; pass the fix to your owner. Skill: configure-routing.
+
+**AI capabilities.** Your first AI call is \`aimeat_ai_capabilities\`: per capability (text, vision,
+files, image, speech, transcription, embed) whether it is on for you, the model, the price, and for one
+that is off the \`reason\` and a \`fix\`: do it or pass it to your owner. \`aimeat_ai_models\` lists the
+catalogue. \`aimeat_ai_transcribe\` turns a stored audio file into text; \`aimeat_ai_embed\` makes
+vectors, and only when word search has proved not enough. When your owner has a provider and no
+model policy, suggest the recommended models once. A key is given by a person on the web page, never
+in chat. Skill: aimeat-ai-capabilities.
 
 **Self & onboarding.** \`aimeat_agent_profile\` · \`aimeat_agent_activity\` ·
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`

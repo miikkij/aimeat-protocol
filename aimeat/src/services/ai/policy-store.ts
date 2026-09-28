@@ -20,8 +20,10 @@
  *   - policyView() — what GET /v1/ai/policy and the MCP tool show
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
+ *   v1.1.0 — 2026-09-28 — appAiMetaOf(): the app's prefer.* and local.* beside its models (V5).
  */
 import type { AimeatConfig } from '../../config.js';
+import type { AiCapability } from './types.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -85,7 +87,7 @@ export async function writeOwnerAiPolicy(storage: Storage, gaii: string, input: 
 }
 
 const APP_MODELS_TTL_MS = 60_000;
-const appModelsCache = new Map<string, { at: number; models: string[] | undefined }>();
+const appModelsCache = new Map<string, { at: number; meta: AppAiMeta | undefined }>();
 
 /** `owner/file.html`, `file.html` or `file`, as the owner's account and the stored file name. */
 function appAddress(payerGaii: string, appRef: string): { owner: string; filename: string } | null {
@@ -104,26 +106,43 @@ function appAddress(payerGaii: string, appRef: string): { owner: string; filenam
  * every AI call from an app would otherwise read it.
  */
 export async function appModelsOf(storage: Storage, payerGaii: string, appRef: string | undefined): Promise<string[] | undefined> {
+  return (await appAiMetaOf(storage, payerGaii, appRef))?.models;
+}
+
+/** What an app's aimeat-ai meta says about its AI calls: its own models, its order of preference per
+ *  capability, and the capabilities it wants answered on this machine only (plan 11, section 9). */
+export interface AppAiMeta {
+  models?: string[];
+  prefer?: Partial<Record<AiCapability, string[]>>;
+  local?: AiCapability[];
+}
+
+/** The app's meta for its AI calls, read for a minute from memory like appModelsOf. */
+export async function appAiMetaOf(storage: Storage, payerGaii: string, appRef: string | undefined): Promise<AppAiMeta | undefined> {
   if (!appRef) return undefined;
   const addr = appAddress(payerGaii, appRef);
   if (!addr) return undefined;
   const key = `${addr.owner}/${addr.filename}`;
   const hit = appModelsCache.get(key);
-  if (hit && Date.now() - hit.at < APP_MODELS_TTL_MS) return hit.models;
-  let models: string[] | undefined;
+  if (hit && Date.now() - hit.at < APP_MODELS_TTL_MS) return hit.meta;
+  let meta: AppAiMeta | undefined;
   try {
     const app = await storage.getAppByOwnerName(addr.owner, addr.filename);
-    const declared = app?.manifest?.aiPosture?.models;
-    models = Array.isArray(declared) ? declared.filter(isModelRef) : undefined;
-    if (models && models.length === 0) models = undefined;
+    const posture = app?.manifest?.aiPosture;
+    const models = Array.isArray(posture?.models) ? posture.models.filter(isModelRef) : [];
+    meta = {
+      ...(models.length ? { models } : {}),
+      ...(posture?.prefer && typeof posture.prefer === 'object' ? { prefer: posture.prefer } : {}),
+      ...(Array.isArray(posture?.local) && posture.local.length ? { local: posture.local } : {}),
+    };
   } catch (err) {
     // An unreadable app is an app with no list of its own; the owner's policy still applies.
     logger.warn('[ai] could not read an app\'s declared models', { app: key, error: String(err) });
-    models = undefined;
+    meta = undefined;
   }
   if (appModelsCache.size > 2000) appModelsCache.clear();
-  appModelsCache.set(key, { at: Date.now(), models });
-  return models;
+  appModelsCache.set(key, { at: Date.now(), meta });
+  return meta;
 }
 
 /** Who changes the policy: the owner in person, or an agent of theirs proposing and confirming. */

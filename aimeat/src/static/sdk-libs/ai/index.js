@@ -1,16 +1,25 @@
 /**
  * @file ai/index.js
  * @description The aimeat-ai library (SDK-libs migration Phase 1). Exposes AIMEAT.ai — a facade
- *   (isAvailable/complete/completeJson/models/usage/invalidateCache) that proxies to /v1/ai/* using
- *   the user's own OpenRouter key via the AIMEAT.auth session, so the key never leaves the server;
- *   short in-memory caches + typed error `.code`s. Componentized ESM source esbuild bundles to the
- *   IIFE served, unchanged, at /v1/libs/aimeat-ai.js. Ported verbatim from lib-ai.ts.
- * @structure imports authFetch (session) + attach (namespace) + the _core spend guard + ./disclose.js
- *   (the transparency primitives); _availCache / _modelsCache; the `ai` facade; attach('ai', …) +
- *   attachSpend().
+ *   (capabilities/isAvailable/complete/completeJson/stream/image/speak/transcribe/embed/models/usage/
+ *   invalidateCache) that proxies to /v1/ai/* on the person's own AI providers via the AIMEAT.auth
+ *   session, so no key ever leaves the server; short in-memory caches + typed error `.code`s.
+ *   Componentized ESM source esbuild bundles to the IIFE served at /v1/libs/aimeat-ai.js.
+ * @structure imports authFetch (session) + attach (namespace) + the _core spend guard + ./call.js
+ *   (typed errors, the paid-call guard) + ./capabilities.js (capabilities, models) + ./stream.js
+ *   (stream, speak) + ./media.js (image, transcribe, embed) + ./disclose.js (the transparency
+ *   primitives) + ./job.js; _availCache; the `ai` facade; attach('ai', …) + attachSpend().
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-ai.js"></script>
- *   if (await AIMEAT.ai.isAvailable()) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
+ *   const caps = await AIMEAT.ai.capabilities({ app_id });
+ *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.6.0 - 2026-09-28 - System 2 plan, V5. capabilities() says per capability whether it is on
+ *     and, when it is off, the fix to show the person. complete() sends `files` (storage keys, data:
+ *     URLs or Blobs), `provider` and `fallback`. New: stream(), image(), speak(), transcribe(),
+ *     embed(). models() reads GET /v1/ai/models, which an app grant with ai:use can call, instead
+ *     of the owner-only /v1/openrouter/models; it takes { capability, type, status, allowed } and
+ *     each row adds context_length and pricing in the old listing's form. A failed call's error
+ *     carries the node's refusal details on `.details`.
  *   v1.5.0 - 2026-09-13 - complete() sends `images`, and the spend guard counts them as part of the
  *     call. The route had accepted pictures since June and this body dropped them. The JSDoc names
  *     finish_reason and truncated, which the route now answers.
@@ -37,18 +46,37 @@
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-ai.js');
 import { attach } from '../_core/namespace.js';
-import { once, keyOf, confirmSpend, noteBudget, cancelledError, attachSpend } from '../_core/spend.js';
+import { attachSpend } from '../_core/spend.js';
 import { disclose, chatNotice, declare } from './disclose.js';
 import { job } from './job.js';
+import { paid, postJson, isBlob, blobToDataUrl } from './call.js';
+import { capabilities, models, clearCaches } from './capabilities.js';
+import { stream, speak } from './stream.js';
+import { image, transcribe, embed, routing } from './media.js';
 
 // 60s in-memory cache for isAvailable so apps can call it on every render
 // without hammering the server. Cleared on logout via storage event.
 /** @type {{ v: boolean, t: number } | null} */
 let _availCache = null;
 
-// 1h in-memory cache for models() — the list barely changes in practice.
-/** @type {{ v: any, t: number } | null} */
-let _modelsCache = null;
+/**
+ * The `files` of a completion in the form the route reads: { storage_key } or { data_url, filename }.
+ * A Blob or File becomes a data: URL here; a string is a data: URL when it starts with "data:" and a
+ * storage key otherwise; an object passes as it is. Undefined when the caller gave no files (an empty
+ * list included, which the route would refuse).
+ * @param {any} files
+ * @returns {Promise<any[]|undefined>}
+ */
+async function callFiles(files) {
+  if (files === undefined || files === null) return undefined;
+  const list = Array.isArray(files) ? files : [files];
+  if (!list.length) return undefined;
+  return Promise.all(list.map(async (f) => {
+    if (isBlob(f)) return { data_url: await blobToDataUrl(f), ...(/** @type {any} */ (f).name ? { filename: /** @type {any} */ (f).name } : {}) };
+    if (typeof f === 'string') return f.startsWith('data:') ? { data_url: f } : { storage_key: f };
+    return f;
+  }));
+}
 
 /**
  * The top-level keys a `schema` asks for. Accepts a JSON-Schema object (`properties` plus an optional
@@ -92,6 +120,17 @@ function conform(parsed, want) {
 
 const ai = {
   /**
+   * What the person's AI can do for this app, per capability (text, vision, files, image, speech,
+   * transcription, embed): { on, model, price, ... } when on, { on: false, reason, fix } when off.
+   * Ask this before showing a button that needs a capability, and show `fix` when it is off.
+   * Cached 60 seconds per app_id.
+   *
+   *   const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' });
+   *   if (!caps.capabilities.image.on) notice.textContent = caps.capabilities.image.fix;
+   */
+  capabilities,
+
+  /**
    * Returns true if the user has AI configured (an OpenRouter key, or a keyless
    * self-hosted provider). Cached 60 seconds. Apps should call this before showing
    * "Use AI" buttons. Uses GET /v1/ai/available, which an app-grant token (a sandboxed
@@ -116,15 +155,28 @@ const ai = {
   },
 
   /**
-   * Run a single completion. Returns { content, model, usage, budget, finish_reason, truncated }.
+   * Run a single completion. Returns { content, model, usage, budget, finish_reason, truncated,
+   * route, policy_chose_model? }.
    * `truncated` is true when the provider cut the answer at a token limit (finish_reason 'length'):
    * show it as unfinished or ask again, never as the whole answer.
-   * Throws an Error with .code set on quota/permission/auth failures.
+   * `route` says who answered: { capability, chosenBy, answeredBy: { provider, model }, attempts,
+   * fellBack }; `fellBack` is true when the first provider failed and another one answered.
+   * `policy_chose_model` is true when the owner's model policy replaced the model the call asked for.
+   * Throws an Error with .code set on quota/permission/auth failures, and `.details` when the node
+   * says more (a policy refusal lists the models it would allow).
    *
    * `images`: an array of data: or https: URLs (at most 8; downscale first) turns the call into a
    * vision request, answered by the owner's vision model.
    *
-   * This spends the signed-in user's own OpenRouter money, so two guards ride along:
+   * `files`: documents the model reads itself (a PDF, a spreadsheet), at most 5 and 20 MB in all.
+   * Each is a storage key of the person's own file, a data: URL, a Blob or File, or an object
+   * { storage_key } | { data_url, filename }. Needs the files capability (see capabilities()).
+   *
+   * `provider` names one of the owner's providers (its id, or a type such as 'anthropic') and
+   * `fallback: false` keeps the call on that one provider. Neither can add a provider or loosen
+   * the owner's rules.
+   *
+   * This spends the signed-in user's own money on their own AI provider, so two guards ride along:
    *   • repeats collapse — while an identical call (same app_id + model + prompts) is in flight,
    *     every further call gets the SAME promise. Five clicks on "Summarise" = one paid call.
    *     `allowDuplicate: true` opts out; `dedupeMs: N` also returns the result to a click made
@@ -147,6 +199,7 @@ const ai = {
   async complete(opts) {
     if (!opts || typeof opts !== 'object') throw new Error('opts object required');
     if (!opts.prompt) throw new Error('opts.prompt required');
+    const files = await callFiles(opts.files);
     const body = {
       prompt: opts.prompt,
       systemPrompt: opts.systemPrompt,
@@ -160,42 +213,23 @@ const ai = {
       // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
       // question about a picture went out as text alone and the model answered it anyway.
       images: Array.isArray(opts.images) ? opts.images : undefined,
+      // Documents the model reads itself (the files capability), and the caller's word on which
+      // provider answers. Absent keys are dropped by JSON.stringify, so a call without them sends
+      // the same body as before.
+      files,
+      ...routing(opts),
     };
-    const call = async () => {
-      if (opts.confirm) {
-        const c = typeof opts.confirm === 'object' ? opts.confirm : {};
-        const okToSpend = await confirmSpend({
-          what: c.what || 'Run an AI request on your own OpenRouter key.',
-          detail: c.detail, estimate: c.estimate, remaining: c.remaining,
-          okLabel: c.okLabel, cancelLabel: c.cancelLabel,
-          remember: c.remember || ('ai:' + (opts.app_id || 'app')),
-        });
-        if (!okToSpend) throw cancelledError('The AI request');
-      }
-      const r = await authFetch('/v1/ai/complete', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      if (!r || !r.ok) {
-        const code = (r && r.error && r.error.code) || 'UNKNOWN';
-        const msg = (r && r.error && r.error.message) || 'AI call failed';
-        const err = /** @type {Error & { code?: string }} */ (new Error(msg));
-        err.code = code;
-        throw err;
-      }
-      if (r.data) noteBudget(r.data.budget);
-      // ADDITIVE, and it cannot break a published app: the provenance record rides in the envelope's
-      // `meta`, not in `data`, so `content` / `model` / `usage` / `budget` are exactly what they were
-      // and an app that never heard of provenance keeps working. An app that wants the label hands
-      // this straight to AIMEAT.ai.disclose(). completeJson() spreads the result, so it inherits it.
-      return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
-    };
-    if (opts.allowDuplicate) return call();
-    // The pictures are part of what makes two calls the same call; without them a second picture
-    // under one prompt would be handed the first picture's answer.
-    const key = keyOf(['ai', opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt,
-      Array.isArray(opts.images) ? opts.images.join('\n') : '']);
-    return once(key, call, { ttlMs: opts.dedupeMs || 0 });
+    // postJson carries the provenance record from the envelope's `meta` onto the result as
+    // `provenance`, so `content` / `model` / `usage` / `budget` are exactly what they were and an
+    // app that never heard of provenance keeps working. completeJson() spreads the result, so it
+    // inherits it. The pictures and the files are part of what makes two calls the same call;
+    // without them a second picture under one prompt would be handed the first picture's answer.
+    return paid(opts, {
+      key: ['ai', opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt,
+        Array.isArray(opts.images) ? opts.images.join('\n') : '',
+        files ? JSON.stringify(files) : '', opts.provider || ''],
+      what: 'Run an AI request on your own AI provider.',
+    }, () => postJson('/v1/ai/complete', body, 'AI call failed'));
   },
 
   /**
@@ -254,17 +288,37 @@ const ai = {
   },
 
   /**
-   * List the models the user's account can hit. Cached 1 hour.
+   * A text reply piece by piece: onText(delta, soFar) per piece, and the promise resolves with
+   * { content, model, finish_reason, truncated, usage, budget, provenance }.
+   *
+   *   await AIMEAT.ai.stream({ app_id, prompt, onText: (d, all) => { out.textContent = all; } });
    */
-  async models() {
-    const now = Date.now();
-    if (_modelsCache && (now - _modelsCache.t) < 3600_000) return _modelsCache.v;
-    const r = await authFetch('/v1/openrouter/models');
-    if (!r || !r.ok) throw new Error((r && r.error && r.error.message) || 'Failed to list models');
-    const v = r.data && r.data.models ? r.data.models : [];
-    _modelsCache = { v, t: now };
-    return v;
-  },
+  stream,
+
+  /**
+   * A picture from a prompt, stored in the person's storage: { storage_key, url, model, route, ... }.
+   * Pass confirm: true; the dialog shows the price per picture when the catalogue knows it.
+   */
+  image,
+
+  /**
+   * Speech from text: { blob, mime_type, format, bytes, model, ... } (mp3 by default).
+   * onAudio(bytes) per chunk for early playback; store: true keeps it as a private file instead.
+   */
+  speak,
+
+  /** Text from a recording: { text, language, seconds, model, route, ... }. */
+  transcribe,
+
+  /** Vectors for texts, for search by meaning: { embeddings, model, dimensions, route, ... }. */
+  embed,
+
+  /**
+   * The models a capability can use: models({ capability: 'image' }). Default: the text models
+   * this caller can use now. Rows are { ref, type, id, name, caps, limits, price, status } plus
+   * context_length and pricing in the old OpenRouter listing's form. Cached 1 hour per query.
+   */
+  models,
 
   /**
    * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".
@@ -280,7 +334,7 @@ const ai = {
    */
   invalidateCache() {
     _availCache = null;
-    _modelsCache = null;
+    clearCaches();
   },
 
   /**

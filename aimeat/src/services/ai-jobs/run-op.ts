@@ -1,0 +1,147 @@
+/**
+ * @file src/services/ai-jobs/run-op.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The model call a running AI job makes, one branch per `op` (op.ts): a completion, an
+ *   image, or a transcription. Each branch calls the service function the synchronous REST route
+ *   calls (completeForOwner, generateForOwner, transcribeForOwner), so the key, the budget, the
+ *   per-app quota, the provider rules and the provenance are decided in one place for both code
+ *   paths. Nothing here writes the result: service.ts does that, for every op the same way.
+ *
+ *   WHO PAYS AND WHERE THINGS ARE. The job and its result stay in the CALLER's namespace; the money
+ *   is the human's (services/agent-ai-keys.ts aiPayerOf), exactly as on POST /v1/ai/complete. So:
+ *     - a picture lands in the PAYER's storage, where POST /v1/ai/image and the MCP tool put it;
+ *     - the audio is read from the CALLER's storage, where POST /v1/ai/transcribe reads it, so one
+ *       account cannot transcribe another's file.
+ *
+ *   NO TOKEN CAP on any branch (scripts/check-no-max-tokens.ts): a cap truncates a long generation
+ *   in silence, and a long generation is the reason a background job exists.
+ * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
+ * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
+ * @version-history
+ *   v1.0.0 — 2026-09-28 — System 2 plan, V5: the text call moved here from service.ts run(), and the
+ *     image and transcription calls added beside it.
+ */
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { completeForOwner } from '../ai-completion.js';
+import { generateForOwner } from '../ai-image.js';
+import { transcribeForOwner } from '../ai-transcription.js';
+import { aiPayerOf } from '../agent-ai-keys.js';
+import { aiOpOf } from './op.js';
+import { AiJobError, type AiJobRecord } from './types.js';
+
+/** What the provider's answer cost, carried onto the job record for every op the same way. */
+export interface JobSpend {
+    cost_usd: number;
+    tokens?: number;
+    provenance_id?: string;
+}
+
+/**
+ * What a finished model call hands back. `value` is what lands at `result_key`, except that a text
+ * answer is still a string here when the job asked for JSON: service.ts parses it, so a malformed
+ * answer fails the job there as it always has.
+ */
+export interface JobOpOutcome {
+    value: unknown;
+    /** True only for a text answer that service.ts must parse as JSON before writing. */
+    parseJson: boolean;
+    spend: JobSpend;
+}
+
+const MB = 1024 * 1024;
+
+/**
+ * The audio exists in the owner's own storage and is within the node's transcription size limit.
+ * Asked at the start, before the job record exists, and the answer is the one POST /v1/ai/transcribe
+ * gives: 404 for a key that is not in the caller's storage, whether or not it exists elsewhere.
+ * Reads the file's metadata only, not its bytes.
+ */
+export async function assertAudioInReach(
+    deps: { storage: Storage; config: AimeatConfig }, ownerGhii: string, audioKey: string,
+): Promise<void> {
+    const meta = await deps.storage.getStorageFileMeta(ownerGhii, audioKey);
+    if (!meta) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${audioKey}".`);
+    const maxMb = deps.config.sttMaxMb;
+    if (maxMb > 0 && meta.size > maxMb * MB) {
+        throw new AiJobError('AUDIO_TOO_LARGE', 400,
+            `The audio at "${audioKey}" is ${(meta.size / MB).toFixed(1)} MB; this node accepts up to ${maxMb} MB for transcription.`);
+    }
+}
+
+/** Run the job's model call. Throws what the service function throws; service.ts records it. */
+export async function runJobOp(
+    deps: { storage: Storage; config: AimeatConfig },
+    job: AiJobRecord,
+    prompt: string,
+    signal: AbortSignal,
+): Promise<JobOpOutcome> {
+    const { storage, config } = deps;
+    const { payer, agent } = aiPayerOf(job.owner);
+    const common = {
+        ...(agent ? { agent } : {}),
+        ...(job.model ? { model: job.model } : {}),
+        ...(job.app_id ? { appId: job.app_id } : {}),
+        ...(job.provider ? { provider: job.provider } : {}),
+        signal,
+    };
+    const op = aiOpOf(job.op);
+
+    if (op === 'image') {
+        const r = await generateForOwner(storage, config, payer, {
+            ...common,
+            prompt,
+            ...(job.size ? { size: job.size } : {}),
+            // A public result record that pointed at a private picture would answer 401 to every
+            // reader it was made public for, so the picture follows the record's visibility.
+            publicVisibility: job.result_visibility === 'public',
+        });
+        return {
+            value: { storage_key: r.storageKey, url: r.fetchUrl, mime_type: r.mime, model: r.model },
+            parseJson: false,
+            spend: { cost_usd: r.usage.costUsd, ...(r.provenance ? { provenance_id: r.provenance.id } : {}) },
+        };
+    }
+
+    if (op === 'transcribe') {
+        const key = job.audio_key ?? '';
+        // Read again here, bytes and all: the start checked the metadata only, and the file may have
+        // been deleted while the job queued.
+        const file = await storage.getStorageFile(job.owner, key);
+        if (!file) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${key}".`);
+        const r = await transcribeForOwner(storage, config, payer, {
+            ...common,
+            audio: {
+                data: file.data,
+                mime: file.mimeType || 'application/octet-stream',
+                filename: key.split('/').pop() || 'audio',
+            },
+            ...(job.language ? { language: job.language } : {}),
+        });
+        return {
+            value: job.json
+                ? { text: r.text, language: r.language ?? null, seconds: r.seconds, model: r.model }
+                : r.text,
+            parseJson: false,
+            spend: {
+                cost_usd: r.usage.costUsd, tokens: r.usage.totalTokens,
+                ...(r.provenance ? { provenance_id: r.provenance.id } : {}),
+            },
+        };
+    }
+
+    const r = await completeForOwner(storage, config, payer, {
+        ...common,
+        prompt,
+        ...(job.system_prompt ? { systemPrompt: job.system_prompt } : {}),
+    });
+    return {
+        value: r.content,
+        parseJson: !!job.json,
+        spend: {
+            cost_usd: r.usage.costUsd, tokens: r.usage.totalTokens,
+            ...(r.provenance ? { provenance_id: r.provenance.id } : {}),
+        },
+    };
+}

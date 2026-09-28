@@ -35,6 +35,8 @@
  * @structure CrewMenu · crewMenu() · readLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.2.0 — 2026-09-28 — writeLlmChoice warns when the owner's model policy leaves the model out; it
+ *     still saves, because the crew runs on its own machine (System 2 plan, V5).
  *   v1.1.0 — 2026-09-16 — The catalogue is read from the agent's own namespace. In the owner's it could
  *     not be published without memory:write-reserved, so hosted runtimes got SCOPE_DENIED.
  *   v1.0.0 — 2026-09-09 — Initial: the drift between this node's copy of the tool menu and the
@@ -45,6 +47,10 @@ import type { Storage } from '../storage/interface.js';
 import { askCrew, resolveCrewAgent, type CrewCaller, type CrewRefusal } from './crew-ops.js';
 import { writeMemoryRecord } from './memory-write.js';
 import { logger } from '../utils/logger.js';
+import { loadPolicyDecision } from './ai/policy-gate.js';
+import { isAllowed, parseModelRef } from './ai/policy.js';
+import { canonicalModelKey } from './ai/catalog/equivalence.js';
+import { AiCompletionError } from './ai/errors.js';
 
 /** The owner's key for a default that covers every agent they have. */
 export const LLM_DEFAULT_KEY = 'crews.llm.default';
@@ -111,7 +117,7 @@ export async function readLlmChoice(deps: Deps, owner: string, agentName: string
  */
 export async function writeLlmChoice(
   deps: Deps, caller: CrewCaller, agentName: string | null, choice: unknown,
-): Promise<{ ok: true; key: string; cleared: boolean } | CrewRefusal> {
+): Promise<{ ok: true; key: string; cleared: boolean; warning?: string } | CrewRefusal> {
   const key = agentName ? llmKeyFor(agentName) : LLM_DEFAULT_KEY;
 
   if (choice === null || choice === undefined) {
@@ -150,7 +156,34 @@ export async function writeLlmChoice(
   });
   if (!out.ok) return { ok: false, status: out.status ?? 400, code: out.code ?? 'WRITE_FAILED', message: out.message ?? 'The choice could not be saved.' };
   logger.info('LLM choice set', { event: 'crew.llm_set', owner: caller.owner, key, kind: valid.kind });
-  return { ok: true, key, cleared: false };
+  const warning = valid.kind === 'model' ? await policyWarning(deps, ownerGhii, agentName, valid.provider as Record<string, unknown>) : null;
+  return { ok: true, key, cleared: false, ...(warning ? { warning } : {}) };
+}
+
+/**
+ * A warning, never a refusal, when the owner's model policy leaves the crew's model out (plan 07,
+ * section 6): the crew runs on its own machine with its own key, so the node cannot stop the call,
+ * only say that it breaks the owner's rule. A crew that calls the node's /v1/llm is held to the
+ * policy there.
+ */
+async function policyWarning(deps: Deps, ownerGhii: string, agentName: string | null, provider: Record<string, unknown>): Promise<string | null> {
+  const model = typeof provider.model === 'string' ? provider.model.trim() : '';
+  if (!model) return null;
+  try {
+    const { decision } = await loadPolicyDecision(deps.storage, deps.config, ownerGhii, {
+      capability: 'text', caller: 'agent', ...(agentName ? { agent: agentName } : {}),
+    });
+    if (decision.allowed === 'any') return null;
+    // A reference names its type; a bare id is compared with the id part of every allowed reference.
+    const bare = (ref: string) => canonicalModelKey(parseModelRef(ref).id);
+    const ok = model.includes(':') ? isAllowed(decision, model) : decision.allowed.some(ref => bare(ref) === canonicalModelKey(model));
+    if (ok) return null;
+    return `The owner's model policy does not allow ${model} for this agent. The choice is saved, because the crew runs on its own machine; `
+      + `models the policy allows: ${decision.allowed.slice(0, 8).join(', ')}${decision.allowed.length > 8 ? ', …' : ''}.`;
+  } catch (e) {
+    // An empty intersection of rules is its own refusal elsewhere; here it is only a warning.
+    return e instanceof AiCompletionError ? e.message : null;
+  }
 }
 
 /**

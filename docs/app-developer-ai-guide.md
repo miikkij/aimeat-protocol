@@ -2,45 +2,81 @@
 
 > **Audience:** AI chats producing AIMEAT apps, and humans who want to add
 > "✨ Use AI" affordances to their app.
-> **Layer:** App-level — uses the user's own OpenRouter (or compatible) API
-> key. The user owns the spend; AIMEAT is just a relay with safety rails.
-> **Status:** Available since AIMEAT 1.13.x via `/v1/libs/aimeat-ai.js`.
+> **Layer:** App-level. The owner's own AI providers answer the calls: their
+> OpenRouter, OpenAI, Anthropic, Mistral or xAI account, a model server on their
+> own machine, or any OpenAI-compatible address, beside the providers the node
+> offers. The owner pays and sets the rules; the node holds the keys and applies
+> the rules.
+> **Status:** Available since AIMEAT 1.13.x via `/v1/libs/aimeat-ai.js`. Providers,
+> capabilities, files, streaming and embeddings: updated 2026-09-28.
 
 ---
 
 ## TL;DR
 
 1. Add `await loadScript('/v1/libs/aimeat-ai.js')` to your app's boot.
-2. Gate "Use AI" buttons on `await AIMEAT.ai.isAvailable()` (false when the
-   user hasn't configured a key).
+2. Ask what is on before you show a control. `await AIMEAT.ai.capabilities()`
+   says, for each capability, whether a call would work now and, when it would
+   not, why and what fixes it. `await AIMEAT.ai.isAvailable()` still answers,
+   but it reads only the older OpenRouter key setup. See
+   [Capabilities: check first](#capabilities-check-first).
 3. **Compose the prompt yourself** from your app's structured data; ask the
    LLM only for the squishy step.
-4. Call `AIMEAT.ai.complete({ prompt, app_id: 'your-app-name', ... })`.
+4. Call `AIMEAT.ai.complete({ prompt, app_id: 'your-app-name', ... })`. Leave
+   out `model`: the owner's providers and model policy choose one.
 5. **Render the result into an editable field** so the human stays in the
    loop. Don't write it directly into final storage.
-6. Catch errors and show actionable messages (`NO_API_KEY`, `QUOTA_EXHAUSTED`,
-   etc. — see the error code table below).
+6. Catch errors and show actionable messages (`AI_CAPABILITY_UNAVAILABLE`,
+   `AI_MODEL_NOT_ALLOWED`, `QUOTA_EXHAUSTED` and the others in the error code
+   table below).
 
-The user's API key never leaves the AIMEAT server. Your app sees only the
-completion text + token/cost usage. Spend is bounded by their daily USD
-budget (default $1) and an optional per-app daily quota.
+No provider key ever leaves the AIMEAT server. Your app sees the answer, the
+token and cost usage, and `route`: which provider answered and whether the call
+moved on to another one. Spend is bounded by the owner's daily USD budget
+(default $1) and an optional per-app daily quota.
 
 ---
 
 ## Why this exists
 
-AI chats are useful, but AI chats don't have your user's OpenRouter account.
+AI chats are useful, but AI chats don't have your user's AI accounts.
 Without this capability, every AIMEAT app that wants AI assistance has to:
 
 - Make the user paste their API key into the app (security risk + UX friction)
 - Bundle the app's OWN API key (the dev pays for everyone's spend)
 - Skip AI features entirely
 
-`AIMEAT.ai` solves all three. The user configures their OpenRouter key **once**
-in their AIMEAT profile (the Calibrator and other node AI features already use
-it for their own purposes). Apps then reach the same key via a budget-gated server
-endpoint — they never see the key, can't exfiltrate it, and can't run up
-spend beyond what the user has allowed.
+`AIMEAT.ai` solves all three. The owner sets up their AI providers **once**, on
+the AI settings page of their AIMEAT profile: their own OpenRouter, OpenAI,
+Anthropic, Mistral or xAI account, a model server on their own machine, or any
+OpenAI-compatible address. The node can offer providers of its own beside them,
+and the Calibrator and the other node features use the same providers. Apps
+reach them through a budget-gated server endpoint: they never see a key, cannot
+copy one out, and cannot spend beyond what the owner allowed.
+
+What the owner decides, and your app works within:
+
+- **Which provider serves which capability.** There are seven capabilities:
+  `text`, `vision` (images as input), `files` (the model reads a PDF or another
+  file itself), `image` (making pictures), `speech` (text to speech),
+  `transcription` (speech to text) and `embed` (embeddings). Each provider serves
+  some of them, and the owner puts the providers in order per capability.
+- **Fallback.** When the first provider fails, the owner's rules say whether the
+  call moves on to the next one. Every answer carries `route`: `chosenBy` (what
+  picked the first provider, for example `call-model`, `app-prefer`,
+  `owner-default` or `node-default`), `answeredBy` (provider and model),
+  `attempts` (each try, its failure class and its cost) and `fellBack` (true
+  when a later provider answered).
+- **Which models are allowed.** The owner's model policy may limit the models. A
+  call that names a model outside it gets 403 `AI_MODEL_NOT_ALLOWED`, and the
+  error's `details.allowed` lists the models it may use. When the policy picks
+  the model itself (the call named none, or the default model is not allowed),
+  the answer carries `policy_chose_model: true`.
+- **What it costs.** A daily budget, and a per-app quota when the owner sets one.
+
+Your app asks for the work. The owner's rules decide which provider and which
+model do it, and an app cannot widen those rules. It can narrow them for itself,
+and state its preferences: see [Choosing models from an app](#choosing-models-from-an-app).
 
 This matches the AIMEAT philosophy: **the user owns their data, their money,
 and their AI.** Apps are tools.
@@ -62,8 +98,9 @@ for the origin setup). What this means for your app:
   expecting the user's session.** There is no session on the app origin — those
   calls fail with 401/403. (This is the exact pattern that was removed; apps
   that read the owner's private memory directly now get rejected.)
-- **`AIMEAT.ai` / `AIMEAT.ai.complete()` (this guide) is unaffected** — the
-  OpenRouter relay is a separate path. Use it exactly as documented here.
+- **`AIMEAT.ai` (this guide) is unaffected.** Its calls go to the node's AI
+  endpoints under the app's own `ai:use` grant, not a session. Use it exactly as
+  documented here.
 
 ### On a node several people share with no app origin: the isolated frame
 
@@ -288,8 +325,12 @@ async function setupAiButton() {
 
 function handleAiError(e, btn) {
   switch (e.code) {
+    case 'AI_CAPABILITY_UNAVAILABLE':             // no working provider for this capability
+    case 'AI_MODEL_NOT_ALLOWED':                  // the message lists the models the owner allows
+      alert(e.message);
+      break;
     case 'NO_API_KEY':
-      alert('You haven\'t configured an OpenRouter key yet. Open your AIMEAT profile → OpenRouter settings to set one.');
+      alert('Your AI provider has no key yet. Set it on the AI settings page of your AIMEAT profile.');
       break;
     case 'QUOTA_EXHAUSTED':
       alert('Your daily AI budget is used up. Raise it in Settings or wait until midnight UTC.');
@@ -304,10 +345,10 @@ function handleAiError(e, btn) {
       alert('Your AI allowlist requires apps to identify themselves. The app didn\'t pass an app_id.');
       break;
     case 'INVALID_API_KEY':
-      alert('Your OpenRouter key was rejected. Re-enter it in Settings.');
+      alert('Your AI provider rejected its key. Enter it again on the AI settings page.');
       break;
     case 'RATE_LIMITED':
-      alert('OpenRouter rate-limited the request. Try again in a few seconds.');
+      alert('The AI provider rate-limited the request. Try again in a few seconds.');
       break;
     default:
       console.error('AI call failed:', e);
@@ -318,8 +359,10 @@ function handleAiError(e, btn) {
 
 Five things this example gets right and you should copy:
 
-1. **`isAvailable()` gate** — silently hides the button when there's no key.
-   No nag dialog on every page load.
+1. **Availability gate**: hides the button when AI is not set up. No nag
+   dialog on every page load. `isAvailable()` reads only the older OpenRouter
+   key setup; in new code gate on `capabilities()` (next section), which is
+   exact for every capability.
 2. **App composes the prompt** — series summary is structured data we already
    have; we just ask the LLM for the suggestion.
 3. **`app_id` always passed** — lets the user see "Comicland used $0.04
@@ -331,28 +374,132 @@ Five things this example gets right and you should copy:
 
 ---
 
+## Capabilities: check first
+
+A capability that works on your node can be off on the owner's. Their providers
+may not serve it, a key may be missing, their model policy may allow nothing for
+it, or today's budget may be spent. Ask before you show the control:
+
+```js
+const { capabilities } = await AIMEAT.ai.capabilities();   // GET /v1/ai/capabilities
+const image = capabilities.image;
+if (image.on) {
+  showImageButton();
+} else {
+  showNote(image.fix);   // what the owner does to turn it on, in words a person can act on
+}
+```
+
+The node plans each capability with the same gate a real call runs, and spends
+nothing. The route takes `?app_id=`, so the answer counts that app's allowlist
+and quota, and an app's own grant and `aimeat-ai` meta count too.
+
+For each of `text`, `vision`, `files`, `image`, `speech`, `transcription` and
+`embed` the answer has:
+
+- **When on:** `model` (as `<type>:<model id>`), `provider`, `providerType`,
+  `leaves` (true when the data goes off this machine), `chosenBy`, `keySource`
+  (whose key pays: `agent`, `own` or `node`), `fallbacks` (how many providers a
+  call could move on to), `price` (from the model catalogue, when known) and
+  `howTo` (the call to make).
+- **When off:** `reason`, `code` and `message` (the refusal a call would get),
+  `fix`, and `howTo`.
+
+Beside the capabilities it returns `policy` (whether the owner's model policy
+applies to this caller), `budget` (`dailyBudgetUsd`, `spentTodayUsd`) and
+`catalog` (when the model catalogue was last refreshed).
+
+| `reason` | What it means |
+|---|---|
+| `NO_MODEL` | A provider serves it, but no model is set for it. |
+| `NO_PROVIDER_SUPPORTS` | None of the owner's providers serves it. `providersThatCan` names the provider types that would. |
+| `NO_KEY` | The provider that would answer has no key. |
+| `POLICY_EMPTY` | The owner's model policy allows no model for it here. |
+| `BUDGET_EXHAUSTED` | Today's budget, or this app's quota, is spent. |
+| `RETIRED_MODEL` | The model set for it is retired. |
+| `UNTESTED` | The owner's rules use only tested providers, and this one has not been tested. |
+| `APP_NOT_ALLOWED` | The owner allows AI only for listed apps, and this app is not on the list. |
+| `UNAVAILABLE` | Anything else; `code` and `message` say what. |
+
+Show `fix` to the person. It names what the owner changes and where. Never ask
+for a key inside your app or in a chat: keys go in on the AI settings page and
+nowhere else. When a capability is off, the rest of the app keeps working
+without it.
+
+The publish check reminds you when an app calls `image()`, `speak()`,
+`transcribe()`, `embed()` or `complete()` with `files` and never calls
+`capabilities()` or `isAvailable()`. The hint never stops a publish.
+
+---
+
+## Choosing models from an app
+
+Ask for the work, not a model: a call without `model` uses what the owner's
+providers and policy give. When the app really needs certain models, or has a
+preference, say so in the `aimeat-ai` meta in the head. The value is
+`key=value` pairs separated by `;`, and a list inside a value is separated by
+`,`. It is not JSON.
+
+```html
+<meta name="aimeat-ai" content="generates=text,image; discloses=yes; models=openrouter:anthropic/claude-opus-5.5,openrouter:black-forest-labs/flux.2-pro; prefer.image=openrouter:black-forest-labs/flux.2-pro; prefer.text=anthropic,openrouter; local.transcription=yes">
+```
+
+| Key | What it does |
+|---|---|
+| `models=` | The models this app allows **itself**, each as `<type>:<model id>`. The type is `openrouter`, `openai`, `anthropic`, `mistral`, `xai`, `local` or `openai-compatible`. The node applies the list to every AI call the app makes, beside the owner's policy, so it can only narrow what the app may use. A malformed entry is left out and named in the publish hints; the app is published either way. |
+| `prefer.<capability>=` | The app's order of preference for one capability: provider types (`anthropic`) or model references (`openrouter:black-forest-labs/flux.2-pro`), first choice first. It reorders the owner's own candidates. It never adds a provider the owner does not have, and never loosens one of their rules. When the app also has `models=`, a preferred model must be on that list too. |
+| `local.<capability>=yes` | Answer this capability only on this machine: a provider whose data does not leave it. When the owner has none, the capability is off for this app, and `capabilities()` says so. |
+
+`<capability>` is one of `text`, `vision`, `files`, `image`, `speech`,
+`transcription` and `embed`. `generates=`, `discloses=` and `public-interest=`
+are the transparency statement the publish check reads; keep them.
+
+Model ids come from the model catalogue: `AIMEAT.ai.models()` (GET
+`/v1/ai/models`) lists each model with its `ref`, which is the string to put in
+`models=` or `prefer.`. The publish check names a declared model the catalogue
+does not know.
+
+A call can also name a `provider` (a provider type) and `fallback: false` (do
+not move on to another provider). An app cannot know the owner's provider ids,
+so prefer the meta over naming providers in calls.
+
+---
+
 ## API reference
 
 ### `await AIMEAT.ai.isAvailable() → boolean`
 
-True if the user has an OpenRouter (or compatible) key configured. Cached
-60s; cheap to call on every render. Returns `false` (not throws) when not
-logged in.
+A yes or no from GET `/v1/ai/available`. Cached 60s; cheap to call on every
+render. Returns `false` (not throws) when not logged in. It reads only the
+older OpenRouter key setup (an OpenRouter key, or a keyless self-hosted
+provider), so an owner whose text runs on another provider, or on one the node
+offers, can get `false`. `capabilities().capabilities.text.on` is the exact
+answer, and `capabilities()` covers every other capability too.
 
-### `await AIMEAT.ai.complete(opts) → { content, model, usage, budget }`
+### `await AIMEAT.ai.capabilities() → { capabilities, policy, budget, catalog }`
 
-Run one completion.
+GET `/v1/ai/capabilities`. What each capability can do for this caller now,
+and for one that is off, the reason and the fix. See
+[Capabilities: check first](#capabilities-check-first).
+
+### `await AIMEAT.ai.complete(opts) → { content, model, usage, budget, route, ... }`
+
+Run one completion. POST `/v1/ai/complete`.
 
 | Option | Type | Notes |
 |---|---|---|
 | `prompt` | string | Required. ≤ 200,000 characters. |
 | `systemPrompt` | string | Optional system message. |
-| `model` | string | Override the user's default. E.g. `'anthropic/claude-3.5-haiku'`. |
-| `modelRole` | `'reasoning'` \| `'execution'` | Pick from user's per-role default. Use `'execution'` for cheap routine tasks; `'reasoning'` for hard ones. |
-| `temperature` | number | 0–2. Falls back to user's default. |
-| `top_p` | number | Falls back to user's default. |
+| `model` | string | Usually leave it out. A model reference `<type>:<model id>` (or a bare id on the provider that answers). A model outside the owner's policy gets 403 `AI_MODEL_NOT_ALLOWED`. |
+| `modelRole` | `'reasoning'` \| `'execution'` | Pick from the owner's per-role default. Use `'execution'` for cheap routine tasks; `'reasoning'` for hard ones. |
+| `images` | string[] | Makes it a `vision` call: data: or https: URLs, at most 8. Downscale first. |
+| `files` | object[] | Makes it a `files` call: `[{ storage_key }]` or `[{ data_url }]`, at most 5 files and 20 MB in all. See [Files and PDFs](#files-and-pdfs). |
+| `provider` | string | A provider type to try first. Prefer `prefer.text=` in the meta. |
+| `fallback` | boolean | `false` stops the call from moving on to another provider when the first one fails. |
+| `temperature` | number | 0–2. Falls back to the owner's default. |
+| `top_p` | number | Falls back to the owner's default. |
 | `max_tokens` | number | Omit in new app code. Specify output shape in the prompt and use the owner's daily budget for spend control. |
-| `app_id` | string | **Always set this.** Identifies your app for per-app quotas and the user's spend dashboard. |
+| `app_id` | string | **Always set this.** Identifies your app for per-app quotas and the owner's spend dashboard. |
 
 Returns:
 
@@ -360,12 +507,22 @@ Returns:
 {
   content: "string the model wrote",
   model: "anthropic/claude-sonnet-4",            // actual model used
+  finish_reason: "stop",
+  truncated: false,                              // true: cut at a length limit, show it as unfinished
+  policy_chose_model: true,                      // only present when the owner's policy picked the model
+  route: {
+    capability: "text",
+    chosenBy: "owner-default",                   // what picked the first provider
+    answeredBy: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
+    attempts: [{ provider: "openrouter", model: "anthropic/claude-sonnet-4", ok: true, costUsd: 0.0018 }],
+    fellBack: false,                             // true when a later provider answered
+  },
   usage: {
     prompt_tokens: 142,
     completion_tokens: 38,
     total_tokens: 180,
-    cost_usd: 0.0018,                            // OpenRouter-reported or estimated
-    cost_exact: true,                            // true if provider reported; false = AIMEAT estimate
+    cost_usd: 0.0018,                            // provider-reported, or from the catalogue price
+    cost_exact: true,                            // true if the provider reported it
   },
   budget: {
     daily_budget_usd: 1.0,
@@ -379,14 +536,20 @@ Throws on failure with `err.code` set. Codes:
 
 | Code | When |
 |---|---|
-| `NO_API_KEY` | User hasn't configured a key. |
+| `AI_CAPABILITY_UNAVAILABLE` | No working provider serves this capability for the owner. The message names what to set up. |
+| `AI_MODEL_NOT_ALLOWED` | 403. The model named in the call is outside the owner's policy, or no allowed model is reachable. `details.allowed` lists the allowed models. |
+| `AI_MODEL_POLICY_EMPTY` | 403. The owner's policy and the app's `models=` have no model in common. |
+| `AI_PROVIDER_NOT_CONFIGURED` | The model named in the call belongs to a provider type the owner has not set up. |
+| `NO_API_KEY` | The provider that would answer has no key. |
 | `INVALID_API_KEY` | Provider rejected the key (key revoked or expired). |
-| `QUOTA_EXHAUSTED` | Daily user budget hit. |
+| `QUOTA_EXHAUSTED` | Daily owner budget hit. |
 | `APP_QUOTA_EXHAUSTED` | Per-app daily quota hit. |
-| `APP_NOT_ALLOWED` | User has an allowlist and your `app_id` isn't on it. |
-| `APP_ID_REQUIRED` | User has an allowlist but the call had no `app_id`. |
-| `INVALID_BODY` | Missing/malformed prompt. |
+| `APP_NOT_ALLOWED` | Owner has an allowlist and your `app_id` isn't on it. |
+| `APP_ID_REQUIRED` | Owner has an allowlist but the call had no `app_id`. |
+| `INVALID_BODY` | Missing/malformed prompt, `images` or `files`. |
 | `PROMPT_TOO_LONG` | Prompt exceeds 200k characters. |
+| `FILES_TOO_LARGE` | The files come to more than 20 MB. |
+| `NOT_FOUND` | A `storage_key` in `files` is not in the caller's own storage. |
 | `RATE_LIMITED` | Provider rate-limited. Retry with backoff. |
 | `PROVIDER_ERROR` | Upstream provider failed (502). |
 | `JSON_PARSE_FAILED` | Only from `completeJson()` — model returned invalid JSON twice. |
@@ -401,10 +564,69 @@ stronger instruction and lower temperature. If both attempts fail, throws
 Use when you want structured output: `{ tags: [...], rating_suggestion: "K-7" }`.
 Don't use for free-form prose.
 
-### `await AIMEAT.ai.models() → Array<{id, name, ...}>`
+### `await AIMEAT.ai.stream(opts)`
 
-List the models the user's account can hit. Cached 1 hour. Useful for
-"advanced" UIs where the user can pick a model per-call.
+POST `/v1/ai/stream`. The answer arrives piece by piece, for a long text the
+person watches being written. The body takes `app_id` (required), `messages`
+(`[{ role: 'system' | 'user' | 'assistant', content }]`, at most 200,000
+characters in all) and optionally `model`, `temperature`, `top_p`, `max_tokens`.
+The response is NDJSON (one JSON object per line, `application/x-ndjson`), not
+SSE:
+
+```
+{"type":"start","model":"..."}
+{"type":"text","text":"Once "}
+{"type":"text","text":"upon a time"}
+{"type":"done","model":"...","finish_reason":"stop","truncated":false,...}
+```
+
+A failure after the first line arrives as `{"type":"error","code":"...","message":"..."}`.
+`?json=1` returns the whole answer as one ordinary JSON response instead.
+
+### `await AIMEAT.ai.image(opts)`
+
+POST `/v1/ai/image` with `{ app_id, prompt, model?, size?, public? }`. The
+picture is stored in the owner's storage and the answer names its
+`storage_key`. Show it with `r.src`: for a private picture it is a signed
+`download_url` that loads without a sign-in for an hour, because the plain `url`
+needs `storage:read`, which an app with only `ai:use` does not hold. To show the
+picture again later, make it `public: true`, or ask for `storage:read`. A picture
+costs more than a text call: show the person the price
+(`capabilities().capabilities.image.price`) before the first one.
+
+### `await AIMEAT.ai.speak(opts)`
+
+POST `/v1/ai/speak` with `{ app_id, input }` (at most 4,000 characters) and
+optionally `voice`, `model`, `response_format` (`pcm` or `mp3`), `speed` and
+`instructions`. Leave out `model` and `voice` when the owner or the node has set
+them. The response is NDJSON: a `start` line, `audio` lines with base64 chunks,
+and a `done` line. `?json=1` stores the audio as a private file in the caller's
+storage instead and answers with its `storage_key`.
+
+### `await AIMEAT.ai.transcribe(opts)`
+
+POST `/v1/ai/transcribe` with `{ app_id, storage_key }` for a recording in the
+caller's own storage (preferred), or `audio_base64` and `mime` for a short
+recording the browser has not stored. Optional `language` and `model`.
+
+### `await AIMEAT.ai.embed(opts)`
+
+POST `/v1/ai/embed` with `{ app_id, input, model?, provider?, fallback? }`.
+`input` is one text or a list of texts: at most 256 texts and 500,000
+characters in one call. Returns `{ embeddings, model, dimensions, route, usage,
+budget }`, one vector per text in the same order. A fallback goes only to the
+**same model** on another provider, because vectors from different models
+cannot be compared. Read [Embeddings](#embeddings) before you use it.
+
+### `await AIMEAT.ai.models(opts?) → { models, total, truncated, snapshot, refreshed_at }`
+
+GET `/v1/ai/models`, the node's model catalogue. An app with `ai:use` can call
+it. Query: `capability` (one of the seven), `type` (a provider type), `status`
+(default `active,retiring`; `all` for everything), and `allowed=true` for only
+the models this caller may use on a provider it can reach. Each model has `ref`
+(`<type>:<model id>`, the string for a call or for `models=`), `name`, `caps`,
+`limits`, `price`, `status` and, when it is being retired, `retires_at`. Useful
+for "advanced" UIs where the person picks a model.
 
 ### `await AIMEAT.ai.usage() → { date, daily_budget_usd, spent_today_usd, ... }`
 
@@ -413,8 +635,8 @@ sidebar, or for an admin dashboard.
 
 ### `AIMEAT.ai.invalidateCache()`
 
-Clears the 60s availability + 1h models cache. Call after the user toggles
-their key/budget in another tab.
+Clears the 60s availability + 1h models cache. Call after the owner changes
+their providers or budget in another tab.
 
 ### `await session.notify(title, { body?, link?, type? }) → envelope`
 
@@ -436,6 +658,117 @@ await session.notify('Report ready', { body: 'Q2 numbers are in.' });
 
 ---
 
+## Files and PDFs
+
+With the `files` capability the **model reads the file itself**: a PDF with its
+layout, tables and pictures, or another file type the model accepts. The node
+converts nothing. It passes the file to a provider whose model reads files, and
+it never turns a PDF into text on the way.
+
+```js
+const { capabilities } = await AIMEAT.ai.capabilities();
+if (!capabilities.files.on) return showNote(capabilities.files.fix);
+const r = await AIMEAT.ai.complete({
+  app_id: 'invoice-reader',
+  prompt: 'List the invoice number, the due date and the total of this invoice.',
+  files: [{ storage_key: 'uploads/invoice-2026-09.pdf' }],
+});
+```
+
+- `files` takes `[{ storage_key }]` for a file already in the caller's own
+  storage (preferred), or `[{ data_url: 'data:application/pdf;base64,...' }]`.
+  Optional `filename` and `mime` on each entry.
+- At most 5 files and 20 MB in all per call.
+- A `storage_key` is looked up in the caller's own storage only; a key that is
+  not there answers 404. An https URL is not accepted: store the file first and
+  pass its `storage_key`.
+- Pictures are a separate capability, `vision`: pass them in `images`.
+
+**When `files` is off**, show the `fix` and offer the person the two honest
+ways on:
+
+1. Add a provider whose model reads files. `providersThatCan` in the
+   capabilities answer names the provider types that would serve it.
+2. Use an outside service built for the job, such as a document conversion or
+   OCR service the person chooses, and bring its text back as text.
+
+Do not convert the file inside the app (for example with a JavaScript PDF
+library) and then send the text as if the model had read the file. Tables,
+layout, pictures and scanned pages drop out, and the answer then claims a
+reading that did not happen. When the person agrees to a text-only reading, say
+so in the app and send it as `prompt` text, not as `files`.
+
+---
+
+## Embeddings
+
+An embedding turns a text into a vector: a list of numbers that captures what
+the text means. Texts with a similar meaning get vectors that lie close
+together, even when they share no words, so "invoice late" finds "payment not
+received by the due date".
+
+**When it helps:**
+
+- Search by meaning in a large collection of text, where people search with
+  words the texts do not use.
+- Answering from the owner's own material: find the passages that fit a
+  question, and give only those to `complete()`.
+- Finding similar items, and finding duplicates that are worded differently.
+- Grouping texts by topic (clustering).
+- Searching across languages: a question in Finnish finds a note in English.
+
+**When it does not help:**
+
+- A few hundred texts or fewer. Word search, or giving the texts to the model
+  directly, is enough.
+- Exact values: ids, names, dates, amounts. A vector for "INV-2026-0413" does
+  not find that invoice reliably; word search does.
+- When only the newest data matters. Sort by date instead.
+- Data that must not leave the machine, when the owner has no local embedding
+  model. Every text goes to the provider.
+- "Just in case". Vectors cost money to make, take room to keep, and must be
+  made again when the model changes.
+
+**The rule: turn embeddings on only when word search has proved not enough for
+a specific use, and you know what you embed.**
+
+**Cost.** Embedding is cheap per text but grows with the collection. As of
+2026-09-27, `text-embedding-3-large` costs $0.13 and `qwen3-embedding-8b` costs
+$0.01 per million input tokens: 10,000 notes of 500 tokens each (5 million
+tokens) cost $0.65 or $0.05. Changing the model means embedding everything again,
+because vectors from different models cannot be compared. Store the `model` the
+answer names beside the vectors, so you know when that is due. The capabilities
+answer shows the price of the model that would answer.
+
+**Size.** A vector has 1,536 or 3,072 numbers, depending on the model: 6 kB or
+12 kB as 32-bit floats, and about two to three times that written as JSON
+numbers. One memory value holds 1,024 kB, so it holds about 85 to 170 vectors as
+raw floats and fewer than half of that as JSON. A memory record is not the place
+for a large vector collection. The publish check reminds you when an app both
+embeds and writes memory.
+
+**What to embed:**
+
+- Condensed content works better than raw text: a summary, the key facts, a
+  title with its abstract. Noise in the text is noise in the vector.
+- Split long text into passages (a few paragraphs each) and embed each passage;
+  one vector for a whole long document blurs its meaning.
+- Embed what people search for, in the form they search it.
+- Never embed secrets: passwords, keys, personal identity numbers. The text goes
+  to the provider, and a vector can give away what it was made from.
+
+**The node itself has no vector search yet.** `POST /v1/ai/embed` makes vectors
+and nothing on the node stores, indexes or compares them. An app that embeds
+keeps the vectors and does the comparison itself (cosine similarity is a few
+lines of JavaScript for a small set).
+
+```js
+const r = await AIMEAT.ai.embed({ app_id: 'notes', input: passages });
+// r.embeddings[i] belongs to passages[i]; keep r.model and r.dimensions beside them
+```
+
+---
+
 ## Cortex and extensions
 
 ### Cortex
@@ -453,22 +786,57 @@ error code propagation, and the `completeJson()` retry.
 
 ### Extensions (WASM sandbox)
 
-Extensions currently **cannot** call `/v1/ai/complete`:
+An extension starts a **background** model call with `ctx.ai.start()`. It does
+not wait for the answer: a model call can take many minutes, and the sandbox
+stops a run after 60 seconds. `start()` queues a job and answers in
+milliseconds; the node runs the job and puts the answer in memory.
 
-- `ctx.fetch()` is for outbound HTTP. SSRF protection blocks localhost callbacks.
-- The sandbox has no JWT representing the user — only `ctx.caller.gaii`.
+```js
+const r = await ctx.ai.start({
+  prompt: 'Summarise these notes in five bullet points.',
+  input_keys: ['notes.2026-09'],                  // records added to the prompt, labelled by key
+  result_key: 'summaries.2026-09',                // where the answer lands
+  on_done: { extension: 'my-notes', action: 'summaryReady' },
+});
+if (!r.ok) return { queued: false, code: r.code, retry_after_s: r.retry_after_s };
+return { queued: true, job_id: r.job_id };
+```
 
-A proper extension AI capability would be `ctx.ai.complete({...})`,
-implemented by the runtime forwarding to the same endpoint with a
-runtime-minted token scoped to the calling user. This is straightforward to
-add (the design parallels `ctx.wallet`) but is **not currently
-implemented** as of this writing. Track it via the `ctx.ai` design doc when
-it lands.
+| Option | Notes |
+|---|---|
+| `prompt` or `prompt_key` | The prompt text, or a memory key that holds it. |
+| `input_keys` | Memory records read and added to the prompt, each labelled by its key. |
+| `result_key` | Required. The memory key the answer is written to, in the installer's namespace. |
+| `result_visibility` | `'private'`, `'owner'` or `'public'`. |
+| `model`, `system_prompt` | As for a completion. |
+| `json` | Parse the answer as JSON before storing it, so a malformed answer fails the job instead of landing as a string. |
+| `op` | `'text'` (default), `'image'` (a picture from the prompt, stored in the owner's storage; the record at `result_key` is `{ storage_key, url, mime_type, model }`) or `'transcribe'` (the audio file at `audio_key` becomes text). |
+| `audio_key`, `language` | For `op: 'transcribe'`: the audio file's storage key, and an optional language hint. |
+| `size`, `provider` | The picture size for `op: 'image'`; a provider id or type to use, with no fallback. |
+| `on_done` | `{ extension, action }`: an action of an extension the same owner installed, called when the job ends. |
 
-For now, the pattern is: **extensions do the data work; the cortex/app
-fetches the result and runs AI on it.** This also tends to produce better
-UX because the user sees what's happening — sandbox-side LLM loops would be
-invisible.
+- **It returns a decision and never throws:** `{ ok: true, job_id, queue_position }`
+  or `{ ok: false, code, message, retry_after_s? }`. The codes are
+  `AI_JOB_QUEUE_FULL` (the node's queue is full; try again later),
+  `AI_JOB_LIMIT_REACHED` (this owner has too many jobs queued, which usually
+  means something loops), `AI_JOB_CHAIN_TOO_DEEP` (a chain of `on_done` jobs went
+  too deep), `AI_JOB_PROMPT_TOO_LARGE` and `AI_JOB_START_FAILED`.
+- **The extension's installer pays, never the caller.** The call counts under
+  `app_id: ext:<extension name>`, so it shows per app in the owner's usage, and
+  a per-app quota applies to it.
+- **`on_done`** calls the named action with `{ job_id, state, result_key }`. That
+  action reads the answer and may start the next job, so the chain logic stays in
+  the extension's own code. When the chain cannot continue, the parent job ends
+  `failed`, never green.
+- **`ctx.ai` can be absent:** on a code path where the node does not know the
+  extension's record (so it cannot say who pays), and on a node without the AI
+  job service. Check `if (!ctx.ai)` and degrade.
+- The same jobs start outside an extension with POST `/v1/ai/jobs` or the MCP
+  tool `aimeat_ai_job_start`.
+
+For short work a person watches, the browser path still fits better: the
+extension does the data work, and the cortex or app runs `AIMEAT.ai` on the
+result, where the person sees it happen.
 
 ---
 
@@ -484,7 +852,7 @@ client code. That is inherent to the web, not a gap in AIMEAT. So:
 - **What CANNOT be copied — the moat:** your **extension** action logic (runs in a
   server-side WASM sandbox; its source is never shipped to the browser and can't be
   re-installed without it), your **extension secrets** (API keys, encrypted at rest),
-  **gated memory**, and the user's **AI key** (never leaves the server). An app whose
+  **gated memory**, and the owner's **AI provider keys** (never leave the server). An app whose
   value lives in an extension is copy-proof by construction — a copied shell is a dead
   client. **If a piece of logic or data matters, put it in an extension**, not the app.
 
@@ -549,23 +917,26 @@ mismatches the user's intent.
 
 ## Spend safety in practice
 
-The user sets a daily USD budget (default $1). Each `complete()` call
-counts toward it. When hit, all subsequent calls return `QUOTA_EXHAUSTED`
-until midnight UTC.
+The owner sets a daily USD budget (default $1). Every AI call counts toward
+it: text, streaming, pictures, speech, transcription and embeddings. When it is
+spent, calls return `QUOTA_EXHAUSTED` until midnight UTC. A call that fell back
+counts the failed attempts too, as `route.attempts` shows.
 
-Cost is reported by OpenRouter when available. For LM Studio / custom
-providers, AIMEAT estimates at Claude-Sonnet-like pricing (intentionally
-high — better to over-estimate and under-spend). The user's OpenRouter
-dashboard is the source of truth for actual billing.
+Where the cost comes from, strongest first: a local provider costs nothing; the
+charge the provider reported (OpenRouter reports one; `cost_exact: true`); the
+model catalogue's price times the use; a fallback rate, set high on purpose. The
+direct OpenAI, Anthropic, Mistral and xAI providers report no cost in their
+answers, so the catalogue price is their figure. The provider's own dashboard is
+the source of truth for the actual bill.
 
-**Per-app quotas** let the user say "Comicland v2 can use $0.20/day, anything
-else $0.10". Not configured? Apps get the $0.10 default. Configure via
-`POST /v1/ai/settings` with `app_quotas: { 'comicland-v2': { daily_usd: 0.20 } }`.
+**Per-app quotas** let the owner say "Comicland v2 can use $0.20/day". Without a
+quota an app may spend up to the whole daily budget. The owner sets both on the
+AI settings page. (`POST /v1/ai/settings` with `app_quotas` still works but is
+deprecated: an operator can switch it off, and it is removed in 4.0.0.)
 
-**App allowlist** is opt-in. If the user sets `app_allowlist: ['comicland-v2']`,
-no other app can call. Apps without an `app_id` are rejected with
-`APP_ID_REQUIRED`. Use this when you don't want untrusted apps spending your
-budget at all.
+**App allowlist** is opt-in. If the owner lists apps, no other app can call.
+Apps without an `app_id` are then rejected with `APP_ID_REQUIRED`, and
+`capabilities()` shows `APP_NOT_ALLOWED` for an app that is not listed.
 
 ---
 
@@ -573,10 +944,12 @@ budget at all.
 
 | Symptom | Cause | App should… |
 |---|---|---|
-| Button hidden | `isAvailable()` returned false | Don't nag. App still works without AI. |
-| `NO_API_KEY` | User had a key, deleted it | One-time toast + link to Settings. |
+| Button hidden | The capability is off in `capabilities()` | Don't nag. Show `fix` once where the button would be. App still works without AI. |
+| `AI_CAPABILITY_UNAVAILABLE` | No working provider for that capability | Show the error's message; it names what to set up. |
+| `AI_MODEL_NOT_ALLOWED` | The app named a model the owner does not allow | Show the allowed list, or call again without `model`. Never show an empty result. |
+| `NO_API_KEY` | The provider that would answer has no key | One-time toast + link to the AI settings page. |
 | `QUOTA_EXHAUSTED` | Daily budget hit | Disable the button + show "AI budget used up for today". |
-| `INVALID_API_KEY` | Key revoked at OpenRouter | Toast + link to Settings — they need to refresh the key. |
+| `INVALID_API_KEY` | Key revoked at the provider | Toast + link to the AI settings page: the owner enters the key again. |
 | `RATE_LIMITED` | Provider throttling | Backoff (1s, then 3s) and retry once. |
 | `PROVIDER_ERROR` | Upstream down | Toast "AI provider is having trouble. Try again in a minute." |
 | `JSON_PARSE_FAILED` | Model couldn't produce JSON twice | Toast + offer the raw text so user isn't blocked. |
@@ -633,26 +1006,41 @@ else renderIssueList(r.parsed.issues);
 
 ## What this is NOT
 
-- **Not free.** Every call spends the user's OpenRouter credits.
+- **Not free.** Every call spends on the owner's providers, except a local
+  model on their own machine.
 - **Not a chat session.** No history. Each `complete()` is one round-trip.
   If you need history, you compose it into the prompt yourself.
-- **Not for streaming yet.** Long completions feel slow. Streaming SSE may
-  land later; for now, specify the output shape in the prompt and show a "Working…" indicator.
+- **Streaming is a separate call.** `complete()` answers once, at the end. For a
+  long text the person watches, use `stream()` (POST `/v1/ai/stream`, NDJSON,
+  not SSE). For work that takes minutes, start a background job (POST
+  `/v1/ai/jobs`).
 - **Not for hidden loops.** This is a human-in-the-loop primitive. Don't
   use it to power agents that run autonomously — AIMEAT has the
   capabilities + work-queue system for that.
 - **Not authoritative for billing.** Cost numbers shown are best-effort.
-  The user's OpenRouter dashboard is the actual bill.
+  The provider's own dashboard is the actual bill.
 
 ---
 
 ## Where to look next
 
-- API endpoint source: [`aimeat/src/routes/ai.ts`](../aimeat/src/routes/ai.ts)
+- API endpoint source: [`aimeat/src/routes/ai.ts`](../aimeat/src/routes/ai.ts),
+  [`ai-capabilities.ts`](../aimeat/src/routes/ai-capabilities.ts) (capabilities, embed),
+  [`ai-voice.ts`](../aimeat/src/routes/ai-voice.ts) (stream, speak),
+  [`ai-models.ts`](../aimeat/src/routes/ai-models.ts) (the catalogue),
+  [`ai-jobs.ts`](../aimeat/src/routes/ai-jobs.ts) (background jobs)
+- The routing, providers and model policy: [`aimeat/src/services/ai/`](../aimeat/src/services/ai/)
+- The `aimeat-ai` meta and the publish hints:
+  [`app-ai-posture.ts`](../aimeat/src/services/app-ai-posture.ts),
+  [`app-ai-capability-hints.ts`](../aimeat/src/services/app-ai-capability-hints.ts)
+- `ctx.ai.start`: [`aimeat/src/services/ai-jobs/ext-capability.ts`](../aimeat/src/services/ai-jobs/ext-capability.ts)
 - Browser library source: [`aimeat/src/static/sdk-libs/ai/index.js`](../aimeat/src/static/sdk-libs/ai/index.js)
+- The node skill `aimeat-ai-capabilities` (`aimeat_skill_get`), the guide an AI
+  reads with the capabilities answer
 - Current contract: [Platform specification](AIMEAT-RFC-v4.0-Platform-full.md)
 - E2E tests as examples of expected behaviour:
-  [`aimeat/test/ai.ts`](../aimeat/test/ai.ts)
-- The OpenRouter settings panel UI lives in
-  [`aimeat/public/views/profile/openrouter-settings.js`](../aimeat/public/views/profile/openrouter-settings.js)
-  (`AiAppsBudgetPanel`).
+  [`aimeat/test/ai.ts`](../aimeat/test/ai.ts),
+  [`e2e-ai-providers.ts`](../aimeat/test/e2e-ai-providers.ts),
+  [`e2e-ai-model-policy.ts`](../aimeat/test/e2e-ai-model-policy.ts)
+- The budget and per-app quota panel lives in
+  [`aimeat/public/views/profile/openrouter/budget-panel.js`](../aimeat/public/views/profile/openrouter/budget-panel.js).

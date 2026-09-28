@@ -5362,6 +5362,11 @@ components:
                 as missing in the prompt rather than left silent.
             json: { type: boolean, description: 'ai: parse the answer as JSON before writing it, so a malformed answer fails the step instead of becoming a string nobody validates.' }
             model: { type: string, maxLength: 200, description: 'ai: override the owner''s default model for this one step.' }
+            op: { type: string, enum: [text, image, transcribe], description: 'ai: what the step does (default text). image writes { storage_key, url, mime_type, model } to result_to_key; transcribe turns the audio at audio_key into text (with json, { text, language, seconds, model }) and needs no prompt.' }
+            provider: { type: string, maxLength: 200, description: 'ai: one of the owner''s provider ids, or a type. No fallback then.' }
+            audio_key: { type: string, maxLength: 400, description: 'ai, op transcribe: the audio file''s key in the owner''s storage, templated with the run''s vars.' }
+            language: { type: string, maxLength: 12, description: 'ai, op transcribe: ISO-639-1 hint.' }
+            size: { type: string, maxLength: 20, description: 'ai, op image: the picture size.' }
             geai: { type: string, description: 'export-out / trigger-geai: the target GEAI.' }
             capability: { type: string, description: 'trigger-geai (required) / export-out (default __deposit__).' }
             from: { type: string, description: 'export-out: owner memory key whose value is pushed.' }
@@ -11055,8 +11060,14 @@ paths:
       responses:
         '200':
           description: |
-            `{ enabled, agent_name, allowance_remaining_usd, has_own_key, note? }`. `note` is present
-            only when `enabled` is false, and names what an operator has to set.
+            `{ enabled, agent_name, allowance_remaining_usd, has_own_key, pays, model, push_devices, note? }`.
+            `note` is present only when `enabled` is false, and names what an operator has to set.
+            `pays` is who pays a chat turn: `own` (the person's own provider key), `allowance` (the
+            node's key, from the person's allowance), `node` (the operator's shared chat key, which is
+            not metered per person), or null when a turn would be refused (the turn says why). Without
+            the shared key each person's chat runs through /v1/llm with their own token, so their
+            model policy (the chat switch), budget and metering apply. `model` is the model a turn
+            would use, when the node can say.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -15093,6 +15104,22 @@ paths:
                     a vision-capable model. At most 8 per request.
                   items:
                     type: string
+                files:
+                  type: array
+                  description: >
+                    Files (a PDF among them) for a model that reads them itself: the call then asks for
+                    the `files` capability, and a provider whose model does not read files is passed over
+                    (on OpenRouter, a PDF engine the owner chose converts for it). The node converts
+                    nothing. Each entry is `{ storage_key }` (a file in the caller's own storage; 404 when
+                    it is not there) or `{ data_url: "data:<mime>;base64,..." }`; an https URL is not
+                    accepted. At most 5 files and 20 MB.
+                  items:
+                    type: object
+                    properties:
+                      storage_key: { type: string }
+                      data_url: { type: string }
+                      filename: { type: string }
+                      mime: { type: string }
                 provider:
                   type: string
                   description: One of the caller's provider ids (GET /v1/ai/providers), or a type (anthropic). No fallback then.
@@ -15300,6 +15327,100 @@ paths:
         '401':
           $ref: '#/components/responses/AimeatError'
         '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/capabilities:
+    get:
+      operationId: getAiCapabilities
+      summary: What the caller can do with AI now, per capability, and the fix for what is off
+      description: >
+        For each capability (text, vision, files, image, speech, transcription, embed): `on`, and when
+        on the `model` (`<type>:<model id>`), `provider`, `providerType`, whether the data `leaves` this
+        machine, `chosenBy`, `keySource`, how many `fallbacks` a call has, and the catalogue `price`;
+        always a one-line `howTo`. When off: `reason` (NO_MODEL, NO_PROVIDER_SUPPORTS, NO_KEY,
+        POLICY_EMPTY, BUDGET_EXHAUSTED, RETIRED_MODEL, UNTESTED, APP_NOT_ALLOWED,
+        UNAVAILABLE), the refusal's `code` and `message`, a `fix` an AI can do or pass on, and for
+        NO_PROVIDER_SUPPORTS the provider types that could serve it. Each capability is planned with the
+        same gate a call runs, for this caller (an owner, an agent with its own key and lists, an app
+        with its grant and its meta), and nothing is spent. Also the owner's model policy mode and
+        whether it binds this caller, today's budget, the catalogue's snapshot, and `guide`, the skill
+        to read next (node:aimeat-ai-capabilities).
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app_id
+          in: query
+          required: false
+          description: The app the caller acts for; its own models=, prefer.* and local.* count.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: data.capabilities, data.policy { mode, appliesToCaller }, data.budget { dailyBudgetUsd, spentTodayUsd, keySource? }, data.catalog { refreshedAt, snapshot }, data.guide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/embed:
+    post:
+      operationId: aiEmbed
+      summary: Embedding vectors for a list of texts
+      description: >
+        The embed capability, on the owner's providers and budget like every AI call. A fallback to
+        another provider is allowed only for the SAME model, because vectors of different models cannot
+        be compared; store `data.model` beside the vectors. The node's own key pays only when the
+        operator named a node default embedding model (AIMEAT_MODEL_DEFAULT_EMBED). At most 256 texts
+        and 500 000 characters per call. Use embeddings only when word search is not enough (skill
+        aimeat-ai-capabilities).
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties:
+                input:
+                  description: One text, or a list of texts; one vector each, in this order.
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items: { type: string }
+                model:
+                  type: string
+                  description: A model reference; omit to let the owner's providers choose.
+                app_id:
+                  type: string
+                provider:
+                  type: string
+                  description: One of the caller's provider ids, or a type. No fallback then.
+                fallback:
+                  type: boolean
+      responses:
+        '200':
+          description: data.embeddings (number[][]), data.model, data.dimensions, data.route, data.usage { prompt_tokens, cost_usd, cost_exact }, data.budget.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '402':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '502':
           $ref: '#/components/responses/AimeatError'
 
   /v1/ai/catalog/meta:
@@ -15696,7 +15817,30 @@ paths:
                   type: boolean
                   description: >
                     Parse the answer as JSON before storing it, so a malformed answer fails the job
-                    rather than becoming a string every reader has to re-parse.
+                    rather than becoming a string every reader has to re-parse. With op transcribe it
+                    stores `{ text, language, seconds, model }`; refused with op image.
+                op:
+                  type: string
+                  enum: [text, image, transcribe]
+                  default: text
+                  description: >
+                    What the job does. `image` makes a picture from the prompt into the payer's storage
+                    and stores `{ storage_key, url, mime_type, model }` at `result_key` (public when
+                    `result_visibility` is public); `transcribe` turns the audio at `audio_key` into
+                    text. A field that does not fit the op is refused 400 `INVALID_BODY` before
+                    anything is written.
+                provider:
+                  type: string
+                  description: One of the caller's provider ids, or a type. No fallback then.
+                audio_key:
+                  type: string
+                  description: Required for op transcribe; a file in the caller's own storage (404 `NOT_FOUND` when it is not there, 400 `AUDIO_TOO_LARGE` over the node's limit).
+                language:
+                  type: string
+                  description: ISO-639-1 hint, op transcribe only.
+                size:
+                  type: string
+                  description: Picture size, op image only.
                 app_id:
                   type: string
                   description: App attribution — enables the per-app allowlist and the per-app quota.
@@ -16783,7 +16927,9 @@ paths:
         `ai:use`.
 
         Pass `public: true` when a model or a web page has to fetch the image back by URL; the
-        default is private.
+        default is private. A private picture's answer also carries `download_url`, a signed address
+        that loads without a sign-in for `download_expires_in_seconds` (an hour): its `url` needs
+        storage:read, which an app holding only ai:use does not have, and an <img> sends no header.
       tags: [AI]
       security:
         - BearerAuth: []
@@ -16893,6 +17039,7 @@ paths:
               properties:
                 app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers; signed owner/filename for app grants.' }
                 model: { type: string, maxLength: 200 }
+                provider: { type: string, minLength: 1, maxLength: 200, description: 'One of the caller''s provider ids, or a type. No fallback then.' }
                 messages:
                   type: array
                   minItems: 1
@@ -16943,8 +17090,9 @@ paths:
       description: >
         Requires ai:use. Uses the same daily and application AI budgets as completions.
         App identity is bound to the signed grant. Returns NDJSON start, audio (base64 bytes),
-        done or error frames. Done carries bytes, model, usage, budget, cost_exact, cost_known,
-        provenance and syntheticAudio. PCM format is provider-specific signed PCM; configure
+        done or error frames. Done carries bytes, model, cost_usd, key_source, usage, budget, cost_exact,
+        cost_known, provenance and syntheticAudio. Speech moves to another provider only when the owner's
+        routing allows another voice (speechVoiceMayChange). PCM format is provider-specific signed PCM; configure
         the browser's sample rate and channels to match. MP3 is available where the model supports it.
         OpenRouter cost uses the generation endpoint, falling back to its per-character catalogue
         estimate. Custom providers without pricing return cost_known false. Cancellation may be billed.
@@ -16966,15 +17114,16 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [input, model, voice]
+              required: [input]
               properties:
                 app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers; signed owner/filename for app grants.' }
                 input: { type: string, minLength: 1, maxLength: 4000 }
-                model: { type: string, minLength: 1, maxLength: 200 }
-                voice: { type: string, minLength: 1, maxLength: 200 }
+                model: { type: string, minLength: 1, maxLength: 200, description: 'Omit to use the speech model of the owner''s provider, the owner''s, or the node''s default (AIMEAT_MODEL_DEFAULT_TTS); none of them is 400 NO_TTS_MODEL.' }
+                voice: { type: string, minLength: 1, maxLength: 200, description: 'Omit to use the provider''s speech voice, the owner''s, or the node''s default (AIMEAT_TTS_VOICE_DEFAULT); none of them is 400 NO_TTS_VOICE.' }
                 response_format: { type: string, enum: [pcm, mp3], default: pcm }
                 speed: { type: number, minimum: 0.25, maximum: 4, default: 1 }
                 instructions: { type: string, maxLength: 2000, description: 'OpenRouter OpenAI provider speech instructions.' }
+                provider: { type: string, minLength: 1, maxLength: 200, description: 'One of the caller''s provider ids, or a type. No fallback then.' }
       responses:
         '200':
           description: NDJSON audio stream, or private audio handle when json=1. Success requires a terminal done frame.
@@ -17132,8 +17281,9 @@ paths:
       summary: Probe whether AI is configured for the caller's owner
       description: >
         Lightweight boolean probe used by apps to decide whether to show AI affordances. Returns
-        `{ available }` — true when the owner has an OpenRouter key configured (or a keyless
-        self-hosted provider). Gated identically to `/v1/ai/complete` (an owner JWT, or any token
+        `{ available }` — true when a text call would find a provider now (the same gate the call runs,
+        spending nothing); a spent budget still answers true, because it is a refusal of its own. For
+        any other capability, and for the reason and fix, read GET /v1/ai/capabilities. Gated identically to `/v1/ai/complete` (an owner JWT, or any token
         with the `ai:use` scope), so a sandboxed app can gate its UI without owner-only access to
         `/v1/ai/settings`.
       tags: [Memory]

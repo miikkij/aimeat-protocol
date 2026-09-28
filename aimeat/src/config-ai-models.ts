@@ -15,6 +15,8 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   v1.4.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): modelDefaultTts,
+ *     modelDefaultEmbed and ttsVoiceDefault.
  *   v1.3.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): aiCatalogRefresh, aiPriceOverrides,
  *     aiCatalogSources.
  *   v1.2.0 — 2026-09-28 — The operator's AI providers (System 2 plan, V3): aiProviders,
@@ -30,6 +32,7 @@ type AiModelSettings = Pick<AiCapabilityConfig,
   'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback'
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
+  | 'modelDefaultTts' | 'modelDefaultEmbed' | 'ttsVoiceDefault'
   | 'aiRecommendedModels' | 'aiProviders' | 'aiBuiltinProviders' | 'aiProviderEgress'
   | 'aiProviderTypes' | 'aiFixedBaseUrlOverrides' | 'aiLegacySettingsRoutes'
   | 'aiCatalogRefresh' | 'aiPriceOverrides' | 'aiCatalogSources'>;
@@ -47,6 +50,9 @@ export function aiModelDefaults(): AiModelSettings {
     modelDefaultStt: process.env.AIMEAT_MODEL_DEFAULT_STT ?? '',
     modelDefaultImage: process.env.AIMEAT_MODEL_DEFAULT_IMAGE ?? '',
     sttLanguageDefault: process.env.AIMEAT_STT_LANGUAGE_DEFAULT ?? '',
+    modelDefaultTts: process.env.AIMEAT_MODEL_DEFAULT_TTS ?? '',
+    modelDefaultEmbed: process.env.AIMEAT_MODEL_DEFAULT_EMBED ?? '',
+    ttsVoiceDefault: process.env.AIMEAT_TTS_VOICE_DEFAULT ?? '',
     aiRecommendedModels: process.env.AIMEAT_AI_RECOMMENDED_MODELS ?? '',
     aiProviders: process.env.AIMEAT_AI_PROVIDERS ?? '',
     aiBuiltinProviders: process.env.AIMEAT_AI_BUILTIN_PROVIDERS ?? '',

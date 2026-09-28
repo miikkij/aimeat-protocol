@@ -1,0 +1,180 @@
+/**
+ * @file src/data/builtin-skills.ai-capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The `aimeat-ai-capabilities` built-in skill: how an AI that builds an app, an
+ *   automation or its own work uses the node's AI capabilities (text, vision, files, image, speech,
+ *   transcription, embed), with recipes (System 2 plan, docs/internal/llmproviderintegrations/13
+ *   section 3, and 12 for embeddings).
+ *
+ *   WHY A NODE SKILL. The capabilities are a platform feature every node ships; a builder on any node
+ *   finds the guide with `aimeat_skill_list`, and `GET /v1/ai/capabilities` names it in `guide`.
+ *   Seeded on every boot.
+ *
+ *   WHAT IT MUST AGREE WITH. The capabilities answer (services/ai/capabilities.ts), the routes, the
+ *   library (sdk-libs/ai/), the publish hints (services/app-ai-capability-hints.ts) and the jobs and
+ *   workflow step. It is measured with its eval suite, .claude/evals/aimeat-ai-capabilities/, through
+ *   `pnpm eval:skill --node-skill aimeat-ai-capabilities`, which never copies it into the repo.
+ * @structure AI_CAPABILITIES_SKILL_ENTRY
+ * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
+ * @version-history
+ *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
+ */
+/** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
+ *  with builtin-skills.ts, which imports it; the compiler checks the two agree where it is listed. */
+type BuiltinSkillEntry = { name: string; skillMd: string; visibility?: 'members' | 'public' };
+
+export const AI_CAPABILITIES_SKILL_ENTRY: BuiltinSkillEntry = {
+  name: 'aimeat-ai-capabilities',
+  visibility: 'public',
+  skillMd: `---
+name: aimeat-ai-capabilities
+description: How to use the AI capabilities of an AIMEAT node (text, reading images, reading files and PDFs, making images, speech, transcription, embeddings) in an app, an automation or an agent's own work. Check first with aimeat_ai_capabilities or AIMEAT.ai.capabilities(), ask for the capability and not a model, handle a capability that is off visibly, tell the price before an expensive call, and use embeddings only when word search is not enough. Recipes for a picture button, voice message to summary, asking a PDF, a morning digest of voice messages, alt text, duplicates in a large collection, and a crew on the node's /v1/llm. Use before building anything that calls AI. Triggers on AI feature, generate image, speech, text to speech, transcribe, voice message, PDF, embeddings, vectors, semantic search, kuvan teko, puhe, litterointi, upotus.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# The node's AI capabilities
+
+The owner's AI providers (their own OpenAI, Anthropic, Mistral, xAI or OpenRouter account, a model
+on their own machine, the node's own) serve seven capabilities. Each is on or off for each caller:
+
+| Capability | What a person gets |
+|---|---|
+| \`text\` | Written answers: summaries, drafts, replies, structured data. |
+| \`vision\` | A model reads a picture: describes it, answers a question about it. |
+| \`files\` | A model reads a file or a PDF itself and answers from it. The node never converts a PDF. |
+| \`image\` | A new picture from a description. |
+| \`speech\` | Text read aloud in a synthetic voice. |
+| \`transcription\` | Speech in an audio file turned into text. |
+| \`embed\` | Text turned into vectors, so a search finds what means the same, not only the same words. |
+
+## 1. Check first
+
+Before you plan, call \`aimeat_ai_capabilities\` (an app: \`AIMEAT.ai.capabilities({ app_id })\`). For
+each capability it answers \`on\`, the \`model\` and \`provider\` a call would use, the \`price\`, and a
+\`howTo\` line. For one that is off it answers \`reason\` and \`fix\`:
+
+| reason | What to do |
+|---|---|
+| NO_MODEL | The owner sets a model for it on a provider, or the operator sets a node default. |
+| NO_PROVIDER_SUPPORTS | The owner adds a provider of a type in \`providersThatCan\`. |
+| NO_KEY | The owner sets the key on the AI settings page. Never ask for a key in chat. |
+| POLICY_EMPTY | Propose a policy change with aimeat_ai_policy_set; the owner confirms. |
+| BUDGET_EXHAUSTED | The owner raises the daily budget, or it resets at midnight UTC. |
+| RETIRED_MODEL | Find another with aimeat_ai_models and propose it. |
+| UNTESTED | The owner's rules use only tested providers. Test it: aimeat_ai_provider_test { provider, capability }. |
+| APP_NOT_ALLOWED | The owner adds the app to their AI app list. |
+
+Tell the person the fix in their words. Do not build around a capability that is off, and do not
+promise a feature the node cannot run for them.
+
+## 2. Five rules for code
+
+1. **Ask for the capability, not a model.** Leave \`model\` out and the owner's providers choose. Name
+   a model only when the app truly needs that one.
+2. **Check first and show the fix.** \`const caps = await AIMEAT.ai.capabilities({ app_id })\`; when
+   \`caps.capabilities.image.on\` is false, keep the control visible, disabled, with \`fix\` beside it.
+   Never hide a button in silence.
+3. **Declare the models the app needs** in its head: \`<meta name="aimeat-ai" content="generates=text,image;
+   discloses=yes; models=<type>:<model id>">\`. \`prefer.<capability>=\` orders the owner's providers (a type,
+   or a model reference) and never adds one; \`local.<capability>=yes\` keeps that capability on this
+   machine. The format is \`key=value;\`, not JSON. Take each reference from \`aimeat_ai_models\` (its \`ref\`).
+4. **Say when the answer came from elsewhere.** \`route.fellBack\` is true when the first provider failed
+   and another answered; \`policy_chose_model\` when the owner's policy picked the model. Say so when it
+   matters, for example a different voice in speech.
+5. **Tell the price before an expensive call**: a picture, a long transcription, a large embedding run.
+   The price is in the capabilities answer; \`confirm: true\` on \`AIMEAT.ai.image()\` and \`speak()\` shows it.
+
+Errors carry \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\` and a \`fix\`),
+AI_MODEL_NOT_ALLOWED (with the \`allowed\` list), QUOTA_EXHAUSTED. Show the message; never an empty result.
+
+## 3. Automations
+
+- A long answer or a picture in the background: \`aimeat_ai_job_start\` (\`ctx.ai.start\` in an extension),
+  with \`op\`: \`text\` (default), \`image\` (the record at \`result_key\` is \`{ storage_key, url, mime_type, model }\`),
+  or \`transcribe\` with \`audio_key\`, the audio file's storage key.
+- A workflow's \`ai\` step takes the same \`op\`, \`audio_key\` and \`provider\`.
+- Something every morning: \`aimeat_schedule_create\` or a scheduled workflow.
+- A capability that goes off while a run is under way stops that step with its refusal, and the owner is
+  told. A spent budget stops it the same way. Check capabilities when you set the automation up.
+
+## 4. Embeddings: only when word search is not enough
+
+An embedding model turns a text into a vector that captures its meaning: "invoice late" finds "payment
+not received by the due date", which share no word.
+
+**Worth it:** meaning search over a large text collection; answering from the person's own material
+(find the passages first, then answer); "similar to this"; duplicates written in different words;
+clustering; search across languages.
+
+**Not worth it:** a few hundred texts or fewer (word search, or the whole collection fits a prompt);
+exact values (ids, names, dates, codes); only the newest items; data that must not leave the machine
+when there is no local embedding model; "just in case".
+
+**The rule:** turn embeddings on only when word search has proved not enough for a specific use, and
+you know what you embed. Do not suggest them otherwise.
+
+- **Cost:** a million input tokens costs from about $0.01 to $0.13 by model (2026-09-27). Changing the
+  model means embedding everything again: vectors of different models cannot be compared, which is why
+  a fallback only ever uses the same model. Store the answered \`model\` beside every vector.
+- **Size:** 1 536 or 3 072 numbers per text, 6 to 12 kB as 32-bit numbers, more as JSON. One memory
+  value holds 1024 kB, so a memory record is not the place for a large vector collection. The node
+  itself has no vector search yet.
+- **What to embed:** condensed facts work better than raw text; split long text into passages; embed
+  what people will search for; never embed secrets or identity numbers (the text goes to the provider).
+
+## 5. Files and PDFs
+
+The model reads the file itself: \`AIMEAT.ai.complete({ app_id, prompt, files: [{ storage_key }] })\`, at
+most 5 files and 20 MB. When \`files\` is off, suggest a provider whose model reads files (the catalogue's
+\`caps.fileIn\`), or on OpenRouter a PDF engine on the provider. Never extract the text in the app and
+present it as the model having read the file.
+
+## 6. Recipes
+
+**A picture from a button, price first, a message when off (app):**
+\`\`\`javascript
+const caps = await AIMEAT.ai.capabilities({ app_id: 'poster' });
+const img = caps.capabilities.image;
+button.disabled = !img.on;
+hint.textContent = img.on ? '' : img.fix;
+button.onclick = async () => {
+  try {
+    const r = await AIMEAT.ai.image({ app_id: 'poster', prompt: input.value, confirm: true });
+    picture.src = r.src;   // loads for a private picture too; keep it public to show it again later
+  } catch (e) { hint.textContent = e.message; }
+};
+\`\`\`
+
+**Voice message → transcript → summary (app):**
+\`\`\`javascript
+const t = await AIMEAT.ai.transcribe({ app_id: 'voice-notes', storage_key: key });
+const s = await AIMEAT.ai.complete({ app_id: 'voice-notes', prompt: 'Summarise in three lines:\\n' + t.text });
+render(t.text, s.content);
+\`\`\`
+Check \`transcription\` and \`text\` first; a long recording costs by the second.
+
+**Ask a PDF (app):** store the file (\`AIMEAT.storage\`), then
+\`AIMEAT.ai.complete({ app_id: 'ask-pdf', prompt: question, files: [{ storage_key: key }] })\`. Check \`files\` first.
+
+**Every morning: yesterday's voice messages as one summary in a workspace (automation):** a scheduled
+workflow whose steps list yesterday's audio files, run an \`ai\` step with \`op: 'transcribe'\` for each,
+then one \`ai\` step (text) that summarises the transcripts, and write the result to the workspace.
+
+**Alt text for published pictures (automation):** for each new picture, \`POST /v1/ai/complete\` with
+\`images: [<the picture's URL>]\` and the prompt "Describe this picture in one sentence for a screen
+reader" (the \`vision\` capability); store the answer beside the picture. A background job takes no
+picture input, so this is a direct call.
+
+**Duplicates in a large notes collection (automation, only when section 4 holds):** embed each note's
+condensed text in batches of at most 256 with \`aimeat_ai_embed\`, keep \`{ id, model, vector }\` in records
+of a few hundred vectors each, compare by cosine similarity, and show pairs above a threshold for a
+person to decide. Embed again only the notes that changed, with the same model.
+
+**A crew on the node's AI (agent):** in Python, \`from aimeat_crewai import node_llm, capabilities\`;
+\`llm = node_llm()\` sends the crew's calls through the node's \`/v1/llm\`, so the owner's providers,
+policy and budget apply. \`capabilities()\` answers what is on, as above.
+`,
+};

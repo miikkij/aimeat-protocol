@@ -1151,10 +1151,10 @@
      "slug": "g-7-built-in-chat",
      "cells": [
       "<strong>Built-in chat</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs.",
-      "<code>/v1/chat</code>, <code>AIMEAT_GOOSE_BIN</code>"
+      "Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs, one per person, and its model calls go through your own AI providers under your model policy and budget. Limits: an operator's shared chat key skips the per-person metering; a conversation idle for 15 minutes starts fresh.",
+      "<code>/v1/chat</code>, <code>AIMEAT_GOOSE_BIN</code>, <code>AIMEAT_GOOSE_PROVIDER_API_KEY</code>"
      ],
-     "plain": "Built-in chat off Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs. /v1/chat, AIMEAT_GOOSE_BIN"
+     "plain": "Built-in chat off Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs, one per person, and its model calls go through your own AI providers under your model policy and budget. Limits: an operator's shared chat key skips the per-person metering; a conversation idle for 15 minutes starts fresh. /v1/chat, AIMEAT_GOOSE_BIN, AIMEAT_GOOSE_PROVIDER_API_KEY"
     }
    ]
   },
@@ -1354,10 +1354,28 @@
      "slug": "g-9-ai-completions-for-apps-and-agents",
      "cells": [
       "<strong>AI completions for apps and agents</strong>",
-      "Anyone with <code>ai:use</code> gets completions on the owner's key, under a daily USD budget, a per-app quota and a provider allowlist. Repeat clicks on a paid button collapse into one call.",
-      "<code>POST /v1/ai/complete</code>, <code>/v1/ai/usage</code>"
+      "Anyone with <code>ai:use</code> gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call.",
+      "<code>POST /v1/ai/complete</code>, <code>POST /v1/ai/stream</code>, <code>/v1/ai/usage</code>"
      ],
-     "plain": "AI completions for apps and agents Anyone with ai:use gets completions on the owner's key, under a daily USD budget, a per-app quota and a provider allowlist. Repeat clicks on a paid button collapse into one call. POST /v1/ai/complete, /v1/ai/usage"
+     "plain": "AI completions for apps and agents Anyone with ai:use gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call. POST /v1/ai/complete, POST /v1/ai/stream, /v1/ai/usage"
+    },
+    {
+     "slug": "g-9-ai-capabilities",
+     "cells": [
+      "<strong>AI capabilities</strong>",
+      "Your AI, an app or an agent asks one question first: what can I do here? For text, reading pictures, reading files, making pictures, speech, transcription and embeddings, the answer says whether it is on, which model and provider would answer and at what price, and for one that is off, what to do about it. An app states its needs in its AI meta (the models it needs, the providers it prefers, what must stay on your machine), and the publish check warns its builder about a capability used without checking first. Speech and embeddings get a model and a voice from your provider, from you or from the operator. Your AI can transcribe a stored recording and make embeddings. Limits: the settings page is not yet built; a crew uses the node's AI through <code>node_llm()</code> in the aimeat-crewai package.",
+      "<code>GET /v1/ai/capabilities</code>, <code>POST /v1/ai/transcribe</code>, <code>POST /v1/ai/speak</code>, <code>aimeat_ai_capabilities</code>, <code>aimeat_ai_models</code>, <code>aimeat_ai_transcribe</code>, <code>AIMEAT.ai.capabilities()</code>, <code>AIMEAT_MODEL_DEFAULT_TTS</code>, <code>AIMEAT_TTS_VOICE_DEFAULT</code>"
+     ],
+     "plain": "AI capabilities Your AI, an app or an agent asks one question first: what can I do here? For text, reading pictures, reading files, making pictures, speech, transcription and embeddings, the answer says whether it is on, which model and provider would answer and at what price, and for one that is off, what to do about it. An app states its needs in its AI meta (the models it needs, the providers it prefers, what must stay on your machine), and the publish check warns its builder about a capability used without checking first. Speech and embeddings get a model and a voice from your provider, from you or from the operator. Your AI can transcribe a stored recording and make embeddings. Limits: the settings page is not yet built; a crew uses the node's AI through node_llm() in the aimeat-crewai package. GET /v1/ai/capabilities, POST /v1/ai/transcribe, POST /v1/ai/speak, aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe, AIMEAT.ai.capabilities(), AIMEAT_MODEL_DEFAULT_TTS, AIMEAT_TTS_VOICE_DEFAULT"
+    },
+    {
+     "slug": "g-9-embeddings",
+     "cells": [
+      "<strong>Embeddings</strong>",
+      "Text turned into vectors, so a search finds what means the same, not only the same words: meaning search in a large collection, similar items, duplicates written in different words. Only the same model ever answers a fallback, because vectors of two models cannot be compared, and the answer names the model to store beside them. The guide says when not to use them: a few hundred texts, exact values, or just in case. Limits: at most 256 texts per call; the node has no vector search of its own yet.",
+      "<code>POST /v1/ai/embed</code>, <code>aimeat_ai_embed</code>, <code>AIMEAT.ai.embed()</code>, <code>AIMEAT_MODEL_DEFAULT_EMBED</code>"
+     ],
+     "plain": "Embeddings Text turned into vectors, so a search finds what means the same, not only the same words: meaning search in a large collection, similar items, duplicates written in different words. Only the same model ever answers a fallback, because vectors of two models cannot be compared, and the answer names the model to store beside them. The guide says when not to use them: a few hundred texts, exact values, or just in case. Limits: at most 256 texts per call; the node has no vector search of its own yet. POST /v1/ai/embed, aimeat_ai_embed, AIMEAT.ai.embed(), AIMEAT_MODEL_DEFAULT_EMBED"
     },
     {
      "slug": "g-9-ai-providers",
@@ -3407,6 +3425,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 338
+  "rows": 340
  }
 }

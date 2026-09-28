@@ -15,6 +15,9 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.0 — 2026-09-28 — System 2 plan, V5: /v1/chat/status answers `pays` and `model` from the
+ *     route the chat runs on: the payer /v1/llm would pick for this person ('own', 'allowance', or
+ *     null when the gate would refuse), and 'node' only on the operator's shared key.
  *   v1.6.0 — 2026-09-08 — The disconnect that ends a turn is read off the response, not the
  *     request: on Express 5 the request's `close` had already fired before the listener existed.
  *   v1.5.0 — 2026-08-17 — A turn may carry `starter` (which starter button fired it); the first
@@ -40,7 +43,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import {
     createThread, readThread, listThreads, deleteThread,
 } from '../services/chat-threads.js';
-import { chatEnabled, runChatTurn, resetChatSession } from '../services/chat-session.js';
+import { chatEnabled, chatPayer, runChatTurn, resetChatSession } from '../services/chat-session.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
 import { readAllowance, remainingOf } from '../services/ai-allowance.js';
 import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
@@ -81,23 +84,18 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             allowance_remaining_usd: remainingOf(allowance),
             has_own_key: !!(await storage.getMemory(gaii, 'openrouter.apikey')),
             push_devices: pushDevices,
-            // WHO ACTUALLY PAYS FOR A TURN, decided here rather than guessed on the page.
+            // WHO ACTUALLY PAYS FOR A TURN, decided on the server rather than guessed on the page.
             //
             // The page used to derive it: an owner with a key stored was told "running on your own
-            // OpenRouter key" and everyone else was shown an allowance counting down. Neither was
-            // true of a chat turn. The agent is one shared `goose acp` process with one
-            // process-wide provider key (AIMEAT_GOOSE_PROVIDER_API_KEY), so every person's turn is
-            // spent from the node's key, no owner key is ever handed to it, and nothing debits the
-            // allowance — `debitAllowance` is called from services/ai-completion.ts and from
-            // nowhere on this road. A person deciding whether to bring their own key was reading a
-            // sentence about their own money that described somebody else's.
-            //
-            // 'own' and 'allowance' stay in the vocabulary because they become the answer the day
-            // the agent's provider is pointed at this node's own /v1/llm proxy, where
-            // prepareAiCall makes exactly that choice per person. Until then the honest answer is
-            // 'node', and it is the server that says so.
-            pays: 'node' as const,
-            model: config.gooseModel || undefined,
+            // OpenRouter key" while the node's key paid for every turn. Since 2026-09-28 (System 2
+            // plan, V5) the answer depends on the route (services/chat-session.ts chatPayer):
+            // - the node route, the default: each person's agent calls this node's /v1/llm with
+            //   their own chat token, and prepareAiCall picks the payer per call. The answer is
+            //   that same decision: 'own' when their own key pays, 'allowance' when the node's key
+            //   pays from their allowance, null when the gate would refuse the call.
+            // - the shared key (AIMEAT_GOOSE_PROVIDER_API_KEY set): the operator's key pays for
+            //   every turn and nothing is metered per person: 'node'.
+            ...(await chatPayer({ storage, config }, gaii)),
             note: enabled ? undefined
                 : 'No chat agent is configured on this node. An operator sets AIMEAT_GOOSE_BIN.',
         }));

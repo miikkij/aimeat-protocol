@@ -22,6 +22,8 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-28 — aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and aimeat_ai_embed on
+ *     appdev and agent, beside aimeat_ai_providers (System 2 plan, V5).
  *   2026-09-28 — aimeat_ai_providers and aimeat_ai_provider_test beside aimeat_image_generate;
  *     aimeat_ai_routing_set beside aimeat_ai_policy_set (System 2 plan, V3).
  *   2026-09-28 — aimeat_ai_policy_set joins the agent and admin surfaces beside aimeat_operator_ai_config.
@@ -152,6 +154,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_seo_status',
         'aimeat_seo_announce',
         'aimeat_image_generate', 'aimeat_ai_providers', 'aimeat_ai_provider_test',
+        'aimeat_ai_capabilities', 'aimeat_ai_models', 'aimeat_ai_transcribe', 'aimeat_ai_embed',
         'aimeat_voice_reply', 'aimeat_voice_speak',
         'aimeat_ai_job_start', 'aimeat_ai_job_list', 'aimeat_ai_job_get', 'aimeat_ai_job_cancel',
         'aimeat_decide', 'aimeat_decision_list', 'aimeat_decision_review', 'aimeat_decide_run', 'aimeat_decide_settings',
@@ -172,6 +175,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
     ],
     agent: [
         'aimeat_image_generate', 'aimeat_ai_providers', 'aimeat_ai_provider_test',
+        'aimeat_ai_capabilities', 'aimeat_ai_models', 'aimeat_ai_transcribe', 'aimeat_ai_embed',
         'aimeat_voice_reply', 'aimeat_voice_speak',
         'aimeat_ai_job_start', 'aimeat_ai_job_list', 'aimeat_ai_job_get', 'aimeat_ai_job_cancel',
         'aimeat_decide', 'aimeat_decision_list', 'aimeat_decision_review', 'aimeat_decide_run', 'aimeat_decide_settings',
