@@ -25,6 +25,8 @@
  *   - effectivePolicy() / blockingLayer() / isAllowed() / firstAllowed() — the decision
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
+ *   v1.1.0 — 2026-09-28 — firstAllowed() takes `serves`: a custom list's model is a source for the
+ *     capability the model catalogue says it serves, not only for text (V4).
  */
 import type { AiCapability } from './types.js';
 
@@ -288,18 +290,20 @@ export function blockingLayer(decision: PolicyDecision, ref: string): PolicyLaye
  * in the node's recommended order for the capability and then in the policy's own order, that the
  * caller's providers can reach. Null when there is none.
  *
- * Without the model catalogue (V4) the node cannot tell which model in a custom list reads an image
- * or makes a transcript; so for every capability but text only the recommended list, which is kept
- * per capability, is a source. A custom list is taken to name text models.
+ * A model of a custom list is a source when `serves` (the model catalogue, V4) says it serves the
+ * capability. A model the catalogue does not know is taken to be a text model, as before the
+ * catalogue, and a source for text only.
  */
 export function firstAllowed(
   decision: PolicyDecision, capability: AiCapability, recommended: RecommendedModels, reachable: readonly string[],
+  serves: (ref: string) => boolean | undefined = () => undefined,
 ): string | null {
   const reach = new Set(reachable.map(t => t.toLowerCase()));
-  const ordered = [
-    ...(recommended[capability] ?? []),
-    ...(capability === 'text' && decision.allowed !== 'any' ? decision.allowed : []),
-  ];
+  const custom = decision.allowed === 'any' ? [] : decision.allowed.filter(ref => {
+    const known = serves(ref);
+    return known ?? capability === 'text';
+  });
+  const ordered = [...(recommended[capability] ?? []), ...custom];
   for (const ref of ordered) {
     const p = parseModelRef(ref);
     if (p.type && reach.has(p.type) && isAllowed(decision, ref)) return ref;

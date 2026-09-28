@@ -19,6 +19,7 @@
  *   - chooseModel() — the model under that decision
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
+ *   v1.1.0 — 2026-09-28 — The node's pick reads the model catalogue for what a custom list's model serves (V4).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -29,6 +30,8 @@ import {
   type CallerClass, type PolicyDecision, type RecommendedModels,
 } from './policy.js';
 import { readOwnerAiPolicy, appModelsOf, recommendedModelsOf } from './policy-store.js';
+import { catalogModel } from './catalog/store.js';
+import { servesCapability } from './catalog/price.js';
 
 export interface PolicyCallContext {
   capability: AiCapability;
@@ -121,7 +124,11 @@ export function chooseModel(
     return fallback ? { model: onProvider(fallback, ctx.providerType)?.id ?? fallback, policyChoseModel: false } : null;
   }
 
-  const pick = firstAllowed(decision, ctx.capability, recommended, [ctx.providerType]);
+  const pick = firstAllowed(decision, ctx.capability, recommended, [ctx.providerType], ref => {
+    const p = parseModelRef(ref);
+    const m = p.type ? catalogModel(p.type, p.id) : undefined;
+    return m ? servesCapability(m, ctx.capability) : undefined;
+  });
   if (pick) return { model: parseModelRef(pick).id, policyChoseModel: true };
   throw new AiCompletionError('AI_MODEL_NOT_ALLOWED', 403,
     `No model your rules allow for ${ctx.capability} is reachable on your ${ctx.providerType} provider. `

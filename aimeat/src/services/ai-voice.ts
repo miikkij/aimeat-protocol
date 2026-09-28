@@ -6,6 +6,8 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.3.0 - 2026-09-28 - A reply the provider did not price is priced from the model catalogue
+ *     (services/ai/catalog/price.ts), as every other text call is (System 2 plan, V4).
  *   v1.2.0 - 2026-09-28 - Providers (System 2 plan, V3): the reply tries the owner's candidates before
  *     the first byte and an Anthropic provider answers through the gateway's converter; the spoken
  *     audio uses the first candidate, whose type speaks OpenAI's /audio/speech (providers.ts).
@@ -21,11 +23,12 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
-  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, estimateCostUsd, planFor, recordFailedAttempts, type AiCallPlan,
+  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai-completion.js';
 import { chatCompletionRaw, speechRaw, generationCost, listModels } from './openrouter.js';
 import { openAiChat, speaksOpenAiChat } from './ai/gateway.js';
 import { runRoute } from './ai/route-run.js';
+import { callCost } from './ai/catalog/price.js';
 import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
@@ -142,9 +145,11 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
     // A disconnected client does not erase what was already generated or paid for.
     if (!prompt) prompt = Math.ceil(options.messages.reduce((n, m) => n + m.content.length, 0) / 4);
     if (!completion) completion = Math.ceil(content.length / 4);
-    // The same fallback price every other text call uses, from one function, not a copy of its numbers.
+    // The same pricing every other text call uses (services/ai/catalog/price.ts): the provider's
+    // charge, then the catalogue, then the table and the estimate.
     result = await settled(storage, config, gaii, plan, options, content,
-      cost ?? estimateCostUsd(prompt, completion), { prompt, completion }, 'voice-complete');
+      callCost({ type: plan.providerType, model: plan.model, promptTokens: prompt, completionTokens: completion, reported: cost }).costUsd,
+      { prompt, completion }, 'voice-complete');
   }
   await emit({ type: 'done', model: plan.model, finish_reason: finish, truncated: finish === 'length', cost_exact: cost !== undefined, ...result });
 }

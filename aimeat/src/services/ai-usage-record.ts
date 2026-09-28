@@ -11,6 +11,8 @@
  * @structure UsageRecord · todayKey · getTodayUsage · recordAiUsage
  * @usage import { getTodayUsage, recordAiUsage, type UsageRecord } from './ai-completion.js';
  * @version-history
+ *   v1.2.0 — 2026-09-28 — `priceRef` on a call: the ledger cites where a caller-priced cost came from
+ *     (the model catalogue's snapshot, or the estimate), not the provider (System 2 plan, V4).
  *   v1.1.0 — 2026-09-20 — `per_agent` and the `agent` a call names, for the per-agent daily cap; the
  *     key scope may say 'agent'.
  *   v1.0.0 — 2026-09-20 — Extracted from ai-completion.ts, unchanged.
@@ -130,6 +132,8 @@ async function appendAiUsage(
     apiKeyScope?: 'agent' | 'own' | 'node';
     /** The bare name of the owner's agent that asked, when one did. Feeds `per_agent`. */
     agent?: string;
+    /** What the ledger cites for `costUsd` when the caller priced it: a catalogue snapshot, `estimate`. */
+    priceRef?: string;
   },
   /** The node's config, so the event window is the operator's number. Optional: the two callers
    *  have it, and a caller that does not gets the default rather than a compile error. */
@@ -183,6 +187,7 @@ async function appendAiUsage(
         // The provider's own figure when we have it. `costUsd` here is already either the exact
         // reported cost or this node's estimate, and priceUsd() prefers what it is given.
         providerCostUsd: call.costUsd,
+        ...(call.priceRef ? { priceRef: call.priceRef } : {}),
         source: call.source ?? 'ai-complete',
         // The ledger's split is who is BILLED: the node's key, or the person's own money. An
         // agent's key is the person's own money, so it is 'own' here; the decision record and

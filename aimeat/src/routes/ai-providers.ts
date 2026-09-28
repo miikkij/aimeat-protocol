@@ -43,6 +43,7 @@ import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import {
   aiProvidersView, putOwnerAiProvider, deleteOwnerAiProvider, setOwnerProviderKey, deleteOwnerProviderKey, knownProviderIds,
+  catalogCheck,
 } from '../services/ai/provider-store.js';
 import { providerView } from '../services/ai/providers.js';
 import { testProvider } from '../services/ai/provider-test.js';
@@ -85,7 +86,8 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
   router.put('/v1/ai/providers/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
     try {
       const p = await putOwnerAiProvider(storage, config, owner(req), req.params.id as string, req.body ?? {});
-      res.json(success(config.nodeId, { provider: providerView(p) }, [
+      const { warnings } = catalogCheck(p);
+      res.json(success(config.nodeId, { provider: providerView(p), ...(warnings.length ? { warnings } : {}) }, [
         { description: 'Set its key', method: 'PUT', url: `/v1/ai/providers/${p.id}/key` },
         { description: 'Test it', method: 'POST', url: `/v1/ai/providers/${p.id}/test` },
       ]));

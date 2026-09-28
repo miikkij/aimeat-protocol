@@ -31,6 +31,7 @@
  *   cd aimeat && pnpm check:config-coverage --seed     # rewrite the exemption file from today
  * @version-history
  *   v1.0.0 — 2026-08-16 — Initial, with the AI group as the first fourteen it would have caught.
+ *   v1.1.0 — 2026-09-28 — Reads the row groups config-schema.ts spreads in (config-schema-*.ts) too.
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,6 +39,10 @@ import { join } from 'node:path';
 const ROOT = process.cwd();
 const CONFIG_DIR = join(ROOT, 'src');
 const SCHEMA = join(ROOT, 'src', 'services', 'config-schema.ts');
+/** config-schema.ts and the row groups it spreads into CONFIG_FIELDS (config-schema-*.ts). */
+const SCHEMA_FILES = [SCHEMA, ...readdirSync(join(ROOT, 'src', 'services'))
+  .filter(f => f.startsWith('config-schema-') && f.endsWith('.ts') && f !== 'config-schema-validators.ts')
+  .map(f => join(ROOT, 'src', 'services', f))];
 const EXEMPTIONS = join(ROOT, 'security', 'config-coverage-exemptions.json');
 
 const STRICT = process.argv.includes('--strict');
@@ -69,9 +74,10 @@ function envVarsRead(): Set<string> {
 }
 
 function schemaEnvVars(): Set<string> {
-  const src = readFileSync(SCHEMA, 'utf-8');
   const found = new Set<string>();
-  for (const m of src.matchAll(/envVar:\s*'([A-Z0-9_]+)'/g)) found.add(m[1] as string);
+  for (const file of SCHEMA_FILES) {
+    for (const m of readFileSync(file, 'utf-8').matchAll(/envVar:\s*'([A-Z0-9_]+)'/g)) found.add(m[1] as string);
+  }
   return found;
 }
 

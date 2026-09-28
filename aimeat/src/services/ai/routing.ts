@@ -21,6 +21,7 @@
  *   rulesFor · defaultsFor · normaliseRoutingInput · setRouting
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
+ *   v1.0.1 — 2026-09-28 — Comments: what the model catalogue (V4) now prices and orders.
  */
 import type { Storage } from '../../storage/interface.js';
 import { upsertPrivateRecord } from '../private-record.js';
@@ -41,7 +42,7 @@ const MAX_DEFAULTS = 10;
 export interface RoutingRules {
   /** When the defaults are used up: try the owner's other providers marked for the pool. */
   extendToPool: boolean;
-  /** The pool's order after the defaults. `cheapest` and `fastest` read the catalogue (V4); until then they keep priority. */
+  /** The pool's order after the defaults. `cheapest` reads the model catalogue; `fastest` keeps priority, since the node measures no latency yet. */
   poolOrder: 'priority' | 'cheapest' | 'fastest';
   /** Pick by capability alone only a provider whose capability is tested and working. */
   onlyTested: boolean;

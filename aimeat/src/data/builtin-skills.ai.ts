@@ -9,6 +9,8 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   v1.2.0 — 2026-09-28 — configure-routing and aimeat-ai-model-policy point to the model catalogue
+ *     (GET /v1/ai/models) and say what it decides (System 2 plan, V4).
  *   v1.1.0 — 2026-09-28 — aimeat-ai-model-policy: the owner's model policy for an AI (System 2 plan,
  *     V2); configure-routing points to it.
  *   v1.0.0 — 2026-09-28 — Extracted from builtin-skills.ts (pure extraction; no content change).
@@ -171,6 +173,11 @@ Three separate "routing" layers — identify which one the owner means:
    The operator's side: \`AIMEAT_AI_PROVIDERS\`, \`AIMEAT_AI_BUILTIN_PROVIDERS\`,
    \`AIMEAT_AI_PROVIDER_EGRESS\` and \`AIMEAT_AI_PROVIDER_TYPES\` on the Config tab; the node's own
    key is the provider \`node-openrouter\` and answers only an owner whose list is empty.
+   **Which models exist**, what each serves and what it costs: \`GET /v1/ai/models\` (the model
+   catalogue; \`?capability=image&allowed=true\` gives what this caller can use). A retiring or
+   retired model shows on its provider in \`aimeat_ai_providers\`: propose another. The operator
+   refreshes the catalogue with \`POST /v1/admin/ai/catalog/refresh\`; \`AIMEAT_AI_CATALOG_REFRESH\`
+   sets the cadence and \`GET /v1/ai/catalog/meta\` says when it last ran.
 2. **Work routing** (which agent does what): driven by agent capabilities, tags, and offers.
    Inspect with \`aimeat_agents_list\` + \`aimeat_agent_profile\`; adjust tags/mode via
    \`aimeat_operator_agent_configure\` (propose-then-confirm) and teach specialization by
@@ -224,7 +231,10 @@ Three lists, and a call may use only a model that every list with something in i
 A model is written \`<type>:<model id>\`, for example \`openrouter:anthropic/claude-opus-5.5\`. The
 type picks the owner's providers of that type (\`aimeat_ai_providers\` lists them); a bare id goes to
 the provider that answers the call. Naming a type the owner has no provider for is 400
-\`AI_PROVIDER_NOT_CONFIGURED\`.
+\`AI_PROVIDER_NOT_CONFIGURED\`. To find a model for a list, read the model catalogue:
+\`GET /v1/ai/models?capability=<capability>&allowed=true\` lists the models this caller can use,
+each with its \`ref\`. When the node picks from a custom list, it uses the catalogue to know which
+model serves the capability; a model the catalogue does not know counts as a text model.
 
 ## When a call is refused
 

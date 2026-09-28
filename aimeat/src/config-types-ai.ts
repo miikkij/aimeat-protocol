@@ -11,6 +11,8 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   v1.4.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): aiCatalogRefresh, aiPriceOverrides,
+ *     aiCatalogSources.
  *   v1.3.0 — 2026-09-28 — The operator's AI providers (System 2 plan, V3): aiProviders,
  *     aiBuiltinProviders, aiProviderEgress, aiProviderTypes, aiFixedBaseUrlOverrides.
  *   v1.2.0 — 2026-09-28 — aiRecommendedModels: the operator's recommended models per capability
@@ -138,6 +140,18 @@ export interface AiCapabilityConfig extends DecideConfig {
    * them 410 Gone naming /v1/ai/providers. They are removed in 4.0.0.
    */
   aiLegacySettingsRoutes: boolean;
+  /**
+   * How often the node refreshes its model catalogue from the public sources (services/ai/catalog/,
+   * System 2 plan V4): weekly (the default), daily, or off. Off keeps the seed the build shipped with.
+   */
+  aiCatalogRefresh: 'weekly' | 'daily' | 'off';
+  /**
+   * The operator's price corrections, as JSON `{ "<type>:<model id>": { "inPerMtok": 3, ... } }`. They
+   * win over every source, so a wrong catalogue price is fixed without waiting for the source.
+   */
+  aiPriceOverrides: string;
+  /** Other addresses for the catalogue sources, as JSON `{ "modelsDev"?, "openRouter"?, "liteLlm"? }`. For a test stub or a mirror. */
+  aiCatalogSources: string;
   /** How many on-demand app screenshots one owner may ask for per hour. Rendering is the most
    *  expensive thing this node does per request, and an unthrottled render is a denial-of-service
    *  shape, which is why the batch job never had a request path at all until this existed. */

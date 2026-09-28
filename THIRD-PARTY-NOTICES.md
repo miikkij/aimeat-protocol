@@ -94,8 +94,10 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
 | [KaTeX](https://katex.org) | 0.18.5 | MIT | Copyright (c) 2013-2020 Khan Academy and other contributors | served by the node | notice only |
 | [AIMEAT (this project's own served libraries)](https://github.com/miikkij/aimeat-protocol) | see each file's @version-history header | MIT | Copyright (c) 2026 Jouni Miikki | served by the node | notice only |
+| [models.dev (model data)](https://models.dev) | 2026-09-28 | MIT | Copyright (c) 2025 models.dev | served by the node | notice only |
+| [LiteLLM model_prices_and_context_window.json (model data)](https://github.com/BerriAI/litellm) | 2026-09-28 | MIT | Copyright (c) 2023 Berri AI | served by the node | notice only |
 
-Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Earth 110m country shapes)** (The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.); **KaTeX** (The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file.)
+Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Earth 110m country shapes)** (The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.); **KaTeX** (The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file.); **models.dev (model data)** (Model capabilities, limits and prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json) and refreshed from the source by the node. Not served under /lib; listed here because the seed ships in the package.); **LiteLLM model_prices_and_context_window.json (model data)** (Image, speech and transcription prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json). The file lies outside the repository's enterprise/ directory, so its MIT licence applies. Not served under /lib; listed here because the seed ships in the package.)
 
 ## Production dependencies
 
@@ -8460,6 +8462,37 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### LiteLLM model_prices_and_context_window.json (model data) 2026-09-28
+
+```text
+Portions of this software are licensed as follows:
+
+* All content that resides under the "enterprise/" directory of this repository, if that directory exists, is licensed under the license defined in "enterprise/LICENSE".
+* Content outside of the above mentioned directories or restrictions above is available under the MIT license as defined below.
+---
+MIT License
+
+Copyright (c) 2023 Berri AI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### logform 2.7.0
 
 ```text
@@ -8863,6 +8896,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+### models.dev (model data) 2026-09-28
+
+```text
+MIT License
+
+Copyright (c) 2025 models.dev
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### Motion 13.1.1

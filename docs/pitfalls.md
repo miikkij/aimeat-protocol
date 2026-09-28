@@ -19,8 +19,8 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 
 ## The five shapes
 
-1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93
-2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93, 98
+2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81, 97
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83
 5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b
@@ -130,6 +130,8 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 95 | A CSS rule in the source that never applied on any page | 1 |
 | 96 | A suite that boots its own node fails in your gate, passes alone | 5 |
 | 97 | An AI call paid by the operator's key, fetched around safeFetch, or charged twice | 3 |
+| 98 | A new provider fails only on the stand-in; Anthropic answers stop near 4096 tokens | 1 |
+| 99 | `pnpm gate` green, then the commit refused for a file over 800 lines | 2 |
 
 ---
 
@@ -1107,3 +1109,23 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why it looked right.** Each default is the library being helpful for a single-tenant script: one key in the environment, one user, retries that make a demo pass. A node is multi-tenant and the owner's key, the outbound guard and the charge are its rules, not the library's.
 - **The rule.** Only `services/ai/gateway.ts` imports `ai` at run time and only `services/ai/adapters/` imports a provider package (`pnpm check:ai-disclosure` refuses anything else, and `@ai-sdk/gateway` anywhere). In those files: never build a provider model without an explicit key (the adapter refuses the target instead), pass `fetch: aiFetch` (which is `safeFetch`), set `maxRetries: 0`, give `generateText` an `experimental_download` that returns `null` for every URL so the URL goes to the provider untouched, and ask for `include: { responseBody: true }` where the cost lives in the body. `test/unit/ai-gateway.test.ts` holds the key and download cases and fails when either protection is removed.
 - **The tell.** A new AI SDK call, or a new provider package in V3, with an options object shorter than the existing calls in the gateway. Read each default of the new package's factory for an environment variable before the first call.
+
+## 98. An AI SDK provider package checks the answer's shape and the model id, and neither shows as an error
+
+*Symptoms: a new provider type fails only against the test stand-in, with a schema error about a field nobody set; or an answer from an Anthropic provider stops mid-sentence at about 4096 tokens with finish reason `length`, and the only trace is a warning line in the console.*
+
+- **The case.** V3 of the System 2 AI plan (commit `ae6f30957`, 2026-09-28) added `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/xai` and `@ai-sdk/mistral`. Two of them hold rules that the OpenAI-compatible package does not:
+  1. **`@ai-sdk/mistral` requires `object: "chat.completion"`** in a chat answer (a `z.literal` in its response schema, 4.0.52). Every real provider sends the field. The test stand-in (`test/helpers/fake-ai-provider.ts`, `chatJson`) did not, and the Mistral case failed on the package's schema before the node saw an answer. The stand-in now sends it.
+  2. **`@ai-sdk/anthropic` caps the output of a model id it does not know** (4.0.65, `getModelCapabilities`). An id that contains `claude-` but is not in its table gets 128 000 tokens and is treated as the newest family (temperature is dropped with a warning). An id without `claude-` gets `maxOutputTokens: 4096` when the call gives none. Both arrive only in the call's `warnings`, which the SDK prints to the console; the call itself answers 200.
+- **Why it looked right.** The OpenAI-compatible package, which V1 was built and tested on, accepts a chat answer without `object` and has no model table, so the stand-in and the gateway both passed with it. Each new package brings its own schema and its own model table.
+- **The rule.** Make the test stand-in answer the way the real provider does, field for field, and read a new package's response schema before the first case. For an Anthropic provider, pass `maxOutputTokens` whenever the model id may be outside the package's table (an Anthropic-compatible server, a model newer than the package), and read `warnings` from the result rather than the console.
+- **The tell.** A schema error that names a field of the provider's answer, only in tests; or answers from one provider type that end at a round token count.
+
+## 99. `pnpm gate` does not run ESLint, so a file over 800 lines passes the gate and the commit is refused
+
+*Symptoms: `pnpm gate` is green on finished work, then the pre-commit hook refuses the commit with `aimeat/max-file-lines` on a file the work grew past 800 lines.*
+
+- **The case.** On 2026-09-28 the V3 commit of the System 2 AI plan (`ae6f30957`) passed `pnpm gate` and was refused by the hook for `services/config-schema.ts` (816 lines) and `server-bootstrap/routes-loader.ts` (803 lines). Two pure moves (`config-schema-validators.ts`, `routes-loader-ai.ts`) fixed it.
+- **Why.** `scripts/gate.ts` runs `check:fast`, `check:invariants`, the unit tests, the changed suites and the guard tier. ESLint (`pnpm lint`, where `aimeat/max-file-lines` lives) is in the pre-commit hook and in CI (`ci.yml`), not in the gate. CLAUDE.md says a green gate is what "done" needs, which reads as if the gate covered the hook.
+- **The rule.** Before `pnpm gate` on finished work, run `pnpm lint` from `aimeat/` (cached, seconds), or at least count the lines of every file the change grew. A split to get under 800 lines is a pure move, and it changes what the gate measured, so the gate runs after the split, not before it.
+- **The tell.** A change that added a hundred lines or more to a file that was already long.

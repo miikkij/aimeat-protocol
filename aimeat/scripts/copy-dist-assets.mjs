@@ -18,6 +18,7 @@
  * @structure noDistributePaths() → the deny list from the manifest; copy() → cpSync with a filter
  * @usage  node scripts/copy-dist-assets.mjs   (run by `pnpm build`)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — Copies the model catalogue's seed, src/data/ai-catalog (System 2 plan, V4).
  *   v1.0.0 — 2026-08-31 — Extracted from the inline build one-liner; skips non-distributable assets.
  */
 import { cpSync, existsSync, readFileSync } from 'node:fs';
@@ -78,6 +79,9 @@ copy(
   'dist/src/storage/providers/postgres-kysely/migrations',
   { recursive: true },
 );
+// The model catalogue's seed (src/services/ai/catalog/store.ts reads it beside its compiled module):
+// a fresh node, and one without network, prices and lists models from it.
+copy('src/data/ai-catalog', 'dist/src/data/ai-catalog', { recursive: true });
 
 if (skipped > 0) {
   console.log(`copy-dist-assets: skipped ${skipped} file(s) marked "distribute": false in vendored-assets.json.`);

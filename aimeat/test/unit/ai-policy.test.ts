@@ -143,4 +143,14 @@ describe('the model the node picks instead', () => {
     const dx = effectivePolicy(RECOMMENDED, policy({ mode: 'custom', allow: [OPUS] }), { capability: 'image', caller: 'owner' });
     expect(firstAllowed(dx, 'image', RECOMMENDED, ['openrouter'])).toBeNull();
   });
+
+  it('from the catalogue, a model of the custom list that serves the capability (V4)', () => {
+    const MINE = 'openrouter:acme/pixel-2';
+    const dc = effectivePolicy(RECOMMENDED, policy({ mode: 'custom', allow: [OPUS, MINE] }), { capability: 'image', caller: 'owner' });
+    const serves = (ref: string) => ref === MINE ? true : ref === OPUS ? false : undefined;
+    expect(firstAllowed(dc, 'image', RECOMMENDED, ['openrouter'], serves)).toBe(MINE);
+    // For text, a model the catalogue says does not write text is passed over; an unknown one is not.
+    const dt = effectivePolicy(RECOMMENDED, policy({ mode: 'custom', allow: [MINE, 'openrouter:acme/unknown'] }), { capability: 'text', caller: 'owner' });
+    expect(firstAllowed(dt, 'text', {}, ['openrouter'], ref => ref === MINE ? false : undefined)).toBe('openrouter:acme/unknown');
+  });
 });

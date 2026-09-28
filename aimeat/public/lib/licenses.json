@@ -510,6 +510,32 @@
         "samples/**"
       ],
       "modified": false
+    },
+    {
+      "id": "models-dev",
+      "name": "models.dev (model data)",
+      "version": "2026-09-28",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2025 models.dev",
+      "homepage": "https://models.dev",
+      "source": "https://models.dev/api.json",
+      "licenseFile": "LICENSES/models-dev.txt",
+      "files": [],
+      "modified": true,
+      "note": "Model capabilities, limits and prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json) and refreshed from the source by the node. Not served under /lib; listed here because the seed ships in the package."
+    },
+    {
+      "id": "litellm-model-prices",
+      "name": "LiteLLM model_prices_and_context_window.json (model data)",
+      "version": "2026-09-28",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2023 Berri AI",
+      "homepage": "https://github.com/BerriAI/litellm",
+      "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+      "licenseFile": "LICENSES/litellm.txt",
+      "files": [],
+      "modified": true,
+      "note": "Image, speech and transcription prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json). The file lies outside the repository's enterprise/ directory, so its MIT licence applies. Not served under /lib; listed here because the seed ships in the package."
     }
   ]
 }

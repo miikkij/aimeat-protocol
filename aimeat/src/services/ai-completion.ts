@@ -124,6 +124,7 @@ import { providersForOwner } from './ai/provider-store.js';
 import { readRouting, rulesFor, type RoutingRules } from './ai/routing.js';
 import { planRoute, refusalFor, type AiCandidate, type ChosenBy, type RejectedCandidate } from './ai/route-plan.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
+import { callCost } from './ai/catalog/price.js';
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -568,6 +569,8 @@ export interface AiCallOutcome {
   units?: { seconds?: number; images?: number };
   /** Where `costUsd` came from (services/ai/types.ts). Logged with the settlement. */
   costSource?: CostSource;
+  /** What the ledger cites for the price: the catalogue snapshot, `estimate`, … (services/ai/catalog/price.ts). */
+  priceRef?: string;
 }
 
 export interface AiCallSettlement {
@@ -596,6 +599,7 @@ export async function settleAiCall(
     model: outcome.model, provider: plan.provider,
     promptTokens: outcome.promptTokens, completionTokens: outcome.completionTokens,
     source: outcome.source, apiKeyScope: plan.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
+    ...(outcome.priceRef ? { priceRef: outcome.priceRef } : {}),
   }, config);
   // Only the node's key draws down an allowance. An own key is the person's own account.
   const allowanceAfter = plan.keyScope === 'node'
@@ -737,14 +741,20 @@ export async function completeForOwner(
   const promptTok = result.usage.promptTokens ?? 0;
   const completionTok = result.usage.completionTokens ?? 0;
   const totalTok = result.usage.totalTokens ?? (promptTok + completionTok);
-  const costExact = typeof result.usage.costUsd === 'number';
-  const costUsd = costExact ? result.usage.costUsd! : estimateCostUsd(promptTok, completionTok);
+  // The provider's own charge, then the model catalogue, then the table, then the estimate
+  // (services/ai/catalog/price.ts). A direct provider reports no charge, so the catalogue is its price.
+  const price = callCost({
+    type: answered.providerType, model: result.model, requestedModel: answered.model,
+    promptTokens: promptTok, completionTokens: completionTok, reported: result.usage.costUsd,
+  });
+  const costExact = price.costSource === 'provider';
+  const costUsd = price.costUsd;
 
   const settled = await settleAiCall(storage, config, gaii, answered, {
     model: result.model,
     promptTokens: promptTok, completionTokens: completionTok, totalTokens: totalTok,
     costUsd, content: result.content, appId: opts.appId, source: 'ai-complete',
-    costSource: costExact ? 'provider' : 'estimate',
+    costSource: price.costSource, priceRef: price.priceRef,
   });
   route.attempts[route.attempts.length - 1].costUsd = costUsd;
 

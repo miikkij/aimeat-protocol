@@ -132,6 +132,7 @@
     "check:invariants": "tsx scripts/check-invariants.ts",
     "test:changed": "vitest run --changed --passWithNoTests",
     "gate": "tsx scripts/gate.ts",
+    "ai:catalog:refresh": "tsx scripts/ai-catalog-refresh.ts",
     "gate:full": "tsx scripts/gate.ts --full",
     "sandbox": "tsx scripts/sandbox.ts",
     "cold-agent": "tsx scripts/cold-agent/run.ts",
