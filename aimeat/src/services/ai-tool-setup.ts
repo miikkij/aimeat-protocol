@@ -32,6 +32,9 @@
  *   remake's branch decision, kept beside the list it reads rather than in the calling code.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.7.0 — 2026-09-29 — `mcp.install.app` on Claude Code, Cursor and VS Code: the desktop app,
+ *     which attaches those three in one click with no terminal and no file. The offer and its
+ *     fixed download addresses live in services/desktop-app-offer.ts.
  *   v1.6.1 — 2026-09-18 — The model names in the three setup notes come from
  *     services/model-recommendation.ts, which also carries the "verified" date below.
  *   v1.6.0 — 2026-09-18 — A name two apps share (Gemini, Microsoft Copilot) raises ONE question,
@@ -70,6 +73,7 @@
 import type { AimeatConfig } from '../config.js';
 import { MODEL_RECOMMENDATION as MODEL } from './model-recommendation.js';
 import { MCP_INSTALL_SCRIPT_OS, mcpConfigFile, mcpInstallLink, mcpInstallScript, type McpInstallClientId } from './mcp-install.js';
+import { desktopAppOffer, type DesktopAppOffer } from './desktop-app-offer.js';
 
 export interface AiToolParam {
     /** The field label as the tool's own UI spells it. */
@@ -104,6 +108,8 @@ export interface AiToolInstall {
      * client that has a one-line command and no install link (Claude Code). Absent for the rest.
      */
     scripts?: { os: 'windows' | 'mac'; label: string; url: string; filename: string; note: string }[];
+    /** The desktop app, which attaches this tool in one click (services/desktop-app-offer.ts). */
+    app?: DesktopAppOffer;
 }
 
 export interface AiTool {
@@ -191,6 +197,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 },
             } : {}),
             ...(scripts.length ? { scripts } : {}),
+            // The three clients this helper serves are exactly the three the desktop app writes.
+            app: desktopAppOffer(l),
             file: {
                 label: s(l, `Download ${filename}`, `Lataa ${filename}`),
                 url: `${node}/v1/connect/mcp.json?client=${id}`,

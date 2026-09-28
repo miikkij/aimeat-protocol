@@ -3310,10 +3310,10 @@
      "slug": "g-22-aimeat-desktop",
      "cells": [
       "<strong>aimeat-desktop</strong>",
-      "A Windows app that opens on the AI tools installed on that computer and attaches them to your AIMEAT with one click, whether your AIMEAT is aimeat.io or your own. The same installer also runs an AIMEAT of your own on SQLite, with a control panel and a tray icon.",
-      "<code>aimeat-desktop/</code>, <a href=\"https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node-setup.exe\" target=\"_blank\" rel=\"noopener\">download</a>"
+      "An app for Windows, Apple-silicon Macs and Linux that opens on the AI tools installed on that computer and attaches Claude Code, Cursor and VS Code to your AIMEAT with one click, whether your AIMEAT is aimeat.io or your own; Claude Desktop and Codex get the address or the lines to paste. The same app can also run an AIMEAT of your own on SQLite on that computer, with the AI that runs there (LM Studio, Ollama), and it updates itself. Not code-signed yet, so the system asks to allow it the first time.",
+      "<code>aimeat-desktop/</code>, <a href=\"https://github.com/miikkij/aimeat-protocol/releases/tag/desktop-latest\" target=\"_blank\" rel=\"noopener\">download</a>"
      ],
-     "plain": "aimeat-desktop A Windows app that opens on the AI tools installed on that computer and attaches them to your AIMEAT with one click, whether your AIMEAT is aimeat.io or your own. The same installer also runs an AIMEAT of your own on SQLite, with a control panel and a tray icon. aimeat-desktop/, download"
+     "plain": "aimeat-desktop An app for Windows, Apple-silicon Macs and Linux that opens on the AI tools installed on that computer and attaches Claude Code, Cursor and VS Code to your AIMEAT with one click, whether your AIMEAT is aimeat.io or your own; Claude Desktop and Codex get the address or the lines to paste. The same app can also run an AIMEAT of your own on SQLite on that computer, with the AI that runs there (LM Studio, Ollama), and it updates itself. Not code-signed yet, so the system asks to allow it the first time. aimeat-desktop/, download"
     },
     {
      "slug": "g-22-aimeat-openhands",
