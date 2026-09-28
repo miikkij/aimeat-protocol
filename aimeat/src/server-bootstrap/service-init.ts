@@ -35,6 +35,8 @@
  *     apps' do. No code changed here.
  *   v1.8.0 — 2026-09-26 — The comment at migrateMailReadConsent() says it tells owners about their
  *     agents too. No code changed here.
+ *   v1.10.0 — 2026-09-28 — loadCatalog() (awaited): the model catalogue into the process cache, the
+ *     seed written for any type the node has no record of (System 2 plan, V4).
  *   v1.9.0 — 2026-09-26 — After the Design Book seed, noticeFailingComponents(): a proposer whose stored
  *     component no longer passes the bench this build runs is told once (design-book/component-notice.ts).
  *   v1.10.0 — 2026-09-27 — migrateAppToolsKeysOnce(): once per node, app tool manifests move to the
@@ -62,6 +64,7 @@ import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedDesignBook } from '../services/design-book/lifecycle.js';
 import { noticeFailingComponents } from '../services/design-book/component-notice.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
+import { loadCatalog } from '../services/ai/catalog/store.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
@@ -190,6 +193,11 @@ export async function initializeServices(
   // something no first request needs.
   await seedSystemPrompts(storage)
     .catch(err => logger.error('Failed to seed system prompts', { error: String(err) }));
+
+  // The model catalogue (System 2 plan V4): read into the process cache, the seed written for any
+  // type the node has no record of. AWAITED, because the first AI call prices from it; it is seven
+  // reads, and loadCatalog never throws.
+  await loadCatalog(storage, config);
 
   // Bring the built-in node-scope skills into step with this build. A skill edited on THIS node is
   // left alone and named in the log; an untouched one follows the repo. Before 2026-08-25 this was

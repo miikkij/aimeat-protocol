@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.11 -- 2026-09-28 -- diagnose-a-workflow names the refusal reason too-costly (model catalogue, V4).
  *   v1.16.10 -- 2026-09-28 -- ai-transparency and configure-routing move to builtin-skills.ai.ts, unchanged
  *            and in the same places of BUILTIN_SKILLS (pure move; the file was at 800 lines).
  *   v1.16.9 -- 2026-09-28 -- ai-transparency says what the node records by itself: pictures and
@@ -566,7 +567,8 @@ metadata:
    permission again, or saves the workflow in person so the trigger runs on their authority.
 7. **An ai step that failed on its provider:** the error names the refusal. 400
    \`AI_CAPABILITY_UNAVAILABLE\` lists each provider with the reason it was left out (\`untested\`,
-   \`failing\`, \`no-key\`, \`no-model\`, \`capability-off\`, \`leaves-machine\`); \`aimeat_ai_providers\`
+   \`failing\`, \`no-key\`, \`no-model\`, \`capability-off\`, \`leaves-machine\`, and \`too-costly\` when the
+   owner's routing sets a ceiling per call that the model's catalogue price exceeds); \`aimeat_ai_providers\`
    shows each provider's health, and \`aimeat_ai_provider_test\` checks one again. A provider that
    failed three times in a row is gone round for five minutes while another can answer, and one
    whose key was refused waits for the owner's test or a new key. An answer that did come carries

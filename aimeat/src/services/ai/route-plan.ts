@@ -29,6 +29,9 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.1.0 — 2026-09-28 — With the model catalogue (V4): a named model falls back to the same model at
+ *     another type (catalog/equivalence.ts); poolOrder `cheapest` orders the pool by the catalogue's
+ *     text price; the owner's maxCostPerCallUsd skips a candidate the catalogue prices above it.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -44,6 +47,9 @@ import { healthKey, seedHealth, skipReason, statusOf } from './health.js';
 import { defaultsFor, type LoadedRouting, type RoutingRules } from './routing.js';
 import { isFixedType, type AiCapability, type AiOp, type AiTarget } from './types.js';
 import { UNSET_MODEL } from './unset-model.js';
+import { catalogModel } from './catalog/store.js';
+import { textPricePerMtok } from './catalog/price.js';
+import { canonicalModelKey, equivalentModels } from './catalog/equivalence.js';
 
 export type ChosenBy = 'call-model' | 'call-provider' | 'app-prefer' | 'agent-default' | 'owner-default' | 'pool' | 'node-default';
 
@@ -62,7 +68,7 @@ export interface AiCandidate {
 
 export type RejectReason =
   | 'problem' | 'type-not-allowed' | 'capability-off' | 'requires-local' | 'host-not-allowed' | 'no-model'
-  | 'policy' | 'no-key' | 'node-key-host' | 'allowance-spent' | 'untested' | 'failing' | 'leaves-machine';
+  | 'policy' | 'no-key' | 'node-key-host' | 'allowance-spent' | 'untested' | 'failing' | 'leaves-machine' | 'too-costly';
 
 export interface RejectedCandidate {
   provider: string;
@@ -100,6 +106,24 @@ export interface RoutePlanInput {
   legacyModel: (capability: AiCapability) => string | undefined;
   /** The node's allowance for this owner, read at most once. */
   nodeAllowance: () => Promise<{ remainingUsd: number }>;
+  /** What the call will use, for the owner's price ceiling: the prompt's tokens (a quarter of its
+   *  length) and the answer's cap. Absent, a text call is estimated at 1024 tokens each way. */
+  estimate?: { promptTokens?: number; maxTokens?: number };
+}
+
+/** The capabilities whose price is per token, so the pool can be ordered by it. */
+const TOKEN_PRICED: readonly AiCapability[] = ['text', 'vision', 'files'];
+const DEFAULT_ESTIMATE_TOKENS = 1024;
+
+/** What one call would cost on this model by the catalogue, or undefined when it has no price. */
+function estimateCallUsd(type: string, model: string, capability: AiCapability, est?: RoutePlanInput['estimate']): number | undefined {
+  const m = catalogModel(type, model);
+  if (!m) return undefined;
+  if (capability === 'image') return m.price.perImage;
+  if (!TOKEN_PRICED.includes(capability) || (m.price.inPerMtok === undefined && m.price.outPerMtok === undefined)) return undefined;
+  const inTok = est?.promptTokens ?? DEFAULT_ESTIMATE_TOKENS;
+  const outTok = est?.maxTokens ?? DEFAULT_ESTIMATE_TOKENS;
+  return (inTok * (m.price.inPerMtok ?? 0) + outTok * (m.price.outPerMtok ?? 0)) / 1e6;
 }
 
 export interface RoutePlan {
@@ -128,14 +152,18 @@ function modelOf(p: AiProvider, cap: AiCapability, input: RoutePlanInput): strin
   return p.capabilities[cap]?.model;
 }
 
-/** The ordered list before any filter: [provider, who chose it]. */
-function rawOrder(input: RoutePlanInput): { list: Array<[AiProvider, ChosenBy]>; chosenBy: ChosenBy; ownerListed: boolean } {
+/** One entry of the raw order: the provider, who chose it, and for a same-model fallback on another
+ *  type the model's reference there (`openrouter:anthropic/claude-opus-5.5`). */
+type RawEntry = [AiProvider, ChosenBy, string?];
+
+/** The ordered list before any filter. */
+function rawOrder(input: RoutePlanInput): { list: RawEntry[]; chosenBy: ChosenBy; ownerListed: boolean } {
   const { providers, capability } = input;
   const all = [...providers.owner, ...providers.node];
   const byId = new Map(all.map(p => [p.id, p]));
   const seen = new Set<string>();
-  const out: Array<[AiProvider, ChosenBy]> = [];
-  const push = (p: AiProvider | undefined, by: ChosenBy) => { if (p && !seen.has(p.id)) { seen.add(p.id); out.push([p, by]); } };
+  const out: RawEntry[] = [];
+  const push = (p: AiProvider | undefined, by: ChosenBy, ref?: string) => { if (p && !seen.has(p.id)) { seen.add(p.id); out.push(ref ? [p, by, ref] : [p, by]); } };
 
   if (input.namedProvider) {
     const named = byId.get(input.namedProvider)
@@ -153,7 +181,16 @@ function rawOrder(input: RoutePlanInput): { list: Array<[AiProvider, ChosenBy]>;
   const ordered: Array<[AiProvider, ChosenBy]> = [];
   for (const id of d.agent) { const p = byId.get(id); if (p) ordered.push([p, 'agent-default']); }
   for (const id of d.owner) { const p = byId.get(id); if (p) ordered.push([p, 'owner-default']); }
-  if (input.rules.extendToPool) for (const p of providers.owner) if (inPool(p, capability)) ordered.push([p, 'pool']);
+  if (input.rules.extendToPool) {
+    const pool = providers.owner.filter(p => inPool(p, capability));
+    // `cheapest` orders the pool by the catalogue's text price (unpriced last); `priority` and
+    // `fastest` keep the owner's order, since the node measures no latency to order by yet.
+    if (input.rules.poolOrder === 'cheapest' && TOKEN_PRICED.includes(capability)) {
+      const priceOf = (p: AiProvider) => { const m = modelOf(p, capability, input); return m ? textPricePerMtok(p.type, m) ?? Infinity : Infinity; };
+      pool.sort((a, b) => priceOf(a) - priceOf(b));
+    }
+    for (const p of pool) ordered.push([p, 'pool']);
+  }
   const ownerListed = ordered.length > 0;
 
   const typed = input.requested ? parseModelRef(input.requested).type : undefined;
@@ -163,6 +200,13 @@ function rawOrder(input: RoutePlanInput): { list: Array<[AiProvider, ChosenBy]>;
     for (const [p] of ordered) if (ofType(p)) push(p, 'call-model');
     for (const p of providers.owner) if (ofType(p) && serves(p, capability)) push(p, 'call-model');
     if (!out.length || typed) for (const p of providers.node) if (ofType(p) && serves(p, capability)) push(p, 'call-model');
+    // Then the same model at another type, as the catalogue matches it (catalog/equivalence.ts): the
+    // only fallback a named model has (plan 11, section 6).
+    if (out.length && typed) {
+      for (const m of equivalentModels(typed, parseModelRef(input.requested).id)) {
+        for (const p of all) if (p.type === m.type && serves(p, capability)) push(p, 'call-model', `${m.type}:${m.id}`);
+      }
+    }
     if (!out.length && typed) {
       throw new AiCompletionError('AI_PROVIDER_NOT_CONFIGURED', 400,
         `The model "${input.requested}" names a provider you have not set up: you have no ${typed} provider. `
@@ -192,8 +236,9 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
   let allowance: { remainingUsd: number } | null = null;
   const deferred: Array<{ candidate: AiCandidate; message: string }> = [];
 
-  for (const [p, by] of list) {
+  for (const [p, by, sameModelRef] of list) {
     if (candidates.length >= wanted) break;
+    const requested = sameModelRef ?? input.requested;
     if (p.problem) { reject(p, 'problem', p.problem); continue; }
     if (!typeAllowed(config, p.type)) { reject(p, 'type-not-allowed', `This node does not allow ${p.type} providers.`); continue; }
     if (!serves(p, capability)) { reject(p, 'capability-off', `${p.title} does not serve ${capability}.`); continue; }
@@ -204,27 +249,35 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     }
 
     // ── the model, under the owner's policy ──
-    const fallbackModel = input.requested ? undefined : modelOf(p, capability, input);
-    if (!input.requested && !fallbackModel) {
+    const fallbackModel = requested ? undefined : modelOf(p, capability, input);
+    if (!requested && !fallbackModel) {
       reject(p, 'no-model', `${p.title} has no model set for ${capability}.`);
       continue;
     }
     let chosen: { model: string; policyChoseModel: boolean } | null;
     try {
-      chosen = chooseModel(input.policy, { ...input.policyCtx, providerType: p.type }, input.requested, fallbackModel);
+      chosen = chooseModel(input.policy, { ...input.policyCtx, providerType: p.type }, requested, fallbackModel);
     } catch (e) {
       // A model the CALLER named and the policy refuses is the answer to the call, not a reason to
-      // try the next provider: the caller asked for that model.
-      if (input.requested && e instanceof AiCompletionError && e.code === 'AI_MODEL_NOT_ALLOWED') throw e;
+      // try the next provider: the caller asked for that model. The same model under another type's
+      // name is only a fallback, so its refusal is a rejection like any other.
+      if (input.requested && !sameModelRef && e instanceof AiCompletionError && e.code === 'AI_MODEL_NOT_ALLOWED') throw e;
       if (e instanceof AiCompletionError) { reject(p, 'policy', e.message, { error: e }); continue; }
       throw e;
     }
     if (!chosen) { reject(p, 'no-model', `${p.title} has no model set for ${capability}.`); continue; }
     // A named model falls back only to the same model: every candidate after the first carries it,
-    // on a provider of the same type. Which ids name one model across types (anthropic's
-    // claude-opus-5-5 and OpenRouter's anthropic/claude-opus-5.5) is the catalogue's to say (V4).
-    if (input.requested && candidates.length
-      && (chosen.model !== candidates[0].model || p.type !== candidates[0].provider.type)) continue;
+    // by the catalogue's key for one model across types (catalog/equivalence.ts).
+    if (input.requested && candidates.length && canonicalModelKey(chosen.model) !== canonicalModelKey(candidates[0].model)) continue;
+
+    // ── the price ceiling (the owner's rule), from the catalogue; an unpriced model passes ──
+    if (rules.maxCostPerCallUsd !== null) {
+      const est = estimateCallUsd(p.type, chosen.model, capability, input.estimate);
+      if (est !== undefined && est > rules.maxCostPerCallUsd) {
+        reject(p, 'too-costly', `${p.title}'s ${chosen.model} would cost about $${est.toFixed(4)} for this call, over your ceiling of $${rules.maxCostPerCallUsd}.`);
+        continue;
+      }
+    }
 
     // ── the key that pays ──
     let key: string | undefined;

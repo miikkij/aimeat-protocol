@@ -15,6 +15,8 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   v1.3.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): aiCatalogRefresh, aiPriceOverrides,
+ *     aiCatalogSources.
  *   v1.2.0 — 2026-09-28 — The operator's AI providers (System 2 plan, V3): aiProviders,
  *     aiBuiltinProviders, aiProviderEgress, aiProviderTypes and aiFixedBaseUrlOverrides; and
  *     aiLegacySettingsRoutes, the flag of the deprecated settings routes.
@@ -29,7 +31,8 @@ type AiModelSettings = Pick<AiCapabilityConfig,
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
   | 'aiRecommendedModels' | 'aiProviders' | 'aiBuiltinProviders' | 'aiProviderEgress'
-  | 'aiProviderTypes' | 'aiFixedBaseUrlOverrides' | 'aiLegacySettingsRoutes'>;
+  | 'aiProviderTypes' | 'aiFixedBaseUrlOverrides' | 'aiLegacySettingsRoutes'
+  | 'aiCatalogRefresh' | 'aiPriceOverrides' | 'aiCatalogSources'>;
 
 /** The node's AI key and model defaults, from the environment. */
 export function aiModelDefaults(): AiModelSettings {
@@ -51,5 +54,9 @@ export function aiModelDefaults(): AiModelSettings {
     aiProviderTypes: process.env.AIMEAT_AI_PROVIDER_TYPES ?? '',
     aiFixedBaseUrlOverrides: process.env.AIMEAT_AI_FIXED_BASEURL_OVERRIDES ?? '',
     aiLegacySettingsRoutes: process.env.AIMEAT_AI_LEGACY_SETTINGS_ROUTES !== 'false',
+    aiCatalogRefresh: process.env.AIMEAT_AI_CATALOG_REFRESH === 'daily' || process.env.AIMEAT_AI_CATALOG_REFRESH === 'off'
+      ? process.env.AIMEAT_AI_CATALOG_REFRESH : 'weekly',
+    aiPriceOverrides: process.env.AIMEAT_AI_PRICE_OVERRIDES ?? '',
+    aiCatalogSources: process.env.AIMEAT_AI_CATALOG_SOURCES ?? '',
   };
 }

@@ -15247,6 +15247,102 @@ paths:
         '401':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ai/models:
+    get:
+      operationId: listAiModels
+      summary: The model catalogue, filtered
+      description: >
+        The models the node knows per provider type (openrouter, openai, anthropic, xai, mistral,
+        deepseek), with what each takes and gives, its limits, its price and its status. The catalogue
+        comes from public sources (models.dev, OpenRouter, LiteLLM), refreshed on the operator's cadence
+        (`AIMEAT_AI_CATALOG_REFRESH`); a model the sources stop listing is `retiring`, then `retired`.
+        A local server's models are not in it. With `allowed=true`, only the models the caller can use:
+        on a provider of theirs (or the node's) that serves the capability, and allowed by their model
+        policy. At most 2000 rows; `truncated` says when there were more. An owner, an agent or an app
+        holding `ai:use` may read it.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: capability
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [text, vision, files, image, speech, transcription, embed]
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [openrouter, openai, anthropic, xai, mistral, deepseek]
+        - name: status
+          in: query
+          required: false
+          description: Comma-separated statuses (active, retiring, retired), or `all`. Default active,retiring.
+          schema:
+            type: string
+        - name: allowed
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: data.models [{ ref, type, id, name, caps, limits, price, status, retires_at?, sources }], data.total, data.truncated, data.snapshot, data.refreshed_at.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/catalog/meta:
+    get:
+      operationId: getAiCatalogMeta
+      summary: When the model catalogue was refreshed, and from where
+      description: >
+        Public. The catalogue's snapshot id (a usage record that was priced from the catalogue names it
+        as `priceRef`), when it was refreshed, whether it came from the bundled seed or a refresh, what
+        each source answered, the record size and model count per type, and the refresh cadence.
+      tags: [Memory]
+      security: []
+      responses:
+        '200':
+          description: data.snapshot, data.refreshed_at, data.origin (seed | refresh), data.sources, data.sizes, data.counts, data.cadence.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/admin/ai/catalog/refresh:
+    post:
+      operationId: refreshAiCatalog
+      tags: [Admin]
+      summary: Refresh the model catalogue now (operator)
+      description: >
+        Operator only. Fetches every source at once, whatever the cadence says. A source that does not
+        answer leaves the models only it knew as they were; when no source answers, only the meta record
+        is written. A recommended model that became retired is told to the operators as a notification.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: data.written (false when no source answered and only the meta was written), data.sources (per source, count or error), data.snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/ai/providers:
     get:
       operationId: listAiProviders

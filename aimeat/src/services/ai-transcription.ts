@@ -42,6 +42,7 @@ import {
 } from './ai-completion.js';
 import { transcribeAudio } from './ai/gateway.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
+import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import { logger } from '../utils/logger.js';
 import { resolveSttLanguage } from './ai-model-defaults.js';
@@ -161,8 +162,11 @@ export async function transcribeForOwner(
   const seconds = result.usage?.seconds ?? 0;
   const totalTok = result.usage?.total_tokens
     ?? ((result.usage?.input_tokens ?? 0) + (result.usage?.output_tokens ?? 0));
-  const costExact = typeof result.usage?.cost_usd === 'number';
-  const costUsd = costExact ? result.usage!.cost_usd! : 0;
+  // The provider's own charge, then the catalogue's price per second (LiteLLM's, measured in its own
+  // unit), never a per-minute guess from OpenRouter's number (services/ai/catalog/types.ts).
+  const price = callCost({ type: answered.providerType, model: result.model, requestedModel: answered.model, seconds, reported: result.usage?.cost_usd });
+  const costExact = price.costSource === 'provider';
+  const costUsd = price.costUsd;
 
   // The duration ceiling can only be checked here: nothing before the response knows how long the
   // audio was. The charge already happened, so this warns rather than throws — refusing to return
@@ -177,7 +181,7 @@ export async function transcribeForOwner(
     // transcription is not a hole in the per-model report.
     model: result.model, promptTokens: 0, completionTokens: totalTok, totalTokens: totalTok,
     costUsd, content: result.text, appId: opts.appId, source: 'ai-transcribe',
-    units: { seconds }, costSource: costExact ? 'provider' : 'none',
+    units: { seconds }, costSource: price.costSource, priceRef: price.priceRef,
   });
   const updated = settled.usage;
   const dailyBudget = plan.dailyBudgetUsd;

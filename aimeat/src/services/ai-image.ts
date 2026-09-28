@@ -48,6 +48,7 @@ import {
 } from './ai-completion.js';
 import { image as gatewayImage } from './ai/gateway.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
+import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import { contentHashOf } from './ai-provenance.js';
 import type { CallerClass } from './ai/policy.js';
@@ -180,8 +181,10 @@ export async function generateForOwner(
     throw new AiCompletionError('PROVIDER_ERROR', 502, (e as Error).message);
   }
 
-  const costExact = typeof result.costUsd === 'number';
-  const costUsd = costExact ? result.costUsd! : 0;
+  // The provider's own charge, then the catalogue's price per picture (services/ai/catalog/price.ts).
+  const price = callCost({ type: answered.providerType, model: result.model, requestedModel: answered.model, images: 1, reported: result.costUsd });
+  const costExact = price.costSource === 'provider';
+  const costUsd = price.costUsd;
 
   const key = opts.storageKey
     || `ai-images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extensionFor(result.mime)}`;
@@ -205,7 +208,7 @@ export async function generateForOwner(
     // The provenance record names the picture by its bytes, the way a voice reply names its audio.
     contentHash: contentHashOf(result.data),
     appId: opts.appId, source: 'ai-image',
-    units: { images: 1 }, costSource: costExact ? 'provider' : 'none',
+    units: { images: 1 }, costSource: price.costSource, priceRef: price.priceRef,
   });
 
   logger.info(`[image] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} `

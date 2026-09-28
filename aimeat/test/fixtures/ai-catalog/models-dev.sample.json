@@ -1,0 +1,743 @@
+{
+ "openai": {
+  "id": "openai",
+  "env": [
+   "OPENAI_API_KEY"
+  ],
+  "npm": "@ai-sdk/openai",
+  "name": "OpenAI",
+  "doc": "https://platform.openai.com/docs/models",
+  "models": {
+   "gpt-5.4": {
+    "id": "gpt-5.4",
+    "name": "GPT-5.4",
+    "description": "Agent-ready GPT for coding and computer-use workflows at a lower cost",
+    "family": "gpt",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "effort",
+      "values": [
+       "none",
+       "low",
+       "medium",
+       "high",
+       "xhigh"
+      ]
+     }
+    ],
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2025-08-31",
+    "release_date": "2026-03-05",
+    "last_updated": "2026-03-05",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 1050000,
+     "input": 922000,
+     "output": 128000
+    },
+    "experimental": {
+     "modes": {
+      "fast": {
+       "cost": {
+        "input": 5,
+        "output": 30,
+        "cache_read": 0.5
+       },
+       "provider": {
+        "body": {
+         "service_tier": "priority"
+        }
+       }
+      }
+     }
+    },
+    "cost": {
+     "input": 2.5,
+     "output": 15,
+     "cache_read": 0.25,
+     "tiers": [
+      {
+       "input": 5,
+       "output": 22.5,
+       "cache_read": 0.5,
+       "tier": {
+        "type": "context",
+        "size": 272000
+       }
+      }
+     ],
+     "context_over_200k": {
+      "input": 5,
+      "output": 22.5,
+      "cache_read": 0.5
+     }
+    }
+   },
+   "gpt-image-2": {
+    "id": "gpt-image-2",
+    "name": "gpt-image-2",
+    "description": "Image model for prompt-driven generation, editing, and visual design workflows",
+    "family": "gpt-image",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": false,
+    "temperature": false,
+    "release_date": "2026-04-21",
+    "last_updated": "2026-04-21",
+    "modalities": {
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "image"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 0,
+     "input": 0,
+     "output": 0
+    },
+    "cost": {
+     "input": 5,
+     "output": 30,
+     "cache_read": 1.25
+    }
+   },
+   "gpt-image-1": {
+    "id": "gpt-image-1",
+    "name": "gpt-image-1",
+    "description": "OpenAI image model for production generation, edits, and brand-safe visual workflows",
+    "family": "gpt-image",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": false,
+    "temperature": false,
+    "release_date": "2025-04-24",
+    "last_updated": "2025-04-24",
+    "modalities": {
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "image"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 0,
+     "input": 0,
+     "output": 0
+    },
+    "status": "deprecated"
+   },
+   "text-embedding-3-small": {
+    "id": "text-embedding-3-small",
+    "name": "text-embedding-3-small",
+    "description": "Embedding model for semantic search, retrieval, clustering, and ranking pipelines",
+    "family": "text-embedding",
+    "attachment": false,
+    "reasoning": false,
+    "tool_call": false,
+    "temperature": false,
+    "knowledge": "2024-01",
+    "release_date": "2024-01-25",
+    "last_updated": "2024-01-25",
+    "modalities": {
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 8191,
+     "output": 1536
+    },
+    "cost": {
+     "input": 0.02,
+     "output": 0
+    }
+   },
+   "gpt-realtime-2.1": {
+    "id": "gpt-realtime-2.1",
+    "name": "GPT-Realtime-2.1",
+    "description": "Realtime speech-to-speech model with configurable reasoning, tool use, and robust voice-agent behavior",
+    "family": "gpt",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "effort",
+      "values": [
+       "minimal",
+       "low",
+       "medium",
+       "high",
+       "xhigh"
+      ]
+     }
+    ],
+    "tool_call": true,
+    "structured_output": false,
+    "temperature": false,
+    "knowledge": "2024-09-30",
+    "release_date": "2026-07-06",
+    "last_updated": "2026-07-06",
+    "modalities": {
+     "input": [
+      "text",
+      "audio",
+      "image"
+     ],
+     "output": [
+      "text",
+      "audio"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 128000,
+     "input": 96000,
+     "output": 32000
+    },
+    "cost": {
+     "input": 4,
+     "output": 24,
+     "cache_read": 0.4,
+     "input_audio": 32,
+     "output_audio": 64
+    }
+   }
+  }
+ },
+ "anthropic": {
+  "id": "anthropic",
+  "env": [
+   "ANTHROPIC_API_KEY"
+  ],
+  "npm": "@ai-sdk/anthropic",
+  "name": "Anthropic",
+  "doc": "https://docs.anthropic.com/en/docs/about-claude/models",
+  "models": {
+   "claude-opus-5-5": {
+    "id": "claude-opus-5-5",
+    "name": "Claude Opus 5.5",
+    "description": "Claude model for long-running agentic coding and knowledge work",
+    "family": "claude-opus",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "effort",
+      "values": [
+       "low",
+       "medium",
+       "high",
+       "xhigh",
+       "max"
+      ]
+     }
+    ],
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": false,
+    "knowledge": "2026-06",
+    "release_date": "2026-09-22",
+    "last_updated": "2026-09-22",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 1000000,
+     "output": 128000
+    },
+    "experimental": {
+     "modes": {
+      "fast": {
+       "cost": {
+        "input": 8,
+        "output": 40,
+        "cache_read": 0.4,
+        "cache_write": 10
+       },
+       "provider": {
+        "body": {
+         "speed": "fast"
+        },
+        "headers": {
+         "anthropic-beta": "fast-mode-2026-02-01"
+        }
+       }
+      }
+     }
+    },
+    "cost": {
+     "input": 4,
+     "output": 20,
+     "cache_read": 0.2,
+     "cache_write": 5
+    }
+   }
+  }
+ },
+ "mistral": {
+  "id": "mistral",
+  "env": [
+   "MISTRAL_API_KEY"
+  ],
+  "npm": "@ai-sdk/mistral",
+  "name": "Mistral",
+  "doc": "https://docs.mistral.ai/getting-started/models/",
+  "models": {
+   "voxtral-mini-tts-latest": {
+    "id": "voxtral-mini-tts-latest",
+    "name": "Voxtral Mini TTS (latest)",
+    "description": "Multilingual text-to-speech model with zero-shot voice cloning",
+    "family": "voxtral",
+    "attachment": false,
+    "reasoning": false,
+    "tool_call": false,
+    "temperature": false,
+    "release_date": "2026-03-01",
+    "last_updated": "2026-03-01",
+    "modalities": {
+     "input": [
+      "text"
+     ],
+     "output": [
+      "audio"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 0,
+     "output": 0
+    }
+   },
+   "voxtral-mini-latest": {
+    "id": "voxtral-mini-latest",
+    "name": "Voxtral Mini (latest)",
+    "description": "Speech transcription model for accurate audio-to-text and captioning workflows",
+    "family": "voxtral",
+    "attachment": false,
+    "reasoning": false,
+    "tool_call": false,
+    "temperature": false,
+    "release_date": "2026-02-01",
+    "last_updated": "2026-02-01",
+    "modalities": {
+     "input": [
+      "audio"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 0,
+     "output": 0
+    }
+   },
+   "voxtral-small-latest": {
+    "id": "voxtral-small-latest",
+    "name": "Voxtral Small (latest)",
+    "description": "Instruct model with native audio input for speech understanding and tool use",
+    "family": "voxtral",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": true,
+    "temperature": true,
+    "release_date": "2025-07-15",
+    "last_updated": "2025-07-15",
+    "modalities": {
+     "input": [
+      "text",
+      "audio"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": true,
+    "limit": {
+     "context": 32000,
+     "output": 32000
+    },
+    "cost": {
+     "input": 0.1,
+     "output": 0.3
+    }
+   },
+   "mistral-embed": {
+    "id": "mistral-embed",
+    "name": "Mistral Embed",
+    "description": "Embedding model for semantic search, retrieval, clustering, and ranking pipelines",
+    "family": "mistral-embed",
+    "attachment": false,
+    "reasoning": false,
+    "tool_call": false,
+    "temperature": false,
+    "release_date": "2023-12-11",
+    "last_updated": "2023-12-11",
+    "modalities": {
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 8000,
+     "output": 3072
+    },
+    "cost": {
+     "input": 0.1,
+     "output": 0
+    }
+   }
+  }
+ },
+ "openrouter": {
+  "id": "openrouter",
+  "env": [
+   "OPENROUTER_API_KEY"
+  ],
+  "npm": "@openrouter/ai-sdk-provider",
+  "api": "https://openrouter.ai/api/v1",
+  "name": "OpenRouter",
+  "doc": "https://openrouter.ai/models",
+  "models": {
+   "anthropic/claude-opus-5.5": {
+    "id": "anthropic/claude-opus-5.5",
+    "name": "Claude Opus 5.5",
+    "description": "Flagship Claude model for deep reasoning, coding, and long-horizon agents",
+    "family": "claude-opus",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "effort",
+      "values": [
+       "low",
+       "medium",
+       "high",
+       "xhigh",
+       "max"
+      ]
+     }
+    ],
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2026-06",
+    "release_date": "2026-09-22",
+    "last_updated": "2026-09-22",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 1000000,
+     "output": 128000
+    },
+    "cost": {
+     "input": 4,
+     "output": 20,
+     "cache_read": 0.2,
+     "cache_write": 5
+    }
+   },
+   "google/gemini-2.5-flash": {
+    "id": "google/gemini-2.5-flash",
+    "name": "Gemini 2.5 Flash",
+    "description": "Fast Gemini workhorse for multimodal apps where latency and price matter",
+    "family": "gemini-flash",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "toggle"
+     }
+    ],
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2025-01",
+    "release_date": "2025-06-17",
+    "last_updated": "2025-06-17",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 1048576,
+     "output": 65535
+    },
+    "cost": {
+     "input": 0.3,
+     "output": 2.5,
+     "reasoning": 2.5,
+     "cache_read": 0.03,
+     "cache_write": 0.083333
+    }
+   },
+   "openai/gpt-audio": {
+    "id": "openai/gpt-audio",
+    "name": "GPT Audio",
+    "description": "Speech generation model for controllable voice, narration, and audio delivery",
+    "family": "gpt",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "release_date": "2026-01-19",
+    "last_updated": "2026-01-19",
+    "modalities": {
+     "input": [
+      "text",
+      "audio"
+     ],
+     "output": [
+      "text",
+      "audio"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 128000,
+     "output": 16384
+    },
+    "cost": {
+     "input": 2.5,
+     "output": 10
+    }
+   }
+  }
+ },
+ "xai": {
+  "id": "xai",
+  "env": [
+   "XAI_API_KEY"
+  ],
+  "npm": "@ai-sdk/xai",
+  "name": "xAI",
+  "doc": "https://docs.x.ai/docs/models",
+  "models": {
+   "grok-imagine-image": {
+    "id": "grok-imagine-image",
+    "name": "Grok Imagine Image",
+    "description": "Image model for prompt-driven generation, editing, and visual design workflows",
+    "family": "grok",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": false,
+    "temperature": false,
+    "release_date": "2026-01-28",
+    "last_updated": "2026-01-28",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "image",
+      "pdf"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 16000,
+     "output": 0
+    }
+   }
+  }
+ },
+ "deepseek": {
+  "id": "deepseek",
+  "env": [
+   "DEEPSEEK_API_KEY"
+  ],
+  "npm": "@ai-sdk/openai-compatible",
+  "api": "https://api.deepseek.com",
+  "name": "DeepSeek",
+  "doc": "https://api-docs.deepseek.com/quick_start/pricing",
+  "models": {
+   "deepseek-v4-flash": {
+    "id": "deepseek-v4-flash",
+    "name": "DeepSeek V4 Flash",
+    "description": "DeepSeek V4.1 Flash model for reasoning and agentic coding",
+    "family": "deepseek-flash",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "toggle"
+     },
+     {
+      "type": "effort",
+      "values": [
+       "low",
+       "high",
+       "max"
+      ]
+     }
+    ],
+    "tool_call": true,
+    "interleaved": {
+     "field": "reasoning_content"
+    },
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2025-05",
+    "release_date": "2026-09-10",
+    "last_updated": "2026-09-10",
+    "modalities": {
+     "input": [
+      "text",
+      "image"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": true,
+    "limit": {
+     "context": 1000000,
+     "output": 393216
+    },
+    "status": "deprecated",
+    "cost": {
+     "input": 0.15,
+     "output": 0.6,
+     "reasoning": 0.6,
+     "cache_read": 0.003
+    }
+   }
+  }
+ },
+ "google-vertex-anthropic": {
+  "id": "google-vertex-anthropic",
+  "env": [
+   "GOOGLE_VERTEX_PROJECT",
+   "GOOGLE_VERTEX_LOCATION",
+   "GOOGLE_APPLICATION_CREDENTIALS"
+  ],
+  "npm": "@ai-sdk/google-vertex/anthropic",
+  "name": "Vertex (Anthropic)",
+  "doc": "https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude",
+  "models": {
+   "claude-opus-4-8@default": {
+    "id": "claude-opus-4-8@default",
+    "name": "Claude Opus 4.8",
+    "description": "Top Claude Opus tier for the hardest reasoning, coding, and long-horizon agents",
+    "family": "claude-opus",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "effort",
+      "values": [
+       "low",
+       "medium",
+       "high",
+       "xhigh",
+       "max"
+      ]
+     }
+    ],
+    "tool_call": true,
+    "temperature": false,
+    "knowledge": "2026-01",
+    "release_date": "2026-05-28",
+    "last_updated": "2026-05-28",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 1000000,
+     "output": 128000
+    },
+    "cost": {
+     "input": 5,
+     "output": 25,
+     "cache_read": 0.5,
+     "cache_write": 6.25,
+     "tiers": [
+      {
+       "input": 10,
+       "output": 37.5,
+       "cache_read": 1,
+       "cache_write": 12.5,
+       "tier": {
+        "type": "context",
+        "size": 200000
+       }
+      }
+     ],
+     "context_over_200k": {
+      "input": 10,
+      "output": 37.5,
+      "cache_read": 1,
+      "cache_write": 12.5
+     }
+    }
+   }
+  }
+ }
+}

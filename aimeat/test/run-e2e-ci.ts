@@ -543,6 +543,10 @@ const ALL_SUITES = [
     // pointed at one stub (each at its own path) and a node key, so which provider a request reached,
     // with which key, is read from what arrived. Follows the runner's backend.
     'test/e2e-ai-providers.ts',
+    // The model catalogue (System 2, V4): its own node on 40440 whose catalogue sources point at a
+    // local stub serving the sample files, so a refresh, a source that fails, a retirement and a
+    // catalogue price are read from what the node wrote. Follows the runner's backend.
+    'test/e2e-ai-catalog.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
     // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.

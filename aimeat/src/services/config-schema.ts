@@ -16,6 +16,8 @@
  *     ai.builtin_providers, ai.provider_egress, ai.provider_types, ai.fixed_baseurl_overrides, and
  *     ai.legacy_settings_routes (the deprecated settings routes: on by default, removed in 4.0.0).
  *     The three value validators moved to config-schema-validators.ts (a pure move, max-file-lines).
+ *   v1.16.0 — 2026-09-28 — The System 2 rows moved to config-schema-ai.ts, spread in their place (a
+ *     pure move, max-file-lines); the model catalogue's three settings are added there (V4).
  *   v1.14.0 — 2026-09-28 — ai.recommended_models: the operator's recommended models (System 2, V2).
  *   v1.13.2 — 2026-09-25 — federation.relay_claim names its two versions: the default becomes
  *     'required' in 3.20.0 and 'optional' is removed in 4.0.0; one peer can keep its own answer.
@@ -66,8 +68,8 @@ import type { AimeatConfig } from '../config.js';
 import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { OperatorConfig } from '../config-types.js';
 import type { ConfigFieldShape } from './config-field-def.js';
-import { parseRecommendedModels } from './ai/policy.js';
-import { isJsonObject, isEmptyOrHttpUrl, isContactList } from './config-schema-validators.js';
+import { isEmptyOrHttpUrl, isContactList } from './config-schema-validators.js';
+import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -638,15 +640,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'aiLabelPublic', dotPath: 'ai.label_public', envVar: 'AIMEAT_AI_LABEL_PUBLIC', type: 'string', validate: v => v === 'strict' || v === 'light' || v === 'off', immutable: false, description: 'How eagerly a VISIBLE AI label is shown ("strict" | "light" | "off"). strict also labels what Article 50 exempts, so an app or a legal page with a named reviewer keeps the light "a model was involved" label; light shows only what the law requires, so the reviewer lifts it; off shows none and is refused on a public node. The interactive notice and the machine planes never change' },
   { key: 'modelDefaultImage', dotPath: 'ai.model_default_image', envVar: 'AIMEAT_MODEL_DEFAULT_IMAGE', type: 'string', validate: () => true, immutable: false, description: 'Default model for generating images. Must produce image output' },
   { key: 'sttLanguageDefault', dotPath: 'ai.stt_language_default', envVar: 'AIMEAT_STT_LANGUAGE_DEFAULT', type: 'string', validate: () => true, immutable: false, description: 'Language hint for transcription (e.g. fi) when the owner has not set one' },
-  // The operator's AI providers (System 2 plan, V3; services/ai/providers.ts). Immutable where an
-  // address or a key name is at stake, as System 1's decide.providers and decide.provider_egress are.
-  { key: 'aiProviders', dotPath: 'ai.providers', envVar: 'AIMEAT_AI_PROVIDERS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'More AI providers of the node, as a JSON array of provider records (id, title, type, baseUrl, auth, capabilities). Auth is none or the NAME of an environment variable, never a key' },
-  { key: 'aiBuiltinProviders', dotPath: 'ai.builtin_providers', envVar: 'AIMEAT_AI_BUILTIN_PROVIDERS', type: 'string', validate: v => typeof v === 'string' && /^[a-z,\s]*$/.test(v as string), immutable: true, description: 'Local AI servers to switch on, comma separated: lmstudio, ollama, llamacpp, at their usual ports on this machine', range: 'lmstudio,ollama,llamacpp' },
-  { key: 'aiProviderEgress', dotPath: 'ai.provider_egress', envVar: 'AIMEAT_AI_PROVIDER_EGRESS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'Exact addresses (scheme, host, port) of the operator\'s own local AI servers, comma separated. Only the node\'s own providers may reach them; an owner\'s provider never does', range: 'http://127.0.0.1:1234,http://ollama:11434' },
-  { key: 'aiProviderTypes', dotPath: 'ai.provider_types', envVar: 'AIMEAT_AI_PROVIDER_TYPES', type: 'string', validate: v => typeof v === 'string' && /^[a-z,\s]*$/.test(v as string), immutable: false, description: 'Which fixed provider types this node allows, comma separated: openrouter, openai, anthropic, mistral, xai. Empty allows all five at their official addresses', range: 'openrouter,anthropic' },
-  { key: 'aiFixedBaseUrlOverrides', dotPath: 'ai.fixed_baseurl_overrides', envVar: 'AIMEAT_AI_FIXED_BASEURL_OVERRIDES', type: 'string', validate: v => typeof v === 'string' && (!(v as string).trim() || isJsonObject(v as string)), immutable: true, description: 'Points a fixed provider type at another address, as JSON {"anthropic": "http://127.0.0.1:40699/v1"}, for a test stub. Refused on a public node' },
-  { key: 'aiLegacySettingsRoutes', dotPath: 'ai.legacy_settings_routes', envVar: 'AIMEAT_AI_LEGACY_SETTINGS_ROUTES', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'The AI settings routes from before providers (/v1/openrouter/settings, /models, /test, /v1/ai/settings) still answer. Deprecated: they are removed in 4.0.0; off, they answer 410 Gone naming /v1/ai/providers' },
-  { key: 'aiRecommendedModels', dotPath: 'ai.recommended_models', envVar: 'AIMEAT_AI_RECOMMENDED_MODELS', type: 'string', validate: v => typeof v === 'string' && parseRecommendedModels(v).problems.length === 0, immutable: false, description: 'The models this node recommends, per capability, as JSON: {"text": ["openrouter:anthropic/claude-opus-5.5"], "image": [...]}, in order. An owner who chooses the recommended models may use only these. Empty recommends nothing' },
+  // The System 2 rows (providers, recommended models, the model catalogue) live in
+  // config-schema-ai.ts since 2026-09-28 (a pure move, max-file-lines), spread here in their place.
+  ...SYSTEM2_AI_CONFIG_FIELDS,
 
   // ── AI jobs (a model call with a handle, running in the background) ──
   // Every range here is deliberately WIDER than the number an operator is likely to want, because

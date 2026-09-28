@@ -13,6 +13,8 @@
  * @usage
  *   import { recordUsageEvent } from '../services/usage-metering.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-28 -- `priceRef` on the input: a caller that priced the cost itself (the model
+ *     catalogue, System 2 V4) says where the number came from, and the event cites that.
  *   v1.0.0 -- 2026-07-10 -- Initial creation for LEDGER TARGET-016 substrate
  *   v1.2.0 -- 2026-08-01 -- Optional provenanceId on a usage event (TARGET-058): a spend can be
  *     joined to the content it produced. Optional, so no existing ingest path changes.
@@ -38,6 +40,11 @@ export interface UsageEventInput {
   completionTokens?: number;
   /** Authoritative provider-reported cost (e.g. OpenRouter usage.cost); wins over the table. */
   providerCostUsd?: number | null;
+  /**
+   * Where `providerCostUsd` came from, when the caller priced it itself (the model catalogue's
+   * snapshot, `catalog@<time>`, or `estimate`). Without it a given cost is cited as the provider's.
+   */
+  priceRef?: string;
   runId?: string;
   /** Ingest source label: crewaimeat | ai-complete | ... */
   source: string;
@@ -94,7 +101,7 @@ export async function recordUsageEvent(storage: Storage, input: UsageEventInput)
     promptTokens,
     completionTokens,
     costUsd,
-    priceRef,
+    priceRef: input.priceRef && typeof input.providerCostUsd === 'number' ? input.priceRef : priceRef,
     source: input.source,
     apiKeyScope: input.apiKeyScope ?? 'own',
     organismId: input.organismId,

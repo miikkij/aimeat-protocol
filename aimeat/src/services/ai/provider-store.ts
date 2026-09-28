@@ -49,6 +49,8 @@ import {
   type AiProvider, type CapabilityHealth, type ProviderCapabilityConfig,
 } from './providers.js';
 import { readRouting, type RoutingDefaults, type RoutingRules } from './routing.js';
+import { catalogModel, catalogModels } from './catalog/store.js';
+import { servesCapability } from './catalog/price.js';
 import { FIXED_BASE_URLS, isFixedType, type AiCapability } from './types.js';
 
 export const PROVIDER_KEY_PREFIX = 'ai.apikey.provider.';
@@ -237,6 +239,31 @@ function assertHostAllowed(config: AimeatConfig, p: AiProvider): void {
 }
 
 /**
+ * Each capability's model against the model catalogue (plan 11, section 4). A model the catalogue
+ * knows and that lacks the capability is a problem, named with models of that type that have it; a
+ * model the catalogue does not know yet is a warning only, because a new model is often offered
+ * before the next refresh lists it. A local or openai-compatible provider's models are not catalogued.
+ */
+export function catalogCheck(p: AiProvider): { problems: string[]; warnings: string[] } {
+  const problems: string[] = [];
+  const warnings: string[] = [];
+  for (const [c, cfg] of Object.entries(p.capabilities) as [AiCapability, ProviderCapabilityConfig][]) {
+    if (!cfg?.enabled || !cfg.model || !isFixedType(p.type)) continue;
+    const known = catalogModels([p.type]);
+    if (!known.length) continue;
+    const m = catalogModel(p.type, cfg.model);
+    if (!m) { warnings.push(`capabilities.${c}.model: ${p.type}:${cfg.model} is not in the model catalogue yet; the provider decides whether it serves ${c}.`); continue; }
+    if (!servesCapability(m, c)) {
+      const can = known.filter(x => x.status !== 'retired' && servesCapability(x, c)).slice(0, 8).map(x => x.id);
+      problems.push(`capabilities.${c}.model: ${p.type}:${cfg.model} does not serve ${c}.${can.length ? ` These ${p.type} models do: ${can.join(', ')}.` : ''}`);
+    } else if (m.status === 'retired') {
+      warnings.push(`capabilities.${c}.model: ${p.type}:${cfg.model} is retired in the model catalogue.`);
+    }
+  }
+  return { problems, warnings };
+}
+
+/**
  * The owner adds or replaces a provider of their own. An id the node uses is refused, so a name
  * means one provider. Writing takes over a migrated provider: the legacy records stop writing it.
  */
@@ -254,6 +281,10 @@ export async function putOwnerAiProvider(
   if (!p.provider) throw new AiCompletionError('INVALID_PROVIDER', 400, p.problems.join(' '), { problems: p.problems });
   if (!typeAllowed(config, p.provider.type)) {
     throw new AiCompletionError('AI_PROVIDER_TYPE_NOT_ALLOWED', 403, `This node does not allow ${p.provider.type} providers. Ask the operator (AIMEAT_AI_PROVIDER_TYPES).`);
+  }
+  const checked = catalogCheck(p.provider);
+  if (checked.problems.length) {
+    throw new AiCompletionError('INVALID_PROVIDER', 400, checked.problems.join(' '), { problems: checked.problems });
   }
   assertHostAllowed(config, p.provider);
   const key = `${PROVIDER_PREFIX}${id}`;
@@ -387,8 +418,19 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
   const [{ node, owner }, keys, routing] = await Promise.all([
     providersForOwner(storage, config, ownerGhii), ownerKeyIds(storage, ownerGhii), readRouting(storage, ownerGhii, agent),
   ]);
+  // Each capability's model with its catalogue status, so an owner sees a model that is retiring or
+  // retired where it is used (plan 06, section 6). A model the catalogue does not know says nothing.
+  const withStatus = (p: AiProvider): Record<string, unknown> => {
+    const v = providerView(p, keys.has(p.id));
+    const caps: Record<string, unknown> = {};
+    for (const [c, cfg] of Object.entries(p.capabilities)) {
+      const m = cfg?.model ? catalogModel(p.type, cfg.model) : undefined;
+      caps[c] = m ? { ...cfg, model_status: m.status, ...(m.retiresAt ? { model_retires_at: m.retiresAt } : {}) } : cfg;
+    }
+    return { ...v, capabilities: caps };
+  };
   return {
-    providers: [...owner, ...node].map(p => providerView(p, keys.has(p.id))),
+    providers: [...owner, ...node].map(withStatus),
     routing: { defaults: routing.owner.defaults, rules: routing.owner.rules, ...(routing.agent ? { agent_defaults: routing.agent } : {}) },
     limits: { max_owner_providers: MAX_OWNER_PROVIDERS },
   };

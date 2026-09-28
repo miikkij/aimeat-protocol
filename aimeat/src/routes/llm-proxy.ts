@@ -49,11 +49,13 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOf } from './ai-policy.js';
 import {
-    prepareAiCall, settleAiCall, estimateCostUsd, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
+    prepareAiCall, settleAiCall, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
 } from '../services/ai-completion.js';
 import { chatCompletionRaw, listModels } from '../services/openrouter.js';
 import { openAiChat, speaksOpenAiChat, type OpenAiChatBody } from '../services/ai/gateway.js';
 import { runRoute } from '../services/ai/route-run.js';
+import { callCost } from '../services/ai/catalog/price.js';
+import type { CostSource } from '../services/ai/types.js';
 import { logger } from '../utils/logger.js';
 
 /** A turn can take minutes when the model is reasoning; the default socket timeout is not enough. */
@@ -69,6 +71,8 @@ interface ProviderOutcome {
     completionTokens: number;
     totalTokens: number;
     costUsd: number;
+    costSource: CostSource;
+    priceRef: string;
 }
 
 export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
@@ -257,7 +261,7 @@ async function passWhole(
         usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number };
     };
     res.json(json);
-    return readUsage(json.model ?? plan.model, json.choices?.[0]?.message?.content ?? '', json.usage);
+    return readUsage(json.model ?? plan.model, json.choices?.[0]?.message?.content ?? '', json.usage, plan);
 }
 
 /**
@@ -326,17 +330,19 @@ async function pipeStream(
         }
     }
     res.end();
-    return readUsage(model, content, usage);
+    return readUsage(model, content, usage, plan);
 }
 
-/** Tokens and cost, with the same estimate the rest of the node falls back to. */
+/** Tokens and cost: the provider's charge, then the model catalogue, then the table and the estimate
+ *  the rest of the node falls back to (services/ai/catalog/price.ts). */
 function readUsage(
     model: string, content: string,
-    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number },
+    usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } | undefined,
+    plan: AiCallPlan,
 ): ProviderOutcome {
     const promptTokens = usage?.prompt_tokens ?? 0;
     const completionTokens = usage?.completion_tokens ?? 0;
     const totalTokens = usage?.total_tokens ?? (promptTokens + completionTokens);
-    const costUsd = typeof usage?.cost === 'number' ? usage.cost : estimateCostUsd(promptTokens, completionTokens);
-    return { model, content, promptTokens, completionTokens, totalTokens, costUsd };
+    const price = callCost({ type: plan.providerType, model, requestedModel: plan.model, promptTokens, completionTokens, reported: usage?.cost });
+    return { model, content, promptTokens, completionTokens, totalTokens, costUsd: price.costUsd, costSource: price.costSource, priceRef: price.priceRef };
 }

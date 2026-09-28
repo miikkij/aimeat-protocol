@@ -14,6 +14,7 @@
  *   - adapterTypeOf() — the owner's legacy provider setting mapped to an adapter type
  *   - CostSource — where the cost recorded for a call came from
  * @version-history
+ *   v1.1.1 — 2026-09-28 — CostSource comment: `catalog` and `table` are in use (V4).
  *   v1.1.0 — 2026-09-28 — The provider types of V3 (openai, anthropic, mistral, xai), their fixed
  *     addresses, and `allowOrigins` on a target.
  *   v1.0.0 — 2026-09-28 — Initial, with the gateway (V1 of the System 2 plan).
@@ -86,6 +87,6 @@ export function adapterTypeOf(provider: string, baseUrl: string): AiAdapterType 
  * node's fallback rate per token. `none`: nothing was known and zero was recorded, flagged as
  * inexact (an image or a transcription whose provider reported no cost; audio prices in the
  * catalogue use different units per provider, so an estimate would be confidently wrong).
- * `catalog` and `table` arrive with the model catalogue (V4).
+ * `catalog`: the model catalogue's price, cited by its snapshot. `table`: the node's old price table.
  */
 export type CostSource = 'provider' | 'catalog' | 'table' | 'estimate' | 'none';

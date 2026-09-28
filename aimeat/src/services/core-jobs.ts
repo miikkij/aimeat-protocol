@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.7.0 — 2026-09-28 — ai-catalog-refresh: the model catalogue from its public sources, when due.
  *   v1.6.0 — 2026-09-25 — usage-visit-retention: an app open older than thirteen months keeps its
  *     count and loses the visitor's account, as the privacy notice says.
  *   v1.5.0 — 2026-09-19 — ai-decision-prune: decision records past their retention window (TARGET-080).
@@ -53,6 +54,14 @@ export function registerCoreHandlers(
     await runDesignBookAgingJob(storage, config);
   });
   scheduler.registerCoreHandler('invitation-expiry', () => runInvitationExpiryJob(storage));
+  // The model catalogue (System 2 plan V4): the job runs daily and refreshes when the operator's
+  // cadence (AIMEAT_AI_CATALOG_REFRESH: weekly, daily, off) says it is due. Dynamic import like the
+  // other heavy handlers.
+  scheduler.registerCoreHandler('ai-catalog-refresh', async () => {
+    const { refreshCatalog, refreshDue } = await import('./ai/catalog/refresh.js');
+    const { catalogMeta } = await import('./ai/catalog/store.js');
+    if (refreshDue(config, catalogMeta())) await refreshCatalog(storage, config);
+  });
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
     scheduler.registerCoreHandler('consent-audit-prune', () => runConsentAuditPruneJob(config, storage));
