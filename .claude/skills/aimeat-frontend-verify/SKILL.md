@@ -15,6 +15,15 @@ Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and pas
 
 **An app that reads mail or asks a model is checked on the sandbox's stand-ins.** The first owner is connected to a test mailbox (18 sample messages, a PDF invoice with a text layer and a scanned one; the connection id is `mailbox` in `.sandbox.json`), and the node's decision model and completion model are local stand-ins that answer each sample with the class and fields a person would give it. A batch, a classification or an extraction therefore runs in the sandbox with no paid key, and its result is known before you look.
 
+**An app built from an approved drawing is compared with it before Jouni sees it: `pnpm ui:compare`.** Publish the approved genre (or the page he approved) to the sandbox beside the app, then, from `aimeat/`:
+
+```bash
+pnpm ui:compare --ref <genre url> --app <app url> --click "Setup" \
+  --login <owner>:<password> --node <sandbox baseUrl> --app-ref <owner>/<file>
+```
+
+It signs the app in (the node's window, as a person does), opens the same view on both with `--click`, and reports two readings into `aimeat/.ui-compare/<time>/`: the kit parts only one screen has and every style that differs on a part both have (background, border, radius, shadow, font, padding), and a pixel diff picture. Parts and styles are the finding; the pixel share also counts different data, so read `diff.png` and `app.png` beside `ref.png` rather than the number. Run it once per view the drawing shows. Postinjalostamo 0.4 went to Jouni with a grey paste box and separate setting boxes where the drawing had a white box and one card; this reading names both.
+
 If you could not drive the browser (MCP unavailable, server down, no credentials), say so. Do not report it as working.
 
 ## A change to the look is one of two kinds, and says which
