@@ -41,6 +41,8 @@
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.64.0 — 2026-09-28 — The tab row's chosen fill is the ink (ink.js): one marker that travels
+ *     to the next tab on two edge springs, kept live through the view transition.
  *   v0.63.0 — 2026-09-28 — THE WORKBENCH FRAME: `logo` draws the app's own mark before the title
  *     (the brand cluster; the login pill and its mount are untouched), and `nav: 'side'` puts the
  *     pages in a left column (workbench.js sideNav) beside a capped content column, both inside
@@ -85,6 +87,7 @@ import { ambient } from './ambient.js';
 import { weather } from './ambient-parts.js';
 import { partEl, slotInto, applyVariant, hasPart, partValue } from './parts-model.js';
 import { sideNav } from './workbench.js';
+import { ink } from './ink.js';
 
 /**
  * The app's own mark beside its name: an https URL (or a same-origin path) to a square image.
@@ -673,6 +676,8 @@ export function tabs(spec) {
   const root = el('div', { class: 'ak-root ak-tabs', role: 'tablist', 'data-ak-part': 'root' });
   applyVariant(root, spec, ['dense', 'pill']);
   if (spec.target) resolve(spec.target).appendChild(root);
+  // The chosen tab's fill is the ink, one marker that travels to the next pick (ink.js).
+  const mark = ink(root, { active: '.ak-tab--active' });
 
   function render() {
     clear(root);
@@ -694,15 +699,17 @@ export function tabs(spec) {
             // transition: the browser crosses the old screen into the new one where it has View
             // Transitions, the kit's curtain does it where it does not, and under reduced motion
             // or an opt-out it is the plain swap it always was.
+            const release = mark.pin();
             viewSwap(function () {
               state.value = item.id;
               render();
               if (spec.onChange) spec.onChange(item.id);
-            }, { kind: spec.transition, node: root });
+            }, { kind: spec.transition, node: root }).then(release, release);
           },
         },
       }, tabLabel(spec, 'tab', item)));
     }
+    mark.sync();
   }
   render();
 
@@ -715,7 +722,7 @@ export function tabs(spec) {
       if (patch.value != null) state.value = patch.value;
       render();
     },
-    destroy() { if (root.parentNode) root.parentNode.removeChild(root); },
+    destroy() { mark.destroy(); if (root.parentNode) root.parentNode.removeChild(root); },
   };
 }
 

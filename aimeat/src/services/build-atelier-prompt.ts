@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.32.0 — 2026-09-28 — The motion parts follow the motion section, each with its call (build-atelier-motion-parts.ts); they sit in the `look` part because `start` is at its size limit.
  *   v1.31.0 — 2026-09-28 — The workbench pieces join the component catalogue (ATELIER_WORKBENCH_COMPONENTS).
  *   v1.30.0 — 2026-09-28 — Twelve layout rules for a settings page and a queue page follow "COMPOSE" (build-atelier-layout-rules.ts).
  *   v1.29.0 — 2026-09-20 —The mosaic section ends with the working screen of a genre fork being a
@@ -143,6 +144,7 @@ import { renderCustomisation, renderLiving, renderPatterns } from './build-ateli
 import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_MOSAIC_IN_GENRE, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
 import { buildAtelierLibrarySection } from '../data/library-packs.js';
 import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
+import { atelierMotionParts } from './build-atelier-motion-parts.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -620,6 +622,7 @@ function composeBody(config: AimeatConfig): string {
     + 'is the look\'s too: each one carries its own stiffness, damping and mass in '
     + '`--ak-spring-*`, and the kit\'s primitives (`spring`, `drag`, `stagger({ spring: true })`) '
     + 'read them off the element they move, so you tune the look and never the call.\n\n';
+  body += atelierMotionParts();
 
   body += '## Imagery\n\n';
   body += 'Images are generated, uploaded and referenced — never inlined and never stock. The '

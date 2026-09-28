@@ -1,0 +1,93 @@
+/*
+ * @file aimeat-atelier/island.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The island and the state button (atelier/island.js): one shape whose size,
+ *   rounding and colour change while its content changes inside it. The shapes and tones are
+ *   here; the travel between them is the script's, which writes width, height and border-radius
+ *   inline only while it moves and removes them when it lands.
+ *
+ *   The tones pair a ground with the ink proven for it: ink on the page's ink turned around,
+ *   accent with the accent's own ink, and the ok and err tones as a light wash under their text
+ *   tokens, the same pair the badges use.
+ * @structure .ak-island · shapes · tones · .ak-island__leaving · .ak-statebtn · spinner · check
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.55.0 — 2026-09-28 — Initial (the ten motion parts).
+ */
+
+.ak-island {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: var(--ak-touch);
+  padding: 0 var(--ak-island-pad);
+  overflow: hidden;
+  vertical-align: middle;
+  border: 0;
+  font: inherit;
+  transition: background-color var(--ak-motion) var(--ak-ease), color var(--ak-motion) var(--ak-ease),
+    box-shadow var(--ak-motion) var(--ak-ease);
+}
+.ak-island__content { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.ak-island__leaving { position: absolute; pointer-events: none; }
+
+/* The shapes. The script reads the rounding each one asks for and travels to it. */
+.ak-island[data-ak-shape='pill'] { border-radius: var(--ak-radius-pill); }
+.ak-island[data-ak-shape='bar'] { border-radius: var(--ak-radius); min-width: min(22rem, 100%); justify-content: flex-start; }
+.ak-island[data-ak-shape='card'] {
+  display: block;
+  width: min(26rem, 100%);
+  padding: var(--ak-pad);
+  border-radius: var(--ak-island-radius);
+}
+.ak-island[data-ak-shape='card'] .ak-island__content { display: block; white-space: normal; }
+.ak-island[data-ak-shape='circle'] {
+  width: var(--ak-touch);
+  height: var(--ak-touch);
+  padding: 0;
+  border-radius: var(--ak-radius-pill);
+}
+
+/* The tones. */
+.ak-island[data-ak-tone='ink'] { background: var(--ak-ink); color: var(--ak-bg); }
+.ak-island[data-ak-tone='surface'] {
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  box-shadow: inset 0 0 0 var(--ak-line-w) var(--ak-line), var(--ak-elev-1);
+}
+.ak-island[data-ak-tone='accent'] { background: var(--ak-accent); color: var(--ak-accent-ink); }
+.ak-island[data-ak-tone='ok'] { background: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface)); color: var(--ak-ok-text); }
+.ak-island[data-ak-tone='err'] { background: color-mix(in oklab, var(--ak-err) 14%, var(--ak-surface)); color: var(--ak-err-text); }
+
+/* As a button. */
+button.ak-island { cursor: pointer; touch-action: manipulation; font-weight: 600; }
+button.ak-island:focus-visible { outline: 2px solid var(--ak-focus, var(--ak-accent)); outline-offset: 2px; }
+button.ak-island[aria-busy='true'], button.ak-island[aria-disabled='true'] { cursor: default; }
+button.ak-island[aria-disabled='true'] { opacity: 0.5; }
+
+/* The spinner turns only while the work runs, and it has a finite count like every loop here. */
+.ak-island__spinner {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--ak-radius-pill);
+  animation: ak-spin 700ms linear 40;
+}
+.ak-island__check { display: block; flex: none; }
+.ak-island__check path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ak-island-draw 420ms var(--ak-ease) 120ms forwards;
+}
+@keyframes ak-island-draw { to { stroke-dashoffset: 0; } }

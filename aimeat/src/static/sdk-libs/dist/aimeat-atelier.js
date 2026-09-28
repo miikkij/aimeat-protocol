@@ -1019,7 +1019,9 @@
       checkTodo: "Needs you",
       checkFail: "Failed",
       checkWait: "In progress",
-      checkOptional: "Optional"
+      checkOptional: "Optional",
+      working: "Working…",
+      done: "Done"
     },
     fi: {
       loading: "Ladataan…",
@@ -1101,7 +1103,9 @@
       checkTodo: "Tarvitsee sinua",
       checkFail: "Epäonnistui",
       checkWait: "Kesken",
-      checkOptional: "Valinnainen"
+      checkOptional: "Valinnainen",
+      working: "Käsitellään…",
+      done: "Valmis"
     },
     es: {
       loading: "Cargando…",
@@ -1183,7 +1187,9 @@
       checkTodo: "Te necesita",
       checkFail: "Falló",
       checkWait: "En curso",
-      checkOptional: "Opcional"
+      checkOptional: "Opcional",
+      working: "Procesando…",
+      done: "Hecho"
     }
   };
   var HOST = { en: {}, fi: {}, es: {} };
@@ -1312,16 +1318,16 @@
     node.setAttribute("data-ak-flapped", "done");
     node.setAttribute("aria-label", text);
     node.textContent = "";
-    const wrap = document.createElement("span");
-    wrap.className = "ak-flaps";
-    wrap.setAttribute("aria-hidden", "true");
+    const wrap2 = document.createElement("span");
+    wrap2.className = "ak-flaps";
+    wrap2.setAttribute("aria-hidden", "true");
     const base = opts && opts.delay || 0;
     let i = 0;
     for (const ch of text) {
       const f = document.createElement("span");
       f.className = "ak-flap" + (ch === " " ? " ak-flap--space" : "");
       f.textContent = ch;
-      wrap.appendChild(f);
+      wrap2.appendChild(f);
       if (!reducedMotion() && f.animate && ch !== " ") {
         f.animate(
           [{ transform: "rotateX(90deg)", opacity: 0.2 }, { transform: "rotateX(0deg)", opacity: 1 }],
@@ -1330,7 +1336,7 @@
       }
       i++;
     }
-    node.appendChild(wrap);
+    node.appendChild(wrap2);
     return true;
   }
   function ransom(target) {
@@ -2796,11 +2802,11 @@
     }
     function samplePalette() {
       const bg = tokenRgb(host, "--ak-bg");
-      const ink2 = tokenRgb(host, "--ak-ink");
+      const ink3 = tokenRgb(host, "--ak-ink");
       return {
-        dark: luma(bg) < luma(ink2),
+        dark: luma(bg) < luma(ink3),
         bg,
-        ink: ink2,
+        ink: ink3,
         accent: tokenRgb(host, "--ak-accent"),
         spectrum2: tokenRgb(host, "--ak-spectrum-2", "--ak-accent"),
         spectrum3: tokenRgb(host, "--ak-spectrum-3", "--ak-accent")
@@ -3960,6 +3966,318 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/springs.js
+  var HOUSE = { stiffness: 170, damping: 20, mass: 1 };
+  var STEP = 1 / 240;
+  var MAX_GAP = 1 / 15;
+  function feelOf(node, opts) {
+    const o = opts || {};
+    let cs = null;
+    if (node && typeof getComputedStyle === "function" && !(o.stiffness && o.damping && o.mass)) {
+      try {
+        cs = getComputedStyle(
+          /** @type {Element} */
+          node
+        );
+      } catch {
+        cs = null;
+      }
+    }
+    const token = function(name) {
+      if (!cs) return void 0;
+      const v = parseFloat(cs.getPropertyValue(name));
+      return isFinite(v) && v > 0 ? v : void 0;
+    };
+    return {
+      stiffness: o.stiffness || token("--ak-spring-stiffness") || HOUSE.stiffness,
+      damping: o.damping || token("--ak-spring-damping") || HOUSE.damping,
+      mass: o.mass || token("--ak-spring-mass") || HOUSE.mass
+    };
+  }
+  function stepSpring(state, target, feel, dt) {
+    let x = state.x;
+    let v = state.v;
+    let left = Math.min(dt, MAX_GAP);
+    while (left > 1e-9) {
+      const h = Math.min(STEP, left);
+      const a = (-feel.stiffness * (x - target) - feel.damping * v) / feel.mass;
+      v += a * h;
+      x += v * h;
+      left -= h;
+    }
+    return { x, v };
+  }
+  function nextFrame(fn) {
+    if (typeof requestAnimationFrame === "function") return requestAnimationFrame(fn);
+    return (
+      /** @type {any} */
+      setTimeout(function() {
+        fn(Date.now());
+      }, 16)
+    );
+  }
+  function cancelFrame(id) {
+    if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(id);
+    else clearTimeout(id);
+  }
+  function liveSpring(onFrame, opts) {
+    const o = opts || {};
+    const precision = o.precision || 0.01;
+    let x = typeof o.value === "number" ? o.value : 0;
+    let v = 0;
+    let goal = x;
+    let feel = null;
+    let raf = 0;
+    let last = 0;
+    function stop() {
+      if (raf) cancelFrame(raf);
+      raf = 0;
+    }
+    function tick(now2) {
+      raf = 0;
+      const dt = last ? Math.max(0, (now2 - last) / 1e3) : 1 / 60;
+      last = now2;
+      const s = stepSpring({ x, v }, goal, feel || HOUSE, dt);
+      x = s.x;
+      v = s.v;
+      if (Math.abs(x - goal) < precision && Math.abs(v) < precision * 10) {
+        x = goal;
+        v = 0;
+        last = 0;
+        onFrame(x, 0);
+        return;
+      }
+      onFrame(x, v);
+      raf = nextFrame(tick);
+    }
+    function jump(value) {
+      stop();
+      x = goal = value;
+      v = 0;
+      last = 0;
+      onFrame(x, 0);
+    }
+    return {
+      set(target, so) {
+        if (!isFinite(target)) return;
+        const s = so || {};
+        if (motionOff(o.el || null)) {
+          jump(target);
+          return;
+        }
+        goal = target;
+        if (typeof s.velocity === "number") v = s.velocity;
+        feel = feelOf(o.el, Object.assign({ stiffness: o.stiffness, damping: o.damping, mass: o.mass }, s.feel || {}));
+        if (Math.abs(x - goal) < precision && Math.abs(v) < precision * 10) {
+          jump(goal);
+          return;
+        }
+        if (!raf) {
+          last = 0;
+          raf = nextFrame(tick);
+        }
+      },
+      jump,
+      value() {
+        return x;
+      },
+      velocity() {
+        return v;
+      },
+      target() {
+        return goal;
+      },
+      moving() {
+        return raf !== 0;
+      },
+      destroy: stop
+    };
+  }
+  function edgePair(onFrame, opts) {
+    const o = opts || {};
+    const lead = o.lead || 2.4;
+    let a = typeof o.start === "number" ? o.start : 0;
+    let b = typeof o.end === "number" ? o.end : a;
+    let queued = false;
+    function paint() {
+      if (queued) return;
+      queued = true;
+      Promise.resolve().then(function() {
+        queued = false;
+        onFrame(a, b);
+      });
+    }
+    const startEdge = liveSpring(function(x) {
+      a = x;
+      paint();
+    }, { el: o.el, value: a, precision: 0.05 });
+    const endEdge = liveSpring(function(x) {
+      b = x;
+      paint();
+    }, { el: o.el, value: b, precision: 0.05 });
+    return {
+      set(start, end) {
+        const base = feelOf(o.el, o);
+        const fast = { stiffness: base.stiffness * lead, damping: base.damping * Math.sqrt(lead), mass: base.mass };
+        const forward = (start + end) / 2 >= (startEdge.target() + endEdge.target()) / 2;
+        startEdge.set(start, { feel: forward ? base : fast });
+        endEdge.set(end, { feel: forward ? fast : base });
+      },
+      jump(start, end) {
+        startEdge.jump(start);
+        endEdge.jump(end);
+      },
+      edges() {
+        return [a, b];
+      },
+      moving() {
+        return startEdge.moving() || endEdge.moving();
+      },
+      destroy() {
+        startEdge.destroy();
+        endEdge.destroy();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/ink.js
+  function ownTransform(node) {
+    const id = { a: 1, d: 1, e: 0, f: 0 };
+    let t2;
+    try {
+      t2 = getComputedStyle(node).transform || "none";
+    } catch {
+      return id;
+    }
+    if (t2 === "none" || typeof DOMMatrixReadOnly !== "function") return id;
+    try {
+      const m = new DOMMatrixReadOnly(t2);
+      return { a: m.a || 1, d: m.d || 1, e: m.e || 0, f: m.f || 0 };
+    } catch {
+      return id;
+    }
+  }
+  function ink2(container, opts) {
+    const o = opts || { active: "" };
+    const axis = o.axis === "y" ? "y" : "x";
+    const mark = el("span", { class: "ak-ink" + (o.className ? " " + o.className : ""), "data-ak-part": "ink", "aria-hidden": "true" });
+    let cross = { pos: 0, size: 0 };
+    let placed = false;
+    let visible = false;
+    function measure() {
+      const found = typeof o.active === "function" ? o.active(container) : o.active ? container.querySelector(o.active) : null;
+      if (!found || found === mark) return null;
+      const c = container.getBoundingClientRect();
+      const r = found.getBoundingClientRect();
+      if (!r.width && !r.height) return null;
+      const sx = container.offsetWidth ? c.width / container.offsetWidth : 1;
+      const sy = container.offsetHeight ? c.height / container.offsetHeight : 1;
+      const kx = sx > 0 ? sx : 1;
+      const ky = sy > 0 ? sy : 1;
+      const own = ownTransform(found);
+      const w = r.width / own.a;
+      const h = r.height / own.d;
+      const cx = r.left + r.width / 2 - own.e * kx;
+      const cy = r.top + r.height / 2 - own.f * ky;
+      const left = (cx - w / 2 - c.left) / kx + container.scrollLeft - (container.clientLeft || 0);
+      const top = (cy - h / 2 - c.top) / ky + container.scrollTop - (container.clientTop || 0);
+      return { left, top, width: w / kx, height: h / ky };
+    }
+    function draw(start, end) {
+      const size = Math.max(0, end - start);
+      if (axis === "x") {
+        mark.style.transform = "translate(" + start + "px, " + cross.pos + "px)";
+        mark.style.width = size + "px";
+        mark.style.height = cross.size + "px";
+      } else {
+        mark.style.transform = "translate(" + cross.pos + "px, " + start + "px)";
+        mark.style.height = size + "px";
+        mark.style.width = cross.size + "px";
+      }
+    }
+    const edges = edgePair(draw, { el: container });
+    function attach2() {
+      if (mark.parentNode !== container) container.appendChild(mark);
+    }
+    function show(on) {
+      if (on === visible) return;
+      visible = on;
+      mark.hidden = !on;
+      container.toggleAttribute("data-ak-ink", on);
+    }
+    function sync(travel3) {
+      attach2();
+      watch2();
+      const box = measure();
+      if (!box) {
+        show(false);
+        placed = false;
+        return;
+      }
+      cross = axis === "x" ? { pos: box.top, size: box.height } : { pos: box.left, size: box.width };
+      const start = axis === "x" ? box.left : box.top;
+      const end = start + (axis === "x" ? box.width : box.height);
+      if (!placed || travel3 === false) {
+        edges.jump(start, end);
+        draw(start, end);
+        placed = true;
+      } else {
+        edges.set(start, end);
+      }
+      show(true);
+    }
+    let ro = null;
+    let watched = null;
+    if (typeof ResizeObserver === "function") {
+      ro = new ResizeObserver(function() {
+        if (placed && !edges.moving()) sync(false);
+      });
+      ro.observe(container);
+    }
+    function watch2() {
+      if (!ro) return;
+      const found = typeof o.active === "function" ? o.active(container) : o.active ? container.querySelector(o.active) : null;
+      if (found === watched) return;
+      if (watched) ro.unobserve(watched);
+      watched = found;
+      if (found) ro.observe(found);
+    }
+    attach2();
+    show(false);
+    if (container.isConnected) sync(false);
+    else if (typeof requestAnimationFrame === "function") requestAnimationFrame(function() {
+      sync(false);
+    });
+    return {
+      el: mark,
+      sync() {
+        sync(true);
+      },
+      jump() {
+        sync(false);
+      },
+      /**
+       * Keep the row out of a view transition's crossfade while the screen changes around it, so
+       * the ink is seen travelling rather than frozen in the old snapshot. Returns the release.
+       */
+      pin() {
+        const name = uid("ak-ink").replace(/[^a-z0-9-]/gi, "");
+        container.style.setProperty("view-transition-name", name);
+        container.style.setProperty("view-transition-class", "ak-live");
+        return function() {
+          container.style.removeProperty("view-transition-name");
+          container.style.removeProperty("view-transition-class");
+        };
+      },
+      destroy() {
+        edges.destroy();
+        if (ro) ro.disconnect();
+        if (mark.parentNode) mark.parentNode.removeChild(mark);
+        container.removeAttribute("data-ak-ink");
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/shell.js
   function logoEl(src) {
     if (typeof src !== "string" || !src.trim()) return null;
@@ -4398,6 +4716,7 @@
     const root = el("div", { class: "ak-root ak-tabs", role: "tablist", "data-ak-part": "root" });
     applyVariant(root, spec, ["dense", "pill"]);
     if (spec.target) resolve(spec.target).appendChild(root);
+    const mark = ink2(root, { active: ".ak-tab--active" });
     function render() {
       clear(root);
       for (const item of state.items) {
@@ -4413,15 +4732,17 @@
           on: {
             click: function() {
               if (item.id === state.value) return;
+              const release = mark.pin();
               viewSwap(function() {
                 state.value = item.id;
                 render();
                 if (spec.onChange) spec.onChange(item.id);
-              }, { kind: spec.transition, node: root });
+              }, { kind: spec.transition, node: root }).then(release, release);
             }
           }
         }, tabLabel(spec, "tab", item)));
       }
+      mark.sync();
     }
     render();
     return {
@@ -4434,6 +4755,7 @@
         render();
       },
       destroy() {
+        mark.destroy();
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
@@ -5752,6 +6074,356 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/controls.js
+  var KNOB_STRETCH = 0.3;
+  var STRETCH_MAX = 22;
+  function switchMotion(input) {
+    input.setAttribute("role", "switch");
+    let pressed = false;
+    function spot(on, press) {
+      let pad;
+      try {
+        pad = parseFloat(getComputedStyle(input).getPropertyValue("--ak-switch-pad")) || 3;
+      } catch {
+        pad = 3;
+      }
+      const w = input.clientWidth || 46;
+      const h = input.clientHeight || 26;
+      const knob = Math.max(0, h - pad * 2);
+      const grow = press ? knob * KNOB_STRETCH : 0;
+      const far = Math.max(knob, w - pad * 2);
+      return on ? [far - knob - grow, far] : [0, knob + grow];
+    }
+    function draw(a, b) {
+      input.style.setProperty("--ak-knob-x", a.toFixed(2) + "px");
+      input.style.setProperty("--ak-knob-w", Math.max(0, b - a).toFixed(2) + "px");
+    }
+    const first = spot(input.checked, false);
+    const edges = edgePair(draw, { el: input, start: first[0], end: first[1] });
+    draw(first[0], first[1]);
+    function sync() {
+      const s = spot(input.checked, pressed);
+      edges.set(s[0], s[1]);
+    }
+    const down = function(e) {
+      if (e.button !== void 0 && e.button !== 0) return;
+      pressed = true;
+      sync();
+    };
+    const up = function() {
+      if (pressed) {
+        pressed = false;
+        sync();
+      }
+    };
+    const keyDown = function(e) {
+      if (e.key === " " && !pressed) {
+        pressed = true;
+        sync();
+      }
+    };
+    input.addEventListener("pointerdown", down);
+    input.addEventListener("pointerup", up);
+    input.addEventListener("pointerleave", up);
+    input.addEventListener("pointercancel", up);
+    input.addEventListener("keydown", keyDown);
+    input.addEventListener("keyup", up);
+    input.addEventListener("change", sync);
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(function() {
+        const s = spot(input.checked, false);
+        edges.jump(s[0], s[1]);
+        draw(s[0], s[1]);
+      });
+    }
+    return {
+      sync,
+      destroy() {
+        edges.destroy();
+        input.removeEventListener("pointerdown", down);
+        input.removeEventListener("pointerup", up);
+        input.removeEventListener("pointerleave", up);
+        input.removeEventListener("pointercancel", up);
+        input.removeEventListener("keydown", keyDown);
+        input.removeEventListener("keyup", up);
+        input.removeEventListener("change", sync);
+      }
+    };
+  }
+  function toggle(spec) {
+    const s = spec || { label: "" };
+    const id = s.id || uid("ak-sw");
+    const input = (
+      /** @type {HTMLInputElement} */
+      el("input", {
+        type: "checkbox",
+        id,
+        class: "ak-toggle",
+        "data-ak-part": "input",
+        name: s.name || null,
+        checked: s.checked ? true : null,
+        disabled: s.disabled ? true : null
+      })
+    );
+    const root = el("div", { class: "ak-root ak-switchrow", "data-ak-part": "root" }, [
+      input,
+      el("label", { class: "ak-switchrow__label", "data-ak-part": "label", for: id, text: s.label })
+    ]);
+    const motion = switchMotion(input);
+    input.addEventListener("change", function() {
+      if (s.onChange) s.onChange(input.checked);
+    });
+    if (s.target) resolve(s.target).appendChild(root);
+    return {
+      el: root,
+      input,
+      value() {
+        return input.checked;
+      },
+      set(on) {
+        input.checked = !!on;
+        motion.sync();
+      },
+      destroy() {
+        motion.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function segmented(spec) {
+    const s = spec || { label: "", items: [] };
+    const state = { items: s.items || [], value: s.value || (s.items && s.items[0] ? s.items[0].id : "") };
+    const root = el("div", { class: "ak-root ak-segmented", role: "radiogroup", "aria-label": s.label, "data-ak-part": "root" });
+    applyVariant(root, s, ["dense"]);
+    const mark = ink2(root, { active: '[aria-checked="true"]' });
+    function pick(id, focus) {
+      if (id === state.value) return;
+      state.value = id;
+      paint();
+      mark.sync();
+      if (focus) {
+        const btn = Array.prototype.slice.call(root.querySelectorAll(".ak-segmented__option")).find(function(b) {
+          return b.getAttribute("data-ak-id") === id;
+        });
+        if (btn) btn.focus();
+      }
+      if (s.onChange) s.onChange(id);
+    }
+    function move(delta, to) {
+      const i = state.items.findIndex(function(it) {
+        return it.id === state.value;
+      });
+      const n = state.items.length;
+      if (!n) return;
+      const next = to === "first" ? 0 : to === "last" ? n - 1 : (i + delta + n) % n;
+      pick(state.items[next].id, true);
+    }
+    function paint() {
+      const kids = Array.prototype.slice.call(root.querySelectorAll(".ak-segmented__option"));
+      kids.forEach(function(b) {
+        const on = b.getAttribute("data-ak-id") === state.value;
+        b.setAttribute("aria-checked", on ? "true" : "false");
+        b.setAttribute("tabindex", on ? "0" : "-1");
+      });
+    }
+    function build() {
+      Array.prototype.slice.call(root.querySelectorAll(".ak-segmented__option")).forEach(function(b) {
+        root.removeChild(b);
+      });
+      state.items.forEach(function(it) {
+        root.insertBefore(el("button", {
+          type: "button",
+          role: "radio",
+          class: "ak-segmented__option",
+          "data-ak-part": "option",
+          "data-ak-id": it.id,
+          "data-ak-noguard": true,
+          on: {
+            click: function() {
+              pick(it.id, false);
+            },
+            keydown: function(e) {
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                e.preventDefault();
+                move(1);
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                e.preventDefault();
+                move(-1);
+              } else if (e.key === "Home") {
+                e.preventDefault();
+                move(0, "first");
+              } else if (e.key === "End") {
+                e.preventDefault();
+                move(0, "last");
+              }
+            }
+          }
+        }, it.label), mark.el);
+      });
+      paint();
+    }
+    build();
+    if (s.target) resolve(s.target).appendChild(root);
+    mark.jump();
+    return {
+      el: root,
+      value() {
+        return state.value;
+      },
+      set(patch) {
+        if (!patch) return;
+        if (patch.items) {
+          state.items = patch.items;
+          build();
+        }
+        if (patch.value != null && patch.value !== state.value) {
+          state.value = patch.value;
+          paint();
+          mark.sync();
+          return;
+        }
+        if (patch.items) mark.jump();
+      },
+      destroy() {
+        mark.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function rubber(over) {
+    const sign = over < 0 ? -1 : 1;
+    return sign * STRETCH_MAX * (1 - Math.exp(-Math.abs(over) / (STRETCH_MAX * 2.5)));
+  }
+  function rangeMotion(input) {
+    let stretch = 0;
+    function num2(name, fallback) {
+      const v = parseFloat(input.getAttribute(name) || "");
+      return isFinite(v) ? v : fallback;
+    }
+    function fill() {
+      const lo = num2("min", 0);
+      const hi = num2("max", 100);
+      const v = parseFloat(input.value);
+      const pct = hi > lo && isFinite(v) ? (v - lo) / (hi - lo) * 100 : 0;
+      input.style.setProperty("--ak-range-fill", Math.max(0, Math.min(100, pct)).toFixed(2) + "%");
+    }
+    function draw(x) {
+      stretch = x;
+      const w = input.offsetWidth || 200;
+      if (Math.abs(x) < 0.05) {
+        input.style.removeProperty("transform");
+        input.style.removeProperty("transform-origin");
+        return;
+      }
+      const k = Math.abs(x) / w;
+      input.style.transformOrigin = x > 0 ? "left center" : "right center";
+      input.style.transform = "scale(" + (1 + k).toFixed(4) + ", " + (1 - k * 0.6).toFixed(4) + ")";
+    }
+    const spring2 = liveSpring(draw, { el: input, value: 0, precision: 0.05 });
+    let held = null;
+    const onMove = function(e) {
+      if (!held || e.pointerId !== held) return;
+      const r = input.getBoundingClientRect();
+      const over = e.clientX > r.right ? e.clientX - r.right : e.clientX < r.left ? e.clientX - r.left : 0;
+      spring2.jump(over ? rubber(over) : 0);
+    };
+    const onUp = function(e) {
+      if (!held || e && e.pointerId !== held) return;
+      held = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      spring2.set(0);
+    };
+    const onDown = function(e) {
+      if (e.button !== void 0 && e.button !== 0) return;
+      held = e.pointerId;
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    };
+    const onKey = function(e) {
+      if (motionOff(input)) return;
+      const v = parseFloat(input.value);
+      const atMax = v >= num2("max", 100);
+      const atMin = v <= num2("min", 0);
+      const up = e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "PageUp" || e.key === "End";
+      const down = e.key === "ArrowLeft" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === "Home";
+      if (up && atMax || down && atMin) spring2.set(0, { velocity: (up ? 1 : -1) * 160 });
+    };
+    input.addEventListener("pointerdown", onDown);
+    input.addEventListener("input", fill);
+    input.addEventListener("change", fill);
+    input.addEventListener("keydown", onKey);
+    fill();
+    return {
+      sync: fill,
+      destroy() {
+        onUp();
+        spring2.destroy();
+        input.removeEventListener("pointerdown", onDown);
+        input.removeEventListener("input", fill);
+        input.removeEventListener("change", fill);
+        input.removeEventListener("keydown", onKey);
+        if (stretch) draw(0);
+      }
+    };
+  }
+  function slider(spec) {
+    const s = spec || { label: "" };
+    const id = uid("ak-sl");
+    const input = (
+      /** @type {HTMLInputElement} */
+      el("input", {
+        type: "range",
+        id,
+        class: "ak-input ak-input--range",
+        "data-ak-part": "input",
+        min: String(s.min != null ? s.min : 0),
+        max: String(s.max != null ? s.max : 100),
+        step: s.step != null ? String(s.step) : null
+      })
+    );
+    input.value = String(s.value != null ? s.value : s.min || 0);
+    const readout = el("output", { class: "ak-form__readout", "data-ak-part": "readout", for: id });
+    const root = el("div", { class: "ak-root ak-slider", "data-ak-part": "root" }, [
+      el("label", { class: "ak-form__label", "data-ak-part": "label", for: id, text: s.label }),
+      el("div", { class: "ak-form__range" }, [input, readout])
+    ]);
+    function say() {
+      const words = input.value + (s.unit ? " " + s.unit : "");
+      readout.textContent = words;
+      input.setAttribute("aria-valuetext", words);
+    }
+    const motion = rangeMotion(input);
+    input.addEventListener("input", function() {
+      say();
+      if (s.onInput) s.onInput(Number(input.value));
+    });
+    input.addEventListener("change", function() {
+      say();
+      if (s.onChange) s.onChange(Number(input.value));
+    });
+    say();
+    if (s.target) resolve(s.target).appendChild(root);
+    return {
+      el: root,
+      input,
+      value() {
+        return Number(input.value);
+      },
+      set(v) {
+        input.value = String(v);
+        say();
+        motion.sync();
+      },
+      destroy() {
+        motion.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/form.js
   var NUMERIC = ["number", "range"];
   function form(spec) {
@@ -5839,12 +6511,12 @@
       const body = readout ? el("div", { class: "ak-form__range", "data-ak-part": "range" }, [input, readout]) : input;
       const inline = type === "checkbox" || type === "toggle";
       const width = ["short", "date", "medium", "long", "full"].indexOf(field.width || "") >= 0 ? field.width : null;
-      const wrap = el("div", {
+      const wrap2 = el("div", {
         class: "ak-form__field" + (inline ? " ak-form__field--inline" : "") + (type === "range" ? " ak-form__field--range" : "") + (width ? " ak-form__field--w-" + width : ""),
         "data-ak-part": "field",
         "data-ak-field": field.name
       }, inline ? [input, label, hint, error] : [label, body, hint, error]);
-      controls.set(field.name, { field, input, error, wrap, readout });
+      controls.set(field.name, { field, input, error, wrap: wrap2, readout });
       input.addEventListener("input", function() {
         refreshReadout(field.name);
         if (field.onInput) field.onInput(valueOf(field.name), field);
@@ -5854,7 +6526,15 @@
         if (field.onChange) field.onChange(valueOf(field.name), field);
       });
       refreshReadout(field.name);
-      return wrap;
+      if (type === "toggle") controls.get(field.name).motion = switchMotion(
+        /** @type {HTMLInputElement} */
+        input
+      );
+      if (type === "range") controls.get(field.name).motion = rangeMotion(
+        /** @type {HTMLInputElement} */
+        input
+      );
+      return wrap2;
     }
     function setError(name, message) {
       const c = controls.get(name);
@@ -5958,6 +6638,7 @@
           if (type === "checkbox" || type === "toggle") c.input.checked = !!next[name];
           else c.input.value = next[name] == null ? "" : String(next[name]);
           refreshReadout(name);
+          if (c.motion) c.motion.sync();
         }
       },
       setError,
@@ -6264,8 +6945,8 @@
     const R = 88;
     const STROKE = 26;
     const C = 2 * Math.PI * R;
-    const GAP = 4;
-    const wrap = el("div", { class: "ak-chart__donutwrap" });
+    const GAP2 = 4;
+    const wrap2 = el("div", { class: "ak-chart__donutwrap" });
     const node = svg("svg", { viewBox: "0 0 230 230", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
     node.appendChild(svg("circle", { cx: 115, cy: 115, r: R, class: "ak-chart__ring", "stroke-width": STROKE }));
     let offset = 0;
@@ -6279,7 +6960,7 @@
         style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
         "stroke-width": STROKE,
         "stroke-linecap": slices.length > 1 ? "round" : "butt",
-        "stroke-dasharray": `${Math.max(frac * C - GAP, 0.5)} ${C}`,
+        "stroke-dasharray": `${Math.max(frac * C - GAP2, 0.5)} ${C}`,
         "stroke-dashoffset": String(-offset * C),
         transform: "rotate(-90 115 115)"
       });
@@ -6290,7 +6971,7 @@
       node.appendChild(ring2);
       offset += frac;
     });
-    wrap.appendChild(node);
+    wrap2.appendChild(node);
     const centre = el("div", { class: "ak-chart__centre" }, [
       el("b", { text: fmtTick(total) }),
       data.delta && data.delta.text ? el("span", { class: "ak-chart__delta", text: String(data.delta.text) }) : null
@@ -6298,8 +6979,8 @@
     if (data.delta && TONES2[data.delta.tone]) {
       centre.lastChild.style.color = TONES2[data.delta.tone];
     }
-    wrap.appendChild(centre);
-    ctx.root.appendChild(wrap);
+    wrap2.appendChild(centre);
+    ctx.root.appendChild(wrap2);
     const legend = el(
       "figcaption",
       { class: "ak-chart__legend" },
@@ -6323,9 +7004,9 @@
     const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 864e5) + 1;
     const weeks = Math.min(Math.ceil(spanDays / 7), 53);
     const CELL = 13;
-    const GAP = 3;
-    const width = weeks * (CELL + GAP) + GAP;
-    const height = 7 * (CELL + GAP) + GAP + 16;
+    const GAP2 = 3;
+    const width = weeks * (CELL + GAP2) + GAP2;
+    const height = 7 * (CELL + GAP2) + GAP2 + 16;
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + days.length + " d");
     const byKey = /* @__PURE__ */ new Map();
     for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
@@ -6338,8 +7019,8 @@
         const value = byKey.get(key);
         if (cursor.getDate() === 1) monthAt.push({ w, m: cursor.getMonth() });
         const cell = svg("rect", {
-          x: GAP + w * (CELL + GAP),
-          y: GAP + dow * (CELL + GAP),
+          x: GAP2 + w * (CELL + GAP2),
+          y: GAP2 + dow * (CELL + GAP2),
           width: CELL,
           height: CELL,
           rx: 3,
@@ -6354,7 +7035,7 @@
     }
     const MONTHS = [t("m1"), t("m2"), t("m3"), t("m4"), t("m5"), t("m6"), t("m7"), t("m8"), t("m9"), t("m10"), t("m11"), t("m12")];
     for (const mark of monthAt) {
-      const label = svg("text", { x: GAP + mark.w * (CELL + GAP), y: height - 4, class: "ak-chart__tick" });
+      const label = svg("text", { x: GAP2 + mark.w * (CELL + GAP2), y: height - 4, class: "ak-chart__tick" });
       label.textContent = MONTHS[mark.m];
       node.appendChild(label);
     }
@@ -6453,16 +7134,16 @@
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps2.map((s) => s.label + " " + s.value).join(", "));
     const W7 = 460;
     const STEP_H = 44;
-    const GAP = 7;
+    const GAP2 = 7;
     const BAND = 340;
     const CX = 195;
-    const H4 = steps2.length * (STEP_H + GAP) - GAP + 8;
+    const H4 = steps2.length * (STEP_H + GAP2) - GAP2 + 8;
     const first = steps2[0].value;
     const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     const still2 = ctx.still();
     const half = (v) => Math.max(v / first * BAND, 18) / 2;
     steps2.forEach((s, i) => {
-      const y = 4 + i * (STEP_H + GAP);
+      const y = 4 + i * (STEP_H + GAP2);
       const topHalf = half(s.value);
       const nxt = steps2[i + 1];
       const botHalf = nxt ? half(nxt.value) : topHalf;
@@ -6719,6 +7400,445 @@
     ctx.root.appendChild(legend);
   }
 
+  // src/static/sdk-libs/atelier/motion.js
+  var STATE = /* @__PURE__ */ new WeakMap();
+  var REST = { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
+  function stateOf(node) {
+    let s = STATE.get(node);
+    if (!s) {
+      s = Object.assign({}, REST);
+      STATE.set(node, s);
+    }
+    return s;
+  }
+  function transformOf(s) {
+    return "translate(" + s.x + "px, " + s.y + "px) scale(" + s.scale + ") rotate(" + s.rotate + "deg)";
+  }
+  function springTokens(el2) {
+    if (!el2 || typeof getComputedStyle !== "function") return {};
+    let cs;
+    try {
+      cs = getComputedStyle(
+        /** @type {Element} */
+        el2
+      );
+    } catch {
+      return {};
+    }
+    if (!cs) return {};
+    const num2 = function(name) {
+      const v = parseFloat(cs.getPropertyValue(name));
+      return isFinite(v) && v > 0 ? v : void 0;
+    };
+    return { stiffness: num2("--ak-spring-stiffness"), damping: num2("--ak-spring-damping"), mass: num2("--ak-spring-mass") };
+  }
+  function springFrames(opts) {
+    const o = opts || {};
+    const look = o.stiffness && o.damping && o.mass ? {} : springTokens(o.el);
+    const k = o.stiffness || look.stiffness || 170;
+    const c = o.damping || look.damping || 20;
+    const m = o.mass || look.mass || 1;
+    const v0 = o.velocity || 0;
+    const w0 = Math.sqrt(k / m);
+    const zeta = c / (2 * Math.sqrt(k * m));
+    const step = 1 / 60;
+    const samples = [];
+    let t2 = 0;
+    let x;
+    let settled = 0;
+    while (t2 < 4) {
+      if (zeta < 1) {
+        const wd = w0 * Math.sqrt(1 - zeta * zeta);
+        const decay = Math.exp(-zeta * w0 * t2);
+        x = 1 - decay * (Math.cos(wd * t2) + (zeta * w0 - v0) / wd * Math.sin(wd * t2));
+      } else {
+        const decay = Math.exp(-w0 * t2);
+        x = 1 - decay * (1 + (w0 - v0) * t2);
+      }
+      samples.push(x);
+      settled = Math.abs(1 - x) < 1e-3 ? settled + 1 : 0;
+      if (settled > 6) break;
+      t2 += step;
+    }
+    samples.push(1);
+    return { samples, duration: Math.round(samples.length * step * 1e3) };
+  }
+  function spring(target, to, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const from = Object.assign({}, stateOf(node));
+    const dest = Object.assign({}, from, to || {});
+    const prior = (
+      /** @type {any} */
+      node.__akSpring
+    );
+    if (prior) {
+      const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
+      if (typeof p === "number") {
+        const at = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
+        Object.keys(from).forEach(function(key) {
+          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at;
+        });
+      }
+      prior.cancel();
+    }
+    STATE.set(node, dest);
+    if (reducedMotion() || typeof node.animate !== "function") {
+      node.style.transform = transformOf(dest);
+      node.style.opacity = String(dest.opacity);
+      return { el: node, finished: Promise.resolve(), cancel() {
+      } };
+    }
+    const sf = springFrames(Object.assign({}, opts, { el: node }));
+    const frames = sf.samples.map(function(at, i) {
+      const s = {};
+      Object.keys(from).forEach(function(key) {
+        s[key] = from[key] + (dest[key] - from[key]) * at;
+      });
+      return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
+    });
+    const anim = (
+      /** @type {any} */
+      node.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" })
+    );
+    anim.__frames = sf.samples;
+    anim.__from = from;
+    anim.__to = dest;
+    node.__akSpring = anim;
+    const finished = anim.finished.then(function() {
+      node.style.transform = transformOf(dest);
+      node.style.opacity = String(dest.opacity);
+      anim.cancel();
+      if (
+        /** @type {any} */
+        node.__akSpring === anim
+      ) node.__akSpring = null;
+    }, function() {
+    });
+    return { el: node, finished, cancel() {
+      anim.cancel();
+    } };
+  }
+  function stagger(targets, opts) {
+    const o = opts || {};
+    const list2 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
+      /** @type {any} */
+      targets.length !== void 0 ? Array.prototype.slice.call(
+        /** @type {any} */
+        targets
+      ) : [targets]
+    );
+    const kids = list2.slice(0, o.max || 40);
+    if (!kids.length || reducedMotion() || typeof kids[0].animate !== "function") return { finished: Promise.resolve() };
+    const cs = getComputedStyle(kids[0]);
+    const dist = o.distance !== void 0 ? o.distance : parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 12;
+    const each = o.each !== void 0 ? o.each : parseFloat(cs.getPropertyValue("--ak-enter-stagger")) || 40;
+    const span = o.duration || (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.5;
+    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+    const start = o.from === "down" ? "translateY(-" + dist + "px)" : o.from === "left" ? "translateX(-" + dist + "px)" : o.from === "right" ? "translateX(" + dist + "px)" : o.from === "scale" ? "scale(0.92)" : "translateY(" + dist + "px)";
+    const end = o.from === "scale" ? "scale(1)" : "translate(0, 0)";
+    let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
+    let timing = { duration: span, easing: ease, fill: "backwards" };
+    if (o.spring) {
+      const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
+      frames = sf.samples.map(function(at, i) {
+        return {
+          offset: i / (sf.samples.length - 1),
+          opacity: Math.min(1, at * 1.4),
+          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at) + ")" : start.replace(/[-\d.]+px/, function(px) {
+            return (parseFloat(px) * (1 - at)).toFixed(2) + "px";
+          })
+        };
+      });
+      timing = { duration: sf.duration, easing: "linear", fill: "backwards" };
+    }
+    const runs = kids.map(function(kid, i) {
+      return kid.animate(frames, Object.assign({}, timing, { delay: i * each })).finished;
+    });
+    return { finished: Promise.all(runs).then(function() {
+    }, function() {
+    }) };
+  }
+  function inView(target, fn, opts) {
+    const node = resolve(target);
+    const o = opts || {};
+    if (typeof IntersectionObserver !== "function") {
+      fn(
+        node,
+        /** @type {any} */
+        { isIntersecting: true, target: node }
+      );
+      return { el: node, destroy() {
+      } };
+    }
+    const io = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          fn(node, entry);
+          if (o.once !== false) io.disconnect();
+        } else if (o.onLeave) {
+          o.onLeave(node);
+        }
+      });
+    }, { rootMargin: o.margin || "0px 0px -10% 0px", threshold: o.threshold || 0.15 });
+    io.observe(node);
+    return { el: node, destroy() {
+      io.disconnect();
+    } };
+  }
+  function nearestScroller(node) {
+    let p = node.parentElement;
+    while (p && p !== document.body) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+      p = p.parentElement;
+    }
+    return window;
+  }
+  function scrollLink(target, frames, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const subject = o.subject || node;
+    const scroller = o.scroller || nearestScroller(subject);
+    const lo = o.range ? o.range[0] : 0;
+    const hi = o.range ? o.range[1] : 1;
+    let last = 0;
+    if (reducedMotion() || typeof node.animate !== "function") {
+      return { el: node, progress() {
+        return 0;
+      }, destroy() {
+      } };
+    }
+    const anim = node.animate(frames, { duration: 1e3, easing: "linear", fill: "both" });
+    anim.pause();
+    const viewportH = function() {
+      return scroller === window ? window.innerHeight : (
+        /** @type {Element} */
+        scroller.clientHeight
+      );
+    };
+    const viewportTop = function() {
+      return scroller === window ? 0 : (
+        /** @type {Element} */
+        scroller.getBoundingClientRect().top
+      );
+    };
+    const tick = function() {
+      const r = subject.getBoundingClientRect();
+      const h = viewportH();
+      const raw = (viewportTop() + h - r.top) / Math.max(h + r.height, 1);
+      let p = (raw - lo) / Math.max(hi - lo, 1e-4);
+      p = Math.max(0, Math.min(1, p));
+      if (p !== last) {
+        last = p;
+        anim.currentTime = p * 1e3;
+      }
+    };
+    let rafId = 0;
+    const onScroll = function() {
+      if (!rafId) rafId = requestAnimationFrame(function() {
+        rafId = 0;
+        tick();
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    tick();
+    return {
+      el: node,
+      progress() {
+        return last;
+      },
+      destroy() {
+        scroller.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        if (rafId) cancelAnimationFrame(rafId);
+        anim.cancel();
+      }
+    };
+  }
+  function drag(target, handlers, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const h = handlers || {};
+    const o = opts || {};
+    const axis = o.axis || "both";
+    const threshold = o.threshold !== void 0 ? o.threshold : 4;
+    node.classList.add("ak-drag");
+    let active = null;
+    const clamp3 = function(v, range) {
+      return range ? Math.max(range[0], Math.min(range[1], v)) : v;
+    };
+    const down = function(e) {
+      if (e.button !== void 0 && e.button !== 0) return;
+      const s = stateOf(node);
+      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
+      if (
+        /** @type {any} */
+        node.__akSpring
+      ) node.__akSpring.cancel();
+      try {
+        node.setPointerCapture(e.pointerId);
+      } catch {
+      }
+    };
+    const move = function(e) {
+      if (!active || e.pointerId !== active.id) return;
+      let dx = e.clientX - active.x0;
+      let dy = e.clientY - active.y0;
+      if (!active.moved) {
+        if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+        active.moved = true;
+        node.classList.add("ak-dragging");
+        if (h.onStart) h.onStart(node);
+      }
+      if (axis === "x") dy = 0;
+      if (axis === "y") dx = 0;
+      const now2 = performance.now();
+      const dt = Math.max(now2 - active.t, 1);
+      active.vx = (e.clientX - active.lx) / dt * 1e3;
+      active.vy = (e.clientY - active.ly) / dt * 1e3;
+      active.t = now2;
+      active.lx = e.clientX;
+      active.ly = e.clientY;
+      const s = stateOf(node);
+      s.x = clamp3(active.bx + dx, o.bounds && o.bounds.x);
+      s.y = clamp3(active.by + dy, o.bounds && o.bounds.y);
+      node.style.transform = transformOf(s);
+      if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
+      e.preventDefault();
+    };
+    const up = function(e) {
+      if (!active || e.pointerId !== active.id) return;
+      const was = active;
+      active = null;
+      node.classList.remove("ak-dragging");
+      try {
+        node.releasePointerCapture(e.pointerId);
+      } catch {
+      }
+      if (!was.moved) return;
+      const s = stateOf(node);
+      const dx = s.x - was.bx;
+      const dy = s.y - was.by;
+      if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
+      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
+    };
+    node.addEventListener("pointerdown", down);
+    node.addEventListener("pointermove", move);
+    node.addEventListener("pointerup", up);
+    node.addEventListener("pointercancel", up);
+    return {
+      el: node,
+      destroy() {
+        node.removeEventListener("pointerdown", down);
+        node.removeEventListener("pointermove", move);
+        node.removeEventListener("pointerup", up);
+        node.removeEventListener("pointercancel", up);
+        node.classList.remove("ak-drag", "ak-dragging");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/chart-motion.js
+  var LATEST_DRAW = 2500;
+  function drawWhenSeen(root, node) {
+    const lines = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__line"));
+    const rest = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__area, .ak-chart__dot"));
+    if (motionOff(root) || !lines.length) return;
+    lines.forEach(function(line) {
+      const len = typeof line.getTotalLength === "function" ? line.getTotalLength() : 0;
+      if (!len) return;
+      line.setAttribute("stroke-dasharray", String(len));
+      line.setAttribute("stroke-dashoffset", String(len));
+      line.classList.add("ak-chart__line--enter");
+    });
+    rest.forEach(function(n) {
+      n.classList.add("ak-chart__late");
+    });
+    let drawn = false;
+    let late = null;
+    let watch2 = null;
+    const draw = function() {
+      if (drawn) return;
+      drawn = true;
+      clearTimeout(late);
+      if (watch2) watch2.destroy();
+      requestAnimationFrame(function() {
+        lines.forEach(function(line) {
+          line.classList.add("ak-chart__line--drawn");
+        });
+        rest.forEach(function(n) {
+          n.classList.add("ak-chart__late--in");
+        });
+      });
+    };
+    watch2 = inView(root, draw);
+    if (!drawn) late = setTimeout(draw, LATEST_DRAW);
+  }
+  function hoverRig(root, node, geom) {
+    const guide = svg("line", { x1: 0, x2: 0, y1: geom.top, y2: geom.bottom, class: "ak-chart__guide" });
+    node.appendChild(guide);
+    const marks = geom.points.map(function(p) {
+      const c = svg("circle", { cx: 0, cy: 0, r: 4.5, class: "ak-chart__hover", style: "stroke:" + p.colour });
+      node.appendChild(c);
+      return c;
+    });
+    const gx = liveSpring(function(x) {
+      guide.setAttribute("x1", x.toFixed(2));
+      guide.setAttribute("x2", x.toFixed(2));
+      marks.forEach(function(m) {
+        m.setAttribute("cx", x.toFixed(2));
+      });
+    }, { el: root, precision: 0.05 });
+    const gy = geom.points.map(function(_p, k) {
+      return liveSpring(function(y) {
+        marks[k].setAttribute("cy", y.toFixed(2));
+      }, { el: root, precision: 0.05 });
+    });
+    let tipSpring = null;
+    let showing = false;
+    let lastTip = null;
+    return {
+      at(i, tip, tipLeft) {
+        if (!tipSpring || lastTip !== tip) {
+          lastTip = tip;
+          tipSpring = liveSpring(function(x) {
+            tip.style.left = x.toFixed(1) + "px";
+          }, { el: root, precision: 0.1 });
+        }
+        if (!showing) {
+          gx.jump(geom.x(i));
+          gy.forEach(function(s, k) {
+            s.jump(geom.points[k].y(i));
+          });
+          tipSpring.jump(tipLeft);
+          showing = true;
+          node.classList.add("ak-chart__svg--reading");
+          tip.classList.add("ak-chart__tip--on");
+          return;
+        }
+        gx.set(geom.x(i));
+        gy.forEach(function(s, k) {
+          s.set(geom.points[k].y(i));
+        });
+        tipSpring.set(tipLeft);
+      },
+      hide(tip) {
+        showing = false;
+        node.classList.remove("ak-chart__svg--reading");
+        tip.classList.remove("ak-chart__tip--on");
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/chart.js
   var W = 560;
   var H = 300;
@@ -6881,26 +8001,23 @@
         const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
         const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
         const line = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
-        if (!still2) line.classList.add("ak-chart__line--enter");
         node.appendChild(line);
         const last = pts[pts.length - 1];
         node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
       }
       root.appendChild(node);
       legendFor(series);
-      if (!horizontal) wireTooltip(node, labels, series, along, slot);
-      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot);
-      if (!still2) {
-        for (const line of node.querySelectorAll(".ak-chart__line--enter")) {
-          const len = (
-            /** @type {SVGPathElement} */
-            line.getTotalLength()
-          );
-          line.setAttribute("stroke-dasharray", String(len));
-          line.setAttribute("stroke-dashoffset", String(len));
-          requestAnimationFrame(() => line.classList.add("ak-chart__line--drawn"));
-        }
+      if (!horizontal) {
+        const rig = hoverRig(root, node, {
+          top: pad.top,
+          bottom: H - pad.bottom,
+          x: (i) => along(i) + slot / 2,
+          points: lines.map((s) => ({ colour: SERIES_VARS[series.indexOf(s) % SERIES_VARS.length], y: (i) => cross(s.values[i] ?? 0) }))
+        });
+        wireTooltip(node, labels, series, along, slot, rig);
       }
+      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot);
+      if (!still2) drawWhenSeen(root, node);
     }
     function legendFor(series) {
       const legend = el(
@@ -6917,32 +8034,36 @@
       });
       root.appendChild(legend);
     }
-    function wireTooltip(node, labels, series, along, slot) {
-      const tip = el("div", { class: "ak-chart__tip", hidden: true });
+    function wireTooltip(node, labels, series, along, slot, rig) {
+      const tip = el("div", { class: "ak-chart__tip" });
       root.appendChild(tip);
+      let shownAt = -1;
       node.addEventListener("pointermove", (ev) => {
         const box = node.getBoundingClientRect();
         const sx = (ev.clientX - box.left) * (W / box.width);
         const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot)));
-        clear(tip);
-        tip.appendChild(el("div", { class: "ak-chart__tip-label", text: String(labels[i]) }));
-        series.forEach((s, si) => {
-          const row = el("div", { class: "ak-chart__tip-row" }, [
-            el("span", { class: "ak-chart__tip-swatch" }),
-            el("span", { text: s.label }),
-            el("b", { text: fmtTick(s.values[i] ?? 0) })
-          ]);
-          row.firstChild.style.background = SERIES_VARS[si % SERIES_VARS.length];
-          tip.appendChild(row);
-        });
-        tip.hidden = false;
+        if (i !== shownAt) {
+          shownAt = i;
+          clear(tip);
+          tip.appendChild(el("div", { class: "ak-chart__tip-label", text: String(labels[i]) }));
+          series.forEach((s, si) => {
+            const row = el("div", { class: "ak-chart__tip-row" }, [
+              el("span", { class: "ak-chart__tip-swatch" }),
+              el("span", { text: s.label }),
+              el("b", { text: fmtTick(s.values[i] ?? 0) })
+            ]);
+            row.firstChild.style.background = SERIES_VARS[si % SERIES_VARS.length];
+            tip.appendChild(row);
+          });
+        }
         const rootBox = root.getBoundingClientRect();
         const px = (along(i) + slot / 2) / W * box.width + (box.left - rootBox.left);
-        tip.style.left = `${Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2))}px`;
         tip.style.top = `${box.top - rootBox.top + 6}px`;
+        rig.at(i, tip, Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2)));
       });
       node.addEventListener("pointerleave", () => {
-        tip.hidden = true;
+        shownAt = -1;
+        rig.hide(tip);
       });
     }
     function noteBubble(node, note, labels, along, slot) {
@@ -7446,7 +8567,7 @@
     function rebuild(data) {
       disposeGroup();
       const accent = tokenColor(root, "--ak-accent");
-      const ink2 = tokenColor(root, "--ak-ink");
+      const ink3 = tokenColor(root, "--ak-ink");
       const surface = tokenColor(root, "--ak-surface-2", "--ak-surface");
       scene.fog = null;
       let barCols = 3;
@@ -7476,7 +8597,7 @@
           const channels = function(s) {
             return (s.match(/\d+/g) || ["0", "0", "0"]).map(Number);
           };
-          const inkCh = channels(ink2);
+          const inkCh = channels(ink3);
           const surfCh = channels(surface);
           const shadow = (inkCh[0] + inkCh[1] + inkCh[2] <= surfCh[0] + surfCh[1] + surfCh[2] ? inkCh : surfCh).map(function(v) {
             return Math.round(v * 0.3);
@@ -7515,7 +8636,7 @@
       if (kind === "globe") {
         const R = 3;
         const accentC = new THREE.Color(accent);
-        const inkC = new THREE.Color(ink2);
+        const inkC = new THREE.Color(ink3);
         const surfaceC = new THREE.Color(surface);
         const ball = new THREE.Group();
         group.add(ball);
@@ -7653,7 +8774,7 @@
         }));
         const frame3 = new THREE.LineSegments(
           new THREE.EdgesGeometry(geo),
-          new THREE.LineBasicMaterial({ color: new THREE.Color(ink2), transparent: true, opacity: 0.35 })
+          new THREE.LineBasicMaterial({ color: new THREE.Color(ink3), transparent: true, opacity: 0.35 })
         );
         group.add(body, frame3);
         applyEntrance = function(p) {
@@ -7666,7 +8787,7 @@
         const sun = new THREE.DirectionalLight();
         sun.intensity = 2.2;
         sun.position.set(4, 8, 6);
-        const fill = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink2), 0.7);
+        const fill = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink3), 0.7);
         group.add(sun, fill);
       }
       frameCamera(barCols);
@@ -8710,353 +9831,6 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/motion.js
-  var STATE = /* @__PURE__ */ new WeakMap();
-  var REST = { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
-  function stateOf(node) {
-    let s = STATE.get(node);
-    if (!s) {
-      s = Object.assign({}, REST);
-      STATE.set(node, s);
-    }
-    return s;
-  }
-  function transformOf(s) {
-    return "translate(" + s.x + "px, " + s.y + "px) scale(" + s.scale + ") rotate(" + s.rotate + "deg)";
-  }
-  function springTokens(el2) {
-    if (!el2 || typeof getComputedStyle !== "function") return {};
-    let cs;
-    try {
-      cs = getComputedStyle(
-        /** @type {Element} */
-        el2
-      );
-    } catch {
-      return {};
-    }
-    if (!cs) return {};
-    const num2 = function(name) {
-      const v = parseFloat(cs.getPropertyValue(name));
-      return isFinite(v) && v > 0 ? v : void 0;
-    };
-    return { stiffness: num2("--ak-spring-stiffness"), damping: num2("--ak-spring-damping"), mass: num2("--ak-spring-mass") };
-  }
-  function springFrames(opts) {
-    const o = opts || {};
-    const look = o.stiffness && o.damping && o.mass ? {} : springTokens(o.el);
-    const k = o.stiffness || look.stiffness || 170;
-    const c = o.damping || look.damping || 20;
-    const m = o.mass || look.mass || 1;
-    const v0 = o.velocity || 0;
-    const w0 = Math.sqrt(k / m);
-    const zeta = c / (2 * Math.sqrt(k * m));
-    const step = 1 / 60;
-    const samples = [];
-    let t2 = 0;
-    let x;
-    let settled = 0;
-    while (t2 < 4) {
-      if (zeta < 1) {
-        const wd = w0 * Math.sqrt(1 - zeta * zeta);
-        const decay = Math.exp(-zeta * w0 * t2);
-        x = 1 - decay * (Math.cos(wd * t2) + (zeta * w0 - v0) / wd * Math.sin(wd * t2));
-      } else {
-        const decay = Math.exp(-w0 * t2);
-        x = 1 - decay * (1 + (w0 - v0) * t2);
-      }
-      samples.push(x);
-      settled = Math.abs(1 - x) < 1e-3 ? settled + 1 : 0;
-      if (settled > 6) break;
-      t2 += step;
-    }
-    samples.push(1);
-    return { samples, duration: Math.round(samples.length * step * 1e3) };
-  }
-  function spring(target, to, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const from = Object.assign({}, stateOf(node));
-    const dest = Object.assign({}, from, to || {});
-    const prior = (
-      /** @type {any} */
-      node.__akSpring
-    );
-    if (prior) {
-      const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
-      if (typeof p === "number") {
-        const at = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
-        Object.keys(from).forEach(function(key) {
-          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at;
-        });
-      }
-      prior.cancel();
-    }
-    STATE.set(node, dest);
-    if (reducedMotion() || typeof node.animate !== "function") {
-      node.style.transform = transformOf(dest);
-      node.style.opacity = String(dest.opacity);
-      return { el: node, finished: Promise.resolve(), cancel() {
-      } };
-    }
-    const sf = springFrames(Object.assign({}, opts, { el: node }));
-    const frames = sf.samples.map(function(at, i) {
-      const s = {};
-      Object.keys(from).forEach(function(key) {
-        s[key] = from[key] + (dest[key] - from[key]) * at;
-      });
-      return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
-    });
-    const anim = (
-      /** @type {any} */
-      node.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" })
-    );
-    anim.__frames = sf.samples;
-    anim.__from = from;
-    anim.__to = dest;
-    node.__akSpring = anim;
-    const finished = anim.finished.then(function() {
-      node.style.transform = transformOf(dest);
-      node.style.opacity = String(dest.opacity);
-      anim.cancel();
-      if (
-        /** @type {any} */
-        node.__akSpring === anim
-      ) node.__akSpring = null;
-    }, function() {
-    });
-    return { el: node, finished, cancel() {
-      anim.cancel();
-    } };
-  }
-  function stagger(targets, opts) {
-    const o = opts || {};
-    const list2 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
-      /** @type {any} */
-      targets.length !== void 0 ? Array.prototype.slice.call(
-        /** @type {any} */
-        targets
-      ) : [targets]
-    );
-    const kids = list2.slice(0, o.max || 40);
-    if (!kids.length || reducedMotion() || typeof kids[0].animate !== "function") return { finished: Promise.resolve() };
-    const cs = getComputedStyle(kids[0]);
-    const dist = o.distance !== void 0 ? o.distance : parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 12;
-    const each = o.each !== void 0 ? o.each : parseFloat(cs.getPropertyValue("--ak-enter-stagger")) || 40;
-    const span = o.duration || (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.5;
-    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
-    const start = o.from === "down" ? "translateY(-" + dist + "px)" : o.from === "left" ? "translateX(-" + dist + "px)" : o.from === "right" ? "translateX(" + dist + "px)" : o.from === "scale" ? "scale(0.92)" : "translateY(" + dist + "px)";
-    const end = o.from === "scale" ? "scale(1)" : "translate(0, 0)";
-    let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
-    let timing = { duration: span, easing: ease, fill: "backwards" };
-    if (o.spring) {
-      const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-      frames = sf.samples.map(function(at, i) {
-        return {
-          offset: i / (sf.samples.length - 1),
-          opacity: Math.min(1, at * 1.4),
-          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at) + ")" : start.replace(/[-\d.]+px/, function(px) {
-            return (parseFloat(px) * (1 - at)).toFixed(2) + "px";
-          })
-        };
-      });
-      timing = { duration: sf.duration, easing: "linear", fill: "backwards" };
-    }
-    const runs = kids.map(function(kid, i) {
-      return kid.animate(frames, Object.assign({}, timing, { delay: i * each })).finished;
-    });
-    return { finished: Promise.all(runs).then(function() {
-    }, function() {
-    }) };
-  }
-  function inView(target, fn, opts) {
-    const node = resolve(target);
-    const o = opts || {};
-    if (typeof IntersectionObserver !== "function") {
-      fn(
-        node,
-        /** @type {any} */
-        { isIntersecting: true, target: node }
-      );
-      return { el: node, destroy() {
-      } };
-    }
-    const io = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting) {
-          fn(node, entry);
-          if (o.once !== false) io.disconnect();
-        } else if (o.onLeave) {
-          o.onLeave(node);
-        }
-      });
-    }, { rootMargin: o.margin || "0px 0px -10% 0px", threshold: o.threshold || 0.15 });
-    io.observe(node);
-    return { el: node, destroy() {
-      io.disconnect();
-    } };
-  }
-  function nearestScroller(node) {
-    let p = node.parentElement;
-    while (p && p !== document.body) {
-      const oy = getComputedStyle(p).overflowY;
-      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
-      p = p.parentElement;
-    }
-    return window;
-  }
-  function scrollLink(target, frames, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const o = opts || {};
-    const subject = o.subject || node;
-    const scroller = o.scroller || nearestScroller(subject);
-    const lo = o.range ? o.range[0] : 0;
-    const hi = o.range ? o.range[1] : 1;
-    let last = 0;
-    if (reducedMotion() || typeof node.animate !== "function") {
-      return { el: node, progress() {
-        return 0;
-      }, destroy() {
-      } };
-    }
-    const anim = node.animate(frames, { duration: 1e3, easing: "linear", fill: "both" });
-    anim.pause();
-    const viewportH = function() {
-      return scroller === window ? window.innerHeight : (
-        /** @type {Element} */
-        scroller.clientHeight
-      );
-    };
-    const viewportTop = function() {
-      return scroller === window ? 0 : (
-        /** @type {Element} */
-        scroller.getBoundingClientRect().top
-      );
-    };
-    const tick = function() {
-      const r = subject.getBoundingClientRect();
-      const h = viewportH();
-      const raw = (viewportTop() + h - r.top) / Math.max(h + r.height, 1);
-      let p = (raw - lo) / Math.max(hi - lo, 1e-4);
-      p = Math.max(0, Math.min(1, p));
-      if (p !== last) {
-        last = p;
-        anim.currentTime = p * 1e3;
-      }
-    };
-    let rafId = 0;
-    const onScroll = function() {
-      if (!rafId) rafId = requestAnimationFrame(function() {
-        rafId = 0;
-        tick();
-      });
-    };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    tick();
-    return {
-      el: node,
-      progress() {
-        return last;
-      },
-      destroy() {
-        scroller.removeEventListener("scroll", onScroll);
-        window.removeEventListener("resize", onScroll);
-        if (rafId) cancelAnimationFrame(rafId);
-        anim.cancel();
-      }
-    };
-  }
-  function drag(target, handlers, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const h = handlers || {};
-    const o = opts || {};
-    const axis = o.axis || "both";
-    const threshold = o.threshold !== void 0 ? o.threshold : 4;
-    node.classList.add("ak-drag");
-    let active = null;
-    const clamp3 = function(v, range) {
-      return range ? Math.max(range[0], Math.min(range[1], v)) : v;
-    };
-    const down = function(e) {
-      if (e.button !== void 0 && e.button !== 0) return;
-      const s = stateOf(node);
-      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
-      if (
-        /** @type {any} */
-        node.__akSpring
-      ) node.__akSpring.cancel();
-      try {
-        node.setPointerCapture(e.pointerId);
-      } catch {
-      }
-    };
-    const move = function(e) {
-      if (!active || e.pointerId !== active.id) return;
-      let dx = e.clientX - active.x0;
-      let dy = e.clientY - active.y0;
-      if (!active.moved) {
-        if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
-        active.moved = true;
-        node.classList.add("ak-dragging");
-        if (h.onStart) h.onStart(node);
-      }
-      if (axis === "x") dy = 0;
-      if (axis === "y") dx = 0;
-      const now2 = performance.now();
-      const dt = Math.max(now2 - active.t, 1);
-      active.vx = (e.clientX - active.lx) / dt * 1e3;
-      active.vy = (e.clientY - active.ly) / dt * 1e3;
-      active.t = now2;
-      active.lx = e.clientX;
-      active.ly = e.clientY;
-      const s = stateOf(node);
-      s.x = clamp3(active.bx + dx, o.bounds && o.bounds.x);
-      s.y = clamp3(active.by + dy, o.bounds && o.bounds.y);
-      node.style.transform = transformOf(s);
-      if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
-      e.preventDefault();
-    };
-    const up = function(e) {
-      if (!active || e.pointerId !== active.id) return;
-      const was = active;
-      active = null;
-      node.classList.remove("ak-dragging");
-      try {
-        node.releasePointerCapture(e.pointerId);
-      } catch {
-      }
-      if (!was.moved) return;
-      const s = stateOf(node);
-      const dx = s.x - was.bx;
-      const dy = s.y - was.by;
-      if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
-      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-    };
-    node.addEventListener("pointerdown", down);
-    node.addEventListener("pointermove", move);
-    node.addEventListener("pointerup", up);
-    node.addEventListener("pointercancel", up);
-    return {
-      el: node,
-      destroy() {
-        node.removeEventListener("pointerdown", down);
-        node.removeEventListener("pointermove", move);
-        node.removeEventListener("pointerup", up);
-        node.removeEventListener("pointercancel", up);
-        node.classList.remove("ak-drag", "ak-dragging");
-      }
-    };
-  }
-
   // src/static/sdk-libs/atelier/materials.js
   function handle(node, off) {
     return { el: node, destroy() {
@@ -9861,7 +10635,7 @@
         summary.appendChild(clearAll);
       }
     }
-    function toggle(rec) {
+    function toggle2(rec) {
       const facet = rec.facet;
       const list2 = picked[facet.id] ? picked[facet.id].slice() : [];
       const at = list2.indexOf(rec.option.id);
@@ -9902,7 +10676,7 @@
         "aria-pressed": "false",
         "data-ak-noguard": true,
         on: { click: function() {
-          toggle(rec);
+          toggle2(rec);
         } }
       }, [rec.label, rec.count]);
       return rec;
@@ -12028,12 +12802,12 @@
     }
     function pips(events) {
       if (!events.length) return null;
-      const wrap = el("span", { class: "ak-calendar__pips", "aria-hidden": "true" });
+      const wrap2 = el("span", { class: "ak-calendar__pips", "aria-hidden": "true" });
       events.slice(0, 3).forEach(function(e) {
-        wrap.appendChild(el("span", { class: "ak-calendar__pip ak-calendar__pip--" + toneOf4(e.tone) }));
+        wrap2.appendChild(el("span", { class: "ak-calendar__pip ak-calendar__pip--" + toneOf4(e.tone) }));
       });
-      if (events.length > 3) wrap.appendChild(el("span", { class: "ak-calendar__more" }, "+" + (events.length - 3)));
-      return wrap;
+      if (events.length > 3) wrap2.appendChild(el("span", { class: "ak-calendar__more" }, "+" + (events.length - 3)));
+      return wrap2;
     }
     function travel3(cells) {
       if (!cells.length) return;
@@ -12067,13 +12841,13 @@
         for (let i = 0; i < 7; i++) {
           const day2 = isoDay(cursor);
           const events = byDay[day2] || [];
-          const outside = cursor.getMonth() !== mon;
+          const outside2 = cursor.getMonth() !== mon;
           const hover = events.map(function(e) {
             return String(e.title || "");
           }).filter(Boolean).join(" · ");
           const button = el("button", {
             type: "button",
-            class: "ak-calendar__day" + (outside ? " ak-calendar__day--out" : "") + (day2 === today ? " ak-calendar__day--today" : ""),
+            class: "ak-calendar__day" + (outside2 ? " ak-calendar__day--out" : "") + (day2 === today ? " ak-calendar__day--today" : ""),
             "aria-label": day2 + (events.length ? " · " + events.length : ""),
             "aria-current": day2 === today ? "date" : null,
             title: hover || null,
@@ -13942,6 +14716,408 @@
     return dialog({ ...spec, from: "bottom" });
   }
 
+  // src/static/sdk-libs/atelier/menu.js
+  var GAP = 6;
+  var EDGE = 8;
+  function placeAt(box, at, o) {
+    const opts = o || {};
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let top = opts.placement === "above" ? at.top - GAP - h : at.bottom + GAP;
+    if (top + h > vh - EDGE && at.top - GAP - h >= EDGE) top = at.top - GAP - h;
+    if (top < EDGE && at.bottom + GAP + h <= vh - EDGE) top = at.bottom + GAP;
+    let left = opts.align === "end" ? at.right - w : opts.align === "center" ? (at.left + at.right) / 2 - w / 2 : at.left;
+    left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
+    top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
+    box.style.left = Math.round(left) + "px";
+    box.style.top = Math.round(top) + "px";
+    const ox = Math.max(0, Math.min(w, (at.left + at.right) / 2 - left));
+    const oy = top >= at.bottom ? 0 : top + h <= at.top ? h : h / 2;
+    return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
+  }
+  function openMotion(box, origin) {
+    box.style.transformOrigin = origin;
+    if (motionOff(box) || typeof box.animate !== "function") return;
+    const sf = springFrames({ el: box });
+    const frames = sf.samples.map(function(at, i) {
+      const s = 0.9 + 0.1 * at;
+      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at * 1.6) };
+    });
+    box.animate(frames, { duration: sf.duration, easing: "linear" });
+  }
+  function closeMotion(box, done) {
+    if (motionOff(box) || typeof box.animate !== "function") {
+      done();
+      return;
+    }
+    const pace2 = paceOf(box);
+    const anim = box.animate(
+      [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.95)" }],
+      { duration: Math.max(90, pace2.span * 0.6), easing: "ease-in", fill: "forwards" }
+    );
+    anim.onfinish = done;
+    anim.oncancel = done;
+  }
+  function outside(nodes, close) {
+    const hit = function(e) {
+      for (const n of nodes) if (n && n.contains(
+        /** @type {Node} */
+        e.target
+      )) return;
+      close();
+    };
+    document.addEventListener("pointerdown", hit, true);
+    return function() {
+      document.removeEventListener("pointerdown", hit, true);
+    };
+  }
+  function menu(spec) {
+    const s = spec || { items: [] };
+    const anchor = s.anchor ? (
+      /** @type {HTMLElement} */
+      resolve(s.anchor)
+    ) : null;
+    let items = s.items || [];
+    let box = null;
+    let mark = null;
+    let unhook = null;
+    let cursor = -1;
+    let picking = false;
+    if (anchor) {
+      anchor.setAttribute("aria-haspopup", "menu");
+      anchor.setAttribute("aria-expanded", "false");
+    }
+    function rows() {
+      return box ? (
+        /** @type {HTMLElement[]} */
+        Array.prototype.slice.call(box.querySelectorAll('.ak-menu__item:not([aria-disabled="true"])'))
+      ) : [];
+    }
+    function focusRow(i) {
+      const list2 = rows();
+      if (!list2.length) return;
+      cursor = (i + list2.length) % list2.length;
+      list2.forEach(function(r, j) {
+        r.classList.toggle("ak-menu__item--on", j === cursor);
+      });
+      list2[cursor].focus({ preventScroll: true });
+      if (mark) mark.sync();
+    }
+    function choose(item) {
+      if (picking || !item || item.disabled) return;
+      picking = true;
+      const finish = function() {
+        picking = false;
+        close(true);
+        if (item.run) item.run();
+        if (s.onPick) s.onPick(item.id, item);
+      };
+      if (!box || motionOff(box) || !mark || typeof mark.el.animate !== "function") {
+        finish();
+        return;
+      }
+      const blink = mark.el.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 1 }], { duration: 150, easing: "linear" });
+      blink.onfinish = finish;
+      blink.oncancel = finish;
+    }
+    function onKey(e) {
+      const list2 = rows();
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusRow(cursor + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusRow(cursor < 0 ? list2.length - 1 : cursor - 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        focusRow(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        focusRow(list2.length - 1);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === "Tab") {
+        close(false);
+      } else if (e.key.length === 1 && /\S/.test(e.key)) {
+        const ch = e.key.toLowerCase();
+        for (let k = 1; k <= list2.length; k++) {
+          const j = (cursor + k) % list2.length;
+          if ((list2[j].textContent || "").trim().toLowerCase().indexOf(ch) === 0) {
+            focusRow(j);
+            break;
+          }
+        }
+      }
+    }
+    function build() {
+      const root = el("div", { class: "ak-root ak-menu", role: "menu", "data-ak-part": "root", "aria-label": s.label || null, tabindex: "-1", on: { keydown: onKey } });
+      items.forEach(function(it) {
+        if (it === "-") {
+          root.appendChild(el("div", { class: "ak-menu__sep", role: "separator", "data-ak-part": "separator" }));
+          return;
+        }
+        root.appendChild(el("button", {
+          type: "button",
+          role: "menuitem",
+          class: "ak-menu__item" + (it.danger ? " ak-menu__item--danger" : ""),
+          "data-ak-part": "item",
+          "data-ak-id": it.id,
+          tabindex: "-1",
+          "data-ak-noguard": true,
+          "aria-disabled": it.disabled ? "true" : null,
+          on: {
+            click: function() {
+              choose(it);
+            },
+            pointermove: function(e) {
+              if (it.disabled) return;
+              const i = rows().indexOf(
+                /** @type {HTMLElement} */
+                e.currentTarget
+              );
+              if (i >= 0 && i !== cursor) focusRow(i);
+            }
+          }
+        }, [
+          el("span", { class: "ak-menu__label", "data-ak-part": "label", text: it.label }),
+          it.hint ? el("span", { class: "ak-menu__hint", "data-ak-part": "hint", text: it.hint }) : null
+        ]));
+      });
+      return root;
+    }
+    function open(at, fromKeys) {
+      if (box) return;
+      box = build();
+      document.body.appendChild(box);
+      const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
+      const origin = placeAt(box, r, { align: s.align });
+      mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
+      openMotion(box, origin);
+      if (!motionOff(box)) {
+        const pace2 = paceOf(box);
+        rows().forEach(function(row, i) {
+          if (typeof row.animate === "function") {
+            row.animate(
+              [{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }],
+              { duration: pace2.span, delay: 20 + i * 18, easing: pace2.ease, fill: "backwards" }
+            );
+          }
+        });
+      }
+      if (anchor) anchor.setAttribute("aria-expanded", "true");
+      unhook = outside([box, anchor], function() {
+        close(false);
+      });
+      cursor = -1;
+      box.focus({ preventScroll: true });
+      if (fromKeys) focusRow(0);
+    }
+    function close(focusBack) {
+      if (!box) return;
+      const gone = box;
+      box = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      if (unhook) {
+        unhook();
+        unhook = null;
+      }
+      if (anchor) anchor.setAttribute("aria-expanded", "false");
+      closeMotion(gone, function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+      });
+      if (focusBack && anchor) anchor.focus({ preventScroll: true });
+    }
+    const onAnchor = function(e) {
+      if (box) close(true);
+      else open(void 0, !!e && e.detail === 0);
+    };
+    const onAnchorKey = function(e) {
+      if (e.key === "ArrowDown" && !box) {
+        e.preventDefault();
+        open(void 0, true);
+      }
+    };
+    if (anchor) {
+      anchor.addEventListener("click", onAnchor);
+      anchor.addEventListener("keydown", onAnchorKey);
+    }
+    return {
+      open,
+      close,
+      isOpen() {
+        return !!box;
+      },
+      set(patch) {
+        if (patch && patch.items) {
+          items = patch.items;
+          if (box) {
+            close(false);
+            open();
+          }
+        }
+      },
+      destroy() {
+        close(false);
+        if (anchor) {
+          anchor.removeEventListener("click", onAnchor);
+          anchor.removeEventListener("keydown", onAnchorKey);
+        }
+      }
+    };
+  }
+  function contextMenu(target, spec) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label });
+    const onCtx = function(e) {
+      e.preventDefault();
+      m.close(false);
+      m.open({ x: e.clientX, y: e.clientY });
+    };
+    const onKey = function(e) {
+      if (e.key === "F10" && e.shiftKey) {
+        e.preventDefault();
+        const r = node.getBoundingClientRect();
+        m.close(false);
+        m.open({ x: r.left + 12, y: r.top + 12 }, true);
+      }
+    };
+    node.addEventListener("contextmenu", onCtx);
+    node.addEventListener("keydown", onKey);
+    return {
+      close() {
+        m.close(false);
+      },
+      destroy() {
+        m.destroy();
+        node.removeEventListener("contextmenu", onCtx);
+        node.removeEventListener("keydown", onKey);
+      }
+    };
+  }
+  function popover(spec) {
+    const anchor = (
+      /** @type {HTMLElement} */
+      resolve(spec.anchor)
+    );
+    let box = null;
+    let unhook = null;
+    anchor.setAttribute("aria-expanded", "false");
+    function open() {
+      if (box) return;
+      const body = typeof spec.content === "function" ? spec.content() : spec.content;
+      box = el(
+        "div",
+        {
+          class: "ak-root ak-popover",
+          role: "dialog",
+          "aria-label": spec.label || null,
+          "data-ak-part": "root",
+          tabindex: "-1",
+          on: { keydown: function(e) {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              close();
+              anchor.focus();
+            }
+          } }
+        },
+        [el("div", { class: "ak-popover__body", "data-ak-part": "body" }, body)]
+      );
+      document.body.appendChild(box);
+      openMotion(box, placeAt(box, anchor.getBoundingClientRect(), { align: spec.align || "center" }));
+      anchor.setAttribute("aria-expanded", "true");
+      unhook = outside([box, anchor], close);
+      box.focus({ preventScroll: true });
+      if (spec.onOpen) spec.onOpen();
+    }
+    function close() {
+      if (!box) return;
+      const gone = box;
+      box = null;
+      if (unhook) {
+        unhook();
+        unhook = null;
+      }
+      anchor.setAttribute("aria-expanded", "false");
+      closeMotion(gone, function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+      });
+      if (spec.onClose) spec.onClose();
+    }
+    const onClick = function() {
+      if (box) close();
+      else open();
+    };
+    anchor.addEventListener("click", onClick);
+    return { open, close, isOpen() {
+      return !!box;
+    }, destroy() {
+      close();
+      anchor.removeEventListener("click", onClick);
+    } };
+  }
+  function tooltip(target, text, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const tip = el("div", { class: "ak-root ak-tooltip", role: "tooltip", "data-ak-part": "root", id: "ak-tip-" + Math.random().toString(36).slice(2, 8), text });
+    let timer = null;
+    let shown = false;
+    node.setAttribute("aria-describedby", tip.id);
+    function show() {
+      clearTimeout(timer);
+      if (shown) return;
+      shown = true;
+      document.body.appendChild(tip);
+      openMotion(tip, placeAt(tip, node.getBoundingClientRect(), { align: "center", placement: o.placement || "above" }));
+    }
+    function hide() {
+      clearTimeout(timer);
+      if (!shown) return;
+      shown = false;
+      closeMotion(tip, function() {
+        if (!shown && tip.parentNode) tip.parentNode.removeChild(tip);
+      });
+    }
+    const enter2 = function() {
+      clearTimeout(timer);
+      timer = setTimeout(show, o.delay != null ? o.delay : 450);
+    };
+    const key = function(e) {
+      if (e.key === "Escape") hide();
+    };
+    node.addEventListener("pointerenter", enter2);
+    node.addEventListener("pointerleave", hide);
+    node.addEventListener("focus", show);
+    node.addEventListener("blur", hide);
+    node.addEventListener("keydown", key);
+    return {
+      set(next) {
+        tip.textContent = next;
+      },
+      destroy() {
+        hide();
+        node.removeEventListener("pointerenter", enter2);
+        node.removeEventListener("pointerleave", hide);
+        node.removeEventListener("focus", show);
+        node.removeEventListener("blur", hide);
+        node.removeEventListener("keydown", key);
+        node.removeAttribute("aria-describedby");
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/parts-ui.js
   var toastHost = null;
   function toast(spec) {
@@ -13989,38 +15165,124 @@
   function palette(spec) {
     const s = spec || { items: [] };
     let root = null;
+    let box = null;
+    let list2 = null;
+    let mark = null;
     let cursor = 0;
     let shown = [];
-    function close() {
-      if (root && root.parentNode) root.parentNode.removeChild(root);
-      root = null;
+    let opener = null;
+    function keyOf2(it, i) {
+      return it.id || it.label || String(i);
     }
-    function paintList(list2) {
-      clear(list2);
-      if (!shown.length) {
-        list2.appendChild(el("li", { class: "ak-palette__empty" }, s.empty || "Nothing matches."));
+    function close(after) {
+      if (!root) return;
+      const gone = root;
+      const goneBox = box;
+      root = null;
+      box = null;
+      list2 = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      const drop = function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+        if (after) after();
+      };
+      if (motionOff(gone) || typeof gone.animate !== "function") {
+        drop();
         return;
       }
-      shown.forEach(function(it, i) {
-        list2.appendChild(el("li", { class: "ak-palette__item", role: "option", "aria-selected": i === cursor ? "true" : "false", on: {
-          click: function() {
-            close();
-            it.run();
-          },
-          mousemove: function() {
-            if (cursor !== i) {
-              cursor = i;
-              paintList(list2);
-            }
-          }
-        } }, [el("span", {}, it.label), it.hint ? el("span", { class: "ak-palette__hint" }, it.hint) : null].filter(Boolean)));
-      });
+      gone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: "ease-in", fill: "forwards" });
+      closeMotion(goneBox, drop);
     }
-    function open() {
+    function runItem(it) {
+      if (!it.done || !box || motionOff(box) || typeof box.animate !== "function") {
+        close();
+        it.run();
+        if (it.done) toast({ title: it.done, tone: "ok", ttl: 3200 });
+        return;
+      }
+      const from = box.getBoundingClientRect();
+      const tw = Math.min(360, window.innerWidth - 32);
+      const to = { left: window.innerWidth - tw - 16, top: window.innerHeight - 72, width: tw, height: 56 };
+      const dx = to.left - from.left;
+      const dy = to.top - from.top;
+      const sx = to.width / Math.max(from.width, 1);
+      const sy = to.height / Math.max(from.height, 1);
+      const sf = springFrames({ el: box });
+      const frames = sf.samples.map(function(at, i) {
+        return {
+          offset: i / (sf.samples.length - 1),
+          transform: "translate(" + (dx * at).toFixed(1) + "px, " + (dy * at).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at).toFixed(4) + ", " + (1 + (sy - 1) * at).toFixed(4) + ")",
+          opacity: at > 0.85 ? 1 - (at - 0.85) / 0.15 : 1
+        };
+      });
+      box.style.transformOrigin = "0 0";
+      if (list2) list2.style.opacity = "0";
+      const gone = root;
+      root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(sf.duration, 260), easing: "ease-out", fill: "forwards" });
+      const anim = box.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" });
+      root = null;
+      box = null;
+      list2 = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      let handed = false;
+      const hand = function() {
+        if (handed) return;
+        handed = true;
+        if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
+        toast({ title: it.done, tone: "ok", ttl: 3200 });
+      };
+      it.run();
+      setTimeout(hand, Math.min(sf.duration, 420));
+      anim.onfinish = hand;
+    }
+    function highlight() {
+      if (!list2) return;
+      const rows = Array.prototype.slice.call(list2.querySelectorAll(".ak-palette__item:not(.ak-layout__ghost)"));
+      rows.forEach(function(row, i) {
+        row.setAttribute("aria-selected", i === cursor ? "true" : "false");
+      });
+      if (rows[cursor] && typeof rows[cursor].scrollIntoView === "function") rows[cursor].scrollIntoView({ block: "nearest" });
+      if (mark) mark.sync();
+    }
+    function paintList() {
+      if (!list2) return;
+      const host = list2;
+      settle(host, function() {
+        Array.prototype.slice.call(host.querySelectorAll(".ak-palette__item, .ak-palette__empty")).forEach(function(n) {
+          host.removeChild(n);
+        });
+        if (!shown.length) {
+          host.appendChild(el("li", { class: "ak-palette__empty", "data-ak-id": "__empty" }, s.empty || "Nothing matches."));
+          return;
+        }
+        shown.forEach(function(it, i) {
+          host.appendChild(el("li", { class: "ak-palette__item", role: "option", "data-ak-id": keyOf2(it, i), "aria-selected": "false", on: {
+            click: function() {
+              runItem(it);
+            },
+            pointermove: function() {
+              if (cursor !== i) {
+                cursor = i;
+                highlight();
+              }
+            }
+          } }, [el("span", {}, it.label), it.hint ? el("span", { class: "ak-palette__hint" }, it.hint) : null].filter(Boolean)));
+        });
+      }, { rows: ".ak-palette__item, .ak-palette__empty" });
+      highlight();
+    }
+    function open(from) {
       if (root) return;
+      opener = from || null;
       cursor = 0;
       shown = s.items.slice();
-      const list2 = el("ul", { class: "ak-palette__list", role: "listbox" });
+      list2 = el("ul", { class: "ak-palette__list", role: "listbox" });
       const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || "go to, run, adopt…", autocomplete: "off", on: {
         input: function() {
           const q = (
@@ -14031,37 +15293,39 @@
             return !q || (it.label + " " + (it.hint || "")).toLowerCase().indexOf(q) >= 0;
           });
           cursor = 0;
-          paintList(list2);
+          paintList();
         },
         keydown: function(e) {
           if (e.key === "ArrowDown") {
             e.preventDefault();
             cursor = Math.min(cursor + 1, shown.length - 1);
-            paintList(list2);
+            highlight();
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             cursor = Math.max(cursor - 1, 0);
-            paintList(list2);
+            highlight();
           } else if (e.key === "Enter") {
             e.preventDefault();
             const it = shown[cursor];
-            if (it) {
-              close();
-              it.run();
-            }
+            if (it) runItem(it);
           } else if (e.key === "Escape") {
             e.preventDefault();
-            close();
+            close(function() {
+              if (opener && opener.isConnected) opener.focus();
+            });
           }
         }
       } });
+      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || "Commands" }, [input, list2]);
       root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
         if (e.target === root) close();
-      } } }, [
-        el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || "Commands" }, [input, list2])
-      ]);
-      paintList(list2);
+      } } }, [box]);
       document.body.appendChild(root);
+      mark = ink2(list2, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
+      paintList();
+      mark.jump();
+      growFrom(box, opener);
+      if (!motionOff(root) && typeof root.animate === "function") root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
       input.focus();
     }
     const key = s.hotkey === void 0 ? "k" : s.hotkey;
@@ -14074,10 +15338,48 @@
       }
     };
     window.addEventListener("keydown", onKey);
-    return { open, close, destroy() {
-      close();
-      window.removeEventListener("keydown", onKey);
-    } };
+    const anchor = s.anchor ? (
+      /** @type {HTMLElement} */
+      resolve(s.anchor)
+    ) : null;
+    const onAnchor = function() {
+      if (root) close();
+      else open(anchor);
+    };
+    if (anchor) anchor.addEventListener("click", onAnchor);
+    return {
+      open,
+      close() {
+        close();
+      },
+      destroy() {
+        close();
+        window.removeEventListener("keydown", onKey);
+        if (anchor) anchor.removeEventListener("click", onAnchor);
+      }
+    };
+  }
+  function growFrom(box, from) {
+    if (!from || !from.isConnected || motionOff(box) || typeof box.animate !== "function") {
+      openMotion(box, "50% 0");
+      return;
+    }
+    const a = from.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const sx = a.width / Math.max(b.width, 1);
+    const sy = a.height / Math.max(b.height, 1);
+    const dx = a.left - b.left;
+    const dy = a.top - b.top;
+    const sf = springFrames({ el: box });
+    box.style.transformOrigin = "0 0";
+    box.animate(sf.samples.map(function(at, i) {
+      const k = 1 - at;
+      return {
+        offset: i / (sf.samples.length - 1),
+        transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
+        opacity: Math.min(1, 0.4 + at)
+      };
+    }), { duration: sf.duration, easing: "linear" });
   }
   function compare(spec) {
     const s = spec || { before: {}, after: {} };
@@ -14204,6 +15506,241 @@
       show(0);
     }
     return { start, end };
+  }
+
+  // src/static/sdk-libs/atelier/island.js
+  var SHAPES = ["pill", "bar", "card", "circle"];
+  var TONES13 = ["ink", "surface", "accent", "ok", "err"];
+  var DONE_HOLD = 1600;
+  var FAIL_HOLD = 2600;
+  function wrap(content) {
+    return el("span", { class: "ak-island__content", "data-ak-part": "content" }, content == null ? [] : content);
+  }
+  function radiusFor(node, h) {
+    let r;
+    try {
+      r = parseFloat(getComputedStyle(node).borderTopLeftRadius) || 0;
+    } catch {
+      r = 0;
+    }
+    return Math.min(r, h / 2);
+  }
+  function island(spec) {
+    const s = spec || {};
+    const root = el(s.as === "button" ? "button" : "div", {
+      class: "ak-root ak-island",
+      "data-ak-part": "root",
+      type: s.as === "button" ? "button" : null,
+      "aria-label": s.label || null,
+      "aria-live": s.live ? "polite" : null,
+      "data-ak-noguard": s.as === "button" ? true : null,
+      on: s.onClick ? { click: s.onClick } : null
+    });
+    let current2 = wrap(s.content);
+    root.appendChild(current2);
+    shapeAndTone(s.shape, s.tone);
+    const box = { w: 0, h: 0, r: 0 };
+    let morphing = false;
+    function draw() {
+      root.style.width = box.w.toFixed(2) + "px";
+      root.style.height = box.h.toFixed(2) + "px";
+      root.style.borderRadius = Math.max(0, box.r).toFixed(2) + "px";
+    }
+    function landed() {
+      if (w.moving() || h.moving() || r.moving()) return;
+      morphing = false;
+      root.style.removeProperty("width");
+      root.style.removeProperty("height");
+      root.style.removeProperty("border-radius");
+    }
+    const frame2 = function(key) {
+      return function(x, v) {
+        box[key] = x;
+        if (morphing) draw();
+        if (v === 0) landed();
+      };
+    };
+    const w = liveSpring(frame2("w"), { el: root, precision: 0.1 });
+    const h = liveSpring(frame2("h"), { el: root, precision: 0.1 });
+    const r = liveSpring(frame2("r"), { el: root, precision: 0.1 });
+    function shapeAndTone(shape, tone) {
+      if (shape) root.setAttribute("data-ak-shape", SHAPES.indexOf(shape) >= 0 ? shape : "pill");
+      else if (!root.hasAttribute("data-ak-shape")) root.setAttribute("data-ak-shape", "pill");
+      if (tone) root.setAttribute("data-ak-tone", TONES13.indexOf(tone) >= 0 ? tone : "ink");
+      else if (!root.hasAttribute("data-ak-tone")) root.setAttribute("data-ak-tone", "ink");
+    }
+    function leave(node, pace2) {
+      const top = node.offsetTop;
+      const left = node.offsetLeft;
+      const width = node.offsetWidth;
+      node.classList.add("ak-island__leaving");
+      node.setAttribute("aria-hidden", "true");
+      node.style.top = top + "px";
+      node.style.left = left + "px";
+      node.style.width = width + "px";
+      const drop = function() {
+        if (node.parentNode) node.parentNode.removeChild(node);
+      };
+      if (typeof node.animate !== "function") {
+        drop();
+        return;
+      }
+      const anim = node.animate([
+        { opacity: 1, filter: "blur(0px)", transform: "scale(1)" },
+        { opacity: 0, filter: "blur(4px)", transform: "scale(0.96)" }
+      ], { duration: Math.max(100, pace2.span * 0.7), easing: "ease-in", fill: "forwards" });
+      anim.onfinish = drop;
+      anim.oncancel = drop;
+    }
+    function arrive(node, pace2) {
+      if (typeof node.animate !== "function") return;
+      node.animate([
+        { opacity: 0, filter: "blur(4px)", transform: "scale(0.96)" },
+        { opacity: 1, filter: "blur(0px)", transform: "scale(1)" }
+      ], { duration: Math.max(140, pace2.span * 1.1), delay: Math.max(60, pace2.span * 0.4), easing: pace2.ease, fill: "backwards" });
+    }
+    function set(patch) {
+      const p = patch || {};
+      const still2 = motionOff(root) || !root.isConnected;
+      const from = still2 ? null : { w: root.offsetWidth, h: root.offsetHeight, r: radiusFor(root, root.offsetHeight) };
+      const pace2 = paceOf(root);
+      if (Object.prototype.hasOwnProperty.call(p, "content")) {
+        const next = wrap(p.content);
+        if (still2) {
+          root.replaceChild(next, current2);
+        } else {
+          leave(current2, pace2);
+          root.appendChild(next);
+          arrive(next, pace2);
+        }
+        current2 = next;
+      }
+      shapeAndTone(p.shape, p.tone);
+      if (still2) {
+        w.jump(0);
+        h.jump(0);
+        r.jump(0);
+        morphing = false;
+        root.style.removeProperty("width");
+        root.style.removeProperty("height");
+        root.style.removeProperty("border-radius");
+        return;
+      }
+      root.style.removeProperty("width");
+      root.style.removeProperty("height");
+      root.style.removeProperty("border-radius");
+      const to = { w: root.offsetWidth, h: root.offsetHeight };
+      const toR = radiusFor(root, to.h);
+      const was = (
+        /** @type {{ w: number, h: number, r: number }} */
+        from
+      );
+      if (!morphing) {
+        w.jump(was.w);
+        h.jump(was.h);
+        r.jump(was.r);
+      }
+      box.w = w.value();
+      box.h = h.value();
+      box.r = r.value();
+      morphing = true;
+      draw();
+      w.set(to.w);
+      h.set(to.h);
+      r.set(toR);
+    }
+    if (s.target) resolve(s.target).appendChild(root);
+    return {
+      el: root,
+      set,
+      destroy() {
+        w.destroy();
+        h.destroy();
+        r.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function check() {
+    const mark = svg("svg", { viewBox: "0 0 24 24", width: 20, height: 20, "aria-hidden": "true", class: "ak-island__check", "data-ak-part": "check" });
+    mark.appendChild(svg("path", { d: "M5 12.5l4.2 4.2L19 7", pathLength: 1 }));
+    return mark;
+  }
+  function stateButton(spec) {
+    const s = spec || { label: "", run() {
+    } };
+    let state = "idle";
+    let timer = null;
+    const status = el("span", { class: "ak-sr-only", role: "status", "data-ak-part": "status" });
+    const isl = island({ as: "button", label: s.label, content: s.label, shape: "pill", tone: s.variant === "ghost" ? "surface" : "accent", onClick: function() {
+      press();
+    } });
+    const root = isl.el;
+    root.classList.add("ak-statebtn");
+    if (s.variant === "ghost") root.setAttribute("data-ak-variant", "ghost");
+    if (s.disabled) root.setAttribute("aria-disabled", "true");
+    root.appendChild(status);
+    function set(next) {
+      clearTimeout(timer);
+      state = next;
+      const base = s.variant === "ghost" ? "surface" : "accent";
+      root.setAttribute("aria-label", next === "busy" ? t("working") : next === "done" ? s.done || t("done") : next === "error" ? s.fail || t("checkFail") : s.label);
+      if (next === "busy") {
+        root.setAttribute("aria-busy", "true");
+        status.textContent = t("working");
+        isl.set({ content: el("span", { class: "ak-island__spinner", "data-ak-part": "spinner", "aria-hidden": "true" }), shape: "circle", tone: base });
+        return;
+      }
+      root.removeAttribute("aria-busy");
+      if (next === "done") {
+        status.textContent = s.done || t("done");
+        isl.set({ content: s.done ? [check(), el("span", { text: s.done })] : check(), shape: s.done ? "pill" : "circle", tone: "ok" });
+        timer = setTimeout(function() {
+          set("idle");
+        }, DONE_HOLD);
+        return;
+      }
+      if (next === "error") {
+        status.textContent = s.fail || t("checkFail");
+        isl.set({ content: s.fail || t("checkFail"), shape: "pill", tone: "err" });
+        setTimeout(function() {
+          attention(root, "shake");
+        }, 60);
+        timer = setTimeout(function() {
+          set("idle");
+        }, FAIL_HOLD);
+        return;
+      }
+      status.textContent = "";
+      isl.set({ content: s.label, shape: "pill", tone: base });
+    }
+    function press() {
+      if (state === "busy" || root.getAttribute("aria-disabled") === "true") return Promise.resolve(false);
+      set("busy");
+      let result;
+      try {
+        result = s.run();
+      } catch (err) {
+        result = Promise.reject(err);
+      }
+      return Promise.resolve(result).then(function() {
+        set("done");
+        return true;
+      }, function() {
+        set("error");
+        return false;
+      });
+    }
+    if (s.target) resolve(s.target).appendChild(root);
+    return {
+      el: root,
+      press,
+      set,
+      destroy() {
+        clearTimeout(timer);
+        isl.destroy();
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/lenis-director.js
@@ -16207,7 +17744,7 @@
   var SPIN = 18;
   var LOB = 60;
   var FLICK2 = 480;
-  var TONES13 = ["ok", "warn", "err"];
+  var TONES14 = ["ok", "warn", "err"];
   function rowsOf5(data) {
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data.items)) return data.items;
@@ -16443,7 +17980,7 @@
         el("span", { class: "ak-swipe__mark ak-swipe__mark--right", "aria-hidden": "true" }),
         el("span", { class: "ak-swipe__mark ak-swipe__mark--left", "aria-hidden": "true" })
       ]);
-      const tone = TONES13.indexOf(item.tone) >= 0 ? " ak-swipe__card--" + item.tone : "";
+      const tone = TONES14.indexOf(item.tone) >= 0 ? " ak-swipe__card--" + item.tone : "";
       const card = (
         /** @type {HTMLElement} */
         el("article", {
@@ -16875,6 +18412,14 @@
       fork: "Copy .ak-hero and .ak-hero__* out of shell.css; you keep the tokens and the scrim's mode-following arithmetic, and you give up the repeated-title claim and the picture layer an effect knows how to land on.",
       file: "hero.js"
     },
+    "island": {
+      parts: ["root", "content"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-island-pad", "--ak-island-radius"],
+      fork: "Animate width, height and border-radius yourself and swap the content; you give up the spring, the separate enter and exit timing of the content, and the interruption that continues from where it was.",
+      file: "island.js"
+    },
     "kanban": {
       parts: ["root", "col", "head", "colname", "count", "well", "card", "cardtitle", "cardsub", "badge", "extra", "aside"],
       slots: ["card(card)", "cardtitle(card)", "cardsub(card)", "extra(card)", "badge(card)", "aside(card)", "colhead(column)"],
@@ -16906,6 +18451,22 @@
       tokens: ["--ak-card-aspect", "--ak-card-pad"],
       fork: "Same as cardGrid; this is one card and its action row.",
       file: "grid.js"
+    },
+    "menu": {
+      parts: ["root", "item", "label", "hint", "separator", "ink"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-menu-min-w", "--ak-menu-row-pad"],
+      fork: "Build a list of buttons in a positioned box; you give up the growing entrance, the travelling highlight, the pick blink and the keyboard model.",
+      file: "menu.js"
+    },
+    "popover": {
+      parts: ["root", "body"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "Put your content in a positioned box; you give up the entrance from the anchor, the outside-click close and the focus return.",
+      file: "menu.js"
     },
     "progressFigure": {
       parts: ["root", "kicker", "figure", "total", "actions", "bar", "fill", "now", "nowLabel", "nowText", "chips", "chip", "counts", "count"],
@@ -16947,6 +18508,14 @@
       fork: "It IS the escape hatch: put your own markup in its body and keep the frame.",
       file: "shell.js"
     },
+    "segmented": {
+      parts: ["root", "option", "ink"],
+      slots: [],
+      variants: ["dense"],
+      tokens: [],
+      fork: "Build a radio group yourself; you give up the travelling ink, the arrow keys and the roving focus.",
+      file: "controls.js"
+    },
     "settingsGroup": {
       parts: ["root", "help", "title", "hint", "body", "after"],
       slots: ["after()"],
@@ -16962,6 +18531,22 @@
       tokens: ["--ak-sidenav-w", "--ak-sidenav-main"],
       fork: "Copy .ak-sidenav* out of workbench.css; you give up the grouping, the counts and the view transition.",
       file: "workbench.js"
+    },
+    "slider": {
+      parts: ["root", "label", "input", "readout"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-range-track", "--ak-range-thumb"],
+      fork: "Use form({ fields: [{ type: 'range' }] }) or a plain input with class ak-input--range; the stretch comes with rangeMotion(input).",
+      file: "controls.js"
+    },
+    "stateButton": {
+      parts: ["root", "content", "spinner", "check", "status"],
+      slots: [],
+      variants: ["ghost"],
+      tokens: [],
+      fork: "Use a button with busy(); you give up the spinner, the check and the morph between them.",
+      file: "island.js"
     },
     "statRow": {
       parts: ["root", "tile", "value", "unit", "delta", "label", "hint", "trend", "aside"],
@@ -17002,6 +18587,22 @@
       tokens: ["--ak-timeline-dot", "--ak-timeline-rail", "--ak-timeline-gap", "--ak-timeline-indent"],
       fork: "Copy .ak-timeline* out of content.css; the rail is one ::before and the dot is one span, and you give up the keyed line so every event re-enters on every change.",
       file: "timeline.js"
+    },
+    "toggle": {
+      parts: ["root", "input", "label"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-switch-w", "--ak-switch-h", "--ak-switch-pad", "--ak-switch-knob"],
+      fork: "Use a plain checkbox with class ak-toggle; you keep the switch's look and give up the knob's stretch and travel.",
+      file: "controls.js"
+    },
+    "tooltip": {
+      parts: ["root"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "",
+      file: "menu.js"
     }
   };
 
@@ -17012,7 +18613,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.54.0",
+    version: "0.55.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -17142,6 +18743,23 @@
     scrollLink,
     drag,
     flipFrom,
+    // ── The live spring (retargetable under a hand) and the parts that answer the hand: the
+    //    travelling ink, the switch, the segmented control, the slider, the menus that grow from
+    //    where they were opened, and the one shape that becomes the next state ──
+    liveSpring,
+    edgePair,
+    ink: ink2,
+    toggle,
+    segmented,
+    slider,
+    switchMotion,
+    rangeMotion,
+    menu,
+    contextMenu,
+    popover,
+    tooltip,
+    island,
+    stateButton,
     // ── The parts that ride the motion libraries: Motion (carousel, lightbox), anime.js (calendar,
     //    priceTable), Lenis (thread, checkout) — each lazy-loads its pack from this node ──
     carousel,

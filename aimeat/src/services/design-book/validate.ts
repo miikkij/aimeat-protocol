@@ -23,6 +23,9 @@
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.6.0 — 2026-09-28 — A motion recipe may carry the spring hand (--ak-spring-stiffness,
+ *     -damping, -mass): the kit's live controls read it, so a recipe now says how things feel
+ *     under the hand, not only how fast they enter.
  *   v1.5.0 — 2026-09-20 — A genre's body may name the proposer's own published app instead of a
  *     shipped template (grown-genre.ts), so the shelf of genres grows without a commit.
  *   v1.4.0 — 2026-09-20 — The COMPONENT kind, the ninth (component.ts): markup and a stylesheet an
@@ -85,6 +88,7 @@ export function defaultEffectTarget(id: string): EffectTarget {
 /** The motion recipe's vocabulary: the signature tokens that ARE motion. */
 export const MOTION_TOKENS = [
   '--ak-motion', '--ak-ease', '--ak-enter-distance', '--ak-enter-stagger', '--ak-tilt', '--ak-kinetic',
+  '--ak-spring-stiffness', '--ak-spring-damping', '--ak-spring-mass',
 ] as const;
 
 export const PART_STATUSES = ['proposed', 'published', 'aging', 'retired'] as const;

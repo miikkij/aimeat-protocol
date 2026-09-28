@@ -24,6 +24,8 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.6.0 — 2026-09-28 — The variants line names segmented's `dense` and stateButton's `ghost`, and
+ *     the per-component token count follows the kit at fifty-six (the motion parts added eight).
  *   v1.5.0 — 2026-09-19 — The ninth node type, `decide` (aimeat-living 0.8.0), in the one-line list.
  *   v1.4.0 — 2026-09-06 — The reach-out paragraph names `{{secret:NAME}}` in a trigger's or a
  *     source's headers, the vault it is filled from, and the words to give the person.
@@ -67,10 +69,11 @@ export function renderCustomisation(): string {
     + 'cardGrid, mediaCard, queue, health, kanban, section and searchBar; `numbered` on list and '
     + 'listDetail; `wide` on cardGrid; `lined` on table; `tall`, `compact` and `center` on hero; '
     + '`compact`, `trend` and `plain` on statRow; `compact` and `center` on figure; `compact` on '
-    + 'rating; `dense` on tabs and bottomNav; `pill` on tabs; `quiet` on section. An unknown name '
+    + 'rating; `dense` on tabs, bottomNav and segmented; `pill` on tabs; `quiet` on section; '
+    + '`ghost` on stateButton. An unknown name '
     + 'is refused with a console line naming the real ones.\n'
     + '4. **Per-component tokens.** `--ak-list-aside-size`, `--ak-stat-figure-size`, '
-    + '`--ak-card-aspect`, `--ak-hero-title-size` and forty-four more, each defaulting to the '
+    + '`--ak-card-aspect`, `--ak-hero-title-size` and fifty-two more, each defaulting to the '
     + 'value the component already had. Set one on YOUR OWN element and exactly that part '
     + 'changes, in every look and both modes.\n\n'
     + 'A statRow tile and a figure also take `unit` (what the number is measured in) and '

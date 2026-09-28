@@ -55,6 +55,16 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.55.0 — 2026-09-28 — THE TEN MOTION PARTS (Jouni's ask of 2026-09-28: controls that answer
+ *     the hand). springs.js is the live spring (liveSpring, retargetable mid-flight, no frames at
+ *     rest) and the edge pair; ink.js is the travelling marker, now the tab row's fill; controls.js
+ *     adds toggle (the knob stretches when pressed and travels on two edges), segmented (the ink
+ *     between two to five choices) and slider (the fill, and the stretch past either end), which
+ *     the form's toggle and range fields also use; menu.js adds menu, contextMenu, popover and
+ *     tooltip (they grow from where they were opened, the menu's highlight is the ink and blinks
+ *     on a pick); island.js adds island (one shape that becomes the next state) and stateButton
+ *     (label, spinner, check, label); the chart's lines draw when seen and its reading travels on
+ *     a spring; the palette grows from its button, glides its rows and turns into the toast.
  *   v0.54.0 — 2026-09-28 — THE WORKBENCH (workbench.js): sideNav, statusBand, checkGrid,
  *     choiceCards, settingsGroup, progressFigure and callout, the pieces of the approved
  *     Postinjalostamo design; app() takes `logo` and `nav: 'side'`, and form fields take `width`.
@@ -357,6 +367,11 @@ import { spotlight, tilt, sheen, odometer, thumb, deal } from './materials.js';
 import { ring, crew, poll, keys, dropzone } from './parts.js';
 import { toast, palette, compare, tour } from './parts-ui.js';
 import { springFrames, spring, stagger, inView, scrollLink, drag } from './motion.js';
+import { liveSpring, edgePair } from './springs.js';
+import { ink } from './ink.js';
+import { toggle, segmented, slider, switchMotion, rangeMotion } from './controls.js';
+import { menu, contextMenu, popover, tooltip } from './menu.js';
+import { island, stateButton } from './island.js';
 import { carousel, lightbox } from './motion-parts.js';
 import { calendar, priceTable } from './anime-parts.js';
 import { thread, checkout } from './lenis-parts.js';
@@ -380,7 +395,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.54.0',
+  version: '0.55.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -458,6 +473,13 @@ const atelier = {
 
   // ── The kit's own motion primitives (Web Animations API, no dependency, finite, reduced-motion safe) ──
   springFrames, spring, stagger, inView, scrollLink, drag, flipFrom,
+  // ── The live spring (retargetable under a hand) and the parts that answer the hand: the
+  //    travelling ink, the switch, the segmented control, the slider, the menus that grow from
+  //    where they were opened, and the one shape that becomes the next state ──
+  liveSpring, edgePair, ink,
+  toggle, segmented, slider, switchMotion, rangeMotion,
+  menu, contextMenu, popover, tooltip,
+  island, stateButton,
 
   // ── The parts that ride the motion libraries: Motion (carousel, lightbox), anime.js (calendar,
   //    priceTable), Lenis (thread, checkout) — each lazy-loads its pack from this node ──

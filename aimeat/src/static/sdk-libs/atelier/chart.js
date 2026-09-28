@@ -24,6 +24,9 @@
  *           { id: 'in', label: 'Income', kind: 'bar', values: [1200, 1400] },
  *           { id: 'cash', label: 'Cash', kind: 'line', values: [300, 900] } ] } });
  * @version-history
+ *   v0.55.0 — 2026-09-28 — The lines draw themselves when the chart comes into view, with the area
+ *     and the end dot behind them, and the reading under the pointer (a guide, a marker per line
+ *     and the tooltip) travels between labels on the look's spring (chart-motion.js).
  *   v0.37.0 — 2026-08-30 — kind radar (chart-shapes.js): profiles on spokes.
  *   v0.36.0 — 2026-08-30 — Basket one of the approved expansion: kinds funnel, treemap and
  *     flow join the dispatch (chart-shapes.js).
@@ -38,6 +41,7 @@ import { t } from './i18n.js';
 import { emptyState } from './state.js';
 import { svg, SERIES_VARS, tickStep, fmtTick, smoothPath, defsFor } from './chart-core.js';
 import { renderDonut, renderCalendar, renderScatter, renderFunnel, renderTreemap, renderFlow, renderRadar } from './chart-shapes.js';
+import { drawWhenSeen, hoverRig } from './chart-motion.js';
 
 const W = 560;
 const H = 300;
@@ -228,7 +232,6 @@ export function chart(spec) {
       const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
       const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
       const line = svg('path', { d: smoothPath(pts), class: 'ak-chart__line', style: `stroke:${colour}` });
-      if (!still) line.classList.add('ak-chart__line--enter');
       node.appendChild(line);
       const last = pts[pts.length - 1];
       node.appendChild(svg('circle', { cx: last.x, cy: last.y, r: 5, class: 'ak-chart__dot', style: `stroke:${colour}` }));
@@ -236,17 +239,16 @@ export function chart(spec) {
 
     root.appendChild(node);
     legendFor(series);
-    if (!horizontal) wireTooltip(node, labels, series, along, slot);
+    if (!horizontal) {
+      const rig = hoverRig(root, node, {
+        top: pad.top, bottom: H - pad.bottom, x: (i) => along(i) + slot / 2,
+        points: lines.map((s) => ({ colour: SERIES_VARS[series.indexOf(s) % SERIES_VARS.length], y: (i) => cross(s.values[i] ?? 0) })),
+      });
+      wireTooltip(node, labels, series, along, slot, rig);
+    }
     if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot);
 
-    if (!still) {
-      for (const line of node.querySelectorAll('.ak-chart__line--enter')) {
-        const len = /** @type {SVGPathElement} */ (line).getTotalLength();
-        line.setAttribute('stroke-dasharray', String(len));
-        line.setAttribute('stroke-dashoffset', String(len));
-        requestAnimationFrame(() => line.classList.add('ak-chart__line--drawn'));
-      }
-    }
+    if (!still) drawWhenSeen(root, node);
   }
 
   /** The legend, in words: one chip per series in its colour. */
@@ -263,32 +265,36 @@ export function chart(spec) {
     root.appendChild(legend);
   }
 
-  /** The touch tooltip: nearest label under the pointer, every series' value in its colour. */
-  function wireTooltip(node, labels, series, along, slot) {
-    const tip = el('div', { class: 'ak-chart__tip', hidden: true });
+  /** The touch tooltip: nearest label under the pointer, every series' value in its colour. The
+   *  guide, the markers and the tooltip travel between labels on the look's spring (hoverRig). */
+  function wireTooltip(node, labels, series, along, slot, rig) {
+    const tip = el('div', { class: 'ak-chart__tip' });
     root.appendChild(tip);
+    let shownAt = -1;
     node.addEventListener('pointermove', (ev) => {
       const box = node.getBoundingClientRect();
       const sx = (ev.clientX - box.left) * (W / box.width);
       const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot)));
-      clear(tip);
-      tip.appendChild(el('div', { class: 'ak-chart__tip-label', text: String(labels[i]) }));
-      series.forEach((s, si) => {
-        const row = el('div', { class: 'ak-chart__tip-row' }, [
-          el('span', { class: 'ak-chart__tip-swatch' }),
-          el('span', { text: s.label }),
-          el('b', { text: fmtTick(s.values[i] ?? 0) }),
-        ]);
-        /** @type {HTMLElement} */ (row.firstChild).style.background = SERIES_VARS[si % SERIES_VARS.length];
-        tip.appendChild(row);
-      });
-      tip.hidden = false;
+      if (i !== shownAt) {
+        shownAt = i;
+        clear(tip);
+        tip.appendChild(el('div', { class: 'ak-chart__tip-label', text: String(labels[i]) }));
+        series.forEach((s, si) => {
+          const row = el('div', { class: 'ak-chart__tip-row' }, [
+            el('span', { class: 'ak-chart__tip-swatch' }),
+            el('span', { text: s.label }),
+            el('b', { text: fmtTick(s.values[i] ?? 0) }),
+          ]);
+          /** @type {HTMLElement} */ (row.firstChild).style.background = SERIES_VARS[si % SERIES_VARS.length];
+          tip.appendChild(row);
+        });
+      }
       const rootBox = root.getBoundingClientRect();
       const px = ((along(i) + slot / 2) / W) * box.width + (box.left - rootBox.left);
-      tip.style.left = `${Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2))}px`;
       tip.style.top = `${box.top - rootBox.top + 6}px`;
+      rig.at(i, tip, Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2)));
     });
-    node.addEventListener('pointerleave', () => { tip.hidden = true; });
+    node.addEventListener('pointerleave', () => { shownAt = -1; rig.hide(tip); });
   }
 
   /** The story bubble: the one point the reader should not miss, said in words on the chart. */

@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.22.0 — 2026-09-28 — Step 3 names the controls that answer a press (toggle, segmented, slider,
+ *     menu, contextMenu, popover, tooltip, stateButton, island), and the motion rule says the
+ *     spring is the look's too, with the Design Book's three spring parts as the way to change it.
  *   v1.21.0 — 2026-09-28 — Step 3 names the workbench pieces beside the catalogue, and says that
  *     genre-workbench is the one genre built on the app() shell, which a fork keeps.
  *   v1.20.0 — 2026-09-26 — Components: step 10 says every element closes inside the markup and a
@@ -199,7 +202,10 @@ moved under you says so.
    statRow, figure, searchBar, timeline, tabs, and the designed \`emptyState\` and \`skeleton\`
    rather than a bare string or a grey box, and for a tool someone works in every day the
    workbench pieces: sideNav through \`app({ nav: 'side' })\`, statusBand, checkGrid,
-   choiceCards, settingsGroup, progressFigure and callout) where the page needs them; the \`section\`
+   choiceCards, settingsGroup, progressFigure and callout, and for anything a hand presses the
+   controls that answer it: toggle, segmented, slider, menu, contextMenu, popover, tooltip,
+   stateButton, and island for showing an agent's work where the person is looking) where the
+   page needs them; the \`section\`
    component is the ONLY place your own raw markup goes. **In a genre fork the genre IS the
    look.** Do not put a look preset and a stack of components in its place: that is the default
    page every app looks like, a genre's name in the head does not change what it is, and it is
@@ -338,9 +344,10 @@ moved under you says so.
 - **Any motion of your own, anywhere.** It is already there: a block and a row arrive with a fade
   and a rise, a \`set()\` makes the rows that arrived rise in, the rows that left fade out where
   they stood and the rows that moved glide there, a changed figure counts to it, a tab or a
-  bottom-bar pick crosses into the next view, and a dialog, drawer or toast enters and leaves.
-  You call none of it. The pace and the distance are the look's, so a still register stays still
-  from the same code. \`app({ motion: false })\` is the only switch, and one block stands still
+  bottom-bar pick crosses into the next view while the tab's marker travels, and a dialog, drawer
+  or toast enters and leaves. You call none of it. The pace, the distance and the spring are the
+  look's, so a still register stays still from the same code; to change how springs feel, adopt
+  one of the Design Book's motion parts (\`motion-spring-snappy\`, \`-soft\`, \`-heavy\`). \`app({ motion: false })\` is the only switch, and one block stands still
   with \`motion: false\` in its props.
 - **Arithmetic written into the page** when the person's numbers stand on each other. A number
   worked out by code you wrote is a number they cannot change without you, so the calculation goes

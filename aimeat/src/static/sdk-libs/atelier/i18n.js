@@ -15,6 +15,8 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.6.0 — 2026-09-28 — working and done (en/fi/es): what the state button's status says to a
+ *     screen reader while the work runs and when it has finished.
  *   v0.5.0 — 2026-09-28 — The workbench pieces' words (en/fi/es): chosen, now, ofTotal and the
  *     five check states a screen reader hears before a tile's title.
  *   v0.4.0 — 2026-09-05 — ambient, ambientOff, ambientCalm, ambientFull (en/fi/es): the weather
@@ -101,6 +103,8 @@ const BASE = {
     checkFail: 'Failed',
     checkWait: 'In progress',
     checkOptional: 'Optional',
+    working: 'Working…',
+    done: 'Done',
   },
   fi: {
     loading: 'Ladataan…',
@@ -173,6 +177,8 @@ const BASE = {
     checkFail: 'Epäonnistui',
     checkWait: 'Kesken',
     checkOptional: 'Valinnainen',
+    working: 'Käsitellään…',
+    done: 'Valmis',
   },
   es: {
     loading: 'Cargando…',
@@ -245,6 +251,8 @@ const BASE = {
     checkFail: 'Falló',
     checkWait: 'En curso',
     checkOptional: 'Opcional',
+    working: 'Procesando…',
+    done: 'Hecho',
   },
 };
 

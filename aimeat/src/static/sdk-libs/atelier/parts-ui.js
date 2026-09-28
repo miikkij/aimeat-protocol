@@ -13,13 +13,21 @@
  *   AIMEAT.atelier.toast({ title: 'Part adopted', sub: 'shop.html', action: { label: 'Undo', onPick } });
  *   AIMEAT.atelier.palette({ items: [{ id: 'adopt', label: 'Adopt…', run() {} }], hotkey: 'k' });
  * @version-history
+ *   v0.55.0 — 2026-09-28 — The palette moves: it grows out of the button that opened it (`anchor`,
+ *     or open(from)), its rows glide, rise and fade as the filter changes (settle), the highlight
+ *     is the travelling ink, it closes with an exit, and an item with `done` turns the palette
+ *     into the toast that confirms it. The highlight no longer rebuilds the list on every
+ *     pointer move.
  *   v0.50.0 — 2026-09-05 — A toast arrives and LEAVES: it rose in only by way of its own
  *     children before, and vanished with no exit at all — a confirmation that blinks out mid-read
  *     reads as a bug rather than as a message ending.
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
  */
-import { el, clear, resolve, enter, reducedMotion, motionOff } from './dom.js';
-import { fadeIn, paceOf } from './arrive.js';
+import { el, resolve, enter, reducedMotion, motionOff } from './dom.js';
+import { fadeIn, paceOf, settle } from './arrive.js';
+import { springFrames } from './motion.js';
+import { ink } from './ink.js';
+import { openMotion, closeMotion } from './menu.js';
 
 let toastHost = null;
 
@@ -69,57 +77,132 @@ export function toast(spec) {
 }
 
 /**
- * The command palette: opens on the hotkey (Ctrl/⌘ + `hotkey`, default k) or on `open()`,
- * filters the declared items as the person types, runs the chosen one, and closes. Escape and
- * a click on the scrim close it; the list is walked with the arrow keys.
- * @param {{ items: Array<{ id: string, label: string, hint?: string, run: () => void }>,
- *   placeholder?: string, hotkey?: string|false, empty?: string }} spec
- * @returns {{ open: () => void, close: () => void, destroy: () => void }}
+ * The command palette: opens on the hotkey (Ctrl/⌘ + `hotkey`, default k), on a click of
+ * `anchor`, or on `open()`, filters the declared items as the person types, runs the chosen one,
+ * and closes. Escape and a click on the scrim close it; the list is walked with the arrow keys.
+ *
+ * It MOVES the way the rest of the kit does (0.55.0): opened from a button it grows out of that
+ * button's box; the rows that stay while the person types glide to their new places, new ones
+ * rise in and gone ones fade; the highlight is the ink and travels from row to row; and an item
+ * with `done` turns the palette itself into the toast that says it ran, so the confirmation comes
+ * out of the thing the person just used.
+ * @param {{ items: Array<{ id?: string, label: string, hint?: string, done?: string, run: () => void }>,
+ *   placeholder?: string, hotkey?: string|false, empty?: string, anchor?: string|Element }} spec
+ * @returns {{ open: (from?: Element) => void, close: () => void, destroy: () => void }}
  */
 export function palette(spec) {
   const s = spec || { items: [] };
   let root = null;
+  let box = null;
+  let list = null;
+  let mark = null;
   let cursor = 0;
   let shown = [];
+  let opener = null;
 
-  function close() {
-    if (root && root.parentNode) root.parentNode.removeChild(root);
-    root = null;
+  function keyOf(it, i) { return it.id || it.label || String(i); }
+  function close(after) {
+    if (!root) return;
+    const gone = root;
+    const goneBox = box;
+    root = null; box = null; list = null;
+    if (mark) { mark.destroy(); mark = null; }
+    const drop = function () { if (gone.parentNode) gone.parentNode.removeChild(gone); if (after) after(); };
+    if (motionOff(gone) || typeof gone.animate !== 'function') { drop(); return; }
+    gone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: 'ease-in', fill: 'forwards' });
+    closeMotion(goneBox, drop);
   }
-  function paintList(list) {
-    clear(list);
-    if (!shown.length) { list.appendChild(el('li', { class: 'ak-palette__empty' }, s.empty || 'Nothing matches.')); return; }
-    shown.forEach(function (it, i) {
-      list.appendChild(el('li', { class: 'ak-palette__item', role: 'option', 'aria-selected': i === cursor ? 'true' : 'false', on: {
-        click: function () { close(); it.run(); },
-        mousemove: function () { if (cursor !== i) { cursor = i; paintList(list); } },
-      } }, [el('span', {}, it.label), it.hint ? el('span', { class: 'ak-palette__hint' }, it.hint) : null].filter(Boolean)));
+  /** Run a chosen item. One with `done` becomes a toast: the box travels to where the toast lands. */
+  function runItem(it) {
+    if (!it.done || !box || motionOff(box) || typeof box.animate !== 'function') {
+      close(); it.run();
+      if (it.done) toast({ title: it.done, tone: 'ok', ttl: 3200 });
+      return;
+    }
+    const from = box.getBoundingClientRect();
+    const tw = Math.min(360, window.innerWidth - 32);
+    const to = { left: window.innerWidth - tw - 16, top: window.innerHeight - 72, width: tw, height: 56 };
+    const dx = to.left - from.left;
+    const dy = to.top - from.top;
+    const sx = to.width / Math.max(from.width, 1);
+    const sy = to.height / Math.max(from.height, 1);
+    const sf = springFrames({ el: box });
+    const frames = sf.samples.map(function (at, i) {
+      return { offset: i / (sf.samples.length - 1),
+        transform: 'translate(' + (dx * at).toFixed(1) + 'px, ' + (dy * at).toFixed(1) + 'px) scale(' + (1 + (sx - 1) * at).toFixed(4) + ', ' + (1 + (sy - 1) * at).toFixed(4) + ')',
+        opacity: at > 0.85 ? 1 - (at - 0.85) / 0.15 : 1 };
     });
+    box.style.transformOrigin = '0 0';
+    if (list) list.style.opacity = '0';
+    const gone = root;
+    root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(sf.duration, 260), easing: 'ease-out', fill: 'forwards' });
+    const anim = box.animate(frames, { duration: sf.duration, easing: 'linear', fill: 'forwards' });
+    root = null; box = null; list = null;
+    if (mark) { mark.destroy(); mark = null; }
+    let handed = false;
+    const hand = function () {
+      if (handed) return;
+      handed = true;
+      if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
+      toast({ title: it.done, tone: 'ok', ttl: 3200 });
+    };
+    it.run();
+    // The toast takes over as the box gets there, not after the spring's last tremor.
+    setTimeout(hand, Math.min(sf.duration, 420));
+    anim.onfinish = hand;
   }
-  function open() {
+  function highlight() {
+    if (!list) return;
+    // A row that just left is still in the list for its fade (arrive.js keeps a stand-in there);
+    // it is scenery, never a row the cursor or the ink can land on.
+    const rows = Array.prototype.slice.call(list.querySelectorAll('.ak-palette__item:not(.ak-layout__ghost)'));
+    rows.forEach(function (row, i) { row.setAttribute('aria-selected', i === cursor ? 'true' : 'false'); });
+    if (rows[cursor] && typeof rows[cursor].scrollIntoView === 'function') rows[cursor].scrollIntoView({ block: 'nearest' });
+    if (mark) mark.sync();
+  }
+  function paintList() {
+    if (!list) return;
+    const host = list;
+    settle(host, function () {
+      Array.prototype.slice.call(host.querySelectorAll('.ak-palette__item, .ak-palette__empty')).forEach(function (n) { host.removeChild(n); });
+      if (!shown.length) { host.appendChild(el('li', { class: 'ak-palette__empty', 'data-ak-id': '__empty' }, s.empty || 'Nothing matches.')); return; }
+      shown.forEach(function (it, i) {
+        host.appendChild(el('li', { class: 'ak-palette__item', role: 'option', 'data-ak-id': keyOf(it, i), 'aria-selected': 'false', on: {
+          click: function () { runItem(it); },
+          pointermove: function () { if (cursor !== i) { cursor = i; highlight(); } },
+        } }, [el('span', {}, it.label), it.hint ? el('span', { class: 'ak-palette__hint' }, it.hint) : null].filter(Boolean)));
+      });
+    }, { rows: '.ak-palette__item, .ak-palette__empty' });
+    highlight();
+  }
+  function open(from) {
     if (root) return;
+    opener = from || null;
     cursor = 0;
     shown = s.items.slice();
-    const list = el('ul', { class: 'ak-palette__list', role: 'listbox' });
+    list = el('ul', { class: 'ak-palette__list', role: 'listbox' });
     const input = el('input', { class: 'ak-palette__input', type: 'text', placeholder: s.placeholder || 'go to, run, adopt…', autocomplete: 'off', on: {
       input: function () {
         const q = /** @type {HTMLInputElement} */ (input).value.trim().toLowerCase();
         shown = s.items.filter(function (it) { return !q || (it.label + ' ' + (it.hint || '')).toLowerCase().indexOf(q) >= 0; });
         cursor = 0;
-        paintList(list);
+        paintList();
       },
       keydown: function (e) {
-        if (e.key === 'ArrowDown') { e.preventDefault(); cursor = Math.min(cursor + 1, shown.length - 1); paintList(list); }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); cursor = Math.max(cursor - 1, 0); paintList(list); }
-        else if (e.key === 'Enter') { e.preventDefault(); const it = shown[cursor]; if (it) { close(); it.run(); } }
-        else if (e.key === 'Escape') { e.preventDefault(); close(); }
+        if (e.key === 'ArrowDown') { e.preventDefault(); cursor = Math.min(cursor + 1, shown.length - 1); highlight(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); cursor = Math.max(cursor - 1, 0); highlight(); }
+        else if (e.key === 'Enter') { e.preventDefault(); const it = shown[cursor]; if (it) runItem(it); }
+        else if (e.key === 'Escape') { e.preventDefault(); close(function () { if (opener && opener.isConnected) /** @type {HTMLElement} */ (opener).focus(); }); }
       },
     } });
-    root = el('div', { class: 'ak-root ak-palette', on: { click: function (e) { if (e.target === root) close(); } } }, [
-      el('div', { class: 'ak-palette__box', role: 'dialog', 'aria-modal': 'true', 'aria-label': s.placeholder || 'Commands' }, [input, list]),
-    ]);
-    paintList(list);
+    box = el('div', { class: 'ak-palette__box', role: 'dialog', 'aria-modal': 'true', 'aria-label': s.placeholder || 'Commands' }, [input, list]);
+    root = el('div', { class: 'ak-root ak-palette', on: { click: function (e) { if (e.target === root) close(); } } }, [box]);
     document.body.appendChild(root);
+    mark = ink(list, { axis: 'y', active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: 'ak-palette__ink' });
+    paintList();
+    mark.jump();
+    growFrom(box, opener);
+    if (!motionOff(root) && typeof root.animate === 'function') root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
     input.focus();
   }
   const key = s.hotkey === undefined ? 'k' : s.hotkey;
@@ -128,7 +211,45 @@ export function palette(spec) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === key) { e.preventDefault(); if (root) close(); else open(); }
   };
   window.addEventListener('keydown', onKey);
-  return { open, close, destroy() { close(); window.removeEventListener('keydown', onKey); } };
+  const anchor = s.anchor ? /** @type {HTMLElement} */ (resolve(s.anchor)) : null;
+  const onAnchor = function () { if (root) close(); else open(anchor); };
+  if (anchor) anchor.addEventListener('click', onAnchor);
+  return {
+    open,
+    close() { close(); },
+    destroy() {
+      close();
+      window.removeEventListener('keydown', onKey);
+      if (anchor) anchor.removeEventListener('click', onAnchor);
+    },
+  };
+}
+
+/**
+ * The palette's entrance: out of the button that opened it (the box starts over the button's box
+ * and springs to its own), or, opened by the hotkey, from a little smaller at its own top edge.
+ * @param {HTMLElement} box @param {Element|null} from
+ * @returns {void}
+ */
+function growFrom(box, from) {
+  if (!from || !from.isConnected || motionOff(box) || typeof box.animate !== 'function') {
+    openMotion(box, '50% 0');
+    return;
+  }
+  const a = from.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  const sx = a.width / Math.max(b.width, 1);
+  const sy = a.height / Math.max(b.height, 1);
+  const dx = a.left - b.left;
+  const dy = a.top - b.top;
+  const sf = springFrames({ el: box });
+  box.style.transformOrigin = '0 0';
+  box.animate(sf.samples.map(function (at, i) {
+    const k = 1 - at;
+    return { offset: i / (sf.samples.length - 1),
+      transform: 'translate(' + (dx * k).toFixed(1) + 'px, ' + (dy * k).toFixed(1) + 'px) scale(' + (1 + (sx - 1) * k).toFixed(4) + ', ' + (1 + (sy - 1) * k).toFixed(4) + ')',
+      opacity: Math.min(1, 0.4 + at) };
+  }), { duration: sf.duration, easing: 'linear' });
 }
 
 /**
