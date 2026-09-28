@@ -7,6 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   v1.3.1 — 2026-09-28 — aimeat_ai_role_set's bindings: null also dismisses the app's request; a role
+ *     that lacks a capability the app's role needs is refused.
  *   v1.3.0 — 2026-09-28 — AI roles: aimeat_ai_roles and aimeat_ai_role_set; `role` (AI_ROLE_PARAM) on
  *     aimeat_ai_transcribe and aimeat_ai_embed.
  *   v1.2.1 — 2026-09-28 — aimeat_ai_embed's description: only when the person decided it, for a
@@ -181,7 +183,7 @@ export const aiModelTools: AimeatToolDefinition[] = [
       + 'aimeat_ai_providers).',
     input: {
       roles: { type: 'object', description: '{ "<role id>": { title, purpose?, capabilities: {capability: [{provider, model?}]}, local?, maxCostPerCallUsd? } or null }.' },
-      bindings: { type: 'object', description: '{ "<owner>/<file>.html#<role name>": "<your role id>" or null }.' },
+      bindings: { type: 'object', description: '{ "<owner>/<file>.html#<role name>": "<your role id>" or null }. Null unbinds and dismisses the app\'s request; a role that lacks a capability the app\'s role needs is refused.' },
       confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
     },
   },

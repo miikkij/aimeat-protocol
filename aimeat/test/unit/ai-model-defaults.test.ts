@@ -9,13 +9,14 @@
  *   closes, so most of what follows pins the absence of behaviour.
  * @usage cd aimeat && pnpm vitest run test/unit/ai-model-defaults.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-28 — Speech and embeddings take only the node's default; the owner fields are not read.
  *   v1.0.0 — 2026-08-16 — initial: precedence per role, empty-string handling, the untouched-node
  *     case, and the speech language hint.
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import {
-  resolveModelFor, resolveSttLanguage, type ModelRole,
+  resolveModelFor, resolveSttLanguage, resolveTtsVoice, type ModelRole,
 } from '../../src/services/ai-model-defaults.js';
 
 const ROLES: ModelRole[] = ['chat', 'reasoning', 'execution', 'vision', 'stt', 'image'];
@@ -110,5 +111,16 @@ describe('resolveSttLanguage', () => {
   it('an owner who cleared the hint gets the node default, not an empty string', () => {
     assert(resolveSttLanguage(configuredNode, { sttLanguage: '' }) === 'fi', 'cleared falls through');
     assert(resolveSttLanguage(bareNode, { sttLanguage: '' }) === undefined, 'and never returns an empty string');
+  });
+});
+
+describe('speech and embeddings', () => {
+  const node = { modelDefaultTts: 'node/tts', modelDefaultEmbed: 'node/embed', ttsVoiceDefault: 'alloy' } as unknown as AimeatConfig;
+  const owner = { ttsModel: 'owner/tts', embedModel: 'owner/embed', ttsVoice: 'nova' };
+  it('take only the node\'s default: the owner sets them on a provider, and nothing wrote these fields', () => {
+    assert(resolveModelFor(node, owner, 'tts') === 'node/tts', 'tts: the node default, not the owner field');
+    assert(resolveModelFor(node, owner, 'embed') === 'node/embed', 'embed: the node default, not the owner field');
+    assert(resolveTtsVoice(node, owner) === 'alloy', 'voice: the node default, not the owner field');
+    assert(resolveModelFor(bareNode, owner, 'tts') === undefined, 'no node default: nothing');
   });
 });

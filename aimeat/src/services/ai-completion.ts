@@ -481,6 +481,7 @@ export async function prepareAiCall(
     ...(opts.agent ? { agent: opts.agent } : {}),
     ...(appPrefer?.length ? { appPrefer } : {}),
     ...(role ? { roleOrder: role.role.capabilities[capability] ?? [] } : {}),
+    ...(role?.declared?.context ? { minContext: role.declared.context } : {}),
     legacyModel,
     nodeAllowance: async () => ({ remainingUsd: remainingOf(await readAllowance(storage, config, gaii)) }),
   });

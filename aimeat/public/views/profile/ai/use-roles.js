@@ -10,6 +10,7 @@
  * @structure useRoles() → rl (state + handlers) · MAX_PLACES
  * @usage const rl = useRoles({ confirm, toast }); … secRoles(ctx) reads ctx.rl
  * @version-history
+ *   v1.1.0 — 2026-09-28 — Dismissing an app's request is an unbind (the server drops the request too).
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -109,14 +110,15 @@ export function useRoles({ confirm, toast, reloadProviders }) {
     }, { danger: true });
   };
 
-  /** Bind an app's role to one of the owner's (their approval), or unbind it with ''. */
-  const bind = async (binding, roleId) => {
+  /** Bind an app's role to one of the owner's (their approval), or unbind it with '', which also
+   *  dismisses the app's request (`dismiss` only changes what the page says). */
+  const bind = async (binding, roleId, dismiss = false) => {
     const flash = flashFor(setAppMsg);
     setBusy('bind');
     try {
       const r = await apiPut('/v1/ai/roles', { bindings: { [binding]: roleId || null } });
       if (r?.ok === false) throw r;
-      flash(roleId ? x('rl.bound', { role: roles.find((q) => q.id === roleId)?.title || roleId }) : x('rl.unbound'));
+      flash(roleId ? x('rl.bound', { role: roles.find((q) => q.id === roleId)?.title || roleId }) : x(dismiss ? 'rl.dismissed' : 'rl.unbound'));
       setBindDraft((d) => { const n = { ...d }; delete n[binding]; return n; });
       await load();
     } catch (e) { flash(errText(e, x('saveFailed')), true); }

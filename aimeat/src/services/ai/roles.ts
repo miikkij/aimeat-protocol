@@ -26,6 +26,8 @@
  *   ROLES_KEY · ROLES_USED_KEY · OwnerRole · RoleBinding · RolesRecord · readRoles · rolesWithLegacy ·
  *   normaliseRolesInput · setRoles · resolveRole · noteRoleUsed · bindingKey
  * @version-history
+ *   v1.1.0 — 2026-09-28 — A binding the owner's role cannot meet (a capability the app's role needs and
+ *     the role has no provider for) is refused; a binding set to null also dismisses the app's request.
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import type { Storage } from '../../storage/interface.js';
@@ -38,6 +40,7 @@ import { AiCompletionError } from './errors.js';
 import type { AiCapability } from './types.js';
 import type { AiProvider } from './providers.js';
 import type { AppAiRole } from '../app-ai-roles.js';
+import { appAiMetaOf } from './policy-store.js';
 
 export const ROLES_KEY = 'ai.roles.owner';
 export const ROLES_USED_KEY = 'ai.roles.used';
@@ -227,14 +230,49 @@ async function writeRoles(storage: Storage, gaii: string, change: CheckedRolesIn
     }
   }
   const bindings = { ...current.bindings };
+  const dismissed: string[] = [];
   for (const [k, target] of Object.entries(change.bindings ?? {})) {
-    if (target === null) delete bindings[k];
+    // Null unbinds, and dismisses the app's request for the role: the owner has seen it and said no,
+    // or the app is gone. A later call from the app asks again.
+    if (target === null) { delete bindings[k]; dismissed.push(k); }
     else bindings[k] = { role: target, boundAt: at };
   }
   const record: RolesRecord = { version: 1, roles, bindings, updatedAt: at };
   await upsertPrivateRecord(storage, gaii, ROLES_KEY, record, ['ai', 'roles']);
+  const answered = [...dismissed, ...Object.keys(change.bindings ?? {}).filter((k) => change.bindings![k] !== null)];
+  if (answered.length) {
+    const rec = await storage.getMemory(gaii, ROLES_REQUESTS_KEY);
+    if (isObj(rec?.value) && answered.some((k) => k in (rec.value as object))) {
+      const requests = { ...rec.value };
+      for (const k of answered) delete requests[k];
+      await upsertPrivateRecord(storage, gaii, ROLES_REQUESTS_KEY, requests, ['ai', 'roles']);
+    }
+  }
   emitChange('ai-providers', gaii);
   return readRoles(storage, gaii);
+}
+
+/**
+ * A binding the owner's role cannot meet: the app's role needs a capability the owner's role has no
+ * provider for. Refused when the binding is made, rather than found by the app's first call. A model
+ * too small for the app's context is shown on the AI page and passed over in the call (roles-fit.ts).
+ */
+async function unmetBindings(storage: Storage, gaii: string, change: CheckedRolesInput, current: RolesRecord): Promise<string[]> {
+  const problems: string[] = [];
+  const roles: Record<string, OwnerRole | null> = { ...current.roles, ...(change.roles ?? {}) };
+  for (const [k, target] of Object.entries(change.bindings ?? {})) {
+    if (target === null) continue;
+    const app = k.slice(0, k.lastIndexOf('#'));
+    const name = k.slice(k.lastIndexOf('#') + 1);
+    const need = (await appAiMetaOf(storage, gaii, app))?.roles?.find((d) => d.name === name);
+    if (!need) continue;
+    const role = roles[target];
+    const missing = need.capabilities.filter((c) => !role?.capabilities[c]?.length);
+    if (missing.length) {
+      problems.push(`bindings.${k}: the app's role needs ${missing.join(', ')}, and your role '${target}' has no provider for ${missing.length > 1 ? 'them' : 'it'}. Add ${missing.length > 1 ? 'them' : 'it'} to the role first, or connect another role.`);
+    }
+  }
+  return problems;
 }
 
 export type RolesActor = { kind: 'owner' } | { kind: 'agent'; principal: string; confirmToken?: string };
@@ -255,6 +293,8 @@ export async function setRoles(
   const current = await readRoles(storage, gaii);
   const r = normaliseRolesInput(input, knownProviders, current);
   if ('problems' in r) throw new AiCompletionError('AI_ROLES_INVALID', 400, `The roles were not saved: ${r.problems.join(' ')}`, { problems: r.problems });
+  const unmet = await unmetBindings(storage, gaii, r.value, current);
+  if (unmet.length) throw new AiCompletionError('AI_ROLES_INVALID', 400, `The roles were not saved: ${unmet.join(' ')}`, { problems: unmet });
   if (actor.kind === 'owner') return { mode: 'applied', roles: await writeRoles(storage, gaii, r.value) };
   if (!actor.confirmToken) {
     return {
