@@ -118,14 +118,18 @@ jobs:
       # come out the same (tauri-cli 2.11.2: sign_updaters in bundle.rs returns at once when the
       # setting is false). On macOS the one thing that setting would add is the .app.tar.gz, which
       # the next step makes itself. APPIMAGE_EXTRACT_AND_RUN lets the AppImage tooling run without
-      # FUSE, which a CI runner does not have; it means nothing on the other two.
+      # FUSE, which a CI runner does not have; NO_STRIP keeps linuxdeploy from running its own old
+      # strip over the libraries it copies, which fails on sections newer toolchains write. Both mean
+      # nothing on the other two. --verbose prints linuxdeploy's own output: without it a failed
+      # AppImage says only "failed to run linuxdeploy" (the first three-platform run, 2026-09-28).
       - name: Build installers
         shell: bash
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
+          NO_STRIP: 'true'
         run: |
           printf '%s' '{"bundle":{"createUpdaterArtifacts":false}}' > "$RUNNER_TEMP/no-updater-artifacts.json"
-          pnpm tauri build --config "$RUNNER_TEMP/no-updater-artifacts.json"
+          pnpm tauri build --verbose --config "$RUNNER_TEMP/no-updater-artifacts.json"
         working-directory: aimeat-desktop
 
       - name: List built bundles

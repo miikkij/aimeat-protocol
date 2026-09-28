@@ -47,12 +47,14 @@
  *
  *   A job that truly needs a write permission and dependency code together goes in
  *   WRITE_JOB_EXEMPTIONS with its reason, and a file that must break a file rule goes in
- *   FILE_EXEMPTIONS the same way. The first is empty and the second has one entry, the desktop's
- *   clone of the project's own fleet repository; adding to either is a decision.
+ *   FILE_EXEMPTIONS the same way. Both are empty; adding to either is a decision.
  * @structure workflowFindings(file, text) · commandFindings(file, text) · modelFindings(file, text)
  *   · composeFindings(file, text) · main() reads the three trees and prints `file:line  rule  what to do`
  * @usage cd aimeat && pnpm check:supply-chain
  * @version-history
+ *   v1.1.1 — 2026-09-29 — FILE_EXEMPTIONS is empty: the desktop app no longer ships the agent-runtime
+ *     scripts (provision.mjs and its fleet clone went with the local agent path). scan() takes the
+ *     exemptions as an optional argument, so the unit test proves the rule with an entry of its own.
  *   v1.1.0 — 2026-09-24 — The pip rules hold in every workflow step, whatever the job holds, with a
  *     build's isolated environment and a local install's dependencies counted as pip installs.
  *   v1.0.0 — 2026-09-24 — Initial. The release, MCP publish, scanner, CodeQL, semantic audit and
@@ -86,12 +88,7 @@ export interface Finding { file: string; line: number; rule: string; fix: string
 export const WRITE_JOB_EXEMPTIONS: Readonly<Record<string, string>> = {};
 
 /** File rules a file may break, `<file>#<rule>` with the reason. An entry nothing matches is refused. */
-export const FILE_EXEMPTIONS: Readonly<Record<string, string>> = {
-    'aimeat-desktop/src-tauri/resources/agent-runtime/provision.mjs#git-unpinned':
-        'The clone is crewaimeat, this project\'s own fleet repository (miikkij/crewaimeat unless AIMEAT_CREWAIMEAT_REPO names another), '
-        + 'which provision.mjs follows at main on purpose: every run fetches main again, so the fleet changes without a desktop release. '
-        + 'Pinning it to a commit is a product decision, not taken here.',
-};
+export const FILE_EXEMPTIONS: Readonly<Record<string, string>> = {};
 
 /**
  * The key each model's server reads, from its own source at the version this repository pins:
@@ -534,8 +531,11 @@ function textOf(root: string, file: string): string | null {
 
 export interface Scan { findings: Finding[]; workflows: number; modelFiles: number; desktopFiles: number }
 
-/** Read the three trees under `root` (the repository, or a copy of one) and list what is wrong. */
-export function scan(root: string): Scan {
+/**
+ * Read the three trees under `root` (the repository, or a copy of one) and list what is wrong.
+ * `fileExemptions` is FILE_EXEMPTIONS unless a caller (the unit test) passes its own.
+ */
+export function scan(root: string, fileExemptions: Readonly<Record<string, string>> = FILE_EXEMPTIONS): Scan {
     const findings: Finding[] = [];
     const workflows = readdirSync(path.join(root, WORKFLOW_DIR)).filter(f => /\.ya?ml$/.test(f)).sort();
     const jobIds = new Set<string>();
@@ -570,11 +570,11 @@ export function scan(root: string): Scan {
     const used = new Set<string>();
     const kept = findings.filter(f => {
         const key = `${f.file}#${f.rule}`;
-        if (!FILE_EXEMPTIONS[key]) return true;
+        if (!fileExemptions[key]) return true;
         used.add(key);
         return false;
     });
-    for (const [key, reason] of Object.entries(FILE_EXEMPTIONS)) {
+    for (const [key, reason] of Object.entries(fileExemptions)) {
         if (!used.has(key)) kept.push({ file: 'aimeat/scripts/check-supply-chain.ts', line: 1, rule: 'exemption', fix: `FILE_EXEMPTIONS names ${key}, which no longer finds anything; remove the entry` });
         if (!reason.trim()) kept.push({ file: 'aimeat/scripts/check-supply-chain.ts', line: 1, rule: 'exemption', fix: `FILE_EXEMPTIONS entry ${key} gives no reason` });
     }
