@@ -374,6 +374,9 @@ const ALL_SUITES = [
     // not call — so the consent layer, the meta.* admin rule and the member.* self-write rule held
     // on the browser and not on the agent.
     'test/e2e-mcp-organism-namespace.ts',
+    // Which of its members' agents an organism admits: the refusal on REST, MCP and the key namespace,
+    // who may change the list and the setting, and the member list naming only the admitted.
+    'test/e2e-organism-agent-access.ts',
     // The MCP task lifecycle, which nothing exercised — which is why five differences from the REST
     // routes survived every green run.
     'test/e2e-mcp-agent-tasks.ts',

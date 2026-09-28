@@ -380,9 +380,9 @@ export const governanceMethods = {
   async createOrganism(this: SqliteStorage, record: OrganismRecord): Promise<OrganismRecord> {
     this.db.prepare(
       `INSERT INTO organisms (id, name, description, type, location, interests, creatorGhii, createdBy, owners, admins,
-       members, agentGaiis, boardId, joinPolicy, maxMembers, visibility, memberVisibility, moderationConfig,
+       members, agentGaiis, boardId, joinPolicy, maxMembers, visibility, memberVisibility, agentAccess, moderationConfig,
        memoryNamespace, semantic, createdAt, updatedAt, archived, archivedAt, archivedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.name, record.description, record.type,
       record.location ? JSON.stringify(record.location) : null,
@@ -393,6 +393,7 @@ export const governanceMethods = {
       JSON.stringify(record.agentGaiis), record.boardId,
       record.joinPolicy, record.maxMembers, record.visibility,
       record.memberVisibility ?? null,
+      record.agentAccess ?? null,
       JSON.stringify(record.moderationConfig), record.memoryNamespace,
       record.semantic ? JSON.stringify(record.semantic) : null,
       record.createdAt, record.updatedAt,
@@ -437,7 +438,7 @@ export const governanceMethods = {
     this.db.prepare(
       `UPDATE organisms SET name = ?, description = ?, type = ?, location = ?, interests = ?,
        creatorGhii = ?, createdBy = ?, owners = ?, admins = ?, members = ?, agentGaiis = ?, boardId = ?,
-       joinPolicy = ?, maxMembers = ?, visibility = ?, memberVisibility = ?, moderationConfig = ?,
+       joinPolicy = ?, maxMembers = ?, visibility = ?, memberVisibility = ?, agentAccess = ?, moderationConfig = ?,
        memoryNamespace = ?, semantic = ?, createdAt = ?, updatedAt = ?,
        archived = ?, archivedAt = ?, archivedBy = ? WHERE id = ?`
     ).run(
@@ -450,6 +451,7 @@ export const governanceMethods = {
       JSON.stringify(updated.agentGaiis), updated.boardId,
       updated.joinPolicy, updated.maxMembers, updated.visibility,
       updated.memberVisibility ?? null,
+      updated.agentAccess ?? null,
       JSON.stringify(updated.moderationConfig), updated.memoryNamespace,
       updated.semantic ? JSON.stringify(updated.semantic) : null,
       updated.createdAt, updated.updatedAt,
@@ -516,6 +518,7 @@ export const governanceMethods = {
       maxMembers: row.maxMembers as number,
       visibility: row.visibility as OrganismRecord['visibility'],
       memberVisibility: (row.memberVisibility as OrganismRecord['memberVisibility'] | null) ?? undefined,
+      agentAccess: (row.agentAccess as OrganismRecord['agentAccess'] | null) ?? undefined,
       moderationConfig: JSON.parse(row.moderationConfig as string),
       memoryNamespace: row.memoryNamespace as string,
       createdAt: row.createdAt as string,

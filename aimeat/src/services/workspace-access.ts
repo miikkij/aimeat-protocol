@@ -17,6 +17,7 @@
  *   import { canReadWorkspace } from '../services/workspace-access.js';
  *   const ok = await canReadWorkspace(storage, config, organism, callerSub, callerOwner, callerGaii, ws);
  * @version-history
+ *   2026-09-28 — Gate 0: an agent the organism does not admit (agentAccess 'listed') reads no workspace.
  *   v1.0.0 -- 2026-06-21 -- Extract the workspace read gate (was inline in the route + organism-comments)
  *     so the connector record-push subscription enforces byte-identical access.
  *   v1.1.0 -- 2026-07-02 -- Gate 3: ecosystem (GEAI) reads require a matching 'read' data-area grant
@@ -34,6 +35,7 @@ import { authorizeRead } from './access-guard.js';
 import { isSameOwner, isGEAI } from '../utils/gaii.js';
 import { ecoMayReadKey } from './ecosystem-access.js';
 import { readWorkspaceMetaRecord } from './workspace-meta.js';
+import { agentBarred } from './organism-agent-access.js';
 
 /**
  * True when this owner is the organism's creator or an admin. Org managers get automatic read+write
@@ -73,6 +75,8 @@ export async function canReadWorkspace(
   callerGaii: string,
   ws: string,
 ): Promise<boolean> {
+  // Gate 0: an organism that admits only listed agents treats every other agent as a non-member.
+  if (agentBarred(organism, callerSub)) return false;
   // Gate 1: membership. The owner's membership row also decides org-manager status (creator/admin),
   // which grants an automatic pass on Gate 2 below — resolve it in the same lookup.
   let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);

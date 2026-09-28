@@ -98,6 +98,7 @@ export function initializeSchema(db: Database.Database): void {
 
   // Organism member-roster visibility (privacy fix 2026-07-03: rosters were world-readable).
   safeAddColumn('organisms', 'memberVisibility', 'TEXT');
+  safeAddColumn('organisms', 'agentAccess', 'TEXT');
   // Ownership split in two (mirrors Postgres migration 0038): `createdBy` is history and never moves,
   // `owners` is the authority and is plural. `creatorGhii` used to be both, so a handover rewrote who
   // made the organism, and a single owner had no way back once that account went unreachable. Both

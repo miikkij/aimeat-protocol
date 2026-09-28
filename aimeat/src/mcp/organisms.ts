@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-09-28 — aimeat_organism_update takes agent_access; an agent can narrow it, never widen it.
+ *     aimeat_organism_members names only the agents the organism admits.
  *   v1.8.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.8.1 — 2026-08-29 — aimeat_organism_create's `type` is described as free text with five presets.
@@ -61,6 +63,7 @@ import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { isOrganismOwner, organismOwners } from '../services/organism-ownership.js';
+import { agentBarred } from '../services/organism-agent-access.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -160,7 +163,9 @@ export function registerOrganismsTools(
             // Get public organisms (archived ones are read-only/hidden from AI operations — excluded)
             const publicOrgs = await storage.listOrganisms({ visibility: 'public', archived: 'exclude' });
             // Get organisms the owner is a member of (may include private ones); archived excluded too
-            const memberOrgs = await storage.listOrganisms({ member: ownerName, archived: 'exclude' });
+            // An organism that does not admit this agent is not one it works in (agentAccess).
+            const memberOrgs = (await storage.listOrganisms({ member: ownerName, archived: 'exclude' }))
+                .filter(o => !agentBarred(o, agentGaii));
             // Merge, deduplicate by id
             const seen = new Set<string>();
             const all = [...publicOrgs, ...memberOrgs].filter(o => {
@@ -339,7 +344,10 @@ export function registerOrganismsTools(
                 const ownerNames = [...new Set(members.map(m => localAccountName(m.ghii)))];
                 const batched = await storage.getAgentsByOwners(ownerNames);
                 for (const name of ownerNames) {
-                    agentsByOwner.set(name, (batched[name] ?? []).map(a => ({ gaii: a.gaii, name: a.name })));
+                    // Only the agents the organism admits (agentAccess): the others cannot act here.
+                    agentsByOwner.set(name, (batched[name] ?? [])
+                        .filter(a => !agentBarred(organism, a.gaii))
+                        .map(a => ({ gaii: a.gaii, name: a.name })));
                 }
             }
 
@@ -568,9 +576,10 @@ export function registerOrganismsTools(
             interests: z.array(z.string()).optional().describe('Interest tags'),
             join_policy: z.string().optional().describe('open | approval_required | invite_only'),
             visibility: z.string().optional().describe('public | listed | private'),
+            agent_access: z.enum(['all', 'listed']).optional().describe('Which members\' agents may act here: "all" (every member\'s agents, the default) or "listed" (only the agents in the Agents section of the organism\'s page; any other agent is refused as a non-member). An agent can set "listed"; only the owner signed in can set "all" again.'),
         },
         annotationsFor('aimeat_organism_update'),
-        async ({ organism_id, name, description, readme, interests, join_policy, visibility }) => {
+        async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = getOwnerName();
@@ -582,6 +591,8 @@ export function registerOrganismsTools(
             // visibility is refused here rather than dropped, so "updated" means it was.
             const result = await updateOrganismRecord({ storage, config }, organism, {
                 name, description, readme, interests, joinPolicy: join_policy, visibility,
+                // An MCP session is always an agent, never the person in person.
+                agentAccess: agent_access, callerIsPerson: false,
             });
             if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);

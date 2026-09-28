@@ -17,6 +17,8 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   2026-09-28 — "Who gets in" has the Agents choice: every member's agents, or only the agents in the Agents
+ *     section (agent_access). Sent only when changed.
  *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the page is the SettingsPage (crumb, title with its small print, the rail as data with the first section marked and the way back), the sections the Section (the member's Leave box a plain one), the fields the TextField, TextArea, TagInput and Choice with their labels and hints, the danger boxes the SettingBox with SettingRow and SettingConfirm, the board id's copy the Action's link tone. The local Choice goes (the kit's Choice draws the same tabs). The page writes no class.
  *   v1.8.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.7.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
@@ -61,12 +63,14 @@ const TYPE_PRESETS = ['community', 'team', 'club', 'cooperative', 'project'];
 const JOIN = ['open', 'approval_required', 'invite_only'];
 const VIS = ['public', 'listed', 'private'];
 const MEMBER_VIS = ['authenticated', 'members', 'admins', 'public'];
+const AGENT_ACCESS = ['all', 'listed'];
 
 export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast, confirm, onBack, onChanged, onLeave, onDeleted }) {
   const baseline = useMemo(() => ({
     name: org.name || '', description: org.description || '', type: org.type || 'community',
     join_policy: org.joinPolicy || 'open', visibility: org.visibility || 'public',
     member_visibility: org.memberVisibility || 'authenticated',
+    agent_access: org.agentAccess === 'listed' ? 'listed' : 'all',
     interests: [...(org.interests || [])],
   }), [org]);
   const [form, setForm] = useState(baseline);
@@ -82,6 +86,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
     const untouched = form.name === prev.name && form.description === prev.description
       && form.type === prev.type && form.join_policy === prev.join_policy
       && form.visibility === prev.visibility && form.member_visibility === prev.member_visibility
+      && form.agent_access === prev.agent_access
       && form.interests.join(' ') === prev.interests.join(' ');
     if (untouched) { setForm(baseline); setCustomType(!TYPE_PRESETS.includes(baseline.type)); }
     prevBaselineRef.current = baseline;
@@ -91,6 +96,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
     || form.type !== baseline.type || form.join_policy !== baseline.join_policy
     || form.visibility !== baseline.visibility
     || form.member_visibility !== baseline.member_visibility
+    || form.agent_access !== baseline.agent_access
     || form.interests.join(' ') !== baseline.interests.join(' ');
 
   const saveEdit = async () => {
@@ -102,6 +108,8 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
         name: form.name.trim(), description: form.description.trim(),
         type: form.type.trim(), join_policy: form.join_policy, visibility: form.visibility,
         member_visibility: form.member_visibility, interests: form.interests,
+        // Sent only when changed: an unchanged setting is no request to change it.
+        ...(form.agent_access !== baseline.agent_access ? { agent_access: form.agent_access } : {}),
       });
       if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); onChanged?.(); }
       else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
@@ -234,9 +242,14 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
         <//>
 
         <${Section} id="og-set-access" num="02" title=${label('setAccess', 'Who gets in')}>
+          <${Fields}>
           <${Choice} label=${label('setJoin', 'Joining')} value=${form.join_policy} onChange=${(id) => setForm(f => ({ ...f, join_policy: id }))}
             hint=${policyHint && !policyHint.startsWith('organisms.') ? policyHint : undefined}
             options=${JOIN.map(id => ({ value: id, label: t(`organisms.policyShort.${id}`) || id }))} />
+          <${Choice} label=${label('setAgentAccess', 'Agents')} value=${form.agent_access} onChange=${(id) => setForm(f => ({ ...f, agent_access: id }))}
+            hint=${t('organisms.agentAccessHint') || "A member's agents can read and write here with the member's rights. When you bring in people from outside, choose the second option: then only the agents you add in the Agents section can act here, and the member list shows only them."}
+            options=${AGENT_ACCESS.map(id => ({ value: id, label: t(`organisms.agentAccess.${id}`) || id }))} />
+          <//>
         <//>
 
         <${Section} id="og-set-vis" num="03" title=${label('setVisibility', 'Who sees')}>

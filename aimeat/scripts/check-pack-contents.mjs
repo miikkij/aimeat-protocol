@@ -17,12 +17,14 @@
  *                                                          fetches and marks distributable
  *     dist/static/x                                      ← src/static/x
  *     dist/docs/{msm-examples,extensions}/x              ← the repo-root docs/ of the same name
+ *     dist/openapi.yaml                                  ← the repo-root openapi.yaml
  *     dist/locales, dist/docs, the migrations, .env.example ← the same path
  *   plus the few files the build itself writes (GENERATED, each with its reason).
  *
  *   Plain .mjs, matching the other build steps.
  * @usage node scripts/check-pack-contents.mjs   # prepublishOnly runs it after `pnpm build`
  * @version-history
+ *   v1.1.0 — 2026-09-28 — dist/openapi.yaml comes from the repo-root contract.
  *   v1.0.0 — 2026-09-15 — Initial.
  */
 import { execFileSync } from 'node:child_process';
@@ -78,6 +80,7 @@ function sourcesFor(rel) {
   }
   if (top === 'static') return [`src/${rel}`];
   if (rel.startsWith('docs/msm-examples/') || rel.startsWith('docs/extensions/')) return [`../${rel}`];
+  if (rel === 'openapi.yaml') return ['../openapi.yaml'];
   return [rel];
 }
 
@@ -86,7 +89,7 @@ function main() {
     console.error('check-pack-contents: dist/ does not exist. Run `pnpm build` first.');
     process.exit(1);
   }
-  const git = tracked(['.', '../docs/msm-examples', '../docs/extensions']);
+  const git = tracked(['.', '../docs/msm-examples', '../docs/extensions', '../openapi.yaml']);
   const vendored = vendoredPublicPaths();
 
   const orphans = [];

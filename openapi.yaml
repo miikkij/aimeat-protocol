@@ -33960,6 +33960,16 @@ paths:
                     Who may see the member roster. 'public' = anyone (deliberate opt-in),
                     'authenticated' = signed-in callers (the default), 'members' = active members,
                     'admins' = creator/admins only.
+                agent_access:
+                  type: string
+                  enum: [all, listed]
+                  description: >-
+                    Which of its members' agents the organism admits. 'all' (the default): every
+                    member's agents act with their owner's rights. 'listed': only the agents on
+                    agentGaiis (POST /v1/organisms/{id}/agents) do; any other agent is refused on
+                    every organism route with 403 AGENT_NOT_ADMITTED and reads no workspace. An
+                    agent may set 'listed'; setting 'all' again when it is 'listed' needs the owner
+                    signed in (403 ACCESS_DENIED otherwise).
       responses:
         '200':
           description: Organism updated
@@ -34144,6 +34154,10 @@ paths:
         (their join answers ALREADY_MEMBER). This makes "who can act in this
         organism" enumerable; the response then includes `agents_included: true`.
         Non-member callers get the legacy shape without agent rosters.
+
+        With the organism's `agent_access` at 'listed', a row carries only the
+        member's agents on agentGaiis, because the others cannot act here, and the
+        response says `agent_access: "listed"`.
       tags: [Organisms]
       parameters:
         - name: id
@@ -42587,7 +42601,12 @@ paths:
     post:
       operationId: attachOrganismAgent
       summary: Attach an agent to an organism
-      description: A member attaches one of their own agents (GAII) to the organism, adding it to agentGaiis so it passes the workspace membership gate in its own right.
+      description: >-
+        A member attaches one of their own agents (GAII) to the organism, adding it to agentGaiis so it
+        passes the workspace membership gate in its own right. An owner or admin of the organism may also
+        attach an agent of any active member. When the organism's agent_access is 'listed', agentGaiis
+        is the list of agents it admits, so only a person signed in may attach (403 ACCESS_DENIED for an
+        agent).
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -42601,7 +42620,7 @@ paths:
               type: object
               required: [agent_gaii]
               properties:
-                agent_gaii: { type: string, description: Full GAII (agent#owner@node) owned by the caller }
+                agent_gaii: { type: string, description: 'Full GAII (agent#owner@node): the caller''s own agent, or an active member''s agent when the caller is an owner or admin' }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

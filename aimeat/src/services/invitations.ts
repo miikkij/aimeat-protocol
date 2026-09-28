@@ -21,6 +21,7 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-09-28 — The invitation email carries each workspace's name; it showed the id (ws-...).
  *   v1.8.1 — 2026-09-26 — A workspace creator's and a departing member's account names come from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-08-25 — Withdraw and edit find a pending invitation through
  *     services/invitation-lookup.ts, which also matches a legacy row keyed by the full GHII. Such a
@@ -286,7 +287,11 @@ export async function createEmailInvitation(
       orgName: input.organism.name,
       inviterName: input.inviterGhii,
       acceptUrl,
-      workspaces: invitation.workspaces.map(g => ({ ws: g.ws, role: g.role })),
+      // By name: the id (ws-...) means nothing to the person reading the email.
+      workspaces: await Promise.all(invitation.workspaces.map(async g => ({
+        ws: g.ws, role: g.role,
+        name: (await findWorkspaceEntry(storage, input.organism.id, g.ws))?.name || undefined,
+      }))),
       message: invitation.message,
       // An expiry a person can read. `existing` is the whole record when the address already has an
       // account here, so their regional format costs nothing extra; an address with no account has

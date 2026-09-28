@@ -13,6 +13,7 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-09-28 — The send names its principal, so an organism's company refuses an agent the organism does not admit.
  *   v1.4.0 — 2026-09-25 — Whether an address has an account here reaches the owner in person only:
  *     a contact's `ghii` on the save, the list, the opt-out and the bounce answers, and the `channel`
  *     of a send, its log rows and its refusal's details, are left out for an agent, an app and any
@@ -51,6 +52,7 @@ import {
 } from '../services/outbound/outbound-service.js';
 import { resolveCompanyScope } from '../services/finance/company-scope.js';
 import { FinanceError } from '../services/finance/errors.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 const ContactSchema = z.object({
   name: z.string().min(1).max(140),
@@ -307,6 +309,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       const result = await sendOutbound(config, storage, resolve(req), {
+        principal: resolveIdentity(req.auth!, config.nodeId),
         contactId: b.contact_id, kind: b.kind,
         subject: b.subject, body: b.body,
         templateId: b.template_id, variables: b.variables,

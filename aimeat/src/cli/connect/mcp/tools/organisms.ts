@@ -5,6 +5,8 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   v1.7.2 -- 2026-09-28 -- aimeat_organism_invite_email takes return_url and passes it to the REST route;
+ *     aimeat_organism_update takes agent_access.
  *   v1.7.1 -- 2026-08-29 -- aimeat_organism_create's `type` is described as free text with five presets.
  *   v1.7.0 -- 2026-08-25 -- aimeat_organism_member_remove (DELETE /v1/organisms/:id/members/:ghii,
  *     ?ban=1), parity with the server MCP and the CLI dispatch.
@@ -84,7 +86,8 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     interests: z.array(z.string()).optional().describe('Interest tags.'),
     join_policy: z.string().optional().describe('open | approval_required | invite_only.'),
     visibility: z.string().optional().describe('public | listed | private.'),
-  }, annotationsFor('aimeat_organism_update'), async ({ organism_id, name, description, readme, interests, join_policy, visibility }) => {
+    agent_access: z.enum(['all', 'listed']).optional().describe('Which members\' agents may act here: "all" (every member\'s agents, the default) or "listed" (only the agents in the Agents section of the organism\'s page; any other agent is refused as a non-member). An agent can set "listed"; only the owner signed in can set "all" again.'),
+  }, annotationsFor('aimeat_organism_update'), async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access }) => {
     const body: Record<string, unknown> = {};
     if (name !== undefined) body.name = name;
     if (description !== undefined) body.description = description;
@@ -92,6 +95,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     if (interests !== undefined) body.interests = interests;
     if (join_policy !== undefined) body.join_policy = join_policy;
     if (visibility !== undefined) body.visibility = visibility;
+    if (agent_access !== undefined) body.agent_access = agent_access;
     const resp = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}`, body);
     return envelopeResult(resp);
   });
@@ -426,12 +430,14 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     workspaces: z.array(z.object({ ws: z.string(), role: z.enum(['viewer', 'contributor']) })).optional().describe('Optional per-workspace grants.'),
     message: z.string().optional().describe('Optional personal note included in the email.'),
     expires_in_days: z.number().int().positive().optional().describe('Days until the invitation expires (1-30, default 7).'),
-  }, annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days }) => {
+    return_url: z.string().optional().describe('Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.'),
+  }, annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url }) => {
     const body: Record<string, unknown> = { email };
     if (org_role) body.orgRole = org_role;
     if (workspaces) body.workspaces = workspaces;
     if (message) body.message = message;
     if (expires_in_days !== undefined) body.expiresInDays = expires_in_days;
+    if (return_url) body.return_url = return_url;
     return out(await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/email`, body));
   });
 

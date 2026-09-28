@@ -489,6 +489,7 @@ export function applySchemaTables1(db: Database.Database): void {
       maxMembers       INTEGER NOT NULL DEFAULT 100,
       visibility       TEXT NOT NULL DEFAULT 'public',
       memberVisibility TEXT,
+      agentAccess TEXT,
       moderationConfig TEXT NOT NULL DEFAULT '{}',
       memoryNamespace  TEXT NOT NULL,
       semantic         TEXT,

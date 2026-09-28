@@ -9,6 +9,7 @@
  * @structure OrgAgentsPanel
  * @usage import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
  * @version-history
+ *   2026-09-28 — The description says when the organism admits only the agents listed here (agentAccess).
  *   v1.10.1 — 2026-09-26 — An agent's contract tag is green again, as main drew it (.badge-success:
  *     Mark tone="fine"; fix pass).
  *   v1.10.0 — 2026-09-26 — The line under an agent's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
@@ -114,7 +115,9 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
   return html`
     <${Split}>
       <${Row} align="start" justify="between" gap="medium">
-        <${HeadDesc}>${t('organisms.agentsDesc') || 'An attached agent works in this organism with its owner’s member rights — it shows up in workspace participants and activity.'}<//>
+        <${HeadDesc}>${org.agentAccess === 'listed'
+          ? (t('organisms.agentsDescListed') || "This organism admits only the agents listed here. Each one acts with its owner's member rights. The members' other agents cannot read or write here.")
+          : (t('organisms.agentsDesc') || 'An attached agent works in this organism with its owner’s member rights — it shows up in workspace participants and activity.')}<//>
         <${Loud} control expanded=${showAttach} onClick=${() => setShowAttach(s => !s)}>${'+ '}${t('organisms.attachAgent') || 'Attach agent'}<//>
       <//>
 

@@ -28,6 +28,7 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-09-28 — updateOrganismRecord takes agentAccess; widening it back to "all" needs the person in person.
  *   v1.1.1 — 2026-09-26 — The joiner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-29 — The type is free text (1 to 40 characters, trimmed) on create and update; the
  *     five names that used to be the whole list are presets the settings offer with a translation.
@@ -50,6 +51,7 @@ import { MEMBER_VISIBILITY_VALUES } from './organism-privacy.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isOrganismOwner } from './organism-ownership.js';
+import { AGENT_ACCESS_VALUES, agentAccessOf, type AgentAccess } from './organism-agent-access.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -205,7 +207,10 @@ export interface UpdateOrganismInput {
   maxMembers?: unknown;
   visibility?: unknown;
   memberVisibility?: unknown;
+  agentAccess?: unknown;
   readme?: unknown;
+  /** The caller is the person in person (isOwnerPrincipal), not an agent: needed to widen agentAccess. */
+  callerIsPerson?: boolean;
 }
 
 /**
@@ -270,6 +275,17 @@ export async function updateOrganismRecord(
       return refuse(400, 'INVALID_INPUT', `member_visibility must be one of: ${MEMBER_VISIBILITY_VALUES.join(', ')}`);
     }
     updates.memberVisibility = input.memberVisibility as OrganismRecord['memberVisibility'];
+  }
+  if (input.agentAccess !== undefined) {
+    if (!AGENT_ACCESS_VALUES.includes(input.agentAccess as AgentAccess)) {
+      return refuse(400, 'INVALID_INPUT', `agent_access must be one of: ${AGENT_ACCESS_VALUES.join(', ')}`);
+    }
+    // Narrowing is open to any manager, an agent included. Widening lets every member's agent in, so
+    // an agent that is kept out could otherwise let itself back in: only the person does it.
+    if (input.agentAccess === 'all' && agentAccessOf(organism) === 'listed' && !input.callerIsPerson) {
+      return refuse(403, 'ACCESS_DENIED', 'Only the owner, signed in, can let every member\'s agent into this organism again. An agent can only narrow it. The setting is on the organism\'s Settings page.');
+    }
+    updates.agentAccess = input.agentAccess as AgentAccess;
   }
   if (input.maxMembers !== undefined) {
     const n = Number(input.maxMembers);

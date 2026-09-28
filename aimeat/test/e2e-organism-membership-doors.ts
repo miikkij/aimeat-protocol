@@ -21,6 +21,8 @@
  *   Phase 9  401 on every door
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-organism-membership-doors
  * @version-history
+ *   2026-09-28 — Test 29: a plain member, not the creator, is the one refused another member's agent; an
+ *     agent nobody holds is refused with 404.
  *   v1.0.0 — 2026-09-08 — Initial. Every route here is requireAuth() + requireRole('agent') except
  *     the members listing (optionalAuth), and requireRole('agent') admits an owner session, so the
  *     suite drives them with owner tokens — which is also what a person's browser sends.
@@ -488,18 +490,23 @@ await test('28. A direct add lands as an ACTIVE member with no accept round trip
 // ─── Phase 8 — agent attach and detach ───
 console.log('Phase 8 — agent attach and detach');
 
-await test('29. Attach refusals: no gaii, an agent you do not own, and a missing organism', async () => {
+await test('29. Attach refusals: no gaii, another member\'s agent without being an owner or admin, a missing organism, an agent nobody holds', async () => {
     const url = `/v1/organisms/${org}/agents`;
     const noGaii = await json(url, { method: 'POST', headers: auth(M.token), body: '{}' });
     assert(noGaii.status === 400 && noGaii.body.error?.code === 'INVALID_INPUT', `no gaii: ${noGaii.status} ${noGaii.body.error?.code}`);
     const notString = await json(url, { method: 'POST', headers: auth(M.token), body: JSON.stringify({ agent_gaii: 12 }) });
     assert(notString.status === 400 && notString.body.error?.code === 'INVALID_INPUT', `non-string gaii: ${notString.status} ${notString.body.error?.code}`);
-    const notMine = await json(url, { method: 'POST', headers: auth(CR.token), body: JSON.stringify({ agent_gaii: mAgent }) });
+    // A plain member may attach only their own agents. An organism owner or admin may attach any active
+    // member's agent (2026-09-28, organism agent access), which e2e-organism-agent-access.ts covers.
+    const notMine = await json(url, { method: 'POST', headers: auth(W.token), body: JSON.stringify({ agent_gaii: mAgent }) });
     assert(notMine.status === 403 && notMine.body.error?.code === 'ACCESS_DENIED', `somebody else's agent: ${notMine.status} ${notMine.body.error?.code}`);
     const notAnAgent = await json(url, { method: 'POST', headers: auth(M.token), body: JSON.stringify({ agent_gaii: `${M.name}@${NODE_ID}` }) });
     assert(notAnAgent.status === 403 && notAnAgent.body.error?.code === 'ACCESS_DENIED', `a GHII is not an agent: ${notAnAgent.status} ${notAnAgent.body.error?.code}`);
     const missingOrg = await json(`/v1/organisms/${MISSING}/agents`, { method: 'POST', headers: auth(M.token), body: JSON.stringify({ agent_gaii: mAgent }) });
     assert(missingOrg.status === 404 && missingOrg.body.error?.code === 'NOT_FOUND', `missing organism: ${missingOrg.status} ${missingOrg.body.error?.code}`);
+    // A name nobody holds would admit whatever agent is later created under it.
+    const ghost = await json(url, { method: 'POST', headers: auth(M.token), body: JSON.stringify({ agent_gaii: `ghost${Date.now()}#${M.name}@${NODE_ID}` }) });
+    assert(ghost.status === 404 && ghost.body.error?.code === 'NOT_FOUND', `an agent nobody holds: ${ghost.status} ${ghost.body.error?.code}`);
 });
 
 await test('30. A non-member cannot attach even their OWN agent → 403 NOT_MEMBER', async () => {

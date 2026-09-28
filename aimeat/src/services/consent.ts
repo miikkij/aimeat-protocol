@@ -14,6 +14,7 @@
  * @usage
  *   import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
  * @version-history
+ *   2026-09-28 — A consent to an organism does not reach an agent the organism does not admit.
  *   v1.1.0 -- 2026-06-07 -- Resolve organism.{id} grants via active-membership lookup in
  *     checkConsentForRead (previously matchesRecipient returned false with no resolver).
  *   v1.2.0 -- 2026-06-21 -- auditDataAccess now enqueues into the in-memory consent-audit
@@ -31,6 +32,7 @@ export { matchesRecipient } from '../storage/consent-recipient.js';
 import { parseGaiiLoose, localAccountName, localAccountOf } from '../utils/gaii.js';
 import { bufferConsentAudit } from './consent-audit-buffer.js';
 import { logger } from '../utils/logger.js';
+import { barredAgentFor } from './organism-agent-access.js';
 
 
 /**
@@ -132,7 +134,10 @@ export async function checkConsentForRead(
           .map(m => m.organismId),
       );
       for (const c of orgGrants) {
-        if (activeOrgIds.has(c.recipient.slice('organism.'.length))) {
+        const orgId = c.recipient.slice('organism.'.length);
+        if (activeOrgIds.has(orgId)) {
+          // An organism that admits only listed agents: its other agents are not members here either.
+          if (await barredAgentFor(storage, orgId, accessorGaii)) continue;
           return { allowed: true, consentId: c.id, reason: 'organism_member_consent' };
         }
       }

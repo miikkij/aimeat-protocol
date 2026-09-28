@@ -32,6 +32,7 @@
  * @structure SendingCompany · resolveSendingCompany · listSendableCompanies
  * @usage const sender = await resolveSendingCompany(storage, callerGhii, companyId);
  * @version-history
+ *   2026-09-28 — An agent the organism does not admit (agentAccess 'listed') does not send as its company.
  *   v1.0.1 — 2026-09-24 — The caller's account is localAccountName's: a visitor's home GHII stays
  *     whole, so it never finds the memberships of the local account sharing its local part
  *     (secaudit 2026-09, F-1).
@@ -40,6 +41,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { CompanyRecord } from '../../models/company-schemas.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { barredAgentFor } from '../organism-agent-access.js';
 
 export interface SendingCompany {
   company: CompanyRecord;
@@ -62,7 +64,7 @@ const bareOwner = (ghii: string): string => localAccountName(String(ghii || ''))
  * gets: whether a company exists is not something a stranger should learn from a refusal.
  */
 export async function resolveSendingCompany(
-  storage: Storage, callerGhii: string, companyId: string,
+  storage: Storage, callerGhii: string, companyId: string, principal: string = callerGhii,
 ): Promise<SendingCompany | null> {
   const company = await storage.getCompany(companyId);
   if (!company) return null;
@@ -76,6 +78,8 @@ export async function resolveSendingCompany(
   if (!company.organismId) return null;
   const membership = await storage.getMembership(company.organismId, bareOwner(callerGhii));
   if (!membership || membership.status !== 'active') return null;
+  // An organism that admits only listed agents does not let its other agents speak for its company.
+  if (await barredAgentFor(storage, company.organismId, principal)) return null;
 
   return { company, bookOwner: company.ownerGhii, via: 'organism' };
 }
@@ -88,7 +92,7 @@ export async function resolveSendingCompany(
  * company is listed once even when both routes reach it.
  */
 export async function listSendableCompanies(
-  storage: Storage, callerGhii: string,
+  storage: Storage, callerGhii: string, principal: string = callerGhii,
 ): Promise<Array<{ company: CompanyRecord; via: 'owner' | 'organism' }>> {
   const own = await storage.listCompanies({ ownerGhii: callerGhii, limit: 100, offset: 0 });
   const seen = new Set(own.map((c) => c.id));
@@ -101,6 +105,7 @@ export async function listSendableCompanies(
   const memberships = await storage.listMembershipsByGhii(bareOwner(callerGhii));
   for (const m of memberships) {
     if (m.status !== 'active') continue;
+    if (await barredAgentFor(storage, m.organismId, principal)) continue;
     const shared = await storage.listCompanies({ organismId: m.organismId, limit: 100, offset: 0 });
     for (const company of shared) {
       if (seen.has(company.id)) continue;

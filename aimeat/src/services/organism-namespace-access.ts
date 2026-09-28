@@ -27,6 +27,8 @@
  *   const refusal = await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write');
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   2026-09-28 — An organism that admits only listed agents refuses the others; a listed agent of an
+ *     active member acts with the member's rights (services/organism-agent-access.ts).
  *   v1.0.0 -- 2026-08-11 -- Extracted from middleware/workspace-access.ts (security audit, MCP/REST
  *     drift): the consent layer, the meta.* admin rule and the member.* self-write rule reach every
  *     door instead of only the HTTP one.
@@ -40,6 +42,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { findWorkspaceRegistration } from './workspace-meta.js';
+import { agentBarred, agentBarredMessage, attachedAsParticipant } from './organism-agent-access.js';
 
 /** The session asking, in the terms this rule decides on. */
 export interface OrganismAccessCaller {
@@ -86,9 +89,16 @@ export async function checkOrganismNamespaceAccess(
         return { status: 404, code: 'NOT_FOUND', message: `Organism not found: ${organismId}` };
     }
 
+    // An organism that admits only listed agents treats every other agent as a non-member.
+    if (agentBarred(organism, caller.principal)) {
+        return { status: 403, code: 'ACCESS_DENIED', message: agentBarredMessage(organism, caller.principal) };
+    }
+
     // An organism-level agent is attached to the organism rather than a member of it. It reads and
     // writes the shared namespace, reads meta, and gets nothing else — a workspace key included.
-    if (organism.agentGaiis.includes(caller.principal)) {
+    // Where the organism admits only listed agents, the list is how a member's agent gets in at all,
+    // so a listed agent acts with its owner's rights below instead (attachedAsParticipant).
+    if (attachedAsParticipant(organism, caller.principal)) {
         if (key.startsWith(`organism.${organismId}.shared.`)) return null;
         if (key.startsWith(`organism.${organismId}.meta.`) && mode === 'read') return null;
         return { status: 403, code: 'ACCESS_DENIED', message: 'Agent not authorized for this workspace namespace' };

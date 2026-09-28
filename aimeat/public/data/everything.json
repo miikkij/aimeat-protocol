@@ -757,10 +757,19 @@
      "slug": "g-6-invitations",
      "cells": [
       "<strong>Invitations</strong>",
-      "Invite by account or by email; the invitee accepts, declines or ignores.",
-      "<code>aimeat_organism_invite</code>, <code>aimeat_organism_invite_email</code>"
+      "Invite by account or by email; the invitee accepts, declines or ignores. An email invitation can say where the invitee lands after joining: an app on this node (for example the app the organism works in) or their profile page.",
+      "<code>aimeat_organism_invite</code>, <code>aimeat_organism_invite_email</code> (<code>return_url</code>), <code>POST /v1/organisms/:id/invitations/email</code>"
      ],
-     "plain": "Invitations Invite by account or by email; the invitee accepts, declines or ignores. aimeat_organism_invite, aimeat_organism_invite_email"
+     "plain": "Invitations Invite by account or by email; the invitee accepts, declines or ignores. An email invitation can say where the invitee lands after joining: an app on this node (for example the app the organism works in) or their profile page. aimeat_organism_invite, aimeat_organism_invite_email (return_url), POST /v1/organisms/:id/invitations/email"
+    },
+    {
+     "slug": "g-6-which-agents-an-organism-admits",
+     "cells": [
+      "<strong>Which agents an organism admits</strong>",
+      "A member's agents act with the member's rights. When outside people join, an owner can admit only the agents listed in the Agents section: every other agent is refused on every organism route and tool, and the member list shows only the admitted agents. An agent may narrow this setting; only the owner signed in may open it to every agent again, or add an agent to the list.",
+      "<code>PUT /v1/organisms/:id</code> (<code>agent_access</code>), <code>POST /v1/organisms/:id/agents</code>, <code>aimeat_organism_update</code> (<code>agent_access</code>)"
+     ],
+     "plain": "Which agents an organism admits A member's agents act with the member's rights. When outside people join, an owner can admit only the agents listed in the Agents section: every other agent is refused on every organism route and tool, and the member list shows only the admitted agents. An agent may narrow this setting; only the owner signed in may open it to every agent again, or add an agent to the list. PUT /v1/organisms/:id (agent_access), POST /v1/organisms/:id/agents, aimeat_organism_update (agent_access)"
     },
     {
      "slug": "g-6-workspaces",
@@ -3461,6 +3470,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 344
+  "rows": 345
  }
 }

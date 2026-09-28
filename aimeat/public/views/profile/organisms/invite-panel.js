@@ -12,6 +12,11 @@
  *   WsGrantList (shared workspace checkbox+role list).
  * @usage import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
  * @version-history
+ *   v1.12.0 — 2026-09-28 — An email invitation can say where the invitee lands after joining: the
+ *     profile page (the default) or one of the apps pinned to the organism's workspaces, opened in
+ *     that workspace. It is sent as return_url, which the server allowlists. Before this only an app
+ *     calling the REST route could set it, so an invitation from this form always landed an outside
+ *     customer on the profile page instead of in the app they were invited to work in.
  *   v1.9.0 — 2026-09-26 — Every part is a kit component (page group G2a): the form is the Box with the Fields (who, role and expiry in a Row of fields, the workspace grants a Field group of Check lines each with its role Select, the message a TextArea, the acceptance a Check), FormActions at its foot, and the accept link in the Box's copy tone with a copy Action; the pending invitations are the List under a Group heading, Edit opening the row's panel. The page writes no class.
  *   v1.11.0 — 2026-09-26 — A workspace to invite to and "Require acceptance" are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.10.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -35,11 +40,12 @@
  *   v1.2.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
+import { swallowed } from '/js/swallowed.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { Box } from '/components/Box.js';
@@ -81,6 +87,31 @@ export function WsGrantList({ wsOptions, sel, onChange }) {
     <//>`;
 }
 
+/** The apps pinned to the organism's workspaces, as return targets for an email invitation. The value
+ *  is the same launch address a workspace's app card opens (workspace-apps.js), on this node's own
+ *  origin, because the server accepts only this node and its app subdomains as a return target. */
+function useLandingOptions(orgId, enabled) {
+  const [opts, setOpts] = useState([]);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let live = true;
+    orgService.discoverWorkspaces(orgId, { include: 'enrichment' }).then((wss) => {
+      const out = [];
+      for (const w of wss || []) {
+        for (const b of (w.enrichment && w.enrichment.apps) || []) {
+          if (!b || !b.owner || !b.filename) continue;
+          const href = `${window.location.origin}/v1/apps/${encodeURIComponent(b.owner)}/${encodeURIComponent(b.filename)}?mode=inline`
+            + `#aimeat-ws=${encodeURIComponent(orgId)}/${encodeURIComponent(w.id)}`;
+          out.push([href, `${b.label || String(b.filename).replace(/\.html?$/i, '')} · ${w.name || w.id}`]);
+        }
+      }
+      if (live) setOpts(out);
+    }).catch(err => { swallowed('invite-panel: landing options', err); });
+    return () => { live = false; };
+  }, [orgId, enabled]);
+  return opts;
+}
+
 const selToGrants = (sel) => Object.entries(sel).map(([ws, role]) => ({ ws, role }));
 const grantsToSel = (grants) => Object.fromEntries((grants || []).map(g => [g.ws, g.role]));
 
@@ -98,8 +129,10 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
   const [expiresInDays, setExpiresInDays] = useState(7);
   const [busy, setBusy] = useState(false);
   const [emResult, setEmResult] = useState(null);
+  const [landing, setLanding] = useState('');
 
   const isEmail = EMAIL_RE.test(who.trim());
+  const landingOptions = useLandingOptions(orgId, isEmail);
 
   const submit = async () => {
     const target = who.trim();
@@ -112,6 +145,7 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
         r = await orgService.inviteByEmail(orgId, {
           email: target, orgRole: role, workspaces,
           message: message.trim() || undefined, expiresInDays: Number(expiresInDays) || 7,
+          return_url: landing || undefined,
         });
       } else if (requireAccept) {
         r = await orgService.inviteMember(orgId, target, { role, workspaces });
@@ -126,7 +160,7 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
         } else {
           showToast(requireAccept ? (t('organisms.invitationSent') || 'Invitation sent') : (t('organisms.memberAdded') || 'Member added'));
         }
-        setWho(''); setRole('member'); setWsSel({}); setMessage('');
+        setWho(''); setRole('member'); setWsSel({}); setMessage(''); setLanding('');
         if (!isEmail) onClose?.();
       }
       onChanged?.();
@@ -160,6 +194,12 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
         <//>
 
         <${WsGrantList} wsOptions=${wsOptions} sel=${wsSel} onChange=${setWsSel} />
+
+        ${isEmail && landingOptions.length ? html`
+          <${Select} label=${t('organisms.inviteLandingLabel') || 'Opens after joining'} value=${landing} onChange=${setLanding} options=${[
+            ['', t('organisms.inviteLandingProfile') || 'Their profile page'],
+            ...landingOptions,
+          ]} />` : null}
 
         ${isEmail ? html`
           <${TextArea} label=${t('organisms.inviteMessageLabel') || 'Personal message (optional)'} rows=${2} value=${message} onInput=${setMessage} />

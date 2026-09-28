@@ -30,6 +30,7 @@
  *   const standing = await workspaceStanding(deps, caller, orgId, ws);
  *   if (isRefusal(standing)) return standing;
  * @version-history
+ *   2026-09-28 — An agent listed by an organism that admits only listed agents is a member's agent here, not an attached participant.
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
 import type { AimeatConfig } from '../config.js';
@@ -43,6 +44,7 @@ import { archivedRefusal } from './workspace-write-guards.js';
 import { isPlatformWorkspaceNamespace } from './workspace-write-items.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { readStoredSections, type Section } from './workspace-sections.js';
+import { attachedAsParticipant } from './organism-agent-access.js';
 
 /** Who is asking, in the terms the rules decide on. `principal` is the full identity (GHII or GAII). */
 export interface ChangeCaller { principal: string; owner: string; roles: string[] }
@@ -93,7 +95,7 @@ export async function workspaceStanding(
     const { storage, config } = deps;
     const organism = await storage.getOrganism(orgId);
     if (!organism) return refusal(404, 'NOT_FOUND', 'Organism not found. Check the id with aimeat_organism_list.');
-    if (organism.agentGaiis.includes(caller.principal)) {
+    if (attachedAsParticipant(organism, caller.principal)) {
         return refusal(403, 'ACCESS_DENIED', 'An agent attached to the organism works in its shared area and does not change a workspace. Make the change as a member instead.');
     }
     const membership = caller.owner ? await storage.getMembership(orgId, caller.owner) : null;
