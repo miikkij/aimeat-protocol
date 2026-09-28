@@ -8,9 +8,12 @@
  *   the REST route (POST /v1/organisms/:id/workspaces — app-provisionable via the organism:write scope)
  *   share one implementation instead of two divergent copies of the schema-locking dance.
  * @structure provisionWorkspace(storage, config, input) -> { ws, types, schemas_locked }
+ *   - checkWorkspaceManifest(): the same manifest check, before anything is written
  *   - WorkspaceProvisionError: thrown for a malformed manifest (surfaces as 400/validation)
  * @usage const { ws } = await provisionWorkspace(storage, config, { orgId, ownerName, ownerGhii, name, manifest, schemas });
  * @version-history
+ *   v1.3.0 -- 2026-09-28 -- checkWorkspaceManifest(): an install set checks every workspace of its
+ *     bundle before it creates the first account or organism (services/install-set-apply.ts).
  *   v1.2.0 -- 2026-08-23 -- Rollback. The four writes had none, so a failure at write three left
  *     locked schemas and a manifest that no registry knows about: a workspace that half exists,
  *     which nothing lists and nothing cleans. Undone in reverse now, with the registry RESTORED
@@ -34,6 +37,26 @@ export class WorkspaceProvisionError extends Error {
 }
 
 type Manifest = { objectTypes?: unknown[]; name?: unknown; status?: unknown } & Record<string, unknown>;
+
+/**
+ * Whether provisionWorkspace() would take this manifest, asked before anything is written: the same
+ * object-type normalization and the same meta-schema, on a copy. Null when it would; the reason when
+ * not. `orgId` names the organism the workspace will live in; before it exists any id will do,
+ * because the meta-schema is the same for every organism.
+ */
+export async function checkWorkspaceManifest(storage: Storage, orgId: string, name: string, manifest: unknown): Promise<string | null> {
+  const man = structuredClone(manifest) as Manifest;
+  if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) return 'manifest must be an object with an objectTypes array.';
+  try {
+    man.objectTypes = normalizeObjectTypes(man.objectTypes as Array<Record<string, unknown>>) as unknown[];
+  } catch (err) {
+    if (err instanceof WorkspaceMetaError) return err.message;
+    throw err;
+  }
+  const value = backfillManifestEnvelope(man as Record<string, unknown>, { orgId, fallbackName: name });
+  const valid = await validateMemoryWrite(`organism.${orgId}.w.ws-check.meta.manifest`, value, storage);
+  return valid.valid ? null : 'Manifest rejected by schema: ' + JSON.stringify(valid.errors);
+}
 
 export interface ProvisionWorkspaceInput {
   orgId: string;

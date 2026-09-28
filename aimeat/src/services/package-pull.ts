@@ -24,6 +24,8 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.4.0 — 2026-09-28 — `preview`: fetch and verify, store nothing, and answer with the verified
+ *     parts (an install set's plan, install-set-apply.ts).
  *   v1.3.0 — 2026-09-28 — The pull and the upstream check are signed as this node, so a package
  *     repository serves an entitled node its private package (package-node-auth.ts); a repository's
  *     UPDATES_ENDED is passed on as itself; `fromUpstream` refreshes a copy from its pinned source;
@@ -48,7 +50,7 @@ import type { PeerInfo } from './federation.js';
 import { gatePeer } from './federation-peer-gate.js';
 import { safeFetch, stripTrailingSlashes } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
-import { parseZip, ZipValidationError } from './package-zip.js';
+import { parseZip, ZipValidationError, type ParsedPackage } from './package-zip.js';
 import {
     verifyAttestation, verifyComponentDigests, type AttestationDoc,
 } from './package-attestation.js';
@@ -85,11 +87,18 @@ export interface PackagePullInput {
      * (package-upstream-refresh.ts).
      */
     fromUpstream?: boolean;
+    /**
+     * Fetch and verify, and store nothing: the answer carries the verified parts instead. An install
+     * set's plan reads a bundle this way before the operator decides to apply it
+     * (install-set-apply.ts), so a plan writes nothing, not even a copy of the package.
+     */
+    preview?: boolean;
 }
 
 export type PackagePullResult =
     | { ok: true; applied: true; package: PackageRecord; upstream: UpstreamRef }
     | { ok: true; applied: false; reason: 'not_newer'; upstream: UpstreamRef }
+    | { ok: true; applied: false; reason: 'preview'; upstream: UpstreamRef; parsed: ParsedPackage }
     | { ok: false; status: number; code: string; message: string };
 
 /** The source a pull resolved to: where to fetch from, and whose key proves it. */
@@ -336,6 +345,8 @@ export async function pullPackage(
             return { ok: true, applied: false, reason: 'not_newer', upstream: existing.upstream };
         }
     }
+
+    if (input.preview) return { ok: true, applied: false, reason: 'preview', upstream, parsed };
 
     // 10. Only now.
     const written = await importParsedPackage({ storage, config },

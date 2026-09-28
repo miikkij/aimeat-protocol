@@ -7,7 +7,7 @@
  *   profile (optionally with a password hash, a verified email, and/or a linked external identity),
  *   and records the welcome-bonus transaction. Used by the OIDC signup finalize path and the email
  *   invitation accept path so account creation stays identical across entry points.
- * @structure ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
+ * @structure emailHashOf; ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
  *   v1.5.0 — 2026-09-14 — creditWelcomeBonus() is exported, and the two registration routes that
@@ -37,7 +37,7 @@ import { logger } from '../utils/logger.js';
 import { promoteContactsForVerifiedEmail } from './contacts.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
-function emailHashOf(email: string): string {
+export function emailHashOf(email: string): string {
   return createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
 }
 

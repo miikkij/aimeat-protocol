@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description .env / .json / .ini config-file generators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The "Install Set" .env section (AIMEAT_INSTALL_SET, AIMEAT_INSTALL_SET_SECRETS),
+ *     written when `aimeat init --install-set` names a file.
  *   v1.1.0 — 2026-08-21 — Add the "Security (encryption at rest)" .env section for the two
  *     per-instance secrets (AIMEAT_TOTP_ENCRYPTION_KEY, AIMEAT_KEY_PASSPHRASE) the wizard now
  *     auto-generates, each with a never-change-on-a-live-instance warning.
@@ -205,6 +207,13 @@ export function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_APP_HOST', comment: 'App origin host, e.g. apps.example.com (required when AIMEAT_APP_ORIGIN_ENABLED=true)' },
         { key: 'AIMEAT_PORTFOLIO_ORIGIN_ENABLED', comment: 'Serve published portfolios standalone at <username>.portfolio.<domain>. Requires DNS + wildcard TLS' },
         { key: 'AIMEAT_PORTFOLIO_HOST', comment: 'Portfolio origin host, e.g. portfolio.example.com (required when AIMEAT_PORTFOLIO_ORIGIN_ENABLED=true)' },
+      ],
+    },
+    {
+      title: 'Install Set',
+      vars: [
+        { key: 'AIMEAT_INSTALL_SET', comment: 'Install set applied at start-up: owner, packages, organisms, users, crew agents (aimeat init --install-set)' },
+        { key: 'AIMEAT_INSTALL_SET_SECRETS', comment: 'Secret config values for that set; never stored in the record of the apply' },
       ],
     },
   ];

@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.6.0 -- 2026-09-28 -- aimeat_admin_install_set (POST /v1/install-sets/apply, GET /v1/install-sets):
+ *     action, install_set and secrets forwarded.
  *   v1.5.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set (PUT /v1/federation/peers/:nodeId/
  *     relay-claim), node_id and relay_claim both forwarded.
  *   v1.4.0 -- 2026-09-12 -- aimeat_admin_federation (GET /v1/admin/federation/overview), the third
@@ -109,6 +111,18 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
                 ? `/v1/admin/agents/${encodeURIComponent(who)}/cors`
                 : `/v1/admin/ghii/${encodeURIComponent(who)}/cors`;
             return client.put(path, { allowed_origins: requiredValue(input, 'origins') });
+        },
+    },
+    {
+        // THE THIRD SURFACE forwards all three: `action` picks the route (list reads, plan and apply
+        // post), and plan is the same POST with dry_run, so the route decides what a plan writes.
+        name: 'aimeat_admin_install_set',
+        handler: ({ client }, input) => {
+            const action = requiredString(input, 'action');
+            if (action === 'list') return client.get('/v1/install-sets');
+            const body: Record<string, unknown> = { install_set: requiredValue(input, 'install_set'), dry_run: action === 'plan' };
+            if (input.secrets !== undefined) body.secrets = input.secrets;
+            return client.post('/v1/install-sets/apply', body);
         },
     },
 ];

@@ -23,7 +23,7 @@
  *   ONLY PRIVATE PACKAGES NEED ONE. A public package is served to everyone as before; the repository
  *   role (config.packageRepository) adds the entitled nodes to the readers of a private one.
  * @structure PackageEntitlement · readEntitlements() · grantEntitlement() · revokeEntitlement()
- *   · listEntitlements() · entitledVersion() · resolveNodeRead() · entitledGroupsOf()
+ *   · listEntitlements() · entitlementOf() · entitledVersion() · resolveNodeRead() · entitledGroupsOf()
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
@@ -31,11 +31,14 @@
  *     versions) or `beta` (beta versions too); the listing names the channel. UPDATES_ENDED only when a
  *     version on the node's channel was made after its cutoff; anything else a held node cannot have is
  *     NOT_FOUND. Channels apply to private packages, the ones served by entitlement.
+ *     entitlementOf(): an entitlement to an install bundle carries the packages the bundle lists, from
+ *     the same author, on the bundle's terms (install packages, phase 4).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
  */
 import type { Storage, PackageRecord } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { verifyPackageNode } from './package-node-auth.js';
+import { bundleOfPackage } from './install-set-spec.js';
 
 export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
 
@@ -160,12 +163,33 @@ export async function listEntitlements(
 export async function entitledVersion(
     storage: Storage, groupId: string, nodeId: string, version?: string,
 ): Promise<PackageRecord | null> {
-    const ent = (await readEntitlements(storage, groupId)).find(e => e.nodeId === nodeId);
+    const ent = await entitlementOf(storage, groupId, nodeId);
     if (!ent) return null;
     const until = ent.updatesUntil ? Date.parse(ent.updatesUntil) : Infinity;
     const allowed = (await channelVersions(storage, groupId, ent, version))
         .filter(v => Date.parse(v.createdAt) <= until);
     return allowed[0] ?? null;
+}
+
+/**
+ * The node's entitlement to `groupId`: its own, or the one it holds to an install bundle of the same
+ * author that lists the package (install-set-spec.ts). A customer buys the bundle, and the bundle's
+ * packages come with it on the bundle's terms: the same end of updates and the same channel.
+ */
+export async function entitlementOf(storage: Storage, groupId: string, nodeId: string): Promise<PackageEntitlement | null> {
+    const own = (await readEntitlements(storage, groupId)).find(e => e.nodeId === nodeId);
+    if (own) return own;
+    const author = groupId.split('::')[1];
+    for (const { groupId: held, entitlement } of await entitledGroupsOf(storage, nodeId)) {
+        if (held === groupId || held.split('::')[1] !== author) continue;
+        // The bundle version the node may have: a package added to the bundle after its updates
+        // ended does not come with it.
+        const until = entitlement.updatesUntil ? Date.parse(entitlement.updatesUntil) : Infinity;
+        const pkg = (await channelVersions(storage, held, entitlement)).find(v => Date.parse(v.createdAt) <= until);
+        const bundle = pkg ? bundleOfPackage(pkg) : null;
+        if (bundle?.ok && bundle.value.packages.some(p => p.groupId === groupId)) return entitlement;
+    }
+    return null;
 }
 
 /** The versions on the entitlement's channel, newest first; only `version` when it names one. */
@@ -185,7 +209,7 @@ async function channelVersions(
  * channel is not that case, and the endpoint answers it as not found.
  */
 async function updatesEndedFor(storage: Storage, groupId: string, nodeId: string, version?: string): Promise<boolean> {
-    const ent = (await readEntitlements(storage, groupId)).find(e => e.nodeId === nodeId);
+    const ent = await entitlementOf(storage, groupId, nodeId);
     if (!ent?.updatesUntil) return false;
     const until = Date.parse(ent.updatesUntil);
     return (await channelVersions(storage, groupId, ent, version)).some(v => Date.parse(v.createdAt) > until);

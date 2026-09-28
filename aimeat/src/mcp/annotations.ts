@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-28 — aimeat_admin_install_set (idempotent, reaches the package repository).
  *   2026-09-28 — aimeat_ai_roles (read only) and aimeat_ai_role_set (propose-then-confirm), AI roles.
  *   2026-09-28 — aimeat_ai_routing_set (propose-then-confirm), aimeat_ai_providers (read only) and
  *     aimeat_ai_provider_test (a real, billed call to an outside provider).
@@ -584,6 +585,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // the same list twice leaves the same list.
     aimeat_admin_cors_set: { title: 'Admin: Set Allowed Origins', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
+    // Creates accounts, installs and organisms; applying again creates nothing twice, and it reaches
+    // the package repository named in the set.
+    aimeat_admin_install_set: { title: 'Admin: Apply an Install Set', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
     aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
     aimeat_designbook_search: { title: 'Design Book: browse the parts', readOnlyHint: true },

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.4 — 2026-09-28 — `aimeat init --install-set` and `--install-set-secrets`.
  *   v1.1.3 — 2026-09-26 — The serve help names 3.20.0 as the release that refuses a request without
  *     the secret; until then the daemon lets it in and names its caller once in its log.
  *   v1.1.2 — 2026-09-24 — `connect call` goes through the serve daemon when one serves the agent.
@@ -24,6 +25,8 @@ USAGE
   aimeat validate                Validate configuration (env, files, database)
   aimeat check                   Alias for validate
   aimeat init                    Interactive config wizard (generates .env, .ini, or .json)
+  aimeat init --install-set <f>  ...and the node applies that install set at start-up
+                                 (--install-set-secrets <f>: its secret config values)
   aimeat update                  Re-scaffold runtime files (safe update)
   aimeat join [URL]              Join a federation network
   aimeat maintenance on [MSG]    Enable maintenance mode (optional message)

@@ -22,6 +22,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.37.0 -- 2026-09-28 -- aimeat_admin_install_set -> operator:admin, the word its REST endpoints ask.
  *   v1.36.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository
  *     and aimeat_package_entitlements -> packages:write, the word their REST endpoints ask.
  *   v1.35.0 -- 2026-09-28 -- aimeat_package_fork -> packages:write, the word POST /v1/instances/:id/fork asks.
@@ -434,6 +435,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_admin_knowledge:                   'operator:admin',
     aimeat_admin_federation:                  'operator:admin',
     aimeat_admin_federation_relay_claim_set:  'operator:admin',
+    aimeat_admin_install_set:                 'operator:admin',
     // What this node's own MCP registry offers every owner, to whom, and at what price.
     aimeat_mcp_registry_list:                 'operator:admin',
     aimeat_mcp_registry_set:                  'operator:admin',

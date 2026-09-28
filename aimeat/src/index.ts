@@ -16,6 +16,7 @@
  * @version-history v1.25.1 — 2026-06-18 — Self-heal scaffolded assets on start after a package upgrade; read update version from package.json.
  * @version-history v1.26.0 — 2026-07-10 — Emit securityPostureWarnings() at startup so a public-profile node flags risky settings.
  * @version-history v1.27.0 — 2026-07-13 — Extract help text, `connect` dispatch, and `start`/`serve` runtime into index-help/index-connect/index-start (max-file-lines).
+ * @version-history v1.28.0 — 2026-09-28 — `aimeat init --install-set <file> [--install-set-secrets <file>]`: the install set the node applies at start-up.
  */
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -58,6 +59,8 @@ const { values, positionals } = parseArgs({
     agent: { type: 'string' },
     to: { type: 'string' },
     body: { type: 'string' },
+    'install-set': { type: 'string' },
+    'install-set-secrets': { type: 'string' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -186,7 +189,10 @@ if (subcommand === 'config') {
   process.exit(0);
 } else if (subcommand === 'init') {
   const { runInitWizard } = await import('./cli/init-wizard.js');
-  await runInitWizard(config);
+  await runInitWizard(config, {
+    installSet: stringFlag(values['install-set']),
+    installSetSecrets: stringFlag(values['install-set-secrets']),
+  });
   process.exit(0);
 } else if (subcommand === 'update') {
   const { scaffoldFiles: doScaffold, findPackageRoot } = await import('./cli/scaffold.js');

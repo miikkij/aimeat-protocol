@@ -44,6 +44,8 @@
  *   v1.10.1 — 2026-09-26 — Anonymous mode is switched on for this node's id (auth/node-auth.ts).
  *   v1.11.0 — 2026-09-28 — The `package-upstream-check` core handler, registered after the peers load
  *     (services/package-upstream-refresh.ts).
+ *   v1.12.0 — 2026-09-28 — The install set named by AIMEAT_INSTALL_SET is applied after the peers load
+ *     (services/install-set-startup.ts).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -370,6 +372,14 @@ export async function initializeServices(
     const moved = outcomes.filter(o => o.pulled || o.result === 'updated' || o.result === 'notified').length;
     if (moved > 0) logger.info(`Package update check: ${moved} of ${outcomes.length} installs moved or were told`);
   });
+
+  // The install set a new customer node applies at start-up (AIMEAT_INSTALL_SET). It needs the peers
+  // to reach the repository, so it runs here; not awaited, so a slow repository never holds the boot.
+  if (config.installSetPath) {
+    void import('../services/install-set-startup.js')
+      .then(({ applyStartupInstallSet }) => applyStartupInstallSet({ storage, config, peers, scheduler }))
+      .catch(err => logger.error('[install-set] start-up apply did not run', { error: String(err) }));
+  }
 
   // Start federation heartbeat job (signed heartbeats with catalogue hash, jittered scheduling)
   startHeartbeatJob(config, storage, peers, networkDirectory);

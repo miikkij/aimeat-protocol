@@ -8,6 +8,9 @@
  *   Presets, helpers, generators, and per-section wizard steps live in
  *   ./init-wizard/*; this file orchestrates them.
  * @version-history
+ *   v1.27.0 — 2026-09-28 — `--install-set <file>` (and `--install-set-secrets <file>`): the file is
+ *     checked as an install set and its path written as AIMEAT_INSTALL_SET, which the node applies at
+ *     start-up (services/install-set-startup.ts).
  *   v1.26.0 — 2026-08-21 — Per-instance at-rest encryption secrets: the wizard now auto-generates
  *     AIMEAT_TOTP_ENCRYPTION_KEY (64-hex AES-256-GCM) and AIMEAT_KEY_PASSPHRASE once and writes them
  *     to the config, so a sold/provisioned instance never ships with plaintext 2FA secrets, an
@@ -24,7 +27,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
 import ini from 'ini';
@@ -36,6 +39,7 @@ import { generateEnvContent, generateIniContent, generateJsonContent } from './i
 import { askCoreSettings } from './init-wizard/steps-core.js';
 import { askOperatorSettings } from './init-wizard/steps-operator.js';
 import { askAllAdvancedSettings, askEconomySettings } from './init-wizard/steps-advanced.js';
+import { parseInstallSet } from '../services/install-set-spec.js';
 
 // Package root: from dist/src/cli/init-wizard.js -> go up 3 levels to aimeat/
 const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -73,7 +77,38 @@ function findEnvFile(): string | null {
   return null;
 }
 
-export async function runInitWizard(config: AimeatConfig): Promise<void> {
+/** `aimeat init` flags that set a value without a question. */
+export interface InitWizardOptions {
+  /** An install set file the node applies at start-up. */
+  installSet?: string;
+  /** The secret config values for that set. */
+  installSetSecrets?: string;
+}
+
+/**
+ * The install set flags as settings: the file must parse as an install set, and both paths are
+ * written absolute, because the node may start from another directory. Exits on a bad file, before
+ * any question is asked.
+ */
+function installSetSettings(opts: InitWizardOptions): Record<string, string> {
+  if (!opts.installSet) return {};
+  const bail = (message: string): never => { p.cancel(message); process.exit(1); };
+  const path = resolve(opts.installSet);
+  let doc: unknown;
+  try { doc = JSON.parse(readFileSync(path, 'utf8')); } catch (err) { bail(`--install-set: cannot read ${path} as JSON: ${String(err)}`); }
+  const shape = parseInstallSet(doc);
+  if (!shape.ok) bail(`--install-set: ${path}: ${shape.message}`);
+  const out: Record<string, string> = { AIMEAT_INSTALL_SET: path };
+  if (opts.installSetSecrets) {
+    const secrets = resolve(opts.installSetSecrets);
+    if (!existsSync(secrets)) bail(`--install-set-secrets: ${secrets} does not exist`);
+    out.AIMEAT_INSTALL_SET_SECRETS = secrets;
+  }
+  return out;
+}
+
+export async function runInitWizard(config: AimeatConfig, opts: InitWizardOptions = {}): Promise<void> {
+  const installSet = installSetSettings(opts);
   // Read existing .env for current values
   const envFilePath = findEnvFile();
   const env = envFilePath ? parseEnvFile(envFilePath) : {};
@@ -150,6 +185,7 @@ export async function runInitWizard(config: AimeatConfig): Promise<void> {
   // is carried forward untouched. This is unlike AIMEAT_ADMIN_PASSWORD, which is a login secret the
   // node may safely regenerate on boot.
   ensureEncryptionSecrets(settings, env);
+  Object.assign(settings, installSet);
 
   // Step 5: Summary
   const changedEntries = Object.entries(settings).filter(

@@ -44468,6 +44468,98 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/install-sets/apply:
+    post:
+      operationId: applyInstallSet
+      summary: Set up this node from an install set
+      description: >-
+        The operator applies one customer's install set: the bundle it names (pulled from the
+        repository node when the set names one, where an entitlement to the bundle also serves the
+        packages it lists), the owner user every package is installed for (created with the email
+        verified and the login link on when the account does not exist), the organisms and
+        workspaces of the bundle under the customer's names, the other users (join `account` creates
+        the account now and adds the membership; join `invite` sends an email invitation carrying the
+        organism role and workspace grants), and the crew agents, deployed through the owner's runner
+        agent or left `pending` until one is connected. `dry_run` true returns the plan and every
+        problem, such as a required config value the set does not give, and writes nothing. Every
+        problem is found before an account, an install or an organism is created, and the answer is
+        then 409 CANNOT_APPLY with `details.problems`. Applying again creates nothing twice: what an
+        apply made is recorded per owner and bundle. `secrets` carries secret config values and is
+        never stored. Operator only: the operator in person, or an agent of the operator holding the
+        exact scope operator:admin.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [install_set]
+              properties:
+                install_set:
+                  type: object
+                  description: >-
+                    `{ spec: "aimeat.install-set/1", bundle: { group_id, node_id?, version? }, repository?: {
+                    node_id, url, public_key } (links a repository this node does not know yet as an active
+                    peer under that key; 409 PEER_KEY_MISMATCH when a peer of that id has another key), owner: { name,
+                    email, display_name? }, members?: [{ email, name?, display_name?, join: invite|account,
+                    memberships: [{ organism, role: admin|member, workspaces: [key | { key, role:
+                    viewer|contributor }] }] }], organism_names?: { <key>: name }, config?: { <group id>: {
+                    <component id>: { <field>: value } } }, auto_update?: boolean }`. The bundle is a package
+                    with a memory component whose JSON is `{ spec: "aimeat.install-bundle/1", name,
+                    packages: [{ group_id, mode?, config? }], organisms: [{ key, name, description?,
+                    workspaces: [{ key, name, manifest, schemas?, readme? }] }], agents: [{ group_id, app,
+                    agent, organism? }] }`.
+                secrets:
+                  type: object
+                  description: 'Secret config values, `{ <group id>: { <component id>: { <field>: value } } }`. Never stored.'
+                dry_run: { type: boolean, default: false }
+      responses:
+        '200':
+          description: '`data` is `{ ok, dry_run: true, plan: { owner, bundle, packages, organisms, members, agents, auto_update, problems } }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '201':
+          description: '`data` is `{ ok, dry_run: false, owner_created, record }`: the record of what this and every earlier apply of the set made.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: CANNOT_APPLY (with `details.problems`), EMAIL_TAKEN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/install-sets:
+    get:
+      operationId: listInstallSets
+      summary: The install sets applied on this node
+      description: >-
+        Every install set applied on this node, newest first: the owner, the bundle and its version,
+        and what each apply made (the installs, the organisms and workspaces, each user's outcome, each
+        crew agent's state, and which secret fields were given). Operator only, as the apply endpoint.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is `{ install_sets: [record] }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/instances/{id}/status:
     get:
       operationId: getInstanceComponentStatus
