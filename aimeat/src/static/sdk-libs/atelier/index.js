@@ -55,6 +55,7 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.57.0 — 2026-09-29 — A list row's badge takes `badgeTone` (ok, warn, err, quiet), styled in shell.css.
  *   v0.56.0 — 2026-09-29 — promptPanel (copy the prompt, paste the answer, parsed) and queueRow
  *     (the content of a queue list row), from the approved Postinjalostamo design (workbench-parts.js).
  *   v0.55.1 — 2026-09-28 — The workbench stylesheet carries `.ak-setgroups` (a settings page's
@@ -400,7 +401,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.56.0',
+  version: '0.57.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

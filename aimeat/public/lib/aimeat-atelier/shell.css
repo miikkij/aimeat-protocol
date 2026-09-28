@@ -17,6 +17,7 @@
  *   fade, for every scroller in the kit) · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.57.0 — 2026-09-29 — .ak-badge--ok / --warn / --err / --quiet: a status badge in its tone.
  *   v0.50.0 — 2026-09-05 — The hero, the KPI row, the section and the tab row read their own
  *     tokens instead of the literals they carried: --ak-hero-pad / -gap / -title-size,
  *     --ak-stat-min / -gap / -pad / -figure-size, --ak-section-pad / -gap, --ak-tabs-gap, at the
@@ -621,6 +622,11 @@
   font-weight: 650;
   white-space: nowrap;
 }
+/* A badge that is a status reads by its colour too: ok, warn, err, quiet (list rows' badgeTone). */
+.ak-badge--ok { background: color-mix(in oklab, var(--ak-ok) 12%, var(--ak-surface)); color: var(--ak-ok-text); }
+.ak-badge--warn { background: color-mix(in oklab, var(--ak-warn) 12%, var(--ak-surface)); color: var(--ak-warn-text); }
+.ak-badge--err { background: color-mix(in oklab, var(--ak-err) 10%, var(--ak-surface)); color: var(--ak-err-text); }
+.ak-badge--quiet { background: var(--ak-surface-2); color: var(--ak-ink-dim); }
 /* Screen-reader-only text: visually gone, still announced. */
 .ak-sr-only {
   position: absolute;
