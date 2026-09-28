@@ -9,6 +9,8 @@
  *   - ActionsTab({ data }): renders data.actions.actions as a List; shows Empty state when none registered
  *
  * @version-history
+ *   v1.1.2 — 2026-09-28 — Reads the fields GET /v1/actions answers (display_name, provider_gaii,
+ *     pricing.base_morsels); it read name, provider and base_cost, so the name, provider and cost were always empty.
  *   v1.1.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so an action's name, description, id, provider or tag with a quote or an ampersand
  *     showed as &quot; / &amp;.
@@ -36,10 +38,10 @@ export default function ActionsTab({ data }) {
       ${acts.map(a => html`
         <${Row} key=${a.id}>
           <${Cell} meta>${a.id}<//>
-          <${Name} desc=${a.description || null}>${a.name}<//>
-          <${Cell} meta>${a.provider}<//>
+          <${Name} desc=${a.description || null}>${a.display_name || a.id}<//>
+          <${Cell} meta>${a.provider_gaii}<//>
           <${Cell}><${Badge} type=${a.category || 'info'} /><//>
-          <${Num}>${num(a.base_cost)} ⬥<//>
+          <${Num}>${num(a.pricing?.base_morsels)} ⬥<//>
           <${Cell} line>${(a.tags || []).map(tag => html`<${Mark} key=${tag}>${tag}<//>`)}<//>
         <//>`)}
     <//>

@@ -34,6 +34,8 @@ const html = htm.bind(h);
  * server-generated markup like badges.
  *
  * @version-history
+ *   2026-09-28 — The table sits in .data-table-wrap, which scrolls sideways when the columns are wider than the
+ *     page; at 390 px the admin sharing-groups table lost its last column to the page's overflow.
  *   v1.1.0 — 2026-09-27 — `compact`: the old app catalogue's backup import table (.backup-table), for
  *     appcat parity; additive, data-table.css .data-table--compact.
  *   v1.0.0 — 2026-06-02 — Component unification (#13): created canonical generic
@@ -61,5 +63,9 @@ export function DataTable({ headers, rows, scroll, className, compact }) {
       </tr>`)}
     </tbody>
   </table>`;
-  return scroll ? html`<div class="scrollable">${table}</div>` : table;
+  // The wrapper scrolls sideways when the columns are wider than the page (a phone): without it the
+  // page's overflow cut the last columns off where nobody could reach them. When the table fits,
+  // nothing about it changes.
+  const wrapped = html`<div class="data-table-wrap">${table}</div>`;
+  return scroll ? html`<div class="scrollable">${wrapped}</div>` : wrapped;
 }

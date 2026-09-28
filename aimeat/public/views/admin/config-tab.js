@@ -28,6 +28,7 @@
  *   - fieldEditor — one field's editor by its type
  *   - ConfigTab (default)
  * @version-history
+ *   v3.0.3 -- 2026-09-28 -- An unset read-only value or an empty list shows "(empty)", not "null" or an empty box; an object's preview ends in "..." only when it was cut.
  *   v3.0.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a setting's value, range, the unsaved-changes list (key, old and new value) or the
  *     save message with a quote or an ampersand showed as &quot; / &amp;.
@@ -145,6 +146,12 @@ function shown(v) {
   return s.length > 60 ? s.slice(0, 57) + '…' : s;
 }
 
+/** An object value in one line: the first 100 characters, with "..." only when something was cut. */
+function jsonPreview(v) {
+  const s = JSON.stringify(v) ?? '';
+  return s.length > 100 ? s.substring(0, 100) + '...' : s;
+}
+
 /** The mark that a field is edited and not saved. */
 const editedMark = (words) => html`<${Tinted} tone="warn">${words}<//>`;
 
@@ -155,7 +162,11 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
     if (typeof e.value === 'boolean') {
       return html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}${e.sealed ? html` <${Note} kind="meta" inline>${t('dashboard.cfgSealed')}<//>` : null}`;
     }
-    return html`<${Code}>${String(e.value)}<//> <${Note} kind="meta" inline>${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}<//>`;
+    // An unset value or an empty list reads as the change list's "(empty)", never as the word "null"
+    // or an empty box; a list reads as its items.
+    const unset = e.value === null || e.value === undefined || e.value === '' || (Array.isArray(e.value) && e.value.length === 0);
+    const shownValue = unset ? tr('dashboard.cfgEmpty', '(empty)') : Array.isArray(e.value) ? e.value.join(', ') : String(e.value);
+    return html`<${Code}>${shownValue}<//> <${Note} kind="meta" inline>${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}<//>`;
   }
   if (e.type === 'boolean') {
     return html`<${Check} checked=${val} onChange=${(on) => onChange(p, on)} disabled=${!editable}>${val ? t('dashboard.enabled') : t('dashboard.disabled')}<//>`;
@@ -176,7 +187,7 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
           onInput=${(v) => onChange(p, v)}
           placeholder=${t('dashboard.cfgOnePerLine')} />
         <${Note} kind="meta">${t('dashboard.cfgOnePerLine')}<//>`
-      : html`<${Code}>${(JSON.stringify(e.value) ?? '').substring(0, 100)}...<//>`;
+      : html`<${Code}>${jsonPreview(e.value)}<//>`;
   }
   return html`<${Code}>${String(e.value)}<//>`;
 }
