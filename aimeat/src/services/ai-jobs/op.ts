@@ -24,6 +24,7 @@
  *   const why = aiOpRefusal(input);
  *   if (why) throw new AiJobError('INVALID_BODY', 400, why);
  * @version-history
+ *   v1.1.0 — 2026-09-28 — `role`, the AI role the call runs as, on any op: a string of 1 to 300 characters.
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
  */
 
@@ -42,7 +43,12 @@ export interface AiOpFields {
     audio_key?: unknown;
     language?: unknown;
     size?: unknown;
+    /** The AI role the call runs as (services/ai/roles.ts); any op. */
+    role?: unknown;
 }
+
+/** The longest role name a job or a step may give; the same bound the AI routes hold (readCallRole). */
+const ROLE_MAX_CHARS = 300;
 
 /** The operation a request names, `text` when it names none. Call after aiOpRefusal accepted it. */
 export function aiOpOf(op: unknown): AiOp {
@@ -57,7 +63,8 @@ const given = (v: unknown): boolean => v !== undefined && v !== null && v !== ''
  * What is refused: an unknown `op`; an image with no prompt; `json` or `system_prompt` on an image;
  * a transcription with no `audio_key`, or with a prompt (it has none to send); `audio_key` or
  * `language` on anything but a transcription; `size` on anything but an image. A text call with no
- * prompt is refused by the prompt assembly, as it was before `op` existed.
+ * prompt is refused by the prompt assembly, as it was before `op` existed. On any op, a `role` that is
+ * not a string of 1 to 300 characters.
  */
 export function aiOpRefusal(spec: AiOpFields): string | null {
     const op = spec.op ?? 'text';
@@ -86,5 +93,9 @@ export function aiOpRefusal(spec: AiOpFields): string | null {
         return 'audio_key and language apply only to op "transcribe".';
     }
     if (op !== 'image' && given(spec.size)) return 'size applies only to op "image".';
+    if (spec.role !== undefined && spec.role !== null
+        && (typeof spec.role !== 'string' || spec.role.length < 1 || spec.role.length > ROLE_MAX_CHARS)) {
+        return `role must be a string of 1 to ${ROLE_MAX_CHARS} characters: one of your AI roles, or for an app a role it declares.`;
+    }
     return null;
 }

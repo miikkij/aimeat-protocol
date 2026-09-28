@@ -24,6 +24,8 @@
  *     two tests first (does it fit one prompt, does word search find it), and the three conditions
  *     that make them truly needed (Jouni: "embeddings should be used rarely and only when user
  *     decides so and is really really needed").
+ *   v1.2.0 — 2026-09-28 — Section 2b, AI roles: an app declares what each kind of AI work is for, the
+ *     owner connects it before it runs, and an AI proposes a connection the owner confirms.
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
  *  with builtin-skills.ts, which imports it; the compiler checks the two agree where it is listed. */
@@ -34,7 +36,7 @@ export const AI_CAPABILITIES_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-ai-capabilities
-description: How to use the AI capabilities of an AIMEAT node (text, reading images, reading files and PDFs, making images, speech, transcription, embeddings) in an app, an automation or an agent's own work. Check first with aimeat_ai_capabilities or AIMEAT.ai.capabilities(), ask for the capability and not a model, handle a capability that is off visibly, tell the price before an expensive call, and never propose embeddings, which are for a collection far too large for one prompt and only when the person decides. Recipes for a picture button, voice message to summary, asking a PDF, a morning digest of voice messages, alt text, duplicates in a very large collection, and a crew on the node's /v1/llm. Use before building anything that calls AI. Triggers on AI feature, generate image, speech, text to speech, transcribe, voice message, PDF, embeddings, vectors, semantic search, kuvan teko, puhe, litterointi, upotus.
+description: How to use the AI capabilities of an AIMEAT node (text, reading images, reading files and PDFs, making images, speech, transcription, embeddings) in an app, an automation or an agent's own work. Check first with aimeat_ai_capabilities or AIMEAT.ai.capabilities(), ask for the capability and not a model, handle a capability that is off visibly, tell the price before an expensive call, and never propose embeddings, which are for a collection far too large for one prompt and only when the person decides. Recipes for a picture button, voice message to summary, asking a PDF, a morning digest of voice messages, alt text, duplicates in a very large collection, and a crew on the node's /v1/llm. Use before building anything that calls AI. Triggers on AI feature, AI role, connect an app's role, generate image, speech, text to speech, transcribe, voice message, PDF, embeddings, vectors, semantic search, kuvan teko, puhe, litterointi, upotus.
 license: MIT
 metadata:
   audience: agent
@@ -95,6 +97,24 @@ promise a feature the node cannot run for them.
 
 Errors carry \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\` and a \`fix\`),
 AI_MODEL_NOT_ALLOWED (with the \`allowed\` list), QUOTA_EXHAUSTED. Show the message; never an empty result.
+
+## 2b. Roles: what a model is for
+
+A capability says what a model does; a role says what it is for (a summarizer, an illustrator). When an
+app has more than one kind of AI work, declare a role for each in the meta, and call with \`role\`:
+\`role.summarizer=text; role.summarizer.purpose=Short summaries; role.summarizer.temperature=0.2\`, then
+\`AIMEAT.ai.complete({ app_id, prompt, role: 'summarizer' })\`. A role takes several capabilities joined
+with \`+\` (\`role.illustrator=text+image\`), and its fine-tuning (\`temperature\`, \`top_p\`, \`max_tokens\`,
+\`reasoning\`) overrides the provider's default.
+
+- **A role says what the work needs, never a model.** The owner connects it to one of their roles, which
+  names the providers and models in order, so the app works on any owner's providers.
+- **Nothing runs until the owner connects it.** An unconnected role is refused with AI_ROLE_NOT_BOUND
+  (409) and the owner sees the request on the AI page. \`capabilities()\` answers \`roles\`, each with
+  \`bound\` and a \`fix\`: show it beside the control, as for a capability that is off.
+- **As the owner's AI:** \`aimeat_ai_roles\` lists the owner's roles and the app roles waiting;
+  \`aimeat_ai_role_set\` proposes a role or a connection, and the owner confirms it. Never connect a role
+  the owner has not seen: connecting it is their approval of what that app may run.
 
 ## 3. Automations
 

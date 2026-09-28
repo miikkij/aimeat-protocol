@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.17.0 -- 2026-09-28 -- AI roles: aimeat_ai_roles and aimeat_ai_role_set, one line each beside aimeat_ai_routing_set.
  *   v1.16.0 -- 2026-09-28 -- AI capabilities: aimeat_ai_capabilities first, aimeat_ai_models, aimeat_ai_transcribe, aimeat_ai_embed.
  *   v1.15.0 -- 2026-09-28 -- Which provider answers: aimeat_ai_providers, aimeat_ai_provider_test, aimeat_ai_routing_set.
  *   v1.14.0 -- 2026-09-28 -- Which AI models are allowed: the owner's model policy and aimeat_ai_policy_set.
@@ -172,6 +173,8 @@ one (an image test costs a picture: ask first). \`aimeat_ai_routing_set\` propos
 first per capability and the fallback rules; the owner confirms. A key is set only by the owner on
 the web page: never ask for one in chat. A refusal \`AI_CAPABILITY_UNAVAILABLE\` lists each provider
 with the reason it was left out; pass the fix to your owner. Skill: configure-routing.
+\`aimeat_ai_roles\` lists your owner's AI roles (what a model is used for) and the app roles that wait for a binding (\`requestedAt\`); pass a role id as \`role\` in an AI call.
+\`aimeat_ai_role_set\` proposes a change to a role, or binds an app's role to one of your owner's; the owner confirms, and an app's role runs only once bound.
 
 **AI capabilities.** Your first AI call is \`aimeat_ai_capabilities\`: per capability (text, vision,
 files, image, speech, transcription, embed) whether it is on for you, the model, the price, and for one

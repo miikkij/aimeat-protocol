@@ -101,6 +101,8 @@ everywhere at once, and say so in the Changes section.
 | trying the next provider when one does not answer | a timeout, a rate limit, a server error or a refused key moves the call on; a bad request or a refused content never does | fallback (verb: fall back) | varalle siirtyminen; verbi siirtyä varalle; varalla oleva tarjoaja | respaldo; verbo pasar al respaldo |
 | a provider type whose address cannot change | OpenRouter, OpenAI, Anthropic, Mistral, xAI: reached only at the vendor's own address, so a key sent to one cannot leak | fixed provider type | kiinteä tarjoajatyyppi | tipo fijo de proveedor |
 | the node's list of AI models | what each model can do, how much it takes and what it costs, refreshed from public sources; a direct provider's calls are priced from it | model catalogue | malliluettelo | catálogo de modelos |
+| what an AI model is used for | a name and a purpose, the capabilities it needs, and for each one the providers and models in order; the owner makes them, an app declares the ones it needs | AI role (role) | tekoälyrooli; rooli when the sentence is about AI | rol de IA; rol |
+| the owner's approval of an app's role | connecting a role an app declares to one of the owner's roles; until then the app's role does not run | bind (noun: binding) | kytkeä (kytkentä) | vincular (vinculación) |
 | an AI model server on the node's own machine | LM Studio, Ollama or llama.cpp on the machine the node runs on; the data does not leave it | local AI server | paikallinen tekoälypalvelin | servidor de IA local |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
@@ -339,3 +341,6 @@ service, the directory, the token, the identifier and the username: the test nam
   "siirtyä varalle", a common Finnish phrase, over the anglicism *fallback*. *Palvelin* for the node
   follows the Config tab's existing strings, so a local AI server is *paikallinen tekoälypalvelin*.
   The same day, *model catalogue*, *malliluettelo* (the plan's own word, file 06).
+- **2026-09-28, later** — AI role and binding (wish-tekoalyn-roolit). *Rooli* is the developer's own
+  word ("roolittaa ne"); *kytkeä* is the word the plan used with him ("kytkee sovelluksen roolin").
+  Spanish *vincular* for bind, the usual word for linking an account or a device.

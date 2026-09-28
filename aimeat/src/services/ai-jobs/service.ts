@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.4.0 — 2026-09-28 — A job may name a `role`, the AI role its call runs as; op.ts refuses one that
+ *     is not a string of 1 to 300 characters, before the record exists.
  *   v1.3.0 — 2026-09-28 — System 2 plan, V5: a job has an `op` (text, image, transcribe) and may name
  *     a `provider`. The start refuses a field that does not apply to the op (op.ts), and for a
  *     transcription it refuses an `audio_key` that is not in the owner's own storage, both before
@@ -150,6 +152,7 @@ export class AiJobService implements AiJobStarter {
             ...(input.system_prompt ? { system_prompt: input.system_prompt } : {}),
             op,
             ...(input.provider ? { provider: input.provider } : {}),
+            ...(input.role ? { role: input.role } : {}),
             ...(input.audio_key ? { audio_key: input.audio_key } : {}),
             ...(input.language ? { language: input.language } : {}),
             ...(input.size ? { size: input.size } : {}),

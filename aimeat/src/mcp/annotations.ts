@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-28 — aimeat_ai_roles (read only) and aimeat_ai_role_set (propose-then-confirm), AI roles.
  *   2026-09-28 — aimeat_ai_routing_set (propose-then-confirm), aimeat_ai_providers (read only) and
  *     aimeat_ai_provider_test (a real, billed call to an outside provider).
  *   2026-09-28 — aimeat_ai_capabilities and aimeat_ai_models (read only); aimeat_ai_transcribe and
@@ -134,6 +135,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_ai_models: { title: 'List AI Models', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_ai_transcribe: { title: 'Transcribe Audio', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_ai_embed: { title: 'Make Embeddings', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_ai_roles: { title: 'List AI Roles', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_ai_role_set: { title: 'Set the AI Roles (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },

@@ -742,6 +742,8 @@
       const body = {
         op: opts.op,
         provider: opts.provider,
+        // The AI role the job's call runs as (GET /v1/ai/roles); a named model or provider wins over it.
+        role: opts.role,
         audio_key: opts.audio_key,
         language: opts.language,
         size: opts.size,
@@ -925,6 +927,11 @@
     _modelsCache.set(qs, { v, t: now });
     return v;
   }
+  async function roles() {
+    const r = await authFetch4("/v1/ai/roles");
+    if (!r || !r.ok) throw aiError(r, "Could not read the AI roles");
+    return r.data;
+  }
   function clearCaches() {
     _capsCache.clear();
     _modelsCache.clear();
@@ -1005,10 +1012,11 @@
       temperature: opts.temperature,
       top_p: opts.top_p,
       max_tokens: opts.max_tokens,
-      reasoning: opts.reasoning
+      reasoning: opts.reasoning,
+      role: typeof opts.role === "string" && opts.role ? opts.role : void 0
     };
     return paid(opts, {
-      key: ["ai-stream", opts.app_id, opts.model, JSON.stringify(messages)],
+      key: ["ai-stream", opts.app_id, opts.model, opts.role, JSON.stringify(messages)],
       what: "Run an AI request on your own AI provider."
     }, async () => {
       const response = await postStream("/v1/ai/stream", body, opts.signal);
@@ -1039,10 +1047,11 @@
       voice: opts.voice,
       response_format: format,
       speed: opts.speed,
-      instructions: opts.instructions
+      instructions: opts.instructions,
+      role: typeof opts.role === "string" && opts.role ? opts.role : void 0
     };
     return paid(opts, {
-      key: ["ai-speak", opts.app_id, opts.model, opts.voice, format, opts.store ? "store" : "", String(input)],
+      key: ["ai-speak", opts.app_id, opts.model, opts.voice, format, opts.role, opts.store ? "store" : "", String(input)],
       what: "Read text aloud on your own AI provider.",
       remember: "ai-speak:" + (opts.app_id || "app"),
       estimate: async () => {
@@ -1073,7 +1082,8 @@
   function routing(opts) {
     return {
       ...typeof opts.provider === "string" && opts.provider ? { provider: opts.provider } : {},
-      ...typeof opts.fallback === "boolean" ? { fallback: opts.fallback } : {}
+      ...typeof opts.fallback === "boolean" ? { fallback: opts.fallback } : {},
+      ...typeof opts.role === "string" && opts.role ? { role: opts.role } : {}
     };
   }
   async function image(opts) {
@@ -1089,7 +1099,7 @@
       ...routing(opts)
     };
     return paid(opts, {
-      key: ["ai-image", opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.prompt],
+      key: ["ai-image", opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.role, opts.prompt],
       what: "Make a picture on your own AI provider.",
       label: "The picture",
       remember: "ai-image:" + (opts.app_id || "app"),
@@ -1123,7 +1133,7 @@
       ...routing(opts)
     };
     return paid(opts, {
-      key: ["ai-transcribe", opts.app_id, opts.model, opts.language, opts.storage_key || audio || ""],
+      key: ["ai-transcribe", opts.app_id, opts.model, opts.language, opts.role, opts.storage_key || audio || ""],
       what: "Turn a recording into text on your own AI provider.",
       label: "The transcription",
       remember: "ai-transcribe:" + (opts.app_id || "app")
@@ -1134,7 +1144,7 @@
     if (opts.input == null || Array.isArray(opts.input) && !opts.input.length) throw new Error("opts.input required");
     const body = { input: opts.input, model: opts.model, app_id: opts.app_id, ...routing(opts) };
     return paid(opts, {
-      key: ["ai-embed", opts.app_id, opts.model, opts.provider, JSON.stringify(opts.input)],
+      key: ["ai-embed", opts.app_id, opts.model, opts.provider, opts.role, JSON.stringify(opts.input)],
       what: "Make embeddings on your own AI provider.",
       label: "The embedding",
       remember: "ai-embed:" + (opts.app_id || "app")
@@ -1242,6 +1252,10 @@
      * `fallback: false` keeps the call on that one provider. Neither can add a provider or loosen
      * the owner's rules.
      *
+     * `role` names the AI role the call runs as: for an app, a role it declares in its aimeat-ai meta
+     * (role.<name>=text), which runs once the owner bound it to one of theirs; a named model or
+     * provider wins over it. See roles().
+     *
      * This spends the signed-in user's own money on their own AI provider, so two guards ride along:
      *   • repeats collapse — while an identical call (same app_id + model + prompts) is in flight,
      *     every further call gets the SAME promise. Five clicks on "Summarise" = one paid call.
@@ -1261,6 +1275,10 @@
      *   RATE_LIMITED          — provider rate limit
      *   PROVIDER_ERROR        — upstream provider failed
      *   SPEND_CANCELLED       — the user declined the confirm dialog
+     *   AI_ROLE_NOT_BOUND     — the owner has not bound this app's role yet (.details.binding)
+     *   AI_ROLE_NOT_DECLARED  — the app's meta does not declare that role
+     *   AI_ROLE_UNKNOWN       — the owner has no role of that id
+     *   AI_ROLE_LACKS_CAPABILITY — the role has no provider for what the call needs
      */
     async complete(opts) {
       if (!opts || typeof opts !== "object") throw new Error("opts object required");
@@ -1294,7 +1312,8 @@
           opts.prompt,
           Array.isArray(opts.images) ? opts.images.join("\n") : "",
           files ? JSON.stringify(files) : "",
-          opts.provider || ""
+          opts.provider || "",
+          opts.role || ""
         ],
         what: "Run an AI request on your own AI provider."
       }, () => postJson("/v1/ai/complete", body, "AI call failed"));
@@ -1379,6 +1398,12 @@
      * context_length and pricing in the old OpenRouter listing's form. Cached 1 hour per query.
      */
     models,
+    /**
+     * The person's AI roles and the roles apps declare, with the owner's bindings (GET /v1/ai/roles):
+     * { roles, apps: [{ app, roles: [{ name, binding, boundTo, requestedAt? }] }] }. An app's role runs
+     * once boundTo is set; until then a call with that `role` is refused AI_ROLE_NOT_BOUND.
+     */
+    roles,
     /**
      * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".
      */

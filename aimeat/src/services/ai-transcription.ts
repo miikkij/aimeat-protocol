@@ -13,6 +13,7 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.2.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
  *   v2.1.0 — 2026-09-28 — Providers (System 2 plan, V3): the owner's candidates are tried by their
  *     rules, a call may name a `provider`, the provider's own transcription language comes after the
@@ -73,6 +74,8 @@ export interface TranscribeForOwnerOptions {
   /** A provider the call names (an id or a type), and the call's word on fallback. */
   provider?: string;
   fallback?: boolean;
+  /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
+  role?: string;
 }
 
 export interface TranscribeForOwnerResult {
@@ -127,6 +130,7 @@ export async function transcribeForOwner(
     op: 'transcribe', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
+    ...(opts.role ? { role: opts.role } : {}),
   });
   let result;
   let answered: AiCallPlan;

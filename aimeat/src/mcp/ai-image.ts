@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.4.0 — 2026-09-28 — `role`, the AI role the call runs as, forwarded as on POST /v1/ai/image.
  *   v1.3.0 — 2026-09-28 — `provider` and `fallback`, forwarded as on POST /v1/ai/image (System 2, V3).
  *   v1.2.0 — 2026-09-28 — The asking agent is named to the service, so its own key pays first and its
  *     daily cap applies, as on /v1/ai/complete. The owner still pays and stores.
@@ -32,6 +33,7 @@ import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
 
 export function registerAiImageTool(
     mcp: McpServer,
@@ -51,9 +53,10 @@ export function registerAiImageTool(
             app_id: z.string().optional().describe('Attribution for the per-app quota and the spend report.'),
             provider: z.string().optional().describe('One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.'),
             fallback: z.boolean().optional().describe('false keeps the call on its first provider; omitted, the owner\'s rules decide.'),
+            role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
         },
         annotationsFor('aimeat_image_generate'),
-        async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback }) => {
+        async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role }) => {
             // The OWNER's identity, not the agent's. The API key, the daily budget and the spend
             // record all live under the owner — an agent has no key of its own and its balance is
             // always zero — so an agent making a picture spends the person's allowance, which is
@@ -72,6 +75,7 @@ export function registerAiImageTool(
                     ...(agent ? { agent } : {}),
                     ...(provider ? { provider } : {}),
                     ...(fallback !== undefined ? { fallback } : {}),
+                    ...(role ? { role } : {}),
                 });
                 const base = config.baseUrl.replace(/\/+$/, '');
                 // The service builds the URL that actually loads for the visibility's audience —

@@ -210,6 +210,44 @@ def test_node_llm_resolves_the_node_and_token_from_the_environment(node: _Node, 
     assert _completion_requests(node)[0]["headers"]["authorization"] == "Bearer from-env"
 
 
+def test_a_role_is_sent_in_the_role_header_on_every_call(node: _Node) -> None:
+    node.answers[("POST", "/v1/llm/chat/completions")] = (200, _completion())
+    llm = node_llm(role="summarizer", node_url=node.url, agent_token=TOKEN)
+    llm.call("hi")
+    llm.call("again")
+    sent = _completion_requests(node)
+    assert [r["headers"].get("x-aimeat-ai-role") for r in sent] == ["summarizer", "summarizer"]
+    # Never in the body: the node reads the header, and the provider must not see the field.
+    assert "role" not in sent[0]["body"]
+
+
+def test_a_role_is_merged_into_extra_headers_the_caller_passes(node: _Node) -> None:
+    node.answers[("POST", "/v1/llm/chat/completions")] = (200, _completion())
+    node_llm(role="reasoning", node_url=node.url, agent_token=TOKEN, extra_headers={"X-Trace": "t1"}).call("hi")
+    headers = _completion_requests(node)[0]["headers"]
+    assert headers.get("x-aimeat-ai-role") == "reasoning"
+    assert headers.get("x-trace") == "t1"
+
+
+def test_no_role_sends_no_role_header(node: _Node) -> None:
+    node.answers[("POST", "/v1/llm/chat/completions")] = (200, _completion())
+    node_llm(node_url=node.url, agent_token=TOKEN).call("hi")
+    assert "x-aimeat-ai-role" not in _completion_requests(node)[0]["headers"]
+
+
+@pytest.mark.skipif(importlib.util.find_spec("litellm") is None, reason="litellm is not installed")
+def test_the_litellm_code_path_sends_the_role_header_too(node: _Node) -> None:
+    node.answers[("POST", "/v1/llm/chat/completions")] = (200, _completion())
+    node_llm(role="summarizer", node_url=node.url, agent_token=TOKEN, is_litellm=True).call("hi")
+    assert _completion_requests(node)[0]["headers"].get("x-aimeat-ai-role") == "summarizer"
+
+
+@pytest.mark.parametrize("role", ["", "x" * 301, 7])
+def test_node_llm_refuses_a_malformed_role_before_sending(role: Any) -> None:
+    with pytest.raises(AiError, match="role"):
+        node_llm(role=role, node_url="http://127.0.0.1:9", agent_token=TOKEN)
+
+
 def test_node_llm_names_a_missing_token(monkeypatch) -> None:
     monkeypatch.delenv("AIMEAT_AGENT_TOKEN", raising=False)
     monkeypatch.setenv("AIMEAT_HOME", "/nonexistent-aimeat-home-xyz")

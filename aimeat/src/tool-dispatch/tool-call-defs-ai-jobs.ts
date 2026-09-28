@@ -14,6 +14,7 @@
  * @structure aiJobTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { aiJobTools } from './tool-call-defs-ai-jobs.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-28 -- aimeat_ai_job_start declares and forwards `role`, the AI role the call runs as.
  *   v1.1.0 -- 2026-09-28 -- System 2 plan, V5: aimeat_ai_job_start declares and forwards `op`,
  *     `provider`, `audio_key`, `language` and `size`.
  *   v1.0.0 -- 2026-08-31 -- Initial.
@@ -22,6 +23,7 @@ import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.j
 import {
     requiredString, optionalString, optionalNumber, optionalBoolean, optionalArray, optionalRecord,
 } from './tool-call-helpers.js';
+import { AI_ROLE_PARAM } from '../mcp/catalog/definitions/ai-models.js';
 
 export const aiJobTools: ConnectCliToolDefinition[] = [
     {
@@ -44,6 +46,7 @@ export const aiJobTools: ConnectCliToolDefinition[] = [
             audio_key: { type: 'string', description: 'For op transcribe (required there): the storage key of an audio file in your own storage.' },
             language: { type: 'string', description: 'For op transcribe: an ISO-639-1 language hint.' },
             size: { type: 'string', description: 'For op image: a provider-specific size, e.g. 1024x1024.' },
+            role: { type: 'string', description: AI_ROLE_PARAM },
         },
         handler: ({ client }, input) => {
             const inputKeys = optionalArray(input, 'input_keys');
@@ -75,6 +78,8 @@ export const aiJobTools: ConnectCliToolDefinition[] = [
             if (audioKey !== undefined) body.audio_key = audioKey;
             if (language !== undefined) body.language = language;
             if (size !== undefined) body.size = size;
+            const role = optionalString(input, 'role');
+            if (role !== undefined) body.role = role;
             return client.post('/v1/ai/jobs', body);
         },
     },

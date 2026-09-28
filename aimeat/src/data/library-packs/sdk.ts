@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.16.2 — 2026-09-28 — aimeat-ai moved to library-packs/sdk-ai.ts (max-file-lines) and is spread
+ *     back in at the same place; its aiDoc gained the AI roles paragraph there.
  *   v1.16.1 — 2026-09-28 — System 2 plan, V5: aimeat-ai's aiDoc and promptLine teach the user's own
  *     AI providers: capabilities() first and the `fix` shown, the capability rather than a model,
  *     the meta's models=, prefer. and local., the price before a paid call, route.fellBack and
@@ -100,6 +102,7 @@ import { PROMPT_PACKS } from './sdk-prompt.js';
 import { DECIDE_PACKS } from './sdk-decide.js';
 import { WORKFLOWS_PACKS } from './sdk-workflows.js';
 import { WEBHOOK_PACKS } from './sdk-webhook.js';
+import { AI_PACKS } from './sdk-ai.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   ...CALENDAR_PRINT_PACKS,
@@ -265,40 +268,7 @@ export const SDK_PACKS: LibraryPack[] = [
     promptGroup: 'core',
     promptLine: '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.',
   },
-  {
-    id: 'aimeat-ai',
-    kind: 'sdk',
-    category: 'ai',
-    title: 'AI completions',
-    description: "AI on the user's own AI providers: text, pictures, speech, transcription and embeddings. Per-user daily budget, per-app quotas and the owner's model policy keep spend safe.",
-    url: '/v1/libs/aimeat-ai.js',
-    include: ['<script src="{{BASE_URL}}/v1/libs/aimeat-ai.js"></script>'],
-    requires: ['aimeat-auth'],
-    license: 'MIT',
-    apiSurface: 'AIMEAT.ai',
-    aiDoc: [
-      "AI on the user's own AI providers, reached through the node (AIMEAT.ai: capabilities, complete, completeJson, stream, image, speak, transcribe, embed, models, usage, job). No key reaches the browser; never bundle your own API key. The server enforces the owner's daily USD budget, per-app quotas and model policy.",
-      'CHECK FIRST: const caps = await AIMEAT.ai.capabilities({ app_id }) gives caps.capabilities.text, .vision, .files, .image, .speech, .transcription and .embed, each { on, model, price, leaves } or, when off, { on: false, reason, fix }. When a capability is off, show the person its `fix` beside the control that needs it (disabled, with that sentence); never hide the button silently, because then nobody learns what to set up. isAvailable() stays the quick yes or no for text.',
-      "ASK FOR THE CAPABILITY, NOT A MODEL: complete({ app_id, prompt }), stream({ app_id, messages or prompt, onText(delta, all) }), image({ app_id, prompt, size }) → { url, storage_key }, speak({ app_id, input }) → { blob } (mp3; new Audio(URL.createObjectURL(r.blob)).play()), transcribe({ app_id, storage_key or audio: blob, language }) → { text }, embed({ app_id, input: [texts] }) → { embeddings, model }. The owner's providers and policy choose the model. When the app truly needs particular models, declare them in its meta: <meta name=\"aimeat-ai\" content=\"generates=text,image; discloses=yes; models=<type>:<id>; prefer.image=openrouter; local.transcription=yes\">. models= takes the `ref` of a row from AIMEAT.ai.models({ capability: 'image' }); prefer.<capability>= a provider type or a ref, in order; local.<capability>=yes keeps that capability on the person's machine. A declaration only narrows what the owner allows.",
-      "TELL THE PRICE BEFORE AN EXPENSIVE CALL: pictures, speech and long batches cost money. image({ ..., confirm: true }) and speak({ ..., confirm: true }) show the catalogue price (caps.capabilities.image.price) in the confirm dialog; for anything else pass confirm: { estimate: '~$0.04' }. A cancel rejects with err.code SPEND_CANCELLED. Identical calls in flight collapse into one paid call.",
-      'EVERY ANSWER SAYS WHO ANSWERED: route { answeredBy: { provider, model }, fellBack } and, on complete, policy_chose_model. When route.fellBack or policy_chose_model is true, say beside the result that another model answered than the usual one. provider: <id or type> and fallback: false pin a call to one of the owner\'s providers. Errors carry err.code from the node (NO_API_KEY, QUOTA_EXHAUSTED, APP_QUOTA_EXHAUSTED, APP_NOT_ALLOWED, AI_CAPABILITY_UNAVAILABLE, AI_MODEL_NOT_ALLOWED, ...) and err.details; after a capability refusal call capabilities({ app_id, fresh: true }) and show the fix.',
-      "complete() details: images: [dataUrlOrHttpsUrl] (at most 8, downscale first) for a question about a picture; files: [storage_key or File or { data_url, filename }] (at most 5, 20 MB in all) for documents the model reads itself (needs files on). Pattern: compose the prompt from app data, call with app_id so spend is attributable, render the result into an editable field. Work that takes minutes goes to AIMEAT.ai.job.start, not complete().",
-      'EMBEDDINGS rarely, and only when the person decided it: never add them on your own. A collection that fits one prompt (thousands of short items, 200 000 tokens) goes to AIMEAT.ai.complete() whole, and word search (AIMEAT.data.search) comes first. Keep the model with every vector (vectors of different models do not compare) and embed again when it changes. A vector is 6 to 12 kB and one memory value holds 1024 kB: never put a collection of vectors in one value; store a vector with its own record, or in small groups.',
-      'models({ capability, type, allowed }) reads the node catalogue (GET /v1/ai/models, open to an app) instead of the old owner-only OpenRouter list: rows are { ref, type, id, name, caps, limits, price, status } plus context_length and pricing in the old form; default is the text models this caller can use. Pass `ref` as model.',
-      'AIMEAT.ai.declare(item, provenance) stores the BARE record under item.aiProvenance (plus aiProvenanceUrl), not the { id, record, recordUrl } wrapper complete() returns, so keep the bare shape on your item from the start. AIMEAT.ai.disclose(provenance, { target }) REPLACES the target\'s content and draws nothing when no label is owed: give it an element of its own, and write your own origin line beside it if readers should always see where a text came from.',
-    ].join(' '),
-    changelog: [],
-    tierHint: 'T1',
-    interviewTriggers: ['ai', 'llm', 'summary', 'suggestion', 'generate', 'tekoäly'],
-    sizeEstimate: '~4KB',
-    status: 'stable',
-    modelTier: 'needs-doc',
-    proofs: [
-      { model: 'claude-haiku-4-5', verdict: 'pass', testSet: 'coresdk-smoke', evidence: 'tools/aeb/results/aeb3-baselib-sweep.md', tokens: 59251, date: '2026-07-17' },
-    ],
-    promptGroup: 'ai',
-    promptLine: "- aimeat-ai.js — AI on the USER's own AI providers: text, pictures, speech, transcription, embeddings. Check `AIMEAT.ai.capabilities()` first and show the `fix` of one that is off; then `complete`, `stream`, `image`, `speak`, `transcribe`, `embed`. Requires aimeat-auth.",
-  },
+  ...AI_PACKS,
   ...DECIDE_PACKS,
   {
     id: 'aimeat-datapackage',

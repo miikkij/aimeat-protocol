@@ -12,6 +12,9 @@
  * @structure secProviders · providerRow · providerOpen · addForm · secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.1.0 — 2026-09-28 — A capability's editor (capEditor): its model with the settings its kind
+ *     takes, the speech voice, the transcription language, OpenRouter's PDF engine and the default
+ *     fine-tuning of text, vision and files, saved together (AI roles).
  *   v1.0.0 — 2026-09-28 — Initial (System 2): the page for the providers, the routing and the model
  *     policy, on the page's existing components (Jouni: no design lab for this, the same components
  *     and the same style).
@@ -32,7 +35,8 @@ import { Hint } from '/components/Hint.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { x, dateWord } from './frame.js';
-import { CAPS, PROVIDER_TYPES, slug } from './use-providers.js';
+import { CAPS, PROVIDER_TYPES, slug, capPatchOf } from './use-providers.js';
+import { t } from '/js/i18n.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 const HEALTH_STATE = { ok: 'fine', degraded: 'attention', failing: 'danger', untested: 'off' };
@@ -128,10 +132,8 @@ function providerOpen(ctx, p) {
       v: html`
         <${Line} wrap gap="medium">
           <${Check} inline checked=${!!cfg?.enabled} disabled=${pv.busy === 'cap'} onChange=${(v) => pv.saveCap(p, c, { enabled: v })}>${x('pv.capInUse')}<//>
-          ${cfg?.enabled ? html`<${TextField} box value=${pv.modelDraft[c] ?? ''} placeholder=${x('pv.modelPlaceholder')} ariaLabel=${x('pv.modelFor', { cap: x('cap.' + c) })}
-            onInput=${(v) => pv.setModelDraft(c, v)}
-            actions=${html`<${Action} small disabled=${pv.busy === 'cap' || (pv.modelDraft[c] ?? '') === (cfg?.model || '')} onClick=${() => pv.saveCap(p, c, { model: (pv.modelDraft[c] || '').trim() })}>${x('save')}<//>`} />` : null}
-        <//>`,
+        <//>
+        ${cfg?.enabled ? capEditor(pv, p, c) : null}`,
       sub,
     });
   }
@@ -161,6 +163,38 @@ function providerOpen(ctx, p) {
       <${Facts} rows=${rows} />
       ${msg(pv.msg)}
     <//>`;
+}
+
+const STT_LANGS = ['', 'fi', 'en', 'sv', 'de', 'fr', 'es', 'et'];
+
+/**
+ * One capability's editor: its model, and the settings its kind takes (the speech voice, the
+ * transcription language, OpenRouter's PDF engine, the default fine-tuning of text, vision and files),
+ * saved together.
+ */
+function capEditor(pv, p, c) {
+  const d = pv.modelDraft[c] || {};
+  const set = (patch) => pv.setModelDraft(c, patch);
+  const tuning = c === 'text' || c === 'vision' || c === 'files';
+  const num = (key, min, max, step) => html`
+    <${TextField} label=${x('param.' + key)} type="number" size="short" min=${min} max=${max} step=${step} value=${d[key] ?? ''} placeholder=${x('default')} onInput=${(v) => set({ [key]: v })} />`;
+  return html`
+    <${Line} wrap gap="small">
+      <${TextField} value=${d.model ?? ''} placeholder=${x('pv.modelPlaceholder')} ariaLabel=${x('pv.modelFor', { cap: x('cap.' + c) })} onInput=${(v) => set({ model: v })} />
+      ${c === 'speech' ? html`<${TextField} value=${d.voice ?? ''} placeholder=${x('pv.voicePlaceholder')} ariaLabel=${x('pv.voice')} onInput=${(v) => set({ voice: v })} />` : null}
+      ${c === 'transcription' ? html`<${Select} fit ariaLabel=${x('pv.language')} value=${d.language ?? ''} onChange=${(v) => set({ language: v })}
+          options=${STT_LANGS.map((code) => [code, code ? t('profile.openrouter.stt.lang_' + code) : x('sttLangDetect')])} />` : null}
+      ${c === 'files' && p.type === 'openrouter' ? html`<${Select} fit ariaLabel=${x('pv.parser')} value=${d.parser ?? ''} onChange=${(v) => set({ parser: v })}
+          options=${[['', x('pv.parserNone')], ['native', x('pv.parserNative')], ['mistral-ocr', 'Mistral OCR'], ['cloudflare-ai', 'Cloudflare AI']]} />` : null}
+    <//>
+    ${tuning ? html`
+      <${Note} kind="meta">${x('pv.tuning')}<//>
+      <${Line} wrap gap="medium">
+        ${num('temperature', 0, 2, 0.1)}${num('top_p', 0, 1, 0.05)}${num('max_tokens', 1, 1000000, 256)}
+        <${Select} fit label=${x('param.reasoning')} value=${d.reasoning ?? ''} onChange=${(v) => set({ reasoning: v })}
+          options=${['', 'off', 'low', 'medium', 'high'].map((k) => [k, x('reasoning.' + (k || 'default'))])} />
+      <//>` : null}
+    <${Actions}><${Action} small disabled=${pv.busy === 'cap'} onClick=${() => pv.saveCap(p, c, capPatchOf(c, d, p.type))}>${x('save')}<//><//>`;
 }
 
 /** Whether an extension's declared ops serve a capability (services/ai/extension-provider.ts CAPABILITY_OP). */

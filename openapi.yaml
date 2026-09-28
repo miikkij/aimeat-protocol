@@ -732,6 +732,96 @@ components:
 
 
     # === Core Envelope ===
+    AiCallRole:
+      type: string
+      minLength: 1
+      maxLength: 300
+      description: >-
+        The AI role the call runs as: one of the caller's role ids (GET /v1/ai/roles), or for an app a
+        role it declares in its aimeat-ai meta and the owner bound. Its providers and models for the
+        capability come first, in its order. A named `model` or `provider` wins over it. Refused 400
+        INVALID_BODY when it is not a string of 1 to 300 characters; AI_ROLE_UNKNOWN,
+        AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY (400) and AI_ROLE_NOT_BOUND (409) as on
+        POST /v1/ai/complete.
+    AiRoleEntry:
+      type: object
+      required: [provider]
+      description: One place in a role's order for a capability.
+      properties:
+        provider: { type: string, description: 'One of the owner''s provider ids (GET /v1/ai/providers).' }
+        model: { type: string, description: The model id as the provider names it; omitted, the provider's own for the capability. }
+    AiOwnerRole:
+      type: object
+      description: >-
+        One of the owner's AI roles: what it is for, and for each capability it needs, the providers
+        (and models) to try in order, at most 5.
+      properties:
+        id: { type: string, description: 'Lower-case letters, digits and "-", 1 to 40 characters.' }
+        title: { type: string, maxLength: 80 }
+        purpose: { type: string, maxLength: 500 }
+        capabilities:
+          type: object
+          description: '{ "<capability>": [AiRoleEntry, ...] } for text, vision, files, image, speech, transcription, embed.'
+          additionalProperties:
+            type: array
+            maxItems: 5
+            items:
+              $ref: '#/components/schemas/AiRoleEntry'
+        local: { type: boolean, description: Only providers on this machine. }
+        maxCostPerCallUsd:
+          oneOf:
+            - type: number
+              minimum: 0
+              maximum: 100
+            - type: 'null'
+          description: A ceiling per call in US dollars, tighter than the owner's routing rule.
+        builtIn: { type: boolean, description: 'reasoning or execution: cannot be removed.' }
+        legacy: { type: boolean, description: A built-in role the owner has not set, showing the legacy setting it replaces. Read only. }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time, description: 'When a call last ran as this role (at most once a day). Read only.' }
+    AiAppRoleView:
+      type: object
+      description: A role an app declares, with the owner's binding.
+      properties:
+        name: { type: string, description: The role name the app declares (role.<name>= in its aimeat-ai meta). }
+        capabilities: { type: array, items: { type: string } }
+        purpose: { type: string }
+        local: { type: boolean }
+        context: { type: integer, description: The least context, in tokens, the role needs. }
+        params:
+          type: object
+          description: The fine-tuning the app wants for this role.
+          properties:
+            temperature: { type: number }
+            top_p: { type: number }
+            max_tokens: { type: integer }
+            reasoning: { type: string, enum: ['off', low, medium, high] }
+        binding: { type: string, description: '<owner>/<file>.html#<name>: the key PUT /v1/ai/roles binds.' }
+        boundTo:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: The owner's role it runs as; null while it does not run.
+        lastUsedAt: { type: string, format: date-time }
+        requestedAt: { type: string, format: date-time, description: When the app last asked for the role while it was unbound. }
+    AiRolesView:
+      type: object
+      properties:
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiOwnerRole'
+        apps:
+          type: array
+          items:
+            type: object
+            properties:
+              app: { type: string, description: '<owner>/<file>.html' }
+              roles:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AiAppRoleView'
     AimeatEnvelope:
       type: object
       required: [ok, protocol, version, node, timestamp, request_id]
@@ -5364,6 +5454,7 @@ components:
             model: { type: string, maxLength: 200, description: 'ai: override the owner''s default model for this one step.' }
             op: { type: string, enum: [text, image, transcribe], description: 'ai: what the step does (default text). image writes { storage_key, url, mime_type, model } to result_to_key; transcribe turns the audio at audio_key into text (with json, { text, language, seconds, model }) and needs no prompt.' }
             provider: { type: string, maxLength: 200, description: 'ai: one of the owner''s provider ids, or a type. No fallback then.' }
+            role: { type: string, minLength: 1, maxLength: 300, description: 'ai: the AI role the step''s call runs as, one of the owner''s role ids (GET /v1/ai/roles). A named model or provider wins over it.' }
             audio_key: { type: string, maxLength: 400, description: 'ai, op transcribe: the audio file''s key in the owner''s storage, templated with the run''s vars.' }
             language: { type: string, maxLength: 12, description: 'ai, op transcribe: ISO-639-1 hint.' }
             size: { type: string, maxLength: 20, description: 'ai, op image: the picture size.' }
@@ -10991,7 +11082,19 @@ paths:
         `text/event-stream` frames are forwarded byte for byte, so any client that understands
         OpenAI's stream understands this one.
 
+        A call may name the AI role it runs as (`GET /v1/ai/roles`): in the body's `role`, or in the
+        `X-AIMEAT-AI-Role` header, which is what an OpenAI-compatible client can send on every call.
+        Both given and different is refused 400. The role orders the providers and models; the
+        caller still names no model. The role refusals are those of `POST /v1/ai/complete`.
+
         Requires an owner session or a token carrying `ai:use`.
+      parameters:
+        - in: header
+          name: X-AIMEAT-AI-Role
+          required: false
+          schema:
+            $ref: '#/components/schemas/AiCallRole'
+          description: The AI role the call runs as, for a client that cannot add a body field.
       requestBody:
         required: true
         content:
@@ -11000,6 +11103,8 @@ paths:
               type: object
               required: [messages]
               properties:
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
                 messages:
                   type: array
                   items: { type: object }
@@ -11020,7 +11125,7 @@ paths:
             text/event-stream:
               schema: { type: string }
         '400':
-          description: messages is missing, or no key is configured for this owner
+          description: messages is missing, no key is configured for this owner, the role is malformed or not the owner's (AI_ROLE_UNKNOWN, AI_ROLE_LACKS_CAPABILITY)
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -11040,6 +11145,15 @@ paths:
         OpenAI's model-list shape, for a client that asks before it asks for anything else. The list
         comes from the provider through the same service the node's own model pickers use, so a model
         that appears here is one the node can reach. Requires an owner session or `ai:use`.
+        A client that sends `X-AIMEAT-AI-Role` on every call gets the models of the provider that
+        role would use.
+      parameters:
+        - in: header
+          name: X-AIMEAT-AI-Role
+          required: false
+          schema:
+            $ref: '#/components/schemas/AiCallRole'
+          description: The AI role the listed models are for.
       responses:
         '200':
           description: '`{ object: "list", data: [{ id, object, owned_by }] }`'
@@ -15064,6 +15178,19 @@ paths:
         `model` falls back only to the same model; a named `provider` never falls back. `data.route`
         says who chose, who answered and every attempt. When no provider can answer, 400
         `AI_CAPABILITY_UNAVAILABLE` lists each provider with the reason it was left out.
+
+
+        AI ROLES. A capability says what a model does; a role says what it is used for
+        (`GET /v1/ai/roles`). `role` names the one the call runs as: its providers and models for
+        the capability come first, in its order, and its `local` and price ceiling only tighten the
+        owner's rules. A named `model` or `provider` wins over it. For an app (its grant, or an
+        `app_id` whose meta declares the role), `role` is a role the app declares in its
+        `<meta name="aimeat-ai">`, and it runs only once the owner bound it to one of theirs; for
+        anyone else it is one of the owner's role ids. Refusals: 400 `AI_ROLE_NOT_DECLARED` (the app
+        does not declare that role; `error.details.declared`), 400 `AI_ROLE_UNKNOWN` (the owner has
+        no such role), 400 `AI_ROLE_LACKS_CAPABILITY` (the role has no provider for this
+        capability), 409 `AI_ROLE_NOT_BOUND` (the owner has not bound the app's role yet;
+        `error.details.binding` and `needs`, and the owner sees the request in `GET /v1/ai/roles`).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15075,6 +15202,8 @@ paths:
               type: object
               required: [prompt]
               properties:
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
                 prompt:
                   type: string
                   description: The user prompt (max 200k characters).
@@ -15140,7 +15269,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
-          $ref: '#/components/responses/AimeatError'
+          description: >
+            Refused before anything was spent: INVALID_BODY (a malformed field; `role` that is not a
+            string of 1 to 300 characters), AI_CAPABILITY_UNAVAILABLE, AI_ROLE_NOT_DECLARED (the app
+            does not declare the role), AI_ROLE_UNKNOWN (the owner has no such role) or
+            AI_ROLE_LACKS_CAPABILITY (the role has no provider for the capability).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '402':
           $ref: '#/components/responses/AimeatError'
         '403':
@@ -15148,6 +15285,15 @@ paths:
             Refused: the caller lacks `ai:use`, the app is not on the owner's allowlist, or the model
             policy refused (`AI_MODEL_NOT_ALLOWED` with `error.details.allowed`, `layer`, `source`;
             `AI_MODEL_POLICY_EMPTY` with `error.details.layers`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '409':
+          description: >
+            AI_ROLE_NOT_BOUND: the app's role runs only once the owner binds it to one of their roles
+            (PUT /v1/ai/roles, or aimeat_ai_role_set). `error.details` has `binding` (the key to bind),
+            `needs` (what the app declares for the role) and `fix`.
           content:
             application/json:
               schema:
@@ -15406,6 +15552,8 @@ paths:
                   description: One of the caller's provider ids, or a type. No fallback then.
                 fallback:
                   type: boolean
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
       responses:
         '200':
           description: data.embeddings (number[][]), data.model, data.dimensions, data.route, data.usage { prompt_tokens, cost_usd, cost_exact }, data.budget.
@@ -15730,6 +15878,112 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ai/roles:
+    get:
+      operationId: getAiRoles
+      summary: The owner's AI roles, and the AI roles apps declare with the owner's bindings
+      description: >
+        A capability says what a model does (text, vision, files, image, speech, transcription,
+        embed); a role says what it is used for. The built-in roles `reasoning` and `execution` are
+        always listed (while the owner has not set one, it shows the legacy setting it replaces, with
+        `legacy: true`), then the owner's own. For each capability a role needs, it lists the
+        providers and models to try, in order. An AI call names the role it runs as with `role`.
+
+
+        `apps` lists the apps that declare roles (the owner's own, the ones with a binding, and the
+        ones that asked for an unbound role). An app's role runs only after the owner binds it to one
+        of their roles; `boundTo` is null until then, and `requestedAt` says when the app last asked
+        for it while unbound. Needs an owner session or a token holding `ai:use`. Nothing here is a key.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: data is AiRolesView.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AiRolesView'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          description: SCOPE_DENIED, the caller holds no `ai:use`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+    put:
+      operationId: setAiRoles
+      summary: Change the roles or bind an app's role (the owner; or an agent proposing, then confirming)
+      description: >
+        `roles` sets a role by id (the whole role) or removes it with null; the built-in `reasoning`
+        and `execution` cannot be removed. `bindings` binds an app's declared role
+        (`<owner>/<file>.html#<role name>`) to one of the owner's role ids, or unbinds it with null;
+        binding is the owner's approval of what that app may run. Every problem is answered at once.
+        The owner applies at once. An agent holding `memory:write-reserved` gets a proposal
+        (`mode: proposal`, `current`, `proposed`, `confirm_token`, `expires_in_seconds`) and applies
+        exactly that change by sending it again with the token within ten minutes. An app, and a
+        session from another node, is refused.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                roles:
+                  type: object
+                  description: '{ "<role id>": AiOwnerRole or null }. An id is lower-case letters, digits and "-", 1 to 40 characters; at most 50 roles.'
+                  additionalProperties:
+                    oneOf:
+                      - $ref: '#/components/schemas/AiOwnerRole'
+                      - type: 'null'
+                bindings:
+                  type: object
+                  description: '{ "<owner>/<file>.html#<role name>": "<role id>" or null }. At most 200.'
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: 'null'
+                confirm_token:
+                  type: string
+                  description: The token from the proposal, sent with the same change to apply it.
+      responses:
+        '200':
+          description: >-
+            data.mode `applied` with data.roles (the stored record: roles, bindings, updatedAt), or
+            `proposal` with data.current, data.proposed, data.confirm_token, data.expires_in_seconds
+            and data.instructions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: AI_ROLES_INVALID, with every problem in error.details.problems.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          description: >
+            OWNER_ONLY (an app, a session from another node, or a principal that is neither the owner
+            nor an agent of theirs), SCOPE_DENIED (an agent without `memory:write-reserved`), or a
+            confirm token that is wrong, expired or bound to another change.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/ai/jobs:
     post:
       operationId: startAiJob
@@ -15840,6 +16094,8 @@ paths:
                 provider:
                   type: string
                   description: One of the caller's provider ids, or a type. No fallback then.
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
                 audio_key:
                   type: string
                   description: Required for op transcribe; a file in the caller's own storage (404 `NOT_FOUND` when it is not there, 400 `AUDIO_TOO_LARGE` over the node's limit).
@@ -16975,6 +17231,8 @@ paths:
                 fallback:
                   type: boolean
                   description: false keeps the call on its first provider; omitted, the owner's rules decide.
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
       responses:
         '200':
           description: The image was generated and stored. data.route says who answered and every attempt.
@@ -17006,7 +17264,9 @@ paths:
                               spent_today_usd: { type: number }
                               remaining_usd: { type: number }
         '400':
-          description: INVALID_BODY, PROMPT_TOO_LONG, or NO_IMAGE_MODEL when neither the owner nor the node has named one
+          description: INVALID_BODY, PROMPT_TOO_LONG, NO_IMAGE_MODEL when neither the owner nor the node has named one, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)
+        '409':
+          description: AI_ROLE_NOT_BOUND - the app's role runs only once the owner binds it (PUT /v1/ai/roles)
         '401':
           description: Unauthorized, or INVALID_API_KEY when the provider rejected the key
         '402':
@@ -17048,6 +17308,8 @@ paths:
                 app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers; signed owner/filename for app grants.' }
                 model: { type: string, maxLength: 200 }
                 provider: { type: string, minLength: 1, maxLength: 200, description: 'One of the caller''s provider ids, or a type. No fallback then.' }
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
                 messages:
                   type: array
                   minItems: 1
@@ -17085,10 +17347,11 @@ paths:
                   - type: object
                     properties:
                       data: { type: object, description: 'Final text, model, usage, budget and provenance.' }
-        '400': { description: Invalid parameters }
+        '400': { description: 'Invalid parameters, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)' }
         '401': { description: Authentication required }
         '402': { description: AI budget exhausted }
         '403': { description: Missing ai:use or conflicting application identity }
+        '409': { description: 'AI_ROLE_NOT_BOUND: the app''s role runs only once the owner binds it (PUT /v1/ai/roles)' }
         '429': { description: Rate limited }
         '502': { description: Provider failure before streaming started }
   /v1/ai/speak:
@@ -17132,6 +17395,8 @@ paths:
                 speed: { type: number, minimum: 0.25, maximum: 4, default: 1 }
                 instructions: { type: string, maxLength: 2000, description: 'OpenRouter OpenAI provider speech instructions.' }
                 provider: { type: string, minLength: 1, maxLength: 200, description: 'One of the caller''s provider ids, or a type. No fallback then.' }
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
       responses:
         '200':
           description: NDJSON audio stream, or private audio handle when json=1. Success requires a terminal done frame.
@@ -17145,10 +17410,11 @@ paths:
                   - type: object
                     properties:
                       data: { type: object, description: 'Private storage_key, fetch_url, mime_type, size_bytes, usage, budget and provenance.' }
-        '400': { description: Invalid parameters or unknown speech model }
+        '400': { description: 'Invalid parameters, unknown speech model, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)' }
         '401': { description: Authentication required }
         '402': { description: AI budget exhausted }
         '403': { description: Missing ai:use or conflicting application identity }
+        '409': { description: 'AI_ROLE_NOT_BOUND: the app''s role runs only once the owner binds it (PUT /v1/ai/roles)' }
         '429': { description: Rate limited }
         '502': { description: Provider failure before streaming started }
   /v1/ai/transcribe:
@@ -17216,6 +17482,8 @@ paths:
                 fallback:
                   type: boolean
                   description: false keeps the call on its first provider; omitted, the owner's rules decide.
+                role:
+                  $ref: '#/components/schemas/AiCallRole'
       responses:
         '200':
           description: Transcription. data.route says who answered and every attempt.

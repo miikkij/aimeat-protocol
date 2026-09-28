@@ -27,6 +27,9 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.4.0 — 2026-09-28 — AI roles: a call may name the AI role it runs as, in the body's `role` or
+ *     the X-AIMEAT-AI-Role header (what an OpenAI-compatible client can send), passed to prepareAiCall.
+ *     The caller still names no model; the owner's role decides the providers and models.
  *   v1.3.0 — 2026-09-28 — Providers (System 2 plan, V3): the owner's candidates are tried in order
  *     before the first byte, by the owner's rules; an Anthropic provider answers through the
  *     gateway's OpenAI chat converter, byte-compatible with the others; the attempts that failed
@@ -51,6 +54,7 @@ import { aiCallerOf } from './ai-policy.js';
 import {
     prepareAiCall, settleAiCall, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
 } from '../services/ai-completion.js';
+import { readCallRole } from '../services/ai-call-guards.js';
 import { chatCompletionRaw, listModels } from '../services/openrouter.js';
 import { openAiChat, speaksOpenAiChat, type OpenAiChatBody } from '../services/ai/gateway.js';
 import { runRoute } from '../services/ai/route-run.js';
@@ -93,7 +97,12 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         // The same payer the completion below resolves, so the list is of the models that key reaches.
         const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
         try {
-            const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) });
+            // A client that sends its role on every call sends it here too, and then lists the
+            // models of the provider that role would use.
+            const role = proxyRole(req);
+            const plan = await prepareAiCall(storage, config, gaii, {
+                appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId), ...(role ? { role } : {}),
+            });
             // A provider that does not speak this dialect has no OpenAI-shaped list: the model the
             // node would use is the one it lists.
             const models = speaksOpenAiChat(plan.providerType)
@@ -144,8 +153,14 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         let plan: AiCallPlan;
         try {
             // `model` is deliberately not passed through: see the file header. The node decides.
+            // A role is the caller's word on WHAT the call is for, which the owner's roles turn into
+            // providers and models (services/ai/roles.ts); it is read, and refused when malformed,
+            // before anything else happens. Never forwarded upstream: `upstream` below names its fields.
+            const role = proxyRole(req);
             // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
-            plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) });
+            plan = await prepareAiCall(storage, config, gaii, {
+                appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId), ...(role ? { role } : {}),
+            });
         } catch (err) {
             sendError(res, config.nodeId, err);
             return;
@@ -222,6 +237,26 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     return router;
+}
+
+/** The header an OpenAI-compatible client sends its AI role in (aimeat-crewai node_llm(role=...)). */
+const LLM_ROLE_HEADER = 'x-aimeat-ai-role';
+
+/**
+ * The AI role a /v1/llm call names: the body's `role`, or the X-AIMEAT-AI-Role header, which is how
+ * an OpenAI-compatible client carries it (it can set a header on every call, and it cannot add a
+ * top-level body field without a client-specific option). Both given and different is refused, so
+ * the call never runs as a role the caller did not mean. Validated by readCallRole: 1 to 300 characters.
+ */
+function proxyRole(req: Request): string | undefined {
+    const fromBody = readCallRole((req.body as { role?: unknown } | undefined)?.role);
+    const header = req.get(LLM_ROLE_HEADER);
+    const fromHeader = header === undefined ? undefined : readCallRole(header);
+    if (fromBody && fromHeader && fromBody !== fromHeader) {
+        throw new AiCompletionError('INVALID_BODY', 400,
+            `The body's role (${fromBody}) and the X-AIMEAT-AI-Role header (${fromHeader}) differ; send one of them.`);
+    }
+    return fromBody ?? fromHeader;
 }
 
 /** A provider status turned into the node's own vocabulary, so a caller sees a named cause. */

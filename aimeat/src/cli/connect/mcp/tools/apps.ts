@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-28 — aimeat_image_generate takes `role`, the AI role the call runs as, sent to POST /v1/ai/image.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.10.0 -- 2026-09-27 -- The versions, screenshot, seo, marks, visitors, visitors_measure, legal and
  *     audit tools moved into aimeat_app_manage (app-manage.ts).
@@ -35,6 +36,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { AI_ROLE_PARAM } from '../../../../mcp/catalog/definitions/ai-models.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
 import { envelopeResult, payloadResult } from './_registry.js';
@@ -399,7 +401,8 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     app_id: z.string().optional().describe('Attribution for the per-app quota and the spend report.'),
     provider: z.string().optional().describe('One of the owner\'s AI providers, or a type. No fallback then.'),
     fallback: z.boolean().optional().describe('false keeps the call on its first provider.'),
-  }, annotationsFor('aimeat_image_generate'), async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback }) => {
+    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
+  }, annotationsFor('aimeat_image_generate'), async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role }) => {
     const body: Record<string, unknown> = { prompt };
     if (size) body.size = size;
     if (storage_key) body.storage_key = storage_key;
@@ -408,6 +411,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (app_id) body.app_id = app_id;
     if (provider) body.provider = provider;
     if (fallback !== undefined) body.fallback = fallback;
+    if (role) body.role = role;
     return out(await client.post('/v1/ai/image', body));
   });
 

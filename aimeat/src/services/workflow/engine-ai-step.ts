@@ -42,6 +42,7 @@
  *     on the file at audio_key in the owner's storage and writes the transcript, or
  *     { text, language, seconds, model } with `json`. `provider` reaches every call. Each op's cost
  *     counts toward the run's cost cap as a text call's does.
+ *   v1.9.0 — 2026-09-28 — `role` reaches every call, as `provider` does: the AI role the step runs as.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -116,6 +117,7 @@ export function dispatchAiStep(
       ...(action.model ? { model: action.model } : {}),
       ...(action.language ? { language: action.language } : {}),
       ...(action.provider ? { provider: action.provider } : {}),
+      ...(action.role ? { role: action.role } : {}),
       appId,
     });
     addSpend(r.usage.costUsd);
@@ -176,6 +178,7 @@ export function dispatchAiStep(
         ...(action.model ? { model: action.model } : {}),
         ...(action.size ? { size: action.size } : {}),
         ...(action.provider ? { provider: action.provider } : {}),
+        ...(action.role ? { role: action.role } : {}),
         appId,
       });
       addSpend(r.usage.costUsd);
@@ -191,6 +194,7 @@ export function dispatchAiStep(
         ...(action.model ? { model: action.model } : {}),
         ...(action.reasoning ? { reasoning: action.reasoning } : {}),
         ...(action.provider ? { provider: action.provider } : {}),
+        ...(action.role ? { role: action.role } : {}),
         uncapped: true,
         appId,
       });

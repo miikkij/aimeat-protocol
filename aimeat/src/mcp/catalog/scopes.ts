@@ -22,6 +22,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.34.0 -- 2026-09-28 -- aimeat_ai_roles needs ai:use; aimeat_ai_role_set needs memory:write-reserved, as
+ *     GET and PUT /v1/ai/roles do (AI roles).
  *   v1.33.0 -- 2026-09-28 -- aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and aimeat_ai_embed need
  *     ai:use (System 2 plan, V5).
  *   v1.32.0 -- 2026-09-28 -- aimeat_ai_providers and aimeat_ai_provider_test need ai:use; aimeat_ai_routing_set needs
@@ -352,6 +354,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_ai_models:                         'ai:use',
     aimeat_ai_transcribe:                     'ai:use',
     aimeat_ai_embed:                          'ai:use',
+    // The roles show no key; changing one or binding an app's role is the owner's rule, as the routing is.
+    aimeat_ai_roles:                          'ai:use',
+    aimeat_ai_role_set:                       'memory:write-reserved',
 
     // Changes WHO ELSE can read the owner's knowledge. A different promise than changing
     // the knowledge, which is why it is not organism:write.

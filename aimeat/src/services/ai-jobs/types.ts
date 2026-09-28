@@ -13,6 +13,7 @@
  * @structure AiJobState · AiJobRecord · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.2.0 — 2026-09-28 — `role`, the AI role the job's call runs as, on the record and on the start input.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: `op` (text, image, transcribe), `audio_key` and
  *     `language` for a transcription, `size` for an image, and `provider` for every operation, on the
  *     record and on the start input.
@@ -54,6 +55,8 @@ export interface AiJobRecord {
     op?: AiOp;
     /** A provider the job names, an id or a type. Naming one turns fallback off (route-plan.ts). */
     provider?: string;
+    /** The AI role the job's call runs as (services/ai/roles.ts). A named model or provider wins over it. */
+    role?: string;
     /** For `transcribe`: the storage key of the audio, in the job owner's own storage. */
     audio_key?: string;
     /** For `transcribe`: an ISO-639-1 hint. */
@@ -111,6 +114,7 @@ export interface StartAiJobInput {
     /** Any string here: the start checks it against AI_OPS (op.ts) and refuses an unknown one. */
     op?: AiOp | string;
     provider?: string;
+    role?: string;
     audio_key?: string;
     language?: string;
     size?: string;

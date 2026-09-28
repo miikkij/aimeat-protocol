@@ -19,6 +19,7 @@
  *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.17.0 — 2026-09-28 — `ai.roles.` joins the list: the owner's AI roles and app role bindings.
  *   v1.16.0 — 2026-09-28 — `ai.providers.`, `ai.apikey.` and `ai.routing.` join the list: the owner's
  *     AI providers, their keys and the routing (System 2 plan, V3).
  *   v1.15.0 — 2026-09-28 — `ai.policy.` joins the list: the owner's model policy (System 2 plan, V2).
@@ -199,6 +200,11 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   'ai.providers.',
   'ai.apikey.',
   'ai.routing.',
+  // 2026-09-28: the AI roles (services/ai/roles.ts). `ai.roles.owner` says which providers a role
+  // runs on and which app role is bound to it: an app that could write it could bind its own role, the
+  // approval the owner gives. `ai.roles.used` and `ai.roles.requests` are the node's notes. The route
+  // (/v1/ai/roles) and the propose-and-confirm tool are the writers. Searched 2026-09-28: new.
+  'ai.roles.',
 ] as const;
 
 /**

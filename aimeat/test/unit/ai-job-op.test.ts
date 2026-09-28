@@ -10,6 +10,8 @@
  *   things mocked: what reached them and what storage was asked to write are the evidence.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-op.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-28 — `role`: the rule refuses one that is not a string of 1 to 300 characters,
+ *     and a job's role reaches the service call of every op.
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -121,8 +123,17 @@ describe('which fields go with which op', () => {
         ['audio_key on a text call', { prompt: 'x', audio_key: AUDIO_KEY }, /only to op "transcribe"/],
         ['language on an image', { op: 'image', prompt: 'x', language: 'fi' }, /only to op "transcribe"/],
         ['size on a text call', { prompt: 'x', size: '512x512' }, /only to op "image"/],
+        ['an empty role', { prompt: 'x', role: '' }, /role must be a string of 1 to 300/],
+        ['a role over 300 characters', { prompt: 'x', role: 'r'.repeat(301) }, /role must be a string of 1 to 300/],
+        ['a role that is not a string', { op: 'image', prompt: 'x', role: 7 }, /role must be a string of 1 to 300/],
     ])('refuses %s', (_label, spec, why) => {
         expect(aiOpRefusal(spec)).toMatch(why);
+    });
+
+    it('accepts a role on every op', () => {
+        expect(aiOpRefusal({ prompt: 'x', role: 'summarizer' })).toBeNull();
+        expect(aiOpRefusal({ op: 'image', prompt: 'x', role: 'r'.repeat(300) })).toBeNull();
+        expect(aiOpRefusal({ op: 'transcribe', audio_key: AUDIO_KEY, role: 'listener' })).toBeNull();
     });
 });
 
@@ -210,6 +221,18 @@ describe('what each op lands at result_key', () => {
         await settle();
         expect(calls.complete[0]).toMatchObject({ prompt: 'Summarise.', provider: 'openrouter' });
         expect(w.writes.find(x => x.key === 'out.result')?.value).toBe('the answer');
+    });
+
+    it('a job\'s role reaches the service call of every op, and is kept on the record', async () => {
+        const w = watchedStorage();
+        const started = await start(w, { prompt: 'Summarise.', role: 'summarizer' });
+        await start(w, { op: 'image', prompt: 'a red bicycle', role: 'illustrator' });
+        await start(w, { op: 'transcribe', audio_key: AUDIO_KEY, role: 'listener' });
+        await settle();
+        expect(calls.complete[0]).toMatchObject({ role: 'summarizer' });
+        expect((calls.image[0] as { input: Record<string, unknown> }).input).toMatchObject({ role: 'illustrator' });
+        expect((calls.transcribe[0] as { input: Record<string, unknown> }).input).toMatchObject({ role: 'listener' });
+        expect(await new AiJobService(config, w.storage).getJob(OWNER, started.job_id)).toMatchObject({ role: 'summarizer' });
     });
 });
 

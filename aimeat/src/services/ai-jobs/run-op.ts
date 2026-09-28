@@ -19,6 +19,7 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.1.0 — 2026-09-28 — Every op passes the job's `role`, the AI role the call runs as.
  *   v1.0.0 — 2026-09-28 — System 2 plan, V5: the text call moved here from service.ts run(), and the
  *     image and transcription calls added beside it.
  */
@@ -84,6 +85,7 @@ export async function runJobOp(
         ...(job.model ? { model: job.model } : {}),
         ...(job.app_id ? { appId: job.app_id } : {}),
         ...(job.provider ? { provider: job.provider } : {}),
+        ...(job.role ? { role: job.role } : {}),
         signal,
     };
     const op = aiOpOf(job.op);

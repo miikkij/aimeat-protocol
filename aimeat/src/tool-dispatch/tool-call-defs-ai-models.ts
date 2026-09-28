@@ -7,6 +7,8 @@
  *   test/unit/cli-tool-param-forwarding.test.ts proves each one leaves the process.
  * @structure aiModelCliTools[] — registered by tool-dispatch/index.ts
  * @version-history
+ *   v1.3.0 — 2026-09-28 — AI roles: aimeat_ai_roles and aimeat_ai_role_set over GET and PUT /v1/ai/roles;
+ *     aimeat_ai_transcribe and aimeat_ai_embed forward `role`.
  *   v1.2.0 — 2026-09-28 — aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and
  *     aimeat_ai_embed (System 2 plan, V5).
  *   v1.1.0 — 2026-09-28 — aimeat_ai_providers, aimeat_ai_provider_test and aimeat_ai_routing_set
@@ -78,7 +80,7 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
     ...def('aimeat_ai_transcribe'),
     handler: ({ client }, input) => {
       const body: Record<string, unknown> = { storage_key: requiredString(input, 'storage_key') };
-      for (const k of ['filename', 'language', 'model', 'provider', 'app_id'] as const) {
+      for (const k of ['filename', 'language', 'model', 'provider', 'app_id', 'role'] as const) {
         const v = optionalString(input, k);
         if (v !== undefined) body[k] = v;
       }
@@ -89,11 +91,28 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
     ...def('aimeat_ai_embed'),
     handler: ({ client }, input) => {
       const body: Record<string, unknown> = { input: requiredArray(input, 'input') };
-      for (const k of ['model', 'provider', 'app_id'] as const) {
+      for (const k of ['model', 'provider', 'app_id', 'role'] as const) {
         const v = optionalString(input, k);
         if (v !== undefined) body[k] = v;
       }
       return client.post('/v1/ai/embed', body);
+    },
+  },
+  {
+    ...def('aimeat_ai_roles'),
+    handler: ({ client }) => client.get('/v1/ai/roles'),
+  },
+  {
+    ...def('aimeat_ai_role_set'),
+    handler: ({ client }, input) => {
+      const roles = optionalRecord(input, 'roles');
+      const bindings = optionalRecord(input, 'bindings');
+      const token = optionalString(input, 'confirm_token');
+      // Everything given goes to the node as given; the node answers a call with neither roles nor
+      // bindings with the reason (AI_ROLES_INVALID) rather than this code path dropping it.
+      return client.put('/v1/ai/roles', {
+        ...(roles ? { roles } : {}), ...(bindings ? { bindings } : {}), ...(token !== undefined ? { confirm_token: token } : {}),
+      });
     },
   },
 ];

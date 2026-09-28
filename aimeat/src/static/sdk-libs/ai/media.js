@@ -7,9 +7,12 @@
  *
  *   `provider` names one of the owner's providers (its id, or a type such as 'openai') and `fallback:
  *   false` keeps the call on it. Both only narrow what the owner allows; neither adds a provider.
+ *   `role` names the AI role the call runs as (GET /v1/ai/roles).
  * @structure image(opts) · transcribe(opts) · embed(opts)
  * @usage const pic = await AIMEAT.ai.image({ app_id, prompt, confirm: true }); img.src = pic.src;
  * @version-history
+ *   v1.1.0 - 2026-09-28 - routing() carries `role`, the AI role the call runs as, so image, transcribe,
+ *     embed and complete send it; it is part of what makes two calls the same call.
  *   v1.0.1 - 2026-09-28 - image() answers `src`, which loads for a private picture too (the signed
  *     download_url); `url` needed storage:read. Found by the V5 browser check.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: image, transcribe and embed for apps.
@@ -19,13 +22,16 @@ import { capabilities, priceEstimate } from './capabilities.js';
 
 /**
  * The routing fields every capability call shares, left out when the caller did not set them.
+ * `role` is the AI role the call runs as: for an app, a role it declares in its aimeat-ai meta, which
+ * runs once the owner bound it (AI_ROLE_NOT_BOUND until then); a named model or provider wins over it.
  * @param {any} opts
- * @returns {{ provider?: string, fallback?: boolean }}
+ * @returns {{ provider?: string, fallback?: boolean, role?: string }}
  */
 export function routing(opts) {
   return {
     ...(typeof opts.provider === 'string' && opts.provider ? { provider: opts.provider } : {}),
     ...(typeof opts.fallback === 'boolean' ? { fallback: opts.fallback } : {}),
+    ...(typeof opts.role === 'string' && opts.role ? { role: opts.role } : {}),
   };
 }
 
@@ -51,7 +57,7 @@ export async function image(opts) {
     public: opts.public === true ? true : undefined, app_id: opts.app_id, ...routing(opts),
   };
   return paid(opts, {
-    key: ['ai-image', opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.prompt],
+    key: ['ai-image', opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.role, opts.prompt],
     what: 'Make a picture on your own AI provider.',
     label: 'The picture',
     remember: 'ai-image:' + (opts.app_id || 'app'),
@@ -87,7 +93,7 @@ export async function transcribe(opts) {
     app_id: opts.app_id, ...routing(opts),
   };
   return paid(opts, {
-    key: ['ai-transcribe', opts.app_id, opts.model, opts.language, opts.storage_key || audio || ''],
+    key: ['ai-transcribe', opts.app_id, opts.model, opts.language, opts.role, opts.storage_key || audio || ''],
     what: 'Turn a recording into text on your own AI provider.',
     label: 'The transcription',
     remember: 'ai-transcribe:' + (opts.app_id || 'app'),
@@ -110,7 +116,7 @@ export async function embed(opts) {
   if (opts.input == null || (Array.isArray(opts.input) && !opts.input.length)) throw new Error('opts.input required');
   const body = { input: opts.input, model: opts.model, app_id: opts.app_id, ...routing(opts) };
   return paid(opts, {
-    key: ['ai-embed', opts.app_id, opts.model, opts.provider, JSON.stringify(opts.input)],
+    key: ['ai-embed', opts.app_id, opts.model, opts.provider, opts.role, JSON.stringify(opts.input)],
     what: 'Make embeddings on your own AI provider.',
     label: 'The embedding',
     remember: 'ai-embed:' + (opts.app_id || 'app'),

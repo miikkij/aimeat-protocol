@@ -26,6 +26,9 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.30.1 -- 2026-09-28 -- `node_llm(role=...)` runs the crew's calls as one of the owner's AI roles
+    (GET /v1/ai/roles): the role is sent in the X-AIMEAT-AI-Role header on every call, on both
+    CrewAI code paths, and the owner's role names the providers and models.
   0.30.0 -- 2026-09-28 -- `node_llm()` returns a CrewAI LLM that calls the node's /v1/llm route with
     the agent's token, so the owner's model policy, key order and budget apply to the crew's calls;
     `capabilities()` reads GET /v1/ai/capabilities (what is on, which model, and why one is off).
@@ -173,7 +176,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.30.0"
+__version__ = "0.30.1"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

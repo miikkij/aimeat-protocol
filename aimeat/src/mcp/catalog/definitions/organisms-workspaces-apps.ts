@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-28 — aimeat_image_generate takes `role`, the AI role the call runs as.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.9.0 — 2026-09-27 — aimeat_app_versions, _screenshot, _seo_set, _marks_set, _legal_set and _audit
  *     moved into aimeat_app_manage (definitions/app-manage.ts) as actions with the same fields.
@@ -45,6 +46,7 @@
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
+import { AI_ROLE_PARAM } from './ai-models.js';
 // Documents and rows: the two surfaces that edit PART of a workspace object rather than replace
 // one. Spread in place below, so the catalog order is exactly what it was before the extraction.
 import { workspaceSpaceTools } from './workspace-spaces.js';
@@ -710,6 +712,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             app_id: { type: 'string', description: 'Attribution for the per-app quota and the spend report.' },
             provider: { type: 'string', description: 'One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.' },
             fallback: { type: 'boolean', description: 'false keeps the call on its first provider; omitted, the owner\'s rules decide.' },
+            role: { type: 'string', description: AI_ROLE_PARAM },
         },
     },
     {

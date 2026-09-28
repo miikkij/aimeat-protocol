@@ -14,6 +14,7 @@
  * @structure aiJobTools -- AimeatToolDefinition[]
  * @usage imported by mcp/catalog/definitions.ts
  * @version-history
+ *   v1.3.0 — 2026-09-28 — aimeat_ai_job_start takes `role`, the AI role the call runs as.
  *   v1.2.0 — 2026-09-28 — System 2 plan, V5: aimeat_ai_job_start takes `op` (text, image,
  *     transcribe), `provider`, `audio_key`, `language` and `size`.
  *   v1.1.0 — 2026-09-26 — input_keys and result_key say a record the node keeps for itself is
@@ -21,6 +22,7 @@
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import { type AimeatToolDefinition, agentEverywhere } from './types.js';
+import { AI_ROLE_PARAM } from './ai-models.js';
 
 export const aiJobTools: AimeatToolDefinition[] = [
     {
@@ -44,6 +46,7 @@ export const aiJobTools: AimeatToolDefinition[] = [
             audio_key: { type: 'string', description: 'For op "transcribe" (required there): the storage key of an audio file in your own storage. A key that is not there is refused with NOT_FOUND before the job is written.' },
             language: { type: 'string', description: 'For op "transcribe": an ISO-639-1 language hint, e.g. "fi". Omit to use the owner\'s setting or auto-detect.' },
             size: { type: 'string', description: 'For op "image": a provider-specific size, e.g. "1024x1024".' },
+            role: { type: 'string', description: AI_ROLE_PARAM },
         },
     },
     {

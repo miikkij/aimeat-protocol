@@ -12,10 +12,11 @@
  *   call. Until V5 it read the owner-only /v1/openrouter/models, which answered 403 to every app.
  *   Each row keeps the catalogue's own fields and adds `context_length` and `pricing` in the form the
  *   old OpenRouter listing had, so a picker written against that listing still reads it.
- * @structure capabilities(opts) · models(opts) · priceEstimate(state, units) · clearCaches()
+ * @structure capabilities(opts) · models(opts) · roles() · priceEstimate(state, units) · clearCaches()
  * @usage const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' });
  *   if (!caps.capabilities.image.on) showNotice(caps.capabilities.image.fix);
  * @version-history
+ *   v1.1.0 - 2026-09-28 - roles(): GET /v1/ai/roles, the owner's AI roles and the apps' role bindings.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: capabilities(), and models() moved from
  *     /v1/openrouter/models to /v1/ai/models.
  */
@@ -117,6 +118,23 @@ export async function models(opts) {
   const v = (r.data && Array.isArray(r.data.models) ? r.data.models : []).map(compatRow);
   _modelsCache.set(qs, { v, t: now });
   return v;
+}
+
+/**
+ * The signed-in person's AI roles and the AI roles apps declare: the data of GET /v1/ai/roles,
+ * { roles: [...], apps: [{ app, roles: [{ name, capabilities, binding, boundTo, requestedAt? }] }] }.
+ *
+ * A capability says what a model does; a role says what it is used for. An app declares its roles in
+ * its aimeat-ai meta (role.<name>=text+image) and names one as `role` in a call; the call runs only
+ * once the owner bound that role to one of theirs (boundTo). Until then it is refused with
+ * AI_ROLE_NOT_BOUND, and the owner sees the request on the AI page. Not cached: a binding the owner
+ * just made should show at once.
+ * @returns {Promise<any>}
+ */
+export async function roles() {
+  const r = await authFetch('/v1/ai/roles');
+  if (!r || !r.ok) throw aiError(r, 'Could not read the AI roles');
+  return r.data;
 }
 
 /** Drop the capabilities and model caches (invalidateCache() calls this). */

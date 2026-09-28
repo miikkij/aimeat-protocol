@@ -9,6 +9,7 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   v1.4.0 — 2026-09-28 — configure-routing names the AI roles, aimeat_ai_roles and aimeat_ai_role_set.
  *   v1.3.0 — 2026-09-28 — configure-routing names the extension provider type (System 2 plan, V6).
  *   v1.2.0 — 2026-09-28 — configure-routing and aimeat-ai-model-policy point to the model catalogue
  *     (GET /v1/ai/models) and say what it decides (System 2 plan, V4).
@@ -182,6 +183,12 @@ Three separate "routing" layers — identify which one the owner means:
    retired model shows on its provider in \`aimeat_ai_providers\`: propose another. The operator
    refreshes the catalogue with \`POST /v1/admin/ai/catalog/refresh\`; \`AIMEAT_AI_CATALOG_REFRESH\`
    sets the cadence and \`GET /v1/ai/catalog/meta\` says when it last ran.
+   **AI roles** say what a model is used for: \`aimeat_ai_roles\` lists the owner's roles (for each
+   capability, the providers and models in order) and the roles apps declare, each connected to one
+   of the owner's or waiting (\`requestedAt\`: the app already asked). \`aimeat_ai_role_set\` proposes a
+   role or a connection, propose-then-confirm; an app's role runs only once the owner connects it, so
+   show the owner what the app needs before you propose it. A call running as a role says
+   \`chosenBy: role\` in its \`route\`.
 2. **Work routing** (which agent does what): driven by agent capabilities, tags, and offers.
    Inspect with \`aimeat_agents_list\` + \`aimeat_agent_profile\`; adjust tags/mode via
    \`aimeat_operator_agent_configure\` (propose-then-confirm) and teach specialization by

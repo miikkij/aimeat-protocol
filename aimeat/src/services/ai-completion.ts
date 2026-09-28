@@ -115,6 +115,11 @@
  *     `uncapped` lets a long-generation caller (the workflow ai step) refuse the owner's max_tokens
  *     preference, which had applied to it although the step's contract says no cap. getUsageHistory
  *     moved to ai-usage-history.ts as a pure move (max-file-lines).
+ *   v1.9.0 — 2026-09-28 — AI roles (services/ai/roles.ts): a call may run as a role (`role`, or a
+ *     crew's modelRole while its built-in role has a provider), which orders the candidates and may
+ *     tighten `local` and the price ceiling; an app's role runs only once the owner bound it. The
+ *     fine-tuning is per candidate: the call's, the app's for its role, the provider's default, and the
+ *     legacy page's setting only on the migrated provider and the node's own.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -130,6 +135,9 @@ import type { CallerClass } from './ai/policy.js';
 import { AiCompletionError } from './ai/errors.js';
 import { providersForOwner } from './ai/provider-store.js';
 import { readRouting, rulesFor, type RoutingRules } from './ai/routing.js';
+import { readRoles, rolesWithLegacy, resolveRole, noteRoleUsed, noteRoleRequest, bindingKey, type ResolvedRole } from './ai/roles.js';
+import { NODE_OPENROUTER_ID, type ProviderParams } from './ai/providers.js';
+import type { AppAiRoleParams } from './app-ai-roles.js';
 import { planRoute, refusalFor, type AiCandidate, type ChosenBy, type RejectedCandidate } from './ai/route-plan.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
 import { callCost } from './ai/catalog/price.js';
@@ -157,6 +165,8 @@ export interface CompleteForOwnerOptions {
   systemPrompt?: string;
   model?: string;
   modelRole?: 'reasoning' | 'execution';
+  /** The AI role the call runs as (PrepareAiCallOptions.role). */
+  role?: string;
   temperature?: number;
   topP?: number;
   maxTokens?: number;
@@ -308,6 +318,8 @@ export interface AiCallPlan {
   /** Whether a failure may move to the next candidate (the owner's rules and the call's own word). */
   allowFallback: boolean;
   rules: RoutingRules;
+  /** The role the call ran as: the owner's role, the app's binding, and the app's fine-tuning for it. */
+  role?: { id: string; binding?: string; params?: AppAiRoleParams };
 }
 
 /** Where the gateway sends a planned call: the adapter, the address and the key that pays. */
@@ -356,6 +368,11 @@ export interface PrepareAiCallOptions {
   fallback?: boolean;
   /** Only a provider on this machine. */
   requires?: { local?: boolean };
+  /**
+   * The AI role the call runs as (services/ai/roles.ts): one of the owner's role ids, or for an app a
+   * role it declares, which runs only once the owner bound it. A named model or provider wins over it.
+   */
+  role?: string;
 }
 
 /**
@@ -392,17 +409,48 @@ export async function prepareAiCall(
   };
   // The owner's providers (the legacy setting migrated on the first read), their routing and their
   // model policy. The legacy records were read above, so the migration reads nothing twice.
-  const [providers, routing, policy, appMeta] = await Promise.all([
+  const [providers, routing, policy, appMeta, rolesRecord] = await Promise.all([
     providersForOwner(storage, config, gaii, { settings: prefsRecord, key: apiKeyRecord }),
     readRouting(storage, gaii, opts.agent),
     loadPolicyDecision(storage, config, gaii, policyCtx),
     appAiMetaOf(storage, gaii, opts.verifiedApp ?? opts.appId),
+    opts.role || opts.modelRole ? readRoles(storage, gaii) : Promise.resolve(null),
   ]);
   // The app's meta orders the owner's candidates (prefer.*) and may ask for this machine only
   // (local.*); neither adds a provider or loosens a rule (plan 11, section 9).
   const appPrefer = appMeta?.prefer?.[capability];
-  const requires = appMeta?.local?.includes(capability) ? { ...opts.requires, local: true } : opts.requires;
-  const rules = rulesFor({ capability, ...(opts.agent ? { agent: opts.agent } : {}), ...(opts.appId ? { app: opts.appId } : {}) }, routing);
+  let requires = appMeta?.local?.includes(capability) ? { ...opts.requires, local: true } : opts.requires;
+  let rules = rulesFor({ capability, ...(opts.agent ? { agent: opts.agent } : {}), ...(opts.appId ? { app: opts.appId } : {}) }, routing);
+
+  // ── The role (services/ai/roles.ts), unless the call named its model or provider ──
+  // A crew's modelRole is the built-in role of that name while it has a provider for the capability;
+  // an app's role is one it declares and the owner bound. The role's own `local` and price ceiling
+  // only tighten the owner's rules.
+  let role: ResolvedRole | undefined;
+  if (rolesRecord && !requested && !opts.provider) {
+    const allRoles = rolesWithLegacy(rolesRecord, prefs, providers);
+    const name = opts.role ?? (opts.modelRole && allRoles[opts.modelRole]?.capabilities[capability]?.length ? opts.modelRole : undefined);
+    if (name) {
+      const declaredByApp = !!appMeta?.roles?.some((r) => r.name === name);
+      const appCall = !!opts.verifiedApp || (!!opts.appId && declaredByApp);
+      const address = appMeta?.address ?? (opts.verifiedApp ?? opts.appId)!;
+      try {
+        role = resolveRole({
+          name, capability, roles: allRoles, record: rolesRecord,
+          ...(appCall ? { app: { address, declared: appMeta?.roles ?? [] } } : {}),
+        });
+      } catch (e) {
+        // The owner sees the request on the AI page, with what the app needs.
+        const needs = appMeta?.roles?.find((r) => r.name === name);
+        if (e instanceof AiCompletionError && e.code === 'AI_ROLE_NOT_BOUND' && needs) noteRoleRequest(storage, gaii, bindingKey(address, name), needs);
+        throw e;
+      }
+      if (role.role.local || role.declared?.local) requires = { ...requires, local: true };
+      if (typeof role.role.maxCostPerCallUsd === 'number') {
+        rules = { ...rules, maxCostPerCallUsd: rules.maxCostPerCallUsd === null ? role.role.maxCostPerCallUsd : Math.min(rules.maxCostPerCallUsd, role.role.maxCostPerCallUsd) };
+      }
+    }
+  }
 
   // The model each role gave before providers existed: the owner's setting, then the node's default
   // (services/ai-model-defaults.ts), and for text, with nothing chosen anywhere, OpenRouter's
@@ -432,6 +480,7 @@ export async function prepareAiCall(
     ...(requires ? { requires } : {}),
     ...(opts.agent ? { agent: opts.agent } : {}),
     ...(appPrefer?.length ? { appPrefer } : {}),
+    ...(role ? { roleOrder: role.role.capabilities[capability] ?? [] } : {}),
     legacyModel,
     nodeAllowance: async () => ({ remainingUsd: remainingOf(await readAllowance(storage, config, gaii)) }),
   });
@@ -444,6 +493,7 @@ export async function prepareAiCall(
   if (overCap) throw new AiCompletionError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
   const first = route.candidates[0];
+  if (role) noteRoleUsed(storage, gaii, [role.role.id, ...(role.binding ? [role.binding] : [])]);
   return planFor({
     prefs, provider: first.provider.id, baseUrl: first.target.baseUrl, key: first.target.key, keyScope: first.keyScope,
     ...(opts.agent ? { agent: opts.agent } : {}),
@@ -451,6 +501,7 @@ export async function prepareAiCall(
     op, providerType: first.provider.type, policyChoseModel: false, allowedModels: policy.decision.allowed,
     target: first.target, capability, candidates: route.candidates, rejected: route.rejected,
     chosenBy: route.chosenBy, allowFallback: route.allowFallback, rules,
+    ...(role ? { role: { id: role.role.id, ...(role.binding ? { binding: role.binding } : {}), ...(role.declared?.params ? { params: role.declared.params } : {}) } } : {}),
   }, first);
 }
 
@@ -604,6 +655,7 @@ export async function completeForOwner(
   const capability = opts.capability ?? (hasFiles ? 'files' : undefined);
   const plan = await prepareAiCall(storage, config, gaii, {
     model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent,
+    ...(opts.role ? { role: opts.role } : {}),
     ...(opts.caller ? { caller: opts.caller } : {}),
     ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}),
@@ -621,7 +673,25 @@ export async function completeForOwner(
   // name would expect to buy.
   const prefReasoning = prefs.reasoning && typeof prefs.reasoning === 'object' && !Array.isArray(prefs.reasoning)
     ? (prefs.reasoning as CompletionReasoning) : undefined;
-  const reasoning = opts.reasoning ?? prefReasoning;
+  // Fine-tuning, per candidate (AI roles, Jouni 2026-09-28): the call's own, then the app's for its
+  // role, then the provider's default for the capability. The legacy page's setting applies only on
+  // the providers it always applied to: the migrated one (which also carries it as its default) and
+  // the node's own. Nothing set anywhere leaves the model's own default.
+  const roleParams = plan.role?.params;
+  const toReasoning = (r: ProviderParams['reasoning']): CompletionReasoning | undefined =>
+    r === 'off' ? { enabled: false } : r ? { effort: r } : undefined;
+  const tuningFor = (c: AiCandidate) => {
+    const pp = c.provider.capabilities[plan.capability]?.params;
+    const legacy = !!c.provider.legacy || c.provider.id === NODE_OPENROUTER_ID;
+    const pref = (k: string) => (legacy && typeof prefs[k] === 'number' ? prefs[k] as number : undefined);
+    return {
+      temperature: opts.temperature ?? roleParams?.temperature ?? pp?.temperature ?? pref('temperature'),
+      topP: opts.topP ?? roleParams?.top_p ?? pp?.top_p ?? pref('top_p'),
+      maxTokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0 ? (opts.maxTokens | 0)
+        : opts.uncapped ? undefined : (roleParams?.max_tokens ?? pp?.max_tokens ?? pref('max_tokens')),
+      reasoning: opts.reasoning ?? toReasoning(roleParams?.reasoning) ?? toReasoning(pp?.reasoning) ?? (legacy ? prefReasoning : undefined),
+    };
+  };
   const retries = typeof opts.retries === 'number' ? opts.retries
     : prefs.autoRetry === false ? 0
       : (typeof prefs.maxRetries === 'number' ? (prefs.maxRetries as number) : undefined);
@@ -632,22 +702,23 @@ export async function completeForOwner(
     const run = await runRoute({
       storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
       allowFallback: plan.allowFallback, rules: plan.rules, ...(opts.signal ? { signal: opts.signal } : {}),
-    }, (c) => gatewayText({
-      target: c.target,
-      model: c.model,
-      prompt: opts.prompt,
-      ...(opts.systemPrompt ? { system: opts.systemPrompt } : {}),
-      ...(opts.images ? { images: opts.images } : {}),
-      ...(hasFiles ? { files: opts.files, ...(c.provider.capabilities.files?.parser ? { pdfEngine: c.provider.capabilities.files.parser } : {}) } : {}),
-      temperature: opts.temperature ?? (typeof prefs.temperature === 'number' ? prefs.temperature : undefined),
-      topP: opts.topP ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
-      maxTokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0
-        ? (opts.maxTokens | 0)
-        : (!opts.uncapped && typeof prefs.max_tokens === 'number' ? (prefs.max_tokens as number) : undefined),
-      ...(reasoning ? { reasoning } : {}),
-      ...(retries !== undefined ? { retries } : {}),
-      ...(opts.signal ? { signal: opts.signal } : {}),
-    }));
+    }, (c) => {
+      const t = tuningFor(c);
+      return gatewayText({
+        target: c.target,
+        model: c.model,
+        prompt: opts.prompt,
+        ...(opts.systemPrompt ? { system: opts.systemPrompt } : {}),
+        ...(opts.images ? { images: opts.images } : {}),
+        ...(hasFiles ? { files: opts.files, ...(c.provider.capabilities.files?.parser ? { pdfEngine: c.provider.capabilities.files.parser } : {}) } : {}),
+        temperature: t.temperature,
+        topP: t.topP,
+        maxTokens: t.maxTokens,
+        ...(t.reasoning ? { reasoning: t.reasoning } : {}),
+        ...(retries !== undefined ? { retries } : {}),
+        ...(opts.signal ? { signal: opts.signal } : {}),
+      });
+    });
     result = run.result;
     answered = planFor(plan, run.candidate);
     route = run.route;

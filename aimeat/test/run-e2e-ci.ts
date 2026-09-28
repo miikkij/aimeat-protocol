@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.64.0 -- 2026-09-28 -- e2e-ai-roles.ts joins the suites (not the guard tier): AI roles on its own node on 40444.
  *   v1.63.0 -- 2026-09-28 -- e2e-ai-model-policy.ts joins the suites (not the guard tier): the model
  *            policy of the System 2 plan, V2.
  *   v1.62.0 -- 2026-09-26 -- federation-messages.ts joins GUARD_SUITES (138 → 139), measured alone on
@@ -555,6 +556,10 @@ const ALL_SUITES = [
     // An extension as an AI provider (System 2, V6): its own node on 40443 and a recording service on
     // this machine, so where the owner's key went, and where it did not, is read from what arrived.
     'test/e2e-ai-extension-provider.ts',
+    // AI roles (wish-tekoalyn-roolit): its own node on 40444 with the fixed types on the stub, so which
+    // model and fine-tuning a role's call sent, and that an unbound app role sent nothing, is read from
+    // what arrived. Follows the runner's backend.
+    'test/e2e-ai-roles.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
     // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.

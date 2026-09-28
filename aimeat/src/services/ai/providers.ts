@@ -43,6 +43,8 @@
  *   v1.1.1 — 2026-09-28 — A base URL loses its trailing slashes through stripTrailingSlashes, one
  *     pass, instead of `replace(/\/+$/, '')`, which takes quadratic time on an address ending in
  *     many slashes and another character (CodeQL js/polynomial-redos, alert 1673).
+ *   v1.2.0 — 2026-09-28 — A text, vision or files capability carries `params`, the provider's default
+ *     fine-tuning, which the call and the app's role override (AI roles).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -78,6 +80,43 @@ export interface ProviderCapabilityConfig {
   language?: string;
   /** OpenRouter's files capability only: who converts a PDF for a model that cannot read one. */
   parser?: 'native' | 'mistral-ocr' | 'cloudflare-ai';
+  /**
+   * Text, vision and files only: the fine-tuning this provider uses when neither the call nor the
+   * app's role says (Jouni, 2026-09-28: the app's fine-tuning overrides the provider's default, and an
+   * empty one leaves the model's own).
+   */
+  params?: ProviderParams;
+}
+
+export interface ProviderParams {
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  reasoning?: 'off' | 'low' | 'medium' | 'high';
+}
+
+/** The capabilities whose calls take fine-tuning. */
+export const PARAM_CAPABILITIES: readonly AiCapability[] = ['text', 'vision', 'files'];
+
+/** Fine-tuning read from a record or a request; what does not read is a problem, named. */
+export function readProviderParams(v: unknown, where: string, problems: string[]): ProviderParams | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!isObj(v)) { problems.push(`${where}: { temperature?, top_p?, max_tokens?, reasoning? }.`); return undefined; }
+  const out: ProviderParams = {};
+  const num = (k: 'temperature' | 'top_p' | 'max_tokens', min: number, max: number) => {
+    const x = v[k];
+    if (x === undefined || x === null || x === '') return;
+    if (typeof x !== 'number' || !Number.isFinite(x) || x < min || x > max) { problems.push(`${where}.${k}: a number from ${min} to ${max}.`); return; }
+    out[k] = k === 'max_tokens' ? Math.round(x) : x;
+  };
+  num('temperature', 0, 2);
+  num('top_p', 0, 1);
+  num('max_tokens', 1, 1_000_000);
+  if (v.reasoning !== undefined && v.reasoning !== null && v.reasoning !== '') {
+    if (v.reasoning === 'off' || v.reasoning === 'low' || v.reasoning === 'medium' || v.reasoning === 'high') out.reasoning = v.reasoning;
+    else problems.push(`${where}.reasoning: off, low, medium or high.`);
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 export type HealthStatus = 'untested' | 'ok' | 'degraded' | 'failing';
@@ -234,6 +273,10 @@ function parseCapabilities(
     const entry: ProviderCapabilityConfig = { enabled, pool, ...(model ? { model } : {}) };
     if (typeof v.voice === 'string' && c === 'speech' && v.voice.trim()) entry.voice = v.voice.trim().slice(0, 64);
     if (typeof v.language === 'string' && c === 'transcription' && /^[a-z]{2,3}$/.test(v.language)) entry.language = v.language;
+    if (v.params !== undefined && v.params !== null) {
+      if (!PARAM_CAPABILITIES.includes(c)) problems.push(`capabilities.${c}.params: only text, vision and files take fine-tuning.`);
+      else { const params = readProviderParams(v.params, `capabilities.${c}.params`, problems); if (params) entry.params = params; }
+    }
     if (v.parser !== undefined) {
       if (c !== 'files' || type !== 'openrouter' || !['native', 'mistral-ocr', 'cloudflare-ai'].includes(String(v.parser))) {
         problems.push('parser: only an OpenRouter provider\'s files capability takes one: native, mistral-ocr or cloudflare-ai.');
