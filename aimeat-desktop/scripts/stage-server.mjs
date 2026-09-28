@@ -20,10 +20,14 @@
  *        from the SQLite desktop bundle).
  *     5. Assert the better-sqlite3 native binary is present.
  *   Between the install and the assert, the files no running server reads are taken out
- *   (step 5c), and every install lifecycle hook of the server's package.json is dropped first,
- *   because this folder has dist/ and no scripts/ (step 4).
+ *   (step 5c), and so are the native prebuilds for other platforms (step 5d). Every install
+ *   lifecycle hook of the server's package.json is dropped first, because this folder has dist/
+ *   and no scripts/ (step 4).
  * @usage  node scripts/stage-server.mjs   (run via `pnpm stage`)
  * @version-history
+ *   v0.5.0 — 2026-09-29 — Step 5d: prebuilds/<platform>-<arch>/ folders for other platforms are
+ *     removed, and on Linux musl builds too; linuxdeploy had stopped the first Linux AppImage build
+ *     on an Android binary of bare-fs.
  *   v0.4.0 — 2026-09-29 — Step 5c: source maps, type declarations and dependency markdown are
  *     removed after the install, about 86 MB of a 353 MB bundle.
  *   v0.3.0 — 2026-09-18 — The server's install lifecycle hooks are dropped from the staged
@@ -172,6 +176,58 @@ function pruneForRuntime(dir, inNodeModules = false) {
 }
 const pruned = pruneForRuntime(serverDir);
 console.log(`[stage-server] removed ${pruned.files} files no running server reads (${(pruned.removed / 1048576).toFixed(1)} MB): source maps, type declarations, dependency markdown`);
+
+// 5d. Keep the native prebuilds for this platform only. A package built with prebuildify ships a
+//     binary for every platform in prebuilds/<platform>-<arch>/ (bare-fs, bare-path and bare-url
+//     carry 13 each: Android, iOS, macOS, Linux and Windows) and loads the one for the platform it
+//     runs on. Each platform stages on its own runner, so the others are dead weight, and on Linux
+//     they are worse: linuxdeploy runs ldd over every ELF file in the AppImage, ldd cannot read an
+//     Android binary, and the 2026-09-28 build stopped there ("Failed to run ldd", on
+//     bare-fs/prebuilds/android-x64). A folder is kept when its platform is this one and one of its
+//     '+'-joined architectures is this one (darwin-x64+arm64 is a universal build).
+//     On Linux, musl builds go as well, files tagged .musl. and folders named for musl: the
+//     AppImage and the .deb run on glibc, where a musl library can never load, and linuxdeploy
+//     refuses one whose libc.musl dependency it cannot find.
+function pruneForeignPrebuilds(dir) {
+  let removed = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (!entry.isDirectory()) {
+      if (process.platform === 'linux' && entry.name.includes('.musl.')) {
+        removed += statSync(full).size;
+        rmSync(full, { force: true });
+      }
+      continue;
+    }
+    if (process.platform === 'linux' && /musl/i.test(entry.name)) {
+      removed += sizeOf(full);
+      rmSync(full, { recursive: true, force: true });
+      continue;
+    }
+    if (entry.name === 'prebuilds') {
+      for (const target of readdirSync(full, { withFileTypes: true })) {
+        if (!target.isDirectory()) continue;
+        const [platform, archs = ''] = target.name.split(/-(.*)/s);
+        if (platform === process.platform && archs.split('+').includes(process.arch)) continue;
+        const targetDir = join(full, target.name);
+        removed += sizeOf(targetDir);
+        rmSync(targetDir, { recursive: true, force: true });
+      }
+    }
+    removed += pruneForeignPrebuilds(full);
+  }
+  return removed;
+}
+function sizeOf(dir) {
+  let size = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    size += entry.isDirectory() ? sizeOf(full) : statSync(full).size;
+  }
+  return size;
+}
+const foreign = pruneForeignPrebuilds(join(serverDir, 'node_modules'));
+console.log(`[stage-server] removed native prebuilds for other platforms (${(foreign / 1048576).toFixed(1)} MB); kept ${process.platform}-${process.arch}`);
 
 // 6. Sanity check: the native SQLite binary must be present, or the packaged app
 //    will fail to start the node.
