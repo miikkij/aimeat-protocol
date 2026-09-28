@@ -8213,6 +8213,8 @@
   "notiftext.direct_message_request.body": "{preview}",
   "notiftext.package_install_request.title": "{who} asks to install the package {name}",
   "notiftext.package_install_request.body": "The package writes entries into your memory, and {who} may not do that on its own. If you approve, it is installed as yours.",
+  "notiftext.package_update_available.title": "An update is ready for {label}",
+  "notiftext.package_update_available.body": "Version {version} of {name} is here. Your install is on {current}. Updating keeps every part you edited as it is.",
   "notiftext.package_update_request.title": "{who} asks to update the package {name}",
   "notiftext.package_update_request.body": "The new version writes entries into your memory, and {who} may not do that on its own. If you approve, your copy is updated.",
   "notiftext.package_request_approved_by_agent.title": "{by} approved the request about the package {name}",

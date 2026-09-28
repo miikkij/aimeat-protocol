@@ -1,0 +1,237 @@
+/**
+ * @file services/package-entitlements.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Which customer node a package repository serves which private package to, and up to
+ *   which version.
+ *
+ *   THE MODEL IS JOUNI'S (2026-09-28, wish-asennuspaketit-uusille-nodeille-ja-keskitetty-
+ *   pakettireposit, decisions 8 and 10): a customer buys an install package once and pays monthly for
+ *   updates and security. When the monthly fee ends, the install stays and receives no updates; to
+ *   update again the customer buys the whole package again. So an entitlement is a node and an
+ *   `updatesUntil` instant: the node may pull every published version made up to that instant and
+ *   none made after it, and a null `updatesUntil` is a subscription that is running. Buying again
+ *   moves the instant forward. Phase 5 (purchase) writes these; until then the package's author or
+ *   an operator grants them.
+ *
+ *   WHERE IT LIVES. One record per package group in the system namespace `package-entitlements`, a
+ *   literal with no `@`, so no principal can address it (the pattern of commerce/beneficiary-split.ts).
+ *   A package's author could otherwise grant themselves entitlements to their own package from an app
+ *   token, which is harmless, but a customer node's owner could not be kept from writing to it if it
+ *   lived in anybody's namespace.
+ *
+ *   ONLY PRIVATE PACKAGES NEED ONE. A public package is served to everyone as before; the repository
+ *   role (config.packageRepository) adds the entitled nodes to the readers of a private one.
+ * @structure PackageEntitlement · readEntitlements() · grantEntitlement() · revokeEntitlement()
+ *   · listEntitlements() · entitledVersion() · resolveNodeRead() · entitledGroupsOf()
+ * @usage
+ *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
+ * @version-history
+ *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
+ */
+import type { Storage, PackageRecord } from '../storage/interface.js';
+import type { PeerInfo } from './federation.js';
+import { verifyPackageNode } from './package-node-auth.js';
+
+export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
+
+export interface PackageEntitlement {
+    nodeId: string;
+    /** Versions published after this instant are not served to the node. Null: the updates run on. */
+    updatesUntil: string | null;
+    note?: string;
+    grantedAt: string;
+    grantedBy: string;
+    updatedAt: string;
+}
+
+type Record_ = { groupId: string; nodes: Record<string, PackageEntitlement> };
+
+const key = (groupId: string): string => `entitlements.${groupId}`;
+
+export async function readEntitlements(storage: Storage, groupId: string): Promise<PackageEntitlement[]> {
+    const rec = await storage.getMemory(NS_PACKAGE_ENTITLEMENTS, key(groupId));
+    const value = rec?.value as Record_ | undefined;
+    return value?.nodes ? Object.values(value.nodes) : [];
+}
+
+async function write(storage: Storage, groupId: string, nodes: Record<string, PackageEntitlement>): Promise<void> {
+    const now = new Date().toISOString();
+    const existing = await storage.getMemory(NS_PACKAGE_ENTITLEMENTS, key(groupId));
+    await storage.setMemory({
+        key: key(groupId),
+        ownerGaii: NS_PACKAGE_ENTITLEMENTS,
+        value: { groupId, nodes } satisfies Record_,
+        visibility: 'private',
+        tags: ['package-entitlements'],
+        ttlHours: null,
+        version: existing ? existing.version + 1 : 1,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+    });
+}
+
+export type EntitlementResult =
+    | { ok: true; entitlement: PackageEntitlement }
+    | { ok: false; status: number; code: string; message: string };
+
+/** Only the package's author or an operator decides who a package is served to. */
+async function mayManage(storage: Storage, groupId: string, caller: { owner: string; isOperator: boolean }): Promise<EntitlementResult | null> {
+    const latest = (await storage.listVersions(groupId, 1, 0)).versions[0];
+    if (!latest) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
+    if (latest.author !== caller.owner && !caller.isOperator) {
+        return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the package\'s author or an operator decides which nodes it is served to.' };
+    }
+    return null;
+}
+
+const NODE_RE = /^[a-z0-9][a-z0-9.-]{2,127}$/i;
+
+/** Grant a node the package, or change the grant: `updatesUntil` null keeps the updates running. */
+export async function grantEntitlement(
+    storage: Storage,
+    caller: { owner: string; isOperator: boolean },
+    input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown },
+): Promise<EntitlementResult> {
+    const refused = await mayManage(storage, input.groupId, caller);
+    if (refused) return refused;
+    if (!NODE_RE.test(input.nodeId)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node_id is a node id such as "aimeat-customer-001".' };
+    let updatesUntil: string | null = null;
+    if (input.updatesUntil !== undefined && input.updatesUntil !== null) {
+        const t = typeof input.updatesUntil === 'string' ? Date.parse(input.updatesUntil) : NaN;
+        if (!Number.isFinite(t)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'updates_until is an ISO date-time, or null for updates that run on.' };
+        updatesUntil = new Date(t).toISOString();
+    }
+    const now = new Date().toISOString();
+    const current = Object.fromEntries((await readEntitlements(storage, input.groupId)).map(e => [e.nodeId, e]));
+    const prev = current[input.nodeId];
+    const entitlement: PackageEntitlement = {
+        nodeId: input.nodeId,
+        updatesUntil,
+        ...(typeof input.note === 'string' && input.note ? { note: input.note.slice(0, 500) } : prev?.note ? { note: prev.note } : {}),
+        grantedAt: prev?.grantedAt ?? now,
+        grantedBy: prev?.grantedBy ?? caller.owner,
+        updatedAt: now,
+    };
+    await write(storage, input.groupId, { ...current, [input.nodeId]: entitlement });
+    return { ok: true, entitlement };
+}
+
+export async function revokeEntitlement(
+    storage: Storage, caller: { owner: string; isOperator: boolean }, groupId: string, nodeId: string,
+): Promise<{ ok: true } | { ok: false; status: number; code: string; message: string }> {
+    const refused = await mayManage(storage, groupId, caller);
+    if (refused) return refused as { ok: false; status: number; code: string; message: string };
+    const current = Object.fromEntries((await readEntitlements(storage, groupId)).map(e => [e.nodeId, e]));
+    if (!current[nodeId]) return { ok: false, status: 404, code: 'NOT_FOUND', message: `${nodeId} holds no entitlement to ${groupId}.` };
+    delete current[nodeId];
+    await write(storage, groupId, current);
+    return { ok: true };
+}
+
+export async function listEntitlements(
+    storage: Storage, caller: { owner: string; isOperator: boolean }, groupId: string,
+): Promise<{ ok: true; entitlements: PackageEntitlement[] } | { ok: false; status: number; code: string; message: string }> {
+    const refused = await mayManage(storage, groupId, caller);
+    if (refused) return refused as { ok: false; status: number; code: string; message: string };
+    return { ok: true, entitlements: await readEntitlements(storage, groupId) };
+}
+
+/**
+ * The version of a private package this node may have: the newest published one made up to its
+ * `updatesUntil`, or the one it names if that one is within its entitlement. Null when the node holds
+ * no entitlement, or the version it names was made after its updates ended.
+ */
+export async function entitledVersion(
+    storage: Storage, groupId: string, nodeId: string, version?: string,
+): Promise<PackageRecord | null> {
+    const ent = (await readEntitlements(storage, groupId)).find(e => e.nodeId === nodeId);
+    if (!ent) return null;
+    const until = ent.updatesUntil ? Date.parse(ent.updatesUntil) : Infinity;
+    const { versions } = await storage.listVersions(groupId, 200, 0);
+    const allowed = versions
+        .filter(v => v.status === 'published' && Date.parse(v.createdAt) <= until)
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    if (version) return allowed.find(v => v.version === version) ?? null;
+    return allowed[0] ?? null;
+}
+
+export type NodeRead =
+    | { kind: 'unsigned' }
+    | { kind: 'refused'; status: number; code: string; message: string }
+    | { kind: 'served'; pkg: PackageRecord; nodeId: string };
+
+/**
+ * A read of `groupId` by another node, on the repository's terms. `unsigned` when the request names
+ * no node, and the endpoint answers on visibility as it always has. With the repository role off, a
+ * signed request is `unsigned` too: nothing private is served on a node that has not taken the role.
+ */
+export async function resolveNodeRead(
+    storage: Storage, config: { packageRepository: boolean }, peers: Map<string, PeerInfo>,
+    headers: Record<string, string | string[] | undefined>, groupId: string, version?: string,
+): Promise<NodeRead> {
+    if (!config.packageRepository) return { kind: 'unsigned' };
+    const who = await verifyPackageNode(headers, peers, groupId);
+    if (!who) return { kind: 'unsigned' };
+    if (!who.ok) return { kind: 'refused', status: who.status, code: who.code, message: who.message };
+    const latest = (await storage.listVersions(groupId, 1, 0)).versions[0];
+    if (!latest || latest.visibility === 'public') return { kind: 'unsigned' };
+    const pkg = await entitledVersion(storage, groupId, who.nodeId, version);
+    if (!pkg) {
+        const held = (await readEntitlements(storage, groupId)).some(e => e.nodeId === who.nodeId);
+        return held
+            ? { kind: 'refused', status: 403, code: 'UPDATES_ENDED', message: `${who.nodeId}'s updates for ${groupId} ended before that version was published. Buying the package again brings them back.` }
+            : { kind: 'refused', status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
+    }
+    return { kind: 'served', pkg, nodeId: who.nodeId };
+}
+
+export interface RepositoryListingEntry {
+    group_id: string;
+    name: string;
+    version: string;
+    published_at: string;
+    description: string;
+    category: string;
+    visibility: 'public' | 'private';
+    updates_until: string | null;
+}
+
+/**
+ * What `nodeId` may pull here: every published public package (its latest version), and each private
+ * one it is entitled to (the latest version its entitlement reaches).
+ */
+export async function repositoryListing(storage: Storage, nodeId: string): Promise<RepositoryListingEntry[]> {
+    const out: RepositoryListingEntry[] = [];
+    const { packages } = await storage.listPackages({ status: 'published', visibility: 'public', limit: 500 });
+    const seen = new Set<string>();
+    for (const p of packages) {
+        if (seen.has(p.packageGroupId)) continue;
+        seen.add(p.packageGroupId);
+        out.push({
+            group_id: p.packageGroupId, name: p.name, version: p.version, published_at: p.createdAt,
+            description: p.description, category: p.category, visibility: 'public', updates_until: null,
+        });
+    }
+    for (const { groupId, entitlement } of await entitledGroupsOf(storage, nodeId)) {
+        const pkg = await entitledVersion(storage, groupId, nodeId);
+        if (!pkg || seen.has(groupId)) continue;
+        out.push({
+            group_id: groupId, name: pkg.name, version: pkg.version, published_at: pkg.createdAt,
+            description: pkg.description, category: pkg.category, visibility: 'private', updates_until: entitlement.updatesUntil,
+        });
+    }
+    return out;
+}
+
+/** The private packages this node is entitled to, for the repository's listing. */
+export async function entitledGroupsOf(storage: Storage, nodeId: string): Promise<Array<{ groupId: string; entitlement: PackageEntitlement }>> {
+    const rows = await storage.listMemory(NS_PACKAGE_ENTITLEMENTS, { prefix: 'entitlements.' });
+    const out: Array<{ groupId: string; entitlement: PackageEntitlement }> = [];
+    for (const row of rows) {
+        const value = row.value as Record_ | undefined;
+        const ent = value?.nodes?.[nodeId];
+        if (value && ent) out.push({ groupId: value.groupId, entitlement: ent });
+    }
+    return out;
+}

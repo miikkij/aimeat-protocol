@@ -3985,6 +3985,11 @@ components:
           type: string
           format: date-time
           description: When the owner forked this managed install. A forked install receives no updates.
+        autoUpdate:
+          type: boolean
+          description: >-
+            Whether the daily update check updates this install by itself when its source has a newer
+            version (true), or tells the owner an update is ready (false).
         installedAt:
           type: string
           format: date-time
@@ -43400,6 +43405,133 @@ paths:
         '413':
           description: Package exceeds size, component count or per-author limit
 
+  /v1/packages/{groupId}/entitlements:
+    get:
+      operationId: listPackageEntitlements
+      summary: Which nodes a private package is served to
+      description: >-
+        On a package repository: the customer nodes entitled to this private package, each with the
+        instant its updates end (null while they run on). The package's author or an operator.
+        `repository_role` says whether this node serves them at all (AIMEAT_PACKAGE_REPOSITORY).
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is `{ entitlements: [{ nodeId, updatesUntil, note?, grantedAt, grantedBy, updatedAt }], repository_role }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/packages/{groupId}/entitlements/{nodeId}:
+    put:
+      operationId: grantPackageEntitlement
+      summary: Serve a private package to a node
+      description: >-
+        Grant a customer node this private package, or change its grant. The node is served every
+        published version made up to `updates_until`, and nothing newer: a monthly subscription that
+        ended. Null or omitted keeps the updates running. The node must also be an active peer of this
+        node with the catalogue shared. The package's author or an operator; requires packages:write.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                updates_until: { type: string, format: date-time, nullable: true }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: '`data` is `{ entitlement, repository_role }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: revokePackageEntitlement
+      summary: Stop serving a private package to a node
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/federation/packages:
+    get:
+      operationId: listRepositoryPackagesForNode
+      summary: What this repository serves the calling node
+      description: >-
+        On a node in the package repository role: the packages the calling peer node may pull, every
+        published public one and each private one it is entitled to, with the version its entitlement
+        reaches. The request is signed as that node over `group_id: "*"` (see the export endpoint).
+        404 NOT_A_REPOSITORY when the role is off.
+      tags: [Federation]
+      responses:
+        '200':
+          description: >-
+            `data` is `{ node, packages: [{ group_id, name, version, published_at, description,
+            category, visibility, updates_until }] }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/federation/peers/{nodeId}/packages:
+    get:
+      operationId: listPeerRepositoryPackages
+      summary: What a repository peer serves this node
+      description: >-
+        This node asks a peer in the package repository role what it may pull there (GET
+        /v1/federation/packages on the peer, signed as this node). The peer must be active with the
+        catalogue shared. Pull one with POST /v1/federation/packages/pull. Requires packages:write.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is `{ node, packages }`, as the repository listed them.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502':
+          description: The repository could not be reached or refused.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/federation/packages/pull:
     post:
       operationId: pullPackageFromNode
@@ -43858,7 +43990,13 @@ paths:
     get:
       operationId: exportPackage
       summary: Export package as ZIP
-      description: Export a package as a ZIP bundle containing manifest.yaml and component files.
+      description: >-
+        Export a package as a ZIP bundle containing manifest.yaml and component files. On a node in
+        the package repository role (AIMEAT_PACKAGE_REPOSITORY), a request signed by a peer node
+        (`x-source-node`, `x-timestamp`, `x-signature` over `{ source_node, timestamp, purpose: "package",
+        group_id }`) is served a PRIVATE package it holds an entitlement to: the newest published
+        version made up to the entitlement's `updates_until`. A version made after it answers 403
+        UPDATES_ENDED; a node with no entitlement 404. An unsigned request is decided on visibility.
       tags: [Packages]
       parameters:
         - name: groupId
@@ -44189,6 +44327,47 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Instance not found
+    patch:
+      operationId: setInstance
+      summary: Change an install's label or auto-update
+      description: >-
+        The instance's owner changes its label, and whether the daily update check updates it by
+        itself (`auto_update: true`) or tells the owner an update is ready (`false`). Managed installs
+        start with auto-update on, editable ones with it off. Requires packages:write.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string, maxLength: 200 }
+                auto_update: { type: boolean }
+      responses:
+        '200':
+          description: The changed instance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageInstanceRecord'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Instance not found
     delete:
       operationId: removeInstance
       summary: Remove instance
@@ -44258,6 +44437,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/instances/check-updates:
+    post:
+      operationId: checkInstanceUpdates
+      summary: Bring the caller's installs up to what their sources serve
+      description: >-
+        For each of the caller's installs whose package was pulled from another node and that was not
+        forked: the package is refreshed from its source under the pinned key (a newer version becomes
+        a new local version), an install with `autoUpdate` on is then updated, and the rest are
+        reported as ready. A source whose updates ended for this node (a package repository's monthly
+        fee ran out) is reported as `updates_ended` and the install is left as it is. The node runs the
+        same daily for every owner (core job package-upstream-check) and then notifies the owners of
+        installs with auto-update off. Requires packages:write (an owner session passes).
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: >-
+            `data` is `{ checked, outcomes: [{ instance_id, owner, package, pulled, version, latest,
+            result: updated|needs_owner|notified|current|updates_ended|error, detail? }] }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/instances/{id}/status:
     get:

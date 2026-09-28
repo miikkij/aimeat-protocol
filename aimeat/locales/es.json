@@ -7079,6 +7079,8 @@
   "notiftext.direct_message_request.body": "{preview}",
   "notiftext.package_install_request.title": "{who} pide permiso para instalar el paquete {name}",
   "notiftext.package_install_request.body": "El paquete escribe entradas en tu memoria. {who} no puede hacerlo sin tu permiso. Si lo apruebas, el paquete se instala para ti.",
+  "notiftext.package_update_available.title": "Hay una actualización para {label}",
+  "notiftext.package_update_available.body": "Ya está disponible la versión {version} de {name}. Tu instalación está en la versión {current}. La actualización no toca las partes que editaste.",
   "notiftext.package_update_request.title": "{who} pide permiso para actualizar el paquete {name}",
   "notiftext.package_update_request.body": "La nueva versión escribe entradas en tu memoria. {who} no puede hacerlo sin tu permiso. Si lo apruebas, tu copia se actualiza.",
   "notiftext.package_request_approved_by_agent.title": "{by} aprobó la solicitud sobre el paquete {name}",

@@ -14,6 +14,7 @@
  *   - readBodyCapped: under the cap, at the cap, over the cap, and no body at all
  * @usage cd aimeat && pnpm exec vitest run test/unit/package-pull-size-cap.test.ts
  * @version-history
+ *   v1.1.1 — 2026-09-28 — The storage stub answers getNodeKey: the pull is signed as the node now.
  *   v1.1.0 — 2026-09-26 — The node card and the upstream statement stop at their own caps (secaudit
  *     2026-09, N3). Both failed on the old code first.
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09, A6-13).
@@ -59,7 +60,8 @@ const { pullPackage, checkUpstream } = await import('../../src/services/package-
 const { readBodyCapped } = await import('../../src/utils/read-capped.js');
 
 const config = { packageFederationEnabled: true, packageMaxSizeMb: CAP_MB, federationTimeoutMs: 5000 } as unknown as AimeatConfig;
-const storage = { getLatestPublished: async () => null } as unknown as Storage;
+// No node key: the pull is sent unsigned, which is what a node without a key does.
+const storage = { getLatestPublished: async () => null, getNodeKey: async () => null } as unknown as Storage;
 const peers = new Map<string, PeerInfo>([['peer', {
     nodeId: 'peer-node', url: 'https://peer.example', publicKey: 'peer-key', status: 'active',
 } as unknown as PeerInfo]]);

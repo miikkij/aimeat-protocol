@@ -239,6 +239,12 @@ export interface PackageInstanceRecord {
    * every record, and stopped receiving updates from its package. Absent when never forked.
    */
   forkedAt?: string;
+  /**
+   * Whether the daily package check (services/package-upstream-refresh.ts) updates this install by
+   * itself when its source has a newer version (true), or tells the owner an update is ready (false).
+   * Configurable (Jouni, 2026-09-28): an install sets it; managed installs default to true.
+   */
+  autoUpdate?: boolean;
   installedAt: string;
   updatedAt: string;
 }

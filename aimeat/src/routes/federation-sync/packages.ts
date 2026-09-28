@@ -12,6 +12,9 @@
  * @structure registerFederationPackageRoutes(router, config, storage, peers)
  * @usage import { registerFederationPackageRoutes } from './federation-sync/packages.js';
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The attestation serves an entitled peer node's signed read of a private
+ *     package on a node in the repository role (services/package-entitlements.ts).
+ *     GET /v1/federation/peers/:nodeId/packages reads what a repository peer serves this node.
  *   v1.0.1 — 2026-09-12 — The pull caller stops carrying `sub`. It travelled three files to become
  *     the fallback identity resolveGhii took, and that fallback is gone: the helper composes the
  *     GHII from the node. wish-identity-gate-sees-resolveghii.
@@ -23,9 +26,10 @@ import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { pullPackage } from '../../services/package-pull.js';
+import { pullPackage, listRepositoryPackages } from '../../services/package-pull.js';
 import { getPackageFor, getPackageVersionFor } from '../../services/package-read.js';
 import { attestationFor } from '../../services/package-attest-serve.js';
+import { resolveNodeRead } from '../../services/package-entitlements.js';
 
 export function registerFederationPackageRoutes(
     router: Router,
@@ -43,7 +47,14 @@ export function registerFederationPackageRoutes(
         const groupId = decodeURIComponent(req.params.groupId as string);
         const version = req.query.version as string | undefined;
 
-        const pkg = version
+        // An entitled peer's signed read of a private package, on the repository's terms
+        // (services/package-entitlements.ts), exactly as the export endpoint serves it.
+        const nodeRead = await resolveNodeRead(storage, config, peers, req.headers, groupId, version);
+        if (nodeRead.kind === 'refused') {
+            res.status(nodeRead.status).json(error(config.nodeId, nodeRead.code, nodeRead.message));
+            return;
+        }
+        const pkg = nodeRead.kind === 'served' ? nodeRead.pkg : version
             ? await getPackageVersionFor(storage, groupId, version, req.auth?.owner)
             : await getPackageFor(storage, groupId, req.auth?.owner);
 
@@ -60,6 +71,20 @@ export function registerFederationPackageRoutes(
         }
 
         res.json(success(config.nodeId, doc));
+    });
+
+    // GET /v1/federation/peers/:nodeId/packages — what a peer that is a package repository serves
+    // this node: its public packages and the private ones this node is entitled to
+    // (services/package-pull.ts listRepositoryPackages). Pull one with POST /v1/federation/packages/pull.
+    router.get('/v1/federation/peers/:nodeId/packages', requireAuth(), requireScope('packages:write'), async (req, res) => {
+        if (!config.packageFederationEnabled) {
+            res.status(403).json(error(config.nodeId, 'PACKAGE_FEDERATION_DISABLED',
+                'This node does not exchange packages with other nodes. An operator turns it on with AIMEAT_PACKAGE_FEDERATION_ENABLED.'));
+            return;
+        }
+        const out = await listRepositoryPackages({ storage, config, peers }, req.params.nodeId as string);
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.json(success(config.nodeId, { node: out.node, packages: out.packages }));
     });
 
     // POST /v1/federation/packages/pull — take a package published on another node.

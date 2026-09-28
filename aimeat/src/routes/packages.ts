@@ -37,6 +37,9 @@
  *   v2.2.1 — 2026-09-12 — Seven doors stop reading `sub`: resolveGhii takes the node, and the caller
  *     bags handed to the package services stop carrying a field those services used only as that
  *     fallback. wish-identity-gate-sees-resolveghii.
+ *   v2.3.0 — 2026-09-28 — The export serves a private package to an entitled peer node's signed pull
+ *     on a node in the repository role (services/package-entitlements.ts), and the entitlement
+ *     routes are registered here (routes/package-entitlements.ts).
  */
 
 import { Router } from 'express';
@@ -61,6 +64,8 @@ import { importParsedPackage, upstreamFromZip } from '../services/package-import
 import type { PeerInfo } from '../services/federation.js';
 import { attestationFor } from '../services/package-attest-serve.js';
 import { checkUpstream } from '../services/package-pull.js';
+import { resolveNodeRead } from '../services/package-entitlements.js';
+import { registerPackageEntitlementRoutes } from './package-entitlements.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy
 // per road. They are in services/package-create.ts now, which is the one place a package version is
@@ -72,6 +77,9 @@ export function packagesRouter(
   peers: Map<string, PeerInfo> = new Map(),
 ): Router {
   const router = Router();
+
+  // Which nodes a private package is served to, on a node in the repository role.
+  registerPackageEntitlementRoutes(router, config, storage, peers);
 
   // ── Static routes FIRST (before parameterized :groupId) ──────────
 
@@ -410,7 +418,14 @@ export function packagesRouter(
     const groupId = decodeURIComponent(req.params.groupId as string);
     const versionParam = req.query.version as string | undefined;
 
-    const pkg = versionParam
+    // A customer node's signed pull of a private package, on a node in the repository role
+    // (services/package-entitlements.ts). An unsigned request is decided on visibility as before.
+    const nodeRead = await resolveNodeRead(storage, config, peers, req.headers, groupId, versionParam);
+    if (nodeRead.kind === 'refused') {
+      res.status(nodeRead.status).json(error(config.nodeId, nodeRead.code, nodeRead.message));
+      return;
+    }
+    const pkg = nodeRead.kind === 'served' ? nodeRead.pkg : versionParam
       ? await getPackageVersionFor(storage, groupId, versionParam, req.auth?.owner)
       : await getPackageFor(storage, groupId, req.auth?.owner);
 

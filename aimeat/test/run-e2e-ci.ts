@@ -806,6 +806,9 @@ const ALL_SUITES = [
     // holding the words) answers: the door, the MCP twin, expiry, decline, and the reserved prefix.
     'test/e2e-package-install-requests.ts',
     'test/e2e-federation-packages.ts',
+    // A package repository and a customer node: a private package served only on an entitlement,
+    // the update check that applies a newer version, and the end of updates.
+    'test/e2e-package-repository.ts',
     'test/e2e-businesslauncher.ts',
     'test/e2e-company-brain.ts',
     'test/e2e-personal-node.ts',

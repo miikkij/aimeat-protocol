@@ -17,6 +17,8 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
+ *     aimeat_package_repository and aimeat_package_entitlements (the package repository).
  *   v1.4.1 -- 2026-09-28 -- aimeat_package_install sends `config`.
  *   v1.4.0 -- 2026-09-28 -- aimeat_package_install sends `mode`; aimeat_package_instances and
  *     aimeat_package_fork over GET /v1/instances and POST /v1/instances/:id/fork.
@@ -245,6 +247,59 @@ export const packageTools: ConnectCliToolDefinition[] = [
             packageGroupId: optionalString(input, 'group_id'),
             status: optionalString(input, 'status'),
         })}`),
+    },
+    {
+        name: 'aimeat_package_instance_set',
+        description: 'Change one installed package copy: its label, and whether the daily update check updates it by itself.',
+        input: {
+            instance_id: { type: 'string', required: true, description: 'The installed copy, from aimeat_package_instances.' },
+            label: { type: 'string', description: 'A new name for this copy.' },
+            auto_update: { type: 'boolean', description: 'true: the daily check updates this copy by itself. false: it tells your owner an update is ready.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const label = optionalString(input, 'label');
+            if (label !== undefined) body.label = label;
+            const auto = optionalBoolean(input, 'auto_update');
+            if (auto !== undefined) body.auto_update = auto;
+            return client.patch(`/v1/instances/${encodeURIComponent(requiredString(input, 'instance_id'))}`, body);
+        },
+    },
+    {
+        name: 'aimeat_package_check_updates',
+        description: 'Check your owner\'s installed packages against the nodes they came from, now: pull newer versions, update the copies with auto_update on, and list the rest.',
+        input: {},
+        handler: ({ client }) => client.post('/v1/instances/check-updates', {}),
+    },
+    {
+        name: 'aimeat_package_repository',
+        description: 'List what a package repository peer serves this node: its public packages and the private ones this node is entitled to.',
+        input: { node_id: { type: 'string', required: true, description: 'The repository node, a peer of this node.' } },
+        handler: ({ client }, input) => client.get(`/v1/federation/peers/${encodeURIComponent(requiredString(input, 'node_id'))}/packages`),
+    },
+    {
+        name: 'aimeat_package_entitlements',
+        description: 'On a package repository: list, grant or revoke which customer nodes a private package of yours is served to, and up to when.',
+        input: {
+            group_id: { type: 'string', required: true, description: 'Your package group identifier.' },
+            action: { type: 'string', required: true, enum: ['list', 'grant', 'revoke'], description: 'list the nodes, grant (or change) one, or revoke one.' },
+            node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
+            updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node.' },
+            note: { type: 'string', description: 'For grant: why.' },
+        },
+        handler: ({ client }, input) => {
+            const base = `/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/entitlements`;
+            const action = requiredString(input, 'action');
+            if (action === 'list') return client.get(base);
+            const node = `${base}/${encodeURIComponent(requiredString(input, 'node_id'))}`;
+            if (action === 'revoke') return client.delete(node);
+            const body: JsonObject = {};
+            const until = optionalString(input, 'updates_until');
+            if (until !== undefined) body.updates_until = until;
+            const note = optionalString(input, 'note');
+            if (note !== undefined) body.note = note;
+            return client.put(node, body);
+        },
     },
     {
         // Releasing a managed install: it becomes editable in place and its updates stop.

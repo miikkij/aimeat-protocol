@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.9.0 — 2026-09-28 — packageRepository: the package repository role.
  *   v1.8.1 — 2026-09-25 — federationRelayClaim names 3.20.0 (default required) and 4.0.0 (optional gone).
  *   v1.8.0 — 2026-09-24 — ThemesConfig mixed in (config-themes.ts); the capability fields moved to
  *     config-types-capabilities.ts unchanged, to stay under the line ceiling.
@@ -725,6 +726,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   templateDiscussionsEnabled: boolean;
   packageFederationEnabled: boolean;
   packageFederationAutoAccept: boolean;
+  /** Package repository role: a private package also reaches entitled peer nodes (package-entitlements.ts). */
+  packageRepository: boolean;
 
   /**
    * Whether this node has a store to send people to: true exactly when `siteLinks.store` is set.

@@ -28,6 +28,9 @@
  *     aimeat_ai_provider_test (a real, billed call to an outside provider).
  *   2026-09-28 — aimeat_ai_capabilities and aimeat_ai_models (read only); aimeat_ai_transcribe and
  *     aimeat_ai_embed (billed calls to an outside provider). System 2 plan, V5.
+ *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates (reaches other nodes),
+ *     aimeat_package_repository (read-only, reaches another node), aimeat_package_entitlements (a revoke
+ *     stops a node's pulls).
  *   2026-09-28 — aimeat_package_instances (read-only) and aimeat_package_fork (destructive: the
  *     updates it gives up do not come back).
  *   2026-09-28 — aimeat_ai_policy_set: propose-then-confirm, idempotent, not destructive.
@@ -394,6 +397,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // because a component the owner edited is refused rather than overwritten.
     aimeat_package_update: { title: 'Update Installed Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_package_instances: { title: 'List Installed Packages', readOnlyHint: true },
+    aimeat_package_instance_set: { title: 'Set Installed Package Options', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // openWorld: it reaches the nodes the packages came from. Not idempotent: it may pull and update.
+    aimeat_package_check_updates: { title: 'Check Package Updates', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_package_repository: { title: 'List Repository Packages', readOnlyHint: true, openWorldHint: true },
+    // Destructive: a revoke stops a customer node's pulls. Idempotent: the same grant twice is one grant.
+    aimeat_package_entitlements: { title: 'Package Entitlements', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
     // call is refused because the copy is no longer managed.
     aimeat_package_fork: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

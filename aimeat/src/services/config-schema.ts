@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.15.1 — 2026-09-28 — federation.package_repository (AIMEAT_PACKAGE_REPOSITORY), the package repository role.
  *   v1.15.0 — 2026-09-28 — The operator's AI providers (System 2, V3): ai.providers,
  *     ai.builtin_providers, ai.provider_egress, ai.provider_types, ai.fixed_baseurl_overrides, and
  *     ai.legacy_settings_routes (the deprecated settings routes: on by default, removed in 4.0.0).
@@ -302,6 +303,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'aiTraining', dotPath: 'site.ai_training', envVar: 'AIMEAT_AI_TRAINING', type: 'string', validate: v => v === 'allow' || v === 'deny', immutable: false, description: 'Allow AI training crawlers in robots.txt ("allow" | "deny"). Search and retrieval bots are always allowed' },
   { key: 'frontPage', dotPath: 'site.front_page', envVar: 'AIMEAT_FRONT_PAGE', type: 'string', validate: v => v === 'classic' || v === 'demo' || v === 'os', immutable: false, description: 'Which front page the root serves to browsers: "classic" (the SPA landing), "demo" (the static showroom, public/front-demo.html) or "os" (the static OS page, public/front-os.html)' },
   { key: 'webBotAuthSign', dotPath: 'federation.web_bot_auth_sign', envVar: 'AIMEAT_WEB_BOT_AUTH_SIGN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sign outbound HTTP with the node Ed25519 key (RFC 9421 Web Bot Auth); the key directory is always served' },
+  { key: 'packageRepository', dotPath: 'federation.package_repository', envVar: 'AIMEAT_PACKAGE_REPOSITORY', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Package repository role: serve a private package to the peer nodes entitled to it (signed requests; entitlements per package). Off: private packages reach their author only' },
 
   // ── Search-engine presence (mutable) ──
   // All of these were literals in public/spa.html naming aimeat.io and its operator, host-rewritten

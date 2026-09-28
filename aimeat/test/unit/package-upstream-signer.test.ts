@@ -13,6 +13,7 @@
  *   Here it is three lines of fixture and one loopback server answering the attestation door.
  * @usage cd aimeat && pnpm exec vitest run test/unit/package-upstream-signer.test.ts
  * @version-history
+ *   v1.0.1 — 2026-09-28 — The storage stub answers getNodeKey: the check is signed as the node now.
  *   v1.0.0 — 2026-09-14 — Initial, with the fix.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -61,7 +62,8 @@ const packageWith = (publicKey: string): PackageRecord => ({
 } as unknown as PackageRecord);
 
 const deps = {
-    storage: {} as Storage,
+    // No node key: the check is sent unsigned, which is what a node without a key does.
+    storage: { getNodeKey: async () => null } as unknown as Storage,
     config: { federationTimeoutMs: 5_000 } as AimeatConfig,
     peers: new Map<string, PeerInfo>(),
 };

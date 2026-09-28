@@ -6,6 +6,8 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-28 — PATCH /v1/instances/:id (label, auto_update) and POST /v1/instances/check-updates
+ *     (services/package-upstream-refresh.ts), install packages phase 3.
  *   v1.3.0 — 2026-09-28 — POST /v1/instances/:id/fork: a managed install becomes editable in place and
  *     stops receiving updates (services/package-managed.ts).
  *   v1.2.0 — 2026-09-14 — requireLocalSession on every door. Each one compares `instance.owner`
@@ -34,7 +36,9 @@ import {
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
 import { planInstanceUpdate } from '../../services/package-update-plan.js';
-import { forkPackageInstance } from '../../services/package-managed.js';
+import { forkPackageInstance, setPackageInstance } from '../../services/package-managed.js';
+import { refreshInstalledPackages } from '../../services/package-upstream-refresh.js';
+import type { PeerInfo } from '../../services/federation.js';
 import { listInstancesFor } from '../../services/package-read.js';
 
 // ── Register instance management routes ───────────────────────────────
@@ -43,6 +47,7 @@ export function registerManageRoutes(
   router: Router,
   config: AimeatConfig,
   storage: Storage,
+  peers: Map<string, PeerInfo> = new Map(),
 ): void {
   // GET /v1/instances — List my instances
   router.get('/v1/instances', requireAuth(), requireLocalSession(), async (req, res) => {
@@ -162,6 +167,27 @@ export function registerManageRoutes(
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${id}/status` },
       { description: 'Check for updates', method: 'GET', url: `/v1/instances/${id}/check-update` },
     ]));
+  });
+
+  // PATCH /v1/instances/:id — the owner's label for an install, and whether the daily package check
+  // updates it by itself (services/package-managed.ts).
+  router.patch('/v1/instances/:id', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const out = await setPackageInstance(storage, { owner: req.auth!.owner }, req.params.id as string,
+      { label: body.label, autoUpdate: body.auto_update });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.json(success(config.nodeId, out.instance));
+  });
+
+  // POST /v1/instances/check-updates — bring the caller's own installs up to what their sources serve
+  // now: a newer version is pulled, an install with auto-update on is updated, the rest are reported
+  // (services/package-upstream-refresh.ts). The daily core job runs the same for every owner.
+  router.post('/v1/instances/check-updates', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
+    const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner: req.auth!.owner }, { notify: false });
+    res.json(success(config.nodeId, { checked: outcomes.length, outcomes }));
   });
 
   // POST /v1/instances/:id/fork — A managed install becomes the owner's own editable copy, in place.

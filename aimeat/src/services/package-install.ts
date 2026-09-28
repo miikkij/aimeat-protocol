@@ -455,6 +455,9 @@ export async function installPackage(
         installedComponents: plannedComponents,
         status: 'installed',
         mode,
+        // A managed install takes the package's updates by itself; an editable one tells its owner.
+        // Either is changed afterwards with PATCH /v1/instances/:id (package-managed.ts).
+        autoUpdate: mode === 'managed',
         installedAt: now,
         updatedAt: now,
     };

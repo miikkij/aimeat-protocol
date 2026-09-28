@@ -26,12 +26,14 @@
  *     dry_run, hash comparison, migration apply, component deletion
  *   v2.2.0 — 2026-07-13 — extract handler groups to ./instances/{install,manage,migration}.ts (max-file-lines)
  *   v2.3.0 — 2026-09-25 — ./instances/install-requests.ts: the package install requests and their decision door
+ *   v2.4.0 — 2026-09-28 — The router takes the federation peers, for POST /v1/instances/check-updates.
  */
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
+import type { PeerInfo } from '../services/federation.js';
 import { registerInstallRoutes } from './instances/install.js';
 import { registerManageRoutes } from './instances/manage.js';
 import { registerMigrationRoutes } from './instances/migration.js';
@@ -43,6 +45,7 @@ export function instancesRouter(
   config: AimeatConfig,
   storage: Storage,
   scheduler?: Scheduler,
+  peers: Map<string, PeerInfo> = new Map(),
 ): Router {
   const router = Router();
 
@@ -53,8 +56,9 @@ export function instancesRouter(
   // POST /v1/packages/:groupId/install
   registerInstallRoutes(router, config, storage, scheduler);
 
-  // GET /v1/instances, GET/:id/status, GET/:id/check-update, GET/:id, DELETE /:id
-  registerManageRoutes(router, config, storage);
+  // GET /v1/instances, GET/:id/status, GET/:id/check-update, GET/:id, DELETE /:id, PATCH /:id,
+  // POST /:id/fork, POST /check-updates (the last reaches other nodes, so it takes the peers)
+  registerManageRoutes(router, config, storage, peers);
 
   // ══════════════════════════════════════════════════════════════════════
   // Phase 4: Migration

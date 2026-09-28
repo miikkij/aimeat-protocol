@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description System-prompt, Package, Template-listing, Package-instance methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
- *   v1.2.0 — 2026-09-28 — An instance carries `mode` (managed | editable) and `forkedAt`.
+ *   v1.2.0 — 2026-09-28 — An instance carries `mode` (managed | editable), `forkedAt` and `autoUpdate`.
  *   v1.1.0 — 2026-09-09 — deleteReview, deleteDiscussion and listInstancesByPackage deleted: no caller.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
@@ -509,6 +509,7 @@ export const packagesMethods = {
       status: row.status as PackageInstanceRecord['status'],
       mode: row.mode === 'managed' ? 'managed' : 'editable',
       ...(row.forkedAt ? { forkedAt: row.forkedAt as string } : {}),
+      autoUpdate: row.autoUpdate === 1 || row.autoUpdate === true,
       installedAt: row.installedAt as string,
       updatedAt: row.updatedAt as string,
     };
@@ -516,13 +517,13 @@ export const packagesMethods = {
 
   async createInstance(this: SqliteStorage, record: PackageInstanceRecord): Promise<PackageInstanceRecord> {
     this.db.prepare(
-      `INSERT INTO package_instances (id, packageGroupId, packageVersion, packageRecordId, owner, ownerGhii, label, installedComponents, status, mode, forkedAt, installedAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO package_instances (id, packageGroupId, packageVersion, packageRecordId, owner, ownerGhii, label, installedComponents, status, mode, forkedAt, autoUpdate, installedAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.packageGroupId, record.packageVersion, record.packageRecordId,
       record.owner, record.ownerGhii, record.label,
       JSON.stringify(record.installedComponents), record.status,
-      record.mode ?? 'editable', record.forkedAt ?? null,
+      record.mode ?? 'editable', record.forkedAt ?? null, record.autoUpdate ? 1 : 0,
       record.installedAt, record.updatedAt,
     );
     return record;
@@ -560,13 +561,13 @@ export const packagesMethods = {
     const merged = { ...existing, ...updates, id };
     this.db.prepare(
       `UPDATE package_instances SET packageGroupId = ?, packageVersion = ?, packageRecordId = ?,
-       owner = ?, ownerGhii = ?, label = ?, installedComponents = ?, status = ?, mode = ?, forkedAt = ?, updatedAt = ?
+       owner = ?, ownerGhii = ?, label = ?, installedComponents = ?, status = ?, mode = ?, forkedAt = ?, autoUpdate = ?, updatedAt = ?
        WHERE id = ?`
     ).run(
       merged.packageGroupId, merged.packageVersion, merged.packageRecordId,
       merged.owner, merged.ownerGhii, merged.label,
       JSON.stringify(merged.installedComponents), merged.status,
-      merged.mode ?? 'editable', merged.forkedAt ?? null, merged.updatedAt, id,
+      merged.mode ?? 'editable', merged.forkedAt ?? null, merged.autoUpdate ? 1 : 0, merged.updatedAt, id,
     );
     return merged;
   },

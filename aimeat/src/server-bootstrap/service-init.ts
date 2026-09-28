@@ -42,6 +42,8 @@
  *   v1.10.0 — 2026-09-27 — migrateAppToolsKeysOnce(): once per node, app tool manifests move to the
  *     app's filename key (services/app-tools-key.ts).
  *   v1.10.1 — 2026-09-26 — Anonymous mode is switched on for this node's id (auth/node-auth.ts).
+ *   v1.11.0 — 2026-09-28 — The `package-upstream-check` core handler, registered after the peers load
+ *     (services/package-upstream-refresh.ts).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -358,6 +360,16 @@ export async function initializeServices(
   } catch (err) {
     logger.error('Failed to load persisted peers', { error: String(err) });
   }
+
+  // The daily package update check needs the peers, so its handler is registered here rather than
+  // with the other core handlers above (services/package-upstream-refresh.ts).
+  scheduler.registerCoreHandler('package-upstream-check', async () => {
+    if (!config.packageFederationEnabled) return;
+    const { refreshInstalledPackages } = await import('../services/package-upstream-refresh.js');
+    const outcomes = await refreshInstalledPackages({ storage, config, peers }, {}, { notify: true });
+    const moved = outcomes.filter(o => o.pulled || o.result === 'updated' || o.result === 'notified').length;
+    if (moved > 0) logger.info(`Package update check: ${moved} of ${outcomes.length} installs moved or were told`);
+  });
 
   // Start federation heartbeat job (signed heartbeats with catalogue hash, jittered scheduling)
   startHeartbeatJob(config, storage, peers, networkDirectory);

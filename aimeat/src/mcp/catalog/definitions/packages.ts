@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.6.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
+ *     aimeat_package_repository and aimeat_package_entitlements (the package repository).
  *   v1.5.1 -- 2026-09-28 -- aimeat_package_install takes `config` (PACKAGE_CONFIG_PARAM).
  *   v1.5.0 -- 2026-09-28 -- aimeat_package_install takes `mode` (managed | editable);
  *     aimeat_package_instances lists the installed copies and aimeat_package_fork releases a managed one.
@@ -181,6 +183,48 @@ export const packagesTools: AimeatToolDefinition[] = [
         input: {
             group_id: { type: 'string', description: 'Only the copies of this package.' },
             status: { type: 'string', enum: ['installed', 'paused', 'removed'], description: 'Only copies in this state.' },
+        },
+    },
+    {
+        name: 'aimeat_package_instance_set',
+        description: 'Change your owner\'s choices about one installed package copy: its label, and whether the daily update check updates it by itself (auto_update true) or tells your owner that an update is ready (false). Managed installs start with auto_update on, editable ones with it off.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            instance_id: { type: 'string', required: true, description: 'The installed copy, from aimeat_package_instances.' },
+            label: { type: 'string', description: 'A new name for this copy.' },
+            auto_update: { type: 'boolean', description: 'true: the daily check updates this copy by itself. false: it tells your owner an update is ready.' },
+        },
+    },
+    {
+        // The daily core job, for this owner's installs and on demand.
+        name: 'aimeat_package_check_updates',
+        description: 'Check your owner\'s installed packages against the nodes they came from, now. A newer version is pulled; a copy with auto_update on is updated (parts your owner edited are left alone and reported), and the rest are listed as ready to update with aimeat_package_update. A source whose updates ended (the monthly fee ran out) is reported as updates_ended. The node also runs this daily.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_package_repository',
+        description: 'List what a package repository serves this node: its public packages and the private ones this node is entitled to, each with the version its entitlement reaches and when its updates end. The repository must be a peer of this node. Take one with aimeat_package_pull (node_id and group_id), then install it with aimeat_package_install, usually with mode "managed".',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            node_id: { type: 'string', required: true, description: 'The repository node, a peer of this node.' },
+        },
+    },
+    {
+        // The repository side. Phase 5 (purchase) will write these; until then the author grants them.
+        name: 'aimeat_package_entitlements',
+        description: 'On a package repository: list, grant or revoke which customer nodes a private package of yours is served to. A grant with updates_until serves the node every version published up to that instant and nothing newer (the monthly updates ended); without it the updates run on. The node must be a peer of this one, and the node must be in the repository role (repository_role in the answer) for the grant to take effect.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', required: true, description: 'Your package group identifier.' },
+            action: { type: 'string', required: true, enum: ['list', 'grant', 'revoke'], description: 'list the nodes, grant (or change) one, or revoke one.' },
+            node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
+            updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node. Omit for updates that run on.' },
+            note: { type: 'string', description: 'For grant: why, e.g. the order it came from.' },
         },
     },
     {
