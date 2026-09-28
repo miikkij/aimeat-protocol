@@ -1,5 +1,5 @@
 ---
-description: A positive case. 40 000 support tickets written by different people; finding the ones that describe the same problem in different words is where embeddings help, and the skill says to keep the model with every vector and not to put the vectors in one memory value.
+description: A positive case. 40 000 support tickets written by different people; finding the ones that describe the same problem in different words is where embeddings can help; the skill says the person decides, and to keep the model with every vector and not to put the vectors in one memory value.
 tags: [embed, positive]
 max_turns: 8
 allowed_tools: [Read, Glob, Grep, Skill]

@@ -21,6 +21,7 @@
  * @structure CAPABILITY_ORDER · CapabilityState · aiCapabilitiesView()
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
+ *   v1.0.1 — 2026-09-28 — The embed howTo says embeddings are rare and the person's decision.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -46,7 +47,7 @@ const HOW_TO: Record<AiCapability, string> = {
   image: 'AIMEAT.ai.image({ app_id, prompt }) · POST /v1/ai/image · aimeat_image_generate; tell the person the price first',
   speech: 'AIMEAT.ai.speak({ app_id, input }) · POST /v1/ai/speak (NDJSON audio)',
   transcription: 'AIMEAT.ai.transcribe({ app_id, storage_key }) · POST /v1/ai/transcribe · aimeat_ai_transcribe',
-  embed: 'AIMEAT.ai.embed({ app_id, input: [texts] }) · POST /v1/ai/embed · aimeat_ai_embed; only when word search is not enough (skill aimeat-ai-capabilities)',
+  embed: 'AIMEAT.ai.embed({ app_id, input: [texts] }) · POST /v1/ai/embed · aimeat_ai_embed; rarely, only when the person decides, for a collection far larger than one prompt (skill aimeat-ai-capabilities)',
 };
 
 export type CapabilityReason =

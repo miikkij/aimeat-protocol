@@ -705,32 +705,44 @@ so in the app and send it as `prompt` text, not as `files`.
 An embedding turns a text into a vector: a list of numbers that captures what
 the text means. Texts with a similar meaning get vectors that lie close
 together, even when they share no words, so "invoice late" finds "payment not
-received by the due date".
+received by the due date". An app seldom needs them.
 
-**When it helps:**
+**The rule: embeddings are rare, and the person decides.** Build with word
+search (`AIMEAT.data.search`), filters, or the whole collection in one prompt.
+An app, or an AI that builds one, never adds embeddings on its own initiative.
+Talk about them only when the person asks, or when both tests below fail; then
+say what they cost and let the person decide.
 
-- Search by meaning in a large collection of text, where people search with
-  words the texts do not use.
-- Answering from the owner's own material: find the passages that fit a
-  question, and give only those to `complete()`.
-- Finding similar items, and finding duplicates that are worded differently.
-- Grouping texts by topic (clustering).
-- Searching across languages: a question in Finnish finds a note in English.
+**Test 1: does the collection fit in one prompt?** A current text model reads
+200,000 tokens or more in one call, about 150,000 words: thousands of short
+items. 120 recipes are about 40,000 tokens. When the collection fits and
+changes little, give all of it to `complete()`. That is simpler, and usually
+more accurate than finding pieces first.
 
-**When it does not help:**
+**Test 2: does word search find it?** Try it with the words people really use.
+A reason exists only when a real use keeps missing texts written in other words
+or in another language.
 
-- A few hundred texts or fewer. Word search, or giving the texts to the model
-  directly, is enough.
+**Truly needed only when all three hold:**
+
+- The collection is far larger than one prompt (hundreds of thousands of tokens
+  and more), or it grows every day.
+- People search it by meaning, often.
+- Sending all of it with every question would cost too much.
+
+Examples: years of a company's documents; a support archive of tens of
+thousands of messages; search across languages in such a collection.
+
+**Never for:**
+
+- A few hundred or a few thousand short texts.
 - Exact values: ids, names, dates, amounts. A vector for "INV-2026-0413" does
   not find that invoice reliably; word search does.
-- When only the newest data matters. Sort by date instead.
+- Only the newest data. Sort by date instead.
 - Data that must not leave the machine, when the owner has no local embedding
   model. Every text goes to the provider.
 - "Just in case". Vectors cost money to make, take room to keep, and must be
   made again when the model changes.
-
-**The rule: turn embeddings on only when word search has proved not enough for
-a specific use, and you know what you embed.**
 
 **Cost.** Embedding is cheap per text but grows with the collection. As of
 2026-09-27, `text-embedding-3-large` costs $0.13 and `qwen3-embedding-8b` costs

@@ -15376,8 +15376,9 @@ paths:
         another provider is allowed only for the SAME model, because vectors of different models cannot
         be compared; store `data.model` beside the vectors. The node's own key pays only when the
         operator named a node default embedding model (AIMEAT_MODEL_DEFAULT_EMBED). At most 256 texts
-        and 500 000 characters per call. Use embeddings only when word search is not enough (skill
-        aimeat-ai-capabilities).
+        and 500 000 characters per call. Embeddings are for a collection far larger than one prompt,
+        only when the person decides; a collection that fits one prompt goes to a text model whole
+        (skill aimeat-ai-capabilities, section 4).
       tags: [Memory]
       security:
         - BearerAuth: []
