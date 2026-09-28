@@ -16,6 +16,7 @@
  * @structure WhichVersion · MenuLinks · OwnHtml · SavedTexts · AskAi · WhatChanged
  * @usage html`<${WhichVersion} hasCustom=${false} source="default" parts=${9} />`
  * @version-history
+ *   2026-09-28 — What changed names each action once, in words (admin.portal.log.action.*); the raw id badge beside the name is gone.
  *   2026-09-28 — What changed shows an entry's `summary`, the field the change log carries.
  *   v2.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a saved text's key or value, a change description or an editor name with a quote
@@ -207,7 +208,6 @@ export function WhatChanged({ changes, versions, onVersions, onRestore, number }
             ? P('log.action.' + (c.action ?? 'other')) : (c.action ?? ''),
           // A change log entry carries `summary` (storage/types/apps.ts SiteChangeLogEntry).
           why: c.summary ?? c.description ?? c.detail ?? '',
-          mark: html`<${Badge} type="info" label=${c.action ?? ''} />`,
           value: `${dt(c.changed_at ?? c.changedAt)} · ${c.changed_by ?? c.changedBy ?? '-'}`,
           last: i === Math.min(changes.length, 12) - 1,
         }))} />`}

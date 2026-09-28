@@ -2656,6 +2656,25 @@
       "visNote_group": "El grupo se nombra en el registro.",
       "visNote_owner": "Una cuenta humana y todo lo que actúa en su nombre.",
       "visNote_private": "Ni siquiera los otros agentes del propietario."
+    },
+    "portal": {
+      "log": {
+        "action": {
+          "template_upload": "HTML propio subido",
+          "template_delete": "HTML propio eliminado",
+          "import": "Importado",
+          "cache_invalidate": "Caché borrada",
+          "app_publish": "Aplicación publicada",
+          "app_update": "Aplicación actualizada",
+          "app_delete": "Aplicación eliminada",
+          "memory_set": "Texto guardado",
+          "memory_delete": "Texto eliminado",
+          "layout_set": "Diseño guardado",
+          "layout_delete": "Diseño eliminado",
+          "layout_restore": "Diseño anterior restaurado",
+          "other": "Otro cambio"
+        }
+      }
     }
   },
   "admin.messages.desc": "Telemetría de entrega de los mensajes entre personas. No se enseña el contenido de ningún mensaje ni quién participa.",

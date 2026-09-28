@@ -11,6 +11,7 @@
  * @structure MessageBubble({ msg, mine, who, … })
  * @usage import { MessageBubble } from './message-turn.js'; (components.js re-exports it)
  * @version-history
+ *   2026-09-28 — No emoji in the menu item "Add to notebook for later" (frontend rule: no emoji in the interface).
  *   v1.1.0 — 2026-09-26 — The message is the Message component; this file only turns a message record
  *     into its data. AttachmentItem moved into the component (components/MessageFile.js). Who wrote
  *     it and the time are inside the message again, as main has them.
@@ -50,7 +51,7 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
     onQuote ? { label: `↩ ${t('inbox.quoteReply')}`, run: () => onQuote(msg) } : null,
     { label: `${starred ? '⭐' : '☆'} ${t('inbox.markImportant')}`, run: () => onStar?.(msg) },
     { label: `🔗 ${t('inbox.trackResponse')}${trk ? ` — ${trk.text}` : ''}`, run: () => onTrack?.(msg) },
-    { label: `📓 ${t('inbox.parkToNotebook')}`, run: () => onPark?.(msg) },
+    { label: t('inbox.parkToNotebook'), run: () => onPark?.(msg) },
     { label: `✨ ${t('inbox.ai.replyToMessage')}`, run: () => onReplyAi?.(msg) },
     onDelete ? { label: t('inbox.deleteMessage'), run: () => onDelete(msg), danger: true } : null,
   ].filter(Boolean);

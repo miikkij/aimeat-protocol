@@ -671,7 +671,22 @@
         "versionsNone": "Tätä sivua ei ole vielä tallennettu, joten mihinkään ei ole palattavaa.",
         "restore": "Palauta tämä",
         "restoreAsk": "Palautetaanko tämä aiempi versio?",
-        "restoreDone": "Palautettu."
+        "restoreDone": "Palautettu.",
+        "action": {
+          "template_upload": "Oma HTML ladattu",
+          "template_delete": "Oma HTML poistettu",
+          "import": "Tuotu",
+          "cache_invalidate": "Välimuisti tyhjennetty",
+          "app_publish": "Sovellus julkaistu",
+          "app_update": "Sovellus päivitetty",
+          "app_delete": "Sovellus poistettu",
+          "memory_set": "Teksti tallennettu",
+          "memory_delete": "Teksti poistettu",
+          "layout_set": "Asettelu tallennettu",
+          "layout_delete": "Asettelu poistettu",
+          "layout_restore": "Aiempi asettelu palautettu",
+          "other": "Muu muutos"
+        }
       },
       "lb": {
         "title": "Tämä sivusto peilaa toista",

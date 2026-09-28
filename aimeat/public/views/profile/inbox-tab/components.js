@@ -9,6 +9,7 @@
  *   re-exported from here; the composer is the Composer component's message tone
  *   (components/Composer.js, tone="message"). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-28 -- No emoji on the two notebook buttons (frontend rule: no emoji in the interface).
  *   v1.31.0 -- 2026-09-26 -- Written on components only (no class): the poll builder's questions are Boxes
  *     of TextFields and Checks; the command bar and fill and the schedule are the pane's strips
  *     (ConversationPane PaneStrip) with the field family's controls, the command a Mark that is a
@@ -359,7 +360,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
               <${TextArea} rows=${12} value=${aiSummary} onInput=${setAiSummary} />
               <${FormActions} end>
                 <${Action} disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}<//>
-                <${Loud} control disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}<//>
+                <${Loud} control disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : t('inbox.notebook.park')}<//>
               <//>`}
           ` : mode === 'copy' ? html`
             <${Note}>${t('inbox.notebook.hintCopy')}<//>
@@ -371,7 +372,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
             <${Note}>${t('inbox.notebook.pasteHint')}<//>
             <${TextArea} rows=${8} placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${setPasted} />
             <${FormActions} end>
-              <${Loud} control disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}<//>
+              <${Loud} control disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : t('inbox.notebook.park')}<//>
             <//>
           ` : html`
             <${Note}>${t('inbox.notebook.hintRaw')}<//>
