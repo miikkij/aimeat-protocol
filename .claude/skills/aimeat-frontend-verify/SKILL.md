@@ -11,6 +11,8 @@ description: AIMEAT frontend rules: the styling conventions to write to, and how
 
 Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and passwords in `aimeat/.sandbox.json`; restart it to pick up a backend change), not the shared dev server on 40050, which belongs to the developer and may be restarted by another session: navigate to the page, reach the authenticated state, perform the real interactions, and confirm the expected result actually happens. Elements appear, data persists, edits and deletes take effect.
 
+**A published app is checked signed in, in the sandbox, before anyone sees it in production.** Publish it to the sandbox (`POST /v1/apps` with an owner token from `.sandbox.json`) and open `<baseUrl>/v1/apps/<owner>/<file>?mode=inline`: it redirects to the app's own origin, `<name>.apps.localhost:<port>`, where the pill's Sign In opens the same grant window as on aimeat.io; sign in there with a sandbox owner. Until 2026-09-29 the sandbox ran apps in an opaque frame whose sign-in the browser refused, and Postinjalostamo's corrections were found by Jouni in production instead.
+
 If you could not drive the browser (MCP unavailable, server down, no credentials), say so. Do not report it as working.
 
 ## A change to the look is one of two kinds, and says which
