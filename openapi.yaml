@@ -43616,13 +43616,17 @@ paths:
       description: >-
         On the selling node: the node signs the request with its own key and sends it to the repository;
         the repository's answer comes back as it said it. Operator only: the operator in person, or an
-        agent of the operator holding the exact scope operator:admin.
+        agent of the operator holding the exact scope operator:admin. `repository_url` and
+        `repository_public_key` link a repository this node does not know yet as a packages-only peer
+        under that key, so the questions can be read before the first sale.
       tags: [Packages]
       security:
         - BearerAuth: []
       parameters:
         - { name: repository, in: query, required: true, schema: { type: string } }
         - { name: group_id, in: query, required: true, schema: { type: string } }
+        - { name: repository_url, in: query, schema: { type: string } }
+        - { name: repository_public_key, in: query, schema: { type: string } }
       responses:
         '200':
           description: The repository's envelope.

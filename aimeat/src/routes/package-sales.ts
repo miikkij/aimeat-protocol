@@ -18,6 +18,9 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   v1.1.0 — 2026-09-29 — GET /v1/package-sales/config-needs takes repository_url and
+ *     repository_public_key to link a repository first; aimeat-commercial found that only the MCP
+ *     tool could, and the questions are read before the first sale.
  *   v1.0.0 — 2026-09-29 — Initial (install packages, phase 5: seller nodes).
  */
 import type { Router, Request, Response } from 'express';
@@ -120,8 +123,13 @@ export function registerPackageSaleRoutes(
         res.status(out.status).json(out.body);
     };
 
+    // `repository_url` and `repository_public_key` link a repository this node does not know yet, as
+    // the grant's `repository` object does: the questions are read before the first sale.
     router.get('/v1/package-sales/config-needs', ...operatorOnly, async (req, res) => {
-        forward(res, await saleConfigNeeds(deps, str(req.query.repository), str(req.query.group_id)));
+        const url = str(req.query.repository_url);
+        const key = str(req.query.repository_public_key);
+        const repository = url || key ? { node_id: str(req.query.repository), url, public_key: key } : str(req.query.repository);
+        forward(res, await saleConfigNeeds(deps, repository, str(req.query.group_id)));
     });
 
     router.put('/v1/package-sales/entitlements', ...operatorOnly, async (req, res) => {
