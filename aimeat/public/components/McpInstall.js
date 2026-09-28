@@ -22,6 +22,9 @@
  *   import { McpQuickConnect } from '/components/McpInstall.js';
  *   html`<${McpQuickConnect} serverName=${agentName} />`
  * @version-history
+ *   v1.2.0 — 2026-09-29 — AppOffer: the desktop app beside the steps it replaces, from
+ *     `install.app`, with the person's own platform first. Once per quick-connect card, once per
+ *     tool row in the setup guide.
  *   2026-09-24 -- The command's Copy is the underlined action link (Jouni's decision "Panel action").
  *   2026-09-13 -- Let the caller compose the install row's shared poster shape by class.
  *   v1.1.0 — 2026-09-02 — The double-click install scripts (`install.scripts`, GET /v1/connect/install)
@@ -33,6 +36,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { useAiTools } from '/views/profile/ai-tool-setup.js';
+import { ownPlatform } from '/js/desktop-download.js';
 
 const html = htm.bind(h);
 // t() echoes the key when a translation is missing — fall back to readable English.
@@ -50,6 +54,24 @@ function fileUrl(file, serverName) {
   if (!serverName) return file.url;
   const sep = file.url.includes('?') ? '&' : '?';
   return `${file.url}${sep}name=${encodeURIComponent(serverName)}`;
+}
+
+/**
+ * The desktop app, offered beside the steps it makes unnecessary: it finds the AI tools on the
+ * computer and attaches them with one click. The words and the fixed download addresses come from
+ * the node (services/desktop-app-offer.ts); this only orders the downloads so the person's own
+ * platform comes first, and draws that one as the primary action when the surface asks for one.
+ */
+function AppOffer({ app, primary = false }) {
+  const mine = ownPlatform();
+  const ordered = [...(app.downloads ?? [])].sort((a, b) => Number(b.os === mine) - Number(a.os === mine));
+  return html`
+    <div class="mcpi-oneclick">
+      <span class="mcpi-cmd-label">${app.label}</span>
+      ${ordered.map((d) => html`
+        <a key=${d.os} class=${primary && d.os === mine ? 'btn-primary btn-sm' : 'btn-outline btn-sm'} href=${d.url}>${d.label}</a>`)}
+    </div>
+    <span class="mcpi-note">${app.note}</span>`;
 }
 
 /** Every tool the node says can be attached by a link or a file, in the table's own order. */
@@ -85,6 +107,7 @@ export function McpInstallRow({ tool, serverName, className = '' }) {
           </a>
           <span class="mcpi-note">${install.file.where}</span>
         </div>` : null}
+      ${install.app ? html`<${AppOffer} app=${install.app} />` : null}
     </div>`;
 }
 
@@ -110,6 +133,8 @@ export function McpQuickConnect({ serverName, guideHref = '/v1/profile?tab=mcp',
   const files = installable.filter((tool) => tool.mcp.install.file);
   const scripts = installable.flatMap((tool) => (tool.mcp.install.scripts ?? []).map((sc) => ({ tool, sc })));
   const commands = installable.filter((tool) => tool.mcp.command && !tool.mcp.install.link);
+  // One offer for the whole card: the app attaches every tool it knows, so it is not repeated per tool.
+  const app = installable.find((tool) => tool.mcp.install.app)?.mcp.install.app;
   const emphasis = title ? 'btn-primary btn-sm' : 'btn-outline btn-sm';
 
   return html`
@@ -128,6 +153,8 @@ export function McpQuickConnect({ serverName, guideHref = '/v1/profile?tab=mcp',
               ${sc.label}
             </a>`)}
         </div>` : null}
+
+      ${app ? html`<${AppOffer} app=${app} primary=${!!title} />` : null}
 
       ${commands.map(tool => html`
         <div class="mcpi-cmd" key=${tool.id}>

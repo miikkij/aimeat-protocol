@@ -41,6 +41,7 @@ import { storeHref } from '/js/site.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { storeWish } from './landing-doors.js';
 import { swallowed } from '/js/swallowed.js';
+import { desktopDownloadUrl } from '/js/desktop-download.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -301,9 +302,10 @@ export function LinuxLine() {
       <p>${afterMit === undefined ? continuity : html`${beforeMit}<a href="https://github.com/miikkij/aimeat-protocol/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>${afterMit}`}</p>
       <a class="showroom-door" href="/v1/business">${tr('landing2.linuxBusiness', 'AIMEAT for your business →')}</a>
       <!-- "or on your own machine" above had no way to act on it until 2026-09-18: the desktop
-           app was built but nothing on this site linked to it. The address carries no version,
-           because the release workflow copies every new installer to this same name. -->
-      <a class="showroom-door" href="https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node-setup.exe">${tr('landing.heroGetApp', 'Put it on your computer (Windows) →')}</a>
+           app was built but nothing on this site linked to it. The link is for the visitor's own
+           platform and carries no version; /js/desktop-download.js decides, and sends a phone or
+           an unknown platform to the release page, where every file is listed. -->
+      <a class="showroom-door" href=${desktopDownloadUrl()}>${tr('landing.heroGetApp', 'Put it on your computer →')}</a>
     </section>`;
 }
 

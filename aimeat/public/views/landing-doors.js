@@ -31,6 +31,7 @@ import { siteLink, hasSite, storeHref } from '/js/site.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { swallowed } from '/js/swallowed.js';
+import { desktopDownloadUrl } from '/js/desktop-download.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -135,10 +136,10 @@ export function BuildHero({ onNavigate }) {
       </div>
       <div class="ld-hero2-more">
         <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Run it on your own server →')}</a>
-        <!-- The desktop app, at an address that never carries a version: the release workflow
-             copies each new installer to this same name, so this link outlives every release.
-             Windows is named in the words because it is the only build there is today. -->
-        <a href="https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node-setup.exe">${tr('landing.heroGetApp', 'Put it on your computer (Windows) →')}</a>
+        <!-- The desktop app, for the visitor's own platform (Windows, Apple-silicon Mac or Linux),
+             at an address that never carries a version; the release page when no build fits.
+             /js/desktop-download.js decides. -->
+        <a href=${desktopDownloadUrl()}>${tr('landing.heroGetApp', 'Put it on your computer →')}</a>
         ${hasSite('learn') ? html`<a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('landing.ecLinkShort', 'Learn it hands-on, free →')}</a>` : ''}
         ${storeHref() ? html`<a href=${storeHref()} target="_blank" rel="noopener">${tr('landing.heroPricing', 'Pricing →')}</a>` : ''}
       </div>

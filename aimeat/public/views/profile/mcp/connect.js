@@ -10,6 +10,9 @@
  * @structure secConnect · quickWays · proofBlock · failList
  * @usage import { secConnect } from './connect.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-29 -- The desktop app is the first row of the short ways in (`install.app` in
+ *     the tool table): one row, because it attaches Claude Code, Cursor and VS Code at once, with
+ *     the visitor's own platform first and the others soft.
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the
  *     sections Section (fold for the guide and the proof, in Folds), the leads and hints Note, the
  *     short ways in Facts with Action links, the before-you-start note the aside Note with its Label,
@@ -56,6 +59,7 @@ import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { SetupGuide } from '/components/SetupGuide.js';
 import { m, day } from './frame.js';
+import { ownPlatform } from '/js/desktop-download.js';
 
 /** The per-tool setup guide: the tool tabs, the install row in the attention note, facts, numbered steps. */
 const guide = () => html`<${SetupGuide} poster asideInstall facts stepRows />`;
@@ -92,14 +96,33 @@ export function secConnect(ctx, proven) {
     <//>`;
 }
 
+/**
+ * The desktop app as one row of its own, first: it attaches every tool it knows in one click, so it
+ * is offered once rather than repeated under each of them. The words and the fixed download
+ * addresses come from the tool table (`install.app`); the person's own platform goes first.
+ */
+function appRow(app) {
+  const mine = ownPlatform();
+  const ordered = [...(app.downloads || [])].sort((a, b) => Number(b.os === mine) - Number(a.os === mine));
+  return {
+    key: 'aimeat-desktop-app',
+    k: app.label,
+    v: html`<${Actions}>
+      ${ordered.map((d) => html`<${Action} small key=${d.os} soft=${d.os !== mine} href=${d.url}>${d.label}<//>`)}
+    <//>`,
+    sub: app.note,
+  };
+}
+
 /** Every tool that can be attached without walking its settings menu, from the tool table. */
 function quickWays(ctx) {
   const tools = (ctx.tools || []).filter((tool) => tool?.mcp?.install && (tool.mcp.install.link || tool.mcp.install.scripts?.length || tool.mcp.install.file));
   if (!tools.length) return null;
+  const app = tools.find((tool) => tool.mcp.install.app)?.mcp.install.app;
   return html`
     <${Space} above="large">
       <${Label} block>${m('quickTitle')}<//>
-      <${Facts} rows=${tools.map((tool) => {
+      <${Facts} rows=${[...(app ? [appRow(app)] : []), ...tools.map((tool) => {
         const ins = tool.mcp.install;
         return {
           key: tool.id,
@@ -111,7 +134,7 @@ function quickWays(ctx) {
           <//>`,
           sub: ins.link ? ins.link.note : ins.scripts?.[0] ? ins.scripts[0].note : ins.file.where,
         };
-      })} />
+      })]} />
       <${Note}>${m('quickHint')}<//>
     <//>`;
 }
