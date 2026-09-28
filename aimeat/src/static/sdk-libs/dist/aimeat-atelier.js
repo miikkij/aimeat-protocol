@@ -6953,6 +6953,7 @@
   var LIST_VARIANTS = ["dense", "numbered", "plain"];
   var DETAIL_MARKED = ".ak-listdetail__title";
   var DETAIL_HEADING = "h1, h2, h3";
+  var BADGE_TONES = ["ok", "warn", "err", "quiet"];
   function fillRow(row, item, spec) {
     clear(row);
     if (hasPart(spec, "row")) {
@@ -6964,7 +6965,8 @@
     slotInto(text, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-list__sub", args: [item] });
     slotInto(text, spec, "extra", null, { cls: "ak-list__extra", args: [item] });
     const side = partEl("span", "ak-list__side", "side");
-    slotInto(side, spec, "badge", item.badge == null ? null : item.badge, { cls: "ak-badge ak-list__badge", args: [item] });
+    const tone = BADGE_TONES.indexOf(item.badgeTone || "") >= 0 ? " ak-badge--" + item.badgeTone : "";
+    slotInto(side, spec, "badge", item.badge == null ? null : item.badge, { cls: "ak-badge ak-list__badge" + tone, args: [item] });
     slotInto(side, spec, "meta", item.meta == null ? null : item.meta, { cls: "ak-list__meta", args: [item] });
     slotInto(side, spec, "aside", null, { cls: "ak-list__aside", args: [item] });
     append(row, side.childNodes.length ? [text, side] : [text]);
@@ -18774,7 +18776,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.56.0",
+    version: "0.57.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
