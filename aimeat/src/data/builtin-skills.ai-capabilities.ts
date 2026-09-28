@@ -20,6 +20,10 @@
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — An extension of the owner's can be a provider (V6).
+ *   v1.1.0 — 2026-09-28 — Embeddings are rare and the person's decision: never proposed by the AI,
+ *     two tests first (does it fit one prompt, does word search find it), and the three conditions
+ *     that make them truly needed (Jouni: "embeddings should be used rarely and only when user
+ *     decides so and is really really needed").
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
  *  with builtin-skills.ts, which imports it; the compiler checks the two agree where it is listed. */
@@ -30,7 +34,7 @@ export const AI_CAPABILITIES_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-ai-capabilities
-description: How to use the AI capabilities of an AIMEAT node (text, reading images, reading files and PDFs, making images, speech, transcription, embeddings) in an app, an automation or an agent's own work. Check first with aimeat_ai_capabilities or AIMEAT.ai.capabilities(), ask for the capability and not a model, handle a capability that is off visibly, tell the price before an expensive call, and use embeddings only when word search is not enough. Recipes for a picture button, voice message to summary, asking a PDF, a morning digest of voice messages, alt text, duplicates in a large collection, and a crew on the node's /v1/llm. Use before building anything that calls AI. Triggers on AI feature, generate image, speech, text to speech, transcribe, voice message, PDF, embeddings, vectors, semantic search, kuvan teko, puhe, litterointi, upotus.
+description: How to use the AI capabilities of an AIMEAT node (text, reading images, reading files and PDFs, making images, speech, transcription, embeddings) in an app, an automation or an agent's own work. Check first with aimeat_ai_capabilities or AIMEAT.ai.capabilities(), ask for the capability and not a model, handle a capability that is off visibly, tell the price before an expensive call, and never propose embeddings, which are for a collection far too large for one prompt and only when the person decides. Recipes for a picture button, voice message to summary, asking a PDF, a morning digest of voice messages, alt text, duplicates in a very large collection, and a crew on the node's /v1/llm. Use before building anything that calls AI. Triggers on AI feature, generate image, speech, text to speech, transcribe, voice message, PDF, embeddings, vectors, semantic search, kuvan teko, puhe, litterointi, upotus.
 license: MIT
 metadata:
   audience: agent
@@ -102,21 +106,31 @@ AI_MODEL_NOT_ALLOWED (with the \`allowed\` list), QUOTA_EXHAUSTED. Show the mess
 - A capability that goes off while a run is under way stops that step with its refusal, and the owner is
   told. A spent budget stops it the same way. Check capabilities when you set the automation up.
 
-## 4. Embeddings: only when word search is not enough
+## 4. Embeddings: rarely, and only when the person decides
 
 An embedding model turns a text into a vector that captures its meaning: "invoice late" finds "payment
-not received by the due date", which share no word.
+not received by the due date", which share no word. They are seldom needed.
 
-**Worth it:** meaning search over a large text collection; answering from the person's own material
-(find the passages first, then answer); "similar to this"; duplicates written in different words;
-clustering; search across languages.
+**Never propose embeddings on your own initiative.** Build with word search (\`AIMEAT.data.search\`),
+filters, or the whole collection in one prompt. Talk about embeddings only when the person asks for
+them, or when both tests below fail; then say what they cost and let the person decide.
 
-**Not worth it:** a few hundred texts or fewer (word search, or the whole collection fits a prompt);
-exact values (ids, names, dates, codes); only the newest items; data that must not leave the machine
-when there is no local embedding model; "just in case".
+**Test 1: does the collection fit in one prompt?** A current text model reads 200 000 tokens or more in
+one call, about 150 000 words: thousands of short items. 120 recipes are about 40 000 tokens. When the
+collection fits and changes little, send all of it to a text model; that is simpler, and usually more
+accurate than finding pieces first.
 
-**The rule:** turn embeddings on only when word search has proved not enough for a specific use, and
-you know what you embed. Do not suggest them otherwise.
+**Test 2: does word search find it?** Try it with the words people really use. A reason exists only when
+a real use keeps missing texts written in other words or in another language.
+
+**Truly needed only when all three hold:** the collection is far larger than one prompt (hundreds of
+thousands of tokens and more) or grows every day; people search it by meaning, often; and sending all of
+it with every question would cost too much. Examples: years of a company's documents, a support archive
+of tens of thousands of messages, search across languages in such a collection.
+
+**Never for:** a few hundred or a few thousand short texts; exact values (ids, names, dates, codes); only
+the newest items; "just in case"; data that must not leave the machine when there is no local embedding
+model.
 
 - **Cost:** a million input tokens costs from about $0.01 to $0.13 by model (2026-09-27). Changing the
   model means embedding everything again: vectors of different models cannot be compared, which is why
@@ -170,7 +184,7 @@ then one \`ai\` step (text) that summarises the transcripts, and write the resul
 reader" (the \`vision\` capability); store the answer beside the picture. A background job takes no
 picture input, so this is a direct call.
 
-**Duplicates in a large notes collection (automation, only when section 4 holds):** embed each note's
+**Duplicates in a very large notes collection (automation, only when the person decided it after section 4):** embed each note's
 condensed text in batches of at most 256 with \`aimeat_ai_embed\`, keep \`{ id, model, vector }\` in records
 of a few hundred vectors each, compare by cosine similarity, and show pairs above a threshold for a
 person to decide. Embed again only the notes that changed, with the same model.

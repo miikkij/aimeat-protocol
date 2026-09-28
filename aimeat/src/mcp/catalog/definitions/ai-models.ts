@@ -7,6 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   v1.2.1 — 2026-09-28 — aimeat_ai_embed's description: only when the person decided it, for a
+ *     collection far larger than one prompt; never proposed by the AI.
  *   v1.2.0 — 2026-09-28 — aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and
  *     aimeat_ai_embed (System 2 plan, V5).
  *   v1.1.0 — 2026-09-28 — aimeat_ai_providers, aimeat_ai_provider_test and aimeat_ai_routing_set
@@ -131,8 +133,9 @@ export const aiModelTools: AimeatToolDefinition[] = [
     caller: 'agent',
     visibility: agentEverywhere,
     description: 'Turn texts into embedding vectors (the embed capability), on the owner\'s providers and budget. Use it '
-      + 'only when word search has proved not enough, for meaning search over a large collection, similar items or '
-      + 'duplicates; not for a few hundred texts, exact values or "just in case" (skill aimeat-ai-capabilities). Store '
+      + 'only when the person decided it: never propose it yourself. It is for a collection far larger than one prompt '
+      + '(hundreds of thousands of tokens) that people search by meaning; a collection that fits one prompt goes to a '
+      + 'text model whole, and word search comes first (skill aimeat-ai-capabilities, section 4). Store '
       + 'the answered `model` beside the vectors: vectors of different models cannot be compared, so a fallback only '
       + 'ever uses the same model. At most 256 texts and 500 000 characters per call.',
     input: {

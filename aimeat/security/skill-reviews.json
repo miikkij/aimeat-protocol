@@ -268,7 +268,7 @@
         "aimeat/src/services/app-ai-capability-hints.ts",
         "aimeat/src/static/sdk-libs/ai/index.js"
       ],
-      "digest": "sha256:50313f102d1b8e27d17decb2"
+      "digest": "sha256:754b78e1932455c36b363a00"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-09-26",
@@ -559,7 +559,7 @@
       "aimeat/src/routes/ai-policy.ts": "d33660e83cdac1c9"
     },
     "node:aimeat-ai-capabilities": {
-      "aimeat/src/services/ai/capabilities.ts": "7102645e4eb8fd06",
+      "aimeat/src/services/ai/capabilities.ts": "8c1fbc7d52eeee9a",
       "aimeat/src/services/ai-embed.ts": "8c7f9febf4b549c4",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
       "aimeat/src/static/sdk-libs/ai/index.js": "90735068ad1d6c68"
