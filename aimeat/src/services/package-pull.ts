@@ -24,6 +24,10 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.3.0 — 2026-09-28 — The pull and the upstream check are signed as this node, so a package
+ *     repository serves an entitled node its private package (package-node-auth.ts); a repository's
+ *     UPDATES_ENDED is passed on as itself; `fromUpstream` refreshes a copy from its pinned source;
+ *     listRepositoryPackages() reads what a repository serves this node.
  *   v1.2.1 — 2026-09-26 — The node card (64 KB) and the upstream statement (256 KB) are read through
  *     utils/read-capped.ts too (secaudit 2026-09, N3).
  *   v1.2.0 — 2026-09-24 — The package body is read through utils/read-capped.ts, which stops at
@@ -50,6 +54,7 @@ import {
 } from './package-attestation.js';
 import { importParsedPackage } from './package-import.js';
 import { getPackageFor } from './package-read.js';
+import { signedPackageHeaders } from './package-node-auth.js';
 import { logger } from '../utils/logger.js';
 
 export interface PackagePullDeps {
@@ -72,6 +77,14 @@ export interface PackagePullInput {
     sourceUrl?: string;
     trust?: string;
     version?: string;
+    /**
+     * Refresh the caller's own copy of `groupId` from the source it was first pulled from, under the
+     * key pinned then. The first pull was the decision to trust that source; a refresh repeats it and
+     * decides nothing new. A source that is a peer still passes the peer gate, so an operator who
+     * switched the peer off stops its refreshes too. Used by the scheduled update check
+     * (package-upstream-refresh.ts).
+     */
+    fromUpstream?: boolean;
 }
 
 export type PackagePullResult =
@@ -90,6 +103,20 @@ interface ResolvedSource {
 const MAX_NODE_CARD_BYTES = 64 * 1024;
 /** The most a signed statement about one package may be: a descriptor and its signature. */
 const MAX_ATTESTATION_BYTES = 256 * 1024;
+
+/**
+ * The repository's words when a 403 says this node's updates ended (package-entitlements.ts), or
+ * null for any other refusal. Read with a cap, like everything this file reads from another node.
+ */
+async function updatesEnded(res: Response): Promise<string | null> {
+    const raw = await readBodyCapped(res, 16 * 1024);
+    if (!raw) return null;
+    let body: { error?: { code?: string; message?: string } } | null;
+    try { body = JSON.parse(raw.toString('utf8')); }
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: a body that is not JSON is not the UPDATES_ENDED answer
+    catch { return null; }
+    return body?.error?.code === 'UPDATES_ENDED' ? (body.error.message ?? 'The repository no longer serves this node new versions.') : null;
+}
 
 /** A node's own public key, from the address every AIMEAT node publishes it at. */
 async function tofuKeyOf(baseUrl: string, timeoutMs: number): Promise<ResolvedSource | null> {
@@ -142,7 +169,18 @@ export async function pullPackage(
 
     // 3. Where this may be pulled from, and whose key proves it.
     let source: ResolvedSource;
-    if (input.nodeId) {
+    if (input.fromUpstream) {
+        const mine = await getPackageFor(storage, `${groupId.split('::')[0]}::${caller.owner}`, caller.owner);
+        const up = mine?.upstream;
+        if (!up || up.groupId !== groupId || !up.publicKey) {
+            return { ok: false, status: 400, code: 'NO_UPSTREAM', message: `Your copy of ${groupId} was not pulled under a key, so there is nothing to refresh it from.` };
+        }
+        if (peers.has(up.node)) {
+            const gate = gatePeer(peers, up.node, 'shareCatalogue');
+            if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+        }
+        source = { nodeId: up.node, baseUrl: up.url, publicKey: up.publicKey };
+    } else if (input.nodeId) {
         const gate = gatePeer(peers, input.nodeId, 'shareCatalogue');
         if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
         source = { nodeId: gate.peer.nodeId, baseUrl: gate.peer.url, publicKey: gate.peer.publicKey };
@@ -202,7 +240,14 @@ export async function pullPackage(
 
     let buf: Buffer;
     try {
-        const res = await safeFetch(path, { signal: AbortSignal.timeout(timeoutMs) });
+        // Signed as this node, so a package repository can serve a private package to the nodes it
+        // is entitled to (package-node-auth.ts). A public package is served whether or not it is.
+        const res = await safeFetch(path, {
+            headers: await signedPackageHeaders(storage, config, groupId),
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+        const ended = res.status === 403 ? await updatesEnded(res) : null;
+        if (ended) return { ok: false, status: 403, code: 'UPDATES_ENDED', message: ended };
         if (res.status === 404) {
             return { ok: false, status: 404, code: 'NOT_FOUND', message: `${source.nodeId} does not serve a package "${groupId}" you may read.` };
         }
@@ -357,8 +402,13 @@ export async function checkUpstream(
 
     let doc: AttestationDoc;
     try {
-        const res = await safeFetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        const res = await safeFetch(url, {
+            headers: await signedPackageHeaders(deps.storage, config, up.groupId),
+            signal: AbortSignal.timeout(timeoutMs),
+        });
         if (!res.ok) {
+            const ended = res.status === 403 ? await updatesEnded(res) : null;
+            if (ended) return { ok: false, status: 403, code: 'UPDATES_ENDED', message: ended };
             return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${up.node} answered ${res.status}.` };
         }
         // Read with its cap while it arrives: a statement is small, and json() held all of it first.
@@ -404,4 +454,35 @@ export async function checkUpstream(
             signerUnchanged,
         },
     };
+}
+
+/** The most a repository's listing may be: one row per package it serves this node. */
+const MAX_LISTING_BYTES = 1024 * 1024;
+
+/**
+ * What a package repository serves this node (GET /v1/federation/packages there, signed as this
+ * node): its public packages and the private ones this node is entitled to, each with the version
+ * the entitlement reaches. The repository must be an active peer with the catalogue shared, the same
+ * gate a pull from it passes. Pull one with pullPackage and its group id.
+ */
+export async function listRepositoryPackages(
+    deps: PackagePullDeps, nodeId: string,
+): Promise<{ ok: true; node: string; packages: unknown[] } | { ok: false; status: number; code: string; message: string }> {
+    const gate = gatePeer(deps.peers, nodeId, 'shareCatalogue');
+    if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+    const url = `${stripTrailingSlashes(gate.peer.url)}/v1/federation/packages`;
+    try {
+        const res = await safeFetch(url, {
+            headers: await signedPackageHeaders(deps.storage, deps.config, '*'),
+            signal: AbortSignal.timeout(deps.config.federationTimeoutMs ?? 10000),
+        });
+        if (res.status === 404) return { ok: false, status: 404, code: 'NOT_A_REPOSITORY', message: `${nodeId} does not serve packages as a repository.` };
+        if (!res.ok) return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${nodeId} answered ${res.status}.` };
+        const raw = await readBodyCapped(res, MAX_LISTING_BYTES);
+        if (!raw) return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${nodeId} answered with more than a listing can be.` };
+        const body = JSON.parse(raw.toString('utf8')) as { data?: { packages?: unknown[] } };
+        return { ok: true, node: nodeId, packages: Array.isArray(body?.data?.packages) ? body.data.packages.slice(0, 1000) : [] };
+    } catch (err) {
+        return { ok: false, status: 502, code: 'SOURCE_UNREACHABLE', message: `Could not reach ${nodeId}: ${String(err)}` };
+    }
 }

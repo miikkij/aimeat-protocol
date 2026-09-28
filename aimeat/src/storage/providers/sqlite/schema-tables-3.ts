@@ -175,6 +175,7 @@ export function applySchemaTables3(db: Database.Database): void {
       status              TEXT DEFAULT 'installed',
       mode                TEXT DEFAULT 'editable',
       forkedAt            TEXT,
+      autoUpdate          INTEGER NOT NULL DEFAULT 0,
       installedAt         TEXT NOT NULL,
       updatedAt           TEXT NOT NULL
     );

@@ -682,6 +682,8 @@ export function initializeSchema(db: Database.Database): void {
   // turned a managed install into their own editable copy. Mirrors Postgres 0087.
   safeAddColumn('package_instances', 'mode', "TEXT DEFAULT 'editable'");
   safeAddColumn('package_instances', 'forkedAt', 'TEXT');
+  // Whether the daily package check updates the install by itself. Mirrors Postgres 0088.
+  safeAddColumn('package_instances', 'autoUpdate', 'INTEGER NOT NULL DEFAULT 0');
 
   // The language a person chose to be written to in. Postgres has had this column since the feature
   // shipped; SQLite never did, and `upsertNotificationPreferences` returned the CALLER's object, so

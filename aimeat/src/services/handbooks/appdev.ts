@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-28 — The package line names the package repository tools.
  *   2026-09-28 — The package line names install config; App config: the aimeat-config block,
  *     AIMEAT.data.appConfig(), config_get and config_set.
  *   2026-09-28 — The package line names managed installs, aimeat_package_instances and aimeat_package_fork.
@@ -64,6 +65,11 @@ lists the installed copies and their mode; \`aimeat_package_fork\` makes a manag
 edit, at the same addresses with the same records, and ends its updates. Fork only when the owner asks.
 An install takes \`config\`, each part's values: run it with \`dry_run\` first, and the answer lists every
 field and which required ones are empty, so you ask your owner for them before installing.
+A package repository is a peer node that serves private packages to the nodes entitled to them:
+\`aimeat_package_repository\` lists what it serves this node, \`aimeat_package_pull\` takes one, and the
+node's daily check (\`aimeat_package_check_updates\` runs it now) pulls newer versions and updates the
+installs whose \`auto_update\` is on (\`aimeat_package_instance_set\`). On the repository itself,
+\`aimeat_package_entitlements\` grants and revokes the nodes and sets when their updates end.
 
 **App config.** An app that needs values to work declares them as a JSON Schema in
 \`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a

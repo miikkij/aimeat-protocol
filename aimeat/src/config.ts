@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.16.1 — 2026-09-28 — packageRepository from AIMEAT_PACKAGE_REPOSITORY (default off).
  *   v1.16.0 — 2026-09-28 — aiModelDefaults(): the node's AI key and model defaults, config-ai-models.ts. A pure move.
  *   v1.15.0 — 2026-09-24 — themesDefaults(): the operator's theme choices (Themes & Styles), config-themes.ts.
  *   v1.14.0 — 2026-09-19 — decideDefaults(): the decision provider (TARGET-080), config-decide.ts.
@@ -659,6 +660,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     templateDiscussionsEnabled: process.env.AIMEAT_TEMPLATE_DISCUSSIONS_ENABLED !== 'false',
     packageFederationEnabled: process.env.AIMEAT_PACKAGE_FEDERATION_ENABLED === 'true',
     packageFederationAutoAccept: process.env.AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT === 'true',
+    packageRepository: process.env.AIMEAT_PACKAGE_REPOSITORY === 'true',
 
     // Portfolio
     portfolioEnabled: process.env.AIMEAT_PORTFOLIO !== 'false',

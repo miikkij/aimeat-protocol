@@ -1822,6 +1822,7 @@ export interface Package {
 }
 
 export interface PackageInstance {
+  autoUpdate: Generated<boolean>;
   forkedAt: Timestamp | null;
   id: Generated<string>;
   installedAt: Generated<Timestamp>;

@@ -89,6 +89,7 @@
     "0084_app_grant_owner_added_scopes.sql": "626be21354bb473c9d9364eeaba263e179fa0cd048b6a7d3bae4ffaa20753069",
     "0085_actions_work_full_identity.sql": "376a414314fabba39a53d319148a5ee0b17157be4eb42c5b2025a02e1fdd4419",
     "0086_full_identity_on_evidence.sql": "7935ac1975263f68b90a2fc4d35824f90ec594dd8acf03c43326741d0264c26f",
-    "0087_package_instance_mode.sql": "fb585ed05f397fc1cf63c55fc8f6ededb92e3bba7249eff1015bb0a67d59629f"
+    "0087_package_instance_mode.sql": "fb585ed05f397fc1cf63c55fc8f6ededb92e3bba7249eff1015bb0a67d59629f",
+    "0088_package_instance_auto_update.sql": "4c3a7897d8445ae7e91f9510f3e05eca61a6411502fc1c86bb38cdb1bed411fc"
   }
 }

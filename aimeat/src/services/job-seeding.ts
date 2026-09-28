@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.5.0 — 2026-09-28 — Seed core:package-upstream-check (daily, 04:41): installed packages brought up
+ *     to what their source node serves.
  *   v1.4.0 — 2026-09-28 — Seed core:ai-catalog-refresh (daily, 04:17; refreshes when due, System 2 V4).
  *   v1.3.0 — 2026-09-25 — Seed core:usage-visit-retention (nightly, 03:40): the privacy notice's
  *     thirteen months for a visit record that names an account.
@@ -47,6 +49,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     { id: 'core:designbook-aging', name: 'Design Book Aging', coreHandler: 'designbook-aging', cron: '0 5 * * *' },
     // Daily at 04:17; the handler refreshes only when AIMEAT_AI_CATALOG_REFRESH says it is due.
     { id: 'core:ai-catalog-refresh', name: 'AI Model Catalogue Refresh', coreHandler: 'ai-catalog-refresh', cron: '17 4 * * *' },
+    // Installed packages brought up to what their source node serves now (package-upstream-refresh.ts).
+    // Daily at 04:41; the handler does nothing while package federation is off.
+    { id: 'core:package-upstream-check', name: 'Package Update Check', coreHandler: 'package-upstream-check', cron: '41 4 * * *' },
     // Mark still-pending email invitations expired once their TTL passes (lazy checks also enforce this).
     { id: 'core:invitation-expiry', name: 'Invitation Expiry', coreHandler: 'invitation-expiry', cron: '*/10 * * * *' },
     // Operator storage-growth telemetry: capture a per-table row-count snapshot every hour.

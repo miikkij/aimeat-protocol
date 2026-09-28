@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository and
+ *     aimeat_package_entitlements over their REST endpoints.
  *   2026-09-28 — aimeat_package_install sends `config`, each part's config.
  *   2026-09-28 — aimeat_package_install sends `mode` (managed | editable), as the node's own tool does;
  *     aimeat_package_instances and aimeat_package_fork over GET /v1/instances and POST /v1/instances/:id/fork.
@@ -157,6 +159,43 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (status !== undefined) qs.set('status', status);
     const q = qs.toString();
     return out(await client.get(`/v1/instances${q ? `?${q}` : ''}`));
+  });
+
+  mcp.tool('aimeat_package_instance_set', descriptionFor('aimeat_package_instance_set'), {
+    instance_id: z.string().describe('The installed copy, from aimeat_package_instances'),
+    label: z.string().optional().describe('A new name for this copy'),
+    auto_update: z.boolean().optional().describe('true: the daily check updates this copy by itself. false: it tells your owner an update is ready'),
+  }, annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
+    const body: Record<string, unknown> = {};
+    if (label !== undefined) body.label = label;
+    if (auto_update !== undefined) body.auto_update = auto_update;
+    return out(await client.patch(`/v1/instances/${encodeURIComponent(instance_id)}`, body));
+  });
+
+  mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), {},
+    annotationsFor('aimeat_package_check_updates'), async () => out(await client.post('/v1/instances/check-updates', {})));
+
+  mcp.tool('aimeat_package_repository', descriptionFor('aimeat_package_repository'), {
+    node_id: z.string().describe('The repository node, a peer of this node'),
+  }, annotationsFor('aimeat_package_repository'), async ({ node_id }) =>
+    out(await client.get(`/v1/federation/peers/${encodeURIComponent(node_id)}/packages`)));
+
+  mcp.tool('aimeat_package_entitlements', descriptionFor('aimeat_package_entitlements'), {
+    group_id: z.string().describe('Your package group identifier'),
+    action: z.enum(['list', 'grant', 'revoke']).describe('list the nodes, grant (or change) one, or revoke one'),
+    node_id: z.string().optional().describe('For grant and revoke: the customer node'),
+    updates_until: z.string().optional().describe('For grant: versions published after this ISO date-time are not served to the node'),
+    note: z.string().optional().describe('For grant: why'),
+  }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, note }) => {
+    const base = `/v1/packages/${encodeURIComponent(group_id)}/entitlements`;
+    if (action === 'list') return out(await client.get(base));
+    if (!node_id) return { content: [{ type: 'text' as const, text: `INVALID_INPUT: action "${action}" needs node_id.` }], isError: true };
+    const node = `${base}/${encodeURIComponent(node_id)}`;
+    if (action === 'revoke') return out(await client.delete(node));
+    const body: Record<string, unknown> = {};
+    if (updates_until !== undefined) body.updates_until = updates_until;
+    if (note !== undefined) body.note = note;
+    return out(await client.put(node, body));
   });
 
   // Releasing a managed install: it becomes editable in place and its updates stop.

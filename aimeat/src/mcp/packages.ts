@@ -19,9 +19,12 @@
  *   same word here, so an agent without it is not handed the tool at all.
  * @structure registerPackageTools(mcp, storage, config, getAgentGaii, peers, sessionScopes) — registers
  *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install,
- *   aimeat_package_instances, aimeat_package_fork.
+ *   aimeat_package_instances, aimeat_package_fork, aimeat_package_instance_set,
+ *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.5.0 — 2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates,
+ *     aimeat_package_repository and aimeat_package_entitlements: the package repository, both sides.
  *   v1.4.1 — 2026-09-28 — install takes `config`, each part's config (services/package-config.ts).
  *   v1.4.0 — 2026-09-28 — install takes `mode` (managed | editable); aimeat_package_instances lists
  *     the owner's installed copies and aimeat_package_fork releases a managed one
@@ -49,12 +52,14 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { installOrRequest, updateOrRequest, requestedBody } from '../services/package-install-requests.js';
 import { listPackagesFor, getPackageFor, listInstancesFor } from '../services/package-read.js';
-import { forkPackageInstance } from '../services/package-managed.js';
+import { forkPackageInstance, setPackageInstance } from '../services/package-managed.js';
+import { refreshInstalledPackages } from '../services/package-upstream-refresh.js';
+import { listEntitlements, grantEntitlement, revokeEntitlement } from '../services/package-entitlements.js';
 import { toolError } from './tool-error.js';
 import { PACKAGE_CONFIG_PARAM } from './catalog/definitions/packages.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
 import { composePackageFromApps } from '../services/package-compose.js';
-import { pullPackage } from '../services/package-pull.js';
+import { pullPackage, listRepositoryPackages } from '../services/package-pull.js';
 import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -318,6 +323,61 @@ export function registerPackageTools(
                 }, null, 2),
             }],
         };
+    });
+
+    // The owner's own choices about an install: its label, and whether the daily check updates it.
+    mcp.tool('aimeat_package_instance_set', descriptionFor('aimeat_package_instance_set'), {
+        instance_id: z.string().describe('The installed copy, from aimeat_package_instances.'),
+        label: z.string().optional().describe('A new name for this copy.'),
+        auto_update: z.boolean().optional().describe('true: the daily check updates this copy by itself. false: it tells your owner an update is ready.'),
+    }, annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
+        const out = await setPackageInstance(storage, { owner: ownerOf() }, instance_id, { label, autoUpdate: auto_update });
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ instance_id: out.instance.id, label: out.instance.label, auto_update: out.instance.autoUpdate === true }, null, 2) }] };
+    });
+
+    // What POST /v1/instances/check-updates does, for this owner's installs.
+    mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), {},
+        annotationsFor('aimeat_package_check_updates'), async () => {
+            if (!config.packageFederationEnabled) {
+                return { ...toolError('PACKAGE_FEDERATION_DISABLED', 'This node does not exchange packages with other nodes, so there is no source to check.') };
+            }
+            const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner: ownerOf() }, { notify: false });
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ checked: outcomes.length, outcomes }, null, 2) }] };
+        });
+
+    // What a repository peer serves this node, before pulling one of them.
+    mcp.tool('aimeat_package_repository', descriptionFor('aimeat_package_repository'), {
+        node_id: z.string().describe('The repository node, a peer of this node.'),
+    }, annotationsFor('aimeat_package_repository'), async ({ node_id }) => {
+        const out = await listRepositoryPackages({ storage, config, peers }, node_id);
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ node: out.node, packages: out.packages }, null, 2) }] };
+    });
+
+    // On a repository: which nodes a private package is served to, and up to when.
+    mcp.tool('aimeat_package_entitlements', descriptionFor('aimeat_package_entitlements'), {
+        group_id: z.string().describe('Your package group identifier.'),
+        action: z.enum(['list', 'grant', 'revoke']).describe('list the nodes, grant (or change) one, or revoke one.'),
+        node_id: z.string().optional().describe('For grant and revoke: the customer node.'),
+        updates_until: z.string().nullable().optional().describe('For grant: versions published after this ISO date-time are not served to the node. null or omitted: the updates run on.'),
+        note: z.string().optional().describe('For grant: why, e.g. the order it came from.'),
+    }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, note }) => {
+        const caller = { owner: ownerOf(), isOperator: false };
+        if (action === 'list') {
+            const out = await listEntitlements(storage, caller, group_id);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlements: out.entitlements, repository_role: config.packageRepository }, null, 2) }] };
+        }
+        if (!node_id) return { ...toolError('INVALID_INPUT', `action "${action}" needs node_id.`) };
+        if (action === 'revoke') {
+            const out = await revokeEntitlement(storage, caller, group_id, node_id);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }, null, 2) }] };
+        }
+        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note });
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, repository_role: config.packageRepository }, null, 2) }] };
     });
 
     // Releasing a managed install: the same service POST /v1/instances/:id/fork calls.

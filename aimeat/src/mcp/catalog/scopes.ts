@@ -22,6 +22,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.36.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository
+ *     and aimeat_package_entitlements -> packages:write, the word their REST endpoints ask.
  *   v1.35.0 -- 2026-09-28 -- aimeat_package_fork -> packages:write, the word POST /v1/instances/:id/fork asks.
  *     aimeat_package_instances reads like GET /v1/instances, with no word.
  *   v1.34.0 -- 2026-09-28 -- aimeat_ai_roles needs ai:use; aimeat_ai_role_set needs memory:write-reserved, as
@@ -267,6 +269,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_package_compose:                   'packages:write',
     aimeat_package_update:                    'packages:write',
     aimeat_package_fork:                      'packages:write',
+    aimeat_package_instance_set:              'packages:write',
+    aimeat_package_check_updates:             'packages:write',
+    aimeat_package_repository:                'packages:write',
+    aimeat_package_entitlements:              'packages:write',
     aimeat_package_pull:                      'packages:write',
 
     // Installing registers an app, a cortex, an extension and any @activate cron the manifest

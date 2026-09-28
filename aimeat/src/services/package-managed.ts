@@ -34,10 +34,13 @@
  *   - ManagedLock / managedLockFor() — is this component part of a managed install?
  *   - managedChangeRefusal() — the refusal every code path returns, or null
  *   - forkPackageInstance() — release the lock: managed → editable, updates stop
+ *   - setPackageInstance() — the owner's label and auto-update choice
+ *   - forkedUpdateRefusal() — a forked install takes no updates
  * @usage
  *   const refused = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
  *   if (refused) return { refusal: refused };
  * @version-history
+ *   v1.1.0 — 2026-09-28 — setPackageInstance(): label and auto-update (install packages, phase 3).
  *   v1.0.0 — 2026-09-28 — Initial: managed installs (install packages, phase 1).
  */
 import type { Storage, PackageComponentType, PackageInstanceRecord } from '../storage/interface.js';
@@ -159,6 +162,42 @@ export async function forkPackageInstance(
     if (!updated) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Instance not found: ${instanceId}` };
     }
+    emitChange('instances');
+    return { ok: true, instance: updated };
+}
+
+/**
+ * Change what the owner may change about an install itself: its label, and whether the daily package
+ * check updates it by itself. Only the instance's owner.
+ */
+export async function setPackageInstance(
+    storage: Storage, caller: { owner: string }, instanceId: string, input: { label?: unknown; autoUpdate?: unknown },
+): Promise<ForkResult> {
+    const instance = await storage.getInstance(instanceId);
+    if (!instance || instance.status === 'removed') {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: `Instance not found: ${instanceId}` };
+    }
+    if (instance.owner !== caller.owner) {
+        return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the instance owner can change it' };
+    }
+    const updates: Partial<PackageInstanceRecord> = {};
+    if (input.label !== undefined) {
+        if (typeof input.label !== 'string' || !input.label.trim() || input.label.length > 200) {
+            return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'label is a name of 1 to 200 characters.' };
+        }
+        updates.label = input.label.trim();
+    }
+    if (input.autoUpdate !== undefined) {
+        if (typeof input.autoUpdate !== 'boolean') {
+            return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'auto_update is true or false.' };
+        }
+        updates.autoUpdate = input.autoUpdate;
+    }
+    if (Object.keys(updates).length === 0) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'Name what to change: label, auto_update.' };
+    }
+    const updated = await storage.updateInstance(instanceId, { ...updates, updatedAt: new Date().toISOString() });
+    if (!updated) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Instance not found: ${instanceId}` };
     emitChange('instances');
     return { ok: true, instance: updated };
 }
