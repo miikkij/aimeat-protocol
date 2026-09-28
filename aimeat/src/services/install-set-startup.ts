@@ -18,16 +18,24 @@
  * @structure applyStartupInstallSet(deps)
  * @usage await applyStartupInstallSet({ storage, config, peers, scheduler });
  * @version-history
+ *   v1.0.1 — 2026-09-28 — A secrets file that cannot be read or parsed is logged by its kind of
+ *     problem only: a JSON parse error quotes the text around the fault, and in that file the text is
+ *     a secret (CodeQL js/clear-text-logging, alert 1674).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import { readFile } from 'node:fs/promises';
 import { logger } from '../utils/logger.js';
 import { applyInstallSet, type ApplyDeps } from './install-set-apply.js';
 
-async function readJson(path: string): Promise<{ ok: true; value: unknown } | { ok: false; reason: string }> {
+/**
+ * A JSON file, or what is wrong with it. `problem` names the kind and never carries the file's path or
+ * content; `detail` is the error's own text, which for a parse error can quote the file, so the caller
+ * logs it only for a file that holds no secrets.
+ */
+async function readJson(path: string): Promise<{ ok: true; value: unknown } | { ok: false; problem: string; detail: string }> {
     let raw: string;
-    try { raw = await readFile(path, 'utf8'); } catch (err) { return { ok: false, reason: `cannot read ${path}: ${String(err)}` }; }
-    try { return { ok: true, value: JSON.parse(raw) }; } catch (err) { return { ok: false, reason: `${path} is not JSON: ${String(err)}` }; }
+    try { raw = await readFile(path, 'utf8'); } catch (err) { return { ok: false, problem: 'cannot be read', detail: String(err) }; }
+    try { return { ok: true, value: JSON.parse(raw) }; } catch (err) { return { ok: false, problem: 'is not JSON', detail: String(err) }; }
 }
 
 /**
@@ -50,11 +58,14 @@ export async function applyStartupInstallSet(deps: ApplyDeps, attempt = 0): Prom
     const { config } = deps;
     if (!config.installSetPath) return;
     const set = await readJson(config.installSetPath);
-    if (!set.ok) { logger.error(`[install-set] not applied: ${set.reason}`); return; }
+    if (!set.ok) { logger.error(`[install-set] not applied: ${config.installSetPath} ${set.problem}: ${set.detail}`); return; }
     let secrets: unknown;
     if (config.installSetSecretsPath) {
         const read = await readJson(config.installSetSecretsPath);
-        if (!read.ok) { logger.error(`[install-set] not applied: ${read.reason}`); return; }
+        if (!read.ok) {
+            logger.error(`[install-set] not applied: the secrets file named by AIMEAT_INSTALL_SET_SECRETS ${read.problem}. The error text is not logged, because it can quote the file.`);
+            return;
+        }
         secrets = read.value;
     }
     let code: string;

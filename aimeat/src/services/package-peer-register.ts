@@ -23,8 +23,12 @@
  *   if (check.ok && check.add) await registerPackagePeer(storage, peers, check.add);
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 5).
+ *   v1.0.1 — 2026-09-28 — The node's url loses its trailing slashes through stripTrailingSlashes, one
+ *     pass, instead of `replace(/\/+$/, '')`, quadratic on a url ending in many slashes and another
+ *     character (CodeQL js/polynomial-redos, alert 1678).
  */
 import type { Storage } from '../storage/interface.js';
+import { stripTrailingSlashes } from '../utils/url-validator.js';
 import type { PeerInfo } from './federation.js';
 import { deriveTierFlags } from './federation-tiers.js';
 
@@ -40,7 +44,7 @@ export function checkPackagePeer(
     peers: Map<string, PeerInfo>, nodeId: string, raw: unknown,
 ): Refusal | { ok: true; add: (PackagePeerInput & { nodeId: string }) | null } {
     const o = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw as Record<string, unknown> : null;
-    const url = typeof o?.url === 'string' ? o.url.trim().replace(/\/+$/, '') : '';
+    const url = typeof o?.url === 'string' ? stripTrailingSlashes(o.url.trim()) : '';
     const publicKey = typeof o?.public_key === 'string' ? o.public_key.trim() : '';
     if (!/^https?:\/\/[^\s/]+/.test(url) || url.length > 500 || !publicKey || publicKey.length > 200) {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node is { url, public_key }: the node\'s http(s) address and the public key its /.well-known/aimeat publishes.' };
