@@ -33,12 +33,16 @@
  *     NOT_FOUND. Channels apply to private packages, the ones served by entitlement.
  *     entitlementOf(): an entitlement to an install bundle carries the packages the bundle lists, from
  *     the same author, on the bundle's terms (install packages, phase 4).
+ *   v1.2.0 — 2026-09-28 — A grant with `node` registers an unknown node as a packages-only peer
+ *     (package-peer-register.ts), and a peer that shares no catalogue is heard for what it holds an
+ *     entitlement to (install packages, phase 5; approved by Jouni 2026-09-28).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
  */
 import type { Storage, PackageRecord } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { verifyPackageNode } from './package-node-auth.js';
 import { bundleOfPackage } from './install-set-spec.js';
+import { checkPackagePeer, registerPackagePeer } from './package-peer-register.js';
 
 export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
 
@@ -86,7 +90,7 @@ async function write(storage: Storage, groupId: string, nodes: Record<string, Pa
 }
 
 export type EntitlementResult =
-    | { ok: true; entitlement: PackageEntitlement }
+    | { ok: true; entitlement: PackageEntitlement; peerRegistered?: boolean }
     | { ok: false; status: number; code: string; message: string };
 
 /** Only the package's author or an operator decides who a package is served to. */
@@ -101,11 +105,17 @@ async function mayManage(storage: Storage, groupId: string, caller: { owner: str
 
 const NODE_RE = /^[a-z0-9][a-z0-9.-]{2,127}$/i;
 
-/** Grant a node the package, or change the grant: `updatesUntil` null keeps the updates running. */
+/**
+ * Grant a node the package, or change the grant: `updatesUntil` null keeps the updates running.
+ * With `node` ({ url, public_key }) and the peers, a node this repository does not know yet is
+ * registered as a packages-only peer in the same call (package-peer-register.ts), after every other
+ * check has passed.
+ */
 export async function grantEntitlement(
     storage: Storage,
     caller: { owner: string; isOperator: boolean },
-    input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown },
+    input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown },
+    peers?: Map<string, PeerInfo>,
 ): Promise<EntitlementResult> {
     const refused = await mayManage(storage, input.groupId, caller);
     if (refused) return refused;
@@ -118,6 +128,13 @@ export async function grantEntitlement(
         const t = typeof input.updatesUntil === 'string' ? Date.parse(input.updatesUntil) : NaN;
         if (!Number.isFinite(t)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'updates_until is an ISO date-time, or null for updates that run on.' };
         updatesUntil = new Date(t).toISOString();
+    }
+    let peerRegistered = false;
+    if (input.node !== undefined && input.node !== null) {
+        if (!peers) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node cannot be registered on this path.' };
+        const check = checkPackagePeer(peers, input.nodeId, input.node);
+        if (!check.ok) return check;
+        if (check.add) { await registerPackagePeer(storage, peers, check.add); peerRegistered = true; }
     }
     const now = new Date().toISOString();
     const current = Object.fromEntries((await readEntitlements(storage, input.groupId)).map(e => [e.nodeId, e]));
@@ -132,7 +149,7 @@ export async function grantEntitlement(
         updatedAt: now,
     };
     await write(storage, input.groupId, { ...current, [input.nodeId]: entitlement });
-    return { ok: true, entitlement };
+    return { ok: true, entitlement, peerRegistered };
 }
 
 export async function revokeEntitlement(
@@ -230,7 +247,8 @@ export async function resolveNodeRead(
     headers: Record<string, string | string[] | undefined>, groupId: string, version?: string,
 ): Promise<NodeRead> {
     if (!config.packageRepository) return { kind: 'unsigned' };
-    const who = await verifyPackageNode(headers, peers, groupId);
+    const who = await verifyPackageNode(headers, peers, groupId, Date.now(),
+        async nodeId => (await entitlementOf(storage, groupId, nodeId)) !== null);
     if (!who) return { kind: 'unsigned' };
     if (!who.ok) return { kind: 'refused', status: who.status, code: who.code, message: who.message };
     const latest = (await storage.listVersions(groupId, 1, 0)).versions[0];
@@ -260,9 +278,11 @@ export interface RepositoryListingEntry {
  * What `nodeId` may pull here: every published public package (its latest version), and each private
  * one it is entitled to (the latest version its entitlement reaches).
  */
-export async function repositoryListing(storage: Storage, nodeId: string): Promise<RepositoryListingEntry[]> {
+export async function repositoryListing(storage: Storage, nodeId: string, opts: { includePublic?: boolean } = {}): Promise<RepositoryListingEntry[]> {
     const out: RepositoryListingEntry[] = [];
-    const { packages } = await storage.listPackages({ status: 'published', visibility: 'public', limit: 500 });
+    const { packages } = opts.includePublic === false
+        ? { packages: [] }
+        : await storage.listPackages({ status: 'published', visibility: 'public', limit: 500 });
     const seen = new Set<string>();
     for (const p of packages) {
         if (seen.has(p.packageGroupId)) continue;

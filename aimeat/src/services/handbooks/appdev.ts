@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-28 — A grant with `node` registers an unknown customer node (install packages, phase 5).
  *   2026-09-28 — The package line names the package repository tools.
  *   2026-09-28 — The package line names install config; App config: the aimeat-config block,
  *     AIMEAT.data.appConfig(), config_get and config_set.
@@ -70,7 +71,9 @@ A package repository is a peer node that serves private packages to the nodes en
 node's daily check (\`aimeat_package_check_updates\` runs it now) pulls newer versions and updates the
 installs whose \`auto_update\` is on (\`aimeat_package_instance_set\`). On the repository itself,
 \`aimeat_package_entitlements\` grants and revokes the nodes and sets when their updates end, and
-\`channel\` beta gives a node the versions you set to \`beta\` with \`aimeat_package_status_set\`.
+\`channel\` beta gives a node the versions you set to \`beta\` with \`aimeat_package_status_set\`. A grant
+with \`node\` ({ url, public_key }) registers a node this repository does not know yet, which can then
+pull only what it is entitled to.
 
 **App config.** An app that needs values to work declares them as a JSON Schema in
 \`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a

@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-28 — aimeat_package_entitlements forwards `node` (packages-only peer registered with a grant).
  *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository and
  *     aimeat_package_entitlements over their REST endpoints.
  *   2026-09-28 — aimeat_package_install sends `config`, each part's config.
@@ -187,17 +188,19 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     updates_until: z.string().optional().describe('For grant: versions published after this ISO date-time are not served to the node'),
     channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable (published versions, the default) or beta (beta versions too)'),
     note: z.string().optional().describe('For grant: why'),
-  }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note }) => {
+    node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For grant: an unknown node registered with the grant as a packages-only peer'),
+  }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
     const base = `/v1/packages/${encodeURIComponent(group_id)}/entitlements`;
     if (action === 'list') return out(await client.get(base));
     if (!node_id) return { content: [{ type: 'text' as const, text: `INVALID_INPUT: action "${action}" needs node_id.` }], isError: true };
-    const node = `${base}/${encodeURIComponent(node_id)}`;
-    if (action === 'revoke') return out(await client.delete(node));
+    const nodePath = `${base}/${encodeURIComponent(node_id)}`;
+    if (action === 'revoke') return out(await client.delete(nodePath));
     const body: Record<string, unknown> = {};
     if (updates_until !== undefined) body.updates_until = updates_until;
     if (channel !== undefined) body.channel = channel;
     if (note !== undefined) body.note = note;
-    return out(await client.put(node, body));
+    if (node !== undefined) body.node = node;
+    return out(await client.put(nodePath, body));
   });
 
   // Releasing a managed install: it becomes editable in place and its updates stop.

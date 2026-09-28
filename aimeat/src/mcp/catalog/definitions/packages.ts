@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.7.0 -- 2026-09-28 -- aimeat_package_entitlements: `node`, the packages-only peer registered with a grant.
  *   v1.6.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
  *     aimeat_package_repository and aimeat_package_entitlements (the package repository).
  *   v1.5.1 -- 2026-09-28 -- aimeat_package_install takes `config` (PACKAGE_CONFIG_PARAM).
@@ -216,7 +217,7 @@ export const packagesTools: AimeatToolDefinition[] = [
     {
         // The repository side. Phase 5 (purchase) will write these; until then the author grants them.
         name: 'aimeat_package_entitlements',
-        description: 'On a package repository: list, grant or revoke which customer nodes a private package of yours is served to. A grant with updates_until serves the node every version published up to that instant and nothing newer (the monthly updates ended); without it the updates run on. The node must be a peer of this one, and the node must be in the repository role (repository_role in the answer) for the grant to take effect.',
+        description: 'On a package repository: list, grant or revoke which customer nodes a private package of yours is served to. A grant with updates_until serves the node every version published up to that instant and nothing newer (the monthly updates ended); without it the updates run on. The node must be a peer of this one, or be registered with the grant by giving `node` (its address and public key), and this node must be in the repository role (repository_role in the answer) for the grant to take effect. A grant to an install bundle serves the packages the bundle lists as well.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -225,6 +226,7 @@ export const packagesTools: AimeatToolDefinition[] = [
             node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
             updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node. Omit for updates that run on.' },
             channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.' },
+            node: { type: 'object', description: 'For grant: { url, public_key } of a node this repository does not know yet. It is registered with the grant as a packages-only peer (active, contact tier, messages off), which can pull only what it is entitled to. A peer of that id under another key, or switched off, is refused.' },
             note: { type: 'string', description: 'For grant: why, e.g. the order it came from.' },
         },
     },
