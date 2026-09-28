@@ -13,6 +13,7 @@
  * @structure TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode, allowPark })
  * @usage import { TrackResponseModal } from '/views/profile/track-response-modal.js';
  * @version-history
+ *   2026-09-28 — No emoji on the park button (frontend rule: no emoji in the interface).
  *   v1.7.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so an organism, workspace or record type name with a quote or an ampersand showed as
  *     &quot; / &amp; in the pickers.
@@ -166,7 +167,7 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
     setBusy(false);
   };
 
-  const parkBtn = allowPark ? html`<${Action} disabled=${busy} onClick=${park}>📓 ${t('inbox.trackPark')}<//>` : null;
+  const parkBtn = allowPark ? html`<${Action} disabled=${busy} onClick=${park}>${t('inbox.trackPark')}<//>` : null;
 
   const footer = phase === 'error' ? html`
       <${Action} disabled=${busy} onClick=${onClose}>${t('common.cancel')}<//>

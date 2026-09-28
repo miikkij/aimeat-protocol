@@ -14,6 +14,7 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   2026-09-28 -- The action row wraps: at 390 px Delete ran 5 px past the page and was cut off.
  *   v1.17.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a note's first line, an organism or workspace name, the AI's reason or an error
  *     with a quote or an ampersand showed as &quot; / &amp;.
@@ -528,12 +529,12 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
           <//>
         <//>`}
       <${Peek} view=${view} line=${firstLine(baseText())}><${Markdown} text=${baseText()} /><//>
-      <${Row} gap="medium" justify="between">
+      <${Row} wrap gap="medium" justify="between">
         <${Row} gap="small">
           <${PeekToggle} view=${view} label=${t('profile.notebook.toggleView')} onToggle=${cycleView} />
           <${Mark} kind="time">${relTime(note.updated_at || note.created_at)}<//>
         <//>
-        <${Row} gap="small">
+        <${Row} wrap gap="small">
           <${Action} small disabled=${planning} onClick=${() => handleEnrich()}>
             ${planning ? t('profile.notebook.planning') : t('profile.notebook.enrichBtn')}
           <//>

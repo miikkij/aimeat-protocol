@@ -671,7 +671,22 @@
         "versionsNone": "This page has not been saved yet, so there is nothing to go back to.",
         "restore": "Put this one back",
         "restoreAsk": "Put this earlier version back?",
-        "restoreDone": "Put back."
+        "restoreDone": "Put back.",
+        "action": {
+          "template_upload": "Own HTML uploaded",
+          "template_delete": "Own HTML removed",
+          "import": "Imported",
+          "cache_invalidate": "Cache cleared",
+          "app_publish": "App published",
+          "app_update": "App updated",
+          "app_delete": "App deleted",
+          "memory_set": "Text saved",
+          "memory_delete": "Text removed",
+          "layout_set": "Layout saved",
+          "layout_delete": "Layout removed",
+          "layout_restore": "Earlier layout put back",
+          "other": "Other change"
+        }
       },
       "lb": {
         "title": "This site mirrors another one",
