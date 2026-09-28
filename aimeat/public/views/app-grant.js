@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Trusted consent page (apex origin) for the H-2 app-grant flow. An app on the
  *   isolated app origin sends the owner here (GET /v1/app-grants/authorize → 302 → /v1/app-grant
- *   ?req=...). The owner, authenticated on aimeat.io, reviews the requesting app + the exact
+ *   ?req=...). The owner, authenticated on the node's own origin, reviews the requesting app + the exact
  *   scopes and Allows or Denies. On Allow we POST /v1/app-grants/authorize-consent and get back the
  *   app's redirect_url carrying a one-time code. Two delivery modes:
  *     • web_message (popup): postMessage { type:'aimeat_app_grant', code, state } to the app
@@ -53,6 +53,10 @@
  *   v1.5.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so an app name, origin, description, scope or error with a quote or an ampersand
  *     showed as &quot; / &amp;.
+ *   v1.5.2 — 2026-09-29 — The signed-out screen names the node the person is on ({node}, the host of
+ *     getNodeUrl()) instead of a hard-coded "aimeat.io", and says what happens after login (the
+ *     Connect screen for an app used the first time, then back in the app signed in) instead of
+ *     asking the person to re-open the app's link, which nobody needs to do.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -60,7 +64,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { showLoginModal, getStoredGhii } from '/js/services/auth.js';
+import { showLoginModal, getStoredGhii, getNodeUrl } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { scopeSentence, areaLine, boundaryLines } from '/js/consent-vocab.js';
 import { AskPage } from '/components/AskPage.js';
@@ -204,10 +208,14 @@ export default function AppGrant() {
     return html`<${AskPage} message=${msg} />`;
   }
   if (state.status === 'login') {
+    // This page runs on the node's own origin, so its host is the name the login modal's crumb shows
+    // and the host of config.baseUrl that the server-rendered pages call nodeName (routes/portal.ts).
+    let nodeHost = '';
+    try { nodeHost = new URL(getNodeUrl()).host; } catch (err) { swallowed('app-grant: nodeHost', err); }
     return html`
       <${AskPage} title=${tr('appGrant.loginTitle', 'Log in to continue')}
         doors=${html`<${Loud} onClick=${doLogin}>${tr('appGrant.loginCta', 'Log in')}<//>`}>
-        <${Note} kind="lead">${tr('appGrant.loginBody', 'Log in on aimeat.io, then re-open the app’s link to approve access.')}<//>
+        <${Note} kind="lead">${tr('appGrant.loginBody', 'Log in with your account on {node}. If you use this app for the first time, you then choose what it can use. After that, you are back in the app, signed in.', { node: nodeHost })}<//>
       <//>`;
   }
   if (state.status === 'error') {
