@@ -4159,7 +4159,7 @@
     "revoke": "Peru pääsy",
     "saveCta": "Tallenna muutokset",
     "loginTitle": "Kirjaudu jatkaaksesi",
-    "loginBody": "Kirjaudu sisään aimeat.io-palveluun ja avaa sitten sovelluksen linkki uudelleen hyväksyäksesi pääsyn.",
+    "loginBody": "Kirjaudu tililläsi palvelussa {node}. Jos käytät sovellusta ensimmäistä kertaa, valitset seuraavaksi, mitä se saa käyttää. Sen jälkeen palaat sovellukseen kirjautuneena.",
     "loginCta": "Kirjaudu",
     "errorTitle": "Pääsyä ei voida myöntää",
     "missing": "Ei valtuutuspyyntöä.",

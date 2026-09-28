@@ -4159,7 +4159,7 @@
     "revoke": "Revoke access",
     "saveCta": "Save changes",
     "loginTitle": "Log in to continue",
-    "loginBody": "Log in on aimeat.io, then re-open the app's link to approve access.",
+    "loginBody": "Log in with your account on {node}. If you use this app for the first time, you then choose what it can use. After that, you are back in the app, signed in.",
     "loginCta": "Log in",
     "errorTitle": "Cannot grant access",
     "missing": "No authorization request.",

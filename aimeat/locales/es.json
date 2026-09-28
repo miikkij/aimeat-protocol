@@ -3102,7 +3102,7 @@
     "revoke": "Revocar el acceso",
     "saveCta": "Guardar los cambios",
     "loginTitle": "Inicia sesión para seguir",
-    "loginBody": "Entra en aimeat.io y vuelve a abrir el enlace de la aplicación para aprobar el acceso.",
+    "loginBody": "Inicia sesión con tu cuenta de {node}. Si es la primera vez que usas esta aplicación, luego eliges a qué puede acceder. Después vuelves a la aplicación con la sesión iniciada.",
     "loginCta": "Iniciar sesión",
     "errorTitle": "No se puede dar el acceso",
     "missing": "No hay ninguna petición de autorización.",
