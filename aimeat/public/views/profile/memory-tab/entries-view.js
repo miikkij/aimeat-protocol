@@ -8,6 +8,9 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.0.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a key, a share pattern or an organism group name with an ampersand or a quote showed
+ *     as &amp; / &quot;.
  *   v2.0.1 -- 2026-09-26 -- The search line, the filter line and Active/Archived stand side by side
  *     again, as on main (SearchLine beside in a Row; fix pass).
  *   v2.0.0 -- 2026-09-26 -- On the component kit, class-free (page group G3): the storage bar is the
@@ -65,7 +68,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { recipientBadge, VisibilityPill } from '../shared.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import TagCloud from '/js/components/tag-cloud.js';
@@ -179,7 +181,7 @@ export function renderEntries(ctx) {
       <${List} cols="name-doors" dense>
         ${covering.map(sh => html`
           <${Row} key=${sh.id}>
-            <${Cell} dim>${sh.group?.name || sh.group_id} · <${Code}>${escHtml(sh.key_pattern)}<//><//>
+            <${Cell} dim>${sh.group?.name || sh.group_id} · <${Code}>${sh.key_pattern}<//><//>
             <${Doors}>
               <${Action} small onClick=${() => revokeCoveringShare(sh)}
                 title=${(t('profile.memory.shRevokeTitle') || 'Stop sharing {pattern}').replace('{pattern}', sh.key_pattern)}>
@@ -231,8 +233,8 @@ export function renderEntries(ctx) {
           : html`<${List} cols="name-desc-doors">${keyRulesPopover.rules.map(r => html`
               <${Row}>
                 <${Name}>${recipientBadge(r.recipient)}<//>
-                <${Desc}><${Code}>${escHtml(r.data_pattern)}<//><//>
-                <${Cell} dim>${escHtml(r.scope || '-')}<//>
+                <${Desc}><${Code}>${r.data_pattern}<//><//>
+                <${Cell} dim>${r.scope || '-'}<//>
               <//>`)}<//>`}
       <//>
     <//>`;
@@ -242,7 +244,7 @@ export function renderEntries(ctx) {
     const v = valueOf(m);
     return html`
       <${Stack}>
-        <${Note} kind="meta" title=${m.key}><${Code}>${escHtml(m.key)}<//><//>
+        <${Note} kind="meta" title=${m.key}><${Code}>${m.key}<//><//>
         ${(!fullLoaded && v === undefined)
           // Always "loading", never a bare ellipsis: the open row fetches its own value (see the
           // effect in memory-tab.js), so a missing value is a read in flight and not a state a
@@ -314,7 +316,7 @@ export function renderEntries(ctx) {
           <${Tabs} label=${visLabel} value=${m.visibility || 'private'} onSelect=${(next) => applyVis(m, next)}
             items=${VIS_OPTIONS.filter(x => x !== 'group').map(x => ({ value: x, label: t('knowledge.visibility.' + x) }))} />` : null}
         panel=${open ? detail(m) : null}>
-        <${Name} asKey title=${m.key}>${escHtml(displayRemainder(m.key, g))}<//>
+        <${Name} asKey title=${m.key}>${displayRemainder(m.key, g)}<//>
         ${typeof m.bytes === 'number'
           ? html`<${Num} dim title=${t('profile.memory.sizeLabel') || 'Value size'}>${formatBytes(m.bytes)}<//>`
           : html`<${Cell} />`}
@@ -415,7 +417,7 @@ export function renderEntries(ctx) {
     ${searchResults !== null
       ? html`
           <${Line} justify="between" below="small">
-            <${Note} kind="meta" inline>${(t('profile.memory.searchResultCount') || '{n} matches').replace('{n}', String(searchResults.length))}${searchScopePrefix ? ` · ${escHtml(searchScopePrefix)}` : ''}<//>
+            <${Note} kind="meta" inline>${(t('profile.memory.searchResultCount') || '{n} matches').replace('{n}', String(searchResults.length))}${searchScopePrefix ? ` · ${searchScopePrefix}` : ''}<//>
             <${Action} small onClick=${clearServerSearch}>✕ ${t('profile.memory.searchClear') || 'Clear search'}<//>
           <//>
           <${List} cols="check-name-size-when-mark-doors" keepCols empty=${t('profile.memory.searchEmpty') || 'No matches'}>
@@ -429,7 +431,7 @@ export function renderEntries(ctx) {
             const groupPrefix = g.kind === 'organism' ? 'organism.' + g.uuid + '.' : g.kind === 'plain' ? g.id + '.' : null;
             return html`
               <${Stack} key=${g.id} gap="none" below="tight">
-                <${FoldRow} name=${escHtml(groupLabel(g))} open=${!collapsed} onClick=${() => toggleGroupCollapsed(g.id)}
+                <${FoldRow} name=${groupLabel(g)} open=${!collapsed} onClick=${() => toggleGroupCollapsed(g.id)}
                   right=${`${g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length))}${g.kind === 'organism' && orgNames[g.uuid] ? ` · ${shortTok(g.uuid)}` : ''}`}
                   doors=${groupPrefix ? html`
                     <${Icon} small label=${t('profile.memory.searchInGroup') || 'Search in this group'}

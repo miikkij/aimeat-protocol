@@ -11,6 +11,9 @@
  *   - handleExport/handleImport: call consulExport/consulImport and reload dashboard data
  *
  * @version-history
+ *   v2.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, and the key table's cells are text cells, so a Consul URL with a query string, a key
+ *     or an error message with a quote or an ampersand showed as &quot; / &amp;.
  *   v2.0.0 — 2026-09-27 — Library components, no class or inline style: the explanation is a hint,
  *     the card is the Object box with the address in its head and the health mark at its end, the
  *     two actions are the loud action and the action link, the result is the form's message (fine or
@@ -22,7 +25,6 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { Badge, StatsGrid, ExpandableHelp, Empty, DataTable } from './shared.js';
 import { consulExport, consulImport } from '/js/services/admin.js';
 import { Box } from '/components/Box.js';
@@ -82,17 +84,17 @@ export default function ConsulTab({ data, reload }) {
       { label: t('dashboard.consulKeysLoaded'), value: consul.key_count },
     ]} />
 
-    ${result && html`<${Space} above="medium" below="medium"><${Note} kind="message" error=${!result.ok}>${escHtml(result.msg)}<//><//>`}
+    ${result && html`<${Space} above="medium" below="medium"><${Note} kind="message" error=${!result.ok}>${result.msg}<//><//>`}
 
     <${Space} above="medium">
-      <${Box} marks=${html`<${Note} kind="meta" inline>${escHtml(consul.url)} — ${escHtml(consul.prefix)}<//>`}
+      <${Box} marks=${html`<${Note} kind="meta" inline>${consul.url} — ${consul.prefix}<//>`}
         end=${html`<${Badge} type=${consul.healthy ? 'healthy' : 'critical'} />`}>
         <${FormActions}>
           <${Loud} control onClick=${handleExport} disabled=${loading}>${t('dashboard.consulExport')}<//>
           <${Action} small onClick=${handleImport} disabled=${loading}>${t('dashboard.consulImport')}<//>
         <//>
         ${consul.keys?.length > 0
-    ? html`<${DataTable} headers=${['Key']} rows=${consul.keys.map(k => [escHtml(k)])} />`
+    ? html`<${DataTable} headers=${['Key']} rows=${consul.keys.map(k => [k])} />`
     : html`<${Empty} text=${t('dashboard.consulNoKeys')} />`}
       <//>
     <//>

@@ -11,6 +11,9 @@
  *   - ChatInstancesTab({ data, reload }): operator-channel CRUD + chat-session list
  *
  * @version-history
+ *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself (the Message is `plain`, so its body is a text node), so a channel name, a message
+ *     body, an author or an app name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.2.0 — 2026-09-27 — On the library components (page group G5): the channels are a Section
  *     with the name field and its create action (TextField), each channel a List row that opens its
  *     chat in the row's Panel; the chat is the Thread of comment Messages (scrolls, kept at its foot)
@@ -24,7 +27,6 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { dt, StatsGrid, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import {
@@ -85,7 +87,7 @@ function ChannelChat({ boardId }) {
         const author = raw.includes('#') ? raw.split('#')[1].split('@')[0] : raw.split('@')[0];
         return html`
           <${Message} key=${p.id || (p.created_at || p.createdAt)} tone="comment" plain
-            who=${escHtml(author)} time=${dt(p.created_at || p.createdAt)} body=${escHtml(p.body || '')} />
+            who=${author} time=${dt(p.created_at || p.createdAt)} body=${p.body || ''} />
         `;
       })}
     <//>
@@ -169,7 +171,7 @@ export default function ChatInstancesTab({ data, reload }) {
             const displayName = (ch.name || ch.id).replace(/^ops:/, '');
             return html`
               <${Row} key=${cid} open=${isOpen} panel=${isOpen ? html`<${ChannelChat} boardId=${cid} />` : null}>
-                <${Name} meta=${ch.post_count != null ? `${ch.post_count} messages` : null}># ${escHtml(displayName)}<//>
+                <${Name} meta=${ch.post_count != null ? `${ch.post_count} messages` : null}># ${displayName}<//>
                 <${Doors}>
                   <${Action} small expanded=${isOpen} onClick=${() => toggleChat(cid)}
                   >${isOpen ? '▲ Collapse' : '▼ Expand'}<//>
@@ -190,9 +192,9 @@ export default function ChatInstancesTab({ data, reload }) {
       ? html`<${Empty} text=${t('dashboard.noChatInstances')} />`
       : html`<${List} cols="name-kind-id-when-state-doors" head=${head} labels>
           ${sessions.map(s => html`<${Row} key=${s.id}>
-            <${Name}>${escHtml(s.app_name || s.id || '')}<//>
-            <${Cell}>${escHtml(s.platform || '')}<//>
-            <${Cell} meta>${escHtml(String(s.ghii || '').substring(0, 20))}<//>
+            <${Name}>${s.app_name || s.id || ''}<//>
+            <${Cell}>${s.platform || ''}<//>
+            <${Cell} meta>${String(s.ghii || '').substring(0, 20)}<//>
             <${When}>${dt(s.created_at)}<//>
             <${Cell}><${Mark} kind="status" tone=${s.is_anonymous ? 'off' : 'fine'}>${s.is_anonymous ? 'anon' : t('dashboard.active')}<//><//>
             <${Doors}><${Icon} small label="Delete" onClick=${() => doDeleteInstance(s.id)}>✗<//><//>

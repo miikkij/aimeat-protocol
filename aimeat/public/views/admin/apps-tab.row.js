@@ -16,6 +16,9 @@
  * @structure appChips · AppRow
  * @usage html`<${AppRow} app=${a} onHide=${fn} onRestore=${fn} onDelete=${fn} ... />` inside the page's List
  * @version-history
+ *   v1.1.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so an app name, filename, owner or take-down reason with a quote or an ampersand
+ *     showed as &quot; / &amp;.
  *   v1.1.0 — 2026-09-27 — On the library components (page group G5): the row is a List Row (an app
  *     taken down is faded), its chips the Name's marks, the reason its line, the figures Num cells,
  *     the doors action links and the ⋯ menu of the Doors (CardMenu: the arrow keys, Escape, a line
@@ -25,7 +28,6 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { dt, fmtBytes, num, Badge } from './shared.js';
 import { Row, Name, Cell, Num, When, Doors } from '/components/List.js';
 import { Action } from '/components/Action.js';
@@ -49,8 +51,8 @@ export function appChips(app) {
 export function AppRow({ app, onHide, onRestore, onDelete, onSeo, busy }) {
   const name = app.manifest?.name || app.filename;
   const reason = app.operator_hidden
-    ? `${app.operator_hide_reason ? `"${escHtml(app.operator_hide_reason)}" ` : ''}${app.operator_hidden_by
-      ? A('takenBy', { by: escHtml(app.operator_hidden_by), at: dt(app.operator_hidden_at) })
+    ? `${app.operator_hide_reason ? `"${app.operator_hide_reason}" ` : ''}${app.operator_hidden_by
+      ? A('takenBy', { by: app.operator_hidden_by, at: dt(app.operator_hidden_at) })
       : ''}`
     : null;
   // The one irreversible action lives in the menu, not on the row.
@@ -64,9 +66,9 @@ export function AppRow({ app, onHide, onRestore, onDelete, onSeo, busy }) {
 
   return html`
     <${Row} faded=${!!app.operator_hidden}>
-      <${Name} meta=${`${escHtml(app.filename)}${app.version_number ? ` · v${num(app.version_number)}` : ''}`}
-        marks=${appChips(app)} desc=${reason || null}>${escHtml(name)}<//>
-      <${Cell} meta>${escHtml(app.owner)}<//>
+      <${Name} meta=${`${app.filename ?? ''}${app.version_number ? ` · v${num(app.version_number)}` : ''}`}
+        marks=${appChips(app)} desc=${reason || null}>${name}<//>
+      <${Cell} meta>${app.owner}<//>
       <${Num} quiet>${fmtBytes(app.size || 0)}<//>
       <${Num} quiet>${num(app.downloads || 0)}<//>
       <${Num} quiet>${num(app.forks || 0)}<//>

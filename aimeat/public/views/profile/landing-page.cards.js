@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.20.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so an organism, workspace, agent, recent item or display name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.20.0 -- 2026-09-26 -- Every part is a kit component (the panels are Card panel with its headline door and note, the rows FoldRow and List, the quota bars Meter, the figures FigureStrip and Card figure doors, the band NumberBand, the tags Mark with its live square, the promo a Box with framed Cards, the waiting box the aside Note with a Group): this file writes no class (page group G8).
  *   v1.19.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.18.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -54,7 +55,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
 import { t, getLocale } from "/js/i18n.js";
-import { escHtml, fmtMoney } from "/js/utils.js";
+import { fmtMoney } from "/js/utils.js";
 import { getNodeUrl } from "/js/services/auth.js";
 import { listAgents } from "/js/services/agents.js";
 import { listAllSchedules } from "/js/services/schedules.js";
@@ -106,9 +107,9 @@ export function WaitingForYou() {
 
   if (!items || items.length === 0) return null;
   const words = (it) => {
-    if (it.kind === 'review') return html`<b>${(t('profile.landing.draftsToReview') || '{n} drafts to review').replace('{n}', String(it.n))}</b> · ${escHtml(it.orgName)} / ${escHtml(it.wsName)}`;
-    if (it.kind === 'join') return html`<b>${it.n === 1 ? (t('profile.landing.joinReqOne') || '1 join request') : (t('profile.landing.joinReqMany') || '{n} join requests').replace('{n}', String(it.n))}</b> · ${escHtml(it.orgName)}`;
-    if (it.kind === 'invite') return html`<b>${t('profile.landing.inviteWaiting') || 'You’re invited'}</b> · ${escHtml(it.orgName)}`;
+    if (it.kind === 'review') return html`<b>${(t('profile.landing.draftsToReview') || '{n} drafts to review').replace('{n}', String(it.n))}</b> · ${it.orgName} / ${it.wsName}`;
+    if (it.kind === 'join') return html`<b>${it.n === 1 ? (t('profile.landing.joinReqOne') || '1 join request') : (t('profile.landing.joinReqMany') || '{n} join requests').replace('{n}', String(it.n))}</b> · ${it.orgName}`;
+    if (it.kind === 'invite') return html`<b>${t('profile.landing.inviteWaiting') || 'You’re invited'}</b> · ${it.orgName}`;
     return null;
   };
   const door = (it) => {
@@ -147,7 +148,7 @@ export function ContinueCard() {
     <${Card} tone="panel" title=${t('profile.landing.continueTitle') || 'Continue'}>
       <${Folds}>
         ${items.map((it) => html`
-          <${FoldRow} key=${it.type + it.id} num=${RECENT_ICONS[it.type] || '•'} name=${escHtml(it.label)}
+          <${FoldRow} key=${it.type + it.id} num=${RECENT_ICONS[it.type] || '•'} name=${it.label}
             right=${relTime(it.at)} onClick=${() => openItem(it)} />`)}
       <//>
     <//>
@@ -206,9 +207,9 @@ export function AgentsCard({ owner, initialAgents }) {
       note=${activeToday > 0 ? (t('profile.landing.activeTodayCount') || '{n} active today').replace('{n}', String(activeToday)) : null}>
       <${Folds}>
         ${agents.slice(0, 3).map(a => html`
-          <${FoldRow} key=${a.gaii || a.name} num=${'🤖'} name=${escHtml(a.display_name || a.name)} right=${seen(a)} onClick=${() => openAgent(a)} />`)}
+          <${FoldRow} key=${a.gaii || a.name} num=${'🤖'} name=${a.display_name || a.name} right=${seen(a)} onClick=${() => openAgent(a)} />`)}
         ${nextJob ? html`
-          <${FoldRow} key="nextjob" num="⏰" name=${escHtml(nextJob.name || nextJob.id || '')}
+          <${FoldRow} key="nextjob" num="⏰" name=${nextJob.name || nextJob.id || ''}
             right=${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}
             onClick=${() => openProfileTab('scheduler')} />` : null}
       <//>
@@ -496,12 +497,12 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
   const federated = typeof stats.nodes === 'number' && stats.nodes > 0;
 
   return html`
-    <${Masthead} avatarSvg=${avatarSvg} name=${escHtml(session.displayName || session.owner)}
-      identity=${escHtml(session.ghii || '')}
+    <${Masthead} avatarSvg=${avatarSvg} name=${session.displayName || session.owner}
+      identity=${session.ghii || ''}
       identityTitle=${t('home.identityHint')}
       onAvatar=${() => onEditProfile?.()} avatarTitle=${t('profile.landing.editProfile')}
       plate=${html`
-        <${Note} kind="meta" mono>${t('profile.node')}: ${escHtml(NODE_URL)}<//>
+        <${Note} kind="meta" mono>${t('profile.node')}: ${NODE_URL}<//>
         <${Space} above="small"><${Marks}>
           <${McpConnectedBadge} />
           ${federated

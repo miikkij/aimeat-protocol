@@ -11,6 +11,9 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.22.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a template or instance title, a section name, an organism name or the charter YAML
+ *     with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.22.1 -- 2026-09-26 -- The ledger is a list again (Stack list: ul/li, as main's .pf-ld-ledger),
  *     so a screen reader hears a list (fix pass).
  *   v1.22.0 -- 2026-09-26 -- Every part is a component that gets data; the page writes no class (page group G4):
@@ -65,7 +68,6 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
@@ -339,7 +341,7 @@ export default function LivingTab({ session, showToast }) {
           <${Tab} tone="fold" on=${charterView === 'yaml'} pressed=${charterView === 'yaml'} onClick=${() => setCharterView(v => v === 'yaml' ? null : 'yaml')}>${t('profile.living.charterYaml')}<//>
         <//>
         ${charterView === 'readable' && html`<${Box} tone="copy" document><${Markdown} text=${editing.charterReadable || editing.charter?.scope || t('profile.living.charterEmpty')} /><//>`}
-        ${charterView === 'yaml' && html`<${Code} block>${escHtml(living.charterToYaml(editing.charter || {}))}<//>`}
+        ${charterView === 'yaml' && html`<${Code} block>${living.charterToYaml(editing.charter || {})}<//>`}
 
         <${Label} block>${t('profile.living.automation')}<//>
         <${Line} wrap gap="large" align="end">
@@ -376,11 +378,11 @@ export default function LivingTab({ session, showToast }) {
           ? html`<${Note} kind="quiet">${t('profile.living.noOrgs')}<//>`
           : html`
             <${Select} label=${t('profile.living.organism')} value=${deploying.orgId} onChange=${v => pickDeployOrg(v)}
-              options=${orgs.map(o => [o.id, escHtml(o.name)])} />
+              options=${orgs.map(o => [o.id, o.name])} />
             ${deploying.workspaces.length === 0
               ? html`<${Field} label=${t('profile.living.workspace')}><${Note} kind="quiet">${t('profile.living.noWorkspaces')}<//><//>`
               : html`<${Select} label=${t('profile.living.workspace')} value=${deploying.wsId} onChange=${v => setDeploying(d => ({ ...d, wsId: v }))}
-                  options=${deploying.workspaces.map(w => [w.id, escHtml(w.name || w.id)])} />`}`}
+                  options=${deploying.workspaces.map(w => [w.id, w.name || w.id])} />`}`}
         <${FormActions}>
           <${Loud} control disabled=${busy || !deploying.orgId || !deploying.wsId} onClick=${confirmDeploy}>${t('profile.living.deployBtn')}<//>
           <${Action} small onClick=${() => setDeploying(null)}>${t('profile.notebook.cancelBtn')}<//>
@@ -395,7 +397,7 @@ export default function LivingTab({ session, showToast }) {
     const st = opened.config.status || {};
     const lastPulse = st.last_pulse ? fmtDateTime(st.last_pulse) : t('profile.living.never');
     return html`
-      <${Section} band title=${escHtml(opened.config.title)} doors=${html`
+      <${Section} band title=${opened.config.title} doors=${html`
         <${Loud} control disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : `↻ ${t('profile.living.pulseNow')}`}<//>
         <${Action} small onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}<//>
         <${Action} small onClick=${handleSaveSnapshot}>${t('profile.living.saveSnapshot')}<//>
@@ -403,12 +405,12 @@ export default function LivingTab({ session, showToast }) {
       <${Stack}>
         <${Line} wrap>
           <${Note} kind="meta" inline>
-            ${orgName(opened.loc.orgId)} · ${escHtml(opened.loc.wsId)} · v${st.version || 1}
+            ${orgName(opened.loc.orgId)} · ${opened.loc.wsId} · v${st.version || 1}
             · ${t('profile.living.lastPulse')}: ${lastPulse}
             · ${t('profile.living.cost')}: $${(st.cost || 0).toFixed(4)}
           <//>
           ${st.paused && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
-          ${st.health === 'retired' && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="danger">${t('profile.living.retired')}: ${escHtml(st.retired_reason || '')}<//>`}
+          ${st.health === 'retired' && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="danger">${t('profile.living.retired')}: ${st.retired_reason || ''}<//>`}
           <${Note} kind="meta" inline>· ${t('profile.living.cadence')}:<//>
           <${Select} fit ariaLabel=${t('profile.living.cadence')} value=${opened.config.charter?.cadence || 'daily'} onChange=${v => changeCadence(v)}
             options=${[['hourly', t('profile.living.cadenceHourly')], ['daily', t('profile.living.cadenceDaily')], ['weekly', t('profile.living.cadenceWeekly')]]} />
@@ -428,23 +430,23 @@ export default function LivingTab({ session, showToast }) {
           return html`
             <${Split} key=${sec.slot} gap="small">
               <${Line} gap="medium" align="baseline">
-                <strong>${escHtml(sec.section || sec.slot)}</strong>
-                <${Note} kind="meta" inline>${escHtml(sec.desc || '')}<//>
-                ${sec.agent && html`<${Mark}>→${escHtml(String(sec.agent).split('/')[0])}<//>`}
-                ${phase && html`<${Mark} kind="status" tone=${phaseTone(phase)}>${escHtml(phase)}<//>`}
+                <strong>${sec.section || sec.slot}</strong>
+                <${Note} kind="meta" inline>${sec.desc || ''}<//>
+                ${sec.agent && html`<${Mark}>→${String(sec.agent).split('/')[0]}<//>`}
+                ${phase && html`<${Mark} kind="status" tone=${phaseTone(phase)}>${phase}<//>`}
               <//>
               ${versions.length > 1 && html`
                 <${Line}>
                   <${Note} kind="meta" inline>${t('profile.living.timeline')}:<//>
                   <${Select} fit ariaLabel=${t('profile.living.timeline')} value=${pickedVer ? String(versions.indexOf(pickedVer)) : ''}
                     onChange=${v => pickVersion(sec.slot, v)} placeholder=${t('profile.living.versionCurrent')}
-                    options=${versions.map((v, i) => [String(i), `${fmtDateTime(v.producedAt)} · ${escHtml(v.producedBy || '')}`])} />
+                    options=${versions.map((v, i) => [String(i), `${fmtDateTime(v.producedAt)} · ${v.producedBy || ''}`])} />
                 <//>
                 ${pickedVer && html`<${Box} tone="copy" document><${Markdown} text=${pickedVer.markdown} /><//>`}`}
               ${sec.kind === 'aggregate' && html`
                 <${Stack}>
                   ${series.length
-                    ? html`<${SeriesBars} series=${series.map(d => ({ label: escHtml(d.label), value: d.value }))} />`
+                    ? html`<${SeriesBars} series=${series.map(d => ({ label: d.label, value: d.value }))} />`
                     : html`<${Note} kind="quiet">${t('profile.living.noData')}<//>`}
                   <${TextField} placeholder=${t('profile.living.dpLabel')} value=${draft(dpl)} onInput=${v => setDraft(dpl, v)}
                     actions=${html`
@@ -472,7 +474,7 @@ export default function LivingTab({ session, showToast }) {
         ${ledger.length > 0 && html`
           <${Label} block>${t('profile.living.ledgerTitle')}<//>
           <${Stack} gap="tight" list>
-            ${ledger.slice(0, 10).map((ev, i) => html`<${Note} key=${i} kind="meta">${fmtDateTime(ev.at)} — ${escHtml(ev.event)}${ev.slot ? ` · ${escHtml(ev.slot)}` : ''}${typeof ev.costUsd === 'number' ? ` · $${ev.costUsd.toFixed(4)}` : ''}<//>`)}
+            ${ledger.slice(0, 10).map((ev, i) => html`<${Note} key=${i} kind="meta">${fmtDateTime(ev.at)} — ${ev.event}${ev.slot ? ` · ${ev.slot}` : ''}${typeof ev.costUsd === 'number' ? ` · $${ev.costUsd.toFixed(4)}` : ''}<//>`)}
           <//>`}
       <//>
       <//>`;
@@ -503,9 +505,9 @@ export default function LivingTab({ session, showToast }) {
             empty=${t('profile.living.noTemplates')}>
             ${(templates || []).map(tpl => html`
               <${Row} key=${tpl.id}>
-                <${Name}>${escHtml(tpl.title || t('profile.living.untitled'))}<//>
+                <${Name}>${tpl.title || t('profile.living.untitled')}<//>
                 <${Desc}>
-                  ${tpl.description && html`<div>${escHtml(tpl.description)}</div>`}
+                  ${tpl.description && html`<div>${tpl.description}</div>`}
                   <div>${(tpl.template || []).length} ${t('profile.living.sectionsShort')}</div>
                 <//>
                 <${Doors}>
@@ -523,14 +525,14 @@ export default function LivingTab({ session, showToast }) {
             empty=${t('profile.living.noInstances')}>
             ${(instances || []).map(inst => html`
               <${Row} key=${inst.loc.docId}>
-                <${Name}>${escHtml(inst.config.title)}<//>
+                <${Name}>${inst.config.title}<//>
                 <${Desc}>
                   v${inst.config.status?.version || 1} ·
                   ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? fmtDateTime(inst.config.status.last_pulse) : t('profile.living.never')} ·
                   ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}
                   ${inst.config.status?.paused && html` · <${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
                 <//>
-                <${Who}><${Mark}>${escHtml(orgName(inst.loc.orgId))}<//><//>
+                <${Who}><${Mark}>${orgName(inst.loc.orgId)}<//><//>
                 <${Doors}>
                   <${Loud} control onClick=${() => openInstance(inst.loc)}>${t('profile.living.open')}<//>
                 <//>

@@ -50,13 +50,15 @@
  *     summary the dim Box, the details toggle an action link that says it is open, each scope a Check
  *     in a row Box with its name as Code and "new" as the coral Tag, the promises ticked list lines,
  *     Revoke the danger action link and Connect the loud action. css/views/app-grant.css is gone.
+ *   v1.5.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so an app name, origin, description, scope or error with a quote or an ampersand
+ *     showed as &quot; / &amp;.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
-import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, getStoredGhii } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
@@ -212,7 +214,7 @@ export default function AppGrant() {
     return html`
       <${AskPage} title=${tr('appGrant.errorTitle', 'Cannot grant access')}
         doors=${html`<${Action} onClick=${deny}>${tr('common.back', 'Back')}<//>`}>
-        <${Note} kind="lead">${escHtml(state.error)}<//>
+        <${Note} kind="lead">${state.error}<//>
       <//>`;
   }
 
@@ -232,7 +234,7 @@ export default function AppGrant() {
   const monogram = (Array.from(String(req.app_name || '?').trim())[0] || '?').toUpperCase();
 
   // The guarantees, said as promises: each one a ticked line.
-  const boundaries = boundaryLines(t).map((line) => escHtml(line));
+  const boundaries = boundaryLines(t);
   const promises = [
     ...boundaries,
     tr('appGrant.assureKey', 'It gets its own key, never your password.'),
@@ -244,9 +246,9 @@ export default function AppGrant() {
       who=${{
         // The app's own icon (an address or one sign), or the first letter of its name.
         picture: icon && iconIsUrl ? html`<img src=${icon} alt="" />` : null,
-        text: icon ? escHtml(icon) : escHtml(monogram),
-        name: escHtml(req.app_name),
-        meta: escHtml(req.app_origin),
+        text: icon || monogram,
+        name: req.app_name,
+        meta: req.app_origin,
         mark: html`<${Mark} kind="status" tone=${ownApp ? 'fine' : 'attention'}>${ownApp ? tr('appGrant.ownBadge', 'Your app') : tr('appGrant.externalBadge', 'External app')}<//>`,
       }}
       title=${existingGrant
@@ -264,9 +266,9 @@ export default function AppGrant() {
         'appGrant.updatedNotice',
         'This app has been updated and now asks for something new. Approve it again to keep using it.',
       )}<//><//>`}
-      ${req.app_description && html`<${Note} kind="lead">${escHtml(req.app_description)}<//>`}
+      ${req.app_description && html`<${Note} kind="lead">${req.app_description}<//>`}
 
-      <${Box} tone="dim"><b>${tr('appGrant.worksWith', 'Works with:')}</b> ${escHtml(summaryLine)}<//>
+      <${Box} tone="dim"><b>${tr('appGrant.worksWith', 'Works with:')}</b> ${summaryLine}<//>
       <${Action} small expanded=${details} onClick=${() => setDetails((v) => !v)}>
         ${details
           ? tr('appGrant.hideDetails', 'Hide the exact permissions')
@@ -278,8 +280,8 @@ export default function AppGrant() {
           ${req.scopes.map((s) => html`
             <${Box} key=${s.scope} tone="row" packed>
               <${Check} checked=${selected.has(s.scope)} onChange=${() => toggle(s.scope)} ariaLabel=${s.scope}
-                hint=${html`<${Code}>${escHtml(s.scope)}<//>`}>
-                ${escHtml(scopeSentence(s.scope, t, s.description))}
+                hint=${html`<${Code}>${s.scope}<//>`}>
+                ${scopeSentence(s.scope, t, s.description)}
                 ${existingGrant && !existingGrant.scopes.includes(s.scope) && html` <${Mark} tone="coral">${tr('appGrant.newScope', 'new')}<//>`}
               <//>
             <//>`)}

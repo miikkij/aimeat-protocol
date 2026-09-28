@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   v1.18.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a service name or description with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.18.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the page frame
  *     (SettingsPage), the view tabs (Tabs bar), the list and its opening rows (List, Row, Panel), the details
  *     (Facts; a schema the Code block that scrolls after 200px, as main's did), the tags (Mark), the ways on
@@ -48,7 +50,6 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
@@ -96,11 +97,11 @@ function ServiceCard({ svc, expanded, onToggle, actions }) {
 
   return html`
     <${Row} open=${expanded} onToggle=${onToggle}>
-      <${Name}>${escHtml(displayName)}<//>
-      <${Desc}>${escHtml(svc.description || '')}${svc.owner ? html` │ ${escHtml(svc.owner)}` : ''}<//>
+      <${Name}>${displayName}<//>
+      <${Desc}>${svc.description || ''}${svc.owner ? html` │ ${svc.owner}` : ''}<//>
       <${Doors}>
         <${Marks}>
-          ${category && html`<${Mark}>${escHtml(category)}<//>`}
+          ${category && html`<${Mark}>${category}<//>`}
           <${Mark}>${priceMorsels ? priceMorsels + ' ❤️' : t('profile.services.free')}<//>
         <//>
         <${Icon} small expanded=${!!expanded}>${expanded ? '▼' : '▶'}<//>
@@ -152,12 +153,12 @@ function ServiceDetail({ svc }) {
   const providerGaii = d.provider_gaii || d.providerGaii || '';
 
   return html`<${Facts} rows=${[
-    description && { k: t('profile.services.descLabel'), v: escHtml(description) },
-    providerGaii && { k: t('profile.services.provider'), v: escHtml(providerGaii), mono: true },
+    description && { k: t('profile.services.descLabel'), v: description },
+    providerGaii && { k: t('profile.services.provider'), v: providerGaii, mono: true },
     { k: t('profile.services.priceLabel'), v: `${priceMorsels} morsels${priceUnit ? ' / ' + priceUnit : ''}` },
-    webhookUrl && { k: t('profile.services.webhookLabel'), v: escHtml(webhookUrl), mono: true },
+    webhookUrl && { k: t('profile.services.webhookLabel'), v: webhookUrl, mono: true },
     estimatedTime && { k: t('profile.services.estTime'), v: `${estimatedTime}s` },
-    tags.length > 0 && { k: 'Tags', v: html`<${Marks}>${tags.map(tag => html`<${Mark} key=${tag}>${escHtml(tag)}<//>`)}<//>` },
+    tags.length > 0 && { k: 'Tags', v: html`<${Marks}>${tags.map(tag => html`<${Mark} key=${tag}>${tag}<//>`)}<//>` },
     schemaRow(inputSchema, 'Input schema'),
     schemaRow(outputSchema, 'Output schema'),
     createdAt && { k: 'Created', v: fmtDate(createdAt) },

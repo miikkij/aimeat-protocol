@@ -14,6 +14,9 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   v1.17.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a note's first line, an organism or workspace name, the AI's reason or an error
+ *     with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.17.0 -- 2026-09-26 -- Every part is a component that takes data: the note is a List row, its
  *     text the Peek (line, peek under a fade, all; PeekToggle cycles them), its foot a Layout row of
  *     Action and Loud, each panel a section Card, the plan and the split pieces PlanSteps (PlanNote
@@ -65,7 +68,6 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { Row as ListRow, Cell } from '/components/List.js';
 import { Row, Stack, Split } from '/components/Layout.js';
 import { Action, Loud } from '/components/Action.js';
@@ -402,7 +404,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
                       <${Action} small disabled=${runningStepId === step.id} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}<//>`}>
                     ${step.description && html`<${Note} kind="meta">${step.description}<//>`}
                     ${step.rationale && html`<${PlanNote}>${step.rationale}<//>`}
-                    ${running && step.kind === 'delegate' && html`<${PlanNote}>${t('profile.notebook.delegateWaiting').replace('{agent}', step.agent || '')}${stepStatus[step.id] ? ` (${escHtml(stepStatus[step.id])})` : ''}<//>`}
+                    ${running && step.kind === 'delegate' && html`<${PlanNote}>${t('profile.notebook.delegateWaiting').replace('{agent}', step.agent || '')}${stepStatus[step.id] ? ` (${stepStatus[step.id]})` : ''}<//>`}
                   <//>`;
               })}
             <//>
@@ -460,28 +462,28 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     const conf = result.suggestion ? Math.round((result.suggestion.confidence || 0) * 100) : null;
     return html`
       <${Card} tone="section"><${Stack} gap="medium">
-        ${result.suggestion?.reason && html`<${PlanNote}>${escHtml(result.suggestion.reason)}${conf !== null ? ` · ${conf}%` : ''}<//>`}
+        ${result.suggestion?.reason && html`<${PlanNote}>${result.suggestion.reason}${conf !== null ? ` · ${conf}%` : ''}<//>`}
         <${Fields}>
           <${Select} label=${t('profile.notebook.fieldOrganism')} value=${edit.organismId} onChange=${v => onOrganismChange(v)}
-            options=${[...orgs.map(o => [o.id, escHtml(o.name)]), [NEW, `➕ ${t('profile.notebook.newOrganism')}`]]} />
+            options=${[...orgs.map(o => [o.id, o.name]), [NEW, `➕ ${t('profile.notebook.newOrganism')}`]]} />
           ${edit.organismId === NEW && html`
             <${TextField} placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
               value=${edit.organismName} onInput=${v => patchEdit({ organismName: v })} />`}
           ${edit.organismId !== NEW && html`
             <${Select} label=${t('profile.notebook.fieldWorkspace')} value=${edit.workspaceId} onChange=${v => onWorkspaceChange(v)}
-              options=${[...workspaces.map(w => [w.id, escHtml(w.name)]), [NEW, `➕ ${t('profile.notebook.newWorkspace')}`]]} />`}
+              options=${[...workspaces.map(w => [w.id, w.name]), [NEW, `➕ ${t('profile.notebook.newWorkspace')}`]]} />`}
           ${(edit.organismId === NEW || edit.workspaceId === NEW) && html`
             <${TextField} placeholder=${t('profile.notebook.newWsNamePlaceholder')}
               value=${edit.workspaceName} onInput=${v => patchEdit({ workspaceName: v })} />`}
           ${edit.organismId !== NEW && edit.workspaceId !== NEW && docSpaces.length > 0 && html`
             <${Select} label=${t('profile.notebook.fieldSpace')} value=${edit.space} onChange=${v => patchEdit({ space: v })}
-              options=${docSpaces.map(s => [s.namespace, escHtml(s.name)])} />`}
+              options=${docSpaces.map(s => [s.namespace, s.name])} />`}
           ${result.alternatives?.length > 0 && html`
             <${Row} wrap gap="small">
               <${Note} kind="meta" inline>${t('profile.notebook.alternatives')}<//>
               ${result.alternatives.map((alt, i) => html`
                 <${Action} key=${i} small onClick=${() => applyAlternative(alt)}>
-                  ${escHtml(alt.organismName || '?')}${alt.workspaceName ? ` ▸ ${escHtml(alt.workspaceName)}` : ''}
+                  ${alt.organismName || '?'}${alt.workspaceName ? ` ▸ ${alt.workspaceName}` : ''}
                 <//>`)}
             <//>`}
           <${TextField} label=${t('profile.notebook.fieldTitle')} value=${edit.title} onInput=${v => patchEdit({ title: v })} />
@@ -506,7 +508,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   // A panel that says the AI refused: why, the key settings when the key is missing, try again.
   const errorPanel = (title, err, retry, dismiss) => html`
     <${Card} tone="section"><${Stack} gap="medium">
-      <${Note} kind="message" error>${title}: ${escHtml(err.message)}<//>
+      <${Note} kind="message" error>${title}: ${err.message}<//>
       ${err.code === 'NO_OPENROUTER_KEY' && html`
         <${Note} kind="meta">${t('profile.notebook.needKey')}<//>
         <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
@@ -521,11 +523,11 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       ${trackMsg && html`
         <${Note} kind="aside" size="small">
           <${Row} gap="medium" justify="between">
-            <${Row} gap="medium"><span>🔗</span><span>${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', escHtml(trackPeer))}</span><//>
+            <${Row} gap="medium"><span>🔗</span><span>${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', trackPeer || '')}</span><//>
             <${Loud} control onClick=${() => setTrackOpen(true)}>${t('inbox.trackResponse')}<//>
           <//>
         <//>`}
-      <${Peek} view=${view} line=${escHtml(firstLine(baseText()))}><${Markdown} text=${baseText()} /><//>
+      <${Peek} view=${view} line=${firstLine(baseText())}><${Markdown} text=${baseText()} /><//>
       <${Row} gap="medium" justify="between">
         <${Row} gap="small">
           <${PeekToggle} view=${view} label=${t('profile.notebook.toggleView')} onToggle=${cycleView} />

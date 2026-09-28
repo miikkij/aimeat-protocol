@@ -6,6 +6,8 @@
  *   prompt, and upload/publish the resulting HTML. Extracted from portfolio.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 -- 2026-09-28 -- No escHtml() on the error text: preact escapes text itself, so an
+ *     error message with a quote or an ampersand showed as &quot; / &amp;. The srcdoc preview is unchanged.
  *   v1.4.0 -- 2026-09-13 -- Compose the page headline and five B1 section slabs.
  *   v1.3.0 -- 2026-09-13 -- Compose poster rules and move inline presentation to portfolio.css.
  *   v1.2.0 — 2026-08-28 — "AIMEAT poster" is the first design style and the default: the house
@@ -21,7 +23,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, handleImgError } from '/js/utils.js';
+import { handleImgError } from '/js/utils.js';
 import { apiGet, apiPut } from '/js/api.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import { CopyButton } from '/components/CopyButton.js';
@@ -307,7 +309,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
   // Render
   if (loading) return html`<div class="portfolio-container"><div class="view-loading">${t('loading') || 'Loading...'}</div></div>`;
-  if (errMsg) return html`<div class="portfolio-container"><div class="alert alert-error">${escHtml(errMsg)}</div></div>`;
+  if (errMsg) return html`<div class="portfolio-container"><div class="alert alert-error">${errMsg}</div></div>`;
   if (!session) return html`<div class="portfolio-container"><div class="portfolio-not-found"><h2>${t('nav.signIn')}</h2><p>Sign in to build your portfolio.</p></div></div>`;
 
   const hasContent = catalog && (catalog.images.length || catalog.apps.length || catalog.boards.length || catalog.cortex.length || catalog.memories.length);

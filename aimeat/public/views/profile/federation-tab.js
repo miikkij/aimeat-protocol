@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing federated peer nodes and their online/offline status.
  * @version-history
+ *   v1.11.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so a peer id or URL with an ampersand showed as &amp;.
  *   v1.11.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage, List, Mark, Note): the page passes data and writes no class. Put back from main: a member peer and a permanent one stand out (the success colour on main, the tag's fine tone now) from a visiting, genesis or temporary one (the plain tag) (page group G8).
  *   v1.10.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v1.9.0 -- 2026-09-25 -- A list drawn as classic cards is the Listing (css/components/listing.css), a row that opens shows the Listing's open panel; the card, its header, arrow and detail rules go (a unification: the look most tabs use).
@@ -28,7 +29,6 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { LoadingLine } from './shared.js';
 import { PageSection } from '/components/PageSection.js';
 import { StatusDot } from '/components/StatusDot.js';
@@ -77,8 +77,8 @@ export default function FederationTab() {
             const tier = p.tier || 'member';
             return html`
               <${Row} key=${p.node_id || p.nodeId || p.url}>
-                <${Name}>${escHtml(p.node_id || p.nodeId || p.url)}<//>
-                <${Desc}>${escHtml(p.url || '')}<//>
+                <${Name}>${p.node_id || p.nodeId || p.url}<//>
+                <${Desc}>${p.url || ''}<//>
                 <${Doors}>
                     ${kindMark(tier === 'member', t('profile.federation.tier_' + tier) || tier)}
                     ${p.availability && p.availability !== 'unknown' ? kindMark(p.availability === 'permanent', t('profile.federation.avail_' + p.availability) || p.availability) : null}

@@ -19,6 +19,8 @@
  * @structure BEATS · BeatRail · Beat · default export BuildStory({ navigate })
  * @usage routed at /v1/how-an-app-builds by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.1 -- 2026-09-28 -- No escHtml() on the prompt preview: preact escapes text itself, so the
+ *     preview showed every quote, ampersand and angle bracket in the build prompt as &quot; / &amp; / &lt;.
  *   v1.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai), not to a
@@ -33,7 +35,6 @@ import { t, getLocale } from '/js/i18n.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { BuildInvite, fetchCanonicalBuildPrompt } from '/views/landing-builder.js';
-import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
@@ -161,7 +162,7 @@ export default function BuildStory({ navigate }) {
               <span>${tr('story.chipPacks', 'the packs you ticked')}</span>
               <span>${tr('story.chipPitfalls', 'the pitfalls other builders hit')}</span>
             </div>
-            <pre class="bs-prompt-preview">${prompt ? escHtml(prompt.slice(0, 600)) : tr('landing.buildLoading', 'Loading the build prompt from this node…')}</pre>
+            <pre class="bs-prompt-preview">${prompt ? prompt.slice(0, 600) : tr('landing.buildLoading', 'Loading the build prompt from this node…')}</pre>
             <${CopyButton} text=${prompt} disabled=${!prompt} className="btn-primary bs-copy"
               label=${tr('common.copyPrompt', 'Copy the prompt')} copiedLabel=${tr('common.copied', 'Copied')} />
           </div>

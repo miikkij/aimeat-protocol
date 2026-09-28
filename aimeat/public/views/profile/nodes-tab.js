@@ -5,6 +5,7 @@
  * @description Profile tab for managing personal node registrations, visibility,
  *   agent assignments, tunnel URLs, and mailbox status.
  * @version-history
+ *   v1.21.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so a node id or agent GAII with an ampersand showed as &amp;.
  *   v1.21.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with the Tabs bar, Section, List with its opened Panel, Facts, Card, Fields, TextField, Check, Tab, Split, Mark, Note, Action): the page passes data and writes no class. The setup steps name their keys again as main did (page group G8).
  *   v1.20.0 -- 2026-09-26 -- Private and Public beside their radio dots are the Check line (css/components/check-line.css), no longer the row label (a unification: Jouni's decision "Check line").
  *   v1.19.0 -- 2026-09-26 -- The page opens with the Settings head: the crumb, NODES as the page's title and the line that says what it is for, the Nodes and Node stats tabs under it; the line leaves the list's band title (a unification: Jouni's decision "Nodes page head").
@@ -49,7 +50,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo } from '/js/utils.js';
+import { timeAgo } from '/js/utils.js';
 import { LoadingLine } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
@@ -162,7 +163,7 @@ function NodesList({ session, showToast, onStats }) {
           const steps = ['profile.nodes.setupStep1', 'profile.nodes.setupStep2', 'profile.nodes.setupStep3', 'profile.nodes.setupStep4'];
           return html`
             <${Row} key=${node.node_id} open=${isOpen} onToggle=${() => toggleIn(expandedNodes, setExpandedNodes, idx)}>
-              <${Name} dot=${statusClass} dotTitle=${statusLabel}>${escHtml(node.node_id)}<//>
+              <${Name} dot=${statusClass} dotTitle=${statusLabel}>${node.node_id}<//>
               <${Desc}>${agentCount} ${agentWord} \u2502 ${t('profile.nodes.mailboxItems')}: ${mailboxCount} ${t('profile.nodes.items')}<//>
               <${Doors}>
                   ${isPublic
@@ -178,7 +179,7 @@ function NodesList({ session, showToast, onStats }) {
                       action: html`<${Action} small copy=${tunnelUrl} onCopied=${() => showToast(t('common.copied'))}>${t('common.copy')}<//>` },
                     { k: t('profile.nodes.agentList'),
                       v: node.agent_gaiis?.length > 0
-                        ? node.agent_gaiis.map(g => html`<${FactLine} key=${g}><${Code}>${escHtml(g)}<//><//>`)
+                        ? node.agent_gaiis.map(g => html`<${FactLine} key=${g}><${Code}>${g}<//><//>`)
                         : html`<${Note} kind="quiet">${t('profile.nodes.noAgents')}<//>` },
                     { k: t('profile.nodes.mailbox'), v: `${mailboxCount} ${t('profile.nodes.items')} (${mbUsedMB} ${t('profile.nodes.mailboxOf')} ${mbQuotaMB} MB)` },
                     { k: t('profile.nodes.lastSeen'), v: node.last_seen ? timeAgo(node.last_seen) : '-' },

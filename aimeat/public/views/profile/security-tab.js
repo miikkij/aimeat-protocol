@@ -5,6 +5,8 @@
  * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
  *   reach the account's API. Operator-only in the menu (the Infrastructure group).
  * @version-history
+ *   v1.22.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so an agent name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.22.0 -- 2026-09-26 -- Every part is a component that takes data (SettingsPage, Card section,
  *     List, Mark, Note, Action/Loud, TextArea, SubHeading, Layout); the page writes no class. Put
  *     back from main: an agent's name and the origins fields in the code face (main's text-code).
@@ -60,7 +62,6 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
@@ -155,7 +156,7 @@ export default function SecurityTab({ session, showToast }) {
     const hasCustom = ac.allowed_origins !== null && ac.allowed_origins !== undefined;
     const isEditing = corsEditAgent && corsEditAgent.name === agentName;
     return html`<${Row} key=${agentName}>
-      <${Name} code>${escHtml(agentName)}<//>
+      <${Name} code>${agentName}<//>
       ${isEditing
         ? html`<${Cell}><${TextArea} code rows=${2} ariaLabel=${t('profile.security.origins')}
             value=${corsEditAgent.value}
