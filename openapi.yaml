@@ -780,6 +780,7 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         lastUsedAt: { type: string, format: date-time, description: 'When a call last ran as this role (at most once a day). Read only.' }
+        stale: { type: boolean, description: 'Not used for 90 days (not a built-in role), so it can be cleaned away. Read only.' }
     AiAppRoleView:
       type: object
       description: A role an app declares, with the owner's binding.
@@ -788,7 +789,7 @@ components:
         capabilities: { type: array, items: { type: string } }
         purpose: { type: string }
         local: { type: boolean }
-        context: { type: integer, description: The least context, in tokens, the role needs. }
+        context: { type: integer, description: 'The least context, in tokens, the role needs. A model the model catalogue says reads less is passed over in the call (reason too-small).' }
         params:
           type: object
           description: The fine-tuning the app wants for this role.
@@ -804,7 +805,23 @@ components:
             - type: 'null'
           description: The owner's role it runs as; null while it does not run.
         lastUsedAt: { type: string, format: date-time }
-        requestedAt: { type: string, format: date-time, description: When the app last asked for the role while it was unbound. }
+        requestedAt: { type: string, format: date-time, description: 'When the app last asked for the role while it was unbound. Binding the key to null dismisses it.' }
+        fit:
+          type: object
+          description: Present when the owner's bound role does not meet the need.
+          properties:
+            missing: { type: array, items: { type: string }, description: The capabilities the app's role needs that the owner's role has no provider for. }
+            small:
+              type: array
+              description: The role's models whose catalogue context is smaller than `context`.
+              items:
+                type: object
+                properties:
+                  capability: { type: string }
+                  provider: { type: string }
+                  model: { type: string }
+                  context: { type: integer }
+        stale: { type: boolean, description: Bound and not used for 90 days. }
     AiRolesView:
       type: object
       properties:
@@ -818,6 +835,7 @@ components:
             type: object
             properties:
               app: { type: string, description: '<owner>/<file>.html' }
+              gone: { type: boolean, description: The app is no longer published; its bindings and requests can be removed. }
               roles:
                 type: array
                 items:
@@ -15964,7 +15982,7 @@ paths:
                       - type: 'null'
                 bindings:
                   type: object
-                  description: '{ "<owner>/<file>.html#<role name>": "<role id>" or null }. At most 200.'
+                  description: '{ "<owner>/<file>.html#<role name>": "<role id>" or null }. At most 200. Null unbinds and dismisses the app''s request. A binding is refused (AI_ROLES_INVALID) when the app''s role needs a capability the owner''s role has no provider for.'
                   additionalProperties:
                     oneOf:
                       - type: string

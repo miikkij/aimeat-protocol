@@ -8,6 +8,9 @@
  *   roles, the ones they have bound, and the ones that asked for an unbound role.
  * @structure aiRolesView · knownRoleProviders
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The lifecycle and the fit: an app no longer published is `gone`; a role or a
+ *     binding not used for STALE_DAYS is `stale`; a bound app role whose owner role misses a capability
+ *     or has a model too small for its context carries `fit` (roles-fit.ts).
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -17,6 +20,7 @@ import { providersForOwner } from './provider-store.js';
 import { appAiMetaOf } from './policy-store.js';
 import { readRoles, rolesWithLegacy, readRolesUsed, readRoleRequests, bindingKey, type OwnerRole } from './roles.js';
 import type { AppAiRole } from '../app-ai-roles.js';
+import { roleFit, type RoleFit } from './roles-fit.js';
 
 export interface AppRoleView extends AppAiRole {
   /** `<app>#<name>`: the key a binding is stored under. */
@@ -26,12 +30,21 @@ export interface AppRoleView extends AppAiRole {
   lastUsedAt?: string;
   /** When the app last asked for it while it was unbound. */
   requestedAt?: string;
+  /** Where the owner's role does not meet the need (roles-fit.ts), when it is bound. */
+  fit?: RoleFit;
+  /** Bound and not used for STALE_DAYS. */
+  stale?: boolean;
 }
 
 export interface AiRolesView {
-  roles: Array<OwnerRole & { legacy?: boolean; lastUsedAt?: string }>;
-  apps: Array<{ app: string; roles: AppRoleView[] }>;
+  roles: Array<OwnerRole & { legacy?: boolean; lastUsedAt?: string; stale?: boolean }>;
+  /** `gone`: the app is no longer published, so its bindings and requests can be removed. */
+  apps: Array<{ app: string; gone?: boolean; roles: AppRoleView[] }>;
 }
+
+/** A role or a binding not used for this long is marked, so the owner can clean it away. */
+export const STALE_DAYS = 90;
+const olderThan = (iso: string | undefined, days: number): boolean => !!iso && Date.now() - Date.parse(iso) > days * 86_400_000;
 
 export async function aiRolesView(storage: Storage, config: AimeatConfig, gaii: string): Promise<AiRolesView> {
   // Each read inside an async function, so a storage that throws before returning a promise rejects
@@ -41,9 +54,14 @@ export async function aiRolesView(storage: Storage, config: AimeatConfig, gaii: 
     providersForOwner(storage, config, gaii), (async () => storage.getMemory(gaii, 'openrouter.settings'))(),
   ]);
   const prefs = (prefsRec?.value as Record<string, unknown>) ?? {};
-  const roles = Object.values(rolesWithLegacy(record, prefs, providers))
+  const allRoles = rolesWithLegacy(record, prefs, providers);
+  const allProviders = [...providers.owner, ...providers.node];
+  const roles = Object.values(allRoles)
     .sort((a, b) => Number(!!b.builtIn) - Number(!!a.builtIn) || a.id.localeCompare(b.id))
-    .map((r) => ({ ...r, ...(used[r.id] ? { lastUsedAt: used[r.id] } : {}) }));
+    .map((r) => ({
+      ...r, ...(used[r.id] ? { lastUsedAt: used[r.id] } : {}),
+      ...(!r.builtIn && olderThan(used[r.id] ?? r.createdAt, STALE_DAYS) ? { stale: true } : {}),
+    }));
 
   // Which apps: the owner's own that declare roles, the ones with a binding, the ones that asked.
   const addresses = new Set<string>();
@@ -66,15 +84,35 @@ export async function aiRolesView(storage: Storage, config: AimeatConfig, gaii: 
     }
     const list = [...declared.values()].map((r) => {
       const key = bindingKey(app, r.name);
+      const bound = record.bindings[key];
+      const role = bound ? allRoles[bound.role] : undefined;
+      const fit = role ? roleFit(r, role, allProviders) : undefined;
       return {
-        ...r, binding: key, boundTo: record.bindings[key]?.role ?? null,
+        ...r, binding: key, boundTo: bound?.role ?? null,
         ...(used[key] ? { lastUsedAt: used[key] } : {}),
-        ...(requests[key] && !record.bindings[key] ? { requestedAt: requests[key].at } : {}),
+        ...(requests[key] && !bound ? { requestedAt: requests[key].at } : {}),
+        ...(fit && (fit.missing.length || fit.small.length) ? { fit } : {}),
+        ...(bound && olderThan(used[key] ?? bound.boundAt, STALE_DAYS) ? { stale: true } : {}),
       };
     });
-    if (list.length) apps.push({ app, roles: list });
+    if (list.length) apps.push({ app, ...(await appExists(storage, app) ? {} : { gone: true }), roles: list });
   }
   return { roles, apps };
+}
+
+/**
+ * Whether the app at `<owner>/<file>.html` is still published, read fresh: appAiMetaOf keeps an app's
+ * meta for a minute, and a removed app should show as removed when the owner looks.
+ */
+async function appExists(storage: Storage, app: string): Promise<boolean> {
+  const slash = app.indexOf('/');
+  if (slash <= 0) return false;
+  try {
+    return !!(await storage.getAppByOwnerName(app.slice(0, slash), app.slice(slash + 1)));
+  } catch (err) {
+    logger.warn('[ai] could not read an app for its AI roles', { app, error: String(err) });
+    return true;
+  }
 }
 
 /** The provider ids a role may name: every provider the owner can use. */

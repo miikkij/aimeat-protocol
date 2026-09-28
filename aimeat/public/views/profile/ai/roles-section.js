@@ -12,6 +12,9 @@
  * @structure secRoles · roleRow · roleOpen · appRoleRow
  * @usage import { secRoles } from './ai/roles-section.js';
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The lifecycle and the fit: a role or a binding unused for 90 days is marked,
+ *     an app no longer published is marked and its request can be dismissed, and a bound app role says
+ *     where the owner's role does not meet its need (a missing capability, a model too small).
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { h } from 'preact';
@@ -66,7 +69,7 @@ export function secRoles(ctx, num) {
           <${Label} block>${x('rl.appsTitle')}<//>
           ${rl.apps.length ? html`
             <${List} cols="name-desc-who-doors" head=${[x('rl.colAppRole'), x('rl.colNeeds'), x('rl.colBinding'), '']}>
-              ${rl.apps.flatMap((a) => a.roles.map((r) => appRoleRow(ctx, a.app, r)))}
+              ${rl.apps.flatMap((a) => a.roles.map((r) => appRoleRow(ctx, a, r)))}
             <//>` : html`<${Note} kind="quiet">${x('rl.noApps')}<//>`}
         <//>
         ${msg(rl.appMsg)}
@@ -77,7 +80,7 @@ export function secRoles(ctx, num) {
 function roleRow(ctx, role, titleOf) {
   const rl = ctx.rl;
   const open = rl.openId === role.id;
-  const meta = [role.id, role.builtIn ? x('rl.builtIn') : '', role.legacy ? x('rl.legacy') : ''].filter(Boolean).join(' · ');
+  const meta = [role.id, role.builtIn ? x('rl.builtIn') : '', role.legacy ? x('rl.legacy') : '', role.stale ? x('rl.stale', { n: 90 }) : ''].filter(Boolean).join(' · ');
   const order = orderWords(role, titleOf);
   return html`
     <${Row} key=${role.id} open=${open} id=${'ai-role-' + role.id}>
@@ -126,8 +129,18 @@ function roleOpen(ctx, role) {
   return html`<${Panel} doors=${doors}><${Facts} rows=${rows} /><//>`;
 }
 
-function appRoleRow(ctx, app, r) {
+/** Where the owner's role does not meet the app's need (services/ai/roles-fit.ts), in words. */
+function fitWords(fit) {
+  if (!fit) return '';
+  return [
+    fit.missing?.length ? x('rl.fitMissing', { caps: fit.missing.map((c) => x('cap.' + c).toLowerCase()).join(', ') }) : '',
+    ...(fit.small || []).map((s) => x('rl.fitSmall', { model: s.model, n: s.context })),
+  ].filter(Boolean).join(' · ');
+}
+
+function appRoleRow(ctx, a, r) {
   const rl = ctx.rl;
+  const app = a.app;
   const pick = rl.bindDraft[r.binding] ?? r.boundTo ?? '';
   const params = r.params
     ? Object.entries(r.params).map(([k, v]) => `${x('param.' + k).toLowerCase()} ${k === 'reasoning' ? x('reasoning.' + v).toLowerCase() : v}`).join(', ')
@@ -138,16 +151,20 @@ function appRoleRow(ctx, app, r) {
     ? x('rl.boundTo', { role: bound ? roleTitle(bound) : r.boundTo })
     : html`<${Marks}><${Mark} tone="coral">${x('rl.notBound')}<//><//>`;
   const options = [['', x('rl.pickRole')], ...rl.roles.map((q) => [q.id, roleTitle(q)])];
+  const when = r.requestedAt && !r.boundTo ? x('rl.requested', { date: dateWord(r.requestedAt) }) : (r.lastUsedAt ? x('rl.usedOn', { date: dateWord(r.lastUsedAt) }) : '');
+  const sub = [fitWords(r.fit), r.stale ? x('rl.stale', { n: 90 }) : '', when].filter(Boolean).join(' · ');
   return html`
     <${Row} key=${r.binding}>
-      <${Name} meta=${app}>${r.name}<//>
+      <${Name} meta=${a.gone ? `${app} · ${x('rl.appGone')}` : app} warn=${!!a.gone}>${r.name}<//>
       <${Desc} sub=${needs}>${r.purpose || ''}<//>
-      <${Who} sub=${r.requestedAt && !r.boundTo ? x('rl.requested', { date: dateWord(r.requestedAt) }) : (r.lastUsedAt ? x('rl.usedOn', { date: dateWord(r.lastUsedAt) }) : '')}>${state}<//>
+      <${Who} sub=${sub} warn=${!!r.fit}>${state}<//>
       <${Doors}>
         <${Line} wrap gap="small">
-          <${Select} fit ariaLabel=${x('rl.bindTo', { name: r.name })} value=${pick} onChange=${(v) => rl.setBindDraft(r.binding, v)} options=${options} />
-          <${Action} small row disabled=${rl.busy === 'bind' || !pick || pick === r.boundTo} onClick=${() => rl.bind(r.binding, pick)}>${x('rl.bind')}<//>
-          ${r.boundTo ? html`<${Action} small soft tone="danger" onClick=${() => rl.bind(r.binding, '')}>${x('rl.unbind')}<//>` : null}
+          ${a.gone ? null : html`
+            <${Select} fit ariaLabel=${x('rl.bindTo', { name: r.name })} value=${pick} onChange=${(v) => rl.setBindDraft(r.binding, v)} options=${options} />
+            <${Action} small row disabled=${rl.busy === 'bind' || !pick || pick === r.boundTo} onClick=${() => rl.bind(r.binding, pick)}>${x('rl.bind')}<//>`}
+          ${r.boundTo ? html`<${Action} small soft tone="danger" onClick=${() => rl.bind(r.binding, '')}>${x('rl.unbind')}<//>`
+            : (r.requestedAt || a.gone ? html`<${Action} small soft tone="danger" onClick=${() => rl.bind(r.binding, '', true)}>${x('rl.dismiss')}<//>` : null)}
         <//>
       <//>
     <//>`;

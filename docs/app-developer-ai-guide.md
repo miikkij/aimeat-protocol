@@ -485,12 +485,15 @@ const r = await AIMEAT.ai.complete({ app_id, prompt, role: 'summarizer' });
 | `role.<name>=` | The capabilities the role needs, joined with `+` (`text`, `text+image`). The name is lower-case letters, digits and `-`. |
 | `role.<name>.purpose=` | What the role is for, in a few words the owner reads. No `;` inside. |
 | `role.<name>.local=yes` | Only providers on this machine. |
-| `role.<name>.context=` | The least context the role needs, in tokens. |
+| `role.<name>.context=` | The least context the role needs, in tokens. A model the model catalogue says reads less is passed over, and the owner's AI page says so. |
 | `role.<name>.temperature=`, `.top_p=`, `.max_tokens=`, `.reasoning=` | The fine-tuning this role wants. It overrides the provider's default, and the call's own value overrides it. `reasoning` is `off`, `low`, `medium` or `high`. |
 
 **A role says what the work needs, never which model.** The owner connects your
 role to one of their own roles, and theirs names the providers and models to try
 in order. So the app works on whatever providers the owner has, from any vendor.
+
+The owner can connect your role only to a role of theirs that has a provider for
+every capability yours needs.
 
 **Nothing runs until the owner connects the role.** A call with a role the owner
 has not connected is refused with `AI_ROLE_NOT_BOUND` (409), and the owner sees

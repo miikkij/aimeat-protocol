@@ -286,6 +286,56 @@ const APP_HTML = `<!doctype html><html><head><title>Recipes</title>
       }
       assert(typeof used === 'string', 'lastUsedAt is set');
     });
+
+    const NEEDS_HTML = `<!doctype html><html><head><title>Reader</title>
+<meta name="aimeat-scopes" content="ai:use">
+<meta name="aimeat-ai" content="generates=text,image; discloses=yes; role.longreader=text; role.longreader.context=100000; role.illustrator=text+image">
+</head><body>reader</body></html>`;
+    let readerToken = '';
+    const readerKey = (name: string) => `${a.name}/reader.html#${name}`;
+
+    await test('11. a binding the owner\'s role cannot meet is refused: the app\'s role needs a capability the role has no provider for', async () => {
+      readerToken = await publishApp(a, 'reader.html', NEEDS_HTML);
+      const r = await putRoles(a.token, { bindings: { [readerKey('illustrator')]: 'brief' } });
+      assert(r.status === 400 && r.body.error.code === 'AI_ROLES_INVALID' && /needs image/.test(r.body.error.message), `refused ${r.status}: ${r.body?.error?.message}`);
+      const ok = await putRoles(a.token, { bindings: { [readerKey('longreader')]: 'brief' } });
+      assert(ok.status === 200, `a text role meets a text need: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+    });
+
+    await test('12. a model too small for the context an app\'s role needs is shown and passed over; a big enough one answers', async () => {
+      assert((await putRoles(a.token, { roles: { brief: { title: 'Brief', capabilities: { text: [{ provider: 'my-openai', model: 'gpt-4' }] } } } })).status === 200, 'small model');
+      const view = (await roles(a.token)).body.data.apps.find((x: any) => x.app === `${a.name}/reader.html`);
+      const lr = view?.roles.find((x: any) => x.name === 'longreader');
+      assert(lr?.fit?.small?.[0]?.model === 'gpt-4' && lr.fit.small[0].context === 8192, `the page is told: ${JSON.stringify(lr?.fit)}`);
+      const before = stub.requestsFor('chat').length;
+      const c = await complete(readerToken, { role: 'longreader' });
+      assert(c.status === 400 && c.body.error.code === 'AI_CAPABILITY_UNAVAILABLE', `too small ${c.status} ${c.body?.error?.code}`);
+      assert(c.body.error.details.rejected.some((x: any) => x.reason === 'too-small'), `reason: ${JSON.stringify(c.body.error.details.rejected)}`);
+      assert(stub.requestsFor('chat').length === before, 'nothing reached a provider');
+      assert((await putRoles(a.token, { roles: { brief: { title: 'Brief', capabilities: { text: [{ provider: 'my-openai', model: 'gpt-4.1-mini' }] } } } })).status === 200, 'big model');
+      const ok = await complete(readerToken, { role: 'longreader' });
+      assert(ok.status === 200 && lastChat()?.model === 'gpt-4.1-mini', `big enough ${ok.status} ${lastChat()?.model}`);
+    });
+
+    await test('13. dismissing an app\'s request removes it; a removed app is marked so its bindings can go', async () => {
+      assert((await complete(readerToken, { role: 'illustrator' })).status === 409, 'unbound');
+      let req: any;
+      for (let i = 0; i < 20 && !req?.requestedAt; i++) {
+        req = (await roles(a.token)).body.data.apps.find((x: any) => x.app === `${a.name}/reader.html`)?.roles.find((x: any) => x.name === 'illustrator');
+        if (!req?.requestedAt) await sleep(100);
+      }
+      assert(typeof req?.requestedAt === 'string', 'the request is shown');
+      assert((await putRoles(a.token, { bindings: { [readerKey('illustrator')]: null } })).status === 200, 'dismiss');
+      const after = (await roles(a.token)).body.data.apps.find((x: any) => x.app === `${a.name}/reader.html`)?.roles.find((x: any) => x.name === 'illustrator');
+      assert(!after?.requestedAt, `dismissed: ${JSON.stringify(after)}`);
+      const del = await json('/v1/apps/reader.html', { method: 'DELETE', headers: auth(a.token) });
+      assert(del.status === 200 || del.status === 204, `delete app ${del.status}`);
+      // longreader is still bound, so the app stays in the list, marked, and its binding can be removed.
+      const gone = (await roles(a.token)).body.data.apps.find((x: any) => x.app === `${a.name}/reader.html`);
+      assert(gone?.gone === true && gone.roles.some((x: any) => x.name === 'longreader' && x.boundTo === 'brief'), `the removed app: ${JSON.stringify(gone)}`);
+      assert((await putRoles(a.token, { bindings: { [readerKey('longreader')]: null } })).status === 200, 'remove the binding');
+      assert(!(await roles(a.token)).body.data.apps.some((x: any) => x.app === `${a.name}/reader.html`), 'the removed app is gone from the list');
+    });
   } finally {
     await stopServer(server);
     await stub.close();

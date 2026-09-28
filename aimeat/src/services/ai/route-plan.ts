@@ -31,6 +31,8 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.5.0 — 2026-09-28 — `minContext`: a model the catalogue says reads less than an app's role needs
+ *     is passed over (reason 'too-small'), the call side of roles-fit.ts.
  *   v1.4.0 — 2026-09-28 — A role's order (`roleOrder`, chosenBy 'role'): the owner's explicit choice, so
  *     its untested providers are not skipped, as a named provider is not.
  *   v1.3.0 — 2026-09-28 — An extension provider (V6): its target carries the runner of its `ai.<op>`
@@ -79,7 +81,8 @@ export interface AiCandidate {
 
 export type RejectReason =
   | 'problem' | 'type-not-allowed' | 'capability-off' | 'requires-local' | 'host-not-allowed' | 'no-model'
-  | 'policy' | 'no-key' | 'node-key-host' | 'allowance-spent' | 'untested' | 'failing' | 'leaves-machine' | 'too-costly';
+  | 'policy' | 'no-key' | 'node-key-host' | 'allowance-spent' | 'untested' | 'failing' | 'leaves-machine' | 'too-costly'
+  | 'too-small';
 
 export interface RejectedCandidate {
   provider: string;
@@ -129,6 +132,9 @@ export interface RoutePlanInput {
    * tried after it, since the owner chose exactly these for the role.
    */
   roleOrder?: Array<{ provider: string; model?: string }>;
+  /** The least context an app's role says it needs (`role.<name>.context=`): a model the catalogue
+   *  says reads less is passed over. A model the catalogue does not know is not. */
+  minContext?: number;
 }
 
 /** The capabilities whose price is per token, so the pool can be ordered by it. */
@@ -335,6 +341,15 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       const parser = p.capabilities.files?.parser;
       if (!(p.type === 'openrouter' && parser && parser !== 'native')) {
         reject(p, 'capability-off', `${p.title}'s ${chosen.model} does not read files itself. Choose a model that does, or for OpenRouter a PDF engine.`);
+        continue;
+      }
+    }
+
+    // ── the context an app's role needs, from the catalogue; a model it does not know passes ──
+    if (input.minContext) {
+      const context = catalogModel(p.type, chosen.model)?.limits?.context;
+      if (context !== undefined && context < input.minContext) {
+        reject(p, 'too-small', `${p.title}'s ${chosen.model} reads at most ${context} tokens, and this role needs ${input.minContext}.`);
         continue;
       }
     }
