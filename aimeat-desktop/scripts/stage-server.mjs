@@ -19,13 +19,20 @@
  *        only; --no-optional drops Prisma engines (Mongo/Postgres are excluded
  *        from the SQLite desktop bundle).
  *     5. Assert the better-sqlite3 native binary is present.
+ *   Between the install and the assert, the files no running server reads are taken out
+ *   (step 5c), and every install lifecycle hook of the server's package.json is dropped first,
+ *   because this folder has dist/ and no scripts/ (step 4).
  * @usage  node scripts/stage-server.mjs   (run via `pnpm stage`)
  * @version-history
+ *   v0.4.0 — 2026-09-29 — Step 5c: source maps, type declarations and dependency markdown are
+ *     removed after the install, about 86 MB of a 353 MB bundle.
+ *   v0.3.0 — 2026-09-18 — The server's install lifecycle hooks are dropped from the staged
+ *     package.json; the node's new postinstall had failed the desktop-v0.5.0 release build.
  *   v0.2.0 — 2026-06-05 — Initial server resource staging (SQLite-only bundle).
  */
 
 import { execSync } from 'node:child_process';
-import { cpSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -121,6 +128,50 @@ if (existsSync(nestedMinimatch)) {
 } else {
   console.log('[stage-server] no nested minimatch under readdir-glob (ok)');
 }
+
+// 5c. Take out what a running server never reads. Measured on 2026-09-29 against the staged
+//     bundle of that day, 352.7 MB of files: 54.4 MB of source maps, 25.5 MB of TypeScript type
+//     declarations and 5.9 MB of markdown inside node_modules, about 86 MB together. The 0.5.0
+//     installer had grown to 105 MB from June's 49 MB, and this was the part of the growth that
+//     buys nothing.
+//
+//     Three kinds only, each safe for a stated reason:
+//       *.map          read by a debugger with the file open, never by Node or a browser at run
+//                      time; a missing map is a devtools warning and nothing else.
+//       *.d.ts, .d.mts, .d.cts
+//                      type declarations for a compiler; nothing executes them.
+//       *.md, *.markdown under node_modules only
+//                      READMEs and changelogs of dependencies. NOT under dist/: the server reads
+//                      its own markdown at startup (docs/AIMEAT_Help_Prompt.md among others).
+//     Left in on purpose: TypeScript sources and test or docs folders inside dependencies (7 MB
+//     and 10 MB), because a package can load a file from a folder with such a name at run time
+//     and the saving does not justify finding out in someone's installed app. Also left in: the
+//     browser libraries under dist/public/lib, duckdb-wasm's 37 MB included, because the AIMEAT
+//     on this computer serves them to the apps it hosts.
+function pruneForRuntime(dir, inNodeModules = false) {
+  let removed = 0;
+  let files = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const sub = pruneForRuntime(full, inNodeModules || entry.name === 'node_modules');
+      removed += sub.removed;
+      files += sub.files;
+      continue;
+    }
+    const name = entry.name.toLowerCase();
+    const drop = name.endsWith('.map')
+      || /\.d\.(ts|mts|cts)$/.test(name)
+      || (inNodeModules && /\.(md|markdown)$/.test(name));
+    if (!drop) continue;
+    removed += statSync(full).size;
+    files += 1;
+    rmSync(full, { force: true });
+  }
+  return { removed, files };
+}
+const pruned = pruneForRuntime(serverDir);
+console.log(`[stage-server] removed ${pruned.files} files no running server reads (${(pruned.removed / 1048576).toFixed(1)} MB): source maps, type declarations, dependency markdown`);
 
 // 6. Sanity check: the native SQLite binary must be present, or the packaged app
 //    will fail to start the node.
