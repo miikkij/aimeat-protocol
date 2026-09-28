@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.10.0 -- 2026-09-29 -- aimeat_package_sale: sell a repository's packages with no token.
  *   v1.9.0 -- 2026-09-28 -- aimeat_admin_install_set: plan first, ask for the missing values, apply.
  *   v1.8.0 -- 2026-09-25 -- The federation paragraph names relay_claims.not_ready and
  *     aimeat_admin_federation_relay_claim_set, before the default turns required in 3.20.0.
@@ -75,6 +76,12 @@ workspaces, the other users and the crew agents. Always \`plan\` first; it write
 account now and they sign in by the login link, Google or Entra, \`join: "invite"\` emails an
 invitation. A crew agent stays \`pending\` until the owner connects a runner; \`apply\` again then
 deploys it and creates nothing twice.
+
+**Selling packages (operator, on a shop's node).** \`aimeat_package_sale\` sells a package repository's
+packages from this node with no token: this node signs each request with its own key, once the
+package's author has named this node a seller there. \`needs\` gives the questions to ask the customer
+before payment, \`grant\` serves a customer node (with \`node\` for a new one, \`updates_until\` when the
+monthly updates end), \`revoke\` stops it.
 
 **Moderation.** \`aimeat_admin_knowledge\` (EVERY knowledge package on the node, not just the
 catalogued ones — the public knowledge catalogue is a subset. Lead with

@@ -26,6 +26,8 @@
  *   cd aimeat && pnpm exec tsx scripts/inventory/build-inventory.ts
  *   cd aimeat && pnpm exec tsx scripts/inventory/build-inventory.ts --json-only
  * @version-history
+ *   v1.0.1 — 2026-09-29 — mcp/catalog/scopes-operator.ts counts as a definition file (the operator rows
+ *     of the tool table, moved out of scopes.ts unchanged).
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1, analysis only).
  */
 import ts from 'typescript';
@@ -171,7 +173,7 @@ function main(): void {
     const rows = toRows(collectDoors(files));
     // The two files that DEFINE the vocabulary rather than demand it. Counting a definition as a
     // demand would make every word look asked-for, which is the opposite of what this measures.
-    const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['mcp/catalog/scopes.ts', 'utils/scope-coverage.ts']);
+    const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['mcp/catalog/scopes.ts', 'mcp/catalog/scopes-operator.ts', 'utils/scope-coverage.ts']);
     mkdirSync(OUT_DIR, { recursive: true });
 
     writeFileSync(join(OUT_DIR, 'inventory.json'), JSON.stringify({

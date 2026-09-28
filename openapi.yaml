@@ -43468,6 +43468,230 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/package-sellers:
+    get:
+      operationId: listPackageSellers
+      summary: The nodes that sell your packages
+      description: >-
+        On a package repository: the nodes the caller named sellers of their packages. A seller node
+        makes sale requests signed with its own node key, with no token (see /v1/federation/package-sales).
+        Requires packages:write.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is `{ sellers: [{ nodeId, addedAt, addedBy, note? }], repository_role }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/package-sellers/{nodeId}:
+    put:
+      operationId: addPackageSeller
+      summary: Name a node a seller of your packages
+      description: >-
+        The seller sells every package of the caller's and nothing of anyone else's. `node`
+        ({ url, public_key }) registers a node this repository does not know yet as a packages-only peer;
+        without it the node must already be an active peer (409 PEER_UNKNOWN). A peer of that id under
+        another key answers 409 PEER_KEY_MISMATCH. Requires packages:write.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node:
+                  type: object
+                  properties:
+                    url: { type: string }
+                    public_key: { type: string }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: '`data` is `{ seller, peer_registered, repository_role }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      operationId: removePackageSeller
+      summary: Stop a node selling your packages
+      description: The grants it made stay; revoke them with the entitlements endpoint. Requires packages:write.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/federation/package-sales/{groupId}/config-needs:
+    get:
+      operationId: sellerPackageConfigNeeds
+      summary: A seller node reads a package's questions, signed
+      description: >-
+        On a package repository, for a seller node of the package's author. No token: the request carries
+        x-source-node, x-timestamp and x-signature, the node's signature over { source_node, timestamp,
+        purpose: "package-sale", method, path, body_sha256 } (sha256 of the canonical JSON body, `{}` when
+        there is none), checked against the key this repository holds for that peer, within five minutes.
+        The answer is that of /v1/packages/{groupId}/config-needs. 403 NOT_A_SELLER when the node does not
+        sell this package; 404 NOT_A_REPOSITORY when the role is off.
+      tags: [Federation]
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is `{ group_id, version, bundle, name, questions, defaults, problems }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/federation/package-sales/{groupId}/entitlements/{nodeId}:
+    put:
+      operationId: sellerGrantEntitlement
+      summary: A seller node grants a customer node, signed
+      description: >-
+        The grant of /v1/packages/{groupId}/entitlements/{nodeId}, made for the package's author by one of
+        its seller nodes, signed as described for the config-needs endpoint. The note records the seller.
+      tags: [Federation]
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node:
+                  type: object
+                  properties:
+                    url: { type: string }
+                    public_key: { type: string }
+                updates_until: { type: string, format: date-time, nullable: true }
+                channel: { type: string, enum: [stable, beta] }
+                note: { type: string }
+      responses:
+        '200':
+          description: '`data` is `{ entitlement, peer_registered }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      operationId: sellerRevokeEntitlement
+      summary: A seller node revokes a customer node, signed
+      tags: [Federation]
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/config-needs:
+    get:
+      operationId: packageSaleConfigNeeds
+      summary: This node, as a seller, asks a repository for a package's questions
+      description: >-
+        On the selling node: the node signs the request with its own key and sends it to the repository;
+        the repository's answer comes back as it said it. Operator only: the operator in person, or an
+        agent of the operator holding the exact scope operator:admin.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: repository, in: query, required: true, schema: { type: string } }
+        - { name: group_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The repository's envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/entitlements:
+    put:
+      operationId: packageSaleGrant
+      summary: This node, as a seller, grants a customer node on a repository
+      description: >-
+        `repository` is the repository's node id, or { node_id, url, public_key } the first time, which
+        links it as a peer. `node` registers a customer node the repository does not know yet;
+        `updates_until` ends its updates; null runs them again. Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, group_id, node_id]
+              properties:
+                repository: {}
+                group_id: { type: string }
+                node_id: { type: string }
+                node:
+                  type: object
+                  properties:
+                    url: { type: string }
+                    public_key: { type: string }
+                updates_until: { type: string, format: date-time, nullable: true }
+                channel: { type: string, enum: [stable, beta] }
+                note: { type: string }
+      responses:
+        '200':
+          description: The repository's envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      operationId: packageSaleRevoke
+      summary: This node, as a seller, revokes a customer node on a repository
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: repository, in: query, required: true, schema: { type: string } }
+        - { name: group_id, in: query, required: true, schema: { type: string } }
+        - { name: node_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The repository's envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/packages/{groupId}/config-needs:
     get:
       operationId: getPackageConfigNeeds

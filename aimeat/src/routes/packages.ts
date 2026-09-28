@@ -40,6 +40,8 @@
  *   v2.3.0 — 2026-09-28 — The export serves a private package to an entitled peer node's signed pull
  *     on a node in the repository role (services/package-entitlements.ts), and the entitlement
  *     routes are registered here (routes/package-entitlements.ts).
+ *   v2.4.0 — 2026-09-29 — The sale routes are registered here too (routes/package-sales.ts): seller
+ *     nodes and their signed requests, with no token.
  */
 
 import { Router } from 'express';
@@ -66,6 +68,7 @@ import { attestationFor } from '../services/package-attest-serve.js';
 import { checkUpstream } from '../services/package-pull.js';
 import { resolveNodeRead } from '../services/package-entitlements.js';
 import { registerPackageEntitlementRoutes } from './package-entitlements.js';
+import { registerPackageSaleRoutes } from './package-sales.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy
 // per road. They are in services/package-create.ts now, which is the one place a package version is
@@ -80,6 +83,8 @@ export function packagesRouter(
 
   // Which nodes a private package is served to, on a node in the repository role.
   registerPackageEntitlementRoutes(router, config, storage, peers);
+  // Selling node to node: the author's seller nodes, their signed requests, and the selling side.
+  registerPackageSaleRoutes(router, config, storage, peers);
 
   // ── Static routes FIRST (before parameterized :groupId) ──────────
 

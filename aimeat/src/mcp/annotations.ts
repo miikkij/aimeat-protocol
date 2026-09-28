@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-29 — aimeat_package_sellers and aimeat_package_sale (a revoke is destructive; the sale reaches the repository).
  *   2026-09-28 — aimeat_package_config_needs (read only).
  *   2026-09-28 — aimeat_admin_install_set (idempotent, reaches the package repository).
  *   2026-09-28 — aimeat_ai_roles (read only) and aimeat_ai_role_set (propose-then-confirm), AI roles.
@@ -406,6 +407,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Destructive: a revoke stops a customer node's pulls. Idempotent: the same grant twice is one grant.
     aimeat_package_entitlements: { title: 'Package Entitlements', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_package_config_needs: { title: 'Package Config Needs', readOnlyHint: true, openWorldHint: false },
+    aimeat_package_sellers: { title: 'Package Sellers', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // Reaches the package repository, and a revoke stops a customer's updates.
+    aimeat_package_sale: { title: 'Sell a Package', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
     // call is refused because the copy is no longer managed.
     aimeat_package_fork: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

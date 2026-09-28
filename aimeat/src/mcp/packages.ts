@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.8.0 — 2026-09-29 — aimeat_package_sellers: the nodes that sell your packages with no token.
  *   v1.7.0 — 2026-09-28 — aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.6.0 — 2026-09-28 — aimeat_package_entitlements takes `node` and registers an unknown node as a
  *     packages-only peer with the grant (install packages, phase 5).
@@ -59,6 +60,7 @@ import { forkPackageInstance, setPackageInstance } from '../services/package-man
 import { refreshInstalledPackages } from '../services/package-upstream-refresh.js';
 import { listEntitlements, grantEntitlement, revokeEntitlement } from '../services/package-entitlements.js';
 import { packageConfigNeeds } from '../services/package-config-needs.js';
+import { listSellers, addSeller, removeSeller } from '../services/package-sellers.js';
 import { toolError } from './tool-error.js';
 import { PACKAGE_CONFIG_PARAM } from './catalog/definitions/packages.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
@@ -384,6 +386,27 @@ export function registerPackageTools(
         const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, repository_role: config.packageRepository }, null, 2) }] };
+    });
+
+    // The nodes that sell this author's packages with no token: the same service /v1/package-sellers calls.
+    mcp.tool('aimeat_package_sellers', descriptionFor('aimeat_package_sellers'), {
+        action: z.enum(['list', 'add', 'remove']).describe('list your sellers, add (or change) one, or remove one.'),
+        node_id: z.string().optional().describe('For add and remove: the seller node.'),
+        node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For add: { url, public_key } of a node this repository does not know yet.'),
+        note: z.string().optional().describe('For add: why.'),
+    }, annotationsFor('aimeat_package_sellers'), async ({ action, node_id, node, note }) => {
+        const owner = ownerOf();
+        const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
+        if (action === 'list') return text({ sellers: await listSellers(storage, owner), repository_role: config.packageRepository });
+        if (!node_id) return { ...toolError('INVALID_INPUT', `action "${action}" needs node_id.`) };
+        if (action === 'remove') {
+            const out = await removeSeller(storage, { owner }, node_id);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return text({ removed: true, node_id });
+        }
+        const out = await addSeller(storage, peers, { owner }, { nodeId: node_id, node, note });
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        return text({ seller: out.seller, peer_registered: out.peerRegistered, repository_role: config.packageRepository });
     });
 
     // The questions a shop asks before payment: the same service GET /v1/packages/:groupId/config-needs calls.

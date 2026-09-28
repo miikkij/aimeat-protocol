@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-29 — aimeat_package_sellers on `appdev` and `agent`; aimeat_package_sale on the operator surface.
  *   2026-09-28 — aimeat_package_config_needs on `appdev` and `agent`, beside the entitlements.
  *   2026-09-28 — aimeat_admin_install_set on the operator surface.
  *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository and
@@ -158,7 +159,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
-        'aimeat_package_config_needs',
+        'aimeat_package_config_needs', 'aimeat_package_sellers',
         'aimeat_package_pull', 'aimeat_package_install_requests',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_seo_status',
@@ -231,7 +232,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
-        'aimeat_package_config_needs',
+        'aimeat_package_config_needs', 'aimeat_package_sellers',
         'aimeat_package_pull',
         // An install that lacked the words becomes a request; the person's own agent answers it here.
         'aimeat_package_install_requests',
@@ -352,6 +353,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_federation', 'aimeat_admin_federation_relay_claim_set',
         // Setting this node up from an install set: owner, packages, organisms, users, crew agents.
         'aimeat_admin_install_set',
+        // Selling a repository's packages from this node, signed by its own key.
+        'aimeat_package_sale',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // ...and the parts those pages are drawn from, and the themes they wear.

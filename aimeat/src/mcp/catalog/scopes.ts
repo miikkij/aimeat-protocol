@@ -22,6 +22,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.39.0 -- 2026-09-29 -- aimeat_package_sellers -> packages:write and aimeat_package_sale -> operator:admin,
+ *     the words their REST endpoints ask. The operator rows moved to scopes-operator.ts unchanged
+ *     (max-file-lines), spread where they stood.
  *   v1.38.0 -- 2026-09-28 -- aimeat_package_config_needs -> packages:write, the word its REST endpoint asks.
  *   v1.37.0 -- 2026-09-28 -- aimeat_admin_install_set -> operator:admin, the word its REST endpoints ask.
  *   v1.36.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository
@@ -126,6 +129,7 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { OPERATOR_TOOL_SCOPES } from './scopes-operator.js';
 
 /**
  * Tool -> required scope, mirroring the REST requireScope() gate for the SAME operation.
@@ -276,6 +280,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_package_repository:                'packages:write',
     aimeat_package_entitlements:              'packages:write',
     aimeat_package_config_needs:              'packages:write',
+    aimeat_package_sellers:                   'packages:write',
     aimeat_package_pull:                      'packages:write',
 
     // Installing registers an app, a cortex, an extension and any @activate cron the manifest
@@ -401,46 +406,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_workspace_sections_set:            'organism:write',
     aimeat_workspace_suggestions:             'organism:write',
 
-    // The node operator's break-glass over an organism this account does not own. The handler also
-    // resolves the caller's OWNER and refuses a non-operator, so the word alone gets nobody in; it is
-    // here as well because a tool is REGISTERED according to this table, and no wildcard carries this
-    // one (SCOPES_OUTSIDE_WILDCARD), so an operator's agent holds it only by an explicit tick.
-    aimeat_admin_organism_ownership:          'operator:organism-repair',
-    aimeat_admin_organism_owner_add:          'operator:organism-repair',
-
-    // Node administration through an agent (security audit A8-1). Each handler asks the account role
-    // first and this word second, through services/owner-lifecycle.ts resolveOperatorAgentName(). No
-    // wildcard carries it. The operator's agents that held `*` got it once per node, from
-    // services/operator-admin-migration.ts; any other agent holds it only by an explicit tick.
-    aimeat_admin_stats:                       'operator:admin',
-    aimeat_admin_agents:                      'operator:admin',
-    aimeat_admin_config:                      'operator:admin',
-    aimeat_admin_mint:                        'operator:admin',
-    aimeat_admin_sso_list:                    'operator:admin',
-    aimeat_admin_sso_get:                     'operator:admin',
-    aimeat_admin_sso_create:                  'operator:admin',
-    aimeat_admin_sso_update:                  'operator:admin',
-    aimeat_admin_sso_delete:                  'operator:admin',
-    aimeat_admin_sso_idp_metadata:            'operator:admin',
-    aimeat_admin_sso_scim_token:              'operator:admin',
-    aimeat_admin_owner_disable:               'operator:admin',
-    aimeat_admin_owner_enable:                'operator:admin',
-    aimeat_admin_totp_reset:                  'operator:admin',
-    aimeat_admin_security_overview:           'operator:admin',
-    aimeat_admin_incident_resolve:            'operator:admin',
-    aimeat_admin_cors_overview:               'operator:admin',
-    aimeat_admin_cors_set:                    'operator:admin',
-    aimeat_admin_hooks:                       'operator:admin',
-    aimeat_admin_hook_set:                    'operator:admin',
-    aimeat_admin_statistics:                  'operator:admin',
-    aimeat_admin_usage:                       'operator:admin',
-    aimeat_admin_knowledge:                   'operator:admin',
-    aimeat_admin_federation:                  'operator:admin',
-    aimeat_admin_federation_relay_claim_set:  'operator:admin',
-    aimeat_admin_install_set:                 'operator:admin',
-    // What this node's own MCP registry offers every owner, to whom, and at what price.
-    aimeat_mcp_registry_list:                 'operator:admin',
-    aimeat_mcp_registry_set:                  'operator:admin',
+    // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
+    ...OPERATOR_TOOL_SCOPES,
 
     // The node-wide compliance report and the register behind it. The handler resolves the caller's
     // OWNER and refuses a non-operator, so the word alone gets nobody in; it is here as well because

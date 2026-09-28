@@ -8,6 +8,7 @@
  *   (src/tool-dispatch/tool-call-defs-admin.ts) all read this description.
  * @structure installSetTools
  * @version-history
+ *   v1.1.0 — 2026-09-29 — aimeat_package_sale: a selling node's signed sale requests, with no token.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
@@ -22,6 +23,23 @@ export const installSetTools: AimeatToolDefinition[] = [
             action: { type: 'string', required: true, enum: ['plan', 'apply', 'list'], description: 'plan: what the set would make, and every problem, writing nothing. apply: make it. list: the sets applied on this node.' },
             install_set: { type: 'object', description: 'For plan and apply: the install set, a JSON object with spec "aimeat.install-set/1".' },
             secrets: { type: 'object', description: 'For plan and apply: secret config values, { <package group id>: { <component id>: { <field>: value } } }. Never stored in the record.' },
+        },
+    },
+    {
+        name: 'aimeat_package_sale',
+        description: 'Operator-only, on a selling node (a shop\'s own AIMEAT). Sell a package repository\'s packages with no token: this node signs each request with its own key, and the repository accepts it when its author named this node a seller (aimeat_package_sellers there). action "needs": the questions the package or install bundle asks before the sale (package, component, field, required, secret, schema), so the customer answers them before paying. action "grant": serve a customer node the package; give `node` ({ url, public_key } from the customer node\'s /.well-known/aimeat) for a new node, `updates_until` (ISO date-time) when its monthly updates end, or null to run them again. action "revoke": stop serving it. The repository\'s answer comes back as it said it, refusals included (NOT_A_SELLER, PEER_KEY_MISMATCH). `repository` is its node id, or { node_id, url, public_key } the first time, which links it. Needs the exact permission "operator:admin", which no wildcard carries. The same as GET, PUT and DELETE /v1/package-sales/...',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            action: { type: 'string', required: true, enum: ['needs', 'grant', 'revoke'], description: 'needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it.' },
+            repository: { type: 'string', required: true, description: 'The package repository\'s node id, e.g. "aimeat-finland-002-repository".' },
+            repository_link: { type: 'object', description: 'The first time only: { url, public_key } of the repository, to link it as a peer of this node.' },
+            group_id: { type: 'string', required: true, description: 'The package or install bundle group id on the repository.' },
+            node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
+            node: { type: 'object', description: 'For grant: { url, public_key } of a customer node the repository does not know yet.' },
+            updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served (the monthly updates ended). Omit to keep the updates running.' },
+            channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable (the default) or beta.' },
+            note: { type: 'string', description: 'For grant: the order it came from.' },
         },
     },
 ];

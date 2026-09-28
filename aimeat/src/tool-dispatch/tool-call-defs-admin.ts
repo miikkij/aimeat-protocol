@@ -9,6 +9,7 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.7.0 -- 2026-09-29 -- aimeat_package_sale (GET, PUT, DELETE /v1/package-sales/...), every field forwarded.
  *   v1.6.0 -- 2026-09-28 -- aimeat_admin_install_set (POST /v1/install-sets/apply, GET /v1/install-sets):
  *     action, install_set and secrets forwarded.
  *   v1.5.0 -- 2026-09-25 -- aimeat_admin_federation_relay_claim_set (PUT /v1/federation/peers/:nodeId/
@@ -123,6 +124,24 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
             const body: Record<string, unknown> = { install_set: requiredValue(input, 'install_set'), dry_run: action === 'plan' };
             if (input.secrets !== undefined) body.secrets = input.secrets;
             return client.post('/v1/install-sets/apply', body);
+        },
+    },
+    {
+        // THE THIRD SURFACE forwards every field: `action` picks the route, and `repository_link` folds
+        // into `repository` as { node_id, url, public_key }, the shape the grant route reads.
+        name: 'aimeat_package_sale',
+        handler: ({ client }, input) => {
+            const action = requiredString(input, 'action');
+            const repository = requiredString(input, 'repository');
+            const groupId = requiredString(input, 'group_id');
+            const q = (extra: Record<string, string>) => new URLSearchParams({ repository, group_id: groupId, ...extra }).toString();
+            if (action === 'needs') return client.get(`/v1/package-sales/config-needs?${q({})}`);
+            const nodeId = requiredString(input, 'node_id');
+            if (action === 'revoke') return client.delete(`/v1/package-sales/entitlements?${q({ node_id: nodeId })}`);
+            const link = input.repository_link as Record<string, unknown> | undefined;
+            const body: Record<string, unknown> = { repository: link ? { node_id: repository, ...link } : repository, group_id: groupId, node_id: nodeId };
+            for (const k of ['node', 'updates_until', 'channel', 'note']) if (input[k] !== undefined) body[k] = input[k];
+            return client.put('/v1/package-sales/entitlements', body);
         },
     },
 ];

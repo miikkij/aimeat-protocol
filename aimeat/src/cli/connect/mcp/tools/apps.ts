@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-29 — aimeat_package_sellers (GET, PUT, DELETE /v1/package-sellers).
  *   2026-09-28 — aimeat_package_config_needs (GET /v1/packages/:groupId/config-needs).
  *   2026-09-28 — aimeat_package_entitlements forwards `node` (packages-only peer registered with a grant).
  *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository and
@@ -202,6 +203,22 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (note !== undefined) body.note = note;
     if (node !== undefined) body.node = node;
     return out(await client.put(nodePath, body));
+  });
+
+  mcp.tool('aimeat_package_sellers', descriptionFor('aimeat_package_sellers'), {
+    action: z.enum(['list', 'add', 'remove']).describe('list your sellers, add (or change) one, or remove one'),
+    node_id: z.string().optional().describe('For add and remove: the seller node'),
+    node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For add: { url, public_key } of a node this repository does not know yet'),
+    note: z.string().optional().describe('For add: why'),
+  }, annotationsFor('aimeat_package_sellers'), async ({ action, node_id, node, note }) => {
+    if (action === 'list') return out(await client.get('/v1/package-sellers'));
+    if (!node_id) return { content: [{ type: 'text' as const, text: `INVALID_INPUT: action "${action}" needs node_id.` }], isError: true };
+    const path = `/v1/package-sellers/${encodeURIComponent(node_id)}`;
+    if (action === 'remove') return out(await client.delete(path));
+    const body: Record<string, unknown> = {};
+    if (node !== undefined) body.node = node;
+    if (note !== undefined) body.note = note;
+    return out(await client.put(path, body));
   });
 
   mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), {

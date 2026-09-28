@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-29 -- aimeat_package_sellers: the nodes that sell your packages with no token.
  *   v1.8.0 -- 2026-09-28 -- aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.7.0 -- 2026-09-28 -- aimeat_package_entitlements: `node`, the packages-only peer registered with a grant.
  *   v1.6.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
@@ -229,6 +230,19 @@ export const packagesTools: AimeatToolDefinition[] = [
             channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.' },
             node: { type: 'object', description: 'For grant: { url, public_key } of a node this repository does not know yet. It is registered with the grant as a packages-only peer (active, contact tier, messages off), which can pull only what it is entitled to. A peer of that id under another key, or switched off, is refused.' },
             note: { type: 'string', description: 'For grant: why, e.g. the order it came from.' },
+        },
+    },
+    {
+        // The author's one decision that lets a shop's node sell with no token.
+        name: 'aimeat_package_sellers',
+        description: 'On a package repository: list, add or remove the nodes that sell your packages. A seller node (a shop\'s own AIMEAT, e.g. store.aimeat.io) then asks for a package\'s questions, grants a customer node, ends its updates and revokes it by requests signed with its own node key, with no token and no copied secret. A seller sells every package of yours and nothing of anyone else\'s. To add a node this repository does not know yet, give `node` ({ url, public_key }; the key is on its /.well-known/aimeat): it is registered as a packages-only peer. Removing a seller leaves the grants it made; revoke those with aimeat_package_entitlements. The same as GET, PUT and DELETE /v1/package-sellers.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            action: { type: 'string', required: true, enum: ['list', 'add', 'remove'], description: 'list your sellers, add (or change) one, or remove one.' },
+            node_id: { type: 'string', description: 'For add and remove: the seller node, e.g. "aimeat-finland-003-store".' },
+            node: { type: 'object', description: 'For add: { url, public_key } of a node this repository does not know yet.' },
+            note: { type: 'string', description: 'For add: why, e.g. "the shop".' },
         },
     },
     {
