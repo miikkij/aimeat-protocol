@@ -175,6 +175,39 @@ describe('the workbench pieces', () => {
     expect(p.el.querySelector('.ak-progress__line').getAttribute('aria-label')).toBe('10 of 10');
   });
 
+  it('parseAnswer finds the JSON object in a pasted chat answer, fenced or not, and says null otherwise', async () => {
+    const { parseAnswer } = await import('../../src/static/sdk-libs/atelier/workbench-parts.js');
+    expect(parseAnswer('Here you go:\n```json\n{ "batchSize": 10 }\n```\nAnything else?')).toEqual({ batchSize: 10 });
+    expect(parseAnswer('{"a":{"b":1}}')).toEqual({ a: { b: 1 } });
+    expect(parseAnswer('no object here')).toBeNull();
+    expect(parseAnswer('{ broken')).toBeNull();
+  });
+
+  it('promptPanel: two steps when an answer is expected, one when it is not, and a short preview', async () => {
+    const { promptPanel } = await import('../../src/static/sdk-libs/atelier/workbench-parts.js');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const text = 'You are an expert assistant.\nline two\nline three';
+    const two = promptPanel({ target: host, prompt: () => text, expect: 'json', onResult: () => {} });
+    expect(two.el.querySelectorAll('[data-ak-part="col"]').length).toBe(2);
+    expect(two.el.querySelector('[data-ak-part="preview"]').textContent).toBe('You are an expert assistant.… (3 lines)');
+    expect(two.el.querySelector('textarea[data-ak-part="answer"]')).not.toBeNull();
+    const one = promptPanel({ target: host, prompt: text });
+    expect(one.el.querySelectorAll('[data-ak-part="col"]').length).toBe(1);
+    expect(one.el.className).toContain('ak-promptpanel--one');
+  });
+
+  it('queueRow: who and when, the subject, the chip and the note in its tone', async () => {
+    const { queueRow } = await import('../../src/static/sdk-libs/atelier/workbench-parts.js');
+    const row = queueRow({ who: 'Context7', when: '2026-09-27T17:32:00', title: 'Refreshed', chips: [{ text: 'System notice' }], note: { text: 'Extraction failed', tone: 'warn' } });
+    expect(row.querySelector('[data-ak-part="who"]').textContent).toBe('Context7');
+    expect(row.querySelector('[data-ak-part="when"]').textContent).toBe('27.9. 17.32');
+    expect(row.querySelector('[data-ak-part="title"]').textContent).toBe('Refreshed');
+    expect(row.querySelector('[data-ak-part="chip"]').textContent).toBe('System notice');
+    expect(row.querySelector('[data-ak-part="note"]').className).toContain('ak-tone-text--warn');
+    expect(queueRow({ title: 'Bare' }).querySelector('[data-ak-part="chips"]')).toBeNull();
+  });
+
   it('callout: err is an alert, the rest are a status, and the tone is a class', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

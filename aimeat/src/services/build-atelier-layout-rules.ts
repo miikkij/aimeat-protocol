@@ -19,6 +19,8 @@
  * @usage body += atelierLayoutRules();
  *        export const ATELIER_COMPONENTS = [ ..., ...ATELIER_WORKBENCH_COMPONENTS ];
  * @version-history
+ *   v1.3.0 — 2026-09-29 — The build order when the owner approved a drawing: drawing → genre on
+ *     sample data → owner approves → app forked from the genre (wish rakennusohjeen-jarjestys).
  *   v1.2.0 — 2026-09-28 — Rule 5 adds the one settings card (`.ak-setgroups`) and saving on change,
  *     as the approved design draws the settings page.
  *   v1.1.0 — 2026-09-28 — The rules name the workbench pieces (settingsGroup, field `width`,
@@ -60,6 +62,16 @@ export const ATELIER_WORKBENCH_COMPONENTS: ReadonlyArray<{ id: string; summary: 
     example: "var p = AIMEAT.atelier.progressFigure({ target: a.main, label: 'Processing', value: 3, total: 10, now: subject, steps: [{ label: 'read', state: 'done' }, { label: 'extract', state: 'now' }], counts: [{ id: 'ok', label: 'Clear', value: 2, tone: 'ok' }] });",
   },
   {
+    id: 'promptPanel',
+    summary: 'The person\'s own AI helps: copy the prompt, paste the answer; expect "json" hands onResult the parsed object.',
+    example: "AIMEAT.atelier.promptPanel({ target: panel, prompt: setupPrompt, expect: 'json', onResult: preview });",
+  },
+  {
+    id: 'queueRow',
+    summary: 'A queue item\'s content (who, when, subject, chips, why it waits), as a list row part.',
+    example: "parts: { row: function (r) { return AIMEAT.atelier.queueRow({ who: r.from, when: r.at, title: r.subject, chips: [{ text: r.klass }] }); } }",
+  },
+  {
     id: 'callout',
     summary: 'A tinted note with a tone (info, ok, warn, err) that says why: why an item is unclear, what failed, what to do.',
     example: "AIMEAT.atelier.callout({ target: detail, tone: 'warn', title: 'Why this is unclear', text: reason });",
@@ -90,5 +102,10 @@ export function atelierLayoutRules(): string {
     + 'data it saw) and "Correct", which says what it changes and from when. A work queue is '
     + '`listDetail`, its queues listed in the side column with counts. THE WHOLE SHAPE IS READY: '
     + 'the look `workbench` and the genre `workbench` (setup, queue, processing and settings screens '
-    + 'with sample data) are this design finished; fork the genre rather than drawing it again.\n\n';
+    + 'with sample data) are this design finished; fork the genre rather than drawing it again. '
+    + 'AND WHEN THE OWNER APPROVED A DRAWN DESIGN OF THEIR OWN, the order is fixed: the drawing '
+    + 'becomes a GENRE first (the drawing\'s screens as one page on sample data), the owner looks at '
+    + 'it running and approves it, and only then is the app forked from that genre. An app built '
+    + 'straight from a drawing out of kit parts drifts from it screen by screen, and the owner finds '
+    + 'every difference himself (Postinjalostamo, 2026-09-28: three rounds).\n\n';
 }

@@ -49,6 +49,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.56.0 — 2026-09-29 — workbench.css: promptPanel (two columns, the preview, the white paste box,
+ *     the outlined apply button) and queueRow (who and when, the subject, the chips, the note).
  *   v0.55.1 — 2026-09-28 — workbench.css: `.ak-setgroups`, a settings page's groups in one card
  *     divided by hairlines, and white inputs on the workbench look.
  *   v0.55.0 — 2026-09-28 — THE MOTION PARTS: controls.css (the travelling ink and the tab row

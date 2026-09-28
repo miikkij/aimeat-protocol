@@ -16,6 +16,7 @@
  *   entrance are the kit's one-shot JavaScript, and they stand down under reduced motion.
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.3.0 — 2026-09-29 — promptPanel and queueRow (workbench-parts.js).
  *   v0.2.0 — 2026-09-28 — `.ak-setgroups` (the settings groups in one card, divided by hairlines)
  *     and white inputs on the workbench look: the two things the first app built on it showed
  *     off the approved design.
@@ -362,6 +363,36 @@ button.ak-checkgrid__tile:focus-visible { outline: 2px solid var(--ak-focus); ou
 .ak-callout--err .ak-callout__icon { color: var(--ak-err); }
 .ak-callout__words { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: calc(var(--ak-text-body) - 0.5px); line-height: 1.5; }
 .ak-callout__title { font-weight: 600; }
+
+/* ── promptPanel (workbench-parts.js) ─────────────────────────────────────────────────────── */
+.ak-promptpanel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; container-type: inline-size; }
+.ak-promptpanel--one { grid-template-columns: minmax(0, 1fr); max-width: 42rem; }
+.ak-promptpanel__col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ak-promptpanel__step { font-weight: 600; font-size: 0.9375rem; }
+.ak-promptpanel__preview {
+  padding: 14px 16px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface-2);
+  font-family: var(--ak-font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ak-ink-dim);
+  overflow-wrap: anywhere;
+}
+.ak-promptpanel__preview--full { white-space: pre-wrap; max-height: 22rem; overflow: auto; }
+.ak-promptpanel__row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ak-promptpanel__answer { min-height: 84px; background: var(--ak-surface); }
+.ak-promptpanel__apply { border-color: var(--ak-accent); color: var(--ak-accent-text); font-weight: 600; }
+@media (max-width: 700px) { .ak-promptpanel { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── queueRow (workbench-parts.js) ────────────────────────────────────────────────────────── */
+.ak-qrow { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; text-align: left; }
+.ak-qrow__top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ak-ink-dim); }
+.ak-qrow__title { font-weight: 600; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.ak-qrow__chips { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+.ak-qrow__chip { padding: 2px 8px; border-radius: 6px; background: var(--ak-surface-2); color: var(--ak-ink); }
+.ak-list__row:has(> .ak-qrow) { padding: 14px 16px; }
+.ak-list__row--selected:has(> .ak-qrow) { border-color: var(--ak-accent); box-shadow: 0 0 0 1px var(--ak-accent); }
 
 /* ── Inputs on the workbench look ─────────────────────────────────────────────────────────── */
 /* The kit's input takes the page ground, which on most looks reads as a well in the card. On the

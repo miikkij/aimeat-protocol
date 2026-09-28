@@ -55,6 +55,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.56.0 — 2026-09-29 — promptPanel (copy the prompt, paste the answer, parsed) and queueRow
+ *     (the content of a queue list row), from the approved Postinjalostamo design (workbench-parts.js).
  *   v0.55.1 — 2026-09-28 — The workbench stylesheet carries `.ak-setgroups` (a settings page's
  *     groups in one card) and white inputs on the workbench look.
  *   v0.55.0 — 2026-09-28 — THE TEN MOTION PARTS (Jouni's ask of 2026-09-28: controls that answer
@@ -338,6 +340,7 @@ import { i18n } from './i18n.js';
 import { flapify, ransom, vu, typeout, dealIn } from './scenics.js';
 import { app, section, tabs, bottomNav } from './shell.js';
 import { sideNav, statusBand, checkGrid, choiceCards, settingsGroup, progressFigure, callout } from './workbench.js';
+import { promptPanel, queueRow, parseAnswer } from './workbench-parts.js';
 import { hero, statRow, figure, rating } from './hero.js';
 import { aide } from './aide.js';
 import { delegate, agentActivity } from './agentic.js';
@@ -397,7 +400,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.55.1',
+  version: '0.56.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -424,6 +427,7 @@ const atelier = {
 
   // ── The workbench: the pieces of a tool somebody works in every day ──
   sideNav, statusBand, checkGrid, choiceCards, settingsGroup, progressFigure, callout,
+  promptPanel, queueRow, parseAnswer,
 
   // ── The stored layout, rendered ──
   mosaic, appRef,

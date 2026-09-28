@@ -1020,6 +1020,17 @@
       checkFail: "Failed",
       checkWait: "In progress",
       checkOptional: "Optional",
+      promptStepCopy: "1. Copy the prompt",
+      promptStepCopyOnly: "Copy the instructions for your AI",
+      promptStepPaste: "2. Paste the answer from your AI",
+      promptCopy: "Copy the prompt",
+      promptShowAll: "Show the whole prompt",
+      promptHide: "Hide the prompt",
+      promptApply: "Show the changes",
+      promptPastePh: "Paste the answer here",
+      promptLines: "{n} lines",
+      promptCopied: "Copied",
+      promptNoJson: "The answer has no JSON object in it. Paste the whole answer.",
       working: "Working…",
       done: "Done"
     },
@@ -1104,6 +1115,17 @@
       checkFail: "Epäonnistui",
       checkWait: "Kesken",
       checkOptional: "Valinnainen",
+      promptStepCopy: "1. Kopioi kehote",
+      promptStepCopyOnly: "Kopioi ohje tekoälyllesi",
+      promptStepPaste: "2. Liitä tekoälyn vastaus",
+      promptCopy: "Kopioi kehote",
+      promptShowAll: "Näytä koko kehote",
+      promptHide: "Piilota kehote",
+      promptApply: "Näytä muutokset",
+      promptPastePh: "Liitä vastaus tähän",
+      promptLines: "{n} riviä",
+      promptCopied: "Kopioitu",
+      promptNoJson: "Vastauksessa ei ole JSON-oliota. Liitä koko vastaus.",
       working: "Käsitellään…",
       done: "Valmis"
     },
@@ -1188,6 +1210,17 @@
       checkFail: "Falló",
       checkWait: "En curso",
       checkOptional: "Opcional",
+      promptStepCopy: "1. Copia la instrucción",
+      promptStepCopyOnly: "Copia las instrucciones para tu IA",
+      promptStepPaste: "2. Pega la respuesta de tu IA",
+      promptCopy: "Copiar la instrucción",
+      promptShowAll: "Ver la instrucción completa",
+      promptHide: "Ocultar la instrucción",
+      promptApply: "Ver los cambios",
+      promptPastePh: "Pega aquí la respuesta",
+      promptLines: "{n} líneas",
+      promptCopied: "Copiado",
+      promptNoJson: "La respuesta no contiene ningún objeto JSON. Pega la respuesta entera.",
       working: "Procesando…",
       done: "Hecho"
     }
@@ -4808,6 +4841,1257 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/motion.js
+  var STATE = /* @__PURE__ */ new WeakMap();
+  var REST = { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
+  function stateOf(node) {
+    let s = STATE.get(node);
+    if (!s) {
+      s = Object.assign({}, REST);
+      STATE.set(node, s);
+    }
+    return s;
+  }
+  function transformOf(s) {
+    return "translate(" + s.x + "px, " + s.y + "px) scale(" + s.scale + ") rotate(" + s.rotate + "deg)";
+  }
+  function springTokens(el2) {
+    if (!el2 || typeof getComputedStyle !== "function") return {};
+    let cs;
+    try {
+      cs = getComputedStyle(
+        /** @type {Element} */
+        el2
+      );
+    } catch {
+      return {};
+    }
+    if (!cs) return {};
+    const num2 = function(name) {
+      const v = parseFloat(cs.getPropertyValue(name));
+      return isFinite(v) && v > 0 ? v : void 0;
+    };
+    return { stiffness: num2("--ak-spring-stiffness"), damping: num2("--ak-spring-damping"), mass: num2("--ak-spring-mass") };
+  }
+  function springFrames(opts) {
+    const o = opts || {};
+    const look = o.stiffness && o.damping && o.mass ? {} : springTokens(o.el);
+    const k = o.stiffness || look.stiffness || 170;
+    const c = o.damping || look.damping || 20;
+    const m = o.mass || look.mass || 1;
+    const v0 = o.velocity || 0;
+    const w0 = Math.sqrt(k / m);
+    const zeta = c / (2 * Math.sqrt(k * m));
+    const step = 1 / 60;
+    const samples = [];
+    let t2 = 0;
+    let x;
+    let settled = 0;
+    while (t2 < 4) {
+      if (zeta < 1) {
+        const wd = w0 * Math.sqrt(1 - zeta * zeta);
+        const decay = Math.exp(-zeta * w0 * t2);
+        x = 1 - decay * (Math.cos(wd * t2) + (zeta * w0 - v0) / wd * Math.sin(wd * t2));
+      } else {
+        const decay = Math.exp(-w0 * t2);
+        x = 1 - decay * (1 + (w0 - v0) * t2);
+      }
+      samples.push(x);
+      settled = Math.abs(1 - x) < 1e-3 ? settled + 1 : 0;
+      if (settled > 6) break;
+      t2 += step;
+    }
+    samples.push(1);
+    return { samples, duration: Math.round(samples.length * step * 1e3) };
+  }
+  function spring(target, to, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const from = Object.assign({}, stateOf(node));
+    const dest = Object.assign({}, from, to || {});
+    const prior = (
+      /** @type {any} */
+      node.__akSpring
+    );
+    if (prior) {
+      const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
+      if (typeof p === "number") {
+        const at = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
+        Object.keys(from).forEach(function(key) {
+          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at;
+        });
+      }
+      prior.cancel();
+    }
+    STATE.set(node, dest);
+    if (reducedMotion() || typeof node.animate !== "function") {
+      node.style.transform = transformOf(dest);
+      node.style.opacity = String(dest.opacity);
+      return { el: node, finished: Promise.resolve(), cancel() {
+      } };
+    }
+    const sf = springFrames(Object.assign({}, opts, { el: node }));
+    const frames = sf.samples.map(function(at, i) {
+      const s = {};
+      Object.keys(from).forEach(function(key) {
+        s[key] = from[key] + (dest[key] - from[key]) * at;
+      });
+      return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
+    });
+    const anim = (
+      /** @type {any} */
+      node.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" })
+    );
+    anim.__frames = sf.samples;
+    anim.__from = from;
+    anim.__to = dest;
+    node.__akSpring = anim;
+    const finished = anim.finished.then(function() {
+      node.style.transform = transformOf(dest);
+      node.style.opacity = String(dest.opacity);
+      anim.cancel();
+      if (
+        /** @type {any} */
+        node.__akSpring === anim
+      ) node.__akSpring = null;
+    }, function() {
+    });
+    return { el: node, finished, cancel() {
+      anim.cancel();
+    } };
+  }
+  function stagger(targets, opts) {
+    const o = opts || {};
+    const list2 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
+      /** @type {any} */
+      targets.length !== void 0 ? Array.prototype.slice.call(
+        /** @type {any} */
+        targets
+      ) : [targets]
+    );
+    const kids = list2.slice(0, o.max || 40);
+    if (!kids.length || reducedMotion() || typeof kids[0].animate !== "function") return { finished: Promise.resolve() };
+    const cs = getComputedStyle(kids[0]);
+    const dist = o.distance !== void 0 ? o.distance : parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 12;
+    const each = o.each !== void 0 ? o.each : parseFloat(cs.getPropertyValue("--ak-enter-stagger")) || 40;
+    const span = o.duration || (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.5;
+    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+    const start = o.from === "down" ? "translateY(-" + dist + "px)" : o.from === "left" ? "translateX(-" + dist + "px)" : o.from === "right" ? "translateX(" + dist + "px)" : o.from === "scale" ? "scale(0.92)" : "translateY(" + dist + "px)";
+    const end = o.from === "scale" ? "scale(1)" : "translate(0, 0)";
+    let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
+    let timing = { duration: span, easing: ease, fill: "backwards" };
+    if (o.spring) {
+      const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
+      frames = sf.samples.map(function(at, i) {
+        return {
+          offset: i / (sf.samples.length - 1),
+          opacity: Math.min(1, at * 1.4),
+          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at) + ")" : start.replace(/[-\d.]+px/, function(px) {
+            return (parseFloat(px) * (1 - at)).toFixed(2) + "px";
+          })
+        };
+      });
+      timing = { duration: sf.duration, easing: "linear", fill: "backwards" };
+    }
+    const runs = kids.map(function(kid, i) {
+      return kid.animate(frames, Object.assign({}, timing, { delay: i * each })).finished;
+    });
+    return { finished: Promise.all(runs).then(function() {
+    }, function() {
+    }) };
+  }
+  function inView(target, fn, opts) {
+    const node = resolve(target);
+    const o = opts || {};
+    if (typeof IntersectionObserver !== "function") {
+      fn(
+        node,
+        /** @type {any} */
+        { isIntersecting: true, target: node }
+      );
+      return { el: node, destroy() {
+      } };
+    }
+    const io = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          fn(node, entry);
+          if (o.once !== false) io.disconnect();
+        } else if (o.onLeave) {
+          o.onLeave(node);
+        }
+      });
+    }, { rootMargin: o.margin || "0px 0px -10% 0px", threshold: o.threshold || 0.15 });
+    io.observe(node);
+    return { el: node, destroy() {
+      io.disconnect();
+    } };
+  }
+  function nearestScroller(node) {
+    let p = node.parentElement;
+    while (p && p !== document.body) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+      p = p.parentElement;
+    }
+    return window;
+  }
+  function scrollLink(target, frames, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const subject = o.subject || node;
+    const scroller = o.scroller || nearestScroller(subject);
+    const lo = o.range ? o.range[0] : 0;
+    const hi = o.range ? o.range[1] : 1;
+    let last = 0;
+    if (reducedMotion() || typeof node.animate !== "function") {
+      return { el: node, progress() {
+        return 0;
+      }, destroy() {
+      } };
+    }
+    const anim = node.animate(frames, { duration: 1e3, easing: "linear", fill: "both" });
+    anim.pause();
+    const viewportH = function() {
+      return scroller === window ? window.innerHeight : (
+        /** @type {Element} */
+        scroller.clientHeight
+      );
+    };
+    const viewportTop = function() {
+      return scroller === window ? 0 : (
+        /** @type {Element} */
+        scroller.getBoundingClientRect().top
+      );
+    };
+    const tick = function() {
+      const r = subject.getBoundingClientRect();
+      const h = viewportH();
+      const raw = (viewportTop() + h - r.top) / Math.max(h + r.height, 1);
+      let p = (raw - lo) / Math.max(hi - lo, 1e-4);
+      p = Math.max(0, Math.min(1, p));
+      if (p !== last) {
+        last = p;
+        anim.currentTime = p * 1e3;
+      }
+    };
+    let rafId = 0;
+    const onScroll = function() {
+      if (!rafId) rafId = requestAnimationFrame(function() {
+        rafId = 0;
+        tick();
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    tick();
+    return {
+      el: node,
+      progress() {
+        return last;
+      },
+      destroy() {
+        scroller.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        if (rafId) cancelAnimationFrame(rafId);
+        anim.cancel();
+      }
+    };
+  }
+  function drag(target, handlers, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const h = handlers || {};
+    const o = opts || {};
+    const axis = o.axis || "both";
+    const threshold = o.threshold !== void 0 ? o.threshold : 4;
+    node.classList.add("ak-drag");
+    let active = null;
+    const clamp3 = function(v, range) {
+      return range ? Math.max(range[0], Math.min(range[1], v)) : v;
+    };
+    const down = function(e) {
+      if (e.button !== void 0 && e.button !== 0) return;
+      const s = stateOf(node);
+      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
+      if (
+        /** @type {any} */
+        node.__akSpring
+      ) node.__akSpring.cancel();
+      try {
+        node.setPointerCapture(e.pointerId);
+      } catch {
+      }
+    };
+    const move = function(e) {
+      if (!active || e.pointerId !== active.id) return;
+      let dx = e.clientX - active.x0;
+      let dy = e.clientY - active.y0;
+      if (!active.moved) {
+        if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+        active.moved = true;
+        node.classList.add("ak-dragging");
+        if (h.onStart) h.onStart(node);
+      }
+      if (axis === "x") dy = 0;
+      if (axis === "y") dx = 0;
+      const now2 = performance.now();
+      const dt = Math.max(now2 - active.t, 1);
+      active.vx = (e.clientX - active.lx) / dt * 1e3;
+      active.vy = (e.clientY - active.ly) / dt * 1e3;
+      active.t = now2;
+      active.lx = e.clientX;
+      active.ly = e.clientY;
+      const s = stateOf(node);
+      s.x = clamp3(active.bx + dx, o.bounds && o.bounds.x);
+      s.y = clamp3(active.by + dy, o.bounds && o.bounds.y);
+      node.style.transform = transformOf(s);
+      if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
+      e.preventDefault();
+    };
+    const up = function(e) {
+      if (!active || e.pointerId !== active.id) return;
+      const was = active;
+      active = null;
+      node.classList.remove("ak-dragging");
+      try {
+        node.releasePointerCapture(e.pointerId);
+      } catch {
+      }
+      if (!was.moved) return;
+      const s = stateOf(node);
+      const dx = s.x - was.bx;
+      const dy = s.y - was.by;
+      if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
+      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
+    };
+    node.addEventListener("pointerdown", down);
+    node.addEventListener("pointermove", move);
+    node.addEventListener("pointerup", up);
+    node.addEventListener("pointercancel", up);
+    return {
+      el: node,
+      destroy() {
+        node.removeEventListener("pointerdown", down);
+        node.removeEventListener("pointermove", move);
+        node.removeEventListener("pointerup", up);
+        node.removeEventListener("pointercancel", up);
+        node.classList.remove("ak-drag", "ak-dragging");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/menu.js
+  var GAP = 6;
+  var EDGE = 8;
+  function placeAt(box, at, o) {
+    const opts = o || {};
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let top = opts.placement === "above" ? at.top - GAP - h : at.bottom + GAP;
+    if (top + h > vh - EDGE && at.top - GAP - h >= EDGE) top = at.top - GAP - h;
+    if (top < EDGE && at.bottom + GAP + h <= vh - EDGE) top = at.bottom + GAP;
+    let left = opts.align === "end" ? at.right - w : opts.align === "center" ? (at.left + at.right) / 2 - w / 2 : at.left;
+    left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
+    top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
+    box.style.left = Math.round(left) + "px";
+    box.style.top = Math.round(top) + "px";
+    const ox = Math.max(0, Math.min(w, (at.left + at.right) / 2 - left));
+    const oy = top >= at.bottom ? 0 : top + h <= at.top ? h : h / 2;
+    return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
+  }
+  function openMotion(box, origin) {
+    box.style.transformOrigin = origin;
+    if (motionOff(box) || typeof box.animate !== "function") return;
+    const sf = springFrames({ el: box });
+    const frames = sf.samples.map(function(at, i) {
+      const s = 0.9 + 0.1 * at;
+      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at * 1.6) };
+    });
+    box.animate(frames, { duration: sf.duration, easing: "linear" });
+  }
+  function closeMotion(box, done) {
+    if (motionOff(box) || typeof box.animate !== "function") {
+      done();
+      return;
+    }
+    const pace2 = paceOf(box);
+    const anim = box.animate(
+      [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.95)" }],
+      { duration: Math.max(90, pace2.span * 0.6), easing: "ease-in", fill: "forwards" }
+    );
+    anim.onfinish = done;
+    anim.oncancel = done;
+  }
+  function outside(nodes, close) {
+    const hit = function(e) {
+      for (const n of nodes) if (n && n.contains(
+        /** @type {Node} */
+        e.target
+      )) return;
+      close();
+    };
+    document.addEventListener("pointerdown", hit, true);
+    return function() {
+      document.removeEventListener("pointerdown", hit, true);
+    };
+  }
+  function menu(spec) {
+    const s = spec || { items: [] };
+    const anchor = s.anchor ? (
+      /** @type {HTMLElement} */
+      resolve(s.anchor)
+    ) : null;
+    let items = s.items || [];
+    let box = null;
+    let mark = null;
+    let unhook = null;
+    let cursor = -1;
+    let picking = false;
+    if (anchor) {
+      anchor.setAttribute("aria-haspopup", "menu");
+      anchor.setAttribute("aria-expanded", "false");
+    }
+    function rows() {
+      return box ? (
+        /** @type {HTMLElement[]} */
+        Array.prototype.slice.call(box.querySelectorAll('.ak-menu__item:not([aria-disabled="true"])'))
+      ) : [];
+    }
+    function focusRow(i) {
+      const list2 = rows();
+      if (!list2.length) return;
+      cursor = (i + list2.length) % list2.length;
+      list2.forEach(function(r, j) {
+        r.classList.toggle("ak-menu__item--on", j === cursor);
+      });
+      list2[cursor].focus({ preventScroll: true });
+      if (mark) mark.sync();
+    }
+    function choose(item) {
+      if (picking || !item || item.disabled) return;
+      picking = true;
+      const finish = function() {
+        picking = false;
+        close(true);
+        if (item.run) item.run();
+        if (s.onPick) s.onPick(item.id, item);
+      };
+      if (!box || motionOff(box) || !mark || typeof mark.el.animate !== "function") {
+        finish();
+        return;
+      }
+      const blink = mark.el.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 1 }], { duration: 150, easing: "linear" });
+      blink.onfinish = finish;
+      blink.oncancel = finish;
+    }
+    function onKey(e) {
+      const list2 = rows();
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusRow(cursor + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusRow(cursor < 0 ? list2.length - 1 : cursor - 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        focusRow(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        focusRow(list2.length - 1);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === "Tab") {
+        close(false);
+      } else if (e.key.length === 1 && /\S/.test(e.key)) {
+        const ch = e.key.toLowerCase();
+        for (let k = 1; k <= list2.length; k++) {
+          const j = (cursor + k) % list2.length;
+          if ((list2[j].textContent || "").trim().toLowerCase().indexOf(ch) === 0) {
+            focusRow(j);
+            break;
+          }
+        }
+      }
+    }
+    function build() {
+      const root = el("div", { class: "ak-root ak-menu", role: "menu", "data-ak-part": "root", "aria-label": s.label || null, tabindex: "-1", on: { keydown: onKey } });
+      items.forEach(function(it) {
+        if (it === "-") {
+          root.appendChild(el("div", { class: "ak-menu__sep", role: "separator", "data-ak-part": "separator" }));
+          return;
+        }
+        root.appendChild(el("button", {
+          type: "button",
+          role: "menuitem",
+          class: "ak-menu__item" + (it.danger ? " ak-menu__item--danger" : ""),
+          "data-ak-part": "item",
+          "data-ak-id": it.id,
+          tabindex: "-1",
+          "data-ak-noguard": true,
+          "aria-disabled": it.disabled ? "true" : null,
+          on: {
+            click: function() {
+              choose(it);
+            },
+            pointermove: function(e) {
+              if (it.disabled) return;
+              const i = rows().indexOf(
+                /** @type {HTMLElement} */
+                e.currentTarget
+              );
+              if (i >= 0 && i !== cursor) focusRow(i);
+            }
+          }
+        }, [
+          el("span", { class: "ak-menu__label", "data-ak-part": "label", text: it.label }),
+          it.hint ? el("span", { class: "ak-menu__hint", "data-ak-part": "hint", text: it.hint }) : null
+        ]));
+      });
+      return root;
+    }
+    function open(at, fromKeys) {
+      if (box) return;
+      box = build();
+      document.body.appendChild(box);
+      const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
+      const origin = placeAt(box, r, { align: s.align });
+      mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
+      openMotion(box, origin);
+      if (!motionOff(box)) {
+        const pace2 = paceOf(box);
+        rows().forEach(function(row, i) {
+          if (typeof row.animate === "function") {
+            row.animate(
+              [{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }],
+              { duration: pace2.span, delay: 20 + i * 18, easing: pace2.ease, fill: "backwards" }
+            );
+          }
+        });
+      }
+      if (anchor) anchor.setAttribute("aria-expanded", "true");
+      unhook = outside([box, anchor], function() {
+        close(false);
+      });
+      cursor = -1;
+      box.focus({ preventScroll: true });
+      if (fromKeys) focusRow(0);
+    }
+    function close(focusBack) {
+      if (!box) return;
+      const gone = box;
+      box = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      if (unhook) {
+        unhook();
+        unhook = null;
+      }
+      if (anchor) anchor.setAttribute("aria-expanded", "false");
+      closeMotion(gone, function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+      });
+      if (focusBack && anchor) anchor.focus({ preventScroll: true });
+    }
+    const onAnchor = function(e) {
+      if (box) close(true);
+      else open(void 0, !!e && e.detail === 0);
+    };
+    const onAnchorKey = function(e) {
+      if (e.key === "ArrowDown" && !box) {
+        e.preventDefault();
+        open(void 0, true);
+      }
+    };
+    if (anchor) {
+      anchor.addEventListener("click", onAnchor);
+      anchor.addEventListener("keydown", onAnchorKey);
+    }
+    return {
+      open,
+      close,
+      isOpen() {
+        return !!box;
+      },
+      set(patch) {
+        if (patch && patch.items) {
+          items = patch.items;
+          if (box) {
+            close(false);
+            open();
+          }
+        }
+      },
+      destroy() {
+        close(false);
+        if (anchor) {
+          anchor.removeEventListener("click", onAnchor);
+          anchor.removeEventListener("keydown", onAnchorKey);
+        }
+      }
+    };
+  }
+  function contextMenu(target, spec) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label });
+    const onCtx = function(e) {
+      e.preventDefault();
+      m.close(false);
+      m.open({ x: e.clientX, y: e.clientY });
+    };
+    const onKey = function(e) {
+      if (e.key === "F10" && e.shiftKey) {
+        e.preventDefault();
+        const r = node.getBoundingClientRect();
+        m.close(false);
+        m.open({ x: r.left + 12, y: r.top + 12 }, true);
+      }
+    };
+    node.addEventListener("contextmenu", onCtx);
+    node.addEventListener("keydown", onKey);
+    return {
+      close() {
+        m.close(false);
+      },
+      destroy() {
+        m.destroy();
+        node.removeEventListener("contextmenu", onCtx);
+        node.removeEventListener("keydown", onKey);
+      }
+    };
+  }
+  function popover(spec) {
+    const anchor = (
+      /** @type {HTMLElement} */
+      resolve(spec.anchor)
+    );
+    let box = null;
+    let unhook = null;
+    anchor.setAttribute("aria-expanded", "false");
+    function open() {
+      if (box) return;
+      const body = typeof spec.content === "function" ? spec.content() : spec.content;
+      box = el(
+        "div",
+        {
+          class: "ak-root ak-popover",
+          role: "dialog",
+          "aria-label": spec.label || null,
+          "data-ak-part": "root",
+          tabindex: "-1",
+          on: { keydown: function(e) {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              close();
+              anchor.focus();
+            }
+          } }
+        },
+        [el("div", { class: "ak-popover__body", "data-ak-part": "body" }, body)]
+      );
+      document.body.appendChild(box);
+      openMotion(box, placeAt(box, anchor.getBoundingClientRect(), { align: spec.align || "center" }));
+      anchor.setAttribute("aria-expanded", "true");
+      unhook = outside([box, anchor], close);
+      box.focus({ preventScroll: true });
+      if (spec.onOpen) spec.onOpen();
+    }
+    function close() {
+      if (!box) return;
+      const gone = box;
+      box = null;
+      if (unhook) {
+        unhook();
+        unhook = null;
+      }
+      anchor.setAttribute("aria-expanded", "false");
+      closeMotion(gone, function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+      });
+      if (spec.onClose) spec.onClose();
+    }
+    const onClick = function() {
+      if (box) close();
+      else open();
+    };
+    anchor.addEventListener("click", onClick);
+    return { open, close, isOpen() {
+      return !!box;
+    }, destroy() {
+      close();
+      anchor.removeEventListener("click", onClick);
+    } };
+  }
+  function tooltip(target, text, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const tip = el("div", { class: "ak-root ak-tooltip", role: "tooltip", "data-ak-part": "root", id: "ak-tip-" + Math.random().toString(36).slice(2, 8), text });
+    let timer = null;
+    let shown = false;
+    node.setAttribute("aria-describedby", tip.id);
+    function show() {
+      clearTimeout(timer);
+      if (shown) return;
+      shown = true;
+      document.body.appendChild(tip);
+      openMotion(tip, placeAt(tip, node.getBoundingClientRect(), { align: "center", placement: o.placement || "above" }));
+    }
+    function hide() {
+      clearTimeout(timer);
+      if (!shown) return;
+      shown = false;
+      closeMotion(tip, function() {
+        if (!shown && tip.parentNode) tip.parentNode.removeChild(tip);
+      });
+    }
+    const enter2 = function() {
+      clearTimeout(timer);
+      timer = setTimeout(show, o.delay != null ? o.delay : 450);
+    };
+    const key = function(e) {
+      if (e.key === "Escape") hide();
+    };
+    node.addEventListener("pointerenter", enter2);
+    node.addEventListener("pointerleave", hide);
+    node.addEventListener("focus", show);
+    node.addEventListener("blur", hide);
+    node.addEventListener("keydown", key);
+    return {
+      set(next) {
+        tip.textContent = next;
+      },
+      destroy() {
+        hide();
+        node.removeEventListener("pointerenter", enter2);
+        node.removeEventListener("pointerleave", hide);
+        node.removeEventListener("focus", show);
+        node.removeEventListener("blur", hide);
+        node.removeEventListener("keydown", key);
+        node.removeAttribute("aria-describedby");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/parts-ui.js
+  var toastHost = null;
+  function toast(spec) {
+    if (!toastHost || !toastHost.isConnected) {
+      toastHost = el("div", { class: "ak-root ak-toasts", role: "status", "aria-live": "polite" });
+      document.body.appendChild(toastHost);
+    }
+    let timer = null;
+    const node = el("div", { class: "ak-toast" + (spec.tone ? " ak-toast--" + spec.tone : "") }, [
+      el("div", { class: "ak-toast__body" }, [
+        el("div", { class: "ak-toast__title" }, spec.title),
+        spec.sub ? el("div", { class: "ak-toast__sub" }, spec.sub) : null
+      ].filter(Boolean)),
+      spec.action ? el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: {
+        click: function() {
+          spec.action.onPick();
+          close();
+        }
+      } }, spec.action.label) : null
+    ].filter(Boolean));
+    const pace2 = paceOf(node);
+    function close() {
+      if (timer) clearTimeout(timer);
+      const drop = function() {
+        if (node.parentNode) node.parentNode.removeChild(node);
+      };
+      if (motionOff(node) || typeof node.animate !== "function") {
+        drop();
+        return;
+      }
+      const anim = node.animate(
+        [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(" + (pace2.dist || 8) + "px)" }],
+        { duration: pace2.span, easing: "ease-in" }
+      );
+      anim.onfinish = drop;
+      anim.oncancel = drop;
+    }
+    toastHost.appendChild(node);
+    fadeIn(node, pace2, 0);
+    enter(node);
+    const ttl = spec.ttl == null ? 6e3 : spec.ttl;
+    if (ttl > 0) timer = setTimeout(close, ttl);
+    return { el: node, close };
+  }
+  function palette(spec) {
+    const s = spec || { items: [] };
+    let root = null;
+    let box = null;
+    let list2 = null;
+    let mark = null;
+    let cursor = 0;
+    let shown = [];
+    let opener = null;
+    function keyOf2(it, i) {
+      return it.id || it.label || String(i);
+    }
+    function close(after) {
+      if (!root) return;
+      const gone = root;
+      const goneBox = box;
+      root = null;
+      box = null;
+      list2 = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      const drop = function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+        if (after) after();
+      };
+      if (motionOff(gone) || typeof gone.animate !== "function") {
+        drop();
+        return;
+      }
+      gone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: "ease-in", fill: "forwards" });
+      closeMotion(goneBox, drop);
+    }
+    function runItem(it) {
+      if (!it.done || !box || motionOff(box) || typeof box.animate !== "function") {
+        close();
+        it.run();
+        if (it.done) toast({ title: it.done, tone: "ok", ttl: 3200 });
+        return;
+      }
+      const from = box.getBoundingClientRect();
+      const tw = Math.min(360, window.innerWidth - 32);
+      const to = { left: window.innerWidth - tw - 16, top: window.innerHeight - 72, width: tw, height: 56 };
+      const dx = to.left - from.left;
+      const dy = to.top - from.top;
+      const sx = to.width / Math.max(from.width, 1);
+      const sy = to.height / Math.max(from.height, 1);
+      const sf = springFrames({ el: box });
+      const frames = sf.samples.map(function(at, i) {
+        return {
+          offset: i / (sf.samples.length - 1),
+          transform: "translate(" + (dx * at).toFixed(1) + "px, " + (dy * at).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at).toFixed(4) + ", " + (1 + (sy - 1) * at).toFixed(4) + ")",
+          opacity: at > 0.85 ? 1 - (at - 0.85) / 0.15 : 1
+        };
+      });
+      box.style.transformOrigin = "0 0";
+      if (list2) list2.style.opacity = "0";
+      const gone = root;
+      root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(sf.duration, 260), easing: "ease-out", fill: "forwards" });
+      const anim = box.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" });
+      root = null;
+      box = null;
+      list2 = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      let handed = false;
+      const hand = function() {
+        if (handed) return;
+        handed = true;
+        if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
+        toast({ title: it.done, tone: "ok", ttl: 3200 });
+      };
+      it.run();
+      setTimeout(hand, Math.min(sf.duration, 420));
+      anim.onfinish = hand;
+    }
+    function highlight() {
+      if (!list2) return;
+      const rows = Array.prototype.slice.call(list2.querySelectorAll(".ak-palette__item:not(.ak-layout__ghost)"));
+      rows.forEach(function(row, i) {
+        row.setAttribute("aria-selected", i === cursor ? "true" : "false");
+      });
+      if (rows[cursor] && typeof rows[cursor].scrollIntoView === "function") rows[cursor].scrollIntoView({ block: "nearest" });
+      if (mark) mark.sync();
+    }
+    function paintList() {
+      if (!list2) return;
+      const host = list2;
+      settle(host, function() {
+        Array.prototype.slice.call(host.querySelectorAll(".ak-palette__item, .ak-palette__empty")).forEach(function(n) {
+          host.removeChild(n);
+        });
+        if (!shown.length) {
+          host.appendChild(el("li", { class: "ak-palette__empty", "data-ak-id": "__empty" }, s.empty || "Nothing matches."));
+          return;
+        }
+        shown.forEach(function(it, i) {
+          host.appendChild(el("li", { class: "ak-palette__item", role: "option", "data-ak-id": keyOf2(it, i), "aria-selected": "false", on: {
+            click: function() {
+              runItem(it);
+            },
+            pointermove: function() {
+              if (cursor !== i) {
+                cursor = i;
+                highlight();
+              }
+            }
+          } }, [el("span", {}, it.label), it.hint ? el("span", { class: "ak-palette__hint" }, it.hint) : null].filter(Boolean)));
+        });
+      }, { rows: ".ak-palette__item, .ak-palette__empty" });
+      highlight();
+    }
+    function open(from) {
+      if (root) return;
+      opener = from || null;
+      cursor = 0;
+      shown = s.items.slice();
+      list2 = el("ul", { class: "ak-palette__list", role: "listbox" });
+      const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || "go to, run, adopt…", autocomplete: "off", on: {
+        input: function() {
+          const q = (
+            /** @type {HTMLInputElement} */
+            input.value.trim().toLowerCase()
+          );
+          shown = s.items.filter(function(it) {
+            return !q || (it.label + " " + (it.hint || "")).toLowerCase().indexOf(q) >= 0;
+          });
+          cursor = 0;
+          paintList();
+        },
+        keydown: function(e) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            cursor = Math.min(cursor + 1, shown.length - 1);
+            highlight();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            cursor = Math.max(cursor - 1, 0);
+            highlight();
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const it = shown[cursor];
+            if (it) runItem(it);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            close(function() {
+              if (opener && opener.isConnected) opener.focus();
+            });
+          }
+        }
+      } });
+      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || "Commands" }, [input, list2]);
+      root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
+        if (e.target === root) close();
+      } } }, [box]);
+      document.body.appendChild(root);
+      mark = ink2(list2, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
+      paintList();
+      mark.jump();
+      growFrom(box, opener);
+      if (!motionOff(root) && typeof root.animate === "function") root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
+      input.focus();
+    }
+    const key = s.hotkey === void 0 ? "k" : s.hotkey;
+    const onKey = function(e) {
+      if (!key) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === key) {
+        e.preventDefault();
+        if (root) close();
+        else open();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const anchor = s.anchor ? (
+      /** @type {HTMLElement} */
+      resolve(s.anchor)
+    ) : null;
+    const onAnchor = function() {
+      if (root) close();
+      else open(anchor);
+    };
+    if (anchor) anchor.addEventListener("click", onAnchor);
+    return {
+      open,
+      close() {
+        close();
+      },
+      destroy() {
+        close();
+        window.removeEventListener("keydown", onKey);
+        if (anchor) anchor.removeEventListener("click", onAnchor);
+      }
+    };
+  }
+  function growFrom(box, from) {
+    if (!from || !from.isConnected || motionOff(box) || typeof box.animate !== "function") {
+      openMotion(box, "50% 0");
+      return;
+    }
+    const a = from.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const sx = a.width / Math.max(b.width, 1);
+    const sy = a.height / Math.max(b.height, 1);
+    const dx = a.left - b.left;
+    const dy = a.top - b.top;
+    const sf = springFrames({ el: box });
+    box.style.transformOrigin = "0 0";
+    box.animate(sf.samples.map(function(at, i) {
+      const k = 1 - at;
+      return {
+        offset: i / (sf.samples.length - 1),
+        transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
+        opacity: Math.min(1, 0.4 + at)
+      };
+    }), { duration: sf.duration, easing: "linear" });
+  }
+  function compare(spec) {
+    const s = spec || { before: {}, after: {} };
+    function layer(side, cls) {
+      const body = side.el ? side.el : side.image ? el("img", { src: side.image, alt: side.label || "" }) : el("span", {}, side.label || "");
+      return el("div", { class: "ak-compare__layer " + cls }, [body]);
+    }
+    const handle2 = el("button", { type: "button", class: "ak-compare__handle", "aria-label": "Compare", role: "slider", "aria-valuemin": "0", "aria-valuemax": "100" }, "⇄");
+    const root = el("div", { class: "ak-root ak-compare" }, [
+      layer(s.before || {}, "ak-compare__before"),
+      layer(s.after || {}, "ak-compare__after"),
+      s.before && s.before.label ? el("span", { class: "ak-compare__label ak-compare__label--before" }, s.before.label) : null,
+      s.after && s.after.label ? el("span", { class: "ak-compare__label ak-compare__label--after" }, s.after.label) : null,
+      el("div", { class: "ak-compare__bar" }),
+      handle2
+    ].filter(Boolean));
+    if (s.target) resolve(s.target).appendChild(root);
+    let pct = typeof s.value === "number" ? s.value : 50;
+    function set(v) {
+      pct = Math.max(0, Math.min(Number(v) || 0, 100));
+      root.style.setProperty("--ak-compare", pct + "%");
+      handle2.setAttribute("aria-valuenow", String(Math.round(pct)));
+      if (s.onChange) s.onChange(pct);
+    }
+    let dragging = false;
+    function at(e) {
+      const r = root.getBoundingClientRect();
+      set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
+    }
+    root.addEventListener("pointerdown", function(e) {
+      dragging = true;
+      root.setPointerCapture(e.pointerId);
+      at(e);
+    });
+    root.addEventListener("pointermove", function(e) {
+      if (dragging) at(e);
+    });
+    root.addEventListener("pointerup", function() {
+      dragging = false;
+    });
+    root.addEventListener("pointercancel", function() {
+      dragging = false;
+    });
+    handle2.addEventListener("keydown", function(e) {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        set(pct - 5);
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        set(pct + 5);
+      }
+    });
+    set(pct);
+    return { el: root, set, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function tour(spec) {
+    const s = spec || { steps: [] };
+    const L = Object.assign({ next: "Next", done: "Done", skip: "Skip" }, s.labels || {});
+    let i = -1;
+    let note = null;
+    let marked = null;
+    function place2() {
+      if (!note || !marked) return;
+      const r = marked.getBoundingClientRect();
+      const w = note.offsetWidth || 260;
+      const top = r.bottom + 12;
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+      note.style.top = (top + (note.offsetHeight || 0) > window.innerHeight ? Math.max(8, r.top - (note.offsetHeight || 0) - 12) : top) + "px";
+      note.style.left = left + "px";
+    }
+    function show(n) {
+      clearStep();
+      const step = s.steps[n];
+      if (!step) {
+        end();
+        return;
+      }
+      i = n;
+      const target = typeof step.target === "string" ? document.querySelector(step.target) : step.target;
+      if (!target) {
+        show(n + 1);
+        return;
+      }
+      marked = /** @type {HTMLElement} */
+      target;
+      marked.classList.add("ak-tour__mark");
+      if (!reducedMotion()) marked.scrollIntoView({ block: "center", behavior: "smooth" });
+      const last = n === s.steps.length - 1;
+      note = el("div", { class: "ak-root ak-tour__note", role: "dialog", "aria-live": "polite" }, [
+        el("div", {}, [el("span", { class: "ak-tour__step" }, n + 1 + "/" + s.steps.length), el("span", {}, step.text)]),
+        el("div", { class: "ak-tour__nav" }, [
+          el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: function() {
+            if (last) end();
+            else show(n + 1);
+          } } }, last ? L.done : L.next),
+          last ? null : el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: end } }, L.skip)
+        ].filter(Boolean))
+      ]);
+      document.body.appendChild(note);
+      place2();
+    }
+    function clearStep() {
+      if (marked) marked.classList.remove("ak-tour__mark");
+      if (note && note.parentNode) note.parentNode.removeChild(note);
+      marked = null;
+      note = null;
+    }
+    function onKey(e) {
+      if (e.key === "Escape") end();
+    }
+    function end() {
+      clearStep();
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", place2);
+      if (i >= 0 && s.onDone) s.onDone();
+      i = -1;
+    }
+    function start() {
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("resize", place2);
+      show(0);
+    }
+    return { start, end };
+  }
+
+  // src/static/sdk-libs/atelier/workbench-parts.js
+  function parseAnswer(text) {
+    const s = String(text || "").replace(/```(?:json)?/gi, "");
+    const a = s.indexOf("{");
+    const b = s.lastIndexOf("}");
+    if (a < 0 || b <= a) return null;
+    try {
+      return JSON.parse(s.slice(a, b + 1));
+    } catch {
+      return null;
+    }
+  }
+  function button(label, cls, part, onClick) {
+    const b = el("button", { type: "button", class: "ak-btn" + (cls ? " " + cls : ""), "data-ak-part": part, "data-ak-noguard": true }, label);
+    b.addEventListener("click", function() {
+      whileBusy(b, Promise.resolve().then(onClick)).catch(function(err) {
+        toast({ title: String(err && err.message || err), tone: "err" });
+      });
+    });
+    return b;
+  }
+  function promptPanel(spec) {
+    const promptText = function() {
+      return typeof spec.prompt === "function" ? spec.prompt() : String(spec.prompt || "");
+    };
+    const answers = !!(spec.onResult && spec.expect !== null);
+    const root = el("div", { class: "ak-root ak-promptpanel" + (answers ? "" : " ak-promptpanel--one"), "data-ak-part": "root" });
+    const shortText = function() {
+      const lines = promptText().split("\n");
+      return lines[0].slice(0, 120) + "… (" + t("promptLines", { n: lines.length }) + ")";
+    };
+    const one = el("div", { class: "ak-promptpanel__col", "data-ak-part": "col" });
+    one.appendChild(el("div", { class: "ak-promptpanel__step", "data-ak-part": "step", text: answers ? t("promptStepCopy") : t("promptStepCopyOnly") }));
+    const preview = el("div", { class: "ak-promptpanel__preview", "data-ak-part": "preview", text: shortText() });
+    one.appendChild(preview);
+    const row = el("div", { class: "ak-promptpanel__row" });
+    row.appendChild(button(spec.copyLabel || t("promptCopy"), "ak-btn--primary", "copy", function() {
+      return navigator.clipboard.writeText(promptText()).then(function() {
+        toast({ title: t("promptCopied"), tone: "ok" });
+      });
+    }));
+    let full = false;
+    const toggle2 = button(t("promptShowAll"), "", "toggle", function() {
+      full = !full;
+      preview.textContent = full ? promptText() : shortText();
+      preview.classList.toggle("ak-promptpanel__preview--full", full);
+      toggle2.textContent = full ? t("promptHide") : t("promptShowAll");
+    });
+    row.appendChild(toggle2);
+    one.appendChild(row);
+    root.appendChild(one);
+    if (answers) {
+      const two = el("div", { class: "ak-promptpanel__col", "data-ak-part": "col" });
+      const id = uid("ak-pp");
+      two.appendChild(el("label", { class: "ak-promptpanel__step", "data-ak-part": "step", for: id, text: t("promptStepPaste") }));
+      const area = el("textarea", { id, class: "ak-input ak-input--area ak-promptpanel__answer", "data-ak-part": "answer", rows: 4, placeholder: t("promptPastePh") });
+      two.appendChild(area);
+      const row2 = el("div", { class: "ak-promptpanel__row" });
+      row2.appendChild(button(spec.applyLabel || t("promptApply"), "ak-promptpanel__apply", "apply", function() {
+        const raw = (
+          /** @type {HTMLTextAreaElement} */
+          area.value
+        );
+        if (spec.expect === "json") {
+          const value = parseAnswer(raw);
+          if (value == null) throw new Error(t("promptNoJson"));
+          return spec.onResult && spec.onResult(value, raw);
+        }
+        return spec.onResult && spec.onResult(raw, raw);
+      }));
+      two.appendChild(row2);
+      root.appendChild(two);
+    }
+    if (spec.target) resolve(spec.target).appendChild(root);
+    return {
+      el: root,
+      destroy() {
+        clear(root);
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function queueRow(spec) {
+    const s = spec || { title: "" };
+    const root = el("span", { class: "ak-qrow", "data-ak-part": "root" });
+    const top = el("span", { class: "ak-qrow__top", "data-ak-part": "top" });
+    top.appendChild(el("span", { class: "ak-qrow__who", "data-ak-part": "who", text: s.who || "" }));
+    top.appendChild(el("span", { class: "ak-qrow__when", "data-ak-part": "when", text: whenText(s.when) }));
+    root.appendChild(top);
+    root.appendChild(el("span", { class: "ak-qrow__title", "data-ak-part": "title", text: s.title || "—" }));
+    const chips = el("span", { class: "ak-qrow__chips", "data-ak-part": "chips" });
+    (s.chips || []).forEach(function(c) {
+      if (c && c.text) chips.appendChild(el("span", { class: "ak-qrow__chip", "data-ak-part": "chip", text: c.text }));
+    });
+    if (s.note && s.note.text) {
+      const tone = ["warn", "err", "ok", "info"].indexOf(s.note.tone || "") >= 0 ? s.note.tone : "warn";
+      chips.appendChild(el("span", { class: "ak-qrow__note ak-tone-text--" + tone, "data-ak-part": "note", text: s.note.text }));
+    }
+    if (chips.firstChild) root.appendChild(chips);
+    return root;
+  }
+  function whenText(when) {
+    if (when == null || when === "") return "";
+    if (typeof when === "string" && !/^\d{4}-\d{2}-\d{2}/.test(when)) return when;
+    const d = when instanceof Date ? when : new Date(when);
+    if (isNaN(d.getTime())) return String(when);
+    const pad = function(n) {
+      return String(n).padStart(2, "0");
+    };
+    return d.getDate() + "." + (d.getMonth() + 1) + ". " + pad(d.getHours()) + "." + pad(d.getMinutes());
+  }
+
   // src/static/sdk-libs/_core/format.js
   function fmt() {
     const ns = typeof window !== "undefined" ? window.AIMEAT : null;
@@ -7398,353 +8682,6 @@
       if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
     });
     ctx.root.appendChild(legend);
-  }
-
-  // src/static/sdk-libs/atelier/motion.js
-  var STATE = /* @__PURE__ */ new WeakMap();
-  var REST = { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
-  function stateOf(node) {
-    let s = STATE.get(node);
-    if (!s) {
-      s = Object.assign({}, REST);
-      STATE.set(node, s);
-    }
-    return s;
-  }
-  function transformOf(s) {
-    return "translate(" + s.x + "px, " + s.y + "px) scale(" + s.scale + ") rotate(" + s.rotate + "deg)";
-  }
-  function springTokens(el2) {
-    if (!el2 || typeof getComputedStyle !== "function") return {};
-    let cs;
-    try {
-      cs = getComputedStyle(
-        /** @type {Element} */
-        el2
-      );
-    } catch {
-      return {};
-    }
-    if (!cs) return {};
-    const num2 = function(name) {
-      const v = parseFloat(cs.getPropertyValue(name));
-      return isFinite(v) && v > 0 ? v : void 0;
-    };
-    return { stiffness: num2("--ak-spring-stiffness"), damping: num2("--ak-spring-damping"), mass: num2("--ak-spring-mass") };
-  }
-  function springFrames(opts) {
-    const o = opts || {};
-    const look = o.stiffness && o.damping && o.mass ? {} : springTokens(o.el);
-    const k = o.stiffness || look.stiffness || 170;
-    const c = o.damping || look.damping || 20;
-    const m = o.mass || look.mass || 1;
-    const v0 = o.velocity || 0;
-    const w0 = Math.sqrt(k / m);
-    const zeta = c / (2 * Math.sqrt(k * m));
-    const step = 1 / 60;
-    const samples = [];
-    let t2 = 0;
-    let x;
-    let settled = 0;
-    while (t2 < 4) {
-      if (zeta < 1) {
-        const wd = w0 * Math.sqrt(1 - zeta * zeta);
-        const decay = Math.exp(-zeta * w0 * t2);
-        x = 1 - decay * (Math.cos(wd * t2) + (zeta * w0 - v0) / wd * Math.sin(wd * t2));
-      } else {
-        const decay = Math.exp(-w0 * t2);
-        x = 1 - decay * (1 + (w0 - v0) * t2);
-      }
-      samples.push(x);
-      settled = Math.abs(1 - x) < 1e-3 ? settled + 1 : 0;
-      if (settled > 6) break;
-      t2 += step;
-    }
-    samples.push(1);
-    return { samples, duration: Math.round(samples.length * step * 1e3) };
-  }
-  function spring(target, to, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const from = Object.assign({}, stateOf(node));
-    const dest = Object.assign({}, from, to || {});
-    const prior = (
-      /** @type {any} */
-      node.__akSpring
-    );
-    if (prior) {
-      const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
-      if (typeof p === "number") {
-        const at = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
-        Object.keys(from).forEach(function(key) {
-          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at;
-        });
-      }
-      prior.cancel();
-    }
-    STATE.set(node, dest);
-    if (reducedMotion() || typeof node.animate !== "function") {
-      node.style.transform = transformOf(dest);
-      node.style.opacity = String(dest.opacity);
-      return { el: node, finished: Promise.resolve(), cancel() {
-      } };
-    }
-    const sf = springFrames(Object.assign({}, opts, { el: node }));
-    const frames = sf.samples.map(function(at, i) {
-      const s = {};
-      Object.keys(from).forEach(function(key) {
-        s[key] = from[key] + (dest[key] - from[key]) * at;
-      });
-      return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
-    });
-    const anim = (
-      /** @type {any} */
-      node.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" })
-    );
-    anim.__frames = sf.samples;
-    anim.__from = from;
-    anim.__to = dest;
-    node.__akSpring = anim;
-    const finished = anim.finished.then(function() {
-      node.style.transform = transformOf(dest);
-      node.style.opacity = String(dest.opacity);
-      anim.cancel();
-      if (
-        /** @type {any} */
-        node.__akSpring === anim
-      ) node.__akSpring = null;
-    }, function() {
-    });
-    return { el: node, finished, cancel() {
-      anim.cancel();
-    } };
-  }
-  function stagger(targets, opts) {
-    const o = opts || {};
-    const list2 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
-      /** @type {any} */
-      targets.length !== void 0 ? Array.prototype.slice.call(
-        /** @type {any} */
-        targets
-      ) : [targets]
-    );
-    const kids = list2.slice(0, o.max || 40);
-    if (!kids.length || reducedMotion() || typeof kids[0].animate !== "function") return { finished: Promise.resolve() };
-    const cs = getComputedStyle(kids[0]);
-    const dist = o.distance !== void 0 ? o.distance : parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 12;
-    const each = o.each !== void 0 ? o.each : parseFloat(cs.getPropertyValue("--ak-enter-stagger")) || 40;
-    const span = o.duration || (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.5;
-    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
-    const start = o.from === "down" ? "translateY(-" + dist + "px)" : o.from === "left" ? "translateX(-" + dist + "px)" : o.from === "right" ? "translateX(" + dist + "px)" : o.from === "scale" ? "scale(0.92)" : "translateY(" + dist + "px)";
-    const end = o.from === "scale" ? "scale(1)" : "translate(0, 0)";
-    let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
-    let timing = { duration: span, easing: ease, fill: "backwards" };
-    if (o.spring) {
-      const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-      frames = sf.samples.map(function(at, i) {
-        return {
-          offset: i / (sf.samples.length - 1),
-          opacity: Math.min(1, at * 1.4),
-          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at) + ")" : start.replace(/[-\d.]+px/, function(px) {
-            return (parseFloat(px) * (1 - at)).toFixed(2) + "px";
-          })
-        };
-      });
-      timing = { duration: sf.duration, easing: "linear", fill: "backwards" };
-    }
-    const runs = kids.map(function(kid, i) {
-      return kid.animate(frames, Object.assign({}, timing, { delay: i * each })).finished;
-    });
-    return { finished: Promise.all(runs).then(function() {
-    }, function() {
-    }) };
-  }
-  function inView(target, fn, opts) {
-    const node = resolve(target);
-    const o = opts || {};
-    if (typeof IntersectionObserver !== "function") {
-      fn(
-        node,
-        /** @type {any} */
-        { isIntersecting: true, target: node }
-      );
-      return { el: node, destroy() {
-      } };
-    }
-    const io = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting) {
-          fn(node, entry);
-          if (o.once !== false) io.disconnect();
-        } else if (o.onLeave) {
-          o.onLeave(node);
-        }
-      });
-    }, { rootMargin: o.margin || "0px 0px -10% 0px", threshold: o.threshold || 0.15 });
-    io.observe(node);
-    return { el: node, destroy() {
-      io.disconnect();
-    } };
-  }
-  function nearestScroller(node) {
-    let p = node.parentElement;
-    while (p && p !== document.body) {
-      const oy = getComputedStyle(p).overflowY;
-      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
-      p = p.parentElement;
-    }
-    return window;
-  }
-  function scrollLink(target, frames, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const o = opts || {};
-    const subject = o.subject || node;
-    const scroller = o.scroller || nearestScroller(subject);
-    const lo = o.range ? o.range[0] : 0;
-    const hi = o.range ? o.range[1] : 1;
-    let last = 0;
-    if (reducedMotion() || typeof node.animate !== "function") {
-      return { el: node, progress() {
-        return 0;
-      }, destroy() {
-      } };
-    }
-    const anim = node.animate(frames, { duration: 1e3, easing: "linear", fill: "both" });
-    anim.pause();
-    const viewportH = function() {
-      return scroller === window ? window.innerHeight : (
-        /** @type {Element} */
-        scroller.clientHeight
-      );
-    };
-    const viewportTop = function() {
-      return scroller === window ? 0 : (
-        /** @type {Element} */
-        scroller.getBoundingClientRect().top
-      );
-    };
-    const tick = function() {
-      const r = subject.getBoundingClientRect();
-      const h = viewportH();
-      const raw = (viewportTop() + h - r.top) / Math.max(h + r.height, 1);
-      let p = (raw - lo) / Math.max(hi - lo, 1e-4);
-      p = Math.max(0, Math.min(1, p));
-      if (p !== last) {
-        last = p;
-        anim.currentTime = p * 1e3;
-      }
-    };
-    let rafId = 0;
-    const onScroll = function() {
-      if (!rafId) rafId = requestAnimationFrame(function() {
-        rafId = 0;
-        tick();
-      });
-    };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    tick();
-    return {
-      el: node,
-      progress() {
-        return last;
-      },
-      destroy() {
-        scroller.removeEventListener("scroll", onScroll);
-        window.removeEventListener("resize", onScroll);
-        if (rafId) cancelAnimationFrame(rafId);
-        anim.cancel();
-      }
-    };
-  }
-  function drag(target, handlers, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const h = handlers || {};
-    const o = opts || {};
-    const axis = o.axis || "both";
-    const threshold = o.threshold !== void 0 ? o.threshold : 4;
-    node.classList.add("ak-drag");
-    let active = null;
-    const clamp3 = function(v, range) {
-      return range ? Math.max(range[0], Math.min(range[1], v)) : v;
-    };
-    const down = function(e) {
-      if (e.button !== void 0 && e.button !== 0) return;
-      const s = stateOf(node);
-      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
-      if (
-        /** @type {any} */
-        node.__akSpring
-      ) node.__akSpring.cancel();
-      try {
-        node.setPointerCapture(e.pointerId);
-      } catch {
-      }
-    };
-    const move = function(e) {
-      if (!active || e.pointerId !== active.id) return;
-      let dx = e.clientX - active.x0;
-      let dy = e.clientY - active.y0;
-      if (!active.moved) {
-        if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
-        active.moved = true;
-        node.classList.add("ak-dragging");
-        if (h.onStart) h.onStart(node);
-      }
-      if (axis === "x") dy = 0;
-      if (axis === "y") dx = 0;
-      const now2 = performance.now();
-      const dt = Math.max(now2 - active.t, 1);
-      active.vx = (e.clientX - active.lx) / dt * 1e3;
-      active.vy = (e.clientY - active.ly) / dt * 1e3;
-      active.t = now2;
-      active.lx = e.clientX;
-      active.ly = e.clientY;
-      const s = stateOf(node);
-      s.x = clamp3(active.bx + dx, o.bounds && o.bounds.x);
-      s.y = clamp3(active.by + dy, o.bounds && o.bounds.y);
-      node.style.transform = transformOf(s);
-      if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
-      e.preventDefault();
-    };
-    const up = function(e) {
-      if (!active || e.pointerId !== active.id) return;
-      const was = active;
-      active = null;
-      node.classList.remove("ak-dragging");
-      try {
-        node.releasePointerCapture(e.pointerId);
-      } catch {
-      }
-      if (!was.moved) return;
-      const s = stateOf(node);
-      const dx = s.x - was.bx;
-      const dy = s.y - was.by;
-      if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
-      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-    };
-    node.addEventListener("pointerdown", down);
-    node.addEventListener("pointermove", move);
-    node.addEventListener("pointerup", up);
-    node.addEventListener("pointercancel", up);
-    return {
-      el: node,
-      destroy() {
-        node.removeEventListener("pointerdown", down);
-        node.removeEventListener("pointermove", move);
-        node.removeEventListener("pointerup", up);
-        node.removeEventListener("pointercancel", up);
-        node.classList.remove("ak-drag", "ak-dragging");
-      }
-    };
   }
 
   // src/static/sdk-libs/atelier/chart-motion.js
@@ -12845,7 +13782,7 @@
           const hover = events.map(function(e) {
             return String(e.title || "");
           }).filter(Boolean).join(" · ");
-          const button = el("button", {
+          const button2 = el("button", {
             type: "button",
             class: "ak-calendar__day" + (outside2 ? " ak-calendar__day--out" : "") + (day2 === today ? " ak-calendar__day--today" : ""),
             "aria-label": day2 + (events.length ? " · " + events.length : ""),
@@ -12858,8 +13795,8 @@
             el("span", { class: "ak-calendar__num" }, String(cursor.getDate())),
             pips(events)
           ]);
-          row.appendChild(el("div", { class: "ak-calendar__cell", role: "gridcell" }, button));
-          cells.push(button);
+          row.appendChild(el("div", { class: "ak-calendar__cell", role: "gridcell" }, button2));
+          cells.push(button2);
           cursor.setDate(cursor.getDate() + 1);
         }
         grid2.appendChild(row);
@@ -14714,798 +15651,6 @@
   }
   function sheet(spec) {
     return dialog({ ...spec, from: "bottom" });
-  }
-
-  // src/static/sdk-libs/atelier/menu.js
-  var GAP = 6;
-  var EDGE = 8;
-  function placeAt(box, at, o) {
-    const opts = o || {};
-    const w = box.offsetWidth;
-    const h = box.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let top = opts.placement === "above" ? at.top - GAP - h : at.bottom + GAP;
-    if (top + h > vh - EDGE && at.top - GAP - h >= EDGE) top = at.top - GAP - h;
-    if (top < EDGE && at.bottom + GAP + h <= vh - EDGE) top = at.bottom + GAP;
-    let left = opts.align === "end" ? at.right - w : opts.align === "center" ? (at.left + at.right) / 2 - w / 2 : at.left;
-    left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
-    top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
-    box.style.left = Math.round(left) + "px";
-    box.style.top = Math.round(top) + "px";
-    const ox = Math.max(0, Math.min(w, (at.left + at.right) / 2 - left));
-    const oy = top >= at.bottom ? 0 : top + h <= at.top ? h : h / 2;
-    return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
-  }
-  function openMotion(box, origin) {
-    box.style.transformOrigin = origin;
-    if (motionOff(box) || typeof box.animate !== "function") return;
-    const sf = springFrames({ el: box });
-    const frames = sf.samples.map(function(at, i) {
-      const s = 0.9 + 0.1 * at;
-      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at * 1.6) };
-    });
-    box.animate(frames, { duration: sf.duration, easing: "linear" });
-  }
-  function closeMotion(box, done) {
-    if (motionOff(box) || typeof box.animate !== "function") {
-      done();
-      return;
-    }
-    const pace2 = paceOf(box);
-    const anim = box.animate(
-      [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.95)" }],
-      { duration: Math.max(90, pace2.span * 0.6), easing: "ease-in", fill: "forwards" }
-    );
-    anim.onfinish = done;
-    anim.oncancel = done;
-  }
-  function outside(nodes, close) {
-    const hit = function(e) {
-      for (const n of nodes) if (n && n.contains(
-        /** @type {Node} */
-        e.target
-      )) return;
-      close();
-    };
-    document.addEventListener("pointerdown", hit, true);
-    return function() {
-      document.removeEventListener("pointerdown", hit, true);
-    };
-  }
-  function menu(spec) {
-    const s = spec || { items: [] };
-    const anchor = s.anchor ? (
-      /** @type {HTMLElement} */
-      resolve(s.anchor)
-    ) : null;
-    let items = s.items || [];
-    let box = null;
-    let mark = null;
-    let unhook = null;
-    let cursor = -1;
-    let picking = false;
-    if (anchor) {
-      anchor.setAttribute("aria-haspopup", "menu");
-      anchor.setAttribute("aria-expanded", "false");
-    }
-    function rows() {
-      return box ? (
-        /** @type {HTMLElement[]} */
-        Array.prototype.slice.call(box.querySelectorAll('.ak-menu__item:not([aria-disabled="true"])'))
-      ) : [];
-    }
-    function focusRow(i) {
-      const list2 = rows();
-      if (!list2.length) return;
-      cursor = (i + list2.length) % list2.length;
-      list2.forEach(function(r, j) {
-        r.classList.toggle("ak-menu__item--on", j === cursor);
-      });
-      list2[cursor].focus({ preventScroll: true });
-      if (mark) mark.sync();
-    }
-    function choose(item) {
-      if (picking || !item || item.disabled) return;
-      picking = true;
-      const finish = function() {
-        picking = false;
-        close(true);
-        if (item.run) item.run();
-        if (s.onPick) s.onPick(item.id, item);
-      };
-      if (!box || motionOff(box) || !mark || typeof mark.el.animate !== "function") {
-        finish();
-        return;
-      }
-      const blink = mark.el.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 1 }], { duration: 150, easing: "linear" });
-      blink.onfinish = finish;
-      blink.oncancel = finish;
-    }
-    function onKey(e) {
-      const list2 = rows();
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        focusRow(cursor + 1);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        focusRow(cursor < 0 ? list2.length - 1 : cursor - 1);
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        focusRow(0);
-      } else if (e.key === "End") {
-        e.preventDefault();
-        focusRow(list2.length - 1);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        close(true);
-      } else if (e.key === "Tab") {
-        close(false);
-      } else if (e.key.length === 1 && /\S/.test(e.key)) {
-        const ch = e.key.toLowerCase();
-        for (let k = 1; k <= list2.length; k++) {
-          const j = (cursor + k) % list2.length;
-          if ((list2[j].textContent || "").trim().toLowerCase().indexOf(ch) === 0) {
-            focusRow(j);
-            break;
-          }
-        }
-      }
-    }
-    function build() {
-      const root = el("div", { class: "ak-root ak-menu", role: "menu", "data-ak-part": "root", "aria-label": s.label || null, tabindex: "-1", on: { keydown: onKey } });
-      items.forEach(function(it) {
-        if (it === "-") {
-          root.appendChild(el("div", { class: "ak-menu__sep", role: "separator", "data-ak-part": "separator" }));
-          return;
-        }
-        root.appendChild(el("button", {
-          type: "button",
-          role: "menuitem",
-          class: "ak-menu__item" + (it.danger ? " ak-menu__item--danger" : ""),
-          "data-ak-part": "item",
-          "data-ak-id": it.id,
-          tabindex: "-1",
-          "data-ak-noguard": true,
-          "aria-disabled": it.disabled ? "true" : null,
-          on: {
-            click: function() {
-              choose(it);
-            },
-            pointermove: function(e) {
-              if (it.disabled) return;
-              const i = rows().indexOf(
-                /** @type {HTMLElement} */
-                e.currentTarget
-              );
-              if (i >= 0 && i !== cursor) focusRow(i);
-            }
-          }
-        }, [
-          el("span", { class: "ak-menu__label", "data-ak-part": "label", text: it.label }),
-          it.hint ? el("span", { class: "ak-menu__hint", "data-ak-part": "hint", text: it.hint }) : null
-        ]));
-      });
-      return root;
-    }
-    function open(at, fromKeys) {
-      if (box) return;
-      box = build();
-      document.body.appendChild(box);
-      const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
-      const origin = placeAt(box, r, { align: s.align });
-      mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
-      openMotion(box, origin);
-      if (!motionOff(box)) {
-        const pace2 = paceOf(box);
-        rows().forEach(function(row, i) {
-          if (typeof row.animate === "function") {
-            row.animate(
-              [{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }],
-              { duration: pace2.span, delay: 20 + i * 18, easing: pace2.ease, fill: "backwards" }
-            );
-          }
-        });
-      }
-      if (anchor) anchor.setAttribute("aria-expanded", "true");
-      unhook = outside([box, anchor], function() {
-        close(false);
-      });
-      cursor = -1;
-      box.focus({ preventScroll: true });
-      if (fromKeys) focusRow(0);
-    }
-    function close(focusBack) {
-      if (!box) return;
-      const gone = box;
-      box = null;
-      if (mark) {
-        mark.destroy();
-        mark = null;
-      }
-      if (unhook) {
-        unhook();
-        unhook = null;
-      }
-      if (anchor) anchor.setAttribute("aria-expanded", "false");
-      closeMotion(gone, function() {
-        if (gone.parentNode) gone.parentNode.removeChild(gone);
-      });
-      if (focusBack && anchor) anchor.focus({ preventScroll: true });
-    }
-    const onAnchor = function(e) {
-      if (box) close(true);
-      else open(void 0, !!e && e.detail === 0);
-    };
-    const onAnchorKey = function(e) {
-      if (e.key === "ArrowDown" && !box) {
-        e.preventDefault();
-        open(void 0, true);
-      }
-    };
-    if (anchor) {
-      anchor.addEventListener("click", onAnchor);
-      anchor.addEventListener("keydown", onAnchorKey);
-    }
-    return {
-      open,
-      close,
-      isOpen() {
-        return !!box;
-      },
-      set(patch) {
-        if (patch && patch.items) {
-          items = patch.items;
-          if (box) {
-            close(false);
-            open();
-          }
-        }
-      },
-      destroy() {
-        close(false);
-        if (anchor) {
-          anchor.removeEventListener("click", onAnchor);
-          anchor.removeEventListener("keydown", onAnchorKey);
-        }
-      }
-    };
-  }
-  function contextMenu(target, spec) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label });
-    const onCtx = function(e) {
-      e.preventDefault();
-      m.close(false);
-      m.open({ x: e.clientX, y: e.clientY });
-    };
-    const onKey = function(e) {
-      if (e.key === "F10" && e.shiftKey) {
-        e.preventDefault();
-        const r = node.getBoundingClientRect();
-        m.close(false);
-        m.open({ x: r.left + 12, y: r.top + 12 }, true);
-      }
-    };
-    node.addEventListener("contextmenu", onCtx);
-    node.addEventListener("keydown", onKey);
-    return {
-      close() {
-        m.close(false);
-      },
-      destroy() {
-        m.destroy();
-        node.removeEventListener("contextmenu", onCtx);
-        node.removeEventListener("keydown", onKey);
-      }
-    };
-  }
-  function popover(spec) {
-    const anchor = (
-      /** @type {HTMLElement} */
-      resolve(spec.anchor)
-    );
-    let box = null;
-    let unhook = null;
-    anchor.setAttribute("aria-expanded", "false");
-    function open() {
-      if (box) return;
-      const body = typeof spec.content === "function" ? spec.content() : spec.content;
-      box = el(
-        "div",
-        {
-          class: "ak-root ak-popover",
-          role: "dialog",
-          "aria-label": spec.label || null,
-          "data-ak-part": "root",
-          tabindex: "-1",
-          on: { keydown: function(e) {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              close();
-              anchor.focus();
-            }
-          } }
-        },
-        [el("div", { class: "ak-popover__body", "data-ak-part": "body" }, body)]
-      );
-      document.body.appendChild(box);
-      openMotion(box, placeAt(box, anchor.getBoundingClientRect(), { align: spec.align || "center" }));
-      anchor.setAttribute("aria-expanded", "true");
-      unhook = outside([box, anchor], close);
-      box.focus({ preventScroll: true });
-      if (spec.onOpen) spec.onOpen();
-    }
-    function close() {
-      if (!box) return;
-      const gone = box;
-      box = null;
-      if (unhook) {
-        unhook();
-        unhook = null;
-      }
-      anchor.setAttribute("aria-expanded", "false");
-      closeMotion(gone, function() {
-        if (gone.parentNode) gone.parentNode.removeChild(gone);
-      });
-      if (spec.onClose) spec.onClose();
-    }
-    const onClick = function() {
-      if (box) close();
-      else open();
-    };
-    anchor.addEventListener("click", onClick);
-    return { open, close, isOpen() {
-      return !!box;
-    }, destroy() {
-      close();
-      anchor.removeEventListener("click", onClick);
-    } };
-  }
-  function tooltip(target, text, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const o = opts || {};
-    const tip = el("div", { class: "ak-root ak-tooltip", role: "tooltip", "data-ak-part": "root", id: "ak-tip-" + Math.random().toString(36).slice(2, 8), text });
-    let timer = null;
-    let shown = false;
-    node.setAttribute("aria-describedby", tip.id);
-    function show() {
-      clearTimeout(timer);
-      if (shown) return;
-      shown = true;
-      document.body.appendChild(tip);
-      openMotion(tip, placeAt(tip, node.getBoundingClientRect(), { align: "center", placement: o.placement || "above" }));
-    }
-    function hide() {
-      clearTimeout(timer);
-      if (!shown) return;
-      shown = false;
-      closeMotion(tip, function() {
-        if (!shown && tip.parentNode) tip.parentNode.removeChild(tip);
-      });
-    }
-    const enter2 = function() {
-      clearTimeout(timer);
-      timer = setTimeout(show, o.delay != null ? o.delay : 450);
-    };
-    const key = function(e) {
-      if (e.key === "Escape") hide();
-    };
-    node.addEventListener("pointerenter", enter2);
-    node.addEventListener("pointerleave", hide);
-    node.addEventListener("focus", show);
-    node.addEventListener("blur", hide);
-    node.addEventListener("keydown", key);
-    return {
-      set(next) {
-        tip.textContent = next;
-      },
-      destroy() {
-        hide();
-        node.removeEventListener("pointerenter", enter2);
-        node.removeEventListener("pointerleave", hide);
-        node.removeEventListener("focus", show);
-        node.removeEventListener("blur", hide);
-        node.removeEventListener("keydown", key);
-        node.removeAttribute("aria-describedby");
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/parts-ui.js
-  var toastHost = null;
-  function toast(spec) {
-    if (!toastHost || !toastHost.isConnected) {
-      toastHost = el("div", { class: "ak-root ak-toasts", role: "status", "aria-live": "polite" });
-      document.body.appendChild(toastHost);
-    }
-    let timer = null;
-    const node = el("div", { class: "ak-toast" + (spec.tone ? " ak-toast--" + spec.tone : "") }, [
-      el("div", { class: "ak-toast__body" }, [
-        el("div", { class: "ak-toast__title" }, spec.title),
-        spec.sub ? el("div", { class: "ak-toast__sub" }, spec.sub) : null
-      ].filter(Boolean)),
-      spec.action ? el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: {
-        click: function() {
-          spec.action.onPick();
-          close();
-        }
-      } }, spec.action.label) : null
-    ].filter(Boolean));
-    const pace2 = paceOf(node);
-    function close() {
-      if (timer) clearTimeout(timer);
-      const drop = function() {
-        if (node.parentNode) node.parentNode.removeChild(node);
-      };
-      if (motionOff(node) || typeof node.animate !== "function") {
-        drop();
-        return;
-      }
-      const anim = node.animate(
-        [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(" + (pace2.dist || 8) + "px)" }],
-        { duration: pace2.span, easing: "ease-in" }
-      );
-      anim.onfinish = drop;
-      anim.oncancel = drop;
-    }
-    toastHost.appendChild(node);
-    fadeIn(node, pace2, 0);
-    enter(node);
-    const ttl = spec.ttl == null ? 6e3 : spec.ttl;
-    if (ttl > 0) timer = setTimeout(close, ttl);
-    return { el: node, close };
-  }
-  function palette(spec) {
-    const s = spec || { items: [] };
-    let root = null;
-    let box = null;
-    let list2 = null;
-    let mark = null;
-    let cursor = 0;
-    let shown = [];
-    let opener = null;
-    function keyOf2(it, i) {
-      return it.id || it.label || String(i);
-    }
-    function close(after) {
-      if (!root) return;
-      const gone = root;
-      const goneBox = box;
-      root = null;
-      box = null;
-      list2 = null;
-      if (mark) {
-        mark.destroy();
-        mark = null;
-      }
-      const drop = function() {
-        if (gone.parentNode) gone.parentNode.removeChild(gone);
-        if (after) after();
-      };
-      if (motionOff(gone) || typeof gone.animate !== "function") {
-        drop();
-        return;
-      }
-      gone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: "ease-in", fill: "forwards" });
-      closeMotion(goneBox, drop);
-    }
-    function runItem(it) {
-      if (!it.done || !box || motionOff(box) || typeof box.animate !== "function") {
-        close();
-        it.run();
-        if (it.done) toast({ title: it.done, tone: "ok", ttl: 3200 });
-        return;
-      }
-      const from = box.getBoundingClientRect();
-      const tw = Math.min(360, window.innerWidth - 32);
-      const to = { left: window.innerWidth - tw - 16, top: window.innerHeight - 72, width: tw, height: 56 };
-      const dx = to.left - from.left;
-      const dy = to.top - from.top;
-      const sx = to.width / Math.max(from.width, 1);
-      const sy = to.height / Math.max(from.height, 1);
-      const sf = springFrames({ el: box });
-      const frames = sf.samples.map(function(at, i) {
-        return {
-          offset: i / (sf.samples.length - 1),
-          transform: "translate(" + (dx * at).toFixed(1) + "px, " + (dy * at).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at).toFixed(4) + ", " + (1 + (sy - 1) * at).toFixed(4) + ")",
-          opacity: at > 0.85 ? 1 - (at - 0.85) / 0.15 : 1
-        };
-      });
-      box.style.transformOrigin = "0 0";
-      if (list2) list2.style.opacity = "0";
-      const gone = root;
-      root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(sf.duration, 260), easing: "ease-out", fill: "forwards" });
-      const anim = box.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" });
-      root = null;
-      box = null;
-      list2 = null;
-      if (mark) {
-        mark.destroy();
-        mark = null;
-      }
-      let handed = false;
-      const hand = function() {
-        if (handed) return;
-        handed = true;
-        if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
-        toast({ title: it.done, tone: "ok", ttl: 3200 });
-      };
-      it.run();
-      setTimeout(hand, Math.min(sf.duration, 420));
-      anim.onfinish = hand;
-    }
-    function highlight() {
-      if (!list2) return;
-      const rows = Array.prototype.slice.call(list2.querySelectorAll(".ak-palette__item:not(.ak-layout__ghost)"));
-      rows.forEach(function(row, i) {
-        row.setAttribute("aria-selected", i === cursor ? "true" : "false");
-      });
-      if (rows[cursor] && typeof rows[cursor].scrollIntoView === "function") rows[cursor].scrollIntoView({ block: "nearest" });
-      if (mark) mark.sync();
-    }
-    function paintList() {
-      if (!list2) return;
-      const host = list2;
-      settle(host, function() {
-        Array.prototype.slice.call(host.querySelectorAll(".ak-palette__item, .ak-palette__empty")).forEach(function(n) {
-          host.removeChild(n);
-        });
-        if (!shown.length) {
-          host.appendChild(el("li", { class: "ak-palette__empty", "data-ak-id": "__empty" }, s.empty || "Nothing matches."));
-          return;
-        }
-        shown.forEach(function(it, i) {
-          host.appendChild(el("li", { class: "ak-palette__item", role: "option", "data-ak-id": keyOf2(it, i), "aria-selected": "false", on: {
-            click: function() {
-              runItem(it);
-            },
-            pointermove: function() {
-              if (cursor !== i) {
-                cursor = i;
-                highlight();
-              }
-            }
-          } }, [el("span", {}, it.label), it.hint ? el("span", { class: "ak-palette__hint" }, it.hint) : null].filter(Boolean)));
-        });
-      }, { rows: ".ak-palette__item, .ak-palette__empty" });
-      highlight();
-    }
-    function open(from) {
-      if (root) return;
-      opener = from || null;
-      cursor = 0;
-      shown = s.items.slice();
-      list2 = el("ul", { class: "ak-palette__list", role: "listbox" });
-      const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || "go to, run, adopt…", autocomplete: "off", on: {
-        input: function() {
-          const q = (
-            /** @type {HTMLInputElement} */
-            input.value.trim().toLowerCase()
-          );
-          shown = s.items.filter(function(it) {
-            return !q || (it.label + " " + (it.hint || "")).toLowerCase().indexOf(q) >= 0;
-          });
-          cursor = 0;
-          paintList();
-        },
-        keydown: function(e) {
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            cursor = Math.min(cursor + 1, shown.length - 1);
-            highlight();
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            cursor = Math.max(cursor - 1, 0);
-            highlight();
-          } else if (e.key === "Enter") {
-            e.preventDefault();
-            const it = shown[cursor];
-            if (it) runItem(it);
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            close(function() {
-              if (opener && opener.isConnected) opener.focus();
-            });
-          }
-        }
-      } });
-      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || "Commands" }, [input, list2]);
-      root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
-        if (e.target === root) close();
-      } } }, [box]);
-      document.body.appendChild(root);
-      mark = ink2(list2, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
-      paintList();
-      mark.jump();
-      growFrom(box, opener);
-      if (!motionOff(root) && typeof root.animate === "function") root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
-      input.focus();
-    }
-    const key = s.hotkey === void 0 ? "k" : s.hotkey;
-    const onKey = function(e) {
-      if (!key) return;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === key) {
-        e.preventDefault();
-        if (root) close();
-        else open();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    const anchor = s.anchor ? (
-      /** @type {HTMLElement} */
-      resolve(s.anchor)
-    ) : null;
-    const onAnchor = function() {
-      if (root) close();
-      else open(anchor);
-    };
-    if (anchor) anchor.addEventListener("click", onAnchor);
-    return {
-      open,
-      close() {
-        close();
-      },
-      destroy() {
-        close();
-        window.removeEventListener("keydown", onKey);
-        if (anchor) anchor.removeEventListener("click", onAnchor);
-      }
-    };
-  }
-  function growFrom(box, from) {
-    if (!from || !from.isConnected || motionOff(box) || typeof box.animate !== "function") {
-      openMotion(box, "50% 0");
-      return;
-    }
-    const a = from.getBoundingClientRect();
-    const b = box.getBoundingClientRect();
-    const sx = a.width / Math.max(b.width, 1);
-    const sy = a.height / Math.max(b.height, 1);
-    const dx = a.left - b.left;
-    const dy = a.top - b.top;
-    const sf = springFrames({ el: box });
-    box.style.transformOrigin = "0 0";
-    box.animate(sf.samples.map(function(at, i) {
-      const k = 1 - at;
-      return {
-        offset: i / (sf.samples.length - 1),
-        transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
-        opacity: Math.min(1, 0.4 + at)
-      };
-    }), { duration: sf.duration, easing: "linear" });
-  }
-  function compare(spec) {
-    const s = spec || { before: {}, after: {} };
-    function layer(side, cls) {
-      const body = side.el ? side.el : side.image ? el("img", { src: side.image, alt: side.label || "" }) : el("span", {}, side.label || "");
-      return el("div", { class: "ak-compare__layer " + cls }, [body]);
-    }
-    const handle2 = el("button", { type: "button", class: "ak-compare__handle", "aria-label": "Compare", role: "slider", "aria-valuemin": "0", "aria-valuemax": "100" }, "⇄");
-    const root = el("div", { class: "ak-root ak-compare" }, [
-      layer(s.before || {}, "ak-compare__before"),
-      layer(s.after || {}, "ak-compare__after"),
-      s.before && s.before.label ? el("span", { class: "ak-compare__label ak-compare__label--before" }, s.before.label) : null,
-      s.after && s.after.label ? el("span", { class: "ak-compare__label ak-compare__label--after" }, s.after.label) : null,
-      el("div", { class: "ak-compare__bar" }),
-      handle2
-    ].filter(Boolean));
-    if (s.target) resolve(s.target).appendChild(root);
-    let pct = typeof s.value === "number" ? s.value : 50;
-    function set(v) {
-      pct = Math.max(0, Math.min(Number(v) || 0, 100));
-      root.style.setProperty("--ak-compare", pct + "%");
-      handle2.setAttribute("aria-valuenow", String(Math.round(pct)));
-      if (s.onChange) s.onChange(pct);
-    }
-    let dragging = false;
-    function at(e) {
-      const r = root.getBoundingClientRect();
-      set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
-    }
-    root.addEventListener("pointerdown", function(e) {
-      dragging = true;
-      root.setPointerCapture(e.pointerId);
-      at(e);
-    });
-    root.addEventListener("pointermove", function(e) {
-      if (dragging) at(e);
-    });
-    root.addEventListener("pointerup", function() {
-      dragging = false;
-    });
-    root.addEventListener("pointercancel", function() {
-      dragging = false;
-    });
-    handle2.addEventListener("keydown", function(e) {
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        set(pct - 5);
-      }
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        set(pct + 5);
-      }
-    });
-    set(pct);
-    return { el: root, set, destroy() {
-      if (root.parentNode) root.parentNode.removeChild(root);
-    } };
-  }
-  function tour(spec) {
-    const s = spec || { steps: [] };
-    const L = Object.assign({ next: "Next", done: "Done", skip: "Skip" }, s.labels || {});
-    let i = -1;
-    let note = null;
-    let marked = null;
-    function place2() {
-      if (!note || !marked) return;
-      const r = marked.getBoundingClientRect();
-      const w = note.offsetWidth || 260;
-      const top = r.bottom + 12;
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
-      note.style.top = (top + (note.offsetHeight || 0) > window.innerHeight ? Math.max(8, r.top - (note.offsetHeight || 0) - 12) : top) + "px";
-      note.style.left = left + "px";
-    }
-    function show(n) {
-      clearStep();
-      const step = s.steps[n];
-      if (!step) {
-        end();
-        return;
-      }
-      i = n;
-      const target = typeof step.target === "string" ? document.querySelector(step.target) : step.target;
-      if (!target) {
-        show(n + 1);
-        return;
-      }
-      marked = /** @type {HTMLElement} */
-      target;
-      marked.classList.add("ak-tour__mark");
-      if (!reducedMotion()) marked.scrollIntoView({ block: "center", behavior: "smooth" });
-      const last = n === s.steps.length - 1;
-      note = el("div", { class: "ak-root ak-tour__note", role: "dialog", "aria-live": "polite" }, [
-        el("div", {}, [el("span", { class: "ak-tour__step" }, n + 1 + "/" + s.steps.length), el("span", {}, step.text)]),
-        el("div", { class: "ak-tour__nav" }, [
-          el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: function() {
-            if (last) end();
-            else show(n + 1);
-          } } }, last ? L.done : L.next),
-          last ? null : el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: end } }, L.skip)
-        ].filter(Boolean))
-      ]);
-      document.body.appendChild(note);
-      place2();
-    }
-    function clearStep() {
-      if (marked) marked.classList.remove("ak-tour__mark");
-      if (note && note.parentNode) note.parentNode.removeChild(note);
-      marked = null;
-      note = null;
-    }
-    function onKey(e) {
-      if (e.key === "Escape") end();
-    }
-    function end() {
-      clearStep();
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", place2);
-      if (i >= 0 && s.onDone) s.onDone();
-      i = -1;
-    }
-    function start() {
-      window.addEventListener("keydown", onKey);
-      window.addEventListener("resize", place2);
-      show(0);
-    }
-    return { start, end };
   }
 
   // src/static/sdk-libs/atelier/island.js
@@ -18476,6 +18621,14 @@
       fork: "Copy .ak-progress* out of workbench.css; the count-up is dom.js countUp.",
       file: "workbench.js"
     },
+    "promptPanel": {
+      parts: ["root", "col", "step", "preview", "copy", "toggle", "answer", "apply"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "Two columns of your own; copy .ak-promptpanel* out of workbench.css and keep the parse in parseAnswer.",
+      file: "workbench-parts.js"
+    },
     "queue": {
       parts: ["root", "strip", "list", "row", "state", "words", "title", "sub", "extra", "aside"],
       slots: ["row(item)", "state(item)", "title(item)", "sub(item)", "extra(item)", "aside(item)"],
@@ -18483,6 +18636,14 @@
       tokens: ["--ak-queue-row-pad-y", "--ak-queue-state-min"],
       fork: "Copy .ak-queue* out of data.css; you give up the keyed line, so a job finishing looks like a repaint.",
       file: "ops.js"
+    },
+    "queueRow": {
+      parts: ["root", "top", "who", "when", "title", "chips", "chip", "note"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "Build your own row content; copy .ak-qrow* out of workbench.css.",
+      file: "workbench-parts.js"
     },
     "rating": {
       parts: ["root", "value", "track", "fill", "words"],
@@ -18613,7 +18774,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.55.1",
+    version: "0.56.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -18646,6 +18807,9 @@
     settingsGroup,
     progressFigure,
     callout,
+    promptPanel,
+    queueRow,
+    parseAnswer,
     // ── The stored layout, rendered ──
     mosaic,
     appRef,

@@ -156,6 +156,14 @@ export const PARTS = {
     fork: "Copy .ak-progress* out of workbench.css; the count-up is dom.js countUp.",
     file: "workbench.js",
   },
+  "promptPanel": {
+    parts: ["root","col","step","preview","copy","toggle","answer","apply"],
+    slots: [],
+    variants: [],
+    tokens: [],
+    fork: "Two columns of your own; copy .ak-promptpanel* out of workbench.css and keep the parse in parseAnswer.",
+    file: "workbench-parts.js",
+  },
   "queue": {
     parts: ["root","strip","list","row","state","words","title","sub","extra","aside"],
     slots: ["row(item)","state(item)","title(item)","sub(item)","extra(item)","aside(item)"],
@@ -163,6 +171,14 @@ export const PARTS = {
     tokens: ["--ak-queue-row-pad-y","--ak-queue-state-min"],
     fork: "Copy .ak-queue* out of data.css; you give up the keyed line, so a job finishing looks like a repaint.",
     file: "ops.js",
+  },
+  "queueRow": {
+    parts: ["root","top","who","when","title","chips","chip","note"],
+    slots: [],
+    variants: [],
+    tokens: [],
+    fork: "Build your own row content; copy .ak-qrow* out of workbench.css.",
+    file: "workbench-parts.js",
   },
   "rating": {
     parts: ["root","value","track","fill","words"],
