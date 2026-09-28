@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.8.0 -- 2026-09-28 -- aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.7.0 -- 2026-09-28 -- aimeat_package_entitlements: `node`, the packages-only peer registered with a grant.
  *   v1.6.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
  *     aimeat_package_repository and aimeat_package_entitlements (the package repository).
@@ -228,6 +229,16 @@ export const packagesTools: AimeatToolDefinition[] = [
             channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.' },
             node: { type: 'object', description: 'For grant: { url, public_key } of a node this repository does not know yet. It is registered with the grant as a packages-only peer (active, contact tier, messages off), which can pull only what it is entitled to. A peer of that id under another key, or switched off, is refused.' },
             note: { type: 'string', description: 'For grant: why, e.g. the order it came from.' },
+        },
+    },
+    {
+        // What a shop asks before payment, before the customer's node exists.
+        name: 'aimeat_package_config_needs',
+        description: 'The settings a package of yours, or every package of an install bundle of yours, needs the customer to give before it works: the questions to ask before a sale. Each question names its package, component and field, whether it is required, whether it is secret, and for an app field its JSON Schema (type, title, description, enum). A field the bundle already fills is not asked; its value is in `defaults`. Put the answers in the install set: `config.<package>.<component>.<field>`, and a secret in the secrets file with the same path, never in the set. A listed package this node does not hold is named in `problems`. For the author or an operator. The same as GET /v1/packages/:groupId/config-needs.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', required: true, description: 'The package or install bundle group id, e.g. "yrittajan-peruspaketti::happyadmin500001".' },
         },
     },
     {

@@ -43468,6 +43468,37 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/packages/{groupId}/config-needs:
+    get:
+      operationId: getPackageConfigNeeds
+      summary: The settings a package or install bundle needs the customer to give
+      description: >-
+        The questions a shop asks before a sale, before the customer's node exists. For an install
+        bundle, every package it lists, with the bundle's own defaults given, so a field the bundle
+        fills is not asked (its value is in `defaults`). Each question names its package, component and
+        field, whether it is required (an app field the install refuses without, or an extension secret),
+        whether it is secret, and for an app field its JSON Schema. Answers go in the install set:
+        `config.<package>.<component>.<field>`; a secret goes in the secrets file under the same path.
+        A listed package this node does not hold is named in `problems`. The package's author or an
+        operator; requires packages:write.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: >-
+            `data` is `{ group_id, version, bundle, name, questions: [{ package, component, field,
+            kind: app|extension, required, secret, schema? }], defaults, problems }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/packages/{groupId}/entitlements/{nodeId}:
     put:
       operationId: grantPackageEntitlement

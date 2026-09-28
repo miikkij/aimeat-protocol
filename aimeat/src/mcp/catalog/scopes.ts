@@ -22,6 +22,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.38.0 -- 2026-09-28 -- aimeat_package_config_needs -> packages:write, the word its REST endpoint asks.
  *   v1.37.0 -- 2026-09-28 -- aimeat_admin_install_set -> operator:admin, the word its REST endpoints ask.
  *   v1.36.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository
  *     and aimeat_package_entitlements -> packages:write, the word their REST endpoints ask.
@@ -274,6 +275,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_package_check_updates:             'packages:write',
     aimeat_package_repository:                'packages:write',
     aimeat_package_entitlements:              'packages:write',
+    aimeat_package_config_needs:              'packages:write',
     aimeat_package_pull:                      'packages:write',
 
     // Installing registers an app, a cortex, an extension and any @activate cron the manifest
