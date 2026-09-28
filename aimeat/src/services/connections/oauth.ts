@@ -21,6 +21,7 @@
  * @structure startAuthorization · completeAuthorization · resolveClient · fetchAccountIdentity
  * @usage import { startAuthorization, completeAuthorization } from './oauth.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The sandbox's `fake-mail` provider asks the same /me as `fake`.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1c.
  */
 
@@ -358,7 +359,7 @@ async function fetchAccountIdentity(
         : (typeof j.userPrincipalName === 'string' ? j.userPrincipalName : id);
       return { externalId: id, accountLabel: label };
     }
-    if (provider.id === 'fake') {
+    if (provider.id === 'fake' || provider.id === 'fake-mail') {
       // Test-only, and reached only when a base URL is configured. It goes through the same
       // safeFetch + shape-checking path as the real ones so the tests exercise that code rather
       // than a shortcut around it.

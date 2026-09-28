@@ -23,6 +23,8 @@
  *   - findProvider(list, id) / listProviderMeta(list) — lookup + the safe public projection
  * @usage const providers = buildOutboundProviders(config);
  * @version-history
+ *   v1.5.0 — 2026-09-29 — `fake-mail` joins the test providers behind AIMEAT_CONNECT_FAKE_BASE_URL:
+ *     a Gmail-shaped mailbox for the sandbox and the refinery's end-to-end runs.
  *   v1.4.0 — 2026-08-26 — Mail grows from one provider to four, in READ/SEND pairs: `google-mail-send`
  *     joins `google-mail`, and Microsoft arrives as `microsoft-mail` + `microsoft-mail-send`. The
  *     pairing is the rule v1.3.0 wrote down and this is its first application — a permission that is
@@ -46,7 +48,7 @@
 
 import type { AimeatConfig } from '../../config.js';
 import type { CredentialShape } from '../../models/connection-schemas.js';
-import { googleMail, googleMailSend, microsoftMail, microsoftMailSend } from './providers-mail.js';
+import { googleMail, googleMailSend, microsoftMail, microsoftMailSend, fakeMail } from './providers-mail.js';
 
 /** Stable provider identifiers. Also the value stored in `Connection.provider`. */
 export type OutboundProviderId =
@@ -56,7 +58,7 @@ export type OutboundProviderId =
   // cannot be misused, leaked, or need explaining to a person who only wanted one of the two.
   | 'google-mail' | 'google-mail-send'
   | 'microsoft-mail' | 'microsoft-mail-send'
-  | 'fake' | 'fake-static';
+  | 'fake' | 'fake-static' | 'fake-mail';
 
 /**
  * What a user must supply for a provider that has NO authorization round.
@@ -640,6 +642,7 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
   if (config.connectFakeBaseUrl) {
     list.push(fake(config.connectFakeBaseUrl, on));
     list.push(fakeStatic(config.connectFakeBaseUrl, on));
+    list.push(fakeMail(config.connectFakeBaseUrl, on));
   }
   return list;
 }

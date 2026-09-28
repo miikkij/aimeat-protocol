@@ -21,6 +21,8 @@
  *   · clampLimit
  * @usage import { googleMail, microsoftMail } from './providers-mail.js';
  * @version-history
+ *   v1.2.0 — 2026-09-29 — gmailResources (the Gmail read resources, pure extraction from googleMail)
+ *     and fakeMail, the sandbox's Gmail-shaped test mailbox on the same resources.
  *   v1.1.0 — 2026-09-28 — An Outlook message comes with its attachments' ids, names, types and sizes
  *     ($expand, no bytes), so an attachment can be fetched or stored at all.
  *   v1.0.0 — 2026-08-26 — Extracted from providers.ts.
@@ -70,7 +72,23 @@ export function googleMail(clientId: string, clientSecret: string, capabilityOn:
     capabilities: ['read-mail'],
     sharedDailyLimit: null,
     attachFields: null,
-    resources: {
+    resources: gmailResources(API, READ),
+    endpoints: () => ({
+      authorize: 'https://accounts.google.com/o/oauth2/v2/auth',
+      token: 'https://oauth2.googleapis.com/token',
+      revoke: 'https://oauth2.googleapis.com/revoke',
+    }),
+  };
+}
+
+/**
+ * The Gmail read resources at an API base. One set for the real Gmail and the sandbox's test
+ * mailbox (fakeMail, below), so what the sandbox exercises is the code the real provider runs.
+ * @param API the users/me base, e.g. https://gmail.googleapis.com/gmail/v1/users/me
+ * @param READ the scope every resource requires
+ */
+export function gmailResources(API: string, READ: string): NonNullable<OutboundProvider['resources']> {
+  return {
       messages: {
         label: 'the list of messages',
         requiresScopes: [READ],
@@ -138,12 +156,43 @@ export function googleMail(clientId: string, clientSecret: string, capabilityOn:
         requiresScopes: [READ],
         url() { return `${API}/settings/sendAs`; },
       },
+  };
+}
+
+/**
+ * THE SANDBOX'S TEST MAILBOX: a Gmail-shaped read provider at a local base URL. Present ONLY when
+ * AIMEAT_CONNECT_FAKE_BASE_URL is set, which nothing but the sandbox and the E2E environment does,
+ * so it cannot appear on a real node. The server behind it is scripts/lib/fake-mail-server.ts: an
+ * OAuth round that approves itself, and a mailbox of sample messages with PDF attachments.
+ *
+ * It exists so a mail pipeline (the refinery, an app like Postinjalostamo) can be run end to end on a
+ * developer's machine without a real mailbox: the same resources, the same read path, the same token
+ * handling, against messages whose right answers are known.
+ */
+export function fakeMail(baseUrl: string, capabilityOn: boolean): OutboundProvider {
+  const enabled = capabilityOn && Boolean(baseUrl);
+  const READ = 'mail.read';
+  return {
+    id: 'fake-mail',
+    label: 'Test mailbox',
+    credentialShape: 'oauth2',
+    instanceScoped: false,
+    enabled,
+    capabilityOn,
+    disabledReason: enabled ? null : 'no AIMEAT_CONNECT_FAKE_BASE_URL (this provider is for the sandbox and the tests)',
+    client: baseUrl ? { id: 'fake-mail-client', secret: 'fake-mail-secret' } : null,
+    scopes: [READ],
+    pkce: true,
+    tokenAuth: 'body',
+    offlineAccess: true,
+    capabilities: ['read-mail'],
+    sharedDailyLimit: null,
+    attachFields: null,
+    resources: baseUrl ? gmailResources(`${baseUrl}/gmail/v1/users/me`, READ) : undefined,
+    endpoints() {
+      if (!baseUrl) return null;
+      return { authorize: `${baseUrl}/authorize`, token: `${baseUrl}/token`, revoke: `${baseUrl}/revoke` };
     },
-    endpoints: () => ({
-      authorize: 'https://accounts.google.com/o/oauth2/v2/auth',
-      token: 'https://oauth2.googleapis.com/token',
-      revoke: 'https://oauth2.googleapis.com/revoke',
-    }),
   };
 }
 
