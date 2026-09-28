@@ -13,6 +13,8 @@
  * @structure AiSettingsTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The providers, the routing and the model policy (System 2) are sections of
+ *     this page: their state and handlers are ai/use-providers.js, passed to the render as ctx.pv.
  *   v1.1.0 — 2026-09-09 — The parameters section carries the reasoning setting: one word on the
  *     page (default, off, light, medium, deep), OpenRouter's object on the wire. Exists because a
  *     reasoning model behind a token limit spends the limit thinking and answers with nothing.
@@ -29,6 +31,7 @@ import { swallowed } from '/js/swallowed.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { renderPage } from './ai/page.js';
 import { x, rollup } from './ai/frame.js';
+import { useProviders } from './ai/use-providers.js';
 
 /** Read a File as bare base64 (no data: prefix), the shape /v1/ai/transcribe takes inline. */
 function fileToBase64(file) {
@@ -81,6 +84,7 @@ export default function AiSettingsTab({ navigate, showToast }) {
   const [paramsMsg, setParamsMsg] = useState(null);
 
   const toast = (m, isErr) => showToast?.(m, !!isErr);
+  const pv = useProviders({ confirm, toast });
   const errText = (e, fallback) => e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error');
   const host = window.location.hostname;
 
@@ -288,7 +292,7 @@ export default function AiSettingsTab({ navigate, showToast }) {
     keyed: keyedFor(settings), isOpenRouter: (settings?.provider || 'openrouter') === 'openrouter', host,
     quotas: aiSettings?.app_quotas || {},
     roll: history ? rollup(history, usage, aiSettings?.app_quotas) : null,
-    navigate, ConfirmUI,
+    navigate, ConfirmUI, pv,
     setConn, setProvider, saveConnection, testConnection, removeKey, loadModels: () => loadModels(settings),
     toggleRole, setQuery, setShowAll, setRole, setSttLanguage, sttTest,
     setBudgetEditing, setBudgetDraft, saveBudget, setCapsEditing, setCap, saveCaps, setShowAllApps, setMetric,
