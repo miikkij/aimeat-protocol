@@ -34,6 +34,9 @@
  *   const { posture, hints } = lintAppAiDisclosure(html, previous?.manifest.aiPosture);
  *   if (posture) manifest.aiPosture = posture;
  * @version-history
+ *   v1.4.0 — 2026-09-28 — `prefer.<capability>=` and `local.<capability>=yes` in the meta, kept on the
+ *     posture for the routing (plan 11, section 9); the capability hints of app-ai-capability-hints.ts
+ *     join `hints` for an app that requests ai:use (System 2 plan V5).
  *   v1.3.0 — 2026-09-28 — `models=` in the meta: the models the app allows itself, as
  *     `<type>:<model id>` references, read without lower-casing and kept on the posture. An invalid
  *     reference is left out and named in a hint; the publish goes through either way (D2). The node
@@ -46,6 +49,8 @@
 import { parseAppScopes } from './protected-resource.js';
 import { lintAppDecideUse } from './app-decide-posture.js';
 import { isModelRef } from './ai/policy.js';
+import type { AiCapability } from './ai/types.js';
+import { lintAppAiCapabilityUse } from './app-ai-capability-hints.js';
 
 /** The modalities Article 50(2) names. Frozen here so the meta and the catalogue agree. */
 export const AI_GENERATES_KINDS = ['text', 'image', 'audio', 'video'] as const;
@@ -80,7 +85,18 @@ export interface AppAiPosture {
    * the owner's policy; it can only tighten. Absent means the app states no list.
    */
   models?: string[];
+  /**
+   * The app's order of preference per capability, from `prefer.<capability>=` in its meta: a provider
+   * type (`anthropic`) or a model reference (`openrouter:black-forest-labs/flux.2-pro`), in order.
+   * It orders the owner's candidates and never adds one or loosens a rule (plan 11, section 9).
+   */
+  prefer?: Partial<Record<AiCapability, string[]>>;
+  /** The capabilities the app wants answered only on this machine, from `local.<capability>=yes`. */
+  local?: AiCapability[];
 }
+
+/** The capabilities `prefer.` and `local.` may name. */
+const META_CAPABILITIES: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
 
 /**
  * What the publish check returns: the posture to store, and the hints to hand back to whoever (or
@@ -116,7 +132,7 @@ export function appUsesAi(html: string): boolean {
  * Returns null when the app declares nothing or the value is unreadable — never an error, because a
  * malformed declaration must not be able to stop a publish or delist an offering.
  */
-export function parseAiPosture(html: string): (Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models'> & { invalidModels?: string[] }) | null {
+export function parseAiPosture(html: string): (Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models' | 'prefer' | 'local'> & { invalidModels?: string[] }) | null {
   const metas = html.slice(0, SCAN_BYTES).match(/<meta\b[^>]*>/gi) ?? [];
   for (const tag of metas) {
     if (!/name\s*=\s*["']aimeat-ai["']/i.test(tag)) continue;
@@ -141,11 +157,27 @@ export function parseAiPosture(html: string): (Pick<AppAiPosture, 'generates' | 
     const listed = (raw.get('models') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     const models = listed.filter(isModelRef);
     const invalidModels = listed.filter((s) => !isModelRef(s));
+    // prefer.<capability>=anthropic,openrouter:x/y and local.<capability>=yes (plan 11, section 9).
+    // A bare word is a provider type, a reference with a colon is a model; anything else is dropped.
+    const prefer: Partial<Record<AiCapability, string[]>> = {};
+    const local: AiCapability[] = [];
+    for (const [key, value] of raw) {
+      const [head, cap] = key.split('.', 2) as [string, AiCapability | undefined];
+      if (!cap || !META_CAPABILITIES.includes(cap)) continue;
+      if (head === 'prefer') {
+        const items = value.split(',').map((s) => s.trim()).filter((s) => s.includes(':') ? isModelRef(s) : /^[a-z][a-z-]*$/.test(s));
+        if (items.length) prefer[cap] = items;
+      } else if (head === 'local' && isYes(value.toLowerCase())) {
+        local.push(cap);
+      }
+    }
     return {
       generates,
       discloses: isYes(parts.get('discloses')),
       publicInterest: isYes(parts.get('public-interest')),
       ...(models.length ? { models } : {}),
+      ...(Object.keys(prefer).length ? { prefer } : {}),
+      ...(local.length ? { local } : {}),
       ...(invalidModels.length ? { invalidModels } : {}),
     };
   }
@@ -177,11 +209,13 @@ function isYes(v: string | undefined): boolean {
  */
 export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppAiLintResult {
   const parsed = parseAiPosture(html);
-  const declared: Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models'> | null = parsed
+  const declared: Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models' | 'prefer' | 'local'> | null = parsed
     ?? (previous?.source === 'declared'
       ? {
         generates: previous.generates, discloses: previous.discloses, publicInterest: previous.publicInterest,
         ...(previous.models?.length ? { models: previous.models } : {}),
+        ...(previous.prefer ? { prefer: previous.prefer } : {}),
+        ...(previous.local?.length ? { local: previous.local } : {}),
       }
       : null);
   const inherited = !parsed && !!declared;
@@ -197,6 +231,8 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
     disclosureCallFound,
     usesAi,
     ...(declared?.models?.length ? { models: declared.models } : {}),
+    ...(declared?.prefer ? { prefer: declared.prefer } : {}),
+    ...(declared?.local?.length ? { local: declared.local } : {}),
   };
 
   if (parsed?.invalidModels?.length) {
@@ -247,6 +283,10 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
     );
   }
 
+  // How the app uses the AI capabilities (plan 13, section 4): check first, declare named models,
+  // name models the catalogue knows, keep vectors out of one memory value. Hints, never refusals.
+  if (usesAi) hints.push(...lintAppAiCapabilityUse(html, posture));
+
   // The decision model's rules ride the same channel (TARGET-080): the app is responsible for what it
   // sends, and this is where the platform checks that it followed the rules it was given.
   hints.push(...lintAppDecideUse(html, parseAppScopes(html)));
@@ -264,5 +304,7 @@ export function publicPosture(p: AppAiPosture | undefined): Omit<AppAiPosture, '
     generates: p.generates, discloses: p.discloses, publicInterest: p.publicInterest,
     source: p.source, disclosureCallFound: p.disclosureCallFound, usesAi: p.usesAi,
     ...(p.models?.length ? { models: p.models } : {}),
+    ...(p.prefer ? { prefer: p.prefer } : {}),
+    ...(p.local?.length ? { local: p.local } : {}),
   };
 }

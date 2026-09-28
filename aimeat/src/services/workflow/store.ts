@@ -54,6 +54,7 @@
  *   v1.15.0 — 2026-09-25 — A save is checked under WORKFLOW_AUTHORITY_VERSION, which asks work:request
  *     for an agent step, and keeps that version on the definition as `authority`.
  *   v1.15.1 — 2026-09-26 — The costCapMorsels warning names the field's removal: 4.0.0.
+ *   v1.15.2 — 2026-09-28 — An ai step with op `transcribe` needs no prompt (System 2 plan, V5).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -382,7 +383,8 @@ export async function validateWorkflow(
         // Same contract as an extension step: name where the answer lands, or bring your own signal.
         // With neither, the only thing left to green on is "the model replied", which is the covering
         // fallback every other kind here exists to remove.
-        if (!a.prompt && !a.prompt_key) {
+        // A transcribe step (System 2 plan, V5) takes its audio from audio_key and has no prompt.
+        if (a.op !== 'transcribe' && !a.prompt && !a.prompt_key) {
           errors.push(`step "${step.id}": an ai step needs prompt or prompt_key`);
         }
         if (!step.success_signal && !a.result_to_key) {

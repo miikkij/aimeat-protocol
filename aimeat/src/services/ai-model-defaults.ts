@@ -16,18 +16,20 @@
  *   role resolves to exactly what it resolved to before this file existed, which is what makes it
  *   safe to put in front of the existing selection rather than beside it.
  * @structure
- *   - ModelRole — the six roles a completion can ask for
+ *   - ModelRole — the eight roles a call can ask for
  *   - resolveModelFor() — owner setting -> instance default -> undefined
  *   - resolveSttLanguage() — the same shape for the speech-to-text language hint
+ *   - resolveTtsVoice() — the same shape for the speech voice
  * @usage
  *   const model = resolveModelFor(config, prefs, 'vision') ?? resolveModelFor(config, prefs, 'chat');
  * @version-history
+ *   v1.1.0 — 2026-09-28 — Roles tts and embed, and the speech voice (System 2 plan, V5).
  *   v1.0.0 — 2026-08-16 — Initial. Six roles plus the language hint.
  */
 import type { AimeatConfig } from '../config.js';
 
 /** The roles a caller can ask for. Each maps to one owner preference and one instance default. */
-export type ModelRole = 'chat' | 'reasoning' | 'execution' | 'vision' | 'stt' | 'image';
+export type ModelRole = 'chat' | 'reasoning' | 'execution' | 'vision' | 'stt' | 'image' | 'tts' | 'embed';
 
 /** The owner's `openrouter.settings` record, as it comes out of memory: free-form JSON. */
 export type OwnerModelPrefs = Record<string, unknown>;
@@ -40,6 +42,8 @@ const PREF_KEY: Record<ModelRole, string> = {
     vision: 'visionModel',
     stt: 'sttModel',
     image: 'imageModel',
+    tts: 'ttsModel',
+    embed: 'embedModel',
 };
 
 /** Which config field holds the instance default for each role. */
@@ -50,6 +54,8 @@ const CONFIG_KEY: Record<ModelRole, keyof AimeatConfig> = {
     vision: 'modelDefaultVision',
     stt: 'modelDefaultStt',
     image: 'modelDefaultImage',
+    tts: 'modelDefaultTts',
+    embed: 'modelDefaultEmbed',
 };
 
 /** A setting counts only when it is a non-empty string; '' is how both layers say "not set". */
@@ -80,4 +86,11 @@ export function resolveSttLanguage(
     config: AimeatConfig, prefs: OwnerModelPrefs | undefined,
 ): string | undefined {
     return usable(prefs?.sttLanguage) ?? usable(config.sttLanguageDefault);
+}
+
+/** The speech voice, same order: the owner's `ttsVoice`, then the node's default. */
+export function resolveTtsVoice(
+    config: AimeatConfig, prefs: OwnerModelPrefs | undefined,
+): string | undefined {
+    return usable(prefs?.ttsVoice) ?? usable(config.ttsVoiceDefault);
 }

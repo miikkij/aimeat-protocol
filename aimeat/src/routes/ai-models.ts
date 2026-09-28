@@ -11,8 +11,10 @@
  *     GET  /v1/ai/catalog/meta    when the catalogue was refreshed and what each source answered. Public:
  *                                 nothing in it is anybody's.
  *     POST /v1/admin/ai/catalog/refresh   the operator refreshes now, whatever the cadence says.
- * @structure aiModelsRouter(config, storage) · modelView
+ * @structure aiModelsRouter(config, storage)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The filtering moved to services/ai/catalog/query.ts, which aimeat_ai_models
+ *     calls too (V5). The answer is unchanged.
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
  */
 import { Router, type Request, type Response } from 'express';
@@ -26,28 +28,9 @@ import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { catalogMeta, catalogModels } from '../services/ai/catalog/store.js';
 import { refreshCatalog } from '../services/ai/catalog/refresh.js';
-import { servesCapability } from '../services/ai/catalog/price.js';
-import { CATALOG_TYPES, type CatalogModel, type CatalogType } from '../services/ai/catalog/types.js';
-import { providersForOwner } from '../services/ai/provider-store.js';
-import { TYPE_CAPABILITIES } from '../services/ai/providers.js';
-import { loadPolicyDecision } from '../services/ai/policy-gate.js';
-import { isAllowed } from '../services/ai/policy.js';
-import type { AiCapability } from '../services/ai/types.js';
+import { queryModels } from '../services/ai/catalog/query.js';
+import { CATALOG_TYPES } from '../services/ai/catalog/types.js';
 import { aiCallerOf } from './ai-policy.js';
-
-const CAPABILITIES: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
-const MAX_ROWS = 2000;
-
-/** One model as the endpoint shows it; `ref` is what a call or a policy names. */
-export function modelView(m: CatalogModel): Record<string, unknown> {
-  return {
-    ref: `${m.type}:${m.id}`, type: m.type, id: m.id, name: m.name,
-    ...(m.family ? { family: m.family } : {}), ...(m.released ? { released: m.released } : {}),
-    caps: m.caps, limits: m.limits, price: m.price, status: m.status,
-    ...(m.retiresAt ? { retires_at: m.retiresAt } : {}),
-    sources: m.sources,
-  };
-}
 
 export function aiModelsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -56,37 +39,14 @@ export function aiModelsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/ai/models', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     const q = req.query as Record<string, string | undefined>;
-    const capability = q.capability as AiCapability | undefined;
-    if (capability && !CAPABILITIES.includes(capability)) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_QUERY', `capability: one of ${CAPABILITIES.join(', ')}.`));
-    }
-    const type = q.type as CatalogType | undefined;
-    if (type && !(CATALOG_TYPES as readonly string[]).includes(type)) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_QUERY', `type: one of ${CATALOG_TYPES.join(', ')}. A local server's models are not in the catalogue.`));
-    }
-    const status = q.status === 'all' ? null : (q.status ?? 'active,retiring').split(',');
     try {
-      let models = catalogModels(type ? [type] : undefined)
-        .filter(m => !status || status.includes(m.status))
-        .filter(m => !capability || servesCapability(m, capability));
-      if (q.allowed === 'true') {
-        // What this caller can actually use: a provider of the model's type that serves the
-        // capability, and a model the caller's policy allows.
-        const { payer, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
-        const cap = capability ?? 'text';
-        const { node, owner } = await providersForOwner(storage, config, payer);
-        const reachable = new Set([...owner, ...node].filter(p => !p.problem && p.capabilities[cap]?.enabled && TYPE_CAPABILITIES[p.type].includes(cap)).map(p => p.type as string));
-        const policy = await loadPolicyDecision(storage, config, payer, {
-          capability: cap, ...aiCallerOf(req, config.nodeId), ...(agent ? { agent } : {}),
-        });
-        models = models.filter(m => reachable.has(m.type) && isAllowed(policy.decision, `${m.type}:${m.id}`));
-      }
-      const total = models.length;
-      const meta = catalogMeta();
-      res.json(success(config.nodeId, {
-        models: models.slice(0, MAX_ROWS).map(modelView), total, truncated: total > MAX_ROWS,
-        snapshot: meta?.snapshot ?? null, refreshed_at: meta?.refreshedAt ?? null,
-      }, [{ description: 'When the catalogue was refreshed, and from where', method: 'GET', url: '/v1/ai/catalog/meta' }]));
+      const { payer, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
+      const answer = await queryModels(storage, config, { payer, ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) }, {
+        ...(q.capability ? { capability: q.capability } : {}), ...(q.type ? { type: q.type } : {}),
+        ...(q.status ? { status: q.status } : {}), allowed: q.allowed === 'true',
+      });
+      res.json(success(config.nodeId, answer,
+        [{ description: 'When the catalogue was refreshed, and from where', method: 'GET', url: '/v1/ai/catalog/meta' }]));
     } catch (e) {
       if (e instanceof AiCompletionError) return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', (e as Error).message));

@@ -6,6 +6,10 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.4.0 - 2026-09-28 - Speech takes no model and no voice when a role gives them (System 2 plan,
+ *     V5): the model is the speech role's (NO_TTS_MODEL without one), the voice the provider's, the
+ *     owner's or the node's (NO_TTS_VOICE without one). The speech `done` event carries cost_usd, and
+ *     the reply and the speech take `provider` (an id or a type, no fallback then).
  *   v1.3.0 - 2026-09-28 - A reply the provider did not price is priced from the model catalogue
  *     (services/ai/catalog/price.ts), as every other text call is (System 2 plan, V4).
  *   v1.2.0 - 2026-09-28 - Providers (System 2 plan, V3): the reply tries the owner's candidates before
@@ -34,6 +38,7 @@ import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import { appSpentToday, appQuotaFor } from './ai-app-id.js';
 import type { CallerClass } from './ai/policy.js';
+import { resolveTtsVoice } from './ai-model-defaults.js';
 
 function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
   return { ...(o.caller ? { caller: o.caller } : {}), ...(o.verifiedApp ? { verifiedApp: o.verifiedApp } : {}) };
@@ -45,10 +50,16 @@ export interface VoicePolicyCaller { caller?: CallerClass; verifiedApp?: string 
 export interface ReplyOptions extends VoicePolicyCaller {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   model?: string; app_id: string; temperature?: number; top_p?: number; max_tokens?: number;
+  /** A provider id or type the call names: no fallback then. */
+  provider?: string;
   reasoning?: { enabled?: boolean; effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean } | null;
 }
 export interface SpeakOptions extends VoicePolicyCaller {
-  input: string; model: string; app_id: string; voice: string; response_format: 'pcm' | 'mp3'; speed: number; instructions?: string;
+  /** Without a model the speech role decides (the provider's, the owner's, the node's); without a
+   *  voice the provider's speech voice, then the owner's, then the node's default. */
+  input: string; model?: string; app_id: string; voice?: string; response_format: 'pcm' | 'mp3'; speed: number; instructions?: string;
+  /** A provider id or type the call names (and the provider test uses): no fallback then. */
+  provider?: string;
 }
 
 async function checkResponse(response: Response): Promise<void> {
@@ -93,7 +104,10 @@ async function settled(storage: Storage, config: AimeatConfig, gaii: string, pla
 }
 
 export async function streamReply(storage: Storage, config: AimeatConfig, gaii: string, options: ReplyOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
-  const first = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id, ...policyCallerOf(options) });
+  const first = await prepareAiCall(storage, config, gaii, {
+    model: options.model, appId: options.app_id, ...policyCallerOf(options),
+    ...(options.provider ? { provider: options.provider, fallback: false } : {}),
+  });
   // The owner's candidates in order, moving on only before the first byte (services/ai/route-run.ts);
   // an Anthropic provider answers through the gateway's converter, in the same SSE shape.
   let plan: AiCallPlan;
@@ -169,7 +183,15 @@ async function speechPrice(plan: AiCallPlan): Promise<number | undefined> {
 
 export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii: string, options: SpeakOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
   // A spoken reply asks for the speech capability: the owner's policy list for speech applies to it.
-  const plan = await prepareAiCall(storage, config, gaii, { model: options.model, appId: options.app_id, capability: 'speech', ...policyCallerOf(options) });
+  const plan = await prepareAiCall(storage, config, gaii, {
+    op: 'speak', model: options.model, appId: options.app_id, capability: 'speech', ...policyCallerOf(options),
+    ...(options.provider ? { provider: options.provider, fallback: false } : {}),
+  });
+  const voice = options.voice || plan.candidates[0]?.provider.capabilities.speech?.voice || resolveTtsVoice(config, plan.prefs);
+  if (!voice) {
+    throw new AiCompletionError('NO_TTS_VOICE', 400,
+      'No voice is set for speech. Name one in the call (`voice`), set one for speech on your AI provider, or ask the operator for a node default.');
+  }
   const unitPrice = await speechPrice(plan);
   const estimate = (unitPrice ?? 0) * Array.from(options.input).length;
   const usage = await getTodayUsage(storage, gaii);
@@ -180,7 +202,7 @@ export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii:
   }
   signal.throwIfAborted();
   const response = await speechRaw(plan.key, plan.baseUrl, { model: plan.model, input: options.input,
-    voice: options.voice, response_format: options.response_format, speed: options.speed,
+    voice, response_format: options.response_format, speed: options.speed,
     ...(options.instructions ? { provider: { options: { openai: { instructions: options.instructions } } } } : {}) }, signal);
   await checkResponse(response);
   const contentType = response.headers.get('content-type') || '';
@@ -211,5 +233,5 @@ export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii:
     result = await settled(storage, config, gaii, plan, options, '', cost ?? estimate, { prompt: 0, completion: 0 }, 'voice-speech',
       size ? 'sha256:' + audioHash.digest('hex') : undefined);
   }
-  await emit({ type: 'done', model: plan.model, bytes: size, cost_exact: cost !== undefined, cost_known: cost !== undefined || unitPrice !== undefined, syntheticAudio: true, ...result });
+  await emit({ type: 'done', model: plan.model, bytes: size, cost_usd: cost ?? estimate, key_source: plan.keyScope, cost_exact: cost !== undefined, cost_known: cost !== undefined || unitPrice !== undefined, syntheticAudio: true, ...result });
 }

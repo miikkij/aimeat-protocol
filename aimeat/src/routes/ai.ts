@@ -21,6 +21,10 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-28 — Capabilities (System 2, V5): /complete takes `files` (services/ai-call-files.ts);
+ *     GET /v1/ai/available asks the gate a text call runs, instead of the old OpenRouter setting;
+ *     POST /v1/ai/image answers a signed download_url for a private picture, so an app with only
+ *     ai:use can show it (found by the V5 browser check).
  *   v1.x — 2026-09-28 — Providers (System 2, V3): /complete, /transcribe and /image take `provider` (an id or a
  *     type) and `fallback`, and answer the `route`; GET and POST /v1/ai/settings are deprecated (legacyAiSettingsRoute).
  *   v1.x — 2026-09-28 — The model policy (System 2, V2): the three AI routes pass who is calling (owner, agent,
@@ -70,10 +74,10 @@ import { aiCallerOf } from './ai-policy.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { aiPayerOf, agentKeyRecord } from '../services/agent-ai-keys.js';
+import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import {
-  completeForOwner, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
+  completeForOwner, prepareAiCall, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
   DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai-completion.js';
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
@@ -81,6 +85,11 @@ import { getUsageHistory } from '../services/ai-usage-history.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
 import { generateForOwner } from '../services/ai-image.js';
+import { readCallFiles, readCallerAudio } from '../services/ai-call-files.js';
+import { generateDownloadToken } from '../services/download-token.js';
+
+/** How long the signed address of a private picture loads without a sign-in. */
+const IMAGE_DOWNLOAD_TTL_SECONDS = 3600;
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { upsertPrivateRecord } from '../services/private-record.js';
 import { legacyAiSettingsRoute } from './openrouter.js';
@@ -126,12 +135,12 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
       const {
         prompt, systemPrompt, model: modelOverride, modelRole,
-        temperature, top_p, max_tokens, app_id, images, provider, fallback,
+        temperature, top_p, max_tokens, app_id, images, provider, fallback, files,
       } = req.body as {
         prompt?: string; systemPrompt?: string; model?: string;
         modelRole?: 'reasoning' | 'execution';
         temperature?: number; top_p?: number; max_tokens?: number;
-        app_id?: string; images?: string[]; provider?: string; fallback?: boolean;
+        app_id?: string; images?: string[]; provider?: string; fallback?: boolean; files?: unknown;
       };
 
       // Bound the image payload (vision attachments) — keep a runaway request from ballooning.
@@ -147,9 +156,13 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       }
 
       try {
+        // Files for a model that reads them itself (the files capability), from the caller's own
+        // storage or a data: URL (services/ai-call-files.ts).
+        const fileList = files !== undefined ? await readCallFiles(storage, resolve(req), files) : undefined;
         const r = await completeForOwner(storage, config, gaii, {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
+          ...(fileList ? { files: fileList } : {}),
           // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
           ...(agent ? { agent } : {}),
           // Whose call it is and which app the grant names, for the owner's model policy.
@@ -228,15 +241,11 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       let audio: { data: Buffer; mime: string; filename: string };
 
       if (typeof storage_key === 'string' && storage_key) {
-        const file = await storage.getStorageFile(gaii, storage_key);
-        if (!file) {
+        const found = await readCallerAudio(storage, gaii, storage_key, { mime, filename });
+        if (!found) {
           return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such file in your storage.'));
         }
-        audio = {
-          data: file.data,
-          mime: mime || file.mimeType || 'application/octet-stream',
-          filename: filename || storage_key.split('/').pop() || 'audio',
-        };
+        audio = found;
       } else if (typeof audio_base64 === 'string' && audio_base64) {
         // A base64 string is 4/3 of the bytes it carries, and it has to fit the JSON body limit —
         // a separate ceiling from the storage quota, which is exactly the trap that made large
@@ -332,12 +341,19 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
+        // A private picture's `url` needs a sign-in with storage:read, which an <img> sends no header
+        // for and an app holding only ai:use does not have. A signed address that loads without a
+        // sign-in for an hour lets the caller show what it just paid for (System 2, V5).
+        const download = r.visibility === 'private'
+          ? await generateDownloadToken({ sub: gaii, key: r.storageKey, mimeType: r.mime, size: r.sizeBytes }, IMAGE_DOWNLOAD_TTL_SECONDS)
+          : null;
         res.json(success(config.nodeId, {
           storage_key: r.storageKey,
           mime_type: r.mime,
           size: r.sizeBytes,
           model: r.model,
           visibility: r.visibility,
+          ...(download ? { download_url: `${config.baseUrl}/v1/download/${download}`, download_expires_in_seconds: IMAGE_DOWNLOAD_TTL_SECONDS } : {}),
           // The URL that loads for the audience the visibility implies — the service builds it
           // once. A public image handed back as /v1/storage/ answered 401 to everyone but the
           // owner, discovered by the first imagery-pipeline demo.
@@ -373,16 +389,16 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       // The same payer the completion door resolves, so the answer here is the answer there: for an
       // agent, its own key or its owner's.
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
-      const [apiKeyRecord, prefsRecord, agentKeyRec] = await Promise.all([
-        storage.getMemory(gaii, 'openrouter.apikey'),
-        storage.getMemory(gaii, 'openrouter.settings'),
-        agent ? storage.getMemory(gaii, agentKeyRecord('openrouter', agent)) : null,
-      ]);
-      const encrypted = (apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted
-        || (agentKeyRec?.value as { encrypted?: string } | undefined)?.encrypted;
-      const provider = ((prefsRecord?.value as Record<string, unknown> | undefined)?.provider as string) || 'openrouter';
-      // openrouter needs a key; self-hosted providers (lmstudio/custom) can run keyless.
-      const available = !!encrypted || provider !== 'openrouter';
+      // The gate a text call runs, spending nothing (System 2, V5): available when a call would find
+      // a provider now. It had read only the old OpenRouter setting, so an owner whose text runs on
+      // another provider, or on the node's own, was told no. A spent budget is a refusal of its own
+      // and does not make the capability unavailable.
+      let available = true;
+      try {
+        await prepareAiCall(storage, config, gaii, { ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) });
+      } catch (e) {
+        available = e instanceof AiCompletionError && ['QUOTA_EXHAUSTED', 'APP_QUOTA_EXHAUSTED', 'AGENT_QUOTA_EXHAUSTED'].includes(e.code);
+      }
       res.json(success(config.nodeId, { available }));
     });
 

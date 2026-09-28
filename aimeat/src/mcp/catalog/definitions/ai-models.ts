@@ -7,6 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   v1.2.0 — 2026-09-28 — aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and
+ *     aimeat_ai_embed (System 2 plan, V5).
  *   v1.1.0 — 2026-09-28 — aimeat_ai_providers, aimeat_ai_provider_test and aimeat_ai_routing_set
  *     (System 2 plan, V3).
  *   v1.0.0 — 2026-09-28 — aimeat_ai_policy_set (System 2 plan, V2).
@@ -51,11 +53,12 @@ export const aiModelTools: AimeatToolDefinition[] = [
     description: 'Test that one of the owner\'s providers serves one capability, with the smallest real call through the '
       + 'same gate every call uses (billed and budgeted like one). A pass marks it tested and working, which the node '
       + 'needs before it picks the provider by capability alone. capability: text (default), vision, files, '
-      + 'transcription, or image (costs one small picture, so accept_cost: true is required; tell the owner first). '
+      + 'transcription, speech (one spoken word), embed (one vector), or image (costs one small picture, so '
+      + 'accept_cost: true is required; tell the owner first). '
       + 'Answers the model, the latency and the cost, never a key.',
     input: {
       provider: { type: 'string', description: 'The provider id, from aimeat_ai_providers.', required: true },
-      capability: { type: 'string', description: 'text | vision | files | transcription | image. Default text.' },
+      capability: { type: 'string', description: 'text | vision | files | transcription | speech | embed | image. Default text.' },
       accept_cost: { type: 'boolean', description: 'Required true for an image test, which the provider charges for.' },
     },
   },
@@ -74,6 +77,69 @@ export const aiModelTools: AimeatToolDefinition[] = [
     input: {
       routing: { type: 'object', description: '{ defaults?: {capability: [provider ids]}, rules?: {...}, agent?: name }. Omit to read.' },
       confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
+    },
+  },
+  {
+    name: 'aimeat_ai_capabilities',
+    caller: 'agent',
+    visibility: agentEverywhere,
+    description: 'CALL THIS FIRST before you plan anything that uses AI: an app, an automation or your own work. Answers, '
+      + 'per capability (text, vision, files, image, speech, transcription, embed), whether it is on for you right now, '
+      + 'the model and provider a call would use, its price from the model catalogue, and a one-line howTo. For a '
+      + 'capability that is off: the reason (NO_MODEL, NO_PROVIDER_SUPPORTS, NO_KEY, POLICY_EMPTY, BUDGET_EXHAUSTED, '
+      + 'RETIRED_MODEL, UNTESTED, APP_NOT_ALLOWED) and a fix you can do or pass to the owner. Also the '
+      + 'owner\'s model policy, today\'s budget, and the guide skill (aimeat-ai-capabilities). Spends nothing.',
+    input: {
+      app_id: { type: 'string', description: 'The app you act for, when you do: its own model list and preferences count.' },
+    },
+  },
+  {
+    name: 'aimeat_ai_models',
+    caller: 'agent',
+    visibility: agentEverywhere,
+    description: 'The model catalogue: which models of OpenRouter, OpenAI, Anthropic, xAI, Mistral and DeepSeek the node '
+      + 'knows, what each takes and gives (caps), its limits, its price and its status (active, retiring, retired). '
+      + 'allowed: true keeps only the models you can use now (a provider of that type serves the capability, and the '
+      + 'owner\'s policy allows the model). Use the `ref` it lists (<type>:<model id>) in a call, a policy or an app\'s '
+      + 'aimeat-ai meta. A model on the owner\'s own machine is not in the catalogue.',
+    input: {
+      capability: { type: 'string', description: 'text | vision | files | image | speech | transcription | embed.' },
+      type: { type: 'string', description: 'openrouter | openai | anthropic | xai | mistral | deepseek.' },
+      status: { type: 'string', description: 'Comma-separated: active, retiring, retired; or all. Default active,retiring.' },
+      allowed: { type: 'boolean', description: 'true: only the models you can use now.' },
+    },
+  },
+  {
+    name: 'aimeat_ai_transcribe',
+    caller: 'agent',
+    visibility: agentEverywhere,
+    description: 'Transcribe an audio file in your storage to text, on the owner\'s providers and budget (the '
+      + 'transcription capability). Store the file first (aimeat_storage_upload) and pass its storage_key. Answers the '
+      + 'text, the model, the language, the seconds and what it cost. Refusals name what to set (NO_STT_MODEL, '
+      + 'AI_CAPABILITY_UNAVAILABLE with a fix).',
+    input: {
+      storage_key: { type: 'string', description: 'The audio file\'s key in your storage.', required: true },
+      filename: { type: 'string', description: 'The file name the provider sees; its extension names the format. Defaults to the key\'s last part.' },
+      language: { type: 'string', description: 'ISO-639-1 hint (fi, en). Omit to let the model detect it.' },
+      model: { type: 'string', description: 'A model reference; omit to let the owner\'s providers choose.' },
+      provider: { type: 'string', description: 'A provider id or type to use, with no fallback.' },
+      app_id: { type: 'string', description: 'The app this is for, so its spend is attributed.' },
+    },
+  },
+  {
+    name: 'aimeat_ai_embed',
+    caller: 'agent',
+    visibility: agentEverywhere,
+    description: 'Turn texts into embedding vectors (the embed capability), on the owner\'s providers and budget. Use it '
+      + 'only when word search has proved not enough, for meaning search over a large collection, similar items or '
+      + 'duplicates; not for a few hundred texts, exact values or "just in case" (skill aimeat-ai-capabilities). Store '
+      + 'the answered `model` beside the vectors: vectors of different models cannot be compared, so a fallback only '
+      + 'ever uses the same model. At most 256 texts and 500 000 characters per call.',
+    input: {
+      input: { type: 'array', description: 'The texts, one vector each.', required: true },
+      model: { type: 'string', description: 'A model reference; omit to let the owner\'s providers choose.' },
+      provider: { type: 'string', description: 'A provider id or type to use, with no fallback.' },
+      app_id: { type: 'string', description: 'The app this is for, so its spend is attributed.' },
     },
   },
 ];

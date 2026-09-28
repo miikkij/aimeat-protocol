@@ -37,6 +37,7 @@
  *   ownerProviderRecords · providerTarget · providerView
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
+ *   v1.0.1 — 2026-09-28 — ownerProviderRecords answers in id order, the same on every backend (V5).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -421,7 +422,10 @@ export async function ownerProviderRecords(storage: Storage, config: AimeatConfi
     }
     out.push(p.provider);
   }
-  return out;
+  // In id order: the pool's `priority` order, when the owner's routing names no list, must be the
+  // same on every backend. A memory listing has no fixed order on Postgres, and the E2E suite's
+  // "priority keeps the owner's order" case failed there once for exactly that.
+  return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 /** The origins this provider's call may reach although private: its own, for the operator's record at a listed origin. */

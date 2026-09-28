@@ -7,9 +7,10 @@
  *   surfaces, and `ctx.ai.start` in the sandbox, so the refusals and the bookkeeping happen where
  *   they were written once.
  *
- *   THE MODEL CALL ITSELF IS NOT NEW. `completeForOwner` already picks the key, enforces the daily
- *   budget and the per-app quota, records per-app usage and stamps provenance. Nothing here
- *   duplicates any of that; it is the runner.
+ *   THE MODEL CALL ITSELF IS NOT NEW. `completeForOwner`, `generateForOwner` and
+ *   `transcribeForOwner` already pick the key, enforce the daily budget and the per-app quota,
+ *   record per-app usage and stamp provenance; run-op.ts calls the one the job's `op` names. Nothing
+ *   here duplicates any of that; it is the runner.
  *
  *   REFUSE BEFORE YOU WRITE. Every gate in `startJob` runs before the record exists, in that order,
  *   so a refused start leaves nothing behind. Three defects in this repo have had exactly the other
@@ -21,6 +22,12 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.3.0 — 2026-09-28 — System 2 plan, V5: a job has an `op` (text, image, transcribe) and may name
+ *     a `provider`. The start refuses a field that does not apply to the op (op.ts), and for a
+ *     transcription it refuses an `audio_key` that is not in the owner's own storage, both before
+ *     the record exists. The model call moved to run-op.ts; the result write, the spend and the
+ *     provenance are the same for every op. A job's own refusal code (AiJobError) is kept on a
+ *     failed job, beside the completion service's.
  *   v1.2.1 — 2026-09-26 — The job owner's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -38,13 +45,14 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
-import { completeForOwner, AiCompletionError } from '../ai-completion.js';
-import { aiPayerOf } from '../agent-ai-keys.js';
+import { AiCompletionError } from '../ai-completion.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
 import { fireOnDone } from './on-done.js';
+import { aiOpOf, aiOpRefusal } from './op.js';
+import { runJobOp, assertAudioInReach } from './run-op.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
     readActiveIndex, addToActiveIndex, removeFromActiveIndex,
@@ -96,6 +104,8 @@ export class AiJobService implements AiJobStarter {
 
         this.assertResultKey(ownerGhii, input.result_key);
         this.assertKeysInReach(input);
+        this.assertOpFields(input);
+        const op = aiOpOf(input.op);
 
         if (chainDepth > this.config.aiJobMaxChain) {
             throw new AiJobError('AI_JOB_CHAIN_TOO_DEEP', 422,
@@ -118,9 +128,11 @@ export class AiJobService implements AiJobStarter {
                 'This node is busy: its AI job queue is full. Try again shortly.', RETRY_AFTER_SECONDS);
         }
 
-        // Last, because it is the only gate that reads anything. Throws INVALID_BODY when there is
-        // no prompt at all and AI_JOB_PROMPT_TOO_LARGE when the assembly is over the cap.
-        const prompt = await assembleJobPrompt({ storage: this.storage, config: this.config }, ownerGhii, input);
+        // Last, because these are the only gates that read anything. The prompt assembly throws
+        // INVALID_BODY when there is no prompt at all and AI_JOB_PROMPT_TOO_LARGE when the assembly is
+        // over the cap. A transcription has no prompt: its read is the audio file's metadata, which
+        // answers 404 for a key that is not in the owner's own storage.
+        const prompt = await this.prepareInput(ownerGhii, { ...input, op });
 
         // ── nothing above this line has written anything ──
 
@@ -136,6 +148,11 @@ export class AiJobService implements AiJobStarter {
             ...(input.input_keys?.length ? { input_keys: input.input_keys } : {}),
             ...(input.model ? { model: input.model } : {}),
             ...(input.system_prompt ? { system_prompt: input.system_prompt } : {}),
+            op,
+            ...(input.provider ? { provider: input.provider } : {}),
+            ...(input.audio_key ? { audio_key: input.audio_key } : {}),
+            ...(input.language ? { language: input.language } : {}),
+            ...(input.size ? { size: input.size } : {}),
             result_key: input.result_key,
             result_visibility: input.result_visibility ?? 'private',
             ...(input.json ? { json: true } : {}),
@@ -266,35 +283,24 @@ export class AiJobService implements AiJobStarter {
 
             // The job and its result stay in the CALLER's namespace; the money is the human's. An
             // agent's job is paid by its owner, in the agent's name, exactly as POST /v1/ai/complete
-            // pays (services/agent-ai-keys.ts aiPayerOf), so the two doors cannot disagree on a key.
-            const { payer, agent } = aiPayerOf(owner);
-            const result = await completeForOwner(this.storage, this.config, payer, {
-                ...(agent ? { agent } : {}),
-                prompt: entry.prompt,
-                ...(entry.job.system_prompt ? { systemPrompt: entry.job.system_prompt } : {}),
-                ...(entry.job.model ? { model: entry.job.model } : {}),
-                ...(entry.job.app_id ? { appId: entry.job.app_id } : {}),
-                signal: entry.controller.signal,
-                // NO TOKEN CAP. scripts/check-no-max-tokens.ts forbids one: a cap truncates a long
-                // generation in silence, and a long generation is the whole point of a background job.
-            });
+            // pays (services/agent-ai-keys.ts aiPayerOf, applied in run-op.ts), so the two code
+            // paths cannot disagree on a key. No token cap: see run-op.ts.
+            const outcome = await runJobOp(
+                { storage: this.storage, config: this.config }, entry.job, entry.prompt, entry.controller.signal,
+            );
 
             // The provider answered, so the money is spent and recorded whatever happens next. Carry
             // the numbers onto the job even if it turns out to have been cancelled meanwhile: a
             // cancelled call is not a free call, and a record that dropped them would make the spend
             // charts disagree with the usage row that is already written.
-            const spend = {
-                cost_usd: result.usage.costUsd,
-                tokens: result.usage.totalTokens,
-                ...(result.provenance ? { provenance_id: result.provenance.id } : {}),
-            };
+            const spend = outcome.spend;
 
             if (entry.controller.signal.aborted) {
                 await this.finish(jobId, { state: 'cancelled', ...spend });
                 return;
             }
 
-            await this.writeResult(entry.job, result.content, result.provenance?.id);
+            await this.writeResult(entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
 
             // The callback, and the reason a green job can still be a failure. See on-done.ts.
             if (entry.job.on_done) {
@@ -318,7 +324,7 @@ export class AiJobService implements AiJobStarter {
                 await this.finish(jobId, { state: 'cancelled' });
                 return;
             }
-            const code = err instanceof AiCompletionError ? err.code : 'AI_JOB_FAILED';
+            const code = err instanceof AiCompletionError || err instanceof AiJobError ? err.code : 'AI_JOB_FAILED';
             await this.finish(jobId, {
                 state: 'failed',
                 error: { code, message: (err as Error).message },
@@ -328,12 +334,14 @@ export class AiJobService implements AiJobStarter {
         }
     }
 
-    /** Land the answer where the caller said it should go. */
-    private async writeResult(job: AiJobRecord, content: string, provenanceId?: string): Promise<void> {
-        let value: unknown = content;
-        if (job.json) {
+    /** Land the answer where the caller said it should go. `parseJson` is set for a text answer
+     *  the job asked JSON of; an image record and a transcription arrive in their final shape. */
+    private async writeResult(job: AiJobRecord, answer: unknown, parseJson: boolean, provenanceId?: string): Promise<void> {
+        let value: unknown = answer;
+        if (parseJson) {
             // Parsed HERE when the job asked for JSON, so a malformed answer fails at the job rather
             // than becoming a string every downstream reader has to re-parse and none of them checks.
+            const content = typeof answer === 'string' ? answer : '';
             const m = /\{[\s\S]*\}|\[[\s\S]*\]/.exec(content);
             if (!m) throw new Error('The job asked for json and the answer contained none.');
             value = JSON.parse(m[0]);
@@ -413,6 +421,33 @@ export class AiJobService implements AiJobStarter {
     }
 
     /**
+     * The fields go with the op (op.ts): an unknown op, an image with no prompt or with `json`, a
+     * transcription with no `audio_key`, and a field of one op given to another are refused. A pure
+     * check, so it runs with the other pure checks at the top of the start.
+     */
+    private assertOpFields(input: StartAiJobInput | AiJobRecord): void {
+        const why = aiOpRefusal(input);
+        if (why) throw new AiJobError('INVALID_BODY', 400, why);
+    }
+
+    /**
+     * The reads a job needs before it may queue, and what the runner is handed: the assembled prompt
+     * for text and image, nothing for a transcription (whose audio is checked here and read again
+     * when it runs, see run-op.ts). Used by the start and by the restart path, so both hold a job to
+     * the same reads.
+     */
+    private async prepareInput(
+        ownerGhii: string, spec: Pick<AiJobRecord, 'op' | 'prompt' | 'prompt_key' | 'input_keys' | 'audio_key'>,
+    ): Promise<string> {
+        const deps = { storage: this.storage, config: this.config };
+        if (aiOpOf(spec.op) === 'transcribe') {
+            await assertAudioInReach(deps, ownerGhii, spec.audio_key ?? '');
+            return '';
+        }
+        return assembleJobPrompt(deps, ownerGhii, spec);
+    }
+
+    /**
      * A callback may name only an extension installed by the job's OWN owner.
      *
      * Same wording whichever way it fails, deliberately: which extensions exist is not a stranger's
@@ -476,9 +511,10 @@ export class AiJobService implements AiJobStarter {
                     // Held to the start's rule about the keys first: a job queued before the rule
                     // existed must not come back reading or writing a record the node keeps.
                     this.assertKeysInReach(job);
+                    this.assertOpFields(job);
                     // Re-assembled rather than carried: the assembled prompt lives in the dead
                     // process's heap, and the record has the fields it was built from.
-                    const prompt = await assembleJobPrompt({ storage: this.storage, config: this.config }, job.owner, job);
+                    const prompt = await this.prepareInput(job.owner, job);
                     let resolveFinished!: () => void;
                     const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
                     this.live.set(job.id, { job, controller: new AbortController(), prompt, finished, resolveFinished });

@@ -51,7 +51,7 @@ export function registerAiProviderTools(
     descriptionFor('aimeat_ai_provider_test'),
     {
       provider: z.string().describe('The provider id, from aimeat_ai_providers.'),
-      capability: z.string().optional().describe('text | vision | files | transcription | image. Default text.'),
+      capability: z.string().optional().describe('text | vision | files | transcription | speech | embed | image. Default text.'),
       accept_cost: z.boolean().optional().describe('Required true for an image test, which the provider charges for.'),
     },
     annotationsFor('aimeat_ai_provider_test'),

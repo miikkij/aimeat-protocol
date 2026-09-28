@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.12.0 — 2026-09-28 — registerAiCapabilityTools (aimeat_ai_capabilities, aimeat_ai_models,
+ *     aimeat_ai_transcribe, aimeat_ai_embed).
  *   v1.11.0 — 2026-09-28 — registerAiProviderTools (aimeat_ai_providers, aimeat_ai_provider_test,
  *     aimeat_ai_routing_set).
  *   v1.10.0 — 2026-09-28 — registerAiPolicyTools (aimeat_ai_policy_set).
@@ -94,6 +96,7 @@ import { registerDecideTools } from './decide.js';
 import { registerAiVoiceTools } from './ai-voice.js';
 import { registerAiPolicyTools } from './ai-policy.js';
 import { registerAiProviderTools } from './ai-providers.js';
+import { registerAiCapabilityTools } from './ai-capabilities.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerAgentV2MessagingTools } from './agent-v2-messaging.js';
@@ -200,6 +203,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAiVoiceTools(mcp, storage, config, agentGaii);
     registerAiPolicyTools(mcp, storage, config, agentGaii);
     registerAiProviderTools(mcp, storage, config, agentGaii);
+    registerAiCapabilityTools(mcp, storage, config, agentGaii);
     registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     // The v2 turn, beside the dashboard thread above it and the federated DM below. A session

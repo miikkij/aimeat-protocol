@@ -20,6 +20,13 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.4.0 — 2026-09-28 — System 2 plan, V5, cases 17a-17e: an image job lands the record
+ *     { storage_key, url, mime_type, model } and the picture is readable at the url; a transcribe job
+ *     reads the audio from the caller's own storage and lands the transcript, or the JSON record with
+ *     `json`; a transcription with no audio_key or with a missing file, and json on an image, are
+ *     refused before anything is written and the provider hears nothing. These cases aim a fourth
+ *     owner at the shared fake provider (helpers/fake-ai-provider.ts), which answers the image and
+ *     transcription routes this suite's own stub does not.
  *   v1.3.0 — 2026-09-26 — Case 13 asserts 403 RESERVED_KEY for a result_key the node keeps (it was
  *     400), over a credential record and a key only the node writes too. 13b: input_keys and a
  *     prompt_key naming one are refused at the start and the provider hears nothing (secaudit
@@ -42,6 +49,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { startFakeAiProvider, imageJson, transcriptionJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -108,8 +116,8 @@ function answer(res: ServerResponse): void {
 
 async function startStub(): Promise<void> {
     stub = createServer((req, res) => {
-        let body = '';
-        req.on('data', c => { body += c; });
+        // The body is read to its end and not kept: nothing here asserts on it.
+        req.resume();
         req.on('end', () => {
             if ((req.url ?? '').includes('/chat/completions')) {
                 completionsSeen++;
@@ -699,8 +707,115 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(wrote.status === 404, 'a refused start writes nothing');
     });
 
+    // ── 17. op: image and transcribe (System 2 plan, V5) ──
+    // A fourth owner aimed at the shared fake provider, which answers /images/generations and
+    // /audio/transcriptions; the owners above stay on this suite's own stub. Its models are the
+    // owner's own settings, so the jobs name none.
+    const fake: FakeAiProvider = await startFakeAiProvider(0);
+    const c = await setupOwner('c');
+    const aimed = await json('/v1/memory', {
+        method: 'POST', headers: auth(c.token),
+        body: JSON.stringify({
+            key: 'openrouter.settings', visibility: 'private',
+            value: {
+                provider: 'custom', baseUrl: fake.baseUrl, model: STUB_MODEL,
+                imageModel: 'stub/ai-jobs-image', sttModel: 'stub/ai-jobs-stt', daily_budget_usd: 50,
+            },
+        }),
+    });
+    assert(aimed.status === 201, `settings for c: ${aimed.status}: ${JSON.stringify(aimed.body?.error)}`);
+
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3, 4]);
+    const AUDIO_KEY = 'aijob-v5/council.webm';
+    const AUDIO = Buffer.from('RIFF-ai-jobs-v5-audio-bytes');
+    const TRANSCRIPT = 'The harbour extension was approved seven to two.';
+
+    await test('17a. An image job lands { storage_key, url, mime_type, model } and the picture loads at the url', async () => {
+        fake.queue('images', imageJson({ b64: PNG.toString('base64'), cost: 0.04 }));
+        const r = await startJob(c, { op: 'image', prompt: 'A harbour at dawn.', size: '1024x1024', result_key: 'aijob.v5.image' });
+        assert(r.status === 202, `expected 202, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(c, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        assert(done.op === 'image', `op on the record: ${done.op}`);
+        assert(done.cost_usd === 0.04, `cost carried onto the job: ${done.cost_usd}`);
+        const sent = fake.lastRequest('images')!.json as Record<string, unknown>;
+        assert(String(sent.prompt).includes('A harbour at dawn.'), `the prompt reached the provider: ${JSON.stringify(sent.prompt)}`);
+        assert(sent.size === '1024x1024', `the size reached the provider: ${sent.size}`);
+        const rec = await readMemory(c, 'aijob.v5.image');
+        assert(rec.status === 200, `result_key read ${rec.status}`);
+        const v = rec.body.data.value;
+        assert(typeof v.storage_key === 'string' && v.storage_key.length > 0, `storage_key: ${JSON.stringify(v)}`);
+        assert(v.mime_type === 'image/png', `mime_type ${v.mime_type}`);
+        assert(typeof v.model === 'string' && v.model.length > 0, `model ${v.model}`);
+        assert(typeof v.url === 'string' && v.url.startsWith('/v1/storage/'), `a private picture loads through the owner route: ${v.url}`);
+        const stored = await fetch(`${BASE}${v.url}`, { headers: auth(c.token) });
+        assert(stored.status === 200, `the picture is readable at the url, got ${stored.status}`);
+        const bytes = Buffer.from(await stored.arrayBuffer());
+        assert(bytes.equals(PNG), `the stored bytes are the provider's picture (${bytes.length} bytes)`);
+    });
+
+    await test('17b. A transcribe job reads audio_key from the caller\'s storage and lands the transcript', async () => {
+        const up = await json('/v1/storage', {
+            method: 'POST', headers: auth(c.token),
+            body: JSON.stringify({ key: AUDIO_KEY, mime_type: 'audio/webm', visibility: 'private', data: AUDIO.toString('base64') }),
+        });
+        assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body?.error)}`);
+        fake.queue('transcriptions', transcriptionJson({ text: TRANSCRIPT, language: 'en', usage: { seconds: 12.5, cost: 0.0009 } }));
+        const r = await startJob(c, { op: 'transcribe', audio_key: AUDIO_KEY, language: 'en', result_key: 'aijob.v5.transcript' });
+        assert(r.status === 202, `expected 202, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(c, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        assert(done.op === 'transcribe' && done.audio_key === AUDIO_KEY, `op and audio_key on the record: ${done.op} ${done.audio_key}`);
+        const form = fake.lastRequest('transcriptions')!;
+        assert(form.bytes.includes(AUDIO), 'the stored audio bytes are what the provider received');
+        assert(/name="language"\r\n\r\nen/.test(form.body), 'the language hint reached the provider');
+        const rec = await readMemory(c, 'aijob.v5.transcript');
+        assert(rec.status === 200, `result_key read ${rec.status}`);
+        assert(rec.body.data.value === TRANSCRIPT, `the transcript: ${JSON.stringify(rec.body.data.value)}`);
+    });
+
+    await test('17c. With json, a transcribe job lands { text, language, seconds, model }', async () => {
+        fake.queue('transcriptions', transcriptionJson({ text: TRANSCRIPT, language: 'en', usage: { seconds: 12.5, cost: 0.0009 } }));
+        const r = await startJob(c, { op: 'transcribe', audio_key: AUDIO_KEY, json: true, result_key: 'aijob.v5.transcript.json' });
+        assert(r.status === 202, `expected 202, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(c, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        const v = (await readMemory(c, 'aijob.v5.transcript.json')).body.data.value;
+        assert(v.text === TRANSCRIPT && v.language === 'en' && v.seconds === 12.5 && typeof v.model === 'string',
+            `the record: ${JSON.stringify(v)}`);
+    });
+
+    await test('17d. A transcription with no audio_key, or with a file that is not there, is refused and nothing is written', async () => {
+        const jobsBefore = (await listJobs(c, '?state=all')).body.data.count;
+        const heardBefore = fake.requestsFor('transcriptions').length;
+        const none = await startJob(c, { op: 'transcribe', result_key: 'aijob.v5.none' });
+        assert(none.status === 400, `no audio_key: expected 400, got ${none.status}: ${JSON.stringify(none.body?.error)}`);
+        assert(none.body.error.code === 'INVALID_BODY', `code ${none.body.error.code}`);
+        const missing = await startJob(c, { op: 'transcribe', audio_key: 'aijob-v5/not-there.webm', result_key: 'aijob.v5.none' });
+        assert(missing.status === 404, `missing file: expected 404, got ${missing.status}: ${JSON.stringify(missing.body?.error)}`);
+        assert(missing.body.error.code === 'NOT_FOUND', `code ${missing.body.error.code}`);
+        // Another owner's file is the same answer: the key is looked up in the caller's storage only.
+        const foreign = await startJob(a, { op: 'transcribe', audio_key: AUDIO_KEY, result_key: 'aijob.v5.none' });
+        assert(foreign.status === 404, `another owner's file: expected 404, got ${foreign.status}`);
+        const jobsAfter = (await listJobs(c, '?state=all')).body.data.count;
+        assert(jobsAfter === jobsBefore, `no job was written: ${jobsBefore} -> ${jobsAfter}`);
+        assert((await readMemory(c, 'aijob.v5.none')).status === 404, 'no result was written');
+        assert(fake.requestsFor('transcriptions').length === heardBefore, 'the provider heard nothing');
+    });
+
+    await test('17e. json on an image, and an unknown op, are refused 400 before anything is written', async () => {
+        const heardBefore = fake.requestsFor('images').length;
+        const json1 = await startJob(c, { op: 'image', prompt: 'x', json: true, result_key: 'aijob.v5.bad' });
+        assert(json1.status === 400 && json1.body.error.code === 'INVALID_BODY', `json on an image: ${json1.status} ${json1.body?.error?.code}`);
+        const unknown = await startJob(c, { op: 'video', prompt: 'x', result_key: 'aijob.v5.bad' });
+        assert(unknown.status === 400 && unknown.body.error.code === 'INVALID_BODY', `unknown op: ${unknown.status} ${unknown.body?.error?.code}`);
+        assert((await readMemory(c, 'aijob.v5.bad')).status === 404, 'no result was written');
+        assert(fake.requestsFor('images').length === heardBefore, 'the provider heard nothing');
+    });
+
     // ── cleanup ──
     releaseHeld();
+    await fake.close();
     await stopServer(server);
     await new Promise<void>(r => { if (stub) stub.close(() => r()); else r(); });
     cleanDbFile();

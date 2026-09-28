@@ -737,8 +737,14 @@
     async start(opts) {
       if (!opts || typeof opts !== "object") throw new Error("opts object required");
       if (!opts.result_key) throw new Error("opts.result_key required");
-      if (!opts.prompt && !opts.prompt_key) throw new Error("opts.prompt or opts.prompt_key required");
+      if (opts.op !== "transcribe" && !opts.prompt && !opts.prompt_key) throw new Error("opts.prompt or opts.prompt_key required");
+      if (opts.op === "transcribe" && !opts.audio_key) throw new Error("opts.audio_key required for op transcribe");
       const body = {
+        op: opts.op,
+        provider: opts.provider,
+        audio_key: opts.audio_key,
+        language: opts.language,
+        size: opts.size,
         prompt: opts.prompt,
         prompt_key: opts.prompt_key,
         input_keys: opts.input_keys,
@@ -812,10 +818,346 @@
     }
   };
 
-  // src/static/sdk-libs/ai/index.js
+  // src/static/sdk-libs/ai/call.js
   var { authFetch: authFetch3 } = makeSession("aimeat-ai.js");
+  function aiError(r, fallback) {
+    const e = r && r.error;
+    const err = (
+      /** @type {Error & { code?: string, details?: any }} */
+      new Error(e && e.message || fallback)
+    );
+    err.code = e && e.code || "UNKNOWN";
+    if (e && e.details !== void 0 && e.details !== null) err.details = e.details;
+    return err;
+  }
+  function withProvenance(r) {
+    return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
+  }
+  async function postJson(path, body, fallback) {
+    const r = await authFetch3(path, { method: "POST", body: JSON.stringify(body) });
+    if (!r || !r.ok) throw aiError(r, fallback);
+    if (r.data) noteBudget(r.data.budget);
+    return withProvenance(r);
+  }
+  function paid(opts, how, call) {
+    const run = async () => {
+      if (opts.confirm) {
+        const c = typeof opts.confirm === "object" ? opts.confirm : {};
+        let estimate = c.estimate;
+        if (!estimate && how.estimate) {
+          try {
+            estimate = await how.estimate();
+          } catch {
+            estimate = void 0;
+          }
+        }
+        const okToSpend = await confirmSpend({
+          what: c.what || how.what,
+          detail: c.detail,
+          estimate,
+          remaining: c.remaining,
+          okLabel: c.okLabel,
+          cancelLabel: c.cancelLabel,
+          remember: c.remember || how.remember || "ai:" + (opts.app_id || "app")
+        });
+        if (!okToSpend) throw cancelledError(how.label || "The AI request");
+      }
+      return call();
+    };
+    if (opts.allowDuplicate) return run();
+    return once(keyOf(how.key), run, { ttlMs: opts.dedupeMs || 0 });
+  }
+  function isBlob(v) {
+    return typeof Blob !== "undefined" && v instanceof Blob;
+  }
+  async function blobToBase64(blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    return btoa(binary);
+  }
+  async function blobToDataUrl(blob) {
+    return "data:" + (blob.type || "application/octet-stream") + ";base64," + await blobToBase64(blob);
+  }
+
+  // src/static/sdk-libs/ai/capabilities.js
+  var { authFetch: authFetch4 } = makeSession("aimeat-ai.js");
+  var _capsCache = /* @__PURE__ */ new Map();
+  var _modelsCache = /* @__PURE__ */ new Map();
+  async function capabilities(opts) {
+    const o = typeof opts === "string" ? { app_id: opts } : opts || {};
+    const appId = o.app_id || "";
+    const now = Date.now();
+    const hit = _capsCache.get(appId);
+    if (!o.fresh && hit && now - hit.t < 6e4) return hit.v;
+    const r = await authFetch4("/v1/ai/capabilities" + (appId ? "?app_id=" + encodeURIComponent(appId) : ""));
+    if (!r || !r.ok) throw aiError(r, "Could not read what the AI can do");
+    _capsCache.set(appId, { v: r.data, t: now });
+    return r.data;
+  }
+  function priceEstimate(state2, units) {
+    const p = state2 && state2.price;
+    if (!p) return void 0;
+    const n = typeof p.perImage === "number" ? p.perImage * (units || 1) : typeof p.speechPerChar === "number" && units ? p.speechPerChar * units : typeof p.transcriptionPerSecond === "number" && units ? p.transcriptionPerSecond * units : void 0;
+    if (typeof n !== "number" || !isFinite(n)) return void 0;
+    return "~$" + (n < 0.01 ? n.toFixed(4) : n.toFixed(2));
+  }
+  function compatRow(m) {
+    const price = m.price || {};
+    const perToken = (v) => typeof v === "number" ? String(v / 1e6) : void 0;
+    const pricing = typeof price.inPerMtok === "number" || typeof price.outPerMtok === "number" ? { prompt: perToken(price.inPerMtok), completion: perToken(price.outPerMtok) } : void 0;
+    return { ...m, context_length: m.limits ? m.limits.context : void 0, ...pricing ? { pricing } : {} };
+  }
+  async function models(opts) {
+    const o = opts || {};
+    const q = new URLSearchParams();
+    q.set("capability", o.capability || "text");
+    if (o.type) q.set("type", o.type);
+    if (o.status) q.set("status", o.status);
+    if (o.allowed !== false) q.set("allowed", "true");
+    const qs = q.toString();
+    const now = Date.now();
+    const hit = _modelsCache.get(qs);
+    if (hit && now - hit.t < 36e5) return hit.v;
+    const r = await authFetch4("/v1/ai/models?" + qs);
+    if (!r || !r.ok) throw aiError(r, "Failed to list models");
+    const v = (r.data && Array.isArray(r.data.models) ? r.data.models : []).map(compatRow);
+    _modelsCache.set(qs, { v, t: now });
+    return v;
+  }
+  function clearCaches() {
+    _capsCache.clear();
+    _modelsCache.clear();
+  }
+
+  // src/static/sdk-libs/ai/stream.js
+  async function postStream(path, body, signal) {
+    const session = (
+      /** @type {any} */
+      getSession("aimeat-ai.js")
+    );
+    const send = () => fetch(NODE_URL + path, {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.jwt },
+      body: JSON.stringify(body)
+    });
+    let response = await send();
+    if (response.status === 401 && typeof session.refresh === "function") {
+      await session.refresh();
+      if (signal) signal.throwIfAborted();
+      response = await send();
+    }
+    if (!response.ok) {
+      const envelope = await response.json().catch(() => null);
+      throw aiError(envelope, "The AI stream failed (HTTP " + response.status + ")");
+    }
+    if (!response.body) throw aiError(null, "The AI stream returned no body");
+    return response;
+  }
+  async function* ndjson(response) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = "";
+    let done = false;
+    try {
+      for (; ; ) {
+        const chunk = await reader.read();
+        pending += decoder.decode(chunk.value, { stream: !chunk.done });
+        if (pending.length > 2e6) throw aiError({ error: { code: "STREAM_FRAME_TOO_LARGE" } }, "An AI stream line exceeds 2 MB");
+        let end;
+        while ((end = pending.indexOf("\n")) >= 0) {
+          const line = pending.slice(0, end);
+          pending = pending.slice(end + 1);
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === "error") throw aiError({ error: { code: event.code, message: event.message } }, "The AI stream failed");
+          if (event.type === "done") {
+            done = true;
+            if (event.budget) noteBudget(event.budget);
+          }
+          yield event;
+        }
+        if (chunk.done) break;
+      }
+      if (!done || pending.trim()) throw aiError({ error: { code: "STREAM_INCOMPLETE" } }, "The AI stream ended before it finished");
+    } finally {
+      try {
+        await reader.cancel();
+      } catch {
+      }
+      reader.releaseLock();
+    }
+  }
+  function withoutType(event) {
+    const out = { ...event };
+    delete out.type;
+    return out;
+  }
+  async function stream(opts) {
+    if (!opts || typeof opts !== "object") throw new Error("opts object required");
+    const messages = Array.isArray(opts.messages) ? opts.messages : opts.prompt ? [...opts.systemPrompt ? [{ role: "system", content: String(opts.systemPrompt) }] : [], { role: "user", content: String(opts.prompt) }] : null;
+    if (!messages || !messages.length) throw new Error("opts.messages or opts.prompt required");
+    const body = {
+      app_id: opts.app_id,
+      messages,
+      model: opts.model,
+      temperature: opts.temperature,
+      top_p: opts.top_p,
+      max_tokens: opts.max_tokens,
+      reasoning: opts.reasoning
+    };
+    return paid(opts, {
+      key: ["ai-stream", opts.app_id, opts.model, JSON.stringify(messages)],
+      what: "Run an AI request on your own AI provider."
+    }, async () => {
+      const response = await postStream("/v1/ai/stream", body, opts.signal);
+      let content = "";
+      let start = null;
+      let done = null;
+      for await (const event of ndjson(response)) {
+        if (event.type === "start") start = event;
+        else if (event.type === "text" && typeof event.text === "string") {
+          content += event.text;
+          if (opts.onText) opts.onText(event.text, content);
+        } else if (event.type === "done") done = event;
+      }
+      const rest = withoutType(done);
+      return { ...rest, content, model: rest.model || start && start.model };
+    });
+  }
+  var SPEECH_MIME = { mp3: "audio/mpeg", pcm: "audio/pcm" };
+  async function speak(opts) {
+    if (!opts || typeof opts !== "object") throw new Error("opts object required");
+    const input = opts.input != null ? opts.input : opts.text;
+    if (!input) throw new Error("opts.input required");
+    const format = opts.format || opts.response_format || "mp3";
+    const body = {
+      app_id: opts.app_id,
+      input: String(input),
+      model: opts.model,
+      voice: opts.voice,
+      response_format: format,
+      speed: opts.speed,
+      instructions: opts.instructions
+    };
+    return paid(opts, {
+      key: ["ai-speak", opts.app_id, opts.model, opts.voice, format, opts.store ? "store" : "", String(input)],
+      what: "Read text aloud on your own AI provider.",
+      remember: "ai-speak:" + (opts.app_id || "app"),
+      estimate: async () => {
+        const caps = await capabilities({ app_id: opts.app_id });
+        return priceEstimate(caps && caps.capabilities && caps.capabilities.speech, Array.from(String(input)).length);
+      }
+    }, async () => {
+      if (opts.store) return postJson("/v1/ai/speak?json=1", body, "Speech failed");
+      const response = await postStream("/v1/ai/speak", body, opts.signal);
+      const chunks = [];
+      let bytes = 0;
+      let done = null;
+      for await (const event of ndjson(response)) {
+        if (event.type === "audio" && typeof event.data === "string") {
+          const chunk = Uint8Array.from(atob(event.data), (c) => c.charCodeAt(0));
+          chunks.push(chunk);
+          bytes += chunk.length;
+          if (opts.onAudio) opts.onAudio(chunk);
+        } else if (event.type === "done") done = event;
+      }
+      const mime = SPEECH_MIME[format] || "application/octet-stream";
+      const rest = withoutType(done);
+      return { ...rest, blob: new Blob(chunks, { type: mime }), mime_type: mime, format, bytes };
+    });
+  }
+
+  // src/static/sdk-libs/ai/media.js
+  function routing(opts) {
+    return {
+      ...typeof opts.provider === "string" && opts.provider ? { provider: opts.provider } : {},
+      ...typeof opts.fallback === "boolean" ? { fallback: opts.fallback } : {}
+    };
+  }
+  async function image(opts) {
+    if (!opts || typeof opts !== "object") throw new Error("opts object required");
+    if (!opts.prompt) throw new Error("opts.prompt required");
+    const body = {
+      prompt: opts.prompt,
+      model: opts.model,
+      size: opts.size,
+      storage_key: opts.storage_key,
+      public: opts.public === true ? true : void 0,
+      app_id: opts.app_id,
+      ...routing(opts)
+    };
+    return paid(opts, {
+      key: ["ai-image", opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.prompt],
+      what: "Make a picture on your own AI provider.",
+      label: "The picture",
+      remember: "ai-image:" + (opts.app_id || "app"),
+      estimate: async () => {
+        const caps = await capabilities({ app_id: opts.app_id });
+        return priceEstimate(caps && caps.capabilities && caps.capabilities.image, 1);
+      }
+    }, async () => {
+      const data = await postJson("/v1/ai/image", body, "The picture could not be made");
+      return data && typeof data === "object" ? { ...data, src: data.download_url || data.url } : data;
+    });
+  }
+  async function transcribe(opts) {
+    if (!opts || typeof opts !== "object") throw new Error("opts object required");
+    if (!opts.storage_key && !opts.audio) throw new Error("opts.storage_key or opts.audio required");
+    const blob = isBlob(opts.audio) ? (
+      /** @type {Blob} */
+      opts.audio
+    ) : null;
+    const audio = blob ? await blobToBase64(blob) : typeof opts.audio === "string" ? opts.audio : void 0;
+    const body = {
+      ...opts.storage_key ? { storage_key: opts.storage_key } : { audio_base64: audio },
+      mime: opts.mime || blob && blob.type || void 0,
+      filename: opts.filename || blob && /** @type {any} */
+      blob.name || void 0,
+      model: opts.model,
+      language: opts.language,
+      temperature: opts.temperature,
+      verbose: opts.verbose,
+      app_id: opts.app_id,
+      ...routing(opts)
+    };
+    return paid(opts, {
+      key: ["ai-transcribe", opts.app_id, opts.model, opts.language, opts.storage_key || audio || ""],
+      what: "Turn a recording into text on your own AI provider.",
+      label: "The transcription",
+      remember: "ai-transcribe:" + (opts.app_id || "app")
+    }, () => postJson("/v1/ai/transcribe", body, "Transcription failed"));
+  }
+  async function embed(opts) {
+    if (!opts || typeof opts !== "object") throw new Error("opts object required");
+    if (opts.input == null || Array.isArray(opts.input) && !opts.input.length) throw new Error("opts.input required");
+    const body = { input: opts.input, model: opts.model, app_id: opts.app_id, ...routing(opts) };
+    return paid(opts, {
+      key: ["ai-embed", opts.app_id, opts.model, opts.provider, JSON.stringify(opts.input)],
+      what: "Make embeddings on your own AI provider.",
+      label: "The embedding",
+      remember: "ai-embed:" + (opts.app_id || "app")
+    }, () => postJson("/v1/ai/embed", body, "Embedding failed"));
+  }
+
+  // src/static/sdk-libs/ai/index.js
+  var { authFetch: authFetch5 } = makeSession("aimeat-ai.js");
   var _availCache = null;
-  var _modelsCache = null;
+  async function callFiles(files) {
+    if (files === void 0 || files === null) return void 0;
+    const list = Array.isArray(files) ? files : [files];
+    if (!list.length) return void 0;
+    return Promise.all(list.map(async (f) => {
+      if (isBlob(f)) return { data_url: await blobToDataUrl(f), .../** @type {any} */
+      f.name ? { filename: (
+        /** @type {any} */
+        f.name
+      ) } : {} };
+      if (typeof f === "string") return f.startsWith("data:") ? { data_url: f } : { storage_key: f };
+      return f;
+    }));
+  }
   function requiredKeysOf(schema) {
     if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
     if (schema.properties && typeof schema.properties === "object") {
@@ -845,6 +1187,16 @@
   }
   var ai = {
     /**
+     * What the person's AI can do for this app, per capability (text, vision, files, image, speech,
+     * transcription, embed): { on, model, price, ... } when on, { on: false, reason, fix } when off.
+     * Ask this before showing a button that needs a capability, and show `fix` when it is off.
+     * Cached 60 seconds per app_id.
+     *
+     *   const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' });
+     *   if (!caps.capabilities.image.on) notice.textContent = caps.capabilities.image.fix;
+     */
+    capabilities,
+    /**
      * Returns true if the user has AI configured (an OpenRouter key, or a keyless
      * self-hosted provider). Cached 60 seconds. Apps should call this before showing
      * "Use AI" buttons. Uses GET /v1/ai/available, which an app-grant token (a sandboxed
@@ -855,12 +1207,12 @@
       const now = Date.now();
       if (_availCache && now - _availCache.t < 6e4) return _availCache.v;
       try {
-        const r = await authFetch3("/v1/ai/available");
+        const r = await authFetch5("/v1/ai/available");
         if (r && r.ok && r.data && typeof r.data.available === "boolean") {
           _availCache = { v: r.data.available, t: now };
           return r.data.available;
         }
-        const s = await authFetch3("/v1/openrouter/settings");
+        const s = await authFetch5("/v1/openrouter/settings");
         const v = !!(s && s.ok && s.data && (s.data.hasApiKey || s.data.has_api_key));
         _availCache = { v, t: now };
         return v;
@@ -869,15 +1221,28 @@
       }
     },
     /**
-     * Run a single completion. Returns { content, model, usage, budget, finish_reason, truncated }.
+     * Run a single completion. Returns { content, model, usage, budget, finish_reason, truncated,
+     * route, policy_chose_model? }.
      * `truncated` is true when the provider cut the answer at a token limit (finish_reason 'length'):
      * show it as unfinished or ask again, never as the whole answer.
-     * Throws an Error with .code set on quota/permission/auth failures.
+     * `route` says who answered: { capability, chosenBy, answeredBy: { provider, model }, attempts,
+     * fellBack }; `fellBack` is true when the first provider failed and another one answered.
+     * `policy_chose_model` is true when the owner's model policy replaced the model the call asked for.
+     * Throws an Error with .code set on quota/permission/auth failures, and `.details` when the node
+     * says more (a policy refusal lists the models it would allow).
      *
      * `images`: an array of data: or https: URLs (at most 8; downscale first) turns the call into a
      * vision request, answered by the owner's vision model.
      *
-     * This spends the signed-in user's own OpenRouter money, so two guards ride along:
+     * `files`: documents the model reads itself (a PDF, a spreadsheet), at most 5 and 20 MB in all.
+     * Each is a storage key of the person's own file, a data: URL, a Blob or File, or an object
+     * { storage_key } | { data_url, filename }. Needs the files capability (see capabilities()).
+     *
+     * `provider` names one of the owner's providers (its id, or a type such as 'anthropic') and
+     * `fallback: false` keeps the call on that one provider. Neither can add a provider or loosen
+     * the owner's rules.
+     *
+     * This spends the signed-in user's own money on their own AI provider, so two guards ride along:
      *   • repeats collapse — while an identical call (same app_id + model + prompts) is in flight,
      *     every further call gets the SAME promise. Five clicks on "Summarise" = one paid call.
      *     `allowDuplicate: true` opts out; `dedupeMs: N` also returns the result to a click made
@@ -900,6 +1265,7 @@
     async complete(opts) {
       if (!opts || typeof opts !== "object") throw new Error("opts object required");
       if (!opts.prompt) throw new Error("opts.prompt required");
+      const files = await callFiles(opts.files);
       const body = {
         prompt: opts.prompt,
         systemPrompt: opts.systemPrompt,
@@ -912,49 +1278,26 @@
         // Pictures for a vision request: data: or https: URLs, at most 8 (the route refuses more).
         // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
         // question about a picture went out as text alone and the model answered it anyway.
-        images: Array.isArray(opts.images) ? opts.images : void 0
+        images: Array.isArray(opts.images) ? opts.images : void 0,
+        // Documents the model reads itself (the files capability), and the caller's word on which
+        // provider answers. Absent keys are dropped by JSON.stringify, so a call without them sends
+        // the same body as before.
+        files,
+        ...routing(opts)
       };
-      const call = async () => {
-        if (opts.confirm) {
-          const c = typeof opts.confirm === "object" ? opts.confirm : {};
-          const okToSpend = await confirmSpend({
-            what: c.what || "Run an AI request on your own OpenRouter key.",
-            detail: c.detail,
-            estimate: c.estimate,
-            remaining: c.remaining,
-            okLabel: c.okLabel,
-            cancelLabel: c.cancelLabel,
-            remember: c.remember || "ai:" + (opts.app_id || "app")
-          });
-          if (!okToSpend) throw cancelledError("The AI request");
-        }
-        const r = await authFetch3("/v1/ai/complete", {
-          method: "POST",
-          body: JSON.stringify(body)
-        });
-        if (!r || !r.ok) {
-          const code = r && r.error && r.error.code || "UNKNOWN";
-          const msg = r && r.error && r.error.message || "AI call failed";
-          const err = (
-            /** @type {Error & { code?: string }} */
-            new Error(msg)
-          );
-          err.code = code;
-          throw err;
-        }
-        if (r.data) noteBudget(r.data.budget);
-        return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
-      };
-      if (opts.allowDuplicate) return call();
-      const key = keyOf([
-        "ai",
-        opts.app_id,
-        opts.model || opts.modelRole,
-        opts.systemPrompt,
-        opts.prompt,
-        Array.isArray(opts.images) ? opts.images.join("\n") : ""
-      ]);
-      return once(key, call, { ttlMs: opts.dedupeMs || 0 });
+      return paid(opts, {
+        key: [
+          "ai",
+          opts.app_id,
+          opts.model || opts.modelRole,
+          opts.systemPrompt,
+          opts.prompt,
+          Array.isArray(opts.images) ? opts.images.join("\n") : "",
+          files ? JSON.stringify(files) : "",
+          opts.provider || ""
+        ],
+        what: "Run an AI request on your own AI provider."
+      }, () => postJson("/v1/ai/complete", body, "AI call failed"));
     },
     /**
      * Convenience: complete + JSON.parse. Adds a "return ONLY valid JSON"
@@ -1010,22 +1353,37 @@
       }
     },
     /**
-     * List the models the user's account can hit. Cached 1 hour.
+     * A text reply piece by piece: onText(delta, soFar) per piece, and the promise resolves with
+     * { content, model, finish_reason, truncated, usage, budget, provenance }.
+     *
+     *   await AIMEAT.ai.stream({ app_id, prompt, onText: (d, all) => { out.textContent = all; } });
      */
-    async models() {
-      const now = Date.now();
-      if (_modelsCache && now - _modelsCache.t < 36e5) return _modelsCache.v;
-      const r = await authFetch3("/v1/openrouter/models");
-      if (!r || !r.ok) throw new Error(r && r.error && r.error.message || "Failed to list models");
-      const v = r.data && r.data.models ? r.data.models : [];
-      _modelsCache = { v, t: now };
-      return v;
-    },
+    stream,
+    /**
+     * A picture from a prompt, stored in the person's storage: { storage_key, url, model, route, ... }.
+     * Pass confirm: true; the dialog shows the price per picture when the catalogue knows it.
+     */
+    image,
+    /**
+     * Speech from text: { blob, mime_type, format, bytes, model, ... } (mp3 by default).
+     * onAudio(bytes) per chunk for early playback; store: true keeps it as a private file instead.
+     */
+    speak,
+    /** Text from a recording: { text, language, seconds, model, route, ... }. */
+    transcribe,
+    /** Vectors for texts, for search by meaning: { embeddings, model, dimensions, route, ... }. */
+    embed,
+    /**
+     * The models a capability can use: models({ capability: 'image' }). Default: the text models
+     * this caller can use now. Rows are { ref, type, id, name, caps, limits, price, status } plus
+     * context_length and pricing in the old OpenRouter listing's form. Cached 1 hour per query.
+     */
+    models,
     /**
      * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".
      */
     async usage() {
-      const r = await authFetch3("/v1/ai/usage");
+      const r = await authFetch5("/v1/ai/usage");
       if (!r || !r.ok) throw new Error(r && r.error && r.error.message || "Failed to read usage");
       return r.data;
     },
@@ -1034,7 +1392,7 @@
      */
     invalidateCache() {
       _availCache = null;
-      _modelsCache = null;
+      clearCaches();
     },
     /**
      * Show the user that a model made this. ONE call, no styling decisions.

@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-09-28 — A declared model the catalogue does not know is a hint (app-ai-model-hints.ts; System 2 plan, V5).
  *   2026-09-26 — A provenance declaration the caller may not make (no provenance:write) is refused
  *     above the dry-run return, 403 SCOPE_DENIED with the held scopes (bbfbeca149de): the mint threw
  *     it below the return, so a dry run answered "would pass" to a publish that then refused.
@@ -102,6 +103,7 @@ import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, declarationLacksModel, type DeclaredProvenance } from './ai-provenance.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
+import { unknownModelHints } from './app-ai-model-hints.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
@@ -447,6 +449,9 @@ export async function publishApp(
   // publish that gets worked around, and the app then ships with less transparency, not more.
   const aiLint = isHtml ? lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture) : null;
   if (aiLint) manifest.aiPosture = aiLint.posture;
+  // A declared model the catalogue does not know (app-ai-model-hints.ts; outside the posture check,
+  // whose import graph must not reach the catalogue store).
+  if (aiLint) aiLint.hints.push(...unknownModelHints(aiLint.posture.models));
 
   // WHERE THIS APP PUTS WHAT. The node READS the map somebody wrote and stamps its summary on the
   // manifest. It does NOT draft one: a map guessed from permission words produced the same confident

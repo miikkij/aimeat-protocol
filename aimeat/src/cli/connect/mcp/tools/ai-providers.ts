@@ -27,7 +27,7 @@ export function registerAiProviderTools(mcp: McpServer, registry: AgentRegistry)
 
   mcp.tool('aimeat_ai_provider_test', descriptionFor('aimeat_ai_provider_test'), {
     provider: z.string().describe('The provider id, from aimeat_ai_providers.'),
-    capability: z.string().optional().describe('text | vision | files | transcription | image. Default text.'),
+    capability: z.string().optional().describe('text | vision | files | transcription | speech | embed | image. Default text.'),
     accept_cost: z.boolean().optional().describe('Required true for an image test, which the provider charges for.'),
   }, annotationsFor('aimeat_ai_provider_test'), async (a) => out(await client.post(`/v1/ai/providers/${encodeURIComponent(a.provider)}/test`, {
     ...(a.capability !== undefined ? { capability: a.capability } : {}),

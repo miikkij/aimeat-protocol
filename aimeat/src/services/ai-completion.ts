@@ -21,6 +21,11 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.8.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): prepareAiCall knows
+ *     the operations speak and embed (roles tts and embed), reads the app's prefer.* and local.* from
+ *     its meta (policy-store appAiMetaOf), and completeForOwner takes `files` for the files capability.
+ *     The cost estimate and the pre-call guards moved to ai-call-guards.ts as a pure move
+ *     (max-file-lines), re-exported here under the same names.
  *   v3.7.0 — 2026-09-28 — Providers and routing (System 2 plan, V3). prepareAiCall reads the owner's
  *     provider records (the legacy setting migrated on the first read, services/ai/provider-store.ts),
  *     their routing and the policy, and plans an ordered candidate list with a reason for every
@@ -113,9 +118,12 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { decrypt, getEncryptionKey } from './encryption.js';
-import type { ProviderType, CompletionReasoning } from './openrouter.js';
-import { text as gatewayText } from './ai/gateway.js';
+import type { CompletionReasoning } from './openrouter.js';
+import {
+  estimateCostUsd, assertProviderAllowed, assertAppAllowed, decryptOwnerKey, assertWithinBudget,
+} from './ai-call-guards.js';
+import { appAiMetaOf } from './ai/policy-store.js';
+import { text as gatewayText, type TextFile } from './ai/gateway.js';
 import type { AiAdapterType, AiCapability, AiOp, AiTarget, CostSource } from './ai/types.js';
 import { loadPolicyDecision } from './ai/policy-gate.js';
 import type { CallerClass } from './ai/policy.js';
@@ -130,116 +138,19 @@ import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
 import { debitAllowance, readAllowance, remainingOf } from './ai-allowance.js';
-import { appSpentToday, appQuotaFor, appAllowlisted } from './ai-app-id.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './ai-usage-record.js';
 import { agentCapRefusal } from './agent-ai-keys.js';
 import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './ai-daily-budget.js';
 export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
 
-/**
- * Rough cost estimate when the provider didn't report one (LM Studio, custom).
- * The user's OpenRouter dashboard is authoritative — budgets exist to prevent
- * runaways, not to bill.
- */
-const FALLBACK_PROMPT_COST_PER_TOKEN = 0.000005;
-const FALLBACK_COMPLETION_COST_PER_TOKEN = 0.000015;
-
 // DEFAULT_DAILY_BUDGET_USD and getDailyBudgetUsd live in ai-daily-budget.ts (a leaf, so the ledger's
-// budget alert can read the number without importing this file) and are re-exported below.
-
-/** The fallback when the provider does not report a cost. Exported so the chat proxy uses the same
- *  arithmetic rather than a second guess at what a turn was worth. */
-export function estimateCostUsd(promptTokens: number, completionTokens: number): number {
-  return promptTokens * FALLBACK_PROMPT_COST_PER_TOKEN
-    + completionTokens * FALLBACK_COMPLETION_COST_PER_TOKEN;
-}
+// budget alert can read the number without importing this file) and are re-exported above. The cost
+// estimate and the guards before a call live in ai-call-guards.ts, re-exported the same way.
+export { estimateCostUsd, assertProviderAllowed, assertAppAllowed, decryptOwnerKey, assertWithinBudget };
 
 // The typed error lives in services/ai/errors.ts (a leaf the policy code can throw too) and is
 // re-exported here, so every existing importer keeps its path.
 export { AiCompletionError };
-
-/**
- * Provider host allowlist — the guard that stands between a decrypted AI key and wherever an
- * owner- (or app-) supplied baseUrl points.
- *
- * On a public multi-tenant node `config.aiProviderAllowlist` restricts which HOST the key may be
- * sent to, so a poisoned baseUrl cannot exfiltrate it. Empty = any host (local dev, self-hosted
- * models). Exported because EVERY path that decrypts a key must run it, and one shared function is
- * how that invariant stays true as paths are added. See docs/coding-guidelines/security-development-dna.md.
- */
-export function assertProviderAllowed(config: AimeatConfig, baseUrl: string): void {
-  if (config.aiProviderAllowlist.length === 0) return;
-  let providerHost: string;
-  try { providerHost = new URL(baseUrl).hostname.toLowerCase(); }
-  catch { throw new AiCompletionError('INVALID_BASE_URL', 400, `Invalid AI provider baseUrl: ${baseUrl}`); }
-  if (!config.aiProviderAllowlist.includes(providerHost)) {
-    throw new AiCompletionError('PROVIDER_NOT_ALLOWED', 403,
-      `AI provider host "${providerHost}" is not in this node's allowlist. Ask the operator to allow it.`);
-  }
-}
-
-/** The owner's per-app allowlist (only meaningful once they configured one). */
-export function assertAppAllowed(prefs: Record<string, unknown>, appId?: string, ownerGhii?: string): void {
-  const allowlist = Array.isArray(prefs.app_allowlist) ? (prefs.app_allowlist as string[]) : null;
-  if (!allowlist) return;
-  // Under any of the app's names (services/ai-app-id.ts): an entry saved as `app.html` still allows `app`.
-  if (appId && !appAllowlisted(allowlist, appId, ownerGhii)) {
-    throw new AiCompletionError('APP_NOT_ALLOWED', 403,
-      `App "${appId}" is not in your AI allowlist. Enable it from Settings.`);
-  }
-  if (!appId) {
-    throw new AiCompletionError('APP_ID_REQUIRED', 403,
-      'app_id is required because you have configured an AI app allowlist.');
-  }
-}
-
-/** Decrypt the owner's stored provider key. Undefined is legitimate for a keyless self-hosted
- *  provider; OpenRouter without a key is not, and says so. */
-export function decryptOwnerKey(
-  config: AimeatConfig, apiKeyRecordValue: unknown, provider: ProviderType,
-): string | undefined {
-  const encrypted = (apiKeyRecordValue as { encrypted?: string } | undefined)?.encrypted;
-  if (encrypted) {
-    const encKey = getEncryptionKey(config);
-    if (!encKey) {
-      throw new AiCompletionError('ENCRYPTION_NOT_CONFIGURED', 503,
-        'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY or AIMEAT_TOTP_ENCRYPTION_KEY.');
-    }
-    return decrypt(encrypted, encKey);
-  }
-  if (provider === 'openrouter') {
-    throw new AiCompletionError('NO_API_KEY', 400, 'No OpenRouter API key configured. Set one in Settings.');
-  }
-  return undefined;
-}
-
-/**
- * Daily budget + per-app cap. Both are pre-call checks against what has ALREADY been spent, so a
- * single call can overshoot the budget by its own cost; the cap stops the next one. Returns the
- * resolved daily budget so the caller can report it.
- */
-export function assertWithinBudget(
-  usage: UsageRecord, prefs: Record<string, unknown>, appId?: string, ownerGhii?: string,
-): number {
-  const dailyBudget = getDailyBudgetUsd(prefs);
-  if (usage.total_cost_usd >= dailyBudget) {
-    throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
-      `Daily AI budget hit ($${usage.total_cost_usd.toFixed(4)} / $${dailyBudget}). Raise it in Settings or wait until midnight UTC.`);
-  }
-  if (appId) {
-    // Per-app cap. By DEFAULT an app may spend the whole daily budget the owner set (the "AI apps
-    // daily budget") — there is no separate hidden per-app default. An explicit app_quotas.<app>
-    // override throttles that one app below the budget when the owner wants it.
-    // One app, one cap, whatever name a door recorded it under (services/ai-app-id.ts).
-    const appQuota = appQuotaFor(prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined, appId, ownerGhii, dailyBudget);
-    const appSpent = appSpentToday(usage.per_app, appId, ownerGhii);
-    if (appSpent >= appQuota) {
-      throw new AiCompletionError('APP_QUOTA_EXHAUSTED', 402,
-        `Daily AI quota for "${appId}" hit ($${appSpent.toFixed(4)} / $${appQuota}). Raise it in Settings.`);
-    }
-  }
-  return dailyBudget;
-}
 
 export interface CompleteForOwnerOptions {
   prompt: string;
@@ -263,6 +174,8 @@ export interface CompleteForOwnerOptions {
   capability?: AiCapability;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
+  /** Files (a PDF among them) for a model that reads them itself: the capability becomes `files`. */
+  files?: TextFile[];
   /**
    * Passed to the provider as given (OpenRouter's unified `reasoning` parameter). When unset, the
    * owner's settings decide, and when those say nothing, nothing is sent.
@@ -413,7 +326,10 @@ export function planFor(plan: AiCallPlan, c: AiCandidate): AiCallPlan {
 }
 
 /** The operations whose model is a role of its own, and never the text model. */
-const OP_ROLE: Partial<Record<AiOp, ModelRole>> = { image: 'image', transcribe: 'stt' };
+const OP_ROLE: Partial<Record<AiOp, ModelRole>> = { image: 'image', transcribe: 'stt', speak: 'tts', embed: 'embed' };
+
+/** The capability an operation asks for when the call does not say. */
+const OP_CAPABILITY: Partial<Record<AiOp, AiCapability>> = { image: 'image', transcribe: 'transcription', speak: 'speech', embed: 'embed' };
 
 export interface PrepareAiCallOptions {
   /** What the call does. Default `text`. */
@@ -466,7 +382,7 @@ export async function prepareAiCall(
   assertAppAllowed(prefs, opts.appId, gaii);
 
   const capability: AiCapability = opts.capability
-    ?? (op === 'image' ? 'image' : op === 'transcribe' ? 'transcription' : opts.hasImages ? 'vision' : 'text');
+    ?? OP_CAPABILITY[op] ?? (opts.hasImages ? 'vision' : 'text');
   const requested = typeof opts.model === 'string' && opts.model ? opts.model : undefined;
   const policyCtx = {
     capability, caller: opts.caller ?? (opts.agent ? 'agent' : 'owner') as CallerClass,
@@ -476,11 +392,16 @@ export async function prepareAiCall(
   };
   // The owner's providers (the legacy setting migrated on the first read), their routing and their
   // model policy. The legacy records were read above, so the migration reads nothing twice.
-  const [providers, routing, policy] = await Promise.all([
+  const [providers, routing, policy, appMeta] = await Promise.all([
     providersForOwner(storage, config, gaii, { settings: prefsRecord, key: apiKeyRecord }),
     readRouting(storage, gaii, opts.agent),
     loadPolicyDecision(storage, config, gaii, policyCtx),
+    appAiMetaOf(storage, gaii, opts.verifiedApp ?? opts.appId),
   ]);
+  // The app's meta orders the owner's candidates (prefer.*) and may ask for this machine only
+  // (local.*); neither adds a provider or loosens a rule (plan 11, section 9).
+  const appPrefer = appMeta?.prefer?.[capability];
+  const requires = appMeta?.local?.includes(capability) ? { ...opts.requires, local: true } : opts.requires;
   const rules = rulesFor({ capability, ...(opts.agent ? { agent: opts.agent } : {}), ...(opts.appId ? { app: opts.appId } : {}) }, routing);
 
   // The model each role gave before providers existed: the owner's setting, then the node's default
@@ -494,7 +415,8 @@ export async function prepareAiCall(
   const legacyModel = (cap: AiCapability): string | undefined => {
     if (cap === 'image') return roleModel('image');
     if (cap === 'transcription') return roleModel('stt');
-    if (cap === 'embed') return undefined;
+    if (cap === 'speech') return roleModel('tts');
+    if (cap === 'embed') return roleModel('embed');
     if (cap === 'vision') return roleModel('vision') || textModel;
     return textModel;
   };
@@ -507,8 +429,9 @@ export async function prepareAiCall(
     ...(requested ? { requested } : {}),
     ...(opts.provider ? { namedProvider: opts.provider } : {}),
     ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
-    ...(opts.requires ? { requires: opts.requires } : {}),
+    ...(requires ? { requires } : {}),
     ...(opts.agent ? { agent: opts.agent } : {}),
+    ...(appPrefer?.length ? { appPrefer } : {}),
     legacyModel,
     nodeAllowance: async () => ({ remainingUsd: remainingOf(await readAllowance(storage, config, gaii)) }),
   });
@@ -677,13 +600,15 @@ export async function completeForOwner(
   }
 
   const hasImages = Array.isArray(opts.images) && opts.images.length > 0;
+  const hasFiles = Array.isArray(opts.files) && opts.files.length > 0;
+  const capability = opts.capability ?? (hasFiles ? 'files' : undefined);
   const plan = await prepareAiCall(storage, config, gaii, {
     model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent,
     ...(opts.caller ? { caller: opts.caller } : {}),
     ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}),
     ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
-    ...(opts.capability ? { capability: opts.capability } : {}),
+    ...(capability ? { capability } : {}),
   });
   const { prefs } = plan;
 
@@ -713,6 +638,7 @@ export async function completeForOwner(
       prompt: opts.prompt,
       ...(opts.systemPrompt ? { system: opts.systemPrompt } : {}),
       ...(opts.images ? { images: opts.images } : {}),
+      ...(hasFiles ? { files: opts.files, ...(c.provider.capabilities.files?.parser ? { pdfEngine: c.provider.capabilities.files.parser } : {}) } : {}),
       temperature: opts.temperature ?? (typeof prefs.temperature === 'number' ? prefs.temperature : undefined),
       topP: opts.topP ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
       maxTokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0

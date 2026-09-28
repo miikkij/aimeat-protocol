@@ -13,6 +13,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-chat
  * @version-history
+ *   v1.5.0 — 2026-09-28 — System 2 plan, V5: this node has no shared chat key, so the chat runs on
+ *     the node route and the status names the payer /v1/llm would pick: no payer with no key
+ *     anywhere, the owner once they store their own key.
  *   v1.4.0 — 2026-08-17 — The first-turn funnel marker: written once with `at`, the starter
  *     dimension lands when a starter button fired the turn, junk starters are dropped at the door,
  *     and a later starter-carrying turn can never rewrite the first record.
@@ -98,26 +101,24 @@ await test('Status says whether this node has an agent, and never pretends', asy
     console.log(`     ↳ chat ${body.data.enabled ? 'enabled' : 'not configured'} on this node`);
 });
 
-await test('Status names WHO PAYS for a turn, and it is not derived from having a key', async () => {
-    // The page used to work the payer out for itself: a stored OpenRouter key meant "running on
-    // your own key" and no key meant an allowance counting down. Neither described a chat turn.
-    // The agent is one shared process with one process-wide provider key, no owner key is ever
-    // handed to it, and nothing on this road debits the allowance. So the server says who pays.
+await test('Status names WHO PAYS for a turn, as the gate would decide it', async () => {
+    // The page used to work the payer out for itself and got it wrong, so the server says who pays.
+    // This node has no shared chat key (AIMEAT_GOOSE_PROVIDER_API_KEY), so the chat runs on the
+    // node route: each person's agent calls /v1/llm with their own chat token, and the payer is
+    // the one prepareAiCall picks there. 'node' is only the shared key's answer.
     const { body } = await json('/v1/chat/status', aAuthed());
-    assert(['own', 'allowance', 'node'].includes(body.data?.pays),
-        `pays must name a payer, got ${JSON.stringify(body.data?.pays)}`);
-    assert(body.data.pays === 'node',
-        `while the agent runs on the node's own provider key, the answer is "node", got ${body.data.pays}`);
+    assert(body.data?.pays !== 'node', `no shared key: the operator's key pays nothing, got ${JSON.stringify(body.data?.pays)}`);
+    assert(body.data?.pays !== 'own', `an owner with no key of their own does not pay, got ${JSON.stringify(body.data?.pays)}`);
 
-    // …and it stays 'node' for an owner who HAS brought a key, which is the case that was wrong.
+    // An owner who brings a key pays for their own chat, because the chat's calls reach the gate.
     const put = await json('/v1/openrouter/settings', aAuthed({
         method: 'PUT', body: JSON.stringify({ apiKey: 'sk-or-e2e-not-a-real-key', model: 'openrouter/free' }),
     }));
     assert(put.status === 200, `store a key: ${put.status} ${JSON.stringify(put.body?.error)}`);
     const after = await json('/v1/chat/status', aAuthed());
     assert(after.body.data.has_own_key === true, 'the key is stored');
-    assert(after.body.data.pays === 'node',
-        `an owner key that the chat never receives must not be reported as paying, got ${after.body.data.pays}`);
+    assert(after.body.data.pays === 'own', `their own key pays for their chat, got ${after.body.data.pays}`);
+    assert(after.body.data.model === 'openrouter/free', `on the model they chose, got ${after.body.data.model}`);
     await json('/v1/openrouter/settings', aAuthed({ method: 'DELETE' }));
 });
 

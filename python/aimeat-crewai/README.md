@@ -169,7 +169,44 @@ owner's, then the server's, and a new `402 AGENT_QUOTA_EXHAUSTED` means this age
 used up — not retryable, like every other quota code. So a crew that wrote its own
 `openrouter.settings` record to reach a provider must stop: no text door reads that record any
 more, and the owner sets the provider. (Neither this package nor crewfive writes one — checked
-2026-09-20.) Transcription and image generation still pay from the agent's namespace.
+2026-09-20.) Since the AI providers of the node's System 2 plan, transcription, pictures, speech and
+embeddings are paid the same way: by the owner, in the agent's name, on the owner's providers.
+
+## The node's AI for a crew (0.30.0+)
+
+`node_llm()` gives you a CrewAI `LLM` that calls the node's OpenAI-compatible route
+(`<node>/v1/llm`) with the agent's token. The crew then holds no provider key: the owner's model
+policy, key order, daily budget and the agent's cap apply to every call, and the node records the
+usage. The agent needs the `ai:use` scope.
+
+```python
+from crewai import Agent
+from aimeat_crewai import capabilities, node_llm
+
+# What this agent can do with AI here, before building on it.
+caps = capabilities(agent_name="company-crew")
+text = caps["capabilities"]["text"]
+if not text["on"]:
+    raise SystemExit(f"{text['message']} {text['fix']}")  # the node's own sentences, as they are
+
+llm = node_llm(agent_name="company-crew", temperature=0.2)
+writer = Agent(role="Writer", goal="...", backstory="...", llm=llm)
+```
+
+The node and the token resolve as for `decide()`: the arguments, then the connector-stored token
+for `agent_name`, then `AIMEAT_NODE_URL` and `AIMEAT_AGENT_TOKEN`.
+
+**The node chooses the model.** `/v1/llm/chat/completions` does not read the request's `model`:
+the owner's preference decides, then the node's default, and the answer says which model ran.
+With no `model=`, `node_llm()` sends the placeholder `aimeat-node-chooses`. `GET <node>/v1/llm/models`
+lists the models the owner's policy allows.
+
+Both CrewAI code paths reach the route: CrewAI 1.x sends an `openai/` model with a `base_url` to
+its native OpenAI client (LiteLLM is not needed), and `is_litellm=True` or CrewAI before 1.0 go
+through LiteLLM. A node refusal (such as `402 AGENT_QUOTA_EXHAUSTED`) comes out of `llm.call()` as
+that client's error. `capabilities()` raises `AiRefused` with the node's code when the node refuses
+the read, and a capability that is off is an answer with `on: false`, a `reason`, a `message`
+and a `fix`.
 
 ## Restricting the toolset
 
@@ -663,6 +700,7 @@ environment variable it lives in (`agent.key_env`) and never the key itself.
 | 0.20.x | 3.3.0+ for data packages (`/v1/datapackages`). `read_package` and `to_dataframe` need only the package's public address, so they read a package from ANY node that publishes one; `publish_package` and `package_versions` need the routes. | 0.80+ |
 | 0.22.x | 3.9.0+ node AND `aimeat` connector for server-initiated invokes (`/local/invoke/next` on the serve daemon). On an older serve daemon the listener logs once that the surface is missing and the rest of the daemon is unchanged. | 0.80+ |
 | 0.27.x | **Node 3.18.0+** for decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`, and `/v1/ai/decisions/stats` for `decision_stats()`), and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. A node below 3.18.0 has none of these doors. For the liaison to SEE the decide tools over MCP, the machine also needs the `aimeat` connector at 3.18.0+: an older CLI refuses an undeclared parameter, so check the CLI version before reporting a node fault. Direct mode needs no node at all. | 0.80+ |
+| 0.30.x | `node_llm()`: a node with `/v1/llm` (3.18.0+ for the owner's key order and budget, and the model policy on the release after 3.19.0). `capabilities()`: a node with `GET /v1/ai/capabilities`, which arrives in the release after 3.19.0. | 0.80+ (verified on 1.15 native and LiteLLM paths) |
 
 ## License
 

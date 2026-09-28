@@ -25,6 +25,9 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.6.0 — 2026-09-28 — System 2 plan, V5: start() takes the person whose turns this child runs, and
+ *     their chat token then becomes the child's /v1/llm key (services/goose-env.ts). A child whose
+ *     handshake fails is stopped rather than left running.
  *   v2.5.0 — 2026-09-16 — The child starts with an allow-listed environment (services/goose-env.ts),
  *     not a copy of the node's. It held DATABASE_URL, the node's private and encryption keys and
  *     every other secret, and a chat user could ask an agent with a shell tool to print them.
@@ -142,20 +145,32 @@ export class GooseAcpClient {
      * Client capabilities are declared HONESTLY: no filesystem, no terminal. The node has neither to
      * offer a hosted agent, and claiming otherwise then failing the callback is worse than saying no
      * up front — the agent plans around what the client says it can do.
+     *
+     * `personal` is the node route (services/goose-env.ts): the token of the one person whose turns
+     * this child runs, which the child sends to /v1/llm as its API key. Without it the child runs on
+     * the shared key or on goose's own configuration.
      */
-    static async start(config: AimeatConfig): Promise<GooseAcpClient> {
+    static async start(config: AimeatConfig, personal?: { token: string }): Promise<GooseAcpClient> {
         const bin = config.gooseBin || 'goose';
         // Only what the agent needs, never the node's whole environment (services/goose-env.ts): the
         // agent talks to people and can run the tools goose's own config switches on.
-        const env = gooseChildEnv(config, process.env);
+        const env = gooseChildEnv(config, process.env, personal);
 
         const child = spawn(bin, ['acp'], { stdio: ['pipe', 'pipe', 'pipe'], env });
         const client = new GooseAcpClient(child);
 
-        const info = await client.call('initialize', {
-            protocolVersion: 1,
-            clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
-        }, HANDSHAKE_TIMEOUT_MS) as { agentInfo?: { name?: string; version?: string } };
+        let info: { agentInfo?: { name?: string; version?: string } };
+        try {
+            info = await client.call('initialize', {
+                protocolVersion: 1,
+                clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
+            }, HANDSHAKE_TIMEOUT_MS) as typeof info;
+        } catch (err) {
+            // A child that did not answer the handshake is stopped here: the caller gets no client
+            // to close, so a child left running now would run until the node stops.
+            client.close();
+            throw err;
+        }
 
         logger.info(`[goose] agent ready: ${info.agentInfo?.name ?? 'goose'} ${info.agentInfo?.version ?? ''}`);
         return client;

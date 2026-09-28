@@ -14,6 +14,8 @@
  * @structure aiJobTools -- AimeatToolDefinition[]
  * @usage imported by mcp/catalog/definitions.ts
  * @version-history
+ *   v1.2.0 — 2026-09-28 — System 2 plan, V5: aimeat_ai_job_start takes `op` (text, image,
+ *     transcribe), `provider`, `audio_key`, `language` and `size`.
  *   v1.1.0 — 2026-09-26 — input_keys and result_key say a record the node keeps for itself is
  *     refused with RESERVED_KEY (services/ai-job-keys.ts).
  *   v1.0.0 — 2026-08-31 — Initial.
@@ -23,7 +25,7 @@ import { type AimeatToolDefinition, agentEverywhere } from './types.js';
 export const aiJobTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_ai_job_start',
-        description: 'Start a BACKGROUND model call and get a handle back in milliseconds. Use this instead of a normal completion whenever the answer may take minutes: the job queues for a slot, runs on this node with the owner\'s own key and budget, and writes its answer to the memory key you name in `result_key`. It answers at once with a job id and a queue position — never an ETA, because model latency is unknown — so read the job back with aimeat_ai_job_get, or just read `result_key` once it says done. Give it `prompt`, or `prompt_key` naming a record that holds the prompt text. `input_keys` names memory records that are READ AND PASTED INTO the prompt, labelled by key: the model has no tools and cannot fetch anything itself, and a record that does not exist is stated as missing rather than left as a silence it would fill in with an invention. `on_done` calls one of the owner\'s own extension actions when the answer has landed, which is how a chain of jobs is built; if that callback cannot run, the job ends failed rather than done. There is no token cap, on purpose.',
+        description: 'Start a BACKGROUND model call and get a handle back in milliseconds. Use this instead of a normal completion whenever the answer may take minutes: the job queues for a slot, runs on this node with the owner\'s own key and budget, and writes its answer to the memory key you name in `result_key`. It answers at once with a job id and a queue position — never an ETA, because model latency is unknown — so read the job back with aimeat_ai_job_get, or just read `result_key` once it says done. Give it `prompt`, or `prompt_key` naming a record that holds the prompt text. `input_keys` names memory records that are READ AND PASTED INTO the prompt, labelled by key: the model has no tools and cannot fetch anything itself, and a record that does not exist is stated as missing rather than left as a silence it would fill in with an invention. `on_done` calls one of the owner\'s own extension actions when the answer has landed, which is how a chain of jobs is built; if that callback cannot run, the job ends failed rather than done. There is no token cap, on purpose. `op` picks the kind of call: "text" (the default) writes the answer; "image" makes one picture from the prompt, stores it in the owner\'s storage and writes the record { storage_key, url, mime_type, model }; "transcribe" turns the audio file at `audio_key` (in your own storage) into text and writes the transcript, or { text, language, seconds, model } with `json`. A field that does not apply to the op is refused before anything is written.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -37,6 +39,11 @@ export const aiJobTools: AimeatToolDefinition[] = [
             json: { type: 'boolean', description: 'Parse the answer as JSON before storing it, so a malformed answer fails the job instead of becoming a string every reader has to re-parse.' },
             app_id: { type: 'string', description: 'App attribution — enables the owner\'s per-app allowlist and per-app daily quota.' },
             on_done: { type: 'object', description: '{ extension, action } — an extension action of the job\'s OWN owner, invoked with { job_id, state, result_key } when the job finishes.' },
+            op: { type: 'string', description: 'The kind of model call. "text" (default): a completion. "image": one picture from the prompt; json does not apply. "transcribe": speech-to-text over audio_key; no prompt.', enum: ['text', 'image', 'transcribe'] },
+            provider: { type: 'string', description: 'A provider to use, by id or by type. Naming one turns fallback to another provider off. Omit to let the owner\'s rules choose.' },
+            audio_key: { type: 'string', description: 'For op "transcribe" (required there): the storage key of an audio file in your own storage. A key that is not there is refused with NOT_FOUND before the job is written.' },
+            language: { type: 'string', description: 'For op "transcribe": an ISO-639-1 language hint, e.g. "fi". Omit to use the owner\'s setting or auto-detect.' },
+            size: { type: 'string', description: 'For op "image": a provider-specific size, e.g. "1024x1024".' },
         },
     },
     {

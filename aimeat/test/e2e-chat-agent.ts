@@ -24,16 +24,20 @@
  *   itself and NODE_OPTIONS carries the peer, which claims the process when the entry point is
  *   called `acp`. One mechanism, both platforms, nothing to mark executable.
  *
- *   E2E_CHAT_AGENT_PORT moves the pair (default 40300, the broken node one port above).
+ *   E2E_CHAT_AGENT_PORT moves the set (default 40300, the broken node one port above, the node-route
+ *   node two above and its stub AI provider three above).
  * @structure
  *   - the node lifecycle: startNode(), stopNode()
  *   - the owner, the uploads, and the SSE reader
  *   - Phase 1, against the fake agent: the turn, the callbacks, the attachments, cancel, reset, death
  *   - Phase 2, against a binary that does not exist
+ *   - Phase 3, the node route (no shared key): a process per person, its model calls through
+ *     /v1/llm with that person's token, metered to them, and the "the node's chat" policy switch
  * @usage
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   v1.2.0 — 2026-09-28 — System 2 plan, V5: phase 3, the node route.
  *   v1.1.0 — 2026-09-16 — The agent child receives no AIMEAT_* value and no DATABASE_URL.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
@@ -46,6 +50,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { startFakeAiProvider, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -80,7 +85,9 @@ interface Node {
     output: () => string;
 }
 
-async function startNode(opts: { port: number; gooseBin: string; tag: string }): Promise<Node> {
+async function startNode(opts: {
+    port: number; gooseBin: string; tag: string; sharedKey?: boolean; extraEnv?: Record<string, string>;
+}): Promise<Node> {
     const dbDir = mkdtempSync(join(tmpdir(), `aimeat-chatagent-${opts.tag}-`));
     const peerLog = join(dbDir, 'peer.jsonl');
     const base = `http://127.0.0.1:${opts.port}`;
@@ -114,11 +121,13 @@ async function startNode(opts: { port: number; gooseBin: string; tag: string }):
             AIMEAT_GOOSE_BIN: opts.gooseBin,
             AIMEAT_GOOSE_MODEL: 'fake/model-1',
             AIMEAT_GOOSE_PROVIDER: 'fake-provider',
-            AIMEAT_GOOSE_PROVIDER_API_KEY: 'sk-fake-e2e-key',
+            // Empty is the node route: each person's agent calls this node's /v1/llm (phase 3).
+            AIMEAT_GOOSE_PROVIDER_API_KEY: opts.sharedKey === false ? '' : 'sk-fake-e2e-key',
             AIMEAT_GOOSE_PATH_ROOT: dbDir,
             // The fake agent writes its log where this names. The child's environment is an
             // allow-list now, so the name is passed the way a host passes a provider key.
             AIMEAT_GOOSE_ENV_PASSTHROUGH: 'FAKE_GOOSE_LOG',
+            ...(opts.extraEnv ?? {}),
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -593,6 +602,179 @@ async function run(): Promise<void> {
 
     await stopNode(broken);
     broken = null;
+
+    await runNodeRoute();
+}
+
+// ─── Phase 3: the node route ──────────────────────────────────────────────────
+
+const ROUTE_PORT = PORT + 2;
+const STUB_PORT = PORT + 3;
+const STUB_MODEL = 'stub/chat-route-model';
+let routed: Node | null = null;
+let stub: FakeAiProvider | null = null;
+
+/** The `sub` of a JWT, read without verifying: the node verified it, this only names whose it is. */
+function subOf(jwt: string): string {
+    return JSON.parse(Buffer.from(jwt.split('.')[1] ?? '', 'base64url').toString('utf8')).sub as string;
+}
+
+async function runNodeRoute(): Promise<void> {
+    stub = await startFakeAiProvider(STUB_PORT);
+    routed = await startNode({
+        port: ROUTE_PORT, gooseBin: process.execPath, tag: 'route', sharedKey: false,
+        // No node key, so a person without a provider has no payer; the stub is on loopback.
+        extraEnv: { AIMEAT_OPENROUTER_INSTANCE_KEY: '', AIMEAT_ALLOW_PRIVATE_EGRESS: 'true', AIMEAT_RL_OPENROUTER: '1000' },
+    });
+    BASE = routed.base;
+    peerLogPath = routed.peerLog;
+
+    const owners: Record<'a' | 'b', { name: string; token: string; thread: string }> = {
+        a: { name: `chatra${Date.now() % 100000}`, token: '', thread: '' },
+        b: { name: `chatrb${Date.now() % 100000}`, token: '', thread: '' },
+    };
+    const as = (who: 'a' | 'b') => { token = owners[who].token; };
+    const usage = async (who: 'a' | 'b') => {
+        const { body } = await json('/v1/ai/usage', { headers: { Authorization: `Bearer ${owners[who].token}` } });
+        return body.data as { total_calls: number; spent_today_usd: number; per_app: Record<string, unknown> };
+    };
+    /** The process that ran the last prompt of a thread's session, and the token it carries. */
+    const processOf = (sessionPrompt: any) => {
+        const started = peerEntries().find((e) => e.kind === 'started' && e.pid === sessionPrompt.pid);
+        assert(!!started, `the process that ran the turn wrote its start record (pid ${sessionPrompt.pid})`);
+        return started;
+    };
+
+    await test('3a. setup: two owners; with no key anywhere the node names no payer, with their own provider it names them', async () => {
+        for (const who of ['a', 'b'] as const) {
+            owners[who].token = await registerOwner(owners[who].name);
+            as(who);
+            const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title: 'route' }) }));
+            assert(created.status === 201, `create ${created.status}`);
+            owners[who].thread = created.body.data.thread.id;
+        }
+        as('a');
+        const before = await json('/v1/chat/status', authed());
+        assert(before.body.data.pays === null, `no key anywhere: no payer, got ${JSON.stringify(before.body.data.pays)}`);
+        for (const who of ['a', 'b'] as const) {
+            as(who);
+            const r = await json('/v1/memory', authed({
+                method: 'POST',
+                body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: stub!.baseUrl, model: STUB_MODEL, daily_budget_usd: 50 } }),
+            }));
+            assert(r.status === 201, `settings ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        }
+        as('a');
+        const after = await json('/v1/chat/status', authed());
+        assert(after.body.data.pays === 'own', `their own provider pays, got ${JSON.stringify(after.body.data.pays)}`);
+        assert(after.body.data.model === STUB_MODEL, `the model /v1/llm would choose, got ${after.body.data.model}`);
+    });
+
+    await test('3b. a turn\'s model call reaches /v1/llm with that owner\'s token and is metered to that owner', async () => {
+        const [aBefore, bBefore] = [await usage('a'), await usage('b')];
+        const chatsBefore = stub!.requestsFor('chat').length;
+        as('a');
+        const events = await turn(owners.a.thread, { text: 'LLMCALL-A what is two and two' });
+        assert(events.at(-1)!.kind === 'done', `the turn finished, got ${JSON.stringify(events.at(-1))}`);
+        const said = events.filter((e) => e.kind === 'text').map((e) => e.text).join('');
+        assert(said.includes('The stub provider answered.'), `the model's answer came back through the node, got ${JSON.stringify(said)}`);
+
+        const call = peerEntries().filter((e) => e.kind === 'llm-call').at(-1);
+        assert(call.url === `${BASE}/v1/llm/chat/completions`, `goose's URL is the node's /v1/llm, got ${call.url}`);
+        assert(call.status === 200, `the node answered, got ${call.status} ${JSON.stringify(call.body)}`);
+        const upstream = stub!.requestsFor('chat').slice(chatsBefore);
+        assert(upstream.length === 1 && upstream[0].body.includes('LLMCALL-A'), `the provider got this turn's call once, got ${upstream.length}`);
+        assert(upstream[0].json?.model === STUB_MODEL, `on the model the node chose, not goose's, got ${upstream[0].json?.model}`);
+
+        const [aAfter, bAfter] = [await usage('a'), await usage('b')];
+        assert(aAfter.total_calls === aBefore.total_calls + 1, `owner A's usage counts the call: ${aBefore.total_calls} -> ${aAfter.total_calls}`);
+        assert(aAfter.spent_today_usd > aBefore.spent_today_usd, `and its cost: ${aBefore.spent_today_usd} -> ${aAfter.spent_today_usd}`);
+        assert(!!aAfter.per_app?.['llm-proxy'], `under llm-proxy, got ${JSON.stringify(aAfter.per_app)}`);
+        assert(bAfter.total_calls === bBefore.total_calls, `owner B paid nothing for it: ${bBefore.total_calls} -> ${bAfter.total_calls}`);
+
+        const thread = await readThread(owners.a.thread);
+        const last = (thread.turns as any[]).filter((t) => t.role === 'agent').at(-1);
+        assert(last.model === undefined, `the node does not claim goose's model answered, got ${last.model}`);
+    });
+
+    await test('3c. that owner\'s process points at the node with their chat token and holds no other key', async () => {
+        const prompt = peerRequests('session/prompt').at(-1)!;
+        const started = processOf(prompt);
+        assert(started.env.GOOSE_PROVIDER === 'openai', `goose's OpenAI provider, got ${started.env.GOOSE_PROVIDER}`);
+        assert(started.env.OPENAI_HOST === BASE, `at this node, got ${started.env.OPENAI_HOST}`);
+        assert(started.env.OPENAI_BASE_PATH === 'v1/llm/chat/completions', `on /v1/llm, got ${started.env.OPENAI_BASE_PATH}`);
+        assert(started.env.OPENROUTER_API_KEY === null, `no provider key of the node's, got ${started.env.OPENROUTER_API_KEY}`);
+        assert(subOf(started.env.OPENAI_API_KEY) === `chat#${owners.a.name}@${NODE_ID}`,
+            `the key is owner A's chat agent token, got ${subOf(started.env.OPENAI_API_KEY)}`);
+        assert(started.leaked.length === 0, `no node configuration, got ${JSON.stringify(started.leaked)}`);
+    });
+
+    await test('3d. another owner\'s turn runs in another process, on their own token, and never in the first one', async () => {
+        const [aBefore, bBefore] = [await usage('a'), await usage('b')];
+        as('b');
+        const events = await turn(owners.b.thread, { text: 'LLMCALL-B and three and three' });
+        assert(events.at(-1)!.kind === 'done', `the turn finished, got ${JSON.stringify(events.at(-1))}`);
+        const prompts = peerRequests('session/prompt');
+        const aPid = prompts.find((p) => textOfPrompt(p).includes('LLMCALL-A'))!.pid;
+        const bPid = prompts.find((p) => textOfPrompt(p).includes('LLMCALL-B'))!.pid;
+        assert(aPid !== bPid, `two owners, two processes, got pid ${aPid} for both`);
+        assert(subOf(processOf({ pid: bPid }).env.OPENAI_API_KEY) === `chat#${owners.b.name}@${NODE_ID}`, 'B\'s process carries B\'s token');
+        // Every turn each process ran belongs to the owner whose token it holds.
+        for (const p of prompts) {
+            const holder = subOf(processOf(p).env.OPENAI_API_KEY);
+            const whose = textOfPrompt(p).includes('LLMCALL-B') ? owners.b.name : owners.a.name;
+            assert(holder === `chat#${whose}@${NODE_ID}`, `a turn of ${whose} ran in a process holding ${holder}`);
+        }
+        const [aAfter, bAfter] = [await usage('a'), await usage('b')];
+        assert(bAfter.total_calls === bBefore.total_calls + 1, `B's usage counts B's call: ${bBefore.total_calls} -> ${bAfter.total_calls}`);
+        assert(aAfter.total_calls === aBefore.total_calls, `A paid nothing for B's turn: ${aBefore.total_calls} -> ${aAfter.total_calls}`);
+    });
+
+    await test('3e. the same owner\'s next turn reuses their process', async () => {
+        const starts = peerEntries().filter((e) => e.kind === 'started').length;
+        as('a');
+        const events = await turn(owners.a.thread, { text: 'LLMCALL-A again' });
+        assert(events.at(-1)!.kind === 'done', `the turn finished, got ${JSON.stringify(events.at(-1))}`);
+        assert(peerEntries().filter((e) => e.kind === 'started').length === starts, 'no new process was started');
+    });
+
+    await test('3f. the owner\'s "the node\'s chat" switch covers these calls: refused before the provider, and nothing metered', async () => {
+        as('a');
+        const setPolicy = async (chat: boolean) => {
+            const r = await json('/v1/ai/policy', authed({
+                method: 'PUT',
+                body: JSON.stringify({ policy: { mode: 'custom', allow: ['openrouter:vendor/not-the-stub-model'], appliesTo: { owner: true, chat, agents: false, apps: true } } }),
+            }));
+            assert(r.status === 200, `policy ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        };
+        await setPolicy(true);
+        const before = await usage('a');
+        const chatsBefore = stub!.requestsFor('chat').length;
+        await turn(owners.a.thread, { text: 'LLMCALL-A under the policy' });
+        const refused = peerEntries().filter((e) => e.kind === 'llm-call').at(-1);
+        assert(refused.status === 403 && refused.body?.error?.code === 'AI_MODEL_NOT_ALLOWED',
+            `the chat's call is the chat's, and the chat switch refuses it: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+        assert(stub!.requestsFor('chat').length === chatsBefore, 'the provider was never called');
+        assert((await usage('a')).total_calls === before.total_calls, 'and nothing was metered');
+
+        // The same policy with the chat switch off lets the chat through, while agents stay off too:
+        // the chat is not counted as one of the owner's other agents.
+        await setPolicy(false);
+        await turn(owners.a.thread, { text: 'LLMCALL-A with the chat switch off' });
+        const allowed = peerEntries().filter((e) => e.kind === 'llm-call').at(-1);
+        assert(allowed.status === 200, `with "the node's chat" off the call passes, got ${allowed.status} ${JSON.stringify(allowed.body?.error)}`);
+        const open = await json('/v1/ai/policy', authed({ method: 'PUT', body: JSON.stringify({ policy: { mode: 'open' } }) }));
+        assert(open.status === 200, `policy back to open ${open.status}`);
+    });
+
+    await stopNode(routed);
+    routed = null;
+    await stub.close();
+    stub = null;
+}
+
+function textOfPrompt(p: any): string {
+    return ((p.params?.prompt ?? []) as any[]).filter((b) => b?.type === 'text').map((b) => String(b.text)).join('\n');
 }
 
 run()
@@ -600,6 +782,8 @@ run()
     .finally(async () => {
         await stopNode(node);
         await stopNode(broken);
+        await stopNode(routed);
+        await stub?.close();
         console.log(`\nChat agent E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
         process.exit(failed > 0 ? 1 : 0);
     });

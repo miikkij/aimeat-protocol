@@ -22,6 +22,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.33.0 -- 2026-09-28 -- aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and aimeat_ai_embed need
+ *     ai:use (System 2 plan, V5).
  *   v1.32.0 -- 2026-09-28 -- aimeat_ai_providers and aimeat_ai_provider_test need ai:use; aimeat_ai_routing_set needs
  *     memory:write-reserved (System 2 plan, V3).
  *   v1.31.0 -- 2026-09-28 -- aimeat_ai_policy_set needs memory:write-reserved, like aimeat_operator_ai_config.
@@ -345,6 +347,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Reading the providers shows no key; a test spends like a call.
     aimeat_ai_providers:                      'ai:use',
     aimeat_ai_provider_test:                  'ai:use',
+    // What the caller can do, the catalogue, and two calls that spend like any other.
+    aimeat_ai_capabilities:                   'ai:use',
+    aimeat_ai_models:                         'ai:use',
+    aimeat_ai_transcribe:                     'ai:use',
+    aimeat_ai_embed:                          'ai:use',
 
     // Changes WHO ELSE can read the owner's knowledge. A different promise than changing
     // the knowledge, which is why it is not organism:write.

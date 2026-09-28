@@ -19,6 +19,8 @@
  *   v1.0.0 — 2026-08-31 — Initial.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-09-28 — System 2 plan, V5: aimeat_ai_job_start declares and passes on `op`,
+ *     `provider`, `audio_key`, `language` and `size`.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -68,6 +70,11 @@ export function registerAiJobTools(
             app_id: z.string().optional().describe('App attribution — enables the per-app allowlist and per-app daily quota.'),
             on_done: z.object({ extension: z.string(), action: z.string() }).optional()
                 .describe('An extension action of the job\'s OWN owner, invoked with { job_id, state, result_key } when the job finishes.'),
+            op: z.enum(['text', 'image', 'transcribe']).optional().describe('The kind of model call: "text" (default), "image" (one picture from the prompt) or "transcribe" (speech-to-text over audio_key).'),
+            provider: z.string().optional().describe('A provider to use, by id or by type. Naming one turns fallback off.'),
+            audio_key: z.string().optional().describe('For op "transcribe" (required there): the storage key of an audio file in your own storage.'),
+            language: z.string().optional().describe('For op "transcribe": an ISO-639-1 language hint.'),
+            size: z.string().optional().describe('For op "image": a provider-specific size, e.g. "1024x1024".'),
         },
         annotationsFor('aimeat_ai_job_start'),
         async (a) => {
@@ -84,6 +91,11 @@ export function registerAiJobTools(
                     ...(a.json ? { json: true } : {}),
                     ...(a.app_id !== undefined ? { app_id: a.app_id } : {}),
                     ...(a.on_done ? { on_done: a.on_done } : {}),
+                    ...(a.op !== undefined ? { op: a.op } : {}),
+                    ...(a.provider !== undefined ? { provider: a.provider } : {}),
+                    ...(a.audio_key !== undefined ? { audio_key: a.audio_key } : {}),
+                    ...(a.language !== undefined ? { language: a.language } : {}),
+                    ...(a.size !== undefined ? { size: a.size } : {}),
                 }, { ownerGhii, createdBy: agentGaii });
                 return text(started);
             } catch (e) {

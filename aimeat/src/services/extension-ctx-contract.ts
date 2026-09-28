@@ -13,6 +13,8 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.3.0 — 2026-09-28 — System 2 plan, V5: `ctx.ai.start` takes `op` (text, image, transcribe),
+ *     `provider`, `audio_key`, `language` and `size`, the fields POST /v1/ai/jobs takes.
  *   v1.2.0 — 2026-09-06 — `fetch` takes a third, host-only argument. The VM bridge had written its
  *     own fetch precisely because it had nowhere to hand the run's deadline and its teardown signal,
  *     and that copy then drifted from this one; the argument is what lets the bridge call the
@@ -109,6 +111,18 @@ export interface ExtensionCtx {
             system_prompt?: string;
             json?: boolean;
             on_done?: { extension: string; action: string };
+            /** 'text' (default), 'image' (one picture from the prompt, the result is
+             *  { storage_key, url, mime_type, model }) or 'transcribe' (the audio at `audio_key`,
+             *  in the extension owner's storage, becomes text). services/ai-jobs/op.ts. */
+            op?: 'text' | 'image' | 'transcribe';
+            /** A provider id or type. Naming one turns fallback off. */
+            provider?: string;
+            /** For 'transcribe' (required there): the storage key of the audio. */
+            audio_key?: string;
+            /** For 'transcribe': an ISO-639-1 hint. */
+            language?: string;
+            /** For 'image': a provider-specific size, e.g. '1024x1024'. */
+            size?: string;
         }): Promise<
             | { ok: true; job_id: string; queue_position: number }
             | { ok: false; code: string; message: string; retry_after_s?: number }

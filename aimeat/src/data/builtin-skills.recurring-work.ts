@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.3.0 — 2026-09-28 — `kind: "ai"` runs on the owner's AI providers; an ai step or job can make a
+ *     picture or transcribe (op), and the capability is checked at setup (System 2 plan, V5).
  *   v1.2.0 — 2026-09-19 — The old name is gone for good (builtin-skills.retired.ts), and step 3
  *     names the way an agent is made today: aimeat_agent_propose with a crew definition.
  *   v1.1.0 — 2026-09-19 — Renamed to aimeat-recurring-work; the old name stays as a superseded stub.
@@ -109,10 +111,13 @@ Then offer what the node itself can do, cheapest first:
 - **\`kind: "extension"\`** — a sandboxed action on the node's own clock. **Zero tokens**, no key
   of theirs, no account anywhere else. This is the right answer for fetch-and-store, for
   checking whether something changed, and for any tidying that needs no judgement.
-- **\`kind: "ai"\`** — a server-side completion over memory keys, on **their own OpenRouter key if
-  they have set one**, otherwise on the node's key while their allowance has something left, and on
-  a free model once it is spent. Right when the work genuinely needs a model: summarising,
-  translating, drafting.
+- **\`kind: "ai"\`** — a server-side completion over memory keys, on **their own AI providers** (their
+  routing picks which one), otherwise on the node's key while their allowance has something left, and
+  on a free model once it is spent. Right when the work genuinely needs a model: summarising,
+  translating, drafting. A workflow \`ai\` step or a background job can also make a picture
+  (\`op: "image"\`) or transcribe a stored recording (\`op: "transcribe"\`, \`audio_key\`). Check the
+  capability with \`aimeat_ai_capabilities\` when you set it up: a capability that is off when the run
+  comes stops that step with a refusal that names what to set.
 
 Prefer the extension whenever the work does not need reasoning. A model called on a clock to do
 something a script could do is a bill that arrives every week for no reason.

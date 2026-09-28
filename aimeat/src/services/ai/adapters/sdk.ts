@@ -17,9 +17,11 @@
  *   - languageModel() — a LanguageModelV4 for every type
  *   - sdkImageModel() — an ImageModelV4 for openai and xai
  *   - sdkTranscriptionModel() — a TranscriptionModelV4 for openai, xai and mistral
+ *   - embeddingModel() — an EmbeddingModelV4 for openrouter, openai, mistral, local and openai-compatible
  *   - OPENROUTER_ATTRIBUTION — the two headers OpenRouter's own address receives
  *   - COMPATIBLE_OPTIONS_KEY — where extra body fields for an OpenAI-compatible provider are filed
  * @version-history
+ *   v1.2.0 — 2026-09-28 — embeddingModel() (System 2 plan, V5).
  *   v1.1.0 — 2026-09-28 — The direct providers (System 2 plan, V3): openai, anthropic, xai and mistral,
  *     each with an explicit key and address; a target's allowOrigins reaches aiFetch.
  *   v1.0.0 — 2026-09-28 — Initial, with the gateway (V1 of the System 2 plan).
@@ -30,7 +32,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createXai } from '@ai-sdk/xai';
 import { createMistral } from '@ai-sdk/mistral';
-import type { ImageModelV4, LanguageModelV4, TranscriptionModelV4 } from '@ai-sdk/provider';
+import type { EmbeddingModelV4, ImageModelV4, LanguageModelV4, TranscriptionModelV4 } from '@ai-sdk/provider';
 import { FIXED_BASE_URLS, type AiTarget } from '../types.js';
 import { aiFetch } from '../fetch.js';
 
@@ -87,6 +89,28 @@ export function sdkImageModel(target: AiTarget, modelId: string): ImageModelV4 {
   if (target.type === 'openai') return createOpenAI(common).image(modelId);
   if (target.type === 'xai') return createXai(common).image(modelId);
   throw Object.assign(new Error(`A ${target.type} provider does not make images here.`), { status: 400 });
+}
+
+/** An embedding model for this target. Anthropic and xAI make none. */
+export function embeddingModel(target: AiTarget, modelId: string): EmbeddingModelV4 {
+  const common = { baseURL: target.baseUrl, fetch: fetchOf(target) };
+  switch (target.type) {
+    case 'openrouter':
+      return createOpenRouter({
+        apiKey: requireKey(target), ...common,
+        headers: target.baseUrl === FIXED_BASE_URLS.openrouter ? OPENROUTER_ATTRIBUTION : {},
+      }).textEmbeddingModel(modelId) as EmbeddingModelV4;
+    case 'openai': return createOpenAI({ apiKey: requireKey(target), ...common }).embedding(modelId);
+    case 'mistral': return createMistral({ apiKey: requireKey(target), ...common }).embedding(modelId);
+    case 'local':
+    case 'openai-compatible':
+      return createOpenAICompatible({
+        name: COMPATIBLE_OPTIONS_KEY, ...common,
+        ...(target.key ? { apiKey: target.key } : {}),
+      }).embeddingModel(modelId);
+    default:
+      throw Object.assign(new Error(`A ${target.type} provider does not make embeddings.`), { status: 400 });
+  }
 }
 
 /** A transcription model from a direct provider's own package. xAI has one model and takes no id. */

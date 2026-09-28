@@ -24,6 +24,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.6.0 — 2026-09-28 — A section on the AI capabilities: capabilities() first, ask for the
+ *     capability, models= and prefer.* in the meta, the price first (System 2 plan, V5).
  *   v1.5.0 — 2026-09-19 — The track comes first. This skill is where a "build me an app" request
  *     lands, and it did not contain the word Atelier: a builder who followed it never learned the
  *     track existed, and one who began on Atelier found a guide that needed HTTP and a Classic
@@ -257,6 +259,17 @@ warning names the exact call to add.
 **Emotion, mood, attention or any biometric inference about a person** is the app owner's OWN
 duty to declare to the people exposed, in their own words, before the inference happens.
 \`AIMEAT.ai.chatNotice({ title, body })\` renders your wording; it cannot write it for you.
+
+## When the app uses an AI capability: check first, ask for the capability
+
+The owner's AI providers decide what is on: text, vision, files, image, speech, transcription,
+embed. Check before you rely on one, and show the person the fix when it is off:
+\`const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' })\`, then
+\`caps.capabilities.image.on\` / \`.fix\`. Ask for the capability, not a model: leave \`model\` out of
+\`complete\`, \`image\`, \`speak\`, \`transcribe\` and \`embed\`. When the app truly needs a model, declare it in
+the same meta, \`models=<type>:<model id>\` (the \`ref\` from \`aimeat_ai_models\`); \`prefer.<capability>=\`
+orders the owner's providers without adding one. Tell the price before a picture or a long
+transcription (\`confirm: true\`). The full guide with recipes is the skill \`aimeat-ai-capabilities\`.
 
 ## When the app needs external data (an extension)
 
