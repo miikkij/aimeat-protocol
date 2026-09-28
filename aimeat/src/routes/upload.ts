@@ -24,6 +24,7 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.21.0 — 2026-09-28 — The extension ZIP refuses other code for an extension a managed package install owns.
  *   v1.20.0 — 2026-09-26 — A ZIP under the name of a cortex the uploader installed goes through
  *     upsertCortex, the redeploy PUT /v1/cortex/:name and aimeat_cortex_install update:true run. An
  *     active cortex is taken down and activated again from the new manifest, its actions published
@@ -156,6 +157,7 @@ import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
+import { managedChangeRefusal } from '../services/package-managed.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -502,6 +504,13 @@ async function handleExtensionUpload(
     // A kept version is immutable on this door as on PUT /v1/extensions/:name (A6-7).
     const kept = existing ? await keptVersionRefusal(storage, 'extension', record.name, record.version, extensionCodeOf(record)) : null;
     if (kept) { res.status(kept.status).json({ success: false, error: kept.code, message: kept.message }); return; }
+
+    // Other code for an extension a managed package install owns is refused here as on PUT
+    // (services/package-managed.ts). Config alone is a setting and goes through.
+    if (existing && extensionCodeOf(record) !== extensionCodeOf(existing)) {
+        const managed = await managedChangeRefusal(storage, existing.installedBy, 'extension', record.name, 'code');
+        if (managed) { res.status(managed.status).json({ success: false, error: managed.code, message: managed.message, details: managed.details }); return; }
+    }
 
     // Encrypt `type: secret` config values before they are stored, exactly as POST/PUT
     // /v1/extensions do. Without this a ZIP install was a way to write an API key to the database

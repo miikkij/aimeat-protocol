@@ -1822,10 +1822,12 @@ export interface Package {
 }
 
 export interface PackageInstance {
+  forkedAt: Timestamp | null;
   id: Generated<string>;
   installedAt: Generated<Timestamp>;
   installedComponents: Json;
   label: Generated<string>;
+  mode: Generated<string>;
   owner: string;
   ownerGhii: string;
   packageGroupId: string;

@@ -14,10 +14,13 @@
  * @usage import { parseAppsBackup, restoreAppsBackup } from '../services/apps-backup-import.js';
  * @version-history
  *   v1.0.0 — 2026-06-12 — Initial: selective app-catalog restore with conflict modes
+ *   v1.1.0 — 2026-09-28 — `append` onto an app a managed package install owns is refused per app
+ *     (services/package-managed.ts); `copy` still restores it beside the app.
  */
 import type { Storage, AppManifest, CortexExtensionRecord } from '../storage/interface.js';
 import { safeUnzip, BACKUP_ZIP_LIMITS, type SafeZipLimits } from './safe-zip.js';
 import { APPS_BACKUP_VERSION } from './apps-backup-export.js';
+import { managedChangeRefusal } from './package-managed.js';
 
 const APP_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -308,6 +311,10 @@ export async function restoreAppsBackup(
       if (mode === 'skip') {
         summary.apps_skipped.push(sel.filename);
       } else if (mode === 'append') {
+        // Stacking a backup on an app a managed package install owns would replace the package's
+        // code (services/package-managed.ts). `copy` restores it beside the app instead.
+        const managed = await managedChangeRefusal(storage, owner, 'app', sel.filename, 'code');
+        if (managed) { summary.errors.push({ item: sel.filename, message: `${managed.code}: ${managed.message}` }); continue; }
         await writeVersions(sel.filename, latest);          // backup versions stack on top
         summary.apps_appended.push(sel.filename);
       } else if (mode === 'copy') {

@@ -10,6 +10,7 @@
  *   Mongo backend), a unique-version clash surfaces as PACKAGE_EXISTS, and archivePackageGroup flips every
  *   still-live version to archived.
  * @version-history
+ *   v1.2.0 — 2026-09-28 — An instance carries `mode` (managed | editable) and `forkedAt` (migration 0087).
  *   v1.1.0 — 2026-09-09 — listInstancesByPackage deleted: no caller (listInstances filters by package).
  *   v1.0.0 — 2026-07-15 — Phase 5: package catalog + instances on Postgres+Kysely.
  */
@@ -58,6 +59,8 @@ function toInstance(r: Selectable<PackageInstance>): PackageInstanceRecord {
     label: r.label ?? '',
     installedComponents: (r.installedComponents ?? []) as unknown as InstalledComponent[],
     status: (r.status ?? 'installed') as PackageInstanceRecord['status'],
+    mode: r.mode === 'managed' ? 'managed' : 'editable',
+    ...(r.forkedAt ? { forkedAt: iso(r.forkedAt) } : {}),
     installedAt: iso(r.installedAt),
     updatedAt: iso(r.updatedAt),
   };
@@ -171,6 +174,7 @@ export const packageMethods = {
       packageGroupId: record.packageGroupId, packageVersion: record.packageVersion,
       packageRecordId: record.packageRecordId, owner: record.owner, ownerGhii: record.ownerGhii,
       label: record.label, installedComponents: jsonb(record.installedComponents), status: record.status,
+      mode: record.mode ?? 'editable', forkedAt: record.forkedAt ? new Date(record.forkedAt) : null,
       installedAt: new Date(record.installedAt), updatedAt: new Date(record.updatedAt),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().executeTakeFirstOrThrow();
@@ -204,6 +208,8 @@ export const packageMethods = {
     if (updates.installedComponents !== undefined) data.installedComponents = jsonb(updates.installedComponents);
     if (updates.packageVersion !== undefined) data.packageVersion = updates.packageVersion;
     if (updates.packageRecordId !== undefined) data.packageRecordId = updates.packageRecordId;
+    if (updates.mode !== undefined) data.mode = updates.mode;
+    if (updates.forkedAt !== undefined) data.forkedAt = updates.forkedAt ? new Date(updates.forkedAt) : null;
     data.updatedAt = new Date();
     const rows = await this.db.updateTable('PackageInstance').set(data as never).where('id', '=', id).returningAll().execute();
     return rows[0] ? toInstance(rows[0]) : null;

@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-28 — The package line names managed installs, aimeat_package_instances and aimeat_package_fork.
  *   2026-09-28 — AI roles: declare a role per kind of AI work; it runs once the owner connects it (aimeat_ai_roles).
  *   2026-09-28 — Embeddings: never proposed, only for a collection far larger than one prompt, the person decides.
  *   2026-09-28 — AI capabilities: aimeat_ai_capabilities first, prefer.* and local.*, aimeat_ai_models (V5).
@@ -54,6 +55,11 @@ browser, you want the app tools above. A package that writes entries into the ow
 memory:write and memory:write-as-owner; without them the install answers \`status: awaiting_owner\` and
 a \`request_id\`, and it happens once the owner approves. \`aimeat_package_install_requests\` lists
 those requests, and lets you approve one you did not file when you hold the words.
+\`aimeat_package_install\` with \`mode: "managed"\` gives the package the code and layout: every
+change to them answers \`MANAGED_BY_PACKAGE\`, an update replaces them, and the owner keeps the settings
+(name, description, access code, parking, search visibility, legal texts). \`aimeat_package_instances\`
+lists the installed copies and their mode; \`aimeat_package_fork\` makes a managed copy the owner's own to
+edit, at the same addresses with the same records, and ends its updates. Fork only when the owner asks.
 
 **Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
 \`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with

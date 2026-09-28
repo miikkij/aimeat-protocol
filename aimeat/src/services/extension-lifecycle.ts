@@ -39,6 +39,8 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.5.0 — 2026-09-28 — writeExtensionRecord refuses other code for an extension a managed package
+ *     install owns, 409 MANAGED_BY_PACKAGE (services/package-managed.ts); a config-only change passes.
  *   v1.4.0 — 2026-09-24 — writeExtensionRecord refuses a redeploy that brings other code under a
  *     version already kept (409 VERSION_EXISTS) before anything is written (secaudit 2026-09, A6-7).
  *   v1.3.0 — 2026-09-13 — writeExtensionRecord refuses a flagged action whose changed text would break
@@ -65,6 +67,7 @@ import { emitChange } from './event-bus.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { logger } from '../utils/logger.js';
 import { snapshotExtensionVersion, forgetVersions, keptVersionRefusal, extensionCodeOf } from './component-versions.js';
+import { managedChangeRefusal } from './package-managed.js';
 
 export interface ExtensionLifecycleDeps {
     storage: Storage;
@@ -182,6 +185,13 @@ export async function writeExtensionRecord(
     // and goes through (secaudit 2026-09, A6-7).
     const kept = await keptVersionRefusal(storage, 'extension', name, record.version, extensionCodeOf(record));
     if (kept) return { ok: false, ...kept };
+
+    // An extension a managed package install owns keeps the package's code; its config is a
+    // setting and still goes through (services/package-managed.ts). Asked of the installing owner.
+    if (extensionCodeOf(record) !== extensionCodeOf(existing)) {
+        const managed = await managedChangeRefusal(storage, existing.installedBy, 'extension', name, 'code');
+        if (managed) return { ok: false, ...managed };
+    }
 
     // Carry forward the encrypted secrets this manifest omitted, then encrypt the plaintext ones. A
     // manifest that declares a secret field without repeating its value must not wipe what is stored.

@@ -13,6 +13,7 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   v1.7.1 — 2026-09-28 — Re-exports types/packages.ts, moved out of types/apps.ts (max-file-lines).
  *   v1.7.0 — 2026-09-26 — HeldAccountNameRepository joins the Storage composite: the record of what
  *     the move to the full identity left for the operator, and the operator's decision on one name.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -39,6 +40,7 @@ export * from './types/identity.js';
 export * from './types/auth.js';
 export * from './types/commerce.js';
 export * from './types/apps.js';
+export * from './types/packages.js';
 export * from './types/organisms-federation.js';
 export * from './types/dependencies.js';
 export * from './types/component-versions.js';

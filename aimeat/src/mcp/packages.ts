@@ -18,9 +18,13 @@
  *   THE SCOPE IS THE GATE. `packages:write` is what the route requires, and TOOL_SCOPES carries the
  *   same word here, so an agent without it is not handed the tool at all.
  * @structure registerPackageTools(mcp, storage, config, getAgentGaii, peers, sessionScopes) — registers
- *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install.
+ *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install,
+ *   aimeat_package_instances, aimeat_package_fork.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.4.0 — 2026-09-28 — install takes `mode` (managed | editable); aimeat_package_instances lists
+ *     the owner's installed copies and aimeat_package_fork releases a managed one
+ *     (services/package-managed.ts).
  *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-25 — install and update go through installOrRequest / updateOrRequest: without
@@ -43,7 +47,9 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { installOrRequest, updateOrRequest, requestedBody } from '../services/package-install-requests.js';
-import { listPackagesFor, getPackageFor } from '../services/package-read.js';
+import { listPackagesFor, getPackageFor, listInstancesFor } from '../services/package-read.js';
+import { forkPackageInstance } from '../services/package-managed.js';
+import { toolError } from './tool-error.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
 import { composePackageFromApps } from '../services/package-compose.js';
 import { pullPackage } from '../services/package-pull.js';
@@ -233,7 +239,8 @@ export function registerPackageTools(
         label: z.string().optional().describe('What to call this copy, e.g. the company it is for. Defaults to "<package> instance".'),
         version: z.string().optional().describe('A specific version to install. Defaults to the latest published one.'),
         dry_run: z.boolean().optional().describe('Report what would be registered and register nothing.'),
-    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun }) => {
+        mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout, updates replace them, and only settings are yours to change. "editable" (default): you may edit everything.'),
+    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
         const owner = localAccountName(gaii);
@@ -242,7 +249,7 @@ export function registerPackageTools(
         const out = await installOrRequest(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },
             { owner, sub: gaii, ownerGhii, ...grant },
-            { groupId: group_id, label, version, dryRun: dryRun === true },
+            { groupId: group_id, label, version, dryRun: dryRun === true, mode },
         );
 
         if (!out.ok) {
@@ -271,9 +278,61 @@ export function registerPackageTools(
                     label: out.instance.label,
                     package: out.instance.packageGroupId,
                     version: out.instance.packageVersion,
+                    mode: out.instance.mode ?? 'editable',
                     components: out.instance.installedComponents.map(c => ({
                         component_id: c.componentId, type: c.type, registered_as: c.registeredAs,
                     })),
+                }, null, 2),
+            }],
+        };
+    });
+
+    // The installed copies. aimeat_package_update and aimeat_package_fork both take an instance id,
+    // and without this list a conversation could not name one.
+    mcp.tool('aimeat_package_instances', descriptionFor('aimeat_package_instances'), {
+        group_id: z.string().optional().describe('Only the copies of this package.'),
+        status: z.enum(['installed', 'paused', 'removed']).optional().describe('Only copies in this state.'),
+    }, annotationsFor('aimeat_package_instances'), async ({ group_id, status }) => {
+        const result = await listInstancesFor(storage, ownerOf(), { packageGroupId: group_id, status, limit: 200 });
+        return {
+            content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                    total: result.total,
+                    instances: result.instances.map(i => ({
+                        instance_id: i.id,
+                        label: i.label,
+                        package: i.packageGroupId,
+                        version: i.packageVersion,
+                        status: i.status,
+                        mode: i.mode ?? 'editable',
+                        ...(i.forkedAt ? { forked_at: i.forkedAt } : {}),
+                        installed_at: i.installedAt,
+                        components: i.installedComponents.map(c => ({
+                            component_id: c.componentId, type: c.type, registered_as: c.registeredAs,
+                        })),
+                    })),
+                }, null, 2),
+            }],
+        };
+    });
+
+    // Releasing a managed install: the same service POST /v1/instances/:id/fork calls.
+    mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), {
+        instance_id: z.string().describe('The managed copy, from aimeat_package_instances.'),
+    }, annotationsFor('aimeat_package_fork'), async ({ instance_id }) => {
+        const out = await forkPackageInstance(storage, { owner: ownerOf() }, instance_id);
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        return {
+            content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                    instance_id: out.instance.id,
+                    label: out.instance.label,
+                    package: out.instance.packageGroupId,
+                    version: out.instance.packageVersion,
+                    mode: out.instance.mode,
+                    forked_at: out.instance.forkedAt,
                 }, null, 2),
             }],
         };

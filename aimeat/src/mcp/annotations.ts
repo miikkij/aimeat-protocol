@@ -28,6 +28,8 @@
  *     aimeat_ai_provider_test (a real, billed call to an outside provider).
  *   2026-09-28 — aimeat_ai_capabilities and aimeat_ai_models (read only); aimeat_ai_transcribe and
  *     aimeat_ai_embed (billed calls to an outside provider). System 2 plan, V5.
+ *   2026-09-28 — aimeat_package_instances (read-only) and aimeat_package_fork (destructive: the
+ *     updates it gives up do not come back).
  *   2026-09-28 — aimeat_ai_policy_set: propose-then-confirm, idempotent, not destructive.
  *   2026-09-26 — aimeat_admin_incident_resolve is destructive: deciding that a held name's rows were a
  *     previous holder's deletes its actions. Still idempotent: the same decision twice does it once.
@@ -391,6 +393,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Idempotent: run twice and the second call finds nothing left to update. Not destructive,
     // because a component the owner edited is refused rather than overwritten.
     aimeat_package_update: { title: 'Update Installed Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_package_instances: { title: 'List Installed Packages', readOnlyHint: true },
+    // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
+    // call is refused because the copy is no longer managed.
+    aimeat_package_fork: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     // openWorld: it reaches another node over the network, which is the one package tool that does.
     // Idempotent: a source with nothing newer answers applied:false rather than writing again.
     aimeat_package_pull: { title: 'Pull Package From Another Node', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },

@@ -50,6 +50,8 @@
  *   v1.2.0 — 2026-09-13 — stageAppDraft removes the node's serve marks from a served copy before the
  *     slot is written (stripServedMarks, the function publishApp uses) and names them in
  *     servedMarksRemoved, so every draft door stores the source rather than the served page.
+ *   v1.3.0 — 2026-09-28 — stageAppDraft refuses a draft of an app a managed package install owns
+ *     (services/package-managed.ts), before the slot is written.
  *   v1.2.1 — 2026-09-26 — resolveAppTargetScope takes the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomBytes } from 'node:crypto';
@@ -69,6 +71,7 @@ import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-stri
 import { publishApp, type PublishAppRefusal, type PublishAppResult } from './app-publish.js';
 import type { DeclaredProvenance } from './ai-provenance.js';
 import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from './dependency-map.js';
+import { managedChangeRefusal } from './package-managed.js';
 
 /**
  * What a catalogue filename may look like. One spelling, because four doors used to carry their own
@@ -176,6 +179,11 @@ export async function stageAppDraft(
       },
     };
   }
+
+  // A draft of an app a managed install owns could only ever be refused at publish, so it is refused
+  // here, before the slot is written (services/package-managed.ts).
+  const managed = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
+  if (managed) return { refusal: managed };
 
   // The live app's manifest is the base, so a draft that only changes the HTML keeps its name,
   // description, category and icon.

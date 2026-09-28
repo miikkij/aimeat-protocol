@@ -6,6 +6,7 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.8.0 — 2026-09-28 — The body takes `mode` (managed | editable), handed to the service unchanged.
  *   v1.7.0 — 2026-09-25 — An agent or an app grant lacking the words a memory part needs gets 202 and
  *     a request for the owner instead of 403 (services/package-install-requests.ts installOrRequest).
  *   v1.6.0 — 2026-09-24 — The session's roles and scopes go to installPackage, which asks them for a
@@ -60,12 +61,12 @@ export function registerInstallRoutes(
     const owner = req.auth!.owner;
     const ownerGhii = await resolveGhii(storage, owner, config);
 
-    const { label, version, dry_run: dryRun } = req.body ?? {};
+    const { label, version, dry_run: dryRun, mode } = req.body ?? {};
 
     const out = await installOrRequest(
       { storage, config, scheduler },
       actCallerOf(req, owner, ownerGhii),
-      { groupId, label, version, dryRun: dryRun === true },
+      { groupId, label, version, dryRun: dryRun === true, mode },
     );
 
     if (!out.ok) {

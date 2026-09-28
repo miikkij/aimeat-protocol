@@ -42,7 +42,7 @@
     "no-twin:GET /v1/ghii/list": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (level) and no agent tool does the same job.",
     "no-twin:GET /v1/ghii/magic-link/verify": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (token) and no agent tool does the same job.",
     "no-twin:GET /v1/ghii/verify/ftn/callback": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (state) and no agent tool does the same job.",
-    "no-twin:GET /v1/instances": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (packageGroupId) and no agent tool does the same job.",
+    "rest-only:packageGroupId GET /v1/instances": "ANSWERED 2026-09-28: the twins take it under the spelling every package tool uses. aimeat_package_instances declares `group_id` on all three surfaces (as aimeat_package_get, _install and _pull do) and sends it as ?packageGroupId= on the connector and the dispatch; the node MCP tool passes it to listInstancesFor, the same service the route calls. The field reaches the door; only its spelling differs. Asserted in test/e2e-package-managed.ts ('aimeat_package_instances lists both copies').",
     "no-twin:GET /v1/intake/forms": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (organism_id) and no agent tool does the same job.",
     "no-twin:GET /v1/knowledge/:id/export": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (entries) and no agent tool does the same job.",
     "no-twin:GET /v1/ledger/billing": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (month) and no agent tool does the same job.",

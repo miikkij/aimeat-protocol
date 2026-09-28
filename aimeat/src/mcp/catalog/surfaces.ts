@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-28 — aimeat_package_instances and aimeat_package_fork on `appdev` and `agent`, beside update.
  *   2026-09-28 — aimeat_ai_roles beside aimeat_ai_providers (appdev, agent); aimeat_ai_role_set beside
  *     aimeat_ai_routing_set (agent, admin). AI roles.
  *   2026-09-28 — aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and aimeat_ai_embed on
@@ -151,6 +152,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
         'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
+        'aimeat_package_instances', 'aimeat_package_fork',
         'aimeat_package_pull', 'aimeat_package_install_requests',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_seo_status',
@@ -221,6 +223,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // group id install requires, and publishing because a package is created private.
         'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
+        'aimeat_package_instances', 'aimeat_package_fork',
         'aimeat_package_pull',
         // An install that lacked the words becomes a request; the person's own agent answers it here.
         'aimeat_package_install_requests',

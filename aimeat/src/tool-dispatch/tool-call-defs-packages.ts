@@ -17,6 +17,8 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-28 -- aimeat_package_install sends `mode`; aimeat_package_instances and
+ *     aimeat_package_fork over GET /v1/instances and POST /v1/instances/:id/fork.
  *   v1.3.0 -- 2026-09-25 -- aimeat_package_install_requests: list, read, approve or decline the
  *     owner's package install requests.
  *   v1.2.0 -- 2026-09-05 -- aimeat_package_status_set, the act that makes a package installable at
@@ -205,12 +207,13 @@ export const packageTools: ConnectCliToolDefinition[] = [
         // through this table, so without an entry here the tool exists on the other two doors and
         // not on the one an agent actually calls.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit. A package that writes into your owner\'s memory, when you lack memory:write and memory:write-as-owner, becomes a request your owner approves.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) it is yours to edit; with mode "managed" the package owns the code and layout and you change only the settings. A package that writes into your owner\'s memory, when you lack memory:write and memory:write-as-owner, becomes a request your owner approves.',
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier, from aimeat_package_list.' },
             label: { type: 'string', description: 'What to call this copy, e.g. the company it is for.' },
             version: { type: 'string', description: 'A specific version. Defaults to the latest published one.' },
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
+            mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = {};
@@ -220,8 +223,33 @@ export const packageTools: ConnectCliToolDefinition[] = [
             if (version !== undefined) body.version = version;
             const dryRun = optionalBoolean(input, 'dry_run');
             if (dryRun !== undefined) body.dry_run = dryRun;
+            const mode = optionalString(input, 'mode');
+            if (mode !== undefined) body.mode = mode;
             return client.post(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/install`, body);
         },
+    },
+    {
+        // The installed copies, which update and fork both address by id.
+        name: 'aimeat_package_instances',
+        description: 'List your owner\'s installed package copies, with each one\'s instance_id, version and whether it is managed or editable.',
+        input: {
+            group_id: { type: 'string', description: 'Only the copies of this package.' },
+            status: { type: 'string', enum: ['installed', 'paused', 'removed'], description: 'Only copies in this state.' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/instances${query({
+            packageGroupId: optionalString(input, 'group_id'),
+            status: optionalString(input, 'status'),
+        })}`),
+    },
+    {
+        // Releasing a managed install: it becomes editable in place and its updates stop.
+        name: 'aimeat_package_fork',
+        description: 'Fork a managed package install: it becomes your own editable copy in place, keeping every address and record, and receives no further updates from its package.',
+        input: {
+            instance_id: { type: 'string', required: true, description: 'The managed copy, from aimeat_package_instances.' },
+        },
+        handler: ({ client }, input) =>
+            client.post(`/v1/instances/${encodeURIComponent(requiredString(input, 'instance_id'))}/fork`, {}),
     },
     {
         // An install that needed words its caller lacked became a request. A fleet daemon's agent
