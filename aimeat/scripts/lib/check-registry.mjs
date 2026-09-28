@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.11.0 (2026-09-28): check:skill-evals, a changed skill with an eval suite waits for the developer's run-or-skip.
  *  - 1.10.0 (2026-09-26): check:migration-hashes, a migration file on main never changes.
  *  - 1.9.0 (2026-09-26): check:identity-shortening, an identity is cut to an account name only in utils/gaii.ts.
  *  - 1.8.0 (2026-09-24): check:supply-chain, the CI workflows and the local model files.
@@ -27,6 +28,7 @@ export const FAST_CHECKS = [
     { script: 'check:openapi', label: 'openapi.yaml parses + refs resolve' },
     { script: 'check:openapi-routes', label: 'The contract and the code name the same routes' },
     { script: 'check:skill-reviews', label: 'Every skill was read against the code it describes, and that code has not changed since' },
+    { script: 'check:skill-evals', label: 'A skill with an eval suite that changed has the developer\'s decision: eval run or skipped' },
     { script: 'check:app-catalog', label: 'app-catalog.html ↔ sources in sync' },
     { script: 'check:everything', label: 'everything.json ↔ docs/AIMEAT-Feature-List.md in sync' },
     { script: 'check:changelog', label: 'Landing change log parses + newest first' },
