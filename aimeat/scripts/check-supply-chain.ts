@@ -52,6 +52,8 @@
  *   · composeFindings(file, text) · main() reads the three trees and prints `file:line  rule  what to do`
  * @usage cd aimeat && pnpm check:supply-chain
  * @version-history
+ *   v1.1.2 — 2026-09-29 — The desktop resources folder is read only when it exists: it holds no
+ *     tracked file any more, so a clean clone has none and the scan crashed with ENOENT.
  *   v1.1.1 — 2026-09-29 — FILE_EXEMPTIONS is empty: the desktop app no longer ships the agent-runtime
  *     scripts (provision.mjs and its fleet clone went with the local agent path). scan() takes the
  *     exemptions as an optional argument, so the unit test proves the rule with an entry of its own.
@@ -61,7 +63,7 @@
  *     nightly-sweep workflows, the model installer and the desktop's uv install were brought into
  *     line in the same change.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMap, isScalar, isSeq, LineCounter, parseDocument } from 'yaml';
@@ -560,8 +562,10 @@ export function scan(root: string, fileExemptions: Readonly<Record<string, strin
         if (/(?:^|\/)compose[^/]*\.ya?ml$/.test(file)) findings.push(...composeFindings(file, text));
     }
 
+    // The desktop resources folder holds no tracked file since the agent-runtime scripts went, so
+    // a clean clone has no such folder; it appears only where `pnpm stage` has run.
     const desktopFiles: string[] = [];
-    walk(root, DESKTOP_DIR, DESKTOP_SKIP, desktopFiles);
+    if (existsSync(path.join(root, DESKTOP_DIR))) walk(root, DESKTOP_DIR, DESKTOP_SKIP, desktopFiles);
     for (const file of desktopFiles) {
         const text = textOf(root, file);
         if (text !== null) findings.push(...commandFindings(file, text));

@@ -5,6 +5,8 @@
  *   case is a file's text in and a list of findings out.
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-supply-chain.test.ts
  * @version-history
+ *   v1.1.2 — 2026-09-29 — A checkout without the desktop resources folder scans clean (the ENOENT
+ *     incident of 2026-09-29).
  *   v1.1.1 — 2026-09-29 — The exemption case passes its own entry: the real list is empty since the
  *     desktop app stopped shipping provision.mjs.
  *   v1.1.0 — 2026-09-24 — The pip rules in every workflow step, whatever the job holds.
@@ -161,6 +163,21 @@ describe('check:supply-chain, the desktop runtime scripts', () => {
     const clone = "const r = await run('git', ['clone', '--depth', '1', REPO, REPO_DIR]);";
     expect(rules(commandFindings(FILE, clone))).toEqual(['git-unpinned']);
     expect(commandFindings(FILE, `${clone}\nawait run('git', ['-C', REPO_DIR, 'checkout', '${PIN}']);`)).toEqual([]);
+  });
+
+  it('reads a checkout that has no desktop resources folder, which a clean clone does not', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'supply-chain-'));
+    try {
+      mkdirSync(path.join(root, '.github/workflows'), { recursive: true });
+      writeFileSync(path.join(root, '.github/workflows/ok.yml'), GOOD_WORKFLOW);
+      mkdirSync(path.join(root, 'tools/systemone'), { recursive: true });
+      writeFileSync(path.join(root, 'tools/systemone/README.md'), 'Local models.\n');
+      const result = scan(root);
+      expect(result.findings).toEqual([]);
+      expect(result.desktopFiles).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('drops a finding its exemption covers, and refuses an exemption that covers nothing', () => {
