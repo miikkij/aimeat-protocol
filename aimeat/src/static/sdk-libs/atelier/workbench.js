@@ -56,6 +56,8 @@
  * @tokens callout --ak-callout-pad
  * @fork callout A tinted box with an icon; copy .ak-callout* out of workbench.css.
  * @version-history
+ *   v0.2.0 — 2026-09-28 — settingsGroup names `.ak-setgroups`, the one-card container for a
+ *     settings page (workbench.css).
  *   v0.1.0 — 2026-09-28 — Initial: the approved Postinjalostamo design, moved into the kit
  *     (wish-ty-p-yt-asettelu-atelieriin-ja-design-bookiin-postinjalostam).
  */
@@ -415,7 +417,9 @@ export function choiceCards(spec) {
 /**
  * THE SETTINGS GROUP — one group of settings the way a settings page reads best: the words
  * that explain it on the left, the controls on the right at the width their content needs. On a
- * narrow box the help moves above the controls. Put a form (or several) in `body`.
+ * narrow box the help moves above the controls. Put a form (or several) in `body`. A settings
+ * PAGE puts its groups in one `<div class="ak-setgroups">` as the target: they then share one
+ * card, divided by hairlines, as the approved design draws it.
  * @param {{ target?: string|Element, title: string, hint?: string, body?: any, parts?: any, variant?: string }} spec
  * @returns {{ el: HTMLElement, body: HTMLElement, set: (patch: { title?: string, hint?: string }) => void, destroy: () => void }}
  */
